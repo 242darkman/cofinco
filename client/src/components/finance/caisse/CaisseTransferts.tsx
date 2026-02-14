@@ -337,27 +337,27 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
       key: 'reference', 
       label: 'Référence', 
       primary: true,
-      mobileClassName: 'font-mono text-xs text-slate-400 bg-slate-800 px-2 py-1 rounded inline-block mb-1'
+      mobileClassName: 'font-mono text-xs text-content-muted bg-surface px-2 py-1 rounded inline-block mb-1'
     },
     { 
       key: 'trajet', 
       label: 'Trajet',
       format: (_: any, t: Transfert) => (
          <div className="flex items-center gap-1.5 text-xs">
-            <span className="text-slate-400 max-w-[100px] truncate" title={t.agenceSourceNom || t.agenceSource?.nom}>
+            <span className="text-content-muted max-w-[100px] truncate" title={t.agenceSourceNom || t.agenceSource?.nom}>
               {t.agenceSourceNom || t.agenceSource?.nom || 'Source'}
             </span>
-            <ArrowRight size={12} className="text-slate-600 shrink-0" />
-            <span className="text-white font-medium max-w-[100px] truncate" title={t.agenceDestNom || t.agenceDest?.nom}>
+            <ArrowRight size={12} className="text-content-muted shrink-0" />
+            <span className="text-content-primary font-medium max-w-[100px] truncate" title={t.agenceDestNom || t.agenceDest?.nom}>
               {t.agenceDestNom || t.agenceDest?.nom || 'Dest'}
             </span>
          </div>
       ),
       mobileFormat: (_: any, t: Transfert) => (
-        <div className="flex items-center gap-2 text-sm text-slate-300">
-           <span className="font-medium text-slate-400">{t.agenceSourceNom || t.agenceSource?.nom}</span>
-           <ArrowRight size={14} className="text-slate-600" />
-           <span className="font-medium text-white">{t.agenceDestNom || t.agenceDest?.nom}</span>
+        <div className="flex items-center gap-2 text-sm text-content-secondary">
+           <span className="font-medium text-content-muted">{t.agenceSourceNom || t.agenceSource?.nom}</span>
+           <ArrowRight size={14} className="text-content-muted" />
+           <span className="font-medium text-content-primary">{t.agenceDestNom || t.agenceDest?.nom}</span>
         </div>
       )
     },
@@ -365,16 +365,16 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
       key: 'montant', 
       label: 'Montant', 
       align: 'right' as const,
-      format: (val: any) => <span className="font-bold text-white">{formatMoney(Number(val))}</span>,
-      mobileFormat: (val: any) => <span className="text-lg font-bold text-white block mt-1">{formatMoney(Number(val))}</span>
+      format: (val: any) => <span className="font-bold text-content-primary">{formatMoney(Number(val))}</span>,
+      mobileFormat: (val: any) => <span className="text-lg font-bold text-content-primary block mt-1">{formatMoney(Number(val))}</span>
     },
     { 
       key: 'infos', 
       label: 'Date & Initiateur',
       format: (_: any, t: Transfert) => (
         <div className="flex flex-col">
-            <span className="text-slate-300">{new Date(t.dateCreation).toLocaleDateString('fr-FR')}</span>
-            <span className="text-[10px] text-slate-500">
+            <span className="text-content-secondary">{new Date(t.dateCreation).toLocaleDateString('fr-FR')}</span>
+            <span className="text-[10px] text-content-muted">
                 {t.createdByNom ? `${t.createdByNom} ${t.createdByPrenom?.charAt(0)}.` : '-'}
             </span>
         </div>
@@ -399,7 +399,7 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
           <Button
             size="sm"
             onClick={(e) => { e.stopPropagation(); prepareReception(t); }}
-            className="h-7 text-xs bg-emerald-600/10 text-emerald-400 hover:bg-emerald-600/20 shadow-none border border-emerald-500/20 px-2"
+            className="h-7 text-xs bg-status-success/10 text-status-success hover:bg-status-success/20 shadow-none border border-status-success/20 px-2"
           >
             Reçu
           </Button>
@@ -409,7 +409,7 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
             size="sm"
             variant="ghost"
             onClick={(e) => { e.stopPropagation(); prepareAnnulation(t); }}
-            className="h-7 w-7 p-0 flex items-center justify-center text-slate-400 hover:bg-slate-800 rounded-full"
+            className="h-7 w-7 p-0 flex items-center justify-center text-content-muted hover:bg-surface rounded-full"
           >
             <X size={14} aria-hidden="true" />
           </Button>
@@ -448,13 +448,13 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
              variant="ghost"
              size="sm"
              onClick={onBack}
-             className="rounded-full hover:bg-slate-800 text-slate-400 h-8 w-8 p-0"
+             className="rounded-full hover:bg-surface text-content-muted h-8 w-8 p-0"
            >
              <ArrowLeft size={18} />
            </Button>
            <div>
-             <h2 className="text-lg font-bold text-white leading-none">Transferts</h2>
-             <p className="text-xs text-slate-500 mt-1">Inter-Agences</p>
+             <h2 className="text-lg font-bold text-content-primary leading-none">Transferts</h2>
+             <p className="text-xs text-content-muted mt-1">Inter-Agences</p>
            </div>
          </div>
 
@@ -463,7 +463,7 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
                 <Button
                     size="sm"
                     onClick={() => setShowForm(true)}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-500/20 h-8 text-xs font-semibold"
+                    className="bg-accent hover:bg-accent-primary-hover text-white shadow-lg shadow-accent/20 h-8 text-xs font-semibold"
                 >
                     <Plus size={14} className="mr-1.5" />
                     Nouveau
@@ -473,7 +473,7 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
                 variant="outline"
                 size="sm"
                 onClick={handlePrintHistory}
-                className="border-slate-700 hover:bg-slate-800 text-slate-300 h-8 w-8 p-0"
+                className="border-edge hover:bg-surface text-content-secondary h-8 w-8 p-0"
                 disabled={isPrinting || transferts.length === 0}
                 title="Imprimer"
             >
@@ -484,39 +484,39 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
 
       {/* 2. Compact Stats Bar (Fixed) */}
       <div className="shrink-0 grid grid-cols-4 gap-2 px-2">
-          <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-2 flex items-center gap-3">
-              <div className="p-1.5 rounded bg-blue-500/10 text-blue-400"><ArrowRightLeft size={14} /></div>
+          <div className="bg-surface-base/50 border border-edge rounded-lg p-2 flex items-center gap-3">
+              <div className="p-1.5 rounded bg-status-info-bg text-status-info"><ArrowRightLeft size={14} /></div>
               <div>
-                  <div className="text-[10px] text-slate-500 uppercase font-bold">Total</div>
-                  <div className="text-sm font-bold text-white leading-none">{stats.total}</div>
+                  <div className="text-[10px] text-content-muted uppercase font-bold">Total</div>
+                  <div className="text-sm font-bold text-content-primary leading-none">{stats.total}</div>
               </div>
           </div>
-          <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-2 flex items-center gap-3">
-              <div className="p-1.5 rounded bg-amber-500/10 text-amber-400"><Clock size={14} /></div>
+          <div className="bg-surface-base/50 border border-edge rounded-lg p-2 flex items-center gap-3">
+              <div className="p-1.5 rounded bg-status-warning-bg text-status-warning"><Clock size={14} /></div>
               <div>
-                  <div className="text-[10px] text-slate-500 uppercase font-bold">En Attente</div>
-                  <div className="text-sm font-bold text-white leading-none">{stats.enAttente}</div>
+                  <div className="text-[10px] text-content-muted uppercase font-bold">En Attente</div>
+                  <div className="text-sm font-bold text-content-primary leading-none">{stats.enAttente}</div>
               </div>
           </div>
-          <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-2 flex items-center gap-3">
-              <div className="p-1.5 rounded bg-indigo-500/10 text-indigo-400"><Send size={14} /></div>
+          <div className="bg-surface-base/50 border border-edge rounded-lg p-2 flex items-center gap-3">
+              <div className="p-1.5 rounded bg-accent/10 text-accent"><Send size={14} /></div>
               <div>
-                  <div className="text-[10px] text-slate-500 uppercase font-bold">Envoyé</div>
-                  <div className="text-sm font-bold text-white leading-none">{formatCompactMoney(stats.volumeEnvoye)}</div>
+                  <div className="text-[10px] text-content-muted uppercase font-bold">Envoyé</div>
+                  <div className="text-sm font-bold text-content-primary leading-none">{formatCompactMoney(stats.volumeEnvoye)}</div>
               </div>
           </div>
-           <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-2 flex items-center gap-3">
-              <div className="p-1.5 rounded bg-emerald-500/10 text-emerald-400"><Wallet size={14} /></div>
+           <div className="bg-surface-base/50 border border-edge rounded-lg p-2 flex items-center gap-3">
+              <div className="p-1.5 rounded bg-status-success-bg text-status-success"><Wallet size={14} /></div>
               <div>
-                  <div className="text-[10px] text-slate-500 uppercase font-bold">Reçu</div>
-                  <div className="text-sm font-bold text-white leading-none">{formatCompactMoney(stats.volumeRecu)}</div>
+                  <div className="text-[10px] text-content-muted uppercase font-bold">Reçu</div>
+                  <div className="text-sm font-bold text-content-primary leading-none">{formatCompactMoney(stats.volumeRecu)}</div>
               </div>
           </div>
       </div>
 
       {/* 3. Responsive Table (Scrollable Flex-1) */}
       <div className="flex-1 min-h-0 px-2 relative">
-          <div className="h-full border border-slate-800 rounded-xl bg-slate-900/20 overflow-hidden flex flex-col">
+          <div className="h-full border border-edge rounded-xl bg-surface-base/20 overflow-hidden flex flex-col">
              <ResponsiveTable
                 data={paginatedTransferts}
                 columns={columns}
@@ -526,7 +526,7 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
                 emptyMessage="Aucun transfert enregistré"
                 density="compact"
                 className="flex-1 overflow-auto"
-                headerClassName="sticky top-0 z-10 bg-slate-900 border-b border-slate-800"
+                headerClassName="sticky top-0 z-10 bg-surface-base border-b border-edge"
                 pagination={{ // Use ResponsiveTable's pagination if implemented, or we use our own footer
                     page: currentPage,
                     totalPages: totalPages,
@@ -546,10 +546,10 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
       >
         {selectedTransfert && (
           <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 bg-slate-900/50 rounded-xl border border-slate-800">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 bg-surface-base/50 rounded-xl border border-edge">
               <div>
-                <p className="text-sm text-slate-400 mb-1">Montant</p>
-                <p className="text-3xl font-bold text-white">{formatMoney(Number(selectedTransfert.montant))}</p>
+                <p className="text-sm text-content-muted mb-1">Montant</p>
+                <p className="text-3xl font-bold text-content-primary">{formatMoney(Number(selectedTransfert.montant))}</p>
               </div>
               <Badge
                 value={selectedTransfert.statut}
@@ -563,32 +563,32 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">
-                <h4 className="text-sm font-semibold text-slate-300 border-b border-slate-800 pb-2">Informations Générales</h4>
+                <h4 className="text-sm font-semibold text-content-secondary border-b border-edge pb-2">Informations Générales</h4>
                 
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-500 uppercase">Référence</p>
-                  <p className="font-mono text-white">{selectedTransfert.reference}</p>
+                  <p className="text-xs text-content-muted uppercase">Référence</p>
+                  <p className="font-mono text-content-primary">{selectedTransfert.reference}</p>
                 </div>
                 
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-500 uppercase">Date Création</p>
-                  <p className="text-white">
+                  <p className="text-xs text-content-muted uppercase">Date Création</p>
+                  <p className="text-content-primary">
                     {new Date(selectedTransfert.dateCreation).toLocaleString('fr-FR')}
                   </p>
                 </div>
 
                 {selectedTransfert.dateValidation && (
                   <div className="space-y-1">
-                    <p className="text-xs text-slate-500 uppercase">Date Validation</p>
-                    <p className="text-white">
+                    <p className="text-xs text-content-muted uppercase">Date Validation</p>
+                    <p className="text-content-primary">
                       {new Date(selectedTransfert.dateValidation).toLocaleString('fr-FR')}
                     </p>
                   </div>
                 )}
                 
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-500 uppercase">Initié par</p>
-                  <p className="text-white">
+                  <p className="text-xs text-content-muted uppercase">Initié par</p>
+                  <p className="text-content-primary">
                     {selectedTransfert.createdByNom 
                       ? `${selectedTransfert.createdByNom} ${selectedTransfert.createdByPrenom || ''}`
                       : 'Inconnu'}
@@ -597,36 +597,36 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
               </div>
 
               <div className="space-y-4">
-                <h4 className="text-sm font-semibold text-slate-300 border-b border-slate-800 pb-2">Trajet</h4>
+                <h4 className="text-sm font-semibold text-content-secondary border-b border-edge pb-2">Trajet</h4>
                 
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-500 uppercase">De (Source)</p>
-                  <p className="text-white font-medium">{selectedTransfert.agenceSourceNom || selectedTransfert.agenceSource?.nom || 'Agence Source'}</p>
+                  <p className="text-xs text-content-muted uppercase">De (Source)</p>
+                  <p className="text-content-primary font-medium">{selectedTransfert.agenceSourceNom || selectedTransfert.agenceSource?.nom || 'Agence Source'}</p>
                 </div>
                 
-                <div className="pl-2 border-l-2 border-slate-700 my-2">
-                  <ArrowRight className="text-slate-500 my-1" size={16} />
+                <div className="pl-2 border-l-2 border-edge my-2">
+                  <ArrowRight className="text-content-muted my-1" size={16} />
                 </div>
                 
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-500 uppercase">Vers (Destination)</p>
-                  <p className="text-white font-medium">{selectedTransfert.agenceDestNom || selectedTransfert.agenceDest?.nom || 'Agence Dest'}</p>
+                  <p className="text-xs text-content-muted uppercase">Vers (Destination)</p>
+                  <p className="text-content-primary font-medium">{selectedTransfert.agenceDestNom || selectedTransfert.agenceDest?.nom || 'Agence Dest'}</p>
                 </div>
               </div>
             </div>
 
             <div className="space-y-4">
-              <h4 className="text-sm font-semibold text-slate-300 border-b border-slate-800 pb-2">Notes</h4>
+              <h4 className="text-sm font-semibold text-content-secondary border-b border-edge pb-2">Notes</h4>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-500 uppercase">Motif</p>
-                  <p className="text-slate-300">{selectedTransfert.motif || '-'}</p>
+                  <p className="text-xs text-content-muted uppercase">Motif</p>
+                  <p className="text-content-secondary">{selectedTransfert.motif || '-'}</p>
                 </div>
                 
                 <div className="space-y-1">
-                  <p className="text-xs text-slate-500 uppercase">Observations</p>
-                  <p className="text-slate-300 italic">{selectedTransfert.observations || 'Aucune observation'}</p>
+                  <p className="text-xs text-content-muted uppercase">Observations</p>
+                  <p className="text-content-secondary italic">{selectedTransfert.observations || 'Aucune observation'}</p>
                 </div>
               </div>
             </div>
@@ -641,18 +641,18 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
       {/* New Transfer Modal */}
       {showForm && (
         <div
-          className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center z-[100] p-0 sm:p-4 animate-in fade-in duration-200"
+          className="fixed inset-0 bg-surface-base/80 backdrop-blur-sm flex items-end sm:items-center justify-center z-[100] p-0 sm:p-4 animate-in fade-in duration-200"
           role="dialog"
           aria-modal="true"
           aria-labelledby="new-transfer-title"
         >
-          <div className="bg-slate-900 border border-slate-800 w-full max-w-lg max-h-[90vh] sm:rounded-2xl rounded-t-2xl shadow-2xl flex flex-col animate-in slide-in-from-bottom-5">
-            <header className="p-5 border-b border-slate-800 flex items-center justify-between sticky top-0 bg-slate-900/95 backdrop-blur z-10 rounded-t-2xl">
+          <div className="bg-surface-base border border-edge w-full max-w-lg max-h-[90vh] sm:rounded-2xl rounded-t-2xl shadow-2xl flex flex-col animate-in slide-in-from-bottom-5">
+            <header className="p-5 border-b border-edge flex items-center justify-between sticky top-0 bg-surface-base/95 backdrop-blur z-10 rounded-t-2xl">
               <div>
-                <h3 id="new-transfer-title" className="text-lg font-bold text-white">
+                <h3 id="new-transfer-title" className="text-lg font-bold text-content-primary">
                   Nouveau Transfert
                 </h3>
-                <p className="text-xs text-slate-400">Initier un mouvement de fonds</p>
+                <p className="text-xs text-content-muted">Initier un mouvement de fonds</p>
               </div>
               <Button
                 size="sm"
@@ -661,7 +661,7 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
                   setShowForm(false);
                   setMontantError(null);
                 }}
-                className="rounded-full text-slate-400 hover:text-white h-10 w-10 p-0"
+                className="rounded-full text-content-muted hover:text-content-primary h-10 w-10 p-0"
                 aria-label="Fermer"
               >
                 <X size={20} aria-hidden="true" />
@@ -673,7 +673,7 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
                 <div className="space-y-1.5">
                   <label
                     htmlFor="agence-dest"
-                    className="text-xs font-semibold text-indigo-400 uppercase"
+                    className="text-xs font-semibold text-accent uppercase"
                   >
                     Agence Destination
                   </label>
@@ -681,7 +681,7 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
                     id="agence-dest"
                     value={formData.agence_dest_id}
                     onChange={(e) => setFormData({ ...formData, agence_dest_id: e.target.value })}
-                    className="w-full px-3 py-2.5 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                    className="w-full px-3 py-2.5 bg-surface-base border border-edge rounded-lg text-sm text-content-primary focus:ring-1 focus:ring-accent focus:border-accent outline-none transition-all"
                     required
                     aria-required="true"
                   >
@@ -697,7 +697,7 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
                 <div className="space-y-1.5">
                   <label
                     htmlFor="montant-transfert"
-                    className="text-xs font-semibold text-slate-400 uppercase"
+                    className="text-xs font-semibold text-content-muted uppercase"
                   >
                     Montant (FCFA)
                   </label>
@@ -710,8 +710,8 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
                         setFormData({ ...formData, montant: e.target.value });
                         if (e.target.value) validateMontant(e.target.value);
                       }}
-                      className={`w-full pl-4 pr-12 py-3 bg-slate-950 border rounded-xl text-lg font-bold text-white focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all ${
-                        montantError ? 'border-red-500' : 'border-slate-700'
+                      className={`w-full pl-4 pr-12 py-3 bg-surface-base border rounded-xl text-lg font-bold text-content-primary focus:ring-1 focus:ring-accent focus:border-accent outline-none transition-all ${
+                        montantError ? 'border-status-danger' : 'border-edge'
                       }`}
                       min="0"
                       placeholder="0"
@@ -720,16 +720,16 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
                       aria-invalid={!!montantError}
                       aria-describedby={montantError ? 'montant-error' : 'solde-info'}
                     />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-slate-500">
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-content-muted">
                       FCFA
                     </span>
                   </div>
                   {montantError ? (
-                    <p id="montant-error" className="text-xs text-red-400" role="alert">
+                    <p id="montant-error" className="text-xs text-status-danger" role="alert">
                       {montantError}
                     </p>
                   ) : (
-                    <p id="solde-info" className="text-xs text-right text-emerald-500/80">
+                    <p id="solde-info" className="text-xs text-right text-status-success/80">
                       Solde dispo: {formatMoney(soldeActuel)}
                     </p>
                   )}
@@ -738,7 +738,7 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
                 <div className="space-y-1.5">
                   <label
                     htmlFor="motif-transfert"
-                    className="text-xs font-semibold text-slate-400 uppercase"
+                    className="text-xs font-semibold text-content-muted uppercase"
                   >
                     Motif
                   </label>
@@ -747,7 +747,7 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
                     type="text"
                     value={formData.motif}
                     onChange={(e) => setFormData({ ...formData, motif: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                    className="w-full px-4 py-2.5 bg-surface-base border border-edge rounded-lg text-sm text-content-primary focus:ring-1 focus:ring-accent focus:border-accent outline-none transition-all"
                     placeholder="Ex: Approvisionnement caisse secondaire..."
                     required
                     aria-required="true"
@@ -757,7 +757,7 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
                 <div className="space-y-1.5">
                   <label
                     htmlFor="observations-transfert"
-                    className="text-xs font-semibold text-slate-400 uppercase"
+                    className="text-xs font-semibold text-content-muted uppercase"
                   >
                     Observations
                   </label>
@@ -765,7 +765,7 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
                     id="observations-transfert"
                     value={formData.observations}
                     onChange={(e) => setFormData({ ...formData, observations: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all resize-none"
+                    className="w-full px-4 py-2.5 bg-surface-base border border-edge rounded-lg text-sm text-content-primary focus:ring-1 focus:ring-accent focus:border-accent outline-none transition-all resize-none"
                     rows={3}
                     placeholder="Notes optionnelles..."
                   />
@@ -780,14 +780,14 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
                     setShowForm(false);
                     setMontantError(null);
                   }}
-                  className="w-full border-slate-700 hover:bg-slate-800 text-slate-300"
+                  className="w-full border-edge hover:bg-surface text-content-secondary"
                 >
                   Annuler
                 </Button>
                 <Button
                   type="submit"
                   disabled={loading || !!montantError}
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-500/20"
+                  className="w-full bg-accent hover:bg-accent-primary-hover text-white shadow-lg shadow-accent/20"
                 >
                   {loading ? (
                     'Traitement...'

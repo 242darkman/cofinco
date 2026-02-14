@@ -216,23 +216,23 @@ export default function EnqueteMiniMap({
   const isDistanceWarning = distance !== null && distance > 200;
 
   return (
-    <div className="relative rounded-lg overflow-hidden border border-slate-700/50" style={{ height }}>
+    <div className="relative rounded-lg overflow-hidden border border-edge-subtle" style={{ height }}>
       {/* Légende superposée */}
-      <div className="absolute top-2 left-2 z-[1000] bg-slate-900/90 backdrop-blur-sm rounded-lg p-2 text-xs space-y-1">
+      <div className="absolute top-2 left-2 z-[1000] bg-surface-base/90 backdrop-blur-sm rounded-lg p-2 text-xs space-y-1">
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-emerald-500" />
-          <span className="text-slate-300">Lieu enquête</span>
+          <div className="w-3 h-3 rounded-full bg-status-success" />
+          <span className="text-content-secondary">Lieu enquête</span>
         </div>
         {clientLatitude && clientLongitude && (
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-blue-500" />
-            <span className="text-slate-300">Adresse client</span>
+            <div className="w-3 h-3 rounded-full bg-status-info" />
+            <span className="text-content-secondary">Adresse client</span>
           </div>
         )}
         {geotaggedPhotos.length > 0 && showPhotosMarkers && (
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-amber-500" />
-            <span className="text-slate-300">Photos ({geotaggedPhotos.length})</span>
+            <div className="w-3 h-3 rounded-full bg-status-warning" />
+            <span className="text-content-secondary">Photos ({geotaggedPhotos.length})</span>
           </div>
         )}
       </div>
@@ -241,8 +241,8 @@ export default function EnqueteMiniMap({
       {distance !== null && (
         <div className={`absolute top-2 right-2 z-[1000] rounded-lg px-2 py-1 text-xs font-medium flex items-center gap-1.5 ${
           isDistanceWarning
-            ? 'bg-red-500/90 text-white'
-            : 'bg-emerald-500/90 text-white'
+            ? 'bg-status-danger/90 text-white'
+            : 'bg-status-success/90 text-white'
         }`}>
           {isDistanceWarning ? (
             <AlertTriangle size={12} />
@@ -307,11 +307,11 @@ export default function EnqueteMiniMap({
         <Marker position={[enqueteLatitude, enqueteLongitude]} icon={enqueteIcon}>
           <Popup>
             <div className="text-sm">
-              <div className="font-semibold text-emerald-600 mb-1 flex items-center gap-1">
+              <div className="font-semibold text-status-success mb-1 flex items-center gap-1">
                 <MapPin size={14} />
                 Lieu de l'enquête
               </div>
-              <div className="text-gray-600 text-xs space-y-0.5">
+              <div className="text-content-muted text-xs space-y-0.5">
                 <div>Lat: {enqueteLatitude.toFixed(6)}</div>
                 <div>Lng: {enqueteLongitude.toFixed(6)}</div>
                 {enqueteAccuracy && <div>Précision: ±{Math.round(enqueteAccuracy)}m</div>}
@@ -328,16 +328,16 @@ export default function EnqueteMiniMap({
           <Marker position={[clientLatitude, clientLongitude]} icon={clientIcon}>
             <Popup>
               <div className="text-sm">
-                <div className="font-semibold text-blue-600 mb-1 flex items-center gap-1">
+                <div className="font-semibold text-status-info mb-1 flex items-center gap-1">
                   <Navigation size={14} />
                   Adresse déclarée
                 </div>
-                <div className="text-gray-600 text-xs space-y-0.5">
+                <div className="text-content-muted text-xs space-y-0.5">
                   {clientAddress && <div className="max-w-[200px]">{clientAddress}</div>}
                   <div>Lat: {clientLatitude.toFixed(6)}</div>
                   <div>Lng: {clientLongitude.toFixed(6)}</div>
                   {distance !== null && (
-                    <div className={isDistanceWarning ? 'text-red-600 font-medium' : ''}>
+                    <div className={isDistanceWarning ? 'text-status-danger font-medium' : ''}>
                       Distance: {formatDistance(distance)}
                     </div>
                   )}
@@ -360,7 +360,7 @@ export default function EnqueteMiniMap({
             >
               <Popup>
                 <div className="text-sm">
-                  <div className="font-semibold text-amber-600 mb-1 flex items-center gap-1">
+                  <div className="font-semibold text-status-warning mb-1 flex items-center gap-1">
                     <Camera size={14} />
                     Photo {index + 1}
                   </div>
@@ -369,7 +369,7 @@ export default function EnqueteMiniMap({
                     alt={`Photo ${index + 1}`}
                     className="w-32 h-24 object-cover rounded mb-1"
                   />
-                  <div className="text-gray-600 text-xs">
+                  <div className="text-content-muted text-xs">
                     {photo.timestamp && (
                       <div>{new Date(photo.timestamp).toLocaleString('fr-FR')}</div>
                     )}

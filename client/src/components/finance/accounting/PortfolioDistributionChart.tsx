@@ -53,12 +53,12 @@ export default function PortfolioDistributionChart({
   const activeItem = activeIndex !== undefined ? data[activeIndex] : null;
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm flex flex-col h-full min-h-[350px]">
-      <div className="p-5 border-b border-slate-800/50">
-        <h3 className="text-base font-bold text-white mb-1">
+    <div className="bg-surface-base border border-edge rounded-2xl overflow-hidden shadow-sm flex flex-col h-full min-h-[350px]">
+      <div className="p-5 border-b border-edge/50">
+        <h3 className="text-base font-bold text-content-primary mb-1">
           {t('repartitionPortefeuille') || 'Répartition Portefeuille'}
         </h3>
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-content-muted">
           {t('vueDensembleComptes') || "Vue d'ensemble par type de produit"}
         </p>
       </div>
@@ -104,10 +104,10 @@ export default function PortfolioDistributionChart({
           
           {/* Centre du Donut */}
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-             <div className="text-2xl font-bold text-white tabular-nums">
+             <div className="text-2xl font-bold text-content-primary tabular-nums">
                {activeItem ? `${activeItem.value}%` : '100%'}
              </div>
-             <div className="text-[10px] text-slate-500 uppercase tracking-widest font-medium mt-1">
+             <div className="text-[10px] text-content-muted uppercase tracking-widest font-medium mt-1">
                {activeItem ? activeItem.name : (t('global') || 'GLOBAL')}
              </div>
           </div>
@@ -123,8 +123,8 @@ export default function PortfolioDistributionChart({
               onMouseLeave={() => setActiveIndex(undefined)}
             >
               <div className="w-2.5 h-2.5 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.5)]" style={{ backgroundColor: item.color }} />
-              <span className="text-xs text-slate-400 font-medium truncate flex-1">{item.name}</span>
-              <span className="text-xs font-bold text-white tabular-nums">{item.value}%</span>
+              <span className="text-xs text-content-muted font-medium truncate flex-1">{item.name}</span>
+              <span className="text-xs font-bold text-content-primary tabular-nums">{item.value}%</span>
             </div>
           ))}
         </div>

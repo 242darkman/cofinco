@@ -24,14 +24,14 @@ export default function PageHeader({
     <div className={`flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 ${className}`}>
       <div className="flex items-center gap-3">
         {Icon && (
-          <div className="p-3 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-lg shadow-blue-500/20">
+          <div className="p-3 bg-gradient-to-br from-status-info to-accent rounded-xl shadow-lg shadow-status-info/20">
             <Icon className="w-8 h-8 text-white" />
           </div>
         )}
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">{title}</h1>
+          <h1 className="text-2xl font-bold text-content-primary tracking-tight">{title}</h1>
           {description && (
-            <p className="text-slate-400 mt-1">{description}</p>
+            <p className="text-content-muted mt-1">{description}</p>
           )}
         </div>
       </div>

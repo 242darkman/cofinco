@@ -1,4 +1,5 @@
 import React from 'react';
+import { useBranding } from '@/contexts/BrandingContext';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Building2, Phone, Mail, MapPin } from 'lucide-react';
@@ -53,8 +54,10 @@ const DEFAULT_COMPANY_INFO = {
 };
 
 export const TransferHistoryPrintTemplate = React.forwardRef<HTMLDivElement, TransferHistoryPrintTemplateProps>(
-  ({ data, companyInfo = DEFAULT_COMPANY_INFO }, ref) => {
-    
+  ({ data, companyInfo: companyInfoProp = DEFAULT_COMPANY_INFO }, ref) => {
+    const { branding } = useBranding();
+    const companyInfo = { ...companyInfoProp, nom: companyInfoProp === DEFAULT_COMPANY_INFO ? branding.appName : companyInfoProp.nom };
+
     const formattedDate = new Date(data.date).toLocaleDateString('fr-FR', {
       day: 'numeric',
       month: 'long',
@@ -64,7 +67,7 @@ export const TransferHistoryPrintTemplate = React.forwardRef<HTMLDivElement, Tra
     });
 
     return (
-      <div className="hidden print:block font-sans text-slate-900 bg-white" ref={ref}>
+      <div className="hidden print:block font-sans text-content-primary bg-white" ref={ref}>
         <style type="text/css" media="print">
           {`
             @page { size: landscape; margin: 10mm; }
@@ -79,18 +82,18 @@ export const TransferHistoryPrintTemplate = React.forwardRef<HTMLDivElement, Tra
         <div className="w-full max-w-[297mm] mx-auto p-8">
           
           {/* Header */}
-          <div className="flex justify-between items-start mb-8 border-b-2 border-slate-900 pb-6">
+          <div className="flex justify-between items-start mb-8 border-b-2 border-edge pb-6">
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-3 mb-2">
-                 <div className="h-10 w-10 bg-blue-900 flex items-center justify-center rounded-lg text-white font-bold text-lg">
+                 <div className="h-10 w-10 bg-status-info flex items-center justify-center rounded-lg text-white font-bold text-lg">
                    CO
                  </div>
-                 <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 uppercase">
+                 <h1 className="text-2xl font-extrabold tracking-tight text-content-primary uppercase">
                    {companyInfo.nom}
                  </h1>
               </div>
               
-              <div className="text-xs text-slate-600 flex flex-col gap-1">
+              <div className="text-xs text-content-muted flex flex-col gap-1">
                 <div className="flex items-center gap-2">
                   <MapPin size={12} /> {companyInfo.adresse}
                 </div>
@@ -104,21 +107,21 @@ export const TransferHistoryPrintTemplate = React.forwardRef<HTMLDivElement, Tra
             </div>
 
             <div className="text-right">
-              <h2 className="text-2xl font-black text-slate-900 uppercase tracking-wide mb-2">
+              <h2 className="text-2xl font-black text-content-primary uppercase tracking-wide mb-2">
                 HISTORIQUE DES TRANSFERTS
               </h2>
               <div className="flex flex-col gap-1 text-sm">
-                <span className="font-semibold text-slate-700">Agence: {data.agencyName}</span>
-                <span className="text-slate-500">Généré le: {formattedDate}</span>
-                <span className="text-slate-500">Par: {data.generatedBy}</span>
+                <span className="font-semibold text-content-secondary">Agence: {data.agencyName}</span>
+                <span className="text-content-muted">Généré le: {formattedDate}</span>
+                <span className="text-content-muted">Par: {data.generatedBy}</span>
               </div>
             </div>
           </div>
 
           {/* Filters Summary (if any) */}
           {(data.filters?.startDate || data.filters?.endDate || data.filters?.status) && (
-             <div className="mb-6 p-3 bg-slate-50 border border-slate-200 rounded text-sm flex gap-6">
-                <span className="font-bold text-slate-700">Filtres appliqués:</span>
+             <div className="mb-6 p-3 bg-surface-muted border border-edge rounded text-sm flex gap-6">
+                <span className="font-bold text-content-secondary">Filtres appliqués:</span>
                 {data.filters.startDate && <span>Du: {new Date(data.filters.startDate).toLocaleDateString('fr-FR')}</span>}
                 {data.filters.endDate && <span>Au: {new Date(data.filters.endDate).toLocaleDateString('fr-FR')}</span>}
                 {data.filters.status && <span>Statut: {ALL_STATUS_LABELS[data.filters.status!] || data.filters.status}</span>}
@@ -128,45 +131,45 @@ export const TransferHistoryPrintTemplate = React.forwardRef<HTMLDivElement, Tra
           {/* Table */}
           <table className="w-full mb-8 text-sm">
             <thead>
-              <tr className="border-b-2 border-slate-900 bg-slate-100">
-                <th className="py-2 px-2 text-left font-bold text-slate-900 uppercase">Date</th>
-                <th className="py-2 px-2 text-left font-bold text-slate-900 uppercase">Référence</th>
-                <th className="py-2 px-2 text-left font-bold text-slate-900 uppercase">Source</th>
-                <th className="py-2 px-2 text-left font-bold text-slate-900 uppercase">Destination</th>
-                <th className="py-2 px-2 text-left font-bold text-slate-900 uppercase">Initié par</th>
-                <th className="py-2 px-2 text-left font-bold text-slate-900 uppercase">Statut</th>
-                <th className="py-2 px-2 text-right font-bold text-slate-900 uppercase">Montant</th>
+              <tr className="border-b-2 border-edge bg-surface-muted">
+                <th className="py-2 px-2 text-left font-bold text-content-primary uppercase">Date</th>
+                <th className="py-2 px-2 text-left font-bold text-content-primary uppercase">Référence</th>
+                <th className="py-2 px-2 text-left font-bold text-content-primary uppercase">Source</th>
+                <th className="py-2 px-2 text-left font-bold text-content-primary uppercase">Destination</th>
+                <th className="py-2 px-2 text-left font-bold text-content-primary uppercase">Initié par</th>
+                <th className="py-2 px-2 text-left font-bold text-content-primary uppercase">Statut</th>
+                <th className="py-2 px-2 text-right font-bold text-content-primary uppercase">Montant</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200">
+            <tbody className="divide-y divide-edge">
               {data.transfers.map((t, index) => (
-                <tr key={index} className="border-b border-slate-100 last:border-0 odd:bg-white even:bg-slate-50">
-                  <td className="py-2 px-2 text-slate-600">
+                <tr key={index} className="border-b border-edge-subtle last:border-0 odd:bg-white even:bg-surface-muted">
+                  <td className="py-2 px-2 text-content-muted">
                     {new Date(t.date).toLocaleDateString('fr-FR')}
                   </td>
-                  <td className="py-2 px-2 font-mono text-slate-900 font-medium">
+                  <td className="py-2 px-2 font-mono text-content-primary font-medium">
                     {t.reference}
                   </td>
-                  <td className="py-2 px-2 text-slate-700">{t.source}</td>
-                  <td className="py-2 px-2 text-slate-700">{t.destination}</td>
-                  <td className="py-2 px-2 text-slate-600 italic">{t.initiator}</td>
+                  <td className="py-2 px-2 text-content-secondary">{t.source}</td>
+                  <td className="py-2 px-2 text-content-secondary">{t.destination}</td>
+                  <td className="py-2 px-2 text-content-muted italic">{t.initiator}</td>
                   <td className="py-2 px-2">
                     <span className={`px-2 py-0.5 rounded text-xs font-bold border ${
-                        (t.statut === StatutTransfertCaisse.VALIDATED) ? 'bg-green-100 text-green-800 border-green-200' :
-                        (t.statut === StatutTransfertCaisse.PENDING) ? 'bg-amber-100 text-amber-800 border-amber-200' :
-                        'bg-slate-100 text-slate-800 border-slate-200'
+                        (t.statut === StatutTransfertCaisse.VALIDATED) ? 'bg-status-success-bg text-status-success border-status-success/30' :
+                        (t.statut === StatutTransfertCaisse.PENDING) ? 'bg-status-warning-bg text-status-warning border-status-warning/30' :
+                        'bg-surface-muted text-content-primary border-edge'
                     }`}>
                         {ALL_STATUS_LABELS[t.statut] || t.statut}
                     </span>
                   </td>
-                  <td className="py-2 px-2 text-right font-bold text-slate-900 font-mono">
+                  <td className="py-2 px-2 text-right font-bold text-content-primary font-mono">
                     {formatMoney(t.montant)}
                   </td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
-               <tr className="bg-slate-900 text-white font-bold border-t-2 border-slate-900">
+               <tr className="bg-surface-base text-content-primary font-bold border-t-2 border-edge">
                   <td colSpan={6} className="py-3 px-4 text-right uppercase tracking-wider">Total ({data.stats.totalCount} transferts)</td>
                   <td className="py-3 px-4 text-right font-mono text-lg">{formatMoney(data.stats.totalAmount)}</td>
                </tr>
@@ -174,9 +177,9 @@ export const TransferHistoryPrintTemplate = React.forwardRef<HTMLDivElement, Tra
           </table>
 
           {/* Footer */}
-          <div className="mt-auto pt-6 text-center border-t border-slate-200">
-             <p className="text-[10px] text-slate-400">
-                Document généré automatiquement par la plateforme COFIN&CO.
+          <div className="mt-auto pt-6 text-center border-t border-edge">
+             <p className="text-[10px] text-content-muted">
+                Document généré automatiquement par la plateforme {branding.appName}.
              </p>
           </div>
         </div>

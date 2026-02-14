@@ -254,29 +254,29 @@ export default function GenerateCodeModal({ isOpen, onClose, onGenerate, generat
       <Modal isOpen={isOpen} onClose={handleClose} title="">
         <div className="text-center py-4">
           {/* Success animation */}
-          <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-emerald-400 to-green-500 flex items-center justify-center animate-pulse">
+          <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-status-success to-status-success flex items-center justify-center animate-pulse">
             <Check className="w-10 h-10 text-white" />
           </div>
 
-          <h2 className="text-xl font-bold text-white mb-2">Code généré avec succès !</h2>
+          <h2 className="text-xl font-bold text-content-primary mb-2">Code généré avec succès !</h2>
 
           {selectedUser && (
-            <p className="text-slate-400 text-sm mb-4">
+            <p className="text-content-muted text-sm mb-4">
               {formData.sendNotification ? 'Notification envoyée à ' : 'Assigné à '}
-              <span className="text-white font-medium">{selectedUser.prenom} {selectedUser.nom}</span>
+              <span className="text-content-primary font-medium">{selectedUser.prenom} {selectedUser.nom}</span>
             </p>
           )}
 
           {/* Code display */}
-          <div className="my-6 p-4 bg-slate-800 rounded-xl">
-            <p className="text-xs text-slate-500 uppercase tracking-wide mb-2">Code d'accès</p>
+          <div className="my-6 p-4 bg-surface rounded-xl">
+            <p className="text-xs text-content-muted uppercase tracking-wide mb-2">Code d'accès</p>
             <div className="flex items-center justify-center gap-3">
-              <span className="text-3xl font-mono font-bold text-emerald-400 tracking-[0.3em]">
+              <span className="text-3xl font-mono font-bold text-status-success tracking-[0.3em]">
                 {generatedCode}
               </span>
               <button
                 onClick={copyToClipboard}
-                className={`p-2 rounded-lg transition-all ${copiedCode ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700 text-slate-400 hover:text-white'}`}
+                className={`p-2 rounded-lg transition-all ${copiedCode ? 'bg-status-success-bg text-status-success' : 'bg-surface-elevated text-content-muted hover:text-content-primary'}`}
               >
                 {copiedCode ? <Check size={18} /> : <Copy size={18} />}
               </button>
@@ -284,27 +284,27 @@ export default function GenerateCodeModal({ isOpen, onClose, onGenerate, generat
           </div>
 
           {/* Warning */}
-          <div className="flex items-center justify-center gap-2 text-amber-400 text-sm mb-6">
+          <div className="flex items-center justify-center gap-2 text-status-warning text-sm mb-6">
             <AlertTriangle size={16} />
             <span>Ce code ne sera plus affiché. Notez-le maintenant.</span>
           </div>
 
           {/* Summary cards */}
           <div className="grid grid-cols-3 gap-2 mb-6">
-            <div className="bg-slate-800/50 rounded-lg p-3">
-              <Clock size={16} className="mx-auto text-slate-500 mb-1" />
-              <p className="text-xs text-slate-500">Validité</p>
-              <p className="text-sm font-medium text-white">{getValidityLabel()}</p>
+            <div className="bg-surface/50 rounded-lg p-3">
+              <Clock size={16} className="mx-auto text-content-muted mb-1" />
+              <p className="text-xs text-content-muted">Validité</p>
+              <p className="text-sm font-medium text-content-primary">{getValidityLabel()}</p>
             </div>
-            <div className="bg-slate-800/50 rounded-lg p-3">
-              <Hash size={16} className="mx-auto text-slate-500 mb-1" />
-              <p className="text-xs text-slate-500">Utilisations</p>
-              <p className="text-sm font-medium text-white">{getUsagesLabel()}</p>
+            <div className="bg-surface/50 rounded-lg p-3">
+              <Hash size={16} className="mx-auto text-content-muted mb-1" />
+              <p className="text-xs text-content-muted">Utilisations</p>
+              <p className="text-sm font-medium text-content-primary">{getUsagesLabel()}</p>
             </div>
-            <div className="bg-slate-800/50 rounded-lg p-3">
-              <Shield size={16} className="mx-auto text-slate-500 mb-1" />
-              <p className="text-xs text-slate-500">Accès</p>
-              <p className="text-sm font-medium text-white">{getAuthLabel()}</p>
+            <div className="bg-surface/50 rounded-lg p-3">
+              <Shield size={16} className="mx-auto text-content-muted mb-1" />
+              <p className="text-xs text-content-muted">Accès</p>
+              <p className="text-sm font-medium text-content-primary">{getAuthLabel()}</p>
             </div>
           </div>
 
@@ -324,25 +324,25 @@ export default function GenerateCodeModal({ isOpen, onClose, onGenerate, generat
           <React.Fragment key={step.key}>
             <div className="flex flex-col items-center">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
-                idx < currentStepIndex ? 'bg-emerald-500 text-white' :
-                idx === currentStepIndex ? 'bg-blue-500 text-white' :
-                'bg-slate-700 text-slate-400'
+                idx < currentStepIndex ? 'bg-status-success text-white' :
+                idx === currentStepIndex ? 'bg-status-info text-white' :
+                'bg-surface-elevated text-content-muted'
               }`}>
                 {idx < currentStepIndex ? <Check size={16} /> : idx + 1}
               </div>
-              <span className={`text-[10px] mt-1 ${idx === currentStepIndex ? 'text-blue-400' : 'text-slate-500'}`}>
+              <span className={`text-[10px] mt-1 ${idx === currentStepIndex ? 'text-status-info' : 'text-content-muted'}`}>
                 {step.label}
               </span>
             </div>
             {idx < steps.length - 1 && (
-              <div className={`flex-1 h-0.5 mx-2 ${idx < currentStepIndex ? 'bg-emerald-500' : 'bg-slate-700'}`} />
+              <div className={`flex-1 h-0.5 mx-2 ${idx < currentStepIndex ? 'bg-status-success' : 'bg-surface-elevated'}`} />
             )}
           </React.Fragment>
         ))}
       </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+        <div className="mb-4 p-3 bg-status-danger-bg border border-status-danger/30 rounded-lg text-status-danger text-sm">
           {error}
         </div>
       )}
@@ -350,7 +350,7 @@ export default function GenerateCodeModal({ isOpen, onClose, onGenerate, generat
       {/* Step 1: Type Selection */}
       {currentStep === 'type' && (
         <div className="space-y-4">
-          <p className="text-slate-400 text-sm">Sélectionnez le type de code adapté à votre besoin</p>
+          <p className="text-content-muted text-sm">Sélectionnez le type de code adapté à votre besoin</p>
 
           <div className="space-y-3">
             {CODE_TYPES.map(({ type, icon, title, subtitle, color }) => (
@@ -361,19 +361,19 @@ export default function GenerateCodeModal({ isOpen, onClose, onGenerate, generat
                 className={`w-full p-4 rounded-xl border-2 transition-all text-left flex items-center gap-4 ${
                   formData.codeType === type
                     ? `border-${color}-500 bg-${color}-500/10`
-                    : 'border-slate-700 hover:border-slate-600 bg-slate-800/50'
+                    : 'border-edge hover:border-edge-strong bg-surface/50'
                 }`}
               >
                 <span className="text-3xl">{icon}</span>
                 <div className="flex-1">
-                  <p className={`font-semibold ${formData.codeType === type ? `text-${color}-400` : 'text-white'}`}>
+                  <p className={`font-semibold ${formData.codeType === type ? `text-${color}-400` : 'text-content-primary'}`}>
                     {title}
                   </p>
-                  <p className="text-sm text-slate-400">{subtitle}</p>
+                  <p className="text-sm text-content-muted">{subtitle}</p>
                 </div>
                 {formData.codeType === type && (
                   <div className={`w-6 h-6 rounded-full bg-${color}-500 flex items-center justify-center`}>
-                    <Check size={14} className="text-white" />
+                    <Check size={14} className="text-content-primary" />
                   </div>
                 )}
               </button>
@@ -385,7 +385,7 @@ export default function GenerateCodeModal({ isOpen, onClose, onGenerate, generat
       {/* Step 2: Configuration */}
       {currentStep === 'config' && (
         <div className="space-y-4">
-          <p className="text-slate-400 text-sm">Configurez les paramètres du code</p>
+          <p className="text-content-muted text-sm">Configurez les paramètres du code</p>
 
           <div className="grid grid-cols-2 gap-4">
             <SelectField
@@ -416,11 +416,11 @@ export default function GenerateCodeModal({ isOpen, onClose, onGenerate, generat
           />
 
           {/* Info box */}
-          <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg flex gap-3">
-            <Info size={18} className="text-blue-400 shrink-0 mt-0.5" />
-            <div className="text-sm text-blue-300">
+          <div className="p-3 bg-status-info-bg border border-status-info/30 rounded-lg flex gap-3">
+            <Info size={18} className="text-status-info shrink-0 mt-0.5" />
+            <div className="text-sm text-status-info">
               <p className="font-medium mb-1">Comment ça fonctionne</p>
-              <ul className="text-xs text-blue-300/80 space-y-1">
+              <ul className="text-xs text-status-info/80 space-y-1">
                 <li>• Le code peut être utilisé pendant <strong>{getValidityLabel()}</strong></li>
                 <li>• Chaque validation donne <strong>{getAuthLabel()}</strong> d'accès à la caisse</li>
                 {formData.codeType !== 'PERMANENT' && (
@@ -435,23 +435,23 @@ export default function GenerateCodeModal({ isOpen, onClose, onGenerate, generat
       {/* Step 3: Recipient */}
       {currentStep === 'recipient' && (
         <div className="space-y-4">
-          <p className="text-slate-400 text-sm">Assignez le code à un utilisateur (optionnel)</p>
+          <p className="text-content-muted text-sm">Assignez le code à un utilisateur (optionnel)</p>
 
           {/* Selected user display */}
           {selectedUser ? (
-            <div className="p-4 bg-slate-800 rounded-xl flex items-center justify-between">
+            <div className="p-4 bg-surface rounded-xl flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-status-info to-status-info flex items-center justify-center text-white font-bold">
                   {selectedUser.prenom?.[0]}{selectedUser.nom?.[0]}
                 </div>
                 <div>
-                  <p className="font-medium text-white">{selectedUser.prenom} {selectedUser.nom}</p>
-                  <p className="text-sm text-slate-400">{selectedUser.role} {selectedUser.agence ? `• ${selectedUser.agence}` : ''}</p>
+                  <p className="font-medium text-content-primary">{selectedUser.prenom} {selectedUser.nom}</p>
+                  <p className="text-sm text-content-muted">{selectedUser.role} {selectedUser.agence ? `• ${selectedUser.agence}` : ''}</p>
                 </div>
               </div>
               <button
                 onClick={clearSelectedUser}
-                className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                className="p-2 text-content-muted hover:text-status-danger hover:bg-status-danger-bg rounded-lg transition-colors"
               >
                 <X size={18} />
               </button>
@@ -460,34 +460,34 @@ export default function GenerateCodeModal({ isOpen, onClose, onGenerate, generat
             <>
               {/* Search input */}
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" size={18} />
                 <input
                   type="text"
                   value={userSearch}
                   onChange={(e) => setUserSearch(e.target.value)}
                   placeholder="Rechercher par nom, email..."
-                  className="w-full pl-10 pr-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder:text-slate-500 focus:border-blue-500 focus:outline-none"
+                  className="w-full pl-10 pr-4 py-3 bg-surface border border-edge rounded-xl text-content-primary placeholder:text-content-muted focus:border-status-info focus:outline-none"
                 />
                 {searchLoading && (
-                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 animate-spin" size={18} />
+                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 text-content-muted animate-spin" size={18} />
                 )}
               </div>
 
               {/* Search results */}
               {searchResults && searchResults.length > 0 && (
-                <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-700 divide-y divide-slate-700">
+                <div className="max-h-48 overflow-y-auto rounded-xl border border-edge divide-y divide-edge">
                   {searchResults.map((user: UserResult) => (
                     <button
                       key={user.id}
                       onClick={() => selectUser(user)}
-                      className="w-full p-3 flex items-center gap-3 hover:bg-slate-800 transition-colors text-left"
+                      className="w-full p-3 flex items-center gap-3 hover:bg-surface transition-colors text-left"
                     >
-                      <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-white text-sm font-medium">
+                      <div className="w-10 h-10 rounded-full bg-surface-elevated flex items-center justify-center text-content-primary text-sm font-medium">
                         {user.prenom?.[0]}{user.nom?.[0]}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-white truncate">{user.prenom} {user.nom}</p>
-                        <p className="text-xs text-slate-400 truncate">{user.email || user.role}</p>
+                        <p className="text-sm font-medium text-content-primary truncate">{user.prenom} {user.nom}</p>
+                        <p className="text-xs text-content-muted truncate">{user.email || user.role}</p>
                       </div>
                     </button>
                   ))}
@@ -495,26 +495,26 @@ export default function GenerateCodeModal({ isOpen, onClose, onGenerate, generat
               )}
 
               {userSearch.length >= 2 && searchResults?.length === 0 && !searchLoading && (
-                <p className="text-center text-slate-500 py-4">Aucun utilisateur trouvé</p>
+                <p className="text-center text-content-muted py-4">Aucun utilisateur trouvé</p>
               )}
             </>
           )}
 
           {/* Notification option */}
           {selectedUser && (
-            <label className="flex items-center gap-3 p-4 bg-slate-800/50 rounded-xl cursor-pointer hover:bg-slate-800 transition-colors">
+            <label className="flex items-center gap-3 p-4 bg-surface/50 rounded-xl cursor-pointer hover:bg-surface transition-colors">
               <input
                 type="checkbox"
                 checked={formData.sendNotification}
                 onChange={(e) => setFormData(prev => ({ ...prev, sendNotification: e.target.checked }))}
-                className="w-5 h-5 rounded border-slate-600 text-blue-500 focus:ring-blue-500 focus:ring-offset-0 bg-slate-700"
+                className="w-5 h-5 rounded border-edge-strong text-status-info focus:ring-status-info focus:ring-offset-0 bg-surface-elevated"
               />
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  <Bell size={16} className="text-blue-400" />
-                  <span className="font-medium text-white">Envoyer une notification</span>
+                  <Bell size={16} className="text-status-info" />
+                  <span className="font-medium text-content-primary">Envoyer une notification</span>
                 </div>
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-xs text-content-muted mt-1">
                   Le bénéficiaire recevra le code par notification push
                 </p>
               </div>
@@ -527,7 +527,7 @@ export default function GenerateCodeModal({ isOpen, onClose, onGenerate, generat
               <button
                 type="button"
                 onClick={nextStep}
-                className="text-sm text-slate-400 hover:text-white transition-colors"
+                className="text-sm text-content-muted hover:text-content-primary transition-colors"
               >
                 Continuer sans assigner →
               </button>
@@ -536,7 +536,7 @@ export default function GenerateCodeModal({ isOpen, onClose, onGenerate, generat
 
           {/* Description */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
+            <label className="block text-sm font-medium text-content-secondary mb-2">
               Motif (optionnel)
             </label>
             <input
@@ -544,7 +544,7 @@ export default function GenerateCodeModal({ isOpen, onClose, onGenerate, generat
               value={formData.description}
               onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
               placeholder="Ex: Clôture mensuelle, Inventaire..."
-              className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder:text-slate-500 focus:border-blue-500 focus:outline-none"
+              className="w-full px-4 py-3 bg-surface border border-edge rounded-xl text-content-primary placeholder:text-content-muted focus:border-status-info focus:outline-none"
             />
           </div>
         </div>
@@ -553,26 +553,26 @@ export default function GenerateCodeModal({ isOpen, onClose, onGenerate, generat
       {/* Step 4: Confirmation */}
       {currentStep === 'confirm' && (
         <div className="space-y-4">
-          <p className="text-slate-400 text-sm">Vérifiez les informations avant de générer le code</p>
+          <p className="text-content-muted text-sm">Vérifiez les informations avant de générer le code</p>
 
           {/* Summary card */}
-          <div className="bg-gradient-to-br from-slate-800 to-slate-800/50 rounded-xl overflow-hidden">
+          <div className="bg-gradient-to-br from-surface to-surface/50 rounded-xl overflow-hidden">
             {/* Type header */}
             <div className={`p-4 ${
-              formData.codeType === 'EMERGENCY' ? 'bg-red-500/10' :
-              formData.codeType === 'DAILY' ? 'bg-blue-500/10' :
-              'bg-purple-500/10'
+              formData.codeType === 'EMERGENCY' ? 'bg-status-danger-bg' :
+              formData.codeType === 'DAILY' ? 'bg-status-info-bg' :
+              'bg-status-info-bg'
             }`}>
               <div className="flex items-center gap-3">
                 <span className="text-2xl">
                   {CODE_TYPES.find(t => t.type === formData.codeType)?.icon}
                 </span>
                 <div>
-                  <p className="font-semibold text-white">
+                  <p className="font-semibold text-content-primary">
                     Code {CODE_TYPES.find(t => t.type === formData.codeType)?.title}
                   </p>
                   {formData.description && (
-                    <p className="text-sm text-slate-400">{formData.description}</p>
+                    <p className="text-sm text-content-muted">{formData.description}</p>
                   )}
                 </div>
               </div>
@@ -581,30 +581,30 @@ export default function GenerateCodeModal({ isOpen, onClose, onGenerate, generat
             {/* Details grid */}
             <div className="p-4 grid grid-cols-3 gap-4">
               <div className="text-center">
-                <Clock size={20} className="mx-auto text-slate-500 mb-2" />
-                <p className="text-xs text-slate-500 uppercase">Validité</p>
-                <p className="text-sm font-semibold text-white mt-1">{getValidityLabel()}</p>
+                <Clock size={20} className="mx-auto text-content-muted mb-2" />
+                <p className="text-xs text-content-muted uppercase">Validité</p>
+                <p className="text-sm font-semibold text-content-primary mt-1">{getValidityLabel()}</p>
               </div>
               <div className="text-center">
-                <Hash size={20} className="mx-auto text-slate-500 mb-2" />
-                <p className="text-xs text-slate-500 uppercase">Utilisations</p>
-                <p className="text-sm font-semibold text-white mt-1">{getUsagesLabel()}</p>
+                <Hash size={20} className="mx-auto text-content-muted mb-2" />
+                <p className="text-xs text-content-muted uppercase">Utilisations</p>
+                <p className="text-sm font-semibold text-content-primary mt-1">{getUsagesLabel()}</p>
               </div>
               <div className="text-center">
-                <Shield size={20} className="mx-auto text-slate-500 mb-2" />
-                <p className="text-xs text-slate-500 uppercase">Accès/session</p>
-                <p className="text-sm font-semibold text-white mt-1">{getAuthLabel()}</p>
+                <Shield size={20} className="mx-auto text-content-muted mb-2" />
+                <p className="text-xs text-content-muted uppercase">Accès/session</p>
+                <p className="text-sm font-semibold text-content-primary mt-1">{getAuthLabel()}</p>
               </div>
             </div>
 
             {/* Recipient */}
             {selectedUser && (
               <div className="px-4 pb-4">
-                <div className="p-3 bg-slate-900/50 rounded-lg flex items-center gap-3">
-                  <User size={18} className="text-slate-500" />
+                <div className="p-3 bg-surface-base/50 rounded-lg flex items-center gap-3">
+                  <User size={18} className="text-content-muted" />
                   <div className="flex-1">
-                    <p className="text-sm text-white">{selectedUser.prenom} {selectedUser.nom}</p>
-                    <p className="text-xs text-slate-400">
+                    <p className="text-sm text-content-primary">{selectedUser.prenom} {selectedUser.nom}</p>
+                    <p className="text-xs text-content-muted">
                       {formData.sendNotification ? '📲 Notification activée' : 'Sans notification'}
                     </p>
                   </div>
@@ -625,7 +625,7 @@ export default function GenerateCodeModal({ isOpen, onClose, onGenerate, generat
               {generating ? 'Génération...' : 'Générer le code'}
             </Button>
           ) : (
-            <div className="text-center p-4 bg-amber-500/10 rounded-xl text-amber-400">
+            <div className="text-center p-4 bg-status-warning-bg rounded-xl text-status-warning">
               Permission requise pour générer des codes
             </div>
           )}
@@ -634,7 +634,7 @@ export default function GenerateCodeModal({ isOpen, onClose, onGenerate, generat
 
       {/* Navigation buttons */}
       {!generatedCode && (
-        <div className="flex justify-between mt-6 pt-4 border-t border-slate-800">
+        <div className="flex justify-between mt-6 pt-4 border-t border-edge">
           <Button
             type="button"
             variant="ghost"

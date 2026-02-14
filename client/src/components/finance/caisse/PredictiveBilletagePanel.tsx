@@ -68,9 +68,9 @@ interface PredictiveBilletagePanelProps {
 }
 
 const confidenceColors = {
-  HIGH: 'text-emerald-400 bg-emerald-500/10',
-  MEDIUM: 'text-amber-400 bg-amber-500/10',
-  LOW: 'text-slate-400 bg-slate-500/10',
+  HIGH: 'text-status-success bg-status-success-bg',
+  MEDIUM: 'text-status-warning bg-status-warning-bg',
+  LOW: 'text-content-muted bg-surface-subtle/30',
 };
 
 const confidenceLabels = {
@@ -176,19 +176,19 @@ export default function PredictiveBilletagePanel({
   }
 
   return (
-    <div className="bg-gradient-to-br from-indigo-500/10 to-purple-500/10 rounded-xl border border-indigo-500/20 overflow-hidden">
+    <div className="bg-gradient-to-br from-accent/10 to-accent/10 rounded-xl border border-accent/20 overflow-hidden">
       {/* En-tête */}
       <button
         onClick={() => setExpanded(!expanded)}
         className="w-full px-4 py-3 flex items-center justify-between hover:bg-white/5 transition-colors"
       >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-indigo-500/20 flex items-center justify-center">
-            <Sparkles className="w-5 h-5 text-indigo-400" />
+          <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center">
+            <Sparkles className="w-5 h-5 text-accent" />
           </div>
           <div className="text-left">
-            <h4 className="font-medium text-white">Suggestion intelligente</h4>
-            <p className="text-xs text-slate-400">
+            <h4 className="font-medium text-content-primary">Suggestion intelligente</h4>
+            <p className="text-xs text-content-muted">
               Répartition optimale basée sur votre historique
             </p>
           </div>
@@ -200,9 +200,9 @@ export default function PredictiveBilletagePanel({
             </span>
           )}
           {expanded ? (
-            <ChevronUp className="w-5 h-5 text-slate-400" />
+            <ChevronUp className="w-5 h-5 text-content-muted" />
           ) : (
-            <ChevronDown className="w-5 h-5 text-slate-400" />
+            <ChevronDown className="w-5 h-5 text-content-muted" />
           )}
         </div>
       </button>
@@ -219,8 +219,8 @@ export default function PredictiveBilletagePanel({
             <div className="px-4 pb-4 space-y-4">
               {isLoading ? (
                 <div className="flex items-center justify-center py-8">
-                  <RefreshCw className="w-5 h-5 animate-spin text-indigo-400" />
-                  <span className="ml-2 text-slate-400">Analyse en cours...</span>
+                  <RefreshCw className="w-5 h-5 animate-spin text-accent" />
+                  <span className="ml-2 text-content-muted">Analyse en cours...</span>
                 </div>
               ) : suggestion ? (
                 <>
@@ -231,9 +231,9 @@ export default function PredictiveBilletagePanel({
                         type="checkbox"
                         checked={prioritizeSmall}
                         onChange={(e) => setPrioritizeSmall(e.target.checked)}
-                        className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-indigo-500 focus:ring-indigo-500"
+                        className="w-4 h-4 rounded border-edge-strong bg-surface text-accent focus:ring-accent"
                       />
-                      <span className="text-sm text-slate-300">
+                      <span className="text-sm text-content-secondary">
                         Priorité petites coupures
                       </span>
                     </label>
@@ -249,12 +249,12 @@ export default function PredictiveBilletagePanel({
 
                   {/* Insights */}
                   {suggestion.insights.length > 0 && (
-                    <div className="bg-slate-800/50 rounded-lg p-3">
+                    <div className="bg-surface/50 rounded-lg p-3">
                       <div className="flex items-start gap-2">
-                        <Lightbulb className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                        <Lightbulb className="w-4 h-4 text-status-warning mt-0.5 flex-shrink-0" />
                         <div className="space-y-1">
                           {suggestion.insights.map((insight, i) => (
-                            <p key={i} className="text-sm text-slate-300">
+                            <p key={i} className="text-sm text-content-secondary">
                               {insight}
                             </p>
                           ))}
@@ -266,11 +266,11 @@ export default function PredictiveBilletagePanel({
                   {/* Suggestion principale */}
                   <div>
                     <div className="flex items-center justify-between mb-3">
-                      <h5 className="text-sm font-medium text-white flex items-center gap-2">
-                        <TrendingUp className="w-4 h-4 text-indigo-400" />
+                      <h5 className="text-sm font-medium text-content-primary flex items-center gap-2">
+                        <TrendingUp className="w-4 h-4 text-accent" />
                         Répartition suggérée
                       </h5>
-                      <span className="text-sm text-slate-400">
+                      <span className="text-sm text-content-muted">
                         Total: {formatMoney(suggestion.totalAmount)} XOF
                       </span>
                     </div>
@@ -279,15 +279,15 @@ export default function PredictiveBilletagePanel({
                       {suggestion.suggestions.filter(s => s.count > 0).map((s) => (
                         <div
                           key={s.denomination}
-                          className="bg-slate-800/70 rounded-lg p-2 border border-slate-700/50"
+                          className="bg-surface/70 rounded-lg p-2 border border-edge-subtle"
                         >
                           <div className="flex items-center justify-between mb-1">
-                            <span className="text-xs text-slate-400">{s.label}</span>
-                            <span className="text-xs text-indigo-400">{s.percentage}%</span>
+                            <span className="text-xs text-content-muted">{s.label}</span>
+                            <span className="text-xs text-accent">{s.percentage}%</span>
                           </div>
                           <div className="flex items-baseline gap-2">
-                            <span className="text-lg font-bold text-white">{s.count}</span>
-                            <span className="text-xs text-slate-500">
+                            <span className="text-lg font-bold text-content-primary">{s.count}</span>
+                            <span className="text-xs text-content-muted">
                               = {formatMoney(s.value)}
                             </span>
                           </div>
@@ -325,20 +325,20 @@ export default function PredictiveBilletagePanel({
                         exit={{ height: 0, opacity: 0 }}
                         className="overflow-hidden"
                       >
-                        <div className="pt-2 border-t border-slate-700/50">
-                          <h5 className="text-sm font-medium text-slate-400 mb-3">
+                        <div className="pt-2 border-t border-edge-subtle">
+                          <h5 className="text-sm font-medium text-content-muted mb-3">
                             Alternative (+ de petites coupures)
                           </h5>
                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                             {suggestion.alternativeSuggestions.filter(s => s.count > 0).map((s) => (
                               <div
                                 key={s.denomination}
-                                className="bg-slate-800/50 rounded-lg p-2 border border-slate-700/30"
+                                className="bg-surface/50 rounded-lg p-2 border border-edge-subtle"
                               >
                                 <div className="flex items-center justify-between mb-1">
-                                  <span className="text-xs text-slate-500">{s.label}</span>
+                                  <span className="text-xs text-content-muted">{s.label}</span>
                                 </div>
-                                <span className="text-sm font-medium text-slate-300">
+                                <span className="text-sm font-medium text-content-secondary">
                                   {s.count} = {formatMoney(s.value)}
                                 </span>
                               </div>
@@ -361,8 +361,8 @@ export default function PredictiveBilletagePanel({
 
                   {/* Templates sauvegardés */}
                   {templates && templates.length > 0 && (
-                    <div className="pt-4 border-t border-slate-700/50">
-                      <h5 className="text-sm font-medium text-slate-400 mb-3 flex items-center gap-2">
+                    <div className="pt-4 border-t border-edge-subtle">
+                      <h5 className="text-sm font-medium text-content-muted mb-3 flex items-center gap-2">
                         <Wallet className="w-4 h-4" />
                         Mes modèles
                       </h5>
@@ -371,10 +371,10 @@ export default function PredictiveBilletagePanel({
                           <button
                             key={template.id}
                             onClick={() => handleApplyTemplate(template)}
-                            className="px-3 py-1.5 bg-slate-800 rounded-lg text-sm text-slate-300 hover:bg-slate-700 transition-colors flex items-center gap-2"
+                            className="px-3 py-1.5 bg-surface rounded-lg text-sm text-content-secondary hover:bg-surface-elevated transition-colors flex items-center gap-2"
                           >
                             <span>{template.nom}</span>
-                            <span className="text-xs text-slate-500">
+                            <span className="text-xs text-content-muted">
                               ({formatMoney(template.totalCalcule)})
                             </span>
                           </button>
@@ -398,7 +398,7 @@ export default function PredictiveBilletagePanel({
                   )}
 
                   {/* Métadonnées */}
-                  <div className="flex items-center gap-4 text-xs text-slate-500 pt-2 border-t border-slate-700/30">
+                  <div className="flex items-center gap-4 text-xs text-content-muted pt-2 border-t border-edge-subtle">
                     <span className="flex items-center gap-1">
                       <Info className="w-3 h-3" />
                       {suggestion.basedOn.sessionsAnalyzed} sessions analysées
@@ -410,7 +410,7 @@ export default function PredictiveBilletagePanel({
                       </span>
                     )}
                     {suggestion.basedOn.isEndOfMonth && (
-                      <span className="flex items-center gap-1 text-amber-400">
+                      <span className="flex items-center gap-1 text-status-warning">
                         <AlertCircle className="w-3 h-3" />
                         Fin de mois
                       </span>
@@ -418,7 +418,7 @@ export default function PredictiveBilletagePanel({
                   </div>
                 </>
               ) : (
-                <div className="text-center py-8 text-slate-400">
+                <div className="text-center py-8 text-content-muted">
                   <Sparkles className="w-8 h-8 mx-auto mb-2 opacity-50" />
                   <p>Entrez un montant pour obtenir des suggestions</p>
                 </div>
@@ -445,10 +445,10 @@ export default function PredictiveBilletagePanel({
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="relative w-full max-w-sm bg-slate-800 rounded-xl shadow-xl border border-slate-700 p-4"
+              className="relative w-full max-w-sm bg-surface rounded-xl shadow-xl border border-edge p-4"
             >
-              <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
-                <Save className="w-5 h-5 text-indigo-400" />
+              <h3 className="font-semibold text-content-primary mb-4 flex items-center gap-2">
+                <Save className="w-5 h-5 text-accent" />
                 Sauvegarder comme modèle
               </h3>
 
@@ -457,7 +457,7 @@ export default function PredictiveBilletagePanel({
                 value={templateName}
                 onChange={(e) => setTemplateName(e.target.value)}
                 placeholder="Nom du modèle..."
-                className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 mb-4"
+                className="w-full px-3 py-2 bg-surface-elevated/50 border border-edge-strong rounded-lg text-content-primary placeholder-content-muted mb-4"
               />
 
               <div className="flex justify-end gap-2">

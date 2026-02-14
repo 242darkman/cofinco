@@ -68,10 +68,10 @@ const DOC_TYPE_LABELS: Record<string, string> = {
 };
 
 const DOC_STATUS_STYLES: Record<string, { label: string; cls: string }> = {
-  PENDING: { label: 'En attente', cls: 'bg-amber-500/10 text-amber-400 border-amber-500/30' },
-  VERIFIED: { label: 'Vérifié', cls: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' },
-  REJECTED: { label: 'Rejeté', cls: 'bg-red-500/10 text-red-400 border-red-500/30' },
-  EXPIRED: { label: 'Expiré', cls: 'bg-slate-500/10 text-slate-400 border-slate-500/30' },
+  PENDING: { label: 'En attente', cls: 'bg-status-warning-bg text-status-warning border-status-warning/30' },
+  VERIFIED: { label: 'Vérifié', cls: 'bg-status-success-bg text-status-success border-status-success/30' },
+  REJECTED: { label: 'Rejeté', cls: 'bg-status-danger-bg text-status-danger border-status-danger/30' },
+  EXPIRED: { label: 'Expiré', cls: 'bg-surface-subtle/30 text-content-muted border-edge-strong/30' },
 };
 
 interface EmployeeProfileDrawerProps {
@@ -410,10 +410,10 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
 
   const getRiskColor = (level: string) => {
     switch (level) {
-      case 'critical': return 'text-red-400 bg-red-500/10 border-red-500/20';
-      case 'high': return 'text-amber-400 bg-amber-500/10 border-amber-500/20';
-      case 'medium': return 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20';
-      default: return 'text-slate-400 bg-slate-500/10 border-slate-500/20';
+      case 'critical': return 'text-status-danger bg-status-danger-bg border-status-danger/20';
+      case 'high': return 'text-status-warning bg-status-warning-bg border-status-warning/20';
+      case 'medium': return 'text-status-warning bg-status-warning-bg border-status-warning/20';
+      default: return 'text-content-muted bg-surface-subtle/30 border-edge-strong/20';
     }
   };
 
@@ -423,21 +423,21 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg bg-slate-950 h-full shadow-2xl border-l border-slate-800 flex flex-col animate-in slide-in-from-right duration-300"
+        className="w-full max-w-lg bg-surface-base h-full shadow-2xl border-l border-edge flex flex-col animate-in slide-in-from-right duration-300"
         onClick={(e) => e.stopPropagation()}
       >
 
         {/* HEADER GRAPHIQUE */}
-        <div className="relative h-40 bg-gradient-to-br from-indigo-900 via-slate-900 to-slate-950 shrink-0">
+        <div className="relative h-40 bg-gradient-to-br from-accent via-surface-base to-surface-base shrink-0">
            <button
              onClick={onClose}
-             className="absolute top-4 right-4 p-2 bg-black/20 hover:bg-black/40 text-white rounded-full transition-colors backdrop-blur-md"
+             className="absolute top-4 right-4 p-2 bg-black/20 hover:bg-black/40 text-content-primary rounded-full transition-colors backdrop-blur-md"
            >
              <X size={20} />
            </button>
 
            <div className="absolute -bottom-10 left-8 flex items-end gap-4">
-              <div className="w-24 h-24 rounded-2xl bg-slate-900 border-4 border-slate-950 overflow-hidden shadow-2xl">
+              <div className="w-24 h-24 rounded-2xl bg-surface-base border-4 border-edge overflow-hidden shadow-2xl">
                  {employee.photoProfile ? (
                    <img
                      src={resolveStorageUrl(employee.photoProfile)}
@@ -445,14 +445,14 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
                      className="w-full h-full object-cover"
                    />
                  ) : (
-                   <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-600 to-indigo-700 text-2xl font-bold text-white">
+                   <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-accent to-accent text-2xl font-bold text-white">
                      {getInitials(employee.nom, employee.prenom)}
                    </div>
                  )}
               </div>
               <div className="mb-2">
-                 <h2 className="text-xl font-bold text-white">{employee.nom} {employee.prenom}</h2>
-                 <p className="text-indigo-400 font-medium text-sm">{employee.poste || 'Non défini'}</p>
+                 <h2 className="text-xl font-bold text-content-primary">{employee.nom} {employee.prenom}</h2>
+                 <p className="text-accent font-medium text-sm">{employee.poste || 'Non défini'}</p>
               </div>
            </div>
         </div>
@@ -460,23 +460,23 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
         {/* CONFIRMATION MODAL OVERLAY */}
         {confirmAction && (
           <div className="absolute inset-0 z-30 bg-black/70 backdrop-blur-sm flex items-center justify-center p-8">
-            <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-in zoom-in-95 fade-in duration-200">
+            <div className="bg-surface-base border border-edge rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-in zoom-in-95 fade-in duration-200">
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 ${
-                confirmAction.variant === 'danger' ? 'bg-red-500/10' :
-                confirmAction.variant === 'warning' ? 'bg-amber-500/10' : 'bg-indigo-500/10'
+                confirmAction.variant === 'danger' ? 'bg-status-danger-bg' :
+                confirmAction.variant === 'warning' ? 'bg-status-warning-bg' : 'bg-accent/10'
               }`}>
                 <AlertTriangle size={20} className={
-                  confirmAction.variant === 'danger' ? 'text-red-400' :
-                  confirmAction.variant === 'warning' ? 'text-amber-400' : 'text-indigo-400'
+                  confirmAction.variant === 'danger' ? 'text-status-danger' :
+                  confirmAction.variant === 'warning' ? 'text-status-warning' : 'text-accent'
                 } />
               </div>
-              <h3 className="text-white font-bold text-lg mb-2">{confirmAction.title}</h3>
-              <p className="text-slate-400 text-sm leading-relaxed mb-6">{confirmAction.message}</p>
+              <h3 className="text-content-primary font-bold text-lg mb-2">{confirmAction.title}</h3>
+              <p className="text-content-muted text-sm leading-relaxed mb-6">{confirmAction.message}</p>
               <div className="flex gap-3">
                 <button
                   onClick={() => setConfirmAction(null)}
                   disabled={actionLoading}
-                  className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-medium text-sm transition-colors border border-slate-700"
+                  className="flex-1 py-2.5 bg-surface hover:bg-surface-elevated text-content-secondary rounded-xl font-medium text-sm transition-colors border border-edge"
                 >
                   Annuler
                 </button>
@@ -485,10 +485,10 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
                   disabled={actionLoading}
                   className={`flex-1 py-2.5 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 ${
                     confirmAction.variant === 'danger'
-                      ? 'bg-red-600 hover:bg-red-500 text-white'
+                      ? 'bg-status-danger hover:bg-status-danger text-white'
                       : confirmAction.variant === 'warning'
-                      ? 'bg-amber-600 hover:bg-amber-500 text-white'
-                      : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                      ? 'bg-status-warning hover:bg-status-warning text-white'
+                      : 'bg-accent hover:bg-accent-primary-hover text-white'
                   }`}
                 >
                   {actionLoading && <Loader2 size={16} className="animate-spin" />}
@@ -506,7 +506,7 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
           {activeView !== 'profile' && (
             <button
               onClick={() => setActiveView('profile')}
-              className="flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors -mt-2 mb-2"
+              className="flex items-center gap-2 text-sm text-content-muted hover:text-content-primary transition-colors -mt-2 mb-2"
             >
               <ChevronLeft size={16} />
               Retour au profil
@@ -520,7 +520,7 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
               <div className="flex gap-3 relative">
                 <button
                   onClick={() => onEdit && onEdit(employee)}
-                  className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-sm transition-colors shadow-lg shadow-indigo-900/20"
+                  className="flex-1 py-2.5 bg-accent hover:bg-accent-primary-hover text-white rounded-xl font-bold text-sm transition-colors shadow-lg shadow-accent/20"
                 >
                   Modifier Profil
                 </button>
@@ -528,10 +528,10 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
                 <button
                   onClick={handleOpenChat}
                   disabled={isLoadingChat}
-                  className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold text-sm border border-slate-700 flex items-center gap-2 transition-colors disabled:opacity-70 disabled:cursor-wait"
+                  className="px-4 py-2.5 bg-surface hover:bg-surface-elevated text-content-primary rounded-xl font-bold text-sm border border-edge flex items-center gap-2 transition-colors disabled:opacity-70 disabled:cursor-wait"
                 >
                   {isLoadingChat ? (
-                    <Loader2 size={18} className="animate-spin text-indigo-400" />
+                    <Loader2 size={18} className="animate-spin text-accent" />
                   ) : (
                     <MessageCircle size={18} />
                   )}
@@ -544,8 +544,8 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
                     onClick={() => setMenuOpen(!isMenuOpen)}
                     className={`px-3 py-2.5 rounded-xl border transition-colors ${
                       isMenuOpen
-                        ? 'bg-slate-700 border-slate-600 text-white'
-                        : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white'
+                        ? 'bg-surface-elevated border-edge-strong text-content-primary'
+                        : 'bg-surface border-edge text-content-secondary hover:text-content-primary'
                     }`}
                   >
                     <MoreVertical size={20} />
@@ -554,9 +554,9 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
                   {isMenuOpen && (
                     <>
                       <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-                      <div className="absolute right-0 top-12 z-20 w-64 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl py-1 animate-in fade-in zoom-in-95 origin-top-right">
+                      <div className="absolute right-0 top-12 z-20 w-64 bg-surface-base border border-edge rounded-xl shadow-2xl py-1 animate-in fade-in zoom-in-95 origin-top-right">
 
-                        <div className="px-3 py-2 text-[10px] uppercase font-bold text-slate-500 tracking-wider">Administration</div>
+                        <div className="px-3 py-2 text-[10px] uppercase font-bold text-content-muted tracking-wider">Administration</div>
                         <MenuItem
                           icon={FileText}
                           label="Gérer les documents"
@@ -568,9 +568,9 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
                           onClick={() => { setActiveView('activity'); setMenuOpen(false); }}
                         />
 
-                        <div className="my-1 border-t border-slate-800" />
+                        <div className="my-1 border-t border-edge" />
 
-                        <div className="px-3 py-2 text-[10px] uppercase font-bold text-slate-500 tracking-wider">Sécurité</div>
+                        <div className="px-3 py-2 text-[10px] uppercase font-bold text-content-muted tracking-wider">Sécurité</div>
                         <MenuItem
                           icon={KeyRound}
                           label="Réinitialiser le mot de passe"
@@ -582,18 +582,18 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
                           onClick={handleForceLogout}
                         />
 
-                        <div className="my-1 border-t border-slate-800" />
+                        <div className="my-1 border-t border-edge" />
 
                         <MenuItem
                           icon={Ban}
                           label={employee.statut === StatutUser.SUSPENDED ? "Réactiver le compte" : "Suspendre le compte"}
-                          color={employee.statut === StatutUser.SUSPENDED ? "text-emerald-500 hover:bg-emerald-500/10" : "text-amber-500 hover:bg-amber-500/10"}
+                          color={employee.statut === StatutUser.SUSPENDED ? "text-status-success hover:bg-status-success-bg" : "text-status-warning hover:bg-status-warning-bg"}
                           onClick={handleSuspendAccount}
                         />
                         <MenuItem
                           icon={Archive}
                           label="Archiver (Départ)"
-                          color="text-red-500 hover:bg-red-500/10"
+                          color="text-status-danger hover:bg-status-danger-bg"
                           onClick={handleArchive}
                         />
                       </div>
@@ -631,21 +631,21 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
 
               {/* Block 3: Financier */}
               <Section title="Données Financières" icon={CreditCard}>
-                <div className="col-span-2 p-4 bg-slate-900 rounded-xl border border-slate-800 flex justify-between items-center">
+                <div className="col-span-2 p-4 bg-surface-base rounded-xl border border-edge flex justify-between items-center">
                    <div>
-                      <div className="text-xs text-slate-500 uppercase font-bold mb-1">Salaire de Base</div>
-                      <div className="text-2xl font-bold text-emerald-400">
+                      <div className="text-xs text-content-muted uppercase font-bold mb-1">Salaire de Base</div>
+                      <div className="text-2xl font-bold text-status-success">
                         {parseFloat(employee.salaireBase || '0').toLocaleString()} FCFA
                       </div>
                       {employee.modeCalculPaie && (
-                        <div className="text-xs text-slate-400 mt-1">
+                        <div className="text-xs text-content-muted mt-1">
                           Mode: {employee.modeCalculPaie === 'MONTHLY' ? 'Mensuel' : employee.modeCalculPaie === 'DAILY' ? 'Journalier' : 'Horaire'}
                         </div>
                       )}
                    </div>
                    <div className="text-right">
-                      <div className="text-xs text-slate-500 mb-1">N° CNSS</div>
-                      <div className="text-sm text-white font-mono">
+                      <div className="text-xs text-content-muted mb-1">N° CNSS</div>
+                      <div className="text-sm text-content-primary font-mono">
                         {employee.numeroCnss || 'Non renseigné'}
                       </div>
                    </div>
@@ -656,9 +656,9 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
               {(employee.agenceId || employee.agence) && (
                 <Section title="Affectation" icon={MapPin}>
                   <div className="col-span-2">
-                    <div className="text-xs text-slate-500 font-medium mb-2">Agence</div>
+                    <div className="text-xs text-content-muted font-medium mb-2">Agence</div>
                     <div className="flex items-center gap-2">
-                      <div className="text-sm text-slate-200 font-medium">
+                      <div className="text-sm text-content-secondary font-medium">
                         {employee.agence?.nom || 'Agence principale'}
                       </div>
                       {employee.agence?.typeAgence && (
@@ -666,7 +666,7 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
                       )}
                     </div>
                     {employee.agence?.codeAgence && (
-                      <div className="text-xs text-slate-500 font-mono mt-1">
+                      <div className="text-xs text-content-muted font-mono mt-1">
                         Code: {employee.agence.codeAgence}
                       </div>
                     )}
@@ -680,17 +680,17 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
           {activeView === 'documents' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-slate-400">
+                <div className="flex items-center gap-2 text-content-muted">
                   <FileText size={18} />
                   <h3 className="text-sm font-bold uppercase tracking-wider">Documents</h3>
-                  <span className="text-xs bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full">
+                  <span className="text-xs bg-surface text-content-muted px-2 py-0.5 rounded-full">
                     {documents.length}
                   </span>
                 </div>
                 <button
                   onClick={() => setShowUploadForm(!showUploadForm)}
                   disabled={uploading}
-                  className="flex items-center gap-2 px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition-colors"
+                  className="flex items-center gap-2 px-3 py-2 bg-accent hover:bg-accent-primary-hover text-white text-xs font-bold rounded-lg transition-colors"
                 >
                   {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
                   Ajouter
@@ -699,24 +699,24 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
 
               {/* Upload form */}
               {showUploadForm && (
-                <div className="p-4 bg-slate-900 border border-indigo-500/30 rounded-xl space-y-3 animate-in slide-in-from-top-2">
+                <div className="p-4 bg-surface-base border border-accent/30 rounded-xl space-y-3 animate-in slide-in-from-top-2">
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase">Nom du document *</label>
+                      <label className="text-[10px] font-bold text-content-muted uppercase">Nom du document *</label>
                       <input
                         type="text"
                         value={uploadMeta.nom}
                         onChange={(e) => setUploadMeta(p => ({ ...p, nom: e.target.value }))}
                         placeholder="ex: Contrat CDI"
-                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:border-indigo-500 outline-none"
+                        className="w-full bg-surface border border-edge rounded-lg px-3 py-2 text-sm text-content-primary placeholder-content-muted focus:border-accent outline-none"
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase">Type</label>
+                      <label className="text-[10px] font-bold text-content-muted uppercase">Type</label>
                       <select
                         value={uploadMeta.typeDocument}
                         onChange={(e) => setUploadMeta(p => ({ ...p, typeDocument: e.target.value }))}
-                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white appearance-none focus:border-indigo-500 outline-none"
+                        className="w-full bg-surface border border-edge rounded-lg px-3 py-2 text-sm text-content-primary appearance-none focus:border-accent outline-none"
                       >
                         {Object.entries(DOC_TYPE_LABELS).map(([k, v]) => (
                           <option key={k} value={k}>{v}</option>
@@ -725,26 +725,26 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Date d'expiration (optionnel)</label>
+                    <label className="text-[10px] font-bold text-content-muted uppercase">Date d'expiration (optionnel)</label>
                     <input
                       type="date"
                       value={uploadMeta.dateExpiration}
                       onChange={(e) => setUploadMeta(p => ({ ...p, dateExpiration: e.target.value }))}
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 outline-none"
+                      className="w-full bg-surface border border-edge rounded-lg px-3 py-2 text-sm text-content-primary focus:border-accent outline-none"
                     />
                   </div>
                   <div className="flex gap-2">
                     <button
                       onClick={() => fileInputRef.current?.click()}
                       disabled={uploading || !uploadMeta.nom}
-                      className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-xs font-bold rounded-lg transition-colors"
+                      className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 bg-accent hover:bg-accent-primary-hover disabled:bg-surface disabled:text-content-muted text-white text-xs font-bold rounded-lg transition-colors"
                     >
                       {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
                       Choisir le fichier
                     </button>
                     <button
                       onClick={() => setShowUploadForm(false)}
-                      className="px-3 py-2 text-slate-400 hover:text-white text-xs transition-colors"
+                      className="px-3 py-2 text-content-muted hover:text-content-primary text-xs transition-colors"
                     >
                       Annuler
                     </button>
@@ -761,10 +761,10 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
 
               {docsLoading ? (
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 size={24} className="animate-spin text-indigo-400" />
+                  <Loader2 size={24} className="animate-spin text-accent" />
                 </div>
               ) : documents.length === 0 ? (
-                <div className="text-center py-12 text-slate-500">
+                <div className="text-center py-12 text-content-muted">
                   <File size={32} className="mx-auto mb-3 opacity-50" />
                   <p className="text-sm">Aucun document</p>
                   <p className="text-xs mt-1">Ajoutez des fichiers pour cet employé</p>
@@ -775,15 +775,15 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
                     const statusStyle = DOC_STATUS_STYLES[doc.statut] || DOC_STATUS_STYLES.PENDING;
                     const isExpired = doc.dateExpiration && new Date(doc.dateExpiration) < new Date();
                     return (
-                      <div key={doc.id} className="p-3 bg-slate-900 border border-slate-800 rounded-xl hover:border-slate-700 transition-colors group">
+                      <div key={doc.id} className="p-3 bg-surface-base border border-edge rounded-xl hover:border-edge transition-colors group">
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-lg bg-indigo-500/10 flex items-center justify-center shrink-0">
-                            <FileText size={16} className="text-indigo-400" />
+                          <div className="w-9 h-9 rounded-lg bg-accent/10 flex items-center justify-center shrink-0">
+                            <FileText size={16} className="text-accent" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm text-slate-200 font-medium truncate">{doc.nom}</p>
-                            <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-0.5">
-                              <span className="text-slate-400">{DOC_TYPE_LABELS[doc.typeDocument] || doc.typeDocument}</span>
+                            <p className="text-sm text-content-secondary font-medium truncate">{doc.nom}</p>
+                            <div className="flex items-center gap-2 text-[11px] text-content-muted mt-0.5">
+                              <span className="text-content-muted">{DOC_TYPE_LABELS[doc.typeDocument] || doc.typeDocument}</span>
                               {doc.fileSize && <span>{formatFileSize(doc.fileSize)}</span>}
                               <span className={`px-1.5 py-0.5 rounded border text-[10px] font-medium ${statusStyle.cls}`}>
                                 {isExpired && doc.statut !== 'EXPIRED' ? 'Expiré' : statusStyle.label}
@@ -795,14 +795,14 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
                               <>
                                 <button
                                   onClick={() => handleVerifyDoc(doc.id, 'VERIFIED')}
-                                  className="p-1.5 text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors"
+                                  className="p-1.5 text-status-success hover:bg-status-success-bg rounded-lg transition-colors"
                                   title="Vérifier"
                                 >
                                   <CheckCircle size={14} />
                                 </button>
                                 <button
                                   onClick={() => handleVerifyDoc(doc.id, 'REJECTED')}
-                                  className="p-1.5 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                                  className="p-1.5 text-status-danger hover:bg-status-danger-bg rounded-lg transition-colors"
                                   title="Rejeter"
                                 >
                                   <Ban size={14} />
@@ -812,7 +812,8 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
                             {doc.url && (
                               <button
                                 onClick={() => setPreviewDoc(doc)}
-                                className="p-1.5 text-slate-500 hover:text-indigo-400 transition-colors"
+                                className="p-1.5 text-content-muted hover:text-accent transition-colors"
+
                                 title="Aperçu"
                               >
                                 <Eye size={14} />
@@ -820,7 +821,7 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
                             )}
                             <button
                               onClick={() => handleDeleteDoc(doc)}
-                              className="p-1.5 text-slate-500 hover:text-red-400 transition-colors"
+                              className="p-1.5 text-content-muted hover:text-status-danger transition-colors"
                               title="Supprimer"
                             >
                               <Trash2 size={14} />
@@ -828,10 +829,10 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
                           </div>
                         </div>
                         {doc.dateExpiration && (
-                          <div className={`mt-2 flex items-center gap-1.5 text-[10px] ${isExpired ? 'text-red-400' : 'text-slate-500'}`}>
+                          <div className={`mt-2 flex items-center gap-1.5 text-[10px] ${isExpired ? 'text-status-danger' : 'text-content-muted'}`}>
                             <Calendar size={10} />
                             <span>Expire le {new Date(doc.dateExpiration).toLocaleDateString('fr-FR')}</span>
-                            {isExpired && <AlertTriangle size={10} className="text-red-400" />}
+                            {isExpired && <AlertTriangle size={10} className="text-status-danger" />}
                           </div>
                         )}
                       </div>
@@ -845,52 +846,52 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
           {/* ========== ACTIVITY HISTORY VIEW ========== */}
           {activeView === 'activity' && (
             <div className="space-y-4">
-              <div className="flex items-center gap-2 text-slate-400">
+              <div className="flex items-center gap-2 text-content-muted">
                 <History size={18} />
                 <h3 className="text-sm font-bold uppercase tracking-wider">Historique d'activité</h3>
-                <span className="text-xs bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full">
+                <span className="text-xs bg-surface text-content-muted px-2 py-0.5 rounded-full">
                   {auditLogs.length}
                 </span>
               </div>
 
               {logsLoading ? (
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 size={24} className="animate-spin text-indigo-400" />
+                  <Loader2 size={24} className="animate-spin text-accent" />
                 </div>
               ) : auditLogs.length === 0 ? (
-                <div className="text-center py-12 text-slate-500">
+                <div className="text-center py-12 text-content-muted">
                   <Clock size={32} className="mx-auto mb-3 opacity-50" />
                   <p className="text-sm">Aucune activité enregistrée</p>
                 </div>
               ) : (
                 <div className="space-y-1">
                   {auditLogs.map((log) => (
-                    <div key={log.id} className="flex gap-3 p-3 bg-slate-900/50 border border-slate-800/50 rounded-xl hover:border-slate-700/50 transition-colors">
+                    <div key={log.id} className="flex gap-3 p-3 bg-surface-base/50 border border-edge/50 rounded-xl hover:border-edge-subtle transition-colors">
                       <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${
-                        log.statut === 'success' ? 'bg-emerald-400' :
-                        log.statut === 'failure' ? 'bg-red-400' : 'bg-amber-400'
+                        log.statut === 'success' ? 'bg-status-success' :
+                        log.statut === 'failure' ? 'bg-status-danger' : 'bg-status-warning'
                       }`} />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm text-slate-200 font-medium">
+                          <span className="text-sm text-content-secondary font-medium">
                             {getActionLabel(log.action)}
                           </span>
                           <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${getRiskColor(log.riskLevel)}`}>
                             {log.riskLevel}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-500">
+                        <div className="flex items-center gap-2 mt-1 text-[11px] text-content-muted">
                           <Clock size={10} />
                           <span>{formatDateTime(log.createdAt)}</span>
                           {log.resource && (
                             <>
-                              <span className="text-slate-700">|</span>
+                              <span className="text-content-secondary">|</span>
                               <span>{log.resource}</span>
                             </>
                           )}
                           {log.ipAddress && (
                             <>
-                              <span className="text-slate-700">|</span>
+                              <span className="text-content-secondary">|</span>
                               <span className="font-mono">{log.ipAddress}</span>
                             </>
                           )}
@@ -929,7 +930,7 @@ function Section({ title, icon: Icon, children }: {
 }) {
   return (
     <div className="space-y-4">
-       <div className="flex items-center gap-2 text-slate-400 border-b border-slate-800 pb-2">
+       <div className="flex items-center gap-2 text-content-muted border-b border-edge pb-2">
          <Icon size={18} />
          <h3 className="text-sm font-bold uppercase tracking-wider">{title}</h3>
        </div>
@@ -957,13 +958,13 @@ function GridItem({
 }) {
   return (
     <div className={`space-y-1 ${fullWidth ? 'col-span-2' : ''}`}>
-       <div className="text-xs text-slate-500 font-medium flex items-center gap-2">
+       <div className="text-xs text-content-muted font-medium flex items-center gap-2">
          {Icon && <Icon size={12} />} {label}
        </div>
-       <div className={`text-sm text-slate-200 font-medium ${
-         mono ? 'font-mono bg-slate-900 px-2 py-1 rounded w-fit text-slate-400 border border-slate-800' : ''
+       <div className={`text-sm text-content-secondary font-medium ${
+         mono ? 'font-mono bg-surface-base px-2 py-1 rounded w-fit text-content-muted border border-edge' : ''
        } ${
-         badge ? 'bg-indigo-500/10 text-indigo-400 px-2 py-0.5 rounded text-xs w-fit border border-indigo-500/20 uppercase font-bold' : ''
+         badge ? 'bg-accent/10 text-accent px-2 py-0.5 rounded text-xs w-fit border border-accent/20 uppercase font-bold' : ''
        }`}>
          {value}
        </div>
@@ -976,9 +977,9 @@ function StatusBadge({ status }: { status: string }) {
   const isSuspended = status === 'Suspendu';
 
   const getStyles = () => {
-    if (isActive) return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
-    if (isSuspended) return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
-    return 'bg-red-500/10 text-red-400 border-red-500/20';
+    if (isActive) return 'bg-status-success-bg text-status-success border-status-success/20';
+    if (isSuspended) return 'bg-status-warning-bg text-status-warning border-status-warning/20';
+    return 'bg-status-danger-bg text-status-danger border-status-danger/20';
   };
 
   const getIcon = () => {
@@ -1000,22 +1001,22 @@ function AgencyTypeBadge({ type }: { type: 'MAIN' | 'SECONDARY' | 'KIOSK' }) {
       case 'MAIN':
         return {
           label: 'Principale',
-          colors: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
+          colors: 'bg-accent/10 text-accent border-accent/20'
         };
       case 'SECONDARY':
         return {
           label: 'Secondaire',
-          colors: 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+          colors: 'bg-status-info-bg text-status-info border-status-info/20'
         };
       case 'KIOSK':
         return {
           label: 'Kiosque',
-          colors: 'bg-purple-500/10 text-purple-400 border-purple-500/20'
+          colors: 'bg-status-info-bg text-status-info border-status-info/20'
         };
       default:
         return {
           label: type,
-          colors: 'bg-slate-500/10 text-slate-400 border-slate-500/20'
+          colors: 'bg-surface-subtle/30 text-content-muted border-edge-strong/20'
         };
     }
   };
@@ -1033,7 +1034,7 @@ function MenuItem({
   icon: Icon,
   label,
   onClick,
-  color = "text-slate-300 hover:bg-slate-800 hover:text-white"
+  color = "text-content-secondary hover:bg-surface hover:text-content-primary"
 }: {
   icon: React.ElementType;
   label: string;

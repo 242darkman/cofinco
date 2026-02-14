@@ -5,8 +5,10 @@ import ComplianceReportCard from './compliance/ComplianceReportCard';
 import ComplianceStatusStats from './compliance/ComplianceStatusStats';
 import SelectField from '../ui/SelectField';
 import Card from '../ui/Card';
+import { useBranding } from '../../contexts/BrandingContext';
 
 export default function ComplianceReports() {
+  const { branding } = useBranding();
   const {
     loading,
     selectedPeriod,
@@ -22,7 +24,7 @@ export default function ComplianceReports() {
       title: 'Rapport de Conformité OHADA',
       description: 'Conforme aux normes comptables SYSCOHADA révisé',
       icon: Shield,
-      color: 'from-blue-600 to-cyan-600',
+      color: 'from-status-info to-accent',
       action: generateOHADAReport,
       items: [
         'Plan comptable OHADA complet',
@@ -38,7 +40,7 @@ export default function ComplianceReports() {
       title: 'Rapport Fiscal DGI Congo',
       description: 'Conforme aux exigences de la Direction Générale des Impôts',
       icon: FileText,
-      color: 'from-green-600 to-emerald-600',
+      color: 'from-status-success to-status-success',
       action: generateDGIReport,
       items: [
         'Déclarations TVA (18.9%)',
@@ -54,7 +56,7 @@ export default function ComplianceReports() {
       title: 'Piste d\'Audit Complète',
       description: 'Export complet de tous les événements système',
       icon: CheckCircle,
-      color: 'from-emerald-600 to-cyan-600',
+      color: 'from-status-success to-accent',
       action: generateAuditTrailReport,
       items: [
         'Tous les événements',
@@ -78,17 +80,17 @@ export default function ComplianceReports() {
     <div className="space-y-8 animate-in fade-in duration-500 pb-20 md:pb-0">
       
       {/* Header Section */}
-      <Card className="bg-slate-900 border-slate-800 p-6 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none" />
+      <Card className="bg-surface-base border-edge p-6 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-status-info/5 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none" />
         
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-blue-500/20 rounded-xl">
-               <Shield className="w-8 h-8 text-blue-400" />
+            <div className="p-3 bg-status-info-bg rounded-xl">
+               <Shield className="w-8 h-8 text-status-info" />
             </div>
             <div>
-              <h2 className="text-2xl md:text-3xl font-bold text-white tracking-tight">Rapports de Compliance</h2>
-              <p className="text-slate-400 mt-1">Conformité OHADA, DGI et Piste d'Audit réglementaire</p>
+              <h2 className="text-2xl md:text-3xl font-bold text-content-primary tracking-tight">Rapports de Compliance</h2>
+              <p className="text-content-muted mt-1">Conformité OHADA, DGI et Piste d'Audit réglementaire</p>
             </div>
           </div>
 
@@ -119,16 +121,16 @@ export default function ComplianceReports() {
       <ComplianceStatusStats />
 
       {/* Certification Footer */}
-      <Card className="bg-gradient-to-br from-blue-900/40 to-emerald-900/40 border-slate-800 p-8">
+      <Card className="bg-gradient-to-br from-status-info/10 to-status-success/10 border-edge p-8">
         <div className="flex flex-col md:flex-row items-center md:items-start gap-6 text-center md:text-left">
-          <div className="p-4 bg-slate-950/50 rounded-full border border-slate-700/50 shadow-xl">
-            <Shield className="w-12 h-12 text-emerald-400" />
+          <div className="p-4 bg-surface-base/50 rounded-full border border-edge-subtle shadow-xl">
+            <Shield className="w-12 h-12 text-status-success" />
           </div>
           <div className="flex-1">
-            <h3 className="text-xl font-bold text-white mb-3">Certification de Conformité</h3>
-            <p className="text-slate-300 mb-6 leading-relaxed max-w-3xl">
-              Le système COFIN Platform est entièrement conforme aux normes <strong className="text-white">SYSCOHADA révisé</strong> et aux
-              exigences de la <strong className="text-white">Direction Générale des Impôts</strong> de la République du Congo.
+            <h3 className="text-xl font-bold text-content-primary mb-3">Certification de Conformité</h3>
+            <p className="text-content-secondary mb-6 leading-relaxed max-w-3xl">
+              Le système {branding.appName} Platform est entièrement conforme aux normes <strong className="text-content-primary">SYSCOHADA révisé</strong> et aux
+              exigences de la <strong className="text-content-primary">Direction Générale des Impôts</strong> de la République du Congo.
               Toutes les transactions sont sécurisées, horodatées et immuables.
             </p>
             
@@ -139,8 +141,8 @@ export default function ComplianceReports() {
                  'Archivage automatique',
                  'Piste d\'audit immuable'
                ].map((cert, idx) => (
-                 <div key={idx} className="flex items-center gap-2 text-sm text-slate-400 bg-slate-950/30 px-3 py-2 rounded-lg">
-                   <CheckCircle size={14} className="text-emerald-400" />
+                 <div key={idx} className="flex items-center gap-2 text-sm text-content-muted bg-surface-base/30 px-3 py-2 rounded-lg">
+                   <CheckCircle size={14} className="text-status-success" />
                    {cert}
                  </div>
                ))}

@@ -688,14 +688,14 @@ export default function EmployeeForm({
     >
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
         {/* TAB NAVIGATION */}
-        <div className="flex p-1 bg-slate-800 rounded-lg mb-4">
+        <div className="flex p-1 bg-surface rounded-lg mb-4">
           <button
             type="button"
             onClick={() => setActiveTab('identity')}
             className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
               activeTab === 'identity' 
-                ? 'bg-indigo-600 text-white shadow-lg' 
-                : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                ? 'bg-accent text-white shadow-lg' 
+                : 'text-content-muted hover:text-content-primary hover:bg-surface-elevated/50'
             }`}
           >
             1. Informations Personnelles
@@ -705,8 +705,8 @@ export default function EmployeeForm({
             onClick={() => setActiveTab('contract')}
             className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
               activeTab === 'contract' 
-                ? 'bg-indigo-600 text-white shadow-lg' 
-                : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                ? 'bg-accent text-white shadow-lg' 
+                : 'text-content-muted hover:text-content-primary hover:bg-surface-elevated/50'
             }`}
           >
             2. Contrat & Poste
@@ -718,10 +718,10 @@ export default function EmployeeForm({
           <div className="space-y-4 animate-in fade-in slide-in-from-left-4 duration-300">
             {/* Section 1: Liaison avec un compte utilisateur (mode création uniquement) */}
             {!editingEmploye && (
-              <div className="p-3 bg-indigo-500/10 border border-indigo-500/30 rounded-lg space-y-3">
+              <div className="p-3 bg-accent/10 border border-accent/30 rounded-lg space-y-3">
                 <div className="flex items-center gap-2">
-                  <Link size={16} className="text-indigo-400" />
-                  <h4 className="text-sm font-semibold text-white">Lier à un compte utilisateur</h4>
+                  <Link size={16} className="text-accent" />
+                  <h4 className="text-sm font-semibold text-content-primary">Lier à un compte utilisateur</h4>
                 </div>
   
                 <SelectField
@@ -740,17 +740,17 @@ export default function EmployeeForm({
                 />
   
                 {selectedUser && (
-                  <div className="flex items-center gap-3 p-2 bg-slate-800/50 rounded-lg border border-slate-700">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-emerald-500 flex items-center justify-center overflow-hidden">
+                  <div className="flex items-center gap-3 p-2 bg-surface/50 rounded-lg border border-edge">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-status-info to-status-success flex items-center justify-center overflow-hidden">
                       {selectedUser.photoProfile ? (
                         <img src={resolveStorageUrl(selectedUser.photoProfile)} alt="" className="w-full h-full object-cover" />
                       ) : (
-                        <User size={20} className="text-white" />
+                        <User size={20} className="text-content-primary" />
                       )}
                     </div>
                     <div className="flex-1">
-                      <p className="text-sm font-semibold text-white">{selectedUser.prenom} {selectedUser.nom}</p>
-                      <p className="text-[10px] text-slate-400">{selectedUser.email || 'Pas d\'email'} • {selectedUser.telephone || 'Pas de téléphone'}</p>
+                      <p className="text-sm font-semibold text-content-primary">{selectedUser.prenom} {selectedUser.nom}</p>
+                      <p className="text-[10px] text-content-muted">{selectedUser.email || 'Pas d\'email'} • {selectedUser.telephone || 'Pas de téléphone'}</p>
                     </div>
                   </div>
                 )}
@@ -758,9 +758,9 @@ export default function EmployeeForm({
             )}
   
             {/* Section 2: Agence et Matricule */}
-            <div className="p-6 bg-slate-800/30 border border-slate-700 rounded-xl">
-              <div className="flex items-center gap-2 mb-6 text-white font-bold text-base">
-                <Building2 size={20} className="text-cyan-400" />
+            <div className="p-6 bg-surface/30 border border-edge rounded-xl">
+              <div className="flex items-center gap-2 mb-6 text-content-primary font-bold text-base">
+                <Building2 size={20} className="text-accent" />
                 Affectation
               </div>
 
@@ -773,19 +773,19 @@ export default function EmployeeForm({
                     </label>
                     {selectedUser ? (
                       selectedUser.agenceId ? (
-                        <div className="flex items-center gap-2 px-4 h-12 bg-slate-700/50 rounded-lg border border-slate-600">
-                          <Building2 size={14} className="text-cyan-400" />
-                          <span className="text-white text-sm font-medium">{selectedUser.agenceNom}</span>
-                          <span className="text-xs text-slate-400">({selectedUser.agenceCode})</span>
+                        <div className="flex items-center gap-2 px-4 h-12 bg-surface-elevated/50 rounded-lg border border-edge-strong">
+                          <Building2 size={14} className="text-accent" />
+                          <span className="text-content-primary text-sm font-medium">{selectedUser.agenceNom}</span>
+                          <span className="text-xs text-content-muted">({selectedUser.agenceCode})</span>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2 px-4 h-12 bg-amber-500/10 rounded-lg border border-amber-500/30">
-                          <AlertTriangle size={14} className="text-amber-400" />
-                          <span className="text-amber-400 text-xs">Aucune agence affectée</span>
+                        <div className="flex items-center gap-2 px-4 h-12 bg-status-warning-bg rounded-lg border border-status-warning/30">
+                          <AlertTriangle size={14} className="text-status-warning" />
+                          <span className="text-status-warning text-xs">Aucune agence affectée</span>
                         </div>
                       )
                     ) : (
-                      <div className="flex items-center px-4 h-12 bg-slate-800/50 rounded-lg border border-slate-700 text-slate-500 text-xs">
+                      <div className="flex items-center px-4 h-12 bg-surface/50 rounded-lg border border-edge text-content-muted text-xs">
                         Sélectionnez d'abord un utilisateur
                       </div>
                     )}
@@ -809,7 +809,7 @@ export default function EmployeeForm({
                 {/* Matricule */}
                 <div>
                   <label className="block text-xs sm:text-sm font-semibold text-content-secondary mb-2">Matricule</label>
-                  <div className="flex items-center gap-2 px-4 h-12 bg-slate-800/50 rounded-lg border border-slate-700 text-slate-300 text-sm font-mono">
+                  <div className="flex items-center gap-2 px-4 h-12 bg-surface/50 rounded-lg border border-edge text-content-secondary text-sm font-mono">
                     {editingEmploye && formData.matricule ? formData.matricule : 'Généré automatiquement'}
                   </div>
                 </div>
@@ -817,25 +817,25 @@ export default function EmployeeForm({
             </div>
   
             {/* Section 3: Identité */}
-            <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-lg space-y-3">
+            <div className="p-3 bg-surface/30 border border-edge rounded-lg space-y-3">
               <div className="flex items-center gap-2">
-                <User size={16} className="text-slate-400" />
-                <h4 className="text-sm font-semibold text-white">Identité</h4>
+                <User size={16} className="text-content-muted" />
+                <h4 className="text-sm font-semibold text-content-primary">Identité</h4>
               </div>
   
               {/* Photo Compact */}
               <div className="flex items-center gap-4">
                  <div className="relative shrink-0">
                     {photoPreview ? (
-                      <img src={resolveStorageUrl(photoPreview)} className="w-16 h-16 rounded-full object-cover border-2 border-slate-600" />
+                      <img src={resolveStorageUrl(photoPreview)} className="w-16 h-16 rounded-full object-cover border-2 border-edge-strong" />
                     ) : (
-                      <div className="w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center border-2 border-slate-600">
-                        <User size={24} className="text-slate-500" />
+                      <div className="w-16 h-16 rounded-full bg-surface-elevated flex items-center justify-center border-2 border-edge-strong">
+                        <User size={24} className="text-content-muted" />
                       </div>
                     )}
                     {!selectedUser && (
-                       <label className="absolute -bottom-1 -right-1 w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center cursor-pointer hover:bg-blue-500 transition-colors">
-                          <Upload size={12} className="text-white" />
+                       <label className="absolute -bottom-1 -right-1 w-6 h-6 bg-status-info rounded-full flex items-center justify-center cursor-pointer hover:bg-status-info transition-colors">
+                          <Upload size={12} className="text-content-primary" />
                           <input type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" />
                        </label>
                     )}
@@ -865,10 +865,10 @@ export default function EmployeeForm({
         {activeTab === 'contract' && (
           <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
             {/* Section 4: Contrat RH */}
-            <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg space-y-3">
+            <div className="p-3 bg-status-success-bg border border-status-success/30 rounded-lg space-y-3">
               <div className="flex items-center gap-2">
-                <Building2 size={16} className="text-emerald-400" />
-                <h4 className="text-sm font-semibold text-white">Contrat & Rémunération</h4>
+                <Building2 size={16} className="text-status-success" />
+                <h4 className="text-sm font-semibold text-content-primary">Contrat & Rémunération</h4>
               </div>
   
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -960,9 +960,9 @@ export default function EmployeeForm({
                   />
                   {formData.numeroCnss && VALIDATION_PATTERNS.cnss.test(formData.numeroCnss) && (
                     <div className="mt-1 text-xs">
-                      {checkingCnss && <span className="text-slate-400">Vérification...</span>}
-                      {!checkingCnss && cnssAvailable === true && <span className="text-emerald-400">Numéro CNSS disponible</span>}
-                      {!checkingCnss && cnssAvailable === false && <span className="text-red-400">{cnssError || 'Déjà utilisé par un autre employé'}</span>}
+                      {checkingCnss && <span className="text-content-muted">Vérification...</span>}
+                      {!checkingCnss && cnssAvailable === true && <span className="text-status-success">Numéro CNSS disponible</span>}
+                      {!checkingCnss && cnssAvailable === false && <span className="text-status-danger">{cnssError || 'Déjà utilisé par un autre employé'}</span>}
                     </div>
                   )}
                 </div>
@@ -970,9 +970,9 @@ export default function EmployeeForm({
             </div>
   
             {/* Section Situation Familiale & Fiscale */}
-            <div className="p-6 bg-purple-500/10 border border-purple-500/30 rounded-xl">
-              <div className="flex items-center gap-2 mb-6 text-white font-bold text-base">
-                <Users size={20} className="text-purple-400" />
+            <div className="p-6 bg-status-info-bg border border-status-info/30 rounded-xl">
+              <div className="flex items-center gap-2 mb-6 text-content-primary font-bold text-base">
+                <Users size={20} className="text-status-info" />
                 Situation Familiale & Fiscale
               </div>
 
@@ -1013,17 +1013,17 @@ export default function EmployeeForm({
                 />
               </div>
 
-              <p className="mt-4 text-[10px] text-purple-400/60 italic">
+              <p className="mt-4 text-[10px] text-status-info/60 italic">
                 La situation familiale et le nombre d'enfants déterminent le quotient familial pour le calcul de l'IRPP.
               </p>
             </div>
 
             {/* Section Sortie (visible uniquement en édition) */}
             {editingEmploye && (
-              <div className="p-3 bg-red-500/5 border border-red-500/20 rounded-lg space-y-3">
+              <div className="p-3 bg-status-danger/5 border border-status-danger/20 rounded-lg space-y-3">
                 <div className="flex items-center gap-2">
-                  <AlertTriangle size={16} className="text-red-400" />
-                  <h4 className="text-sm font-semibold text-white">Sortie</h4>
+                  <AlertTriangle size={16} className="text-status-danger" />
+                  <h4 className="text-sm font-semibold text-content-primary">Sortie</h4>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1052,14 +1052,14 @@ export default function EmployeeForm({
                   />
                 </div>
 
-                <p className="text-[10px] text-red-400/60">
+                <p className="text-[10px] text-status-danger/60">
                   Si renseignée, la date de sortie permet le calcul du prorata sur le dernier mois de paie.
                 </p>
               </div>
             )}
 
             {/* Section Hiérarchie */}
-            <div className="pt-2 border-t border-slate-700">
+            <div className="pt-2 border-t border-edge">
                <div className="grid grid-cols-1 gap-4">
                 <SelectField
                   label="Supérieur Hiérarchique (Manager)"
@@ -1077,7 +1077,7 @@ export default function EmployeeForm({
         )}
 
         {/* FOOTER ACTIONS */}
-        <div className="flex justify-between gap-3 pt-4 border-t border-slate-700 mt-auto">
+        <div className="flex justify-between gap-3 pt-4 border-t border-edge mt-auto">
           <Button type="button" variant="secondary" onClick={handleClose} disabled={saving}>
              Annuler
           </Button>

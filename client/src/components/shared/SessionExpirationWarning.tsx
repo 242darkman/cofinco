@@ -512,17 +512,17 @@ function WarningToastContent({
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2">
         {isCritical ? (
-          <AlertTriangle className="h-5 w-5 text-red-500 animate-pulse" />
+          <AlertTriangle className="h-5 w-5 text-status-danger animate-pulse" />
         ) : (
-          <Clock className="h-5 w-5 text-amber-500" />
+          <Clock className="h-5 w-5 text-status-warning" />
         )}
-        <span className={`font-semibold ${isCritical ? 'text-red-600' : ''}`}>
+        <span className={`font-semibold ${isCritical ? 'text-status-danger' : ''}`}>
           {isCritical ? 'Session expire très bientôt !' : 'Session expire bientôt'}
         </span>
       </div>
 
       <div className="flex items-center gap-2">
-        <span className={`text-2xl font-mono font-bold ${isCritical ? 'text-red-600' : 'text-amber-600'}`}>
+        <span className={`text-2xl font-mono font-bold ${isCritical ? 'text-status-danger' : 'text-status-warning'}`}>
           {countdown}
         </span>
         <span className="text-sm text-muted-foreground">

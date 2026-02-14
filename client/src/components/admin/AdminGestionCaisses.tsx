@@ -237,19 +237,19 @@ export default function AdminGestionCaisses() {
       {/* Compact Header */}
       <div className="flex items-center justify-between gap-3 p-2 border-b border-edge bg-surface-muted/30">
         <div className="flex-1 max-w-sm relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-content-muted" />
           <input
             type="text"
             placeholder="Rechercher..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-8 pr-3 py-1.5 bg-slate-800/40 border border-slate-700/50 rounded-md text-xs text-white placeholder-slate-500 focus:outline-none focus:border-slate-600"
+            className="w-full pl-8 pr-3 py-1.5 bg-surface/40 border border-edge-subtle rounded-md text-xs text-content-primary placeholder-content-muted focus:outline-none focus:border-edge-strong"
           />
         </div>
         <Button 
           onClick={() => setIsModalOpen(true)} 
           size="sm"
-          className="bg-cyan-600 hover:bg-cyan-700 text-white h-7 px-3 text-xs"
+          className="bg-accent-secondary hover:bg-accent-secondary-hover text-content-primary h-7 px-3 text-xs"
         >
           <Plus className="w-3.5 h-3.5 mr-1" />
           Nouvelle
@@ -257,42 +257,42 @@ export default function AdminGestionCaisses() {
       </div>
 
       {/* Compact Table View */}
-      <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg overflow-hidden">
+      <div className="bg-surface/40 border border-edge-subtle rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-slate-900/50 border-b border-slate-700/50">
+            <thead className="bg-surface-base/50 border-b border-edge-subtle">
               <tr>
-                <th className="px-3 py-2 text-left text-[10px] font-medium text-slate-400 uppercase tracking-wider">Caisse</th>
-                <th className="px-3 py-2 text-left text-[10px] font-medium text-slate-400 uppercase tracking-wider">Agence</th>
-                <th className="px-3 py-2 text-left text-[10px] font-medium text-slate-400 uppercase tracking-wider">Statut</th>
-                <th className="px-3 py-2 text-right text-[10px] font-medium text-slate-400 uppercase tracking-wider">Solde</th>
-                <th className="px-3 py-2 text-left text-[10px] font-medium text-slate-400 uppercase tracking-wider min-w-[180px]">Agents assignés</th>
-                <th className="px-3 py-2 text-right text-[10px] font-medium text-slate-400 uppercase tracking-wider w-8"></th>
+                <th className="px-3 py-2 text-left text-[10px] font-medium text-content-muted uppercase tracking-wider">Caisse</th>
+                <th className="px-3 py-2 text-left text-[10px] font-medium text-content-muted uppercase tracking-wider">Agence</th>
+                <th className="px-3 py-2 text-left text-[10px] font-medium text-content-muted uppercase tracking-wider">Statut</th>
+                <th className="px-3 py-2 text-right text-[10px] font-medium text-content-muted uppercase tracking-wider">Solde</th>
+                <th className="px-3 py-2 text-left text-[10px] font-medium text-content-muted uppercase tracking-wider min-w-[180px]">Agents assignés</th>
+                <th className="px-3 py-2 text-right text-[10px] font-medium text-content-muted uppercase tracking-wider w-8"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-700/30">
+            <tbody className="divide-y divide-edge/30">
               {paginatedCaisses.map((caisse) => (
-                <tr key={caisse.id} className="hover:bg-slate-700/20 transition-colors">
+                <tr key={caisse.id} className="hover:bg-surface-elevated/20 transition-colors">
                   <td className="px-3 py-1.5">
                     <div className="flex items-center gap-2">
                       <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
                         caisse.type === 'Coffre-Fort' 
-                          ? 'bg-amber-500/10' 
-                          : 'bg-blue-500/10'
+                          ? 'bg-status-warning-bg' 
+                          : 'bg-status-info-bg'
                       }`}>
                         {caisse.type === 'Coffre-Fort' ? 
-                          <Lock className="w-4 h-4 text-amber-400" /> : 
-                          <Monitor className="w-4 h-4 text-blue-400" />
+                          <Lock className="w-4 h-4 text-status-warning" /> : 
+                          <Monitor className="w-4 h-4 text-status-info" />
                         }
                       </div>
                       <div className="min-w-0">
-                        <div className="font-medium text-white truncate">{caisse.nom}</div>
-                        <div className="text-xs text-slate-500">{TYPE_CAISSE_LABELS[caisse.type as TypeCaisseType] || caisse.type}</div>
+                        <div className="font-medium text-content-primary truncate">{caisse.nom}</div>
+                        <div className="text-xs text-content-muted">{TYPE_CAISSE_LABELS[caisse.type as TypeCaisseType] || caisse.type}</div>
                       </div>
                     </div>
                   </td>
                   <td className="px-3 py-1.5">
-                    <span className="inline-flex items-center justify-center px-2 py-0.5 rounded text-xs font-medium bg-slate-700/50 text-slate-300 border border-slate-600/50 min-w-[100px] max-w-[140px] truncate">
+                    <span className="inline-flex items-center justify-center px-2 py-0.5 rounded text-xs font-medium bg-surface-elevated/50 text-content-secondary border border-edge-strong/50 min-w-[100px] max-w-[140px] truncate">
                       {agences.find(a => a.id === caisse.agenceId)?.nom || 'N/A'}
                     </span>
                   </td>
@@ -300,29 +300,29 @@ export default function AdminGestionCaisses() {
                     <div className="flex items-center gap-1.5">
                       <div className={`w-1.5 h-1.5 rounded-full ${
                         caisse.isOccupied 
-                          ? 'bg-emerald-400 shadow-sm shadow-emerald-500/50 animate-pulse' 
-                          : 'bg-slate-500'
+                          ? 'bg-status-success shadow-sm shadow-status-success/50 animate-pulse' 
+                          : 'bg-surface-muted0'
                       }`} />
                       <span className={`text-xs font-medium ${
-                        caisse.isOccupied ? 'text-emerald-400' : 'text-slate-500'
+                        caisse.isOccupied ? 'text-status-success' : 'text-content-muted'
                       }`}>
                         {caisse.isOccupied ? 'En ligne' : 'Fermée'}
                       </span>
                     </div>
                   </td>
                   <td className="px-3 py-1.5 text-right">
-                    <div className="font-mono font-semibold text-white">
+                    <div className="font-mono font-semibold text-content-primary">
                       {Number(caisse.solde).toLocaleString()}
                     </div>
-                    <div className="text-xs text-slate-500">FCFA</div>
+                    <div className="text-xs text-content-muted">FCFA</div>
                   </td>
                   <td className="px-3 py-1.5">
                     {(() => {
                       const details: AssignmentDetail[] = caisse.assignmentsDetails || [];
                       if (details.length === 0) {
                         return (
-                          <span className="text-xs text-slate-500 italic flex items-center gap-1.5">
-                            <User className="w-3.5 h-3.5 text-slate-600" />
+                          <span className="text-xs text-content-muted italic flex items-center gap-1.5">
+                            <User className="w-3.5 h-3.5 text-content-muted" />
                             Non assignée
                           </span>
                         );
@@ -331,17 +331,17 @@ export default function AdminGestionCaisses() {
                       return (
                         <button
                           onClick={() => { setAgentsPanelCaisse(caisse); setAgentsSearch(''); }}
-                          className="flex items-center gap-2 group/btn hover:bg-slate-700/30 rounded-md px-1.5 py-1 -mx-1.5 -my-1 transition-colors w-full text-left"
+                          className="flex items-center gap-2 group/btn hover:bg-surface-elevated/30 rounded-md px-1.5 py-1 -mx-1.5 -my-1 transition-colors w-full text-left"
                         >
                           {/* Avatar stack */}
                           <div className="flex -space-x-1.5">
                             {details.slice(0, 3).map((a, i) => (
                               <div
                                 key={a.userId}
-                                className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold border-2 border-slate-800 ${
+                                className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold border-2 border-edge ${
                                   caisse.isOccupied && caisse.occupiedBy === a.userId
-                                    ? 'bg-emerald-500/30 text-emerald-300'
-                                    : 'bg-cyan-500/15 text-cyan-400'
+                                    ? 'bg-status-success/30 text-status-success'
+                                    : 'bg-accent-secondary/15 text-accent'
                                 }`}
                                 style={{ zIndex: 3 - i }}
                               >
@@ -349,17 +349,17 @@ export default function AdminGestionCaisses() {
                               </div>
                             ))}
                             {details.length > 3 && (
-                              <div className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold border-2 border-slate-800 bg-slate-700 text-slate-300">
+                              <div className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold border-2 border-edge bg-surface-elevated text-content-secondary">
                                 +{details.length - 3}
                               </div>
                             )}
                           </div>
                           <div className="min-w-0">
-                            <span className="text-xs font-medium text-slate-300 group-hover/btn:text-white transition-colors">
+                            <span className="text-xs font-medium text-content-secondary group-hover/btn:text-content-primary transition-colors">
                               {details.length} agent{details.length > 1 ? 's' : ''}
                             </span>
                             {onlineAgent && (
-                              <span className="block text-[10px] text-emerald-400 truncate">
+                              <span className="block text-[10px] text-status-success truncate">
                                 {onlineAgent.prenom} en ligne
                               </span>
                             )}
@@ -375,9 +375,9 @@ export default function AdminGestionCaisses() {
                           e.stopPropagation();
                           setOpenMenuId(openMenuId === caisse.id ? null : caisse.id);
                         }}
-                        className="p-1 hover:bg-slate-700/50 rounded transition-colors"
+                        className="p-1 hover:bg-surface-elevated/50 rounded transition-colors"
                       >
-                        <MoreVertical className="w-4 h-4 text-slate-400" />
+                        <MoreVertical className="w-4 h-4 text-content-muted" />
                       </button>
 
                       {openMenuId === caisse.id && (
@@ -386,7 +386,7 @@ export default function AdminGestionCaisses() {
                             className="fixed inset-0 z-10" 
                             onClick={() => setOpenMenuId(null)}
                           />
-                          <div className="fixed z-20 w-44 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden"
+                          <div className="fixed z-20 w-44 bg-surface border border-edge rounded-lg shadow-xl overflow-hidden"
                             style={{
                               top: `${(document.activeElement as HTMLElement)?.getBoundingClientRect().bottom + 4}px`,
                               right: `${window.innerWidth - (document.activeElement as HTMLElement)?.getBoundingClientRect().right}px`
@@ -403,7 +403,7 @@ export default function AdminGestionCaisses() {
                                   setIsForceCloseModalOpen(true);
                                   setOpenMenuId(null);
                                 }}
-                                className="w-full px-3 py-2 text-left text-xs text-orange-400 hover:bg-slate-700/50 flex items-center gap-2"
+                                className="w-full px-3 py-2 text-left text-xs text-status-warning hover:bg-surface-elevated/50 flex items-center gap-2"
                               >
                                 <XCircle className="w-3.5 h-3.5" />
                                 Forcer clôture
@@ -414,7 +414,7 @@ export default function AdminGestionCaisses() {
                                 handleOpenAssign(caisse);
                                 setOpenMenuId(null);
                               }}
-                              className="w-full px-3 py-2 text-left text-xs text-slate-300 hover:bg-slate-700/50 flex items-center gap-2"
+                              className="w-full px-3 py-2 text-left text-xs text-content-secondary hover:bg-surface-elevated/50 flex items-center gap-2"
                             >
                               <User className="w-3.5 h-3.5" />
                               Assigner
@@ -425,14 +425,14 @@ export default function AdminGestionCaisses() {
                                 setIsOperatingHoursModalOpen(true);
                                 setOpenMenuId(null);
                               }}
-                              className="w-full px-3 py-2 text-left text-xs text-slate-300 hover:bg-slate-700/50 flex items-center gap-2"
+                              className="w-full px-3 py-2 text-left text-xs text-content-secondary hover:bg-surface-elevated/50 flex items-center gap-2"
                             >
                               <Clock className="w-3.5 h-3.5" />
                               Horaires d'accès
                             </button>
                             <button
                               onClick={() => handleDelete(caisse)}
-                              className="w-full px-3 py-2 text-left text-xs text-red-400 hover:bg-slate-700/50 flex items-center gap-2 border-t border-slate-700"
+                              className="w-full px-3 py-2 text-left text-xs text-status-danger hover:bg-surface-elevated/50 flex items-center gap-2 border-t border-edge"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                               Supprimer
@@ -451,8 +451,8 @@ export default function AdminGestionCaisses() {
       </div>
 
       {/* Advanced Pagination Controls */}
-      <div className="p-2 border border-slate-700/50 bg-slate-800/40 rounded-lg flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="flex items-center gap-3 text-xs text-slate-500">
+      <div className="p-2 border border-edge-subtle bg-surface/40 rounded-lg flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="flex items-center gap-3 text-xs text-content-muted">
           <span className="hidden sm:inline">
             {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, filteredCaisses.length)} sur {filteredCaisses.length}
           </span>
@@ -465,7 +465,7 @@ export default function AdminGestionCaisses() {
               setPageSize(Number(e.target.value));
               setCurrentPage(1);
             }}
-            className="px-2 py-1 bg-slate-900 border border-slate-700 rounded text-[10px] text-slate-300 focus:border-cyan-600 outline-none"
+            className="px-2 py-1 bg-surface-base border border-edge rounded text-[10px] text-content-secondary focus:border-accent outline-none"
           >
             <option value={8}>8 / page</option>
             <option value={10}>10 / page</option>
@@ -478,20 +478,20 @@ export default function AdminGestionCaisses() {
           <button
             onClick={() => setCurrentPage(1)}
             disabled={currentPage === 1}
-            className="p-1 rounded hover:bg-slate-700 text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            className="p-1 rounded hover:bg-surface-elevated text-content-muted hover:text-content-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           >
             <ChevronsLeft size={14} />
           </button>
           <button
             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
             disabled={currentPage === 1}
-            className="p-1 rounded hover:bg-slate-700 text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            className="p-1 rounded hover:bg-surface-elevated text-content-muted hover:text-content-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           >
             <ChevronLeft size={14} />
           </button>
           
           <div className="flex items-center gap-1 mx-1">
-             <span className="text-xs font-medium text-white px-2">
+             <span className="text-xs font-medium text-content-primary px-2">
                {currentPage} / {Math.max(1, totalPages)}
              </span>
           </div>
@@ -499,14 +499,14 @@ export default function AdminGestionCaisses() {
           <button
             onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
             disabled={currentPage === totalPages || totalPages === 0}
-            className="p-1 rounded hover:bg-slate-700 text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            className="p-1 rounded hover:bg-surface-elevated text-content-muted hover:text-content-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           >
             <ChevronRight size={14} />
           </button>
           <button
             onClick={() => setCurrentPage(totalPages)}
             disabled={currentPage === totalPages || totalPages === 0}
-            className="p-1 rounded hover:bg-slate-700 text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            className="p-1 rounded hover:bg-surface-elevated text-content-muted hover:text-content-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           >
             <ChevronsRight size={14} />
           </button>
@@ -591,35 +591,35 @@ export default function AdminGestionCaisses() {
       {agentsPanelCaisse && (
         <>
           <div className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm" onClick={() => setAgentsPanelCaisse(null)} />
-          <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md flex flex-col bg-slate-900 border-l border-slate-700 shadow-2xl animate-in slide-in-from-right duration-200">
+          <div className="fixed inset-y-0 right-0 z-50 w-full max-w-md flex flex-col bg-surface-base border-l border-edge shadow-2xl animate-in slide-in-from-right duration-200">
             {/* Header */}
-            <div className="shrink-0 px-5 py-4 border-b border-slate-700/60 bg-slate-800/50">
+            <div className="shrink-0 px-5 py-4 border-b border-edge/60 bg-surface/50">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center">
-                    <Users size={16} className="text-cyan-400" />
+                  <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center">
+                    <Users size={16} className="text-accent" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-white">{agentsPanelCaisse.nom}</h3>
-                    <p className="text-[10px] text-slate-500">
+                    <h3 className="text-sm font-bold text-content-primary">{agentsPanelCaisse.nom}</h3>
+                    <p className="text-[10px] text-content-muted">
                       {(agentsPanelCaisse.assignmentsDetails || []).length} agent{(agentsPanelCaisse.assignmentsDetails || []).length > 1 ? 's' : ''} assigné{(agentsPanelCaisse.assignmentsDetails || []).length > 1 ? 's' : ''}
                     </p>
                   </div>
                 </div>
-                <button onClick={() => setAgentsPanelCaisse(null)} className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors">
+                <button onClick={() => setAgentsPanelCaisse(null)} className="p-1.5 rounded-lg hover:bg-surface-elevated text-content-muted hover:text-content-primary transition-colors">
                   <X size={16} />
                 </button>
               </div>
               {/* Search */}
               {(agentsPanelCaisse.assignmentsDetails || []).length > 4 && (
                 <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-content-muted" />
                   <input
                     type="text"
                     placeholder="Rechercher un agent..."
                     value={agentsSearch}
                     onChange={e => setAgentsSearch(e.target.value)}
-                    className="w-full pl-8 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-600"
+                    className="w-full pl-8 pr-3 py-2 bg-surface border border-edge rounded-lg text-xs text-content-primary placeholder-content-muted focus:outline-none focus:border-accent"
                   />
                 </div>
               )}
@@ -637,7 +637,7 @@ export default function AdminGestionCaisses() {
 
                 if (filtered.length === 0) {
                   return (
-                    <div className="flex flex-col items-center justify-center py-12 text-slate-600">
+                    <div className="flex flex-col items-center justify-center py-12 text-content-muted">
                       <User size={28} className="mb-2 opacity-20" />
                       <p className="text-xs">{agentsSearch ? 'Aucun résultat' : 'Aucun agent assigné'}</p>
                     </div>
@@ -649,13 +649,13 @@ export default function AdminGestionCaisses() {
                   return (
                     <div
                       key={agent.userId}
-                      className="flex items-center gap-3 p-3 rounded-xl bg-slate-800/50 border border-slate-700/40 hover:bg-slate-800 transition-colors group/item"
+                      className="flex items-center gap-3 p-3 rounded-xl bg-surface/50 border border-edge/40 hover:bg-surface transition-colors group/item"
                     >
                       {/* Avatar */}
                       <div className={`w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-sm font-bold ${
                         isOnline
-                          ? 'bg-emerald-500/20 text-emerald-400 ring-2 ring-emerald-500/30'
-                          : 'bg-cyan-500/10 text-cyan-400'
+                          ? 'bg-status-success-bg text-status-success ring-2 ring-status-success/30'
+                          : 'bg-accent/10 text-accent'
                       }`}>
                         {(agent.prenom?.[0] || agent.nom?.[0] || '?').toUpperCase()}
                       </div>
@@ -663,18 +663,18 @@ export default function AdminGestionCaisses() {
                       {/* Info */}
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
-                          <span className="text-sm font-semibold text-white truncate">
+                          <span className="text-sm font-semibold text-content-primary truncate">
                             {agent.prenom} {agent.nom}
                           </span>
                           {isOnline && (
-                            <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                            <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-status-success-bg text-status-success border border-status-success/20">
+                              <span className="w-1.5 h-1.5 rounded-full bg-status-success animate-pulse" />
                               EN LIGNE
                             </span>
                           )}
                         </div>
                         {agent.assignedAt && (
-                          <span className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
+                          <span className="text-[11px] text-content-muted flex items-center gap-1 mt-0.5">
                             <CalendarDays size={10} />
                             Assigné le {new Date(agent.assignedAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
                           </span>
@@ -696,7 +696,7 @@ export default function AdminGestionCaisses() {
                               },
                             });
                           }}
-                          className="shrink-0 p-2 rounded-lg text-slate-600 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover/item:opacity-100 transition-all"
+                          className="shrink-0 p-2 rounded-lg text-content-muted hover:text-status-danger hover:bg-status-danger-bg opacity-0 group-hover/item:opacity-100 transition-all"
                           title="Désassigner"
                         >
                           <UserMinus size={14} />
@@ -709,10 +709,10 @@ export default function AdminGestionCaisses() {
             </div>
 
             {/* Footer actions */}
-            <div className="shrink-0 p-4 border-t border-slate-700/60 bg-slate-800/30">
+            <div className="shrink-0 p-4 border-t border-edge/60 bg-surface/30">
               <Button
                 size="sm"
-                className="w-full bg-cyan-600 hover:bg-cyan-700 text-white"
+                className="w-full bg-accent-secondary hover:bg-accent-secondary-hover text-content-primary"
                 onClick={() => {
                   handleOpenAssign(agentsPanelCaisse);
                   setAgentsPanelCaisse(null);

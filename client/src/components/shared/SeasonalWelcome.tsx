@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Sparkles, PartyPopper } from 'lucide-react';
+import { useBranding } from '../../contexts/BrandingContext';
 
 interface SeasonalWelcomeProps {
   userName?: string;
@@ -9,6 +10,7 @@ interface SeasonalWelcomeProps {
 type EventType = 'christmas' | 'newyear' | null;
 
 export default function SeasonalWelcome({ userName = 'Utilisateur', onComplete }: SeasonalWelcomeProps) {
+  const { branding } = useBranding();
   const [eventType, setEventType] = useState<EventType>(null);
   const [visible, setVisible] = useState(true);
   const [particles, setParticles] = useState<Array<{ id: number; left: number; delay: number; duration: number; color?: string }>>([]);
@@ -60,12 +62,12 @@ export default function SeasonalWelcome({ userName = 'Utilisateur', onComplete }
   if (!visible || !eventType) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/90 backdrop-blur-md animate-fadeIn overflow-hidden">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-surface-base/90 backdrop-blur-md animate-fadeIn overflow-hidden">
       {/* Background Particles */}
       {particles.map((p) => (
         <div
           key={p.id}
-          className={`absolute ${eventType === 'christmas' ? 'text-white text-2xl opacity-80' : 'w-2 h-2 rounded-full'} animate-fall`}
+          className={`absolute ${eventType === 'christmas' ? 'text-content-primary text-2xl opacity-80' : 'w-2 h-2 rounded-full'} animate-fall`}
           style={{
             left: `${p.left}%`,
             animationDelay: `${p.delay}s`,
@@ -81,7 +83,7 @@ export default function SeasonalWelcome({ userName = 'Utilisateur', onComplete }
       <div className="relative z-10 text-center animate-scaleIn px-4 w-full max-w-md mx-auto">
         {/* Logo Container */}
         <div className="relative mb-6 md:mb-8 mx-auto w-20 h-20 md:w-24 md:h-24">
-          <div className={`absolute inset-0 rounded-2xl blur-xl ${eventType === 'christmas' ? 'bg-green-500/20' : 'bg-purple-500/20'}`} />
+          <div className={`absolute inset-0 rounded-2xl blur-xl ${eventType === 'christmas' ? 'bg-status-success-bg' : 'bg-status-info-bg'}`} />
           
           <div className="relative w-full h-full bg-white rounded-2xl flex items-center justify-center shadow-2xl">
             <img src="/cofin-logo.png" alt="Logo" className="w-12 h-12 md:w-16 md:h-16 object-contain" />
@@ -97,33 +99,33 @@ export default function SeasonalWelcome({ userName = 'Utilisateur', onComplete }
             {eventType === 'christmas' ? (
               <>
                 <span className="text-3xl animate-bounce">🎄</span>
-                <Sparkles className="text-cyan-400 animate-pulse" size={28} />
+                <Sparkles className="text-accent animate-pulse" size={28} />
                 <span className="text-3xl animate-bounce" style={{ animationDelay: '0.2s' }}>⛄</span>
               </>
             ) : (
               <>
                 <span className="text-3xl animate-bounce">🎇</span>
-                <PartyPopper className="text-yellow-400 animate-pulse" size={28} />
+                <PartyPopper className="text-status-warning animate-pulse" size={28} />
                 <span className="text-3xl animate-bounce" style={{ animationDelay: '0.2s' }}>🥂</span>
               </>
             )}
           </div>
 
           <h1 className={`text-3xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r ${
-            eventType === 'christmas' ? 'from-red-500 via-green-500 to-red-500' : 'from-yellow-400 via-purple-500 to-pink-500'
+            eventType === 'christmas' ? 'from-status-danger via-green-500 to-status-danger' : 'from-status-warning via-purple-500 to-pink-500'
           } animate-glow`}>
             {eventType === 'christmas' ? 'Joyeux Noël !' : 'Bonne Année !'}
           </h1>
 
-          <h2 className="text-xl md:text-2xl font-bold text-white">
-            Bienvenue sur <span className="text-cyan-400">COFIN&CO-M</span>
+          <h2 className="text-xl md:text-2xl font-bold text-content-primary">
+            Bienvenue sur <span className="text-accent">{branding.appName}</span>
           </h2>
 
-          <p className="text-lg md:text-2xl text-slate-300">
-            Bonjour <span className={`${eventType === 'christmas' ? 'text-green-400' : 'text-purple-400'} font-semibold`}>{userName}</span> 👋
+          <p className="text-lg md:text-2xl text-content-secondary">
+            Bonjour <span className={`${eventType === 'christmas' ? 'text-status-success' : 'text-status-info'} font-semibold`}>{userName}</span> 👋
           </p>
 
-          <p className="text-sm md:text-base text-slate-400 mt-4 max-w-xs mx-auto">
+          <p className="text-sm md:text-base text-content-muted mt-4 max-w-xs mx-auto">
             {eventType === 'christmas' 
               ? "Toute l'équipe vous souhaite de joyeuses fêtes et une excellente fin d'année." 
               : "Que cette nouvelle année vous apporte succès, prospérité et réussite dans vos projets."}
@@ -132,7 +134,7 @@ export default function SeasonalWelcome({ userName = 'Utilisateur', onComplete }
           <div className="pt-6">
              <button 
                onClick={() => setVisible(false)}
-               className="text-slate-500 text-sm hover:text-white transition underline"
+               className="text-content-muted text-sm hover:text-content-primary transition underline"
              >
                Passer l'animation
              </button>

@@ -462,8 +462,8 @@ export default function AdminGestionProfils() {
         <div className="p-2 border-b border-edge bg-surface-muted/30">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-blue-500/10 rounded-lg flex items-center justify-center shrink-0">
-                <Users className="w-4 h-4 text-blue-400" />
+              <div className="w-8 h-8 bg-status-info-bg rounded-lg flex items-center justify-center shrink-0">
+                <Users className="w-4 h-4 text-status-info" />
               </div>
               <div>
                 <h2 className="text-lg sm:text-xl font-bold text-content-primary">Personnel</h2>
@@ -616,7 +616,7 @@ export default function AdminGestionProfils() {
                           variant="ghost"
                           size="sm"
                           onClick={(e) => { e.stopPropagation(); toggleUserStatus(emp); }}
-                          className={isActive ? 'text-amber-500 hover:bg-amber-500/10' : 'text-success hover:bg-success/10'}
+                          className={isActive ? 'text-status-warning hover:bg-status-warning-bg' : 'text-success hover:bg-success/10'}
                           title={isActive ? 'Désactiver' : 'Activer'}
                           aria-label={isActive ? 'Désactiver' : 'Activer'}
                         />
@@ -627,7 +627,7 @@ export default function AdminGestionProfils() {
                           variant="ghost"
                           size="sm"
                           onClick={(e) => { e.stopPropagation(); openPermissionsModal(emp); }}
-                          className="text-blue-400 hover:bg-blue-500/10"
+                          className="text-status-info hover:bg-status-info-bg"
                           title="Permissions"
                           aria-label="Gérer les permissions"
                         />
@@ -638,7 +638,7 @@ export default function AdminGestionProfils() {
                           variant="ghost"
                           size="sm"
                           onClick={(e) => { e.stopPropagation(); deleteUser(emp); }}
-                          className="text-red-400 hover:bg-red-500/10"
+                          className="text-status-danger hover:bg-status-danger-bg"
                           title="Supprimer"
                           aria-label="Supprimer le profil"
                         />
@@ -715,7 +715,7 @@ export default function AdminGestionProfils() {
                         onClick={() => setCurrentPage(pageNum)}
                         className={`w-8 h-8 rounded-lg text-xs font-medium transition-colors ${
                           currentPage === pageNum
-                            ? 'bg-primary text-white'
+                            ? 'bg-primary text-content-primary'
                             : 'text-content-muted hover:bg-surface-muted'
                         }`}
                       >
@@ -821,7 +821,7 @@ export default function AdminGestionProfils() {
                     <button 
                          type="button"
                          onClick={() => fileInputRef.current?.click()}
-                         className="text-white hover:text-primary transition-colors p-1 flex items-center justify-center"
+                         className="text-content-primary hover:text-primary transition-colors p-1 flex items-center justify-center"
                          title="Changer la photo"
                          disabled={uploadingPhoto}
                        >
@@ -832,7 +832,7 @@ export default function AdminGestionProfils() {
                        <button 
                          type="button"
                          onClick={() => setFormData({ ...formData, photoProfile: '' })}
-                         className="text-white hover:text-red-400 transition-colors p-1 flex items-center justify-center"
+                         className="text-content-primary hover:text-status-danger transition-colors p-1 flex items-center justify-center"
                          title="Supprimer la photo"
                        >
                          <Trash2 size={16} />
@@ -891,8 +891,8 @@ export default function AdminGestionProfils() {
               </div>
 
               {/* Note: Agent Terrain config et données RH seront gérées dans le module RH */}
-              <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-                <p className="text-xs text-amber-400 flex items-center gap-2">
+              <div className="p-3 bg-status-warning-bg border border-status-warning/30 rounded-lg">
+                <p className="text-xs text-status-warning flex items-center gap-2">
                   <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                   </svg>
@@ -919,12 +919,12 @@ export default function AdminGestionProfils() {
                     value={formData.confirmPassword}
                     onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
                     className={`w-full px-3 py-2 bg-surface-muted border rounded-lg text-sm text-content-primary outline-none focus:ring-1 ${
-                      formData.confirmPassword && !passwordValidation.match ? 'border-red-500 focus:ring-red-500' : 'border-edge focus:border-primary focus:ring-primary'
+                      formData.confirmPassword && !passwordValidation.match ? 'border-status-danger focus:ring-status-danger' : 'border-edge focus:border-primary focus:ring-primary'
                     }`}
                     required
                   />
                   {formData.confirmPassword && !passwordValidation.match && (
-                    <p className="text-[10px] text-red-500 mt-1 flex items-center gap-1">
+                    <p className="text-[10px] text-status-danger mt-1 flex items-center gap-1">
                       <XCircle size={10} /> Les mots de passe ne correspondent pas
                     </p>
                   )}

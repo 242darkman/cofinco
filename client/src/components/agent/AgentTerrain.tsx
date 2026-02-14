@@ -416,29 +416,29 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
   const agentDisabled = canSupervise && !selectedAgentId;
 
   return (
-    <div className="flex flex-col h-full bg-slate-950 overflow-hidden font-sans text-white">
+    <div className="flex flex-col h-full bg-surface-base overflow-hidden font-sans text-content-primary">
 
       {/* ═══ 1. TOP BAR ═══ */}
-      <header className="h-12 flex-none bg-slate-900 border-b border-slate-800 flex justify-between items-center px-3">
+      <header className="h-12 flex-none bg-surface-base border-b border-edge flex justify-between items-center px-3">
         <div className="flex items-center gap-2">
            {isOnline ? (
-             <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold">
+             <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-status-success-bg border border-status-success/20 text-status-success text-[10px] font-bold">
                 <Wifi size={10} /> En ligne
              </div>
            ) : (
-             <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-bold">
+             <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-status-warning-bg border border-status-warning/20 text-status-warning text-[10px] font-bold">
                 <Wifi size={10} /> Hors ligne {pendingCount > 0 && `(${pendingCount})`}
              </div>
            )}
            {/* POS version only shown in standalone/PWA mode (actual POS device) */}
            {window.matchMedia?.('(display-mode: standalone)')?.matches && (
-             <span className="text-[10px] text-slate-600 hidden sm:inline">POS v2.2</span>
+             <span className="text-[10px] text-content-muted hidden sm:inline">POS v2.2</span>
            )}
         </div>
         <button
           onClick={loadData}
           disabled={loading}
-          className="p-1.5 bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors disabled:opacity-50"
+          className="p-1.5 bg-surface rounded-lg text-content-muted hover:text-content-primary transition-colors disabled:opacity-50"
         >
            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
         </button>
@@ -453,27 +453,27 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
               <div className="relative">
                  <button
                     onClick={() => setAgentDropdownOpen(!agentDropdownOpen)}
-                    className="w-full h-14 bg-slate-900 border-2 border-slate-700 rounded-2xl px-4 text-base text-white flex items-center justify-between focus:border-indigo-500 outline-none cursor-pointer hover:bg-slate-800 transition-colors"
+                    className="w-full h-14 bg-surface-base border-2 border-edge rounded-2xl px-4 text-base text-content-primary flex items-center justify-between focus:border-accent outline-none cursor-pointer hover:bg-surface transition-colors"
                  >
                     <div className="flex items-center gap-3">
-                       <Search className="h-4 w-4 text-slate-500" />
-                       <span className="text-slate-400">Sélectionner un agent...</span>
+                       <Search className="h-4 w-4 text-content-muted" />
+                       <span className="text-content-muted">Sélectionner un agent...</span>
                     </div>
-                    <ChevronDown className={`h-4 w-4 text-slate-500 transition-transform ${agentDropdownOpen ? 'rotate-180' : ''}`} />
+                    <ChevronDown className={`h-4 w-4 text-content-muted transition-transform ${agentDropdownOpen ? 'rotate-180' : ''}`} />
                  </button>
 
                  {agentDropdownOpen && (
-                    <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border-2 border-slate-700 rounded-2xl shadow-xl z-50 overflow-hidden">
+                    <div className="absolute top-full left-0 right-0 mt-2 bg-surface-base border-2 border-edge rounded-2xl shadow-xl z-50 overflow-hidden">
                        {/* Search Input */}
-                       <div className="p-3 border-b border-slate-700">
+                       <div className="p-3 border-b border-edge">
                           <div className="relative">
-                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-content-muted" />
                              <input
                                 type="text"
                                 placeholder="Rechercher un agent..."
                                 value={agentSearchQuery}
                                 onChange={(e) => setAgentSearchQuery(e.target.value)}
-                                className="w-full h-10 bg-slate-800 border border-slate-600 rounded-xl pl-10 pr-4 text-sm text-white placeholder-slate-500 focus:border-indigo-500 outline-none"
+                                className="w-full h-10 bg-surface border border-edge-strong rounded-xl pl-10 pr-4 text-sm text-content-primary placeholder-content-muted focus:border-accent outline-none"
                                 autoFocus
                              />
                           </div>
@@ -498,29 +498,29 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                                       setAgentDropdownOpen(false);
                                       setAgentSearchQuery('');
                                    }}
-                                   className="w-full px-4 py-3 flex items-center gap-3 hover:bg-slate-800 transition-colors text-left border-b border-slate-800 last:border-b-0"
+                                   className="w-full px-4 py-3 flex items-center gap-3 hover:bg-surface transition-colors text-left border-b border-edge last:border-b-0"
                                 >
                                    {agent.photo_url ? (
-                                      <img src={resolveStorageUrl(agent.photo_url)} alt="" className="w-9 h-9 rounded-full object-cover border border-slate-600" />
+                                      <img src={resolveStorageUrl(agent.photo_url)} alt="" className="w-9 h-9 rounded-full object-cover border border-edge-strong" />
                                    ) : (
-                                      <div className="w-9 h-9 rounded-full bg-indigo-600/30 flex items-center justify-center text-indigo-400 font-bold text-xs">
+                                      <div className="w-9 h-9 rounded-full bg-accent/10 flex items-center justify-center text-accent font-bold text-xs">
                                          {agent.nom.charAt(0)}{agent.prenom.charAt(0)}
                                       </div>
                                    )}
                                    <div className="flex-1 min-w-0">
-                                      <div className="text-sm font-medium text-white truncate">
+                                      <div className="text-sm font-medium text-content-primary truncate">
                                          {agent.nom} {agent.prenom}
                                       </div>
                                       {agent.zone_affectation && (
-                                         <div className="text-xs text-slate-500 flex items-center gap-1 truncate">
+                                         <div className="text-xs text-content-muted flex items-center gap-1 truncate">
                                             <MapPin size={10} /> {agent.zone_affectation}
                                          </div>
                                       )}
                                    </div>
                                    <div className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                                       agent.statut === StatutUser.ACTIVE
-                                         ? 'bg-emerald-500/10 text-emerald-400'
-                                         : 'bg-slate-500/10 text-slate-400'
+                                         ? 'bg-status-success-bg text-status-success'
+                                         : 'bg-surface-subtle/30 text-content-muted'
                                    }`}>
                                       {agent.statut === StatutUser.ACTIVE ? 'Actif' : 'Inactif'}
                                    </div>
@@ -531,7 +531,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                              const query = agentSearchQuery.toLowerCase();
                              return agent.nom.toLowerCase().includes(query) || agent.prenom.toLowerCase().includes(query);
                           }).length === 0 && (
-                             <div className="px-4 py-8 text-center text-slate-500 text-sm">
+                             <div className="px-4 py-8 text-center text-content-muted text-sm">
                                 Aucun agent trouvé
                              </div>
                           )}
@@ -551,17 +551,17 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                  )}
               </div>
            ) : (
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 flex items-center justify-between relative overflow-hidden">
+              <div className="bg-surface-base border border-edge rounded-2xl p-3 flex items-center justify-between relative overflow-hidden">
                  <div className="flex items-center gap-3 z-10">
                     {currentAgent?.photo_url ? (
-                      <img src={resolveStorageUrl(currentAgent.photo_url)} alt="" className="w-10 h-10 rounded-full object-cover shrink-0 border-2 border-indigo-500/30" />
+                      <img src={resolveStorageUrl(currentAgent.photo_url)} alt="" className="w-10 h-10 rounded-full object-cover shrink-0 border-2 border-accent/30" />
                     ) : (
-                      <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center font-bold text-sm text-white shrink-0">
+                      <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center font-bold text-sm text-white shrink-0">
                         {currentAgent ? `${currentAgent.nom.charAt(0)}${currentAgent.prenom.charAt(0)}` : <Users size={16} />}
                       </div>
                     )}
                     <div className="min-w-0">
-                       <div className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">
+                       <div className="text-[9px] text-content-muted uppercase font-bold tracking-wider">
                          {canSupervise ? 'Supervision' : 'Agent Actif'}
                        </div>
                        <div className="text-sm font-bold leading-tight truncate">
@@ -570,24 +570,24 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                     </div>
                  </div>
                  <div className="text-right z-10 shrink-0">
-                    <div className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">Solde</div>
-                    <div className="text-lg font-bold text-emerald-400 leading-tight">
+                    <div className="text-[9px] text-content-muted uppercase font-bold tracking-wider">Solde</div>
+                    <div className="text-lg font-bold text-status-success leading-tight">
                       {loading ? '...' : formatMoney(agentSummary?.disponible || 0)}
                     </div>
                     {!loading && agentSummary && agentSummary.pendingIn > 0 && (
-                      <div className="text-[10px] text-amber-400 font-medium mt-0.5">
+                      <div className="text-[10px] text-status-warning font-medium mt-0.5">
                         +{formatMoney(agentSummary.pendingIn)} FCFA en attente
                       </div>
                     )}
                     {(!agentSummary?.pendingIn || agentSummary.pendingIn === 0) && (
-                      <div className="text-[9px] text-emerald-600 font-bold">FCFA</div>
+                      <div className="text-[9px] text-status-success font-bold">FCFA</div>
                     )}
                  </div>
 
                  {canSupervise && (
                    <button
                      onClick={() => setSelectedAgentId(null)}
-                     className="absolute inset-0 opacity-0 hover:opacity-100 bg-black/60 backdrop-blur-sm flex items-center justify-center z-20 text-white text-xs font-bold transition-all"
+                     className="absolute inset-0 opacity-0 hover:opacity-100 bg-black/60 backdrop-blur-sm flex items-center justify-center z-20 text-content-primary text-xs font-bold transition-all"
                    >
                      Changer d'agent
                    </button>
@@ -673,20 +673,20 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
         {/* --- AGENDA DU JOUR (planning + enquêtes intégrées) --- */}
         {!agentDisabled && (
           <div className="px-3 pb-2">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-              <div className="px-3 py-2 border-b border-slate-800 flex items-center justify-between">
-                <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+            <div className="bg-surface-base border border-edge rounded-xl overflow-hidden">
+              <div className="px-3 py-2 border-b border-edge flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-[10px] font-bold text-content-muted uppercase tracking-wider">
                   <Calendar size={11} /> Mon agenda
                 </div>
                 <div className="flex items-center gap-2">
                   {allAgendaItems.length > 0 && (
-                    <span className="text-[10px] font-bold text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded">
+                    <span className="text-[10px] font-bold text-accent bg-accent/10 px-1.5 py-0.5 rounded">
                       {allAgendaItems.length}
                     </span>
                   )}
                   <button
                     onClick={() => setShowFullPlanning(true)}
-                    className="text-[10px] font-bold text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 px-2 py-0.5 rounded transition-colors"
+                    className="text-[10px] font-bold text-accent bg-accent/10 hover:bg-accent/20 px-2 py-0.5 rounded transition-colors"
                   >
                     Voir Planning
                   </button>
@@ -694,7 +694,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
               </div>
 
               {allAgendaItems.length > 0 ? (
-                <div className="divide-y divide-slate-800/60">
+                <div className="divide-y divide-edge/60">
                   {paginatedAgendaItems.map((item) => {
                     if (item.type === 'enquete') {
                       const enq = item.data;
@@ -702,50 +702,50 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                       const isAssigned = enq.statut === 'ASSIGNED';
                       const isStarting = startingEnquete === enq.id;
                       const borderColor =
-                        enq.priority === 'URGENT' ? 'bg-red-500' :
-                        enq.priority === 'HIGH' ? 'bg-amber-500' :
-                        enq.priority === 'MEDIUM' ? 'bg-blue-500' :
-                        'bg-slate-500';
+                        enq.priority === 'URGENT' ? 'bg-status-danger' :
+                        enq.priority === 'HIGH' ? 'bg-status-warning' :
+                        enq.priority === 'MEDIUM' ? 'bg-status-info' :
+                        'bg-surface-muted0';
                       const priorityConf: Record<string, { label: string; color: string }> = {
-                        LOW: { label: 'Basse', color: 'bg-slate-500/15 text-slate-400' },
-                        MEDIUM: { label: 'Normale', color: 'bg-blue-500/15 text-blue-400' },
-                        HIGH: { label: 'Haute', color: 'bg-amber-500/15 text-amber-400' },
-                        URGENT: { label: 'Urgente', color: 'bg-red-500/15 text-red-400 animate-pulse' },
+                        LOW: { label: 'Basse', color: 'bg-surface-subtle/35 text-content-muted' },
+                        MEDIUM: { label: 'Normale', color: 'bg-status-info-bg text-status-info' },
+                        HIGH: { label: 'Haute', color: 'bg-status-warning-bg text-status-warning' },
+                        URGENT: { label: 'Urgente', color: 'bg-status-danger-bg text-status-danger animate-pulse' },
                       };
                       const pConf = priorityConf[enq.priority || 'MEDIUM'] || priorityConf.MEDIUM;
 
                       return (
                         <div
                           key={`enq-${enq.id}`}
-                          className={`flex items-center gap-2.5 px-3 py-2.5 ${isOverdue ? 'bg-red-950/40' : ''}`}
+                          className={`flex items-center gap-2.5 px-3 py-2.5 ${isOverdue ? 'bg-status-danger-bg' : ''}`}
                         >
                           <div className={`w-1 self-stretch rounded-full shrink-0 ${borderColor} ${enq.priority === 'URGENT' ? 'animate-pulse' : ''}`} />
-                          <div className="w-7 h-7 rounded-full bg-indigo-600/20 flex items-center justify-center text-indigo-400 font-bold text-[10px] shrink-0">
+                          <div className="w-7 h-7 rounded-full bg-accent/10 flex items-center justify-center text-accent font-bold text-[10px] shrink-0">
                             {enq.client
                               ? `${(enq.client.nom || '?')[0]}${(enq.client.prenom || '')[0] || ''}`
                               : '?'}
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-1 mb-0.5">
-                              <ClipboardCheck size={10} className="text-amber-400 shrink-0" />
-                              <span className="text-[10px] text-amber-400/80 font-medium">Enquête crédit</span>
+                              <ClipboardCheck size={10} className="text-status-warning shrink-0" />
+                              <span className="text-[10px] text-status-warning/80 font-medium">Enquête crédit</span>
                             </div>
-                            <p className="text-xs font-semibold text-white truncate">
+                            <p className="text-xs font-semibold text-content-primary truncate">
                               {enq.client
                                 ? `${enq.client.prenom || ''} ${enq.client.nom || ''}`.trim() || 'Client'
                                 : enq.clientNom || 'Client'}
                             </p>
                             <div className="flex items-center flex-wrap gap-x-2 gap-y-0.5 mt-0.5">
                               {enq.montantDemande && (
-                                <span className="text-[10px] text-emerald-400 font-medium">
+                                <span className="text-[10px] text-status-success font-medium">
                                   {Number(enq.montantDemande).toLocaleString('fr-FR')} F
                                 </span>
                               )}
                               {enq.dueDate && (
                                 <span className={`text-[10px] flex items-center gap-0.5 px-1.5 py-0.5 rounded ${
                                   isOverdue
-                                    ? 'text-red-400 font-bold bg-red-500/10 border border-red-500/20'
-                                    : 'text-amber-400 font-medium bg-amber-500/10 border border-amber-500/20'
+                                    ? 'text-status-danger font-bold bg-status-danger-bg border border-status-danger/20'
+                                    : 'text-status-warning font-medium bg-status-warning-bg border border-status-warning/20'
                                 }`}>
                                   {isOverdue ? <AlertTriangle size={9} /> : <Calendar size={9} />}
                                   Échéance : {new Date(enq.dueDate).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
@@ -762,7 +762,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                               <button
                                 onClick={() => handleStartEnquete(enq.id)}
                                 disabled={isStarting}
-                                className="flex items-center gap-1 px-2 py-1 bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-700 text-white text-[9px] font-bold rounded-lg transition-colors"
+                                className="flex items-center gap-1 px-2 py-1 bg-accent-secondary hover:bg-accent-secondary-hover disabled:bg-surface-elevated text-content-primary text-[9px] font-bold rounded-lg transition-colors"
                               >
                                 {isStarting ? <Loader2 size={10} className="animate-spin" /> : <Play size={10} />}
                                 Démarrer
@@ -770,7 +770,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                             ) : enq.statut === 'IN_PROGRESS' ? (
                               <button
                                 onClick={() => setEnqueteFormData(enq)}
-                                className="flex items-center gap-1 px-2 py-1 bg-blue-600 hover:bg-blue-500 text-white text-[9px] font-bold rounded-lg transition-colors"
+                                className="flex items-center gap-1 px-2 py-1 bg-status-info hover:bg-status-info text-white text-[9px] font-bold rounded-lg transition-colors"
                               >
                                 <ClipboardCheck size={10} /> Remplir
                               </button>
@@ -782,30 +782,30 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                       const p = item.data;
                       return (
                         <div key={p.id} className="flex items-center gap-2.5 px-3 py-2">
-                          <div className="text-[10px] font-mono font-bold text-slate-500 w-10 shrink-0">
+                          <div className="text-[10px] font-mono font-bold text-content-muted w-10 shrink-0">
                             {p.heureDebut}
                           </div>
                           <div className={`w-1 h-6 rounded-full shrink-0 ${
-                            p.typeActivite === 'Visite' ? 'bg-blue-500' :
-                            p.typeActivite === 'Collecte' ? 'bg-emerald-500' :
-                            p.typeActivite === 'Prospection' ? 'bg-violet-500' :
-                            'bg-slate-600'
+                            p.typeActivite === 'Visite' ? 'bg-status-info' :
+                            p.typeActivite === 'Collecte' ? 'bg-status-success' :
+                            p.typeActivite === 'Prospection' ? 'bg-accent' :
+                            'bg-surface-subtle'
                           }`} />
                           <div className="min-w-0 flex-1">
-                            <div className="text-xs font-semibold text-white truncate">
+                            <div className="text-xs font-semibold text-content-primary truncate">
                               {p.typeActivite}
                             </div>
                             {p.zone && (
-                              <div className="text-[10px] text-slate-500 flex items-center gap-1 truncate">
+                              <div className="text-[10px] text-content-muted flex items-center gap-1 truncate">
                                 <MapPin size={8} /> {p.zone}
                               </div>
                             )}
                           </div>
                           <div className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${
-                            p.statut === 'COMPLETED' ? 'bg-emerald-500/15 text-emerald-400' :
-                            p.statut === 'IN_PROGRESS' ? 'bg-blue-500/15 text-blue-400' :
-                            p.statut === 'CANCELLED' ? 'bg-red-500/15 text-red-400' :
-                            'bg-slate-700 text-slate-400'
+                            p.statut === 'COMPLETED' ? 'bg-status-success-bg text-status-success' :
+                            p.statut === 'IN_PROGRESS' ? 'bg-status-info-bg text-status-info' :
+                            p.statut === 'CANCELLED' ? 'bg-status-danger-bg text-status-danger' :
+                            'bg-surface-elevated text-content-muted'
                           }`}>
                             {p.statut === 'COMPLETED' ? 'Fait' :
                              p.statut === 'IN_PROGRESS' ? 'En cours' :
@@ -818,11 +818,11 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                 </div>
               ) : (
                 <div className="px-3 py-4 text-center">
-                  <Calendar size={20} className="mx-auto text-slate-600 mb-1" />
-                  <p className="text-[11px] text-slate-500">Aucune activite prevue aujourd'hui</p>
+                  <Calendar size={20} className="mx-auto text-content-muted mb-1" />
+                  <p className="text-[11px] text-content-muted">Aucune activite prevue aujourd'hui</p>
                   <button
                     onClick={() => setShowFullPlanning(true)}
-                    className="mt-2 text-[10px] font-bold text-indigo-400 hover:text-indigo-300 transition-colors"
+                    className="mt-2 text-[10px] font-bold text-accent hover:text-accent transition-colors"
                   >
                     + Planifier une activite
                   </button>
@@ -831,21 +831,21 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
 
               {/* Pagination controls */}
               {totalAgendaPages > 1 && (
-                <div className="px-3 py-1.5 border-t border-slate-800 flex items-center justify-between">
+                <div className="px-3 py-1.5 border-t border-edge flex items-center justify-between">
                   <button
                     onClick={() => setAgendaPage(p => Math.max(0, p - 1))}
                     disabled={safeAgendaPage === 0}
-                    className="p-1.5 rounded-lg disabled:opacity-20 text-slate-400 hover:text-white hover:bg-slate-800 active:bg-slate-700 transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center"
+                    className="p-1.5 rounded-lg disabled:opacity-20 text-content-muted hover:text-content-primary hover:bg-surface active:bg-surface-elevated transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center"
                   >
                     <ChevronLeft size={14} />
                   </button>
-                  <span className="text-[10px] text-slate-500 font-medium tabular-nums">
+                  <span className="text-[10px] text-content-muted font-medium tabular-nums">
                     {safeAgendaPage + 1} / {totalAgendaPages}
                   </span>
                   <button
                     onClick={() => setAgendaPage(p => Math.min(totalAgendaPages - 1, p + 1))}
                     disabled={safeAgendaPage >= totalAgendaPages - 1}
-                    className="p-1.5 rounded-lg disabled:opacity-20 text-slate-400 hover:text-white hover:bg-slate-800 active:bg-slate-700 transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center"
+                    className="p-1.5 rounded-lg disabled:opacity-20 text-content-muted hover:text-content-primary hover:bg-surface active:bg-surface-elevated transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center"
                   >
                     <ChevronRight size={14} />
                   </button>
@@ -858,27 +858,27 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
         {/* --- RECENT TRANSACTIONS --- */}
         {!agentDisabled && recentTransactions.length > 0 && (
            <div className="px-3 pb-3">
-              <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-                <div className="px-3 py-2 border-b border-slate-800">
-                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              <div className="bg-surface-base border border-edge rounded-xl overflow-hidden">
+                <div className="px-3 py-2 border-b border-edge">
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-content-muted uppercase tracking-wider">
                     <Clock size={11} /> Recemment
                   </div>
                 </div>
-                <div className="divide-y divide-slate-800/60">
+                <div className="divide-y divide-edge/60">
                    {recentTransactions.map(op => (
                       <div key={op.id} className="flex items-center justify-between px-3 py-2">
                          <div className="flex items-center gap-2 min-w-0">
-                            <div className={`w-1 h-6 rounded-full shrink-0 ${op.type === 'Collecte' ? 'bg-emerald-500' : 'bg-sky-500'}`} />
+                            <div className={`w-1 h-6 rounded-full shrink-0 ${op.type === 'Collecte' ? 'bg-status-success' : 'bg-status-info'}`} />
                             <div className="min-w-0">
-                               <div className="text-xs font-semibold text-white truncate">{op.type}</div>
-                               <div className="text-[10px] text-slate-500 truncate">{op.clientNom}</div>
+                               <div className="text-xs font-semibold text-content-primary truncate">{op.type}</div>
+                               <div className="text-[10px] text-content-muted truncate">{op.clientNom}</div>
                             </div>
                          </div>
                          <div className="text-right shrink-0 pl-2">
-                            <div className="text-xs font-bold text-white">{formatMoney(op.montant)}</div>
-                            <div className="flex items-center justify-end gap-1 text-[10px] text-slate-500">
+                            <div className="text-xs font-bold text-content-primary">{formatMoney(op.montant)}</div>
+                            <div className="flex items-center justify-end gap-1 text-[10px] text-content-muted">
                               <span>{formatTime(op.date)}</span>
-                              {op.statut === StatutOperationTerrain.APPROVED && <CheckCircle size={8} className="text-emerald-500" />}
+                              {op.statut === StatutOperationTerrain.APPROVED && <CheckCircle size={8} className="text-status-success" />}
                             </div>
                          </div>
                       </div>
@@ -927,10 +927,10 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
 
       {/* ═══ FULL PLANNING OVERLAY ═══ */}
       {showFullPlanning && (
-        <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col">
-          <header className="h-12 flex-none bg-slate-900 border-b border-slate-800 flex items-center justify-between px-3">
-            <div className="flex items-center gap-2 text-white font-bold text-sm">
-              <Calendar size={16} className="text-indigo-400" />
+        <div className="fixed inset-0 z-50 bg-surface-base flex flex-col">
+          <header className="h-12 flex-none bg-surface-base border-b border-edge flex items-center justify-between px-3">
+            <div className="flex items-center gap-2 text-content-primary font-bold text-sm">
+              <Calendar size={16} className="text-accent" />
               Planning
             </div>
             <button
@@ -938,7 +938,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                 setShowFullPlanning(false);
                 if (targetAgentId) loadKPIs(targetAgentId);
               }}
-              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold text-slate-300 transition-colors"
+              className="px-3 py-1.5 bg-surface hover:bg-surface-elevated rounded-lg text-xs font-bold text-content-secondary transition-colors"
             >
               Fermer
             </button>
@@ -951,13 +951,13 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
 
       {/* ═══ FULL ENQUETES OVERLAY ═══ */}
       {showEnquetesPanel && (
-        <div className="fixed inset-0 z-50 bg-slate-950 flex flex-col">
-          <header className="h-12 flex-none bg-slate-900 border-b border-slate-800 flex items-center justify-between px-3">
-            <div className="flex items-center gap-2 text-white font-bold text-sm">
-              <ClipboardCheck size={16} className="text-amber-400" />
+        <div className="fixed inset-0 z-50 bg-surface-base flex flex-col">
+          <header className="h-12 flex-none bg-surface-base border-b border-edge flex items-center justify-between px-3">
+            <div className="flex items-center gap-2 text-content-primary font-bold text-sm">
+              <ClipboardCheck size={16} className="text-status-warning" />
               Enquêtes à effectuer
               {pendingEnquetes.length > 0 && (
-                <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">
+                <span className="text-[10px] font-bold text-status-warning bg-status-warning-bg px-1.5 py-0.5 rounded">
                   {pendingEnquetes.length}
                 </span>
               )}
@@ -967,7 +967,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                 setShowEnquetesPanel(false);
                 loadEnquetes();
               }}
-              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg text-xs font-bold text-slate-300 transition-colors"
+              className="px-3 py-1.5 bg-surface hover:bg-surface-elevated rounded-lg text-xs font-bold text-content-secondary transition-colors"
             >
               Fermer
             </button>
@@ -975,38 +975,38 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
             {pendingEnquetes.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
-                <ClipboardCheck size={40} className="text-slate-700 mb-3" />
-                <p className="text-sm text-slate-400 font-medium">Aucune enquête en attente</p>
-                <p className="text-xs text-slate-600 mt-1">Les nouvelles enquêtes assignées apparaîtront ici</p>
+                <ClipboardCheck size={40} className="text-content-secondary mb-3" />
+                <p className="text-sm text-content-muted font-medium">Aucune enquête en attente</p>
+                <p className="text-xs text-content-muted mt-1">Les nouvelles enquêtes assignées apparaîtront ici</p>
               </div>
             ) : (
               pendingEnquetes.map((enq: any) => {
                 const isOverdue = enq.dueDate && new Date(enq.dueDate) < new Date();
                 const priorityConf: Record<string, { label: string; color: string }> = {
-                  LOW: { label: 'Basse', color: 'bg-slate-500/15 text-slate-400' },
-                  MEDIUM: { label: 'Normale', color: 'bg-blue-500/15 text-blue-400' },
-                  HIGH: { label: 'Haute', color: 'bg-amber-500/15 text-amber-400' },
-                  URGENT: { label: 'Urgente', color: 'bg-red-500/15 text-red-400 animate-pulse' },
+                  LOW: { label: 'Basse', color: 'bg-surface-subtle/35 text-content-muted' },
+                  MEDIUM: { label: 'Normale', color: 'bg-status-info-bg text-status-info' },
+                  HIGH: { label: 'Haute', color: 'bg-status-warning-bg text-status-warning' },
+                  URGENT: { label: 'Urgente', color: 'bg-status-danger-bg text-status-danger animate-pulse' },
                 };
                 const pConf = priorityConf[enq.priority || 'MEDIUM'] || priorityConf.MEDIUM;
                 return (
                   <div
                     key={enq.id}
-                    className={`bg-slate-900 border rounded-xl p-3 ${isOverdue ? 'border-red-500/40' : 'border-slate-800'}`}
+                    className={`bg-surface-base border rounded-xl p-3 ${isOverdue ? 'border-status-danger/40' : 'border-edge'}`}
                   >
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                        <div className="w-9 h-9 rounded-full bg-indigo-600/20 flex items-center justify-center text-indigo-400 font-bold text-xs shrink-0">
+                        <div className="w-9 h-9 rounded-full bg-accent/10 flex items-center justify-center text-accent font-bold text-xs shrink-0">
                           {enq.client
                             ? `${(enq.client.nom || '?')[0]}${(enq.client.prenom || '')[0] || ''}`
                             : '?'}
                         </div>
                         <div className="min-w-0">
-                          <div className="text-sm font-semibold text-white truncate">
+                          <div className="text-sm font-semibold text-content-primary truncate">
                             {enq.client ? `${enq.client.nom || ''} ${enq.client.prenom || ''}`.trim() : 'Client'}
                           </div>
                           {enq.objetCredit && (
-                            <div className="text-[11px] text-slate-500 truncate">{enq.objetCredit}</div>
+                            <div className="text-[11px] text-content-muted truncate">{enq.objetCredit}</div>
                           )}
                         </div>
                       </div>
@@ -1016,39 +1016,39 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                     </div>
                     <div className="grid grid-cols-2 gap-1.5 text-[11px]">
                       {enq.montantDemande && (
-                        <div className="flex items-center gap-1.5 text-slate-400">
-                          <Banknote size={11} className="text-emerald-500 shrink-0" />
+                        <div className="flex items-center gap-1.5 text-content-muted">
+                          <Banknote size={11} className="text-status-success shrink-0" />
                           {Number(enq.montantDemande).toLocaleString('fr-FR')} FCFA
                         </div>
                       )}
                       {enq.client?.telephone && (
-                        <div className="flex items-center gap-1.5 text-slate-400">
-                          <User size={11} className="text-blue-400 shrink-0" />
+                        <div className="flex items-center gap-1.5 text-content-muted">
+                          <User size={11} className="text-status-info shrink-0" />
                           <span className="truncate">{enq.client.telephone}</span>
                         </div>
                       )}
                       {enq.client?.adresseDomicile && (
-                        <div className="flex items-center gap-1.5 text-slate-400">
-                          <MapPin size={11} className="text-purple-400 shrink-0" />
+                        <div className="flex items-center gap-1.5 text-content-muted">
+                          <MapPin size={11} className="text-status-info shrink-0" />
                           <span className="truncate">{enq.client.adresseDomicile}</span>
                         </div>
                       )}
                       {enq.dueDate && (
-                        <div className={`flex items-center gap-1.5 ${isOverdue ? 'text-red-400' : 'text-slate-400'}`}>
-                          <Calendar size={11} className={isOverdue ? 'text-red-400' : 'text-slate-500'} />
+                        <div className={`flex items-center gap-1.5 ${isOverdue ? 'text-status-danger' : 'text-content-muted'}`}>
+                          <Calendar size={11} className={isOverdue ? 'text-status-danger' : 'text-content-muted'} />
                           {isOverdue && <AlertTriangle size={9} />}
                           {new Date(enq.dueDate).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
                         </div>
                       )}
                       {enq.assignedAt && (
-                        <div className="flex items-center gap-1.5 text-slate-500">
+                        <div className="flex items-center gap-1.5 text-content-muted">
                           <Clock size={11} />
                           Assignée: {new Date(enq.assignedAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
                         </div>
                       )}
                     </div>
                     {isOverdue && (
-                      <div className="mt-2 flex items-center gap-1.5 text-[10px] text-red-400 bg-red-500/10 rounded-lg px-2 py-1">
+                      <div className="mt-2 flex items-center gap-1.5 text-[10px] text-status-danger bg-status-danger-bg rounded-lg px-2 py-1">
                         <AlertTriangle size={10} />
                         <span className="font-medium">Echéance dépassée</span>
                       </div>
@@ -1059,7 +1059,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                         <button
                           onClick={() => handleStartEnquete(enq.id)}
                           disabled={startingEnquete === enq.id}
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-700 text-white text-[11px] font-bold rounded-lg transition-colors"
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-accent-secondary hover:bg-accent-secondary-hover disabled:bg-surface-elevated text-content-primary text-[11px] font-bold rounded-lg transition-colors"
                         >
                           {startingEnquete === enq.id ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
                           Démarrer l'enquête
@@ -1067,7 +1067,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                       ) : enq.statut === 'IN_PROGRESS' ? (
                         <button
                           onClick={() => setEnqueteFormData(enq)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-bold rounded-lg transition-colors"
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-status-info hover:bg-status-info text-white text-[11px] font-bold rounded-lg transition-colors"
                         >
                           <ClipboardCheck size={12} /> Remplir l'enquête
                         </button>
@@ -1126,13 +1126,13 @@ interface KPIChipProps {
 
 function KPIChip({ icon: Icon, value, label, color, pulse }: KPIChipProps) {
   const colorMap: Record<string, string> = {
-    emerald: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400',
-    cyan: 'bg-cyan-500/10 border-cyan-500/20 text-cyan-400',
-    blue: 'bg-blue-500/10 border-blue-500/20 text-blue-400',
-    amber: 'bg-amber-500/10 border-amber-500/20 text-amber-400',
-    red: 'bg-red-500/10 border-red-500/20 text-red-400',
-    purple: 'bg-purple-500/10 border-purple-500/20 text-purple-400',
-    slate: 'bg-slate-800 border-slate-700 text-slate-400',
+    emerald: 'bg-status-success-bg border-status-success/20 text-status-success',
+    cyan: 'bg-accent/10 border-accent/20 text-accent',
+    blue: 'bg-status-info-bg border-status-info/20 text-status-info',
+    amber: 'bg-status-warning-bg border-status-warning/20 text-status-warning',
+    red: 'bg-status-danger-bg border-status-danger/20 text-status-danger',
+    purple: 'bg-status-info-bg border-status-info/20 text-status-info',
+    slate: 'bg-surface border-edge text-content-muted',
   };
 
   return (
@@ -1165,9 +1165,9 @@ interface ActionTileProps {
 
 function ActionTile({ title, subtitle, icon: Icon, color, className = '', onClick }: ActionTileProps) {
   const colors = {
-    emerald: 'bg-emerald-600 hover:bg-emerald-500 border-emerald-500 shadow-emerald-900/20',
-    blue: 'bg-sky-600 hover:bg-sky-500 border-sky-500 shadow-sky-900/20',
-    purple: 'bg-violet-600 hover:bg-violet-500 border-violet-500 shadow-violet-900/20',
+    emerald: 'bg-status-success hover:bg-status-success border-status-success shadow-status-success/20',
+    blue: 'bg-status-info hover:bg-status-info border-status-info shadow-status-info/20',
+    purple: 'bg-accent hover:bg-accent border-accent shadow-accent/20',
   };
 
   const isWide = className.includes('col-span-2');

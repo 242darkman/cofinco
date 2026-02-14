@@ -30,7 +30,7 @@ export default function AppRouter({
     return (
       <div className="text-center py-20">
         <h2 className="text-2xl font-bold mb-4">Module non trouvé</h2>
-        <p className="text-slate-400">Le module "{currentModule}" n'existe pas.</p>
+        <p className="text-content-muted">Le module "{currentModule}" n'existe pas.</p>
       </div>
     );
   }
@@ -42,12 +42,12 @@ export default function AppRouter({
     }
     return (
       <div className="text-center py-20">
-        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-6 max-w-md mx-auto">
-          <h2 className="text-xl font-bold text-red-400 mb-2">Accès Refusé</h2>
-          <p className="text-slate-400">
+        <div className="bg-status-danger-bg border border-status-danger/30 rounded-lg p-6 max-w-md mx-auto">
+          <h2 className="text-xl font-bold text-status-danger mb-2">Accès Refusé</h2>
+          <p className="text-content-muted">
             Vous n'avez pas les permissions nécessaires pour accéder à ce module.
           </p>
-          <p className="text-sm text-slate-500 mt-2">
+          <p className="text-sm text-content-muted mt-2">
             Rôle requis : {route.requiredRoles?.map(getRoleLabel).join(', ') || getRoleLabel(SystemRole.ADMIN)}
           </p>
         </div>
@@ -74,7 +74,7 @@ export default function AppRouter({
     return (
       <div className="text-center py-20">
         <h2 className="text-2xl font-bold mb-4">Module en développement</h2>
-        <p className="text-slate-400">
+        <p className="text-content-muted">
           Cette fonctionnalité ({activeRoute.label}) sera disponible prochainement.
         </p>
       </div>

@@ -36,13 +36,13 @@ function formatMoney(value: string | number): string {
 }
 
 const TYPE_LABEL: Record<string, { label: string; icon: React.ElementType; className: string }> = {
-  SAVINGS: { label: 'Épargne', icon: PiggyBank, className: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' },
-  CURRENT: { label: 'Courant', icon: Wallet, className: 'bg-blue-500/10 border-blue-500/20 text-blue-400' },
-  BLOCKED: { label: 'Bloqué', icon: Lock, className: 'bg-amber-500/10 border-amber-500/20 text-amber-400' },
+  SAVINGS: { label: 'Épargne', icon: PiggyBank, className: 'bg-status-success-bg border-status-success/20 text-status-success' },
+  CURRENT: { label: 'Courant', icon: Wallet, className: 'bg-status-info-bg border-status-info/20 text-status-info' },
+  BLOCKED: { label: 'Bloqué', icon: Lock, className: 'bg-status-warning-bg border-status-warning/20 text-status-warning' },
 };
 
 function AccountTypeBadge({ typeCompte }: { typeCompte?: string }) {
-  const config = TYPE_LABEL[typeCompte || ''] || { label: typeCompte || '—', icon: CreditCard, className: 'bg-slate-500/10 border-slate-500/20 text-slate-400' };
+  const config = TYPE_LABEL[typeCompte || ''] || { label: typeCompte || '—', icon: CreditCard, className: 'bg-surface-subtle/30 border-edge-strong/20 text-content-muted' };
   const Icon = config.icon;
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-medium ${config.className}`}>
@@ -169,17 +169,17 @@ export default function OpeningApprovals({ agenceId }: OpeningApprovalsProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <Loader2 size={24} className="animate-spin text-cyan-500" />
+        <Loader2 size={24} className="animate-spin text-accent" />
       </div>
     );
   }
 
   if (requests.length === 0) {
     return (
-      <Card variant="default" padding="lg" className="border-dashed border-slate-700 bg-transparent">
+      <Card variant="default" padding="lg" className="border-dashed border-edge bg-transparent">
         <div className="text-center py-8">
-          <CheckCircle className="text-emerald-500 mx-auto mb-2" size={32} />
-          <p className="text-slate-400 text-sm">Aucune demande d'ouverture en attente</p>
+          <CheckCircle className="text-status-success mx-auto mb-2" size={32} />
+          <p className="text-content-muted text-sm">Aucune demande d'ouverture en attente</p>
         </div>
       </Card>
     );
@@ -189,25 +189,25 @@ export default function OpeningApprovals({ agenceId }: OpeningApprovalsProps) {
     <div className="space-y-3">
       {/* Header + Search */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <h4 className="text-sm font-semibold text-slate-400 uppercase flex items-center gap-2">
+        <h4 className="text-sm font-semibold text-content-muted uppercase flex items-center gap-2">
           <Clock size={14} />
           Ouvertures en attente
           <Badge value={String(requests.length)} size="sm" />
         </h4>
         <div className="flex items-center gap-2">
           <div className="relative">
-            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-content-muted" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="N° compte, client, produit..."
-              className="pl-8 pr-3 py-1.5 w-48 sm:w-56 bg-slate-800/60 border border-slate-700 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50 transition"
+              className="pl-8 pr-3 py-1.5 w-48 sm:w-56 bg-surface/60 border border-edge rounded-lg text-xs text-content-primary placeholder-content-muted focus:outline-none focus:border-status-info/50 transition"
             />
           </div>
           <button
             onClick={fetchPending}
-            className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-white transition"
+            className="p-1.5 rounded hover:bg-surface text-content-muted hover:text-content-primary transition"
             title="Rafraîchir"
           >
             <RefreshCw size={14} />
@@ -217,15 +217,15 @@ export default function OpeningApprovals({ agenceId }: OpeningApprovalsProps) {
 
       {/* Search result count when filtering */}
       {searchQuery.trim() && (
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-content-muted">
           {filtered.length} résultat{filtered.length !== 1 ? 's' : ''} sur {requests.length}
         </p>
       )}
 
       {/* Cards */}
       {paginated.length === 0 ? (
-        <Card variant="default" padding="md" className="border-dashed border-slate-700 bg-transparent">
-          <p className="text-center text-sm text-slate-500 py-4">
+        <Card variant="default" padding="md" className="border-dashed border-edge bg-transparent">
+          <p className="text-center text-sm text-content-muted py-4">
             Aucun résultat pour « {searchQuery} »
           </p>
         </Card>
@@ -236,25 +236,25 @@ export default function OpeningApprovals({ agenceId }: OpeningApprovalsProps) {
           const total = fee + deposit;
 
           return (
-            <Card key={req.id} variant="default" padding="md" className="border-purple-500/20">
+            <Card key={req.id} variant="default" padding="md" className="border-status-info/20">
               <div className="space-y-4">
                 {/* Top: Account + Client */}
                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <CreditCard size={16} className="text-purple-400" />
-                      <span className="text-white font-mono text-sm font-semibold">
+                      <CreditCard size={16} className="text-status-info" />
+                      <span className="text-content-primary font-mono text-sm font-semibold">
                         {req.numeroCompte || req.compteId.slice(0, 8)}
                       </span>
                     </div>
                     {req.clientNom && (
-                      <p className="text-sm text-slate-300 pl-6">{req.clientNom}</p>
+                      <p className="text-sm text-content-secondary pl-6">{req.clientNom}</p>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
                     <AccountTypeBadge typeCompte={req.typeCompte} />
                     {req.produitNom && (
-                      <span className="text-xs text-slate-400 bg-slate-800/60 px-2 py-1 rounded-md border border-slate-700/50">
+                      <span className="text-xs text-content-muted bg-surface/60 px-2 py-1 rounded-md border border-edge-subtle">
                         {req.produitNom}
                       </span>
                     )}
@@ -262,41 +262,41 @@ export default function OpeningApprovals({ agenceId }: OpeningApprovalsProps) {
                 </div>
 
                 {/* Financial details grid */}
-                <div className="grid grid-cols-3 gap-3 bg-slate-800/40 rounded-lg p-3">
+                <div className="grid grid-cols-3 gap-3 bg-surface/40 rounded-lg p-3">
                   <div>
-                    <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-0.5">Frais d'ouverture</p>
-                    <p className="text-sm font-semibold text-red-400">
-                      {fee > 0 ? `${formatMoney(fee)}` : 'Offerts'} <span className="text-[10px] text-slate-500">FCFA</span>
+                    <p className="text-[10px] uppercase tracking-wider text-content-muted mb-0.5">Frais d'ouverture</p>
+                    <p className="text-sm font-semibold text-status-danger">
+                      {fee > 0 ? `${formatMoney(fee)}` : 'Offerts'} <span className="text-[10px] text-content-muted">FCFA</span>
                     </p>
                   </div>
                   <div>
-                    <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-0.5">Dépôt initial</p>
-                    <p className="text-sm font-semibold text-slate-200">
-                      {formatMoney(deposit)} <span className="text-[10px] text-slate-500">FCFA</span>
+                    <p className="text-[10px] uppercase tracking-wider text-content-muted mb-0.5">Dépôt initial</p>
+                    <p className="text-sm font-semibold text-content-secondary">
+                      {formatMoney(deposit)} <span className="text-[10px] text-content-muted">FCFA</span>
                     </p>
                   </div>
                   <div>
-                    <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-0.5">Total à verser</p>
-                    <p className="text-sm font-bold text-emerald-400">
-                      {formatMoney(total)} <span className="text-[10px] text-slate-500">FCFA</span>
+                    <p className="text-[10px] uppercase tracking-wider text-content-muted mb-0.5">Total à verser</p>
+                    <p className="text-sm font-bold text-status-success">
+                      {formatMoney(total)} <span className="text-[10px] text-content-muted">FCFA</span>
                     </p>
                   </div>
                 </div>
 
                 {/* Info notice */}
-                <div className="flex items-start gap-2 px-3 py-2 bg-blue-500/5 border border-blue-500/15 rounded-lg">
-                  <Banknote size={14} className="text-blue-400 mt-0.5 shrink-0" />
-                  <p className="text-xs text-blue-400/90">
+                <div className="flex items-start gap-2 px-3 py-2 bg-status-info/5 border border-status-info/15 rounded-lg">
+                  <Banknote size={14} className="text-status-info mt-0.5 shrink-0" />
+                  <p className="text-xs text-status-info/90">
                     Après approbation, le caissier pourra encaisser le dépôt initial de {formatMoney(total)} FCFA.
                   </p>
                 </div>
 
                 {/* Footer: Initiator + Actions */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-slate-700/50">
-                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-edge-subtle">
+                  <div className="flex items-center gap-2 text-xs text-content-muted">
                     <User size={12} />
                     <span>
-                      Initié par <span className="text-slate-300">{req.initiatorName || req.initiatedBy.slice(0, 8)}</span>
+                      Initié par <span className="text-content-secondary">{req.initiatorName || req.initiatedBy.slice(0, 8)}</span>
                       {' — '}
                       {new Date(req.initiatedAt).toLocaleDateString('fr-FR', {
                         day: '2-digit',
@@ -312,7 +312,7 @@ export default function OpeningApprovals({ agenceId }: OpeningApprovalsProps) {
                     <button
                       onClick={() => setApproveTarget(req)}
                       disabled={actionLoading === req.id}
-                      className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg text-xs font-medium flex items-center gap-1.5 transition"
+                      className="px-3 py-1.5 bg-status-success-bg hover:bg-status-success-bg text-status-success border border-status-success/30 rounded-lg text-xs font-medium flex items-center gap-1.5 transition"
                     >
                       <CheckCircle size={14} />
                       Approuver
@@ -320,7 +320,7 @@ export default function OpeningApprovals({ agenceId }: OpeningApprovalsProps) {
                     <button
                       onClick={() => setRejectTarget(req)}
                       disabled={actionLoading === req.id}
-                      className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-xs font-medium flex items-center gap-1.5 transition"
+                      className="px-3 py-1.5 bg-status-danger-bg hover:bg-status-danger-bg text-status-danger border border-status-danger/30 rounded-lg text-xs font-medium flex items-center gap-1.5 transition"
                     >
                       <XCircle size={14} />
                       Rejeter
@@ -336,14 +336,14 @@ export default function OpeningApprovals({ agenceId }: OpeningApprovalsProps) {
       {/* Pagination */}
       {filtered.length > PAGE_SIZE && (
         <div className="flex items-center justify-between pt-2">
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-content-muted">
             {(safeCurrentPage - 1) * PAGE_SIZE + 1}–{Math.min(safeCurrentPage * PAGE_SIZE, filtered.length)} sur {filtered.length}
           </p>
           <div className="flex items-center gap-1">
             <button
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={safeCurrentPage <= 1}
-              className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition"
+              className="p-1.5 rounded hover:bg-surface text-content-muted hover:text-content-primary disabled:opacity-30 disabled:pointer-events-none transition"
             >
               <ChevronLeft size={16} />
             </button>
@@ -353,8 +353,8 @@ export default function OpeningApprovals({ agenceId }: OpeningApprovalsProps) {
                 onClick={() => setCurrentPage(page)}
                 className={`px-2.5 py-1 rounded text-xs font-medium transition ${
                   page === safeCurrentPage
-                    ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
-                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                    ? 'bg-status-info-bg text-status-info border border-status-info/30'
+                    : 'text-content-muted hover:bg-surface hover:text-content-primary'
                 }`}
               >
                 {page}
@@ -363,7 +363,7 @@ export default function OpeningApprovals({ agenceId }: OpeningApprovalsProps) {
             <button
               onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
               disabled={safeCurrentPage >= totalPages}
-              className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition"
+              className="p-1.5 rounded hover:bg-surface text-content-muted hover:text-content-primary disabled:opacity-30 disabled:pointer-events-none transition"
             >
               <ChevronRight size={16} />
             </button>
@@ -382,42 +382,42 @@ export default function OpeningApprovals({ agenceId }: OpeningApprovalsProps) {
             <div className="space-y-3">
               <p>
                 Vous allez approuver l'ouverture du compte{' '}
-                <span className="font-mono text-white font-semibold">{approveTarget.numeroCompte || approveTarget.compteId.slice(0, 8)}</span>
+                <span className="font-mono text-content-primary font-semibold">{approveTarget.numeroCompte || approveTarget.compteId.slice(0, 8)}</span>
                 {approveTarget.clientNom && (
-                  <> du client <span className="text-white">{approveTarget.clientNom}</span></>
+                  <> du client <span className="text-content-primary">{approveTarget.clientNom}</span></>
                 )}.
               </p>
 
               {/* Financial summary in dialog */}
-              <div className="grid grid-cols-3 gap-2 bg-slate-800/60 rounded-lg p-3 text-center">
+              <div className="grid grid-cols-3 gap-2 bg-surface/60 rounded-lg p-3 text-center">
                 <div>
-                  <p className="text-[10px] text-slate-500 uppercase">Frais ouverture</p>
-                  <p className="text-sm font-semibold text-red-400">
+                  <p className="text-[10px] text-content-muted uppercase">Frais ouverture</p>
+                  <p className="text-sm font-semibold text-status-danger">
                     {Number(approveTarget.openingFeeAmount) > 0
                       ? formatMoney(approveTarget.openingFeeAmount)
                       : 'Offerts'}
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-slate-500 uppercase">Dépôt initial</p>
-                  <p className="text-sm font-semibold text-slate-200">{formatMoney(approveTarget.initialDepositAmount)}</p>
+                  <p className="text-[10px] text-content-muted uppercase">Dépôt initial</p>
+                  <p className="text-sm font-semibold text-content-secondary">{formatMoney(approveTarget.initialDepositAmount)}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-slate-500 uppercase">Total</p>
-                  <p className="text-sm font-bold text-emerald-400">
+                  <p className="text-[10px] text-content-muted uppercase">Total</p>
+                  <p className="text-sm font-bold text-status-success">
                     {formatMoney(Number(approveTarget.openingFeeAmount) + Number(approveTarget.initialDepositAmount))}
                   </p>
                 </div>
               </div>
 
               {approveTarget.produitNom && (
-                <p className="text-sm text-slate-400">
-                  Produit : <span className="text-white">{approveTarget.produitNom}</span>
+                <p className="text-sm text-content-muted">
+                  Produit : <span className="text-content-primary">{approveTarget.produitNom}</span>
                 </p>
               )}
 
-              <p className="text-sm text-slate-400">
-                Le compte passera en statut <span className="text-cyan-400 font-medium">En attente d'activation</span>.
+              <p className="text-sm text-content-muted">
+                Le compte passera en statut <span className="text-accent font-medium">En attente d'activation</span>.
                 Le caissier pourra ensuite encaisser le dépôt initial.
               </p>
             </div>
@@ -438,23 +438,23 @@ export default function OpeningApprovals({ agenceId }: OpeningApprovalsProps) {
           <div className="space-y-3">
             <p>
               Le compte{' '}
-              <span className="font-mono text-white">{rejectTarget?.numeroCompte || rejectTarget?.compteId.slice(0, 8)}</span>
+              <span className="font-mono text-content-primary">{rejectTarget?.numeroCompte || rejectTarget?.compteId.slice(0, 8)}</span>
               {' '}sera annulé et la demande rejetée.
             </p>
-            <div className="flex items-start gap-2 px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-lg">
-              <AlertTriangle size={14} className="text-red-400 mt-0.5 shrink-0" />
-              <p className="text-xs text-red-400">
+            <div className="flex items-start gap-2 px-3 py-2 bg-status-danger-bg border border-status-danger/20 rounded-lg">
+              <AlertTriangle size={14} className="text-status-danger mt-0.5 shrink-0" />
+              <p className="text-xs text-status-danger">
                 Cette action est irréversible. Le client devra recommencer la procédure d'ouverture.
               </p>
             </div>
             <div>
-              <label className="block text-xs text-slate-400 mb-1">Motif du rejet *</label>
+              <label className="block text-xs text-content-muted mb-1">Motif du rejet *</label>
               <textarea
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
                 placeholder="Raison du rejet..."
                 rows={2}
-                className="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm text-white resize-none"
+                className="w-full bg-surface-base border border-edge rounded p-2 text-sm text-content-primary resize-none"
               />
             </div>
           </div>

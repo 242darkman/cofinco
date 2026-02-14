@@ -278,17 +278,17 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
 
   // --- Shared detail card for confirm dialogs ---
   const accentStyles: Record<string, string> = {
-    slate: 'border-slate-500/20 bg-slate-500/5',
-    emerald: 'border-emerald-500/20 bg-emerald-500/5',
-    red: 'border-red-500/20 bg-red-500/5',
-    cyan: 'border-cyan-500/20 bg-cyan-500/5',
+    slate: 'border-edge-strong/20 bg-surface-muted0/5',
+    emerald: 'border-status-success/20 bg-status-success-bg/50',
+    red: 'border-status-danger/20 bg-status-danger-bg/50',
+    cyan: 'border-accent/20 bg-accent/5',
   };
   const TransfertDetailCard = ({ rows, accentColor = 'slate' }: { rows: { label: string; value: React.ReactNode; highlight?: boolean }[]; accentColor?: string }) => (
     <div className={`rounded-xl border overflow-hidden ${accentStyles[accentColor] || accentStyles.slate}`}>
       {rows.map((row, i) => (
-        <div key={i} className={`flex items-center justify-between gap-3 px-3 sm:px-4 py-2 sm:py-2.5 ${i > 0 ? 'border-t border-slate-700/40' : ''}`}>
-          <span className="text-[10px] sm:text-xs text-slate-400 uppercase tracking-wider shrink-0 whitespace-nowrap">{row.label}</span>
-          <span className={`text-xs sm:text-sm font-medium text-right whitespace-nowrap ${row.highlight ? 'text-white font-bold font-mono tabular-nums sm:text-base' : 'text-slate-200'}`}>{row.value}</span>
+        <div key={i} className={`flex items-center justify-between gap-3 px-3 sm:px-4 py-2 sm:py-2.5 ${i > 0 ? 'border-t border-edge/40' : ''}`}>
+          <span className="text-[10px] sm:text-xs text-content-muted uppercase tracking-wider shrink-0 whitespace-nowrap">{row.label}</span>
+          <span className={`text-xs sm:text-sm font-medium text-right whitespace-nowrap ${row.highlight ? 'text-content-primary font-bold font-mono tabular-nums sm:text-base' : 'text-content-secondary'}`}>{row.value}</span>
         </div>
       ))}
     </div>
@@ -297,8 +297,8 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
   const DirectionBadge = ({ type }: { type: string }) => (
     <span className={`inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg text-[10px] sm:text-xs font-semibold ${
       type === "COFFRE_VERS_CAISSE"
-        ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-        : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+        ? 'bg-status-warning-bg text-status-warning border border-status-warning/20'
+        : 'bg-status-success-bg text-status-success border border-status-success/20'
     }`}>
       {type === "COFFRE_VERS_CAISSE" ? <ArrowDownRight size={12} /> : <ArrowUpRight size={12} />}
       {type === "COFFRE_VERS_CAISSE" ? "Coffre → Caisse" : "Caisse → Coffre"}
@@ -321,7 +321,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
           message: (
             <div className="space-y-3">
               <TransfertDetailCard accentColor="emerald" rows={[
-                { label: 'Montant', value: <>{montantFormatted} <span className="text-xs text-slate-400">FCFA</span></>, highlight: true },
+                { label: 'Montant', value: <>{montantFormatted} <span className="text-xs text-content-muted">FCFA</span></>, highlight: true },
                 { label: 'Caisse', value: caisse },
                 { label: 'Demandé par', value: transfert.requestedByNom },
               ]} />
@@ -339,13 +339,13 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
           message: (
             <div className="space-y-3">
               <TransfertDetailCard accentColor="red" rows={[
-                { label: 'Montant', value: <>{montantFormatted} <span className="text-xs text-slate-400">FCFA</span></>, highlight: true },
+                { label: 'Montant', value: <>{montantFormatted} <span className="text-xs text-content-muted">FCFA</span></>, highlight: true },
                 { label: 'Caisse', value: caisse },
                 { label: 'Demandé par', value: transfert.requestedByNom },
               ]} />
-              <div className="flex items-center gap-2 p-2.5 rounded-lg bg-red-500/5 border border-red-500/15">
-                <AlertTriangle size={14} className="text-red-400 shrink-0" />
-                <span className="text-xs text-red-300">Cette action est irréversible. Le demandeur sera notifié.</span>
+              <div className="flex items-center gap-2 p-2.5 rounded-lg bg-status-danger-bg/50 border border-status-danger/15">
+                <AlertTriangle size={14} className="text-status-danger shrink-0" />
+                <span className="text-xs text-status-danger/80">Cette action est irréversible. Le demandeur sera notifié.</span>
               </div>
             </div>
           ),
@@ -358,17 +358,17 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
           message: (
             <div className="space-y-3">
               <div className="text-center py-1.5">
-                <span className="text-xl sm:text-2xl font-bold font-mono tabular-nums text-white">{montantFormatted}</span>
-                <span className="text-xs sm:text-sm text-slate-400 ml-1">FCFA</span>
+                <span className="text-xl sm:text-2xl font-bold font-mono tabular-nums text-content-primary">{montantFormatted}</span>
+                <span className="text-xs sm:text-sm text-content-muted ml-1">FCFA</span>
               </div>
               <TransfertDetailCard accentColor="cyan" rows={[
                 { label: 'Caisse', value: caisse },
                 { label: 'Direction', value: <DirectionBadge type={transfert.typeTransfert} /> },
-                ...(transfert.reference ? [{ label: 'Réf.', value: <span className="font-mono text-[10px] text-slate-400">{transfert.reference}</span> }] : []),
+                ...(transfert.reference ? [{ label: 'Réf.', value: <span className="font-mono text-[10px] text-content-muted">{transfert.reference}</span> }] : []),
               ]} />
-              <div className="flex items-center gap-2 p-2.5 rounded-lg bg-emerald-500/5 border border-emerald-500/15">
-                <Play size={13} className="text-emerald-400 shrink-0" />
-                <span className="text-xs text-emerald-300">Les fonds seront immédiatement transférés.</span>
+              <div className="flex items-center gap-2 p-2.5 rounded-lg bg-status-success-bg/50 border border-status-success/15">
+                <Play size={13} className="text-status-success shrink-0" />
+                <span className="text-xs text-status-success/80">Les fonds seront immédiatement transférés.</span>
               </div>
             </div>
           ),
@@ -381,16 +381,16 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
           message: (
             <div className="space-y-3">
               <div className="text-center py-1.5">
-                <span className="text-xl sm:text-2xl font-bold font-mono tabular-nums text-white">{montantFormatted}</span>
-                <span className="text-xs sm:text-sm text-slate-400 ml-1">FCFA</span>
+                <span className="text-xl sm:text-2xl font-bold font-mono tabular-nums text-content-primary">{montantFormatted}</span>
+                <span className="text-xs sm:text-sm text-content-muted ml-1">FCFA</span>
               </div>
               <TransfertDetailCard accentColor="emerald" rows={[
                 { label: 'Caisse', value: transfert.caisseDestinationNom || caisse },
                 { label: 'Caissier', value: transfert.caissierNom || transfert.requestedByNom },
               ]} />
-              <div className="flex items-center gap-2 p-2.5 rounded-lg bg-emerald-500/5 border border-emerald-500/15">
-                <KeyRound size={13} className="text-emerald-400 shrink-0" />
-                <span className="text-xs text-emerald-300">Le caissier pourra confirmer la réception et ouvrir sa session.</span>
+              <div className="flex items-center gap-2 p-2.5 rounded-lg bg-status-success-bg/50 border border-status-success/15">
+                <KeyRound size={13} className="text-status-success shrink-0" />
+                <span className="text-xs text-status-success/80">Le caissier pourra confirmer la réception et ouvrir sa session.</span>
               </div>
             </div>
           ),
@@ -403,13 +403,13 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
           message: (
             <div className="space-y-3">
               <TransfertDetailCard accentColor="red" rows={[
-                { label: 'Montant demandé', value: <>{montantFormatted} <span className="text-xs text-slate-400">FCFA</span></>, highlight: true },
+                { label: 'Montant demandé', value: <>{montantFormatted} <span className="text-xs text-content-muted">FCFA</span></>, highlight: true },
                 { label: 'Caisse', value: transfert.caisseDestinationNom || caisse },
                 { label: 'Caissier', value: transfert.caissierNom || transfert.requestedByNom },
               ]} />
-              <div className="flex items-center gap-2 p-2.5 rounded-lg bg-amber-500/5 border border-amber-500/15">
-                <AlertTriangle size={14} className="text-amber-400 shrink-0" />
-                <span className="text-xs text-amber-300">Le caissier sera notifié et devra soumettre une nouvelle demande.</span>
+              <div className="flex items-center gap-2 p-2.5 rounded-lg bg-status-warning-bg/50 border border-status-warning/15">
+                <AlertTriangle size={14} className="text-status-warning shrink-0" />
+                <span className="text-xs text-status-warning/80">Le caissier sera notifié et devra soumettre une nouvelle demande.</span>
               </div>
             </div>
           ),
@@ -437,12 +437,12 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
       key: 'createdAt',
       label: 'Date',
       format: (_: any, row: any) => (
-        <span className="text-xs text-slate-300 whitespace-nowrap">
+        <span className="text-xs text-content-secondary whitespace-nowrap">
            {format(new Date(row.createdAt), "dd/MM HH:mm", { locale: fr })}
         </span>
       ),
       mobileFormat: (_: any, row: any) => (
-        <span className="text-[10px] text-slate-400">
+        <span className="text-[10px] text-content-muted">
           {format(new Date(row.createdAt), "dd/MM/yy HH:mm", { locale: fr })}
         </span>
       ),
@@ -458,7 +458,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
             ) : (
                 <Badge variant="success" size="sm" icon={<ArrowUpRight size={10} />} value="Entrée" className="text-[10px] whitespace-nowrap" />
             )}
-            <span className="text-[10px] text-slate-400 hidden xl:inline">
+            <span className="text-[10px] text-content-muted hidden xl:inline">
                 {row.typeTransfert === "COFFRE_VERS_CAISSE" ? "Vers Caisse" : "De Caisse"}
             </span>
         </div>
@@ -471,10 +471,10 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
             <Badge variant="success" size="sm" icon={<ArrowUpRight size={10} />} value="Entrée" className="text-[10px]" />
           )}
           <div className="flex flex-col min-w-0">
-            <span className="text-sm font-semibold text-white truncate">
+            <span className="text-sm font-semibold text-content-primary truncate">
               {Number(row.montant).toLocaleString()} FCFA
             </span>
-            <span className="text-[10px] text-slate-400 truncate">
+            <span className="text-[10px] text-content-muted truncate">
               {row.typeTransfert === "COFFRE_VERS_CAISSE" ? row.caisseDestinationNom : row.caisseSourceNom}
             </span>
           </div>
@@ -486,7 +486,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
       label: 'Caisse',
       hideOnMobile: true,
       format: (_: any, row: any) => (
-        <span className="font-medium text-white text-xs truncate max-w-[140px] block" title={row.typeTransfert === "COFFRE_VERS_CAISSE" ? row.caisseDestinationNom : row.caisseSourceNom}>
+        <span className="font-medium text-content-primary text-xs truncate max-w-[140px] block" title={row.typeTransfert === "COFFRE_VERS_CAISSE" ? row.caisseDestinationNom : row.caisseSourceNom}>
           {row.typeTransfert === "COFFRE_VERS_CAISSE" ? row.caisseDestinationNom : row.caisseSourceNom}
         </span>
       )
@@ -497,8 +497,8 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
       align: 'right' as const,
       hideOnMobile: true,
       format: (val: any) => (
-        <span className="font-bold font-mono text-white text-xs whitespace-nowrap tabular-nums">
-            {Number(val).toLocaleString()} <span className="text-[10px] text-slate-400">FCFA</span>
+        <span className="font-bold font-mono text-content-primary text-xs whitespace-nowrap tabular-nums">
+            {Number(val).toLocaleString()} <span className="text-[10px] text-content-muted">FCFA</span>
         </span>
       )
     },
@@ -506,12 +506,12 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
       key: 'requestedByNom',
       label: 'Initié par',
       format: (_: any, row: any) => (
-        <span className="text-xs text-slate-400 truncate max-w-[120px] block" title={`${row.requestedByNom} ${row.requestedByPrenom || ''}`}>
+        <span className="text-xs text-content-muted truncate max-w-[120px] block" title={`${row.requestedByNom} ${row.requestedByPrenom || ''}`}>
             {row.requestedByNom} {row.requestedByPrenom?.charAt(0)}.
         </span>
       ),
       mobileFormat: (_: any, row: any) => (
-        <span className="text-[10px] text-slate-400">
+        <span className="text-[10px] text-content-muted">
           par {row.requestedByNom} {row.requestedByPrenom?.charAt(0)}.
         </span>
       ),
@@ -543,7 +543,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
               <Button
                 size="sm"
                 variant="secondary"
-                className="h-6 sm:h-7 px-1.5 sm:px-2.5 text-[10px] sm:text-xs font-medium bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20 hover:border-emerald-500/50 transition-all"
+                className="h-6 sm:h-7 px-1.5 sm:px-2.5 text-[10px] sm:text-xs font-medium bg-status-success-bg text-status-success border-status-success/30 hover:bg-status-success-bg hover:border-status-success/50 transition-all"
                 onClick={(e) => { e.stopPropagation(); setConfirmAction({ type: 'validate', transfert: row }); }}
                 disabled={isLoading}
               >
@@ -559,7 +559,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
               <Button
                 size="sm"
                 variant="secondary"
-                className="h-6 sm:h-7 px-1.5 sm:px-2.5 text-[10px] sm:text-xs font-medium bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20 hover:border-red-500/50 transition-all"
+                className="h-6 sm:h-7 px-1.5 sm:px-2.5 text-[10px] sm:text-xs font-medium bg-status-danger-bg text-status-danger border-status-danger/30 hover:bg-status-danger-bg hover:border-status-danger/50 transition-all"
                 onClick={(e) => { e.stopPropagation(); setConfirmAction({ type: 'reject', transfert: row }); }}
                 disabled={isLoading}
               >
@@ -569,7 +569,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
             </>
           )}
           {!canValidate && (
-            <span className="text-[9px] sm:text-xs text-slate-500 italic flex items-center gap-1">
+            <span className="text-[9px] sm:text-xs text-content-muted italic flex items-center gap-1">
               <Clock size={10} />
               <span className="hidden sm:inline">En attente</span>
             </span>
@@ -598,7 +598,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
             <Button
               size="sm"
               variant="primary"
-              className="h-6 sm:h-7 px-2 sm:px-3 text-[10px] sm:text-xs font-medium shadow-lg shadow-cyan-500/20 hover:shadow-cyan-500/30 transition-all"
+              className="h-6 sm:h-7 px-2 sm:px-3 text-[10px] sm:text-xs font-medium shadow-lg shadow-accent/20 hover:shadow-accent/30 transition-all"
               onClick={(e) => { e.stopPropagation(); setConfirmAction({ type: 'execute', transfert: row }); }}
               disabled={isLoading}
             >
@@ -612,7 +612,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
               )}
             </Button>
           ) : (
-            <span className="text-[9px] sm:text-xs text-amber-400/80 flex items-center gap-1 bg-amber-500/10 px-1.5 sm:px-2.5 py-1 rounded-md">
+            <span className="text-[9px] sm:text-xs text-status-warning/80 flex items-center gap-1 bg-status-warning-bg px-1.5 sm:px-2.5 py-1 rounded-md">
               <Clock size={10} />
               <span className="hidden sm:inline">En attente</span>
             </span>
@@ -636,7 +636,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
     // Statuts terminaux (Exécuté, Rejeté, Annulé)
     if (row.statut === StatutTransfertCoffre.EXECUTED) {
       return (
-        <span className="text-[10px] sm:text-xs text-emerald-400/60 flex items-center gap-1">
+        <span className="text-[10px] sm:text-xs text-status-success/60 flex items-center gap-1">
           <CheckCircle2 size={10} />
           <span className="hidden sm:inline">Terminé</span>
         </span>
@@ -645,7 +645,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
 
     if (row.statut === StatutTransfertCoffre.REJECTED || row.statut === StatutTransfertCoffre.CANCELLED) {
       return (
-        <span className="text-[10px] sm:text-xs text-red-400/60 flex items-center gap-1">
+        <span className="text-[10px] sm:text-xs text-status-danger/60 flex items-center gap-1">
           <Ban size={10} />
           <span className="hidden sm:inline">{ALL_STATUS_LABELS[row.statut] || row.statut}</span>
         </span>
@@ -660,14 +660,14 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* ── Nav bar ── */}
-      <div className="shrink-0 flex items-center gap-0.5 sm:gap-1.5 px-1.5 sm:px-2 border-b border-slate-800/60">
+      <div className="shrink-0 flex items-center gap-0.5 sm:gap-1.5 px-1.5 sm:px-2 border-b border-edge/60">
         {/* Balance chip — always visible */}
-        <div className="hidden xs:flex items-center gap-1.5 bg-blue-500/8 border border-blue-500/15 rounded-lg px-2 py-1.5 shrink-0 mr-0.5">
-          <Vault size={13} className="text-blue-400" />
-          <span className="text-[11px] font-bold text-white font-mono tabular-nums">
+        <div className="hidden xs:flex items-center gap-1.5 bg-status-info-bg border border-status-info/15 rounded-lg px-2 py-1.5 shrink-0 mr-0.5">
+          <Vault size={13} className="text-status-info" />
+          <span className="text-[11px] font-bold text-content-primary font-mono tabular-nums">
             {isLoadingStats ? '···' : (statsData?.solde || 0).toLocaleString()}
           </span>
-          <span className="text-[9px] text-slate-500">FCFA</span>
+          <span className="text-[9px] text-content-muted">FCFA</span>
         </div>
 
         {/* Tabs — underline style, scrollable */}
@@ -690,18 +690,18 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
                   onClick={() => setActiveTab(tab.id)}
                   className={`
                     relative flex items-center gap-1.5 px-2.5 py-2.5 text-[11px] font-medium whitespace-nowrap transition-colors
-                    ${isActive ? 'text-blue-400' : 'text-slate-500 hover:text-slate-300'}
+                    ${isActive ? 'text-status-info' : 'text-content-muted hover:text-content-secondary'}
                   `}
                 >
                   <tab.icon size={13} />
                   {tab.label}
                   {tab.id === 'operations' && pendingCount > 0 && (
-                    <span className="px-1 min-w-[16px] text-center rounded-full bg-amber-500 text-white text-[9px] font-bold leading-[16px]">
+                    <span className="px-1 min-w-[16px] text-center rounded-full bg-status-warning text-white text-[9px] font-bold leading-[16px]">
                       {pendingCount}
                     </span>
                   )}
                   {isActive && (
-                    <span className="absolute bottom-0 inset-x-1.5 h-[2px] bg-blue-500 rounded-full" />
+                    <span className="absolute bottom-0 inset-x-1.5 h-[2px] bg-accent rounded-full" />
                   )}
                 </button>
               );
@@ -714,7 +714,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
           <div className="relative shrink-0">
             <button
               onClick={() => setShowHelp(v => !v)}
-              className={`p-1.5 rounded-md transition ${showHelp ? 'text-blue-400 bg-blue-500/10' : 'text-slate-600 hover:text-slate-400'}`}
+              className={`p-1.5 rounded-md transition ${showHelp ? 'text-status-info bg-status-info-bg' : 'text-content-muted hover:text-content-muted'}`}
               aria-label="Aide"
             >
               <Info size={14} />
@@ -722,8 +722,8 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
             {showHelp && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setShowHelp(false)} />
-                <div className="absolute right-0 top-full mt-1.5 w-72 p-3 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 animate-in fade-in slide-in-from-top-1 duration-150">
-                  <p className="text-[11px] text-slate-300 leading-relaxed">{TAB_HELP[activeTab]}</p>
+                <div className="absolute right-0 top-full mt-1.5 w-72 p-3 bg-surface border border-edge rounded-lg shadow-xl z-50 animate-in fade-in slide-in-from-top-1 duration-150">
+                  <p className="text-[11px] text-content-secondary leading-relaxed">{TAB_HELP[activeTab]}</p>
                 </div>
               </>
             )}
@@ -734,7 +734,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
         {canConfigure && (
           <button
             onClick={() => setShowProvisionModal(true)}
-            className="shrink-0 flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 text-[11px] font-semibold text-emerald-400 border border-emerald-500/30 rounded-lg hover:bg-emerald-500/10 transition whitespace-nowrap"
+            className="shrink-0 flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 text-[11px] font-semibold text-status-success border border-status-success/30 rounded-lg hover:bg-status-success-bg transition whitespace-nowrap"
           >
             <ArrowDownRight size={13} />
             <span className="hidden sm:inline">Approvisionner</span>
@@ -764,12 +764,12 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
             <>
             {/* Header Stats - Compact & Responsive */}
             <div className="grid grid-cols-1 xs:grid-cols-3 gap-2">
-               <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-2.5 sm:p-3 flex items-center xs:flex-col xs:items-start justify-between xs:justify-center gap-1">
-                  <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest xs:mb-0.5">Solde Coffre</span>
+               <div className="bg-surface/40 border border-edge-subtle rounded-lg p-2.5 sm:p-3 flex items-center xs:flex-col xs:items-start justify-between xs:justify-center gap-1">
+                  <span className="text-[9px] sm:text-[10px] font-bold text-content-muted uppercase tracking-widest xs:mb-0.5">Solde Coffre</span>
                   <div className="flex items-center gap-1.5">
-                     <Wallet className="text-blue-400 shrink-0" size={15} />
-                     <div className="text-sm sm:text-base lg:text-lg font-bold text-white font-mono tabular-nums max-w-full truncate" title={isLoadingStats ? "..." : `${(statsData?.solde || 0).toLocaleString()} FCFA`}>
-                        {isLoadingStats ? "..." : <>{(statsData?.solde || 0).toLocaleString()} <span className="text-[10px] sm:text-xs text-slate-400 font-sans">FCFA</span></>}
+                     <Wallet className="text-status-info shrink-0" size={15} />
+                     <div className="text-sm sm:text-base lg:text-lg font-bold text-content-primary font-mono tabular-nums max-w-full truncate" title={isLoadingStats ? "..." : `${(statsData?.solde || 0).toLocaleString()} FCFA`}>
+                        {isLoadingStats ? "..." : <>{(statsData?.solde || 0).toLocaleString()} <span className="text-[10px] sm:text-xs text-content-muted font-sans">FCFA</span></>}
                      </div>
                   </div>
                </div>
@@ -777,42 +777,42 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
                   const totalPending = pendingCount + (pendingOpeningRequests?.length || 0);
                   const hasPending = totalPending > 0;
                   return (
-                    <div className={`rounded-lg p-2.5 sm:p-3 flex items-center xs:flex-col xs:items-start justify-between xs:justify-center gap-1 border transition-colors ${hasPending ? 'bg-amber-500/10 border-amber-500/40' : 'bg-slate-800/40 border-slate-700/50'}`}>
-                       <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest xs:mb-0.5">Opérations en attente</span>
+                    <div className={`rounded-lg p-2.5 sm:p-3 flex items-center xs:flex-col xs:items-start justify-between xs:justify-center gap-1 border transition-colors ${hasPending ? 'bg-status-warning-bg border-status-warning/40' : 'bg-surface/40 border-edge-subtle'}`}>
+                       <span className="text-[9px] sm:text-[10px] font-bold text-content-muted uppercase tracking-widest xs:mb-0.5">Opérations en attente</span>
                        <div className="flex items-center gap-1.5">
-                          <Clock className={`shrink-0 ${hasPending ? 'text-amber-400' : 'text-slate-500'}`} size={15} />
-                          <div className={`text-sm sm:text-base lg:text-lg font-bold font-mono tabular-nums ${hasPending ? 'text-amber-300' : 'text-white'}`}>{totalPending}</div>
+                          <Clock className={`shrink-0 ${hasPending ? 'text-status-warning' : 'text-content-muted'}`} size={15} />
+                          <div className={`text-sm sm:text-base lg:text-lg font-bold font-mono tabular-nums ${hasPending ? 'text-status-warning' : 'text-content-primary'}`}>{totalPending}</div>
                        </div>
                     </div>
                   );
                })()}
-               <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-2.5 sm:p-3 flex items-center xs:flex-col xs:items-start justify-between xs:justify-center gap-1">
-                  <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest xs:mb-0.5">Mouvements du Jour</span>
+               <div className="bg-surface/40 border border-edge-subtle rounded-lg p-2.5 sm:p-3 flex items-center xs:flex-col xs:items-start justify-between xs:justify-center gap-1">
+                  <span className="text-[9px] sm:text-[10px] font-bold text-content-muted uppercase tracking-widest xs:mb-0.5">Mouvements du Jour</span>
                   <div className="flex items-center gap-1.5">
-                     <ArrowRightLeft className="text-emerald-400 shrink-0" size={15} />
-                     <div className="text-sm sm:text-base lg:text-lg font-bold text-white font-mono tabular-nums max-w-full truncate">{todayVolume.toLocaleString()} <span className="text-[10px] sm:text-xs text-slate-400 font-sans">FCFA</span></div>
+                     <ArrowRightLeft className="text-status-success shrink-0" size={15} />
+                     <div className="text-sm sm:text-base lg:text-lg font-bold text-content-primary font-mono tabular-nums max-w-full truncate">{todayVolume.toLocaleString()} <span className="text-[10px] sm:text-xs text-content-muted font-sans">FCFA</span></div>
                   </div>
                </div>
             </div>
 
             {/* Pending Opening Requests Section - New Secure Workflow */}
             {(pendingOpeningRequests?.length > 0 || isLoadingOpeningRequests) && (
-              <Card className="overflow-hidden bg-gradient-to-br from-amber-500/5 to-orange-500/5 border-amber-500/30">
-                <div className="p-2 border-b border-amber-500/20 flex justify-between items-center gap-2">
+              <Card className="overflow-hidden bg-gradient-to-br from-status-warning-bg/50 to-status-warning-bg/50 border-status-warning/30">
+                <div className="p-2 border-b border-status-warning/20 flex justify-between items-center gap-2">
                   <div className="flex items-center gap-2 min-w-0">
-                    <div className="p-1 rounded-lg bg-amber-500/20 shrink-0">
-                      <KeyRound className="w-3 h-3 text-amber-400" />
+                    <div className="p-1 rounded-lg bg-status-warning-bg shrink-0">
+                      <KeyRound className="w-3 h-3 text-status-warning" />
                     </div>
                     <div className="min-w-0">
-                      <h3 className="font-bold text-white text-[11px] sm:text-xs flex items-center gap-2">
+                      <h3 className="font-bold text-content-primary text-[11px] sm:text-xs flex items-center gap-2">
                         <span className="truncate">Ouverture Caisse</span>
                         {pendingOpeningRequests?.length > 0 && (
-                          <span className="px-1.5 py-0 rounded-full bg-amber-500 text-white text-[9px] font-bold animate-pulse shrink-0">
+                          <span className="px-1.5 py-0 rounded-full bg-status-warning text-white text-[9px] font-bold animate-pulse shrink-0">
                             {pendingOpeningRequests.length}
                           </span>
                         )}
                       </h3>
-                      <p className="text-slate-400 text-[9px] sm:text-[10px] hidden xs:block">Caissiers en attente de dotation</p>
+                      <p className="text-content-muted text-[9px] sm:text-[10px] hidden xs:block">Caissiers en attente de dotation</p>
                     </div>
                   </div>
                   <Button
@@ -820,7 +820,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
                     size="sm"
                     onClick={() => refetchOpeningRequests()}
                     disabled={isLoadingOpeningRequests}
-                    className="h-6 px-2 text-[10px] border-amber-500/30 text-amber-400 hover:bg-amber-500/10 shrink-0"
+                    className="h-6 px-2 text-[10px] border-status-warning/30 text-status-warning hover:bg-status-warning-bg shrink-0"
                   >
                     <Loader2
                       size={10}
@@ -832,42 +832,42 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
 
                 {isLoadingOpeningRequests ? (
                   <div className="p-2 text-center">
-                    <Loader2 className="w-4 h-4 animate-spin text-amber-400 mx-auto" />
-                    <p className="text-slate-400 mt-1 text-[10px]">Chargement...</p>
+                    <Loader2 className="w-4 h-4 animate-spin text-status-warning mx-auto" />
+                    <p className="text-content-muted mt-1 text-[10px]">Chargement...</p>
                   </div>
                 ) : (
-                  <div className="divide-y divide-amber-500/10">
+                  <div className="divide-y divide-status-warning/10">
                     {pendingOpeningRequests.map((request: any) => (
                       <div
                         key={request.transfert?.id || request.session?.id}
-                        className="p-2 hover:bg-amber-500/5 transition-colors"
+                        className="p-2 hover:bg-status-warning-bg/50 transition-colors"
                       >
                         <div className="flex flex-col gap-2">
                           {/* Request Info */}
                           <div className="flex items-start gap-2">
-                            <div className="p-1.5 rounded-lg bg-slate-800 border border-slate-700 shrink-0">
-                              <User className="w-3 h-3 text-slate-400" />
+                            <div className="p-1.5 rounded-lg bg-surface border border-edge shrink-0">
+                              <User className="w-3 h-3 text-content-muted" />
                             </div>
                             <div className="min-w-0 flex-1">
                               <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                                <span className="font-bold text-white text-[11px] sm:text-xs">
+                                <span className="font-bold text-content-primary text-[11px] sm:text-xs">
                                   {request.caissierNom || request.transfert?.requestedByNom || 'Caissier'}
                                 </span>
-                                <span className="text-slate-500 text-[9px] sm:text-[10px]">
+                                <span className="text-content-muted text-[9px] sm:text-[10px]">
                                    • {request.caisseNom || request.transfert?.caisseDestinationNom || 'Caisse'}
                                 </span>
                               </div>
                               <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px]">
-                                <span className="text-amber-400 font-bold">
+                                <span className="text-status-warning font-bold">
                                   {Number(request.montantDemande || request.transfert?.montant || 0).toLocaleString()} FCFA
                                 </span>
                                 {request.soldeVeille > 0 && (
-                                  <span className="text-slate-500 hidden xs:inline">
+                                  <span className="text-content-muted hidden xs:inline">
                                     (+{Number(request.soldeVeille).toLocaleString()} veille)
                                   </span>
                                 )}
                                 {request.fundsRequestedAt && (
-                                  <span className="text-[9px] text-slate-500">
+                                  <span className="text-[9px] text-content-muted">
                                     {format(new Date(request.fundsRequestedAt), "dd/MM HH:mm", { locale: fr })}
                                   </span>
                                 )}
@@ -881,7 +881,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
                                   <Button
                                     size="sm"
                                     variant="secondary"
-                                    className="h-6 px-2 text-[9px] font-medium bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20 hover:border-emerald-500/50 transition-all"
+                                    className="h-6 px-2 text-[9px] font-medium bg-status-success-bg text-status-success border-status-success/30 hover:bg-status-success-bg hover:border-status-success/50 transition-all"
                                     onClick={() => setConfirmAction({
                                       type: 'validate-opening',
                                       transfert: {
@@ -906,7 +906,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
                                   <Button
                                     size="sm"
                                     variant="secondary"
-                                    className="h-6 px-2 text-[9px] font-medium bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20 hover:border-red-500/50 transition-all"
+                                    className="h-6 px-2 text-[9px] font-medium bg-status-danger-bg text-status-danger border-status-danger/30 hover:bg-status-danger-bg hover:border-status-danger/50 transition-all"
                                     onClick={() => setConfirmAction({
                                       type: 'reject-opening',
                                       transfert: {
@@ -925,7 +925,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
                                 </>
                               )}
                               {!canValidate && (
-                                <span className="text-[9px] text-slate-500 italic flex items-center gap-1">
+                                <span className="text-[9px] text-content-muted italic flex items-center gap-1">
                                   <Clock size={10} />
                                   En attente
                                 </span>
@@ -939,7 +939,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
                               <Button
                                 size="sm"
                                 variant="secondary"
-                                className="flex-1 h-7 text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20"
+                                className="flex-1 h-7 text-[10px] font-medium bg-status-success-bg text-status-success border-status-success/30 hover:bg-status-success-bg"
                                 onClick={() => setConfirmAction({
                                   type: 'validate-opening',
                                   transfert: {
@@ -958,7 +958,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
                               <Button
                                 size="sm"
                                 variant="secondary"
-                                className="flex-1 h-7 text-[10px] font-medium bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20"
+                                className="flex-1 h-7 text-[10px] font-medium bg-status-danger-bg text-status-danger border-status-danger/30 hover:bg-status-danger-bg"
                                 onClick={() => setConfirmAction({
                                   type: 'reject-opening',
                                   transfert: {
@@ -984,13 +984,13 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
               </Card>
             )}
 
-            <Card className="overflow-hidden bg-slate-900/50 backdrop-blur border-slate-800">
-              <div className="p-2.5 border-b border-slate-800 flex justify-between items-center">
+            <Card className="overflow-hidden bg-surface-base/50 backdrop-blur border-edge">
+              <div className="p-2.5 border-b border-edge flex justify-between items-center">
                    <div className="flex items-center gap-2">
-                      <ArrowRightLeft className="text-blue-400" size={14} />
-                      <h3 className="font-bold text-white text-xs sm:text-sm">Transferts</h3>
+                      <ArrowRightLeft className="text-status-info" size={14} />
+                      <h3 className="font-bold text-content-primary text-xs sm:text-sm">Transferts</h3>
                       {transferts.length > 0 && (
-                        <span className="text-[9px] text-slate-500 font-medium">{transferts.length}</span>
+                        <span className="text-[9px] text-content-muted font-medium">{transferts.length}</span>
                       )}
                    </div>
                    <Button
@@ -998,11 +998,11 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
                       size="sm"
                       onClick={() => refetch()}
                       disabled={isRefetchingTransferts}
-                      className="h-7 px-2 text-[10px] text-slate-400 hover:text-white"
+                      className="h-7 px-2 text-[10px] text-content-muted hover:text-content-primary"
                    >
                       <Loader2
                           size={12}
-                          className={`mr-1 ${isRefetchingTransferts ? 'animate-spin text-blue-400' : 'text-slate-400'}`}
+                          className={`mr-1 ${isRefetchingTransferts ? 'animate-spin text-status-info' : 'text-content-muted'}`}
                       />
                       <span className="hidden xs:inline">Actualiser</span>
                       <span className="xs:hidden">Act.</span>
@@ -1049,16 +1049,16 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => !isCancelling && setTransfertToCancel(null)}
           />
-          <div className="relative bg-slate-900 border border-slate-700 rounded-lg shadow-2xl max-w-md w-full p-6 space-y-4 animate-in zoom-in-95 duration-200">
+          <div className="relative bg-surface-base border border-edge rounded-lg shadow-2xl max-w-md w-full p-6 space-y-4 animate-in zoom-in-95 duration-200">
             <div className="flex items-start gap-3">
-              <div className="p-2 bg-red-500/20 rounded-lg">
-                <AlertCircle className="w-5 h-5 text-red-400" />
+              <div className="p-2 bg-status-danger-bg rounded-lg">
+                <AlertCircle className="w-5 h-5 text-status-danger" />
               </div>
               <div className="flex-1">
-                <h3 className="font-bold text-white text-base mb-1">
+                <h3 className="font-bold text-content-primary text-base mb-1">
                   Annuler ce transfert ?
                 </h3>
-                <p className="text-sm text-slate-400">
+                <p className="text-sm text-content-muted">
                   {transfertToCancel.statut === StatutTransfertCoffre.EXECUTED
                     ? 'Un transfert compensatoire (sens inverse) sera créé automatiquement pour maintenir la traçabilité comptable.'
                     : 'Cette action annulera définitivement ce transfert.'}
@@ -1067,41 +1067,41 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
             </div>
 
             {/* Transfer details */}
-            <div className="p-3 bg-slate-800/50 rounded-lg space-y-1.5">
+            <div className="p-3 bg-surface/50 rounded-lg space-y-1.5">
               <div className="flex justify-between text-xs">
-                <span className="text-slate-500">Montant</span>
-                <span className="font-mono font-bold text-white">
+                <span className="text-content-muted">Montant</span>
+                <span className="font-mono font-bold text-content-primary">
                   {Number(transfertToCancel.montant).toLocaleString()} FCFA
                 </span>
               </div>
               <div className="flex justify-between text-xs">
-                <span className="text-slate-500">Référence</span>
-                <span className="font-mono text-slate-300">{transfertToCancel.reference}</span>
+                <span className="text-content-muted">Référence</span>
+                <span className="font-mono text-content-secondary">{transfertToCancel.reference}</span>
               </div>
               <div className="flex justify-between text-xs">
-                <span className="text-slate-500">Type</span>
-                <span className="text-slate-300">{getMouvementCoffreLabel(transfertToCancel.typeTransfert)}</span>
+                <span className="text-content-muted">Type</span>
+                <span className="text-content-secondary">{getMouvementCoffreLabel(transfertToCancel.typeTransfert)}</span>
               </div>
               <div className="flex justify-between text-xs">
-                <span className="text-slate-500">Statut</span>
+                <span className="text-content-muted">Statut</span>
                 <Badge variant="warning" value={transfertToCancel.statut} className="text-xs" />
               </div>
             </div>
 
             {/* Reason input */}
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">
+              <label className="block text-xs font-medium text-content-secondary mb-1.5">
                 Raison de l'annulation *
               </label>
               <textarea
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500 resize-none"
+                className="w-full px-3 py-2 bg-surface border border-edge-strong rounded-lg text-sm text-content-primary placeholder-content-muted focus:outline-none focus:ring-2 focus:ring-status-danger/50 focus:border-status-danger resize-none"
                 placeholder="Expliquez pourquoi vous annulez ce transfert..."
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)}
                 rows={3}
                 disabled={isCancelling}
               />
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-content-muted">
                 Minimum 10 caractères requis pour la traçabilité
               </p>
             </div>
@@ -1169,10 +1169,10 @@ function CoffreFortHistorique({ agenceId }: { agenceId: string }) {
             label: 'Date',
             format: (_: any, row: any) => (
                 <div className="flex flex-col leading-tight">
-                    <span className="text-[11px] text-white font-medium">
+                    <span className="text-[11px] text-content-primary font-medium">
                         {format(new Date(row.dateOperation), "dd MMM", { locale: fr })}
                     </span>
-                    <span className="text-[9px] text-slate-500">
+                    <span className="text-[9px] text-content-muted">
                         {format(new Date(row.dateOperation), "HH:mm", { locale: fr })}
                     </span>
                 </div>
@@ -1191,7 +1191,7 @@ function CoffreFortHistorique({ agenceId }: { agenceId: string }) {
                             className="px-1 py-0 text-[9px] h-4"
                             value={isCredit ? 'Entrée' : 'Sortie'}
                         />
-                        <span className="text-[10px] text-slate-400 hidden sm:inline truncate max-w-[80px]">
+                        <span className="text-[10px] text-content-muted hidden sm:inline truncate max-w-[80px]">
                             {getMouvementCoffreLabel(row.typePaiement || row.metadata?.type || row.sourceModule)}
                         </span>
                     </div>
@@ -1203,11 +1203,11 @@ function CoffreFortHistorique({ agenceId }: { agenceId: string }) {
             label: 'Description',
             format: (_: any, row: any) => (
                 <div className="flex flex-col max-w-[200px]">
-                    <span className="text-[11px] text-slate-300 truncate leading-tight">
+                    <span className="text-[11px] text-content-secondary truncate leading-tight">
                         {row.metadata?.description || row.metadata?.motif || row.reference}
                     </span>
                      {row.initiator && (
-                        <span className="text-[9px] text-slate-600 truncate">
+                        <span className="text-[9px] text-content-muted truncate">
                             {row.initiator.prenom} {row.initiator.nom}
                         </span>
                     )}
@@ -1219,7 +1219,7 @@ function CoffreFortHistorique({ agenceId }: { agenceId: string }) {
             label: 'Montant',
             align: 'right' as const,
             format: (val: any, row: any) => (
-                <span className={`font-bold font-mono text-xs ${row.sens === 'CREDIT' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                <span className={`font-bold font-mono text-xs ${row.sens === 'CREDIT' ? 'text-status-success' : 'text-status-warning'}`}>
                     {row.sens === 'CREDIT' ? '+' : '-'} {Number(val).toLocaleString()} FCFA
                 </span>
             )
@@ -1234,22 +1234,22 @@ function CoffreFortHistorique({ agenceId }: { agenceId: string }) {
 
     return (
         <>
-            <Card className="overflow-hidden bg-slate-900/50 backdrop-blur border-slate-800">
-                <div className="p-2 border-b border-slate-800 flex justify-between items-center bg-slate-900/40">
+            <Card className="overflow-hidden bg-surface-base/50 backdrop-blur border-edge">
+                <div className="p-2 border-b border-edge flex justify-between items-center bg-surface-base/40">
                     <div className="flex items-center gap-2">
-                        <Clock className="text-slate-500" size={14} />
-                        <h3 className="font-bold text-white text-xs">Historique</h3>
+                        <Clock className="text-content-muted" size={14} />
+                        <h3 className="font-bold text-content-primary text-xs">Historique</h3>
                     </div>
                     <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => refetch()}
                         disabled={isRefetching}
-                        className="h-6 px-2 text-[10px] text-slate-400 hover:text-white hover:bg-slate-800"
+                        className="h-6 px-2 text-[10px] text-content-muted hover:text-content-primary hover:bg-surface"
                     >
                         <Loader2
                             size={10}
-                            className={`mr-1 ${isRefetching ? 'animate-spin text-blue-400' : 'text-slate-400'}`}
+                            className={`mr-1 ${isRefetching ? 'animate-spin text-status-info' : 'text-content-muted'}`}
                         />
                         Act.
                     </Button>
@@ -1291,29 +1291,29 @@ function MouvementDetailPanel({ mouvement, onClose }: { mouvement: any; onClose:
             />
 
             {/* Slider Panel */}
-            <div className="fixed inset-y-0 right-0 z-50 w-full max-w-[100vw] sm:max-w-sm bg-slate-900 border-l border-slate-700 shadow-2xl animate-in slide-in-from-right duration-300 flex flex-col">
+            <div className="fixed inset-y-0 right-0 z-50 w-full max-w-[100vw] sm:max-w-sm bg-surface-base border-l border-edge shadow-2xl animate-in slide-in-from-right duration-300 flex flex-col">
                 {/* Header */}
-                <div className={`p-3 sm:p-4 border-b border-slate-700 flex items-center justify-between ${isCredit ? 'bg-emerald-500/10' : 'bg-amber-500/10'} shrink-0`}>
+                <div className={`p-3 sm:p-4 border-b border-edge flex items-center justify-between ${isCredit ? 'bg-status-success-bg' : 'bg-status-warning-bg'} shrink-0`}>
                     <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                        <div className={`p-1.5 sm:p-2 rounded-lg shrink-0 ${isCredit ? 'bg-emerald-500/20' : 'bg-amber-500/20'}`}>
+                        <div className={`p-1.5 sm:p-2 rounded-lg shrink-0 ${isCredit ? 'bg-status-success-bg' : 'bg-status-warning-bg'}`}>
                             {isCredit ? (
-                                <ArrowDownRight className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />
+                                <ArrowDownRight className="w-4 h-4 sm:w-5 sm:h-5 text-status-success" />
                             ) : (
-                                <ArrowUpRight className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
+                                <ArrowUpRight className="w-4 h-4 sm:w-5 sm:h-5 text-status-warning" />
                             )}
                         </div>
                         <div className="min-w-0">
-                            <h3 className="font-bold text-white text-sm sm:text-base">
+                            <h3 className="font-bold text-content-primary text-sm sm:text-base">
                                 {isCredit ? 'Entrée de fonds' : 'Sortie de fonds'}
                             </h3>
-                            <p className="text-[10px] sm:text-xs text-slate-400 truncate">
+                            <p className="text-[10px] sm:text-xs text-content-muted truncate">
                                 {getMouvementCoffreLabel(mouvement.typePaiement || mouvement.metadata?.type || mouvement.sourceModule)}
                             </p>
                         </div>
                     </div>
                     <button
                         onClick={onClose}
-                        className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors shrink-0"
+                        className="p-1.5 rounded-lg hover:bg-surface text-content-muted hover:text-content-primary transition-colors shrink-0"
                     >
                         <XCircle size={20} />
                     </button>
@@ -1322,9 +1322,9 @@ function MouvementDetailPanel({ mouvement, onClose }: { mouvement: any; onClose:
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 pb-20">
                     {/* Montant */}
-                    <div className="text-center py-3 sm:py-4 bg-slate-800/50 rounded-lg">
-                        <span className="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wide">Montant</span>
-                        <div className={`text-xl sm:text-2xl font-bold font-mono ${isCredit ? 'text-emerald-400' : 'text-amber-400'}`}>
+                    <div className="text-center py-3 sm:py-4 bg-surface/50 rounded-lg">
+                        <span className="text-[10px] sm:text-xs text-content-muted uppercase tracking-wide">Montant</span>
+                        <div className={`text-xl sm:text-2xl font-bold font-mono ${isCredit ? 'text-status-success' : 'text-status-warning'}`}>
                             {isCredit ? '+' : '-'} {Number(mouvement.montant).toLocaleString()} FCFA
                         </div>
                     </div>
@@ -1373,7 +1373,7 @@ function MouvementDetailPanel({ mouvement, onClose }: { mouvement: any; onClose:
                 </div>
 
                 {/* Footer */}
-                <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4 border-t border-slate-700 bg-slate-900">
+                <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4 border-t border-edge bg-surface-base">
                     <Button
                         variant="secondary"
                         className="w-full h-9 text-xs"
@@ -1396,13 +1396,13 @@ function TransfertDetailPanel({ transfert, onClose }: { transfert: any; onClose:
 
     const isSortie = transfert.typeTransfert === 'COFFRE_VERS_CAISSE';
     const statusMap: Record<string, { color: string; bg: string; label: string }> = {
-        [StatutTransfertCoffre.REQUESTED]: { color: 'text-amber-400', bg: 'bg-amber-500/10', label: 'En attente' },
-        [StatutTransfertCoffre.VALIDATED]: { color: 'text-blue-400', bg: 'bg-blue-500/10', label: 'Validé' },
-        [StatutTransfertCoffre.EXECUTED]: { color: 'text-emerald-400', bg: 'bg-emerald-500/10', label: 'Exécuté' },
-        [StatutTransfertCoffre.REJECTED]: { color: 'text-red-400', bg: 'bg-red-500/10', label: 'Rejeté' },
-        [StatutTransfertCoffre.CANCELLED]: { color: 'text-slate-400', bg: 'bg-slate-500/10', label: 'Annulé' },
+        [StatutTransfertCoffre.REQUESTED]: { color: 'text-status-warning', bg: 'bg-status-warning-bg', label: 'En attente' },
+        [StatutTransfertCoffre.VALIDATED]: { color: 'text-status-info', bg: 'bg-status-info-bg', label: 'Validé' },
+        [StatutTransfertCoffre.EXECUTED]: { color: 'text-status-success', bg: 'bg-status-success-bg', label: 'Exécuté' },
+        [StatutTransfertCoffre.REJECTED]: { color: 'text-status-danger', bg: 'bg-status-danger-bg', label: 'Rejeté' },
+        [StatutTransfertCoffre.CANCELLED]: { color: 'text-content-muted', bg: 'bg-surface-subtle/30', label: 'Annulé' },
     };
-    const statusVariant = statusMap[transfert.statut as string] || { color: 'text-slate-400', bg: 'bg-slate-500/10', label: transfert.statut };
+    const statusVariant = statusMap[transfert.statut as string] || { color: 'text-content-muted', bg: 'bg-surface-subtle/30', label: transfert.statut };
 
     // Déterminer si le transfert peut être annulé
     const canBeCancelled = [StatutTransfertCoffre.REQUESTED, StatutTransfertCoffre.VALIDATED].includes(transfert.statut);
@@ -1452,27 +1452,27 @@ function TransfertDetailPanel({ transfert, onClose }: { transfert: any; onClose:
             />
 
             {/* Slider Panel */}
-            <div className="fixed inset-y-0 right-0 z-50 w-full max-w-[100vw] sm:max-w-sm bg-slate-900 border-l border-slate-700 shadow-2xl animate-in slide-in-from-right duration-300 flex flex-col">
+            <div className="fixed inset-y-0 right-0 z-50 w-full max-w-[100vw] sm:max-w-sm bg-surface-base border-l border-edge shadow-2xl animate-in slide-in-from-right duration-300 flex flex-col">
                 {/* Header */}
-                <div className={`p-3 sm:p-4 border-b border-slate-700 flex items-center justify-between shrink-0 ${isSortie ? 'bg-amber-500/10' : 'bg-emerald-500/10'}`}>
+                <div className={`p-3 sm:p-4 border-b border-edge flex items-center justify-between shrink-0 ${isSortie ? 'bg-status-warning-bg' : 'bg-status-success-bg'}`}>
                     <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                        <div className={`p-1.5 sm:p-2 rounded-lg shrink-0 ${isSortie ? 'bg-amber-500/20' : 'bg-emerald-500/20'}`}>
+                        <div className={`p-1.5 sm:p-2 rounded-lg shrink-0 ${isSortie ? 'bg-status-warning-bg' : 'bg-status-success-bg'}`}>
                             {isSortie ? (
-                                <ArrowUpRight className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
+                                <ArrowUpRight className="w-4 h-4 sm:w-5 sm:h-5 text-status-warning" />
                             ) : (
-                                <ArrowDownRight className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />
+                                <ArrowDownRight className="w-4 h-4 sm:w-5 sm:h-5 text-status-success" />
                             )}
                         </div>
                         <div className="min-w-0">
-                            <h3 className="font-bold text-white text-sm sm:text-base">
+                            <h3 className="font-bold text-content-primary text-sm sm:text-base">
                                 {isSortie ? 'Coffre → Caisse' : 'Caisse → Coffre'}
                             </h3>
-                            <p className="text-[10px] sm:text-xs text-slate-400">Demande de transfert</p>
+                            <p className="text-[10px] sm:text-xs text-content-muted">Demande de transfert</p>
                         </div>
                     </div>
                     <button
                         onClick={onClose}
-                        className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors shrink-0"
+                        className="p-1.5 rounded-lg hover:bg-surface text-content-muted hover:text-content-primary transition-colors shrink-0"
                     >
                         <XCircle size={20} />
                     </button>
@@ -1488,9 +1488,9 @@ function TransfertDetailPanel({ transfert, onClose }: { transfert: any; onClose:
                     </div>
 
                     {/* Montant */}
-                    <div className="text-center py-3 sm:py-4 bg-slate-800/50 rounded-lg">
-                        <span className="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wide">Montant</span>
-                        <div className={`text-xl sm:text-2xl font-bold font-mono ${isSortie ? 'text-amber-400' : 'text-emerald-400'}`}>
+                    <div className="text-center py-3 sm:py-4 bg-surface/50 rounded-lg">
+                        <span className="text-[10px] sm:text-xs text-content-muted uppercase tracking-wide">Montant</span>
+                        <div className={`text-xl sm:text-2xl font-bold font-mono ${isSortie ? 'text-status-warning' : 'text-status-success'}`}>
                             {Number(transfert.montant).toLocaleString()} FCFA
                         </div>
                     </div>
@@ -1549,16 +1549,16 @@ function TransfertDetailPanel({ transfert, onClose }: { transfert: any; onClose:
                         )}
 
                         {transfert.rejectionReason && (
-                            <div className="mt-3 p-2 sm:p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
-                                <span className="text-[10px] sm:text-xs text-red-400 font-medium block mb-1">Motif de rejet</span>
-                                <span className="text-xs sm:text-sm text-red-300">{transfert.rejectionReason}</span>
+                            <div className="mt-3 p-2 sm:p-3 bg-status-danger-bg border border-status-danger/20 rounded-lg">
+                                <span className="text-[10px] sm:text-xs text-status-danger font-medium block mb-1">Motif de rejet</span>
+                                <span className="text-xs sm:text-sm text-status-danger/80">{transfert.rejectionReason}</span>
                             </div>
                         )}
                     </div>
                 </div>
 
                 {/* Footer */}
-                <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4 border-t border-slate-700 bg-slate-900 space-y-2">
+                <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4 border-t border-edge bg-surface-base space-y-2">
                     {/* Bouton d'annulation si applicable */}
                     {(canBeCancelled || canReverseWithin24h) && (
                         <Button
@@ -1585,16 +1585,16 @@ function TransfertDetailPanel({ transfert, onClose }: { transfert: any; onClose:
             {showCancelModal && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !isLoading && setShowCancelModal(false)} />
-                    <div className="relative bg-slate-900 border border-slate-700 rounded-lg shadow-2xl max-w-md w-full p-6 space-y-4 animate-in zoom-in-95 duration-200">
+                    <div className="relative bg-surface-base border border-edge rounded-lg shadow-2xl max-w-md w-full p-6 space-y-4 animate-in zoom-in-95 duration-200">
                         <div className="flex items-start gap-3">
-                            <div className="p-2 bg-red-500/20 rounded-lg">
-                                <AlertCircle className="w-5 h-5 text-red-400" />
+                            <div className="p-2 bg-status-danger-bg rounded-lg">
+                                <AlertCircle className="w-5 h-5 text-status-danger" />
                             </div>
                             <div className="flex-1">
-                                <h3 className="font-bold text-white text-base mb-1">
+                                <h3 className="font-bold text-content-primary text-base mb-1">
                                     Annuler ce transfert ?
                                 </h3>
-                                <p className="text-sm text-slate-400">
+                                <p className="text-sm text-content-muted">
                                     {canBeReversed
                                         ? 'Un transfert compensatoire (sens inverse) sera créé automatiquement pour maintenir la traçabilité comptable.'
                                         : 'Cette action annulera définitivement ce transfert.'}
@@ -1603,33 +1603,33 @@ function TransfertDetailPanel({ transfert, onClose }: { transfert: any; onClose:
                         </div>
 
                         {/* Informations du transfert */}
-                        <div className="p-3 bg-slate-800/50 rounded-lg space-y-1.5">
+                        <div className="p-3 bg-surface/50 rounded-lg space-y-1.5">
                             <div className="flex justify-between text-xs">
-                                <span className="text-slate-500">Montant</span>
-                                <span className="font-mono font-bold text-white">
+                                <span className="text-content-muted">Montant</span>
+                                <span className="font-mono font-bold text-content-primary">
                                     {Number(transfert.montant).toLocaleString()} FCFA
                                 </span>
                             </div>
                             <div className="flex justify-between text-xs">
-                                <span className="text-slate-500">Référence</span>
-                                <span className="font-mono text-slate-300">{transfert.reference}</span>
+                                <span className="text-content-muted">Référence</span>
+                                <span className="font-mono text-content-secondary">{transfert.reference}</span>
                             </div>
                             <div className="flex justify-between text-xs">
-                                <span className="text-slate-500">Statut</span>
+                                <span className="text-content-muted">Statut</span>
                                 <span className={statusVariant.color}>{statusVariant.label}</span>
                             </div>
                         </div>
 
                         {/* Champ raison */}
                         <div className="space-y-2">
-                            <label className="text-xs text-slate-400 font-medium">
+                            <label className="text-xs text-content-muted font-medium">
                                 Raison de l'annulation {canBeReversed ? '(min. 10 caractères)' : ''}
                             </label>
                             <textarea
                                 value={cancelReason}
                                 onChange={(e) => setCancelReason(e.target.value)}
                                 placeholder="Expliquez pourquoi ce transfert doit être annulé..."
-                                className="w-full h-20 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-red-500/50"
+                                className="w-full h-20 px-3 py-2 bg-surface border border-edge rounded-lg text-sm text-content-primary placeholder-content-muted focus:outline-none focus:ring-2 focus:ring-status-danger/50"
                                 disabled={isLoading}
                             />
                         </div>
@@ -1670,9 +1670,9 @@ function TransfertDetailPanel({ transfert, onClose }: { transfert: any; onClose:
 /** Ligne de détail réutilisable */
 function DetailRow({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
     return (
-        <div className="flex justify-between items-start gap-2 sm:gap-4 py-1.5 sm:py-2 border-b border-slate-800 last:border-0">
-            <span className="text-[10px] sm:text-xs text-slate-500 shrink-0">{label}</span>
-            <span className={`text-xs sm:text-sm text-white text-right break-words min-w-0 ${mono ? 'font-mono text-[10px] sm:text-xs' : ''}`}>
+        <div className="flex justify-between items-start gap-2 sm:gap-4 py-1.5 sm:py-2 border-b border-edge last:border-0">
+            <span className="text-[10px] sm:text-xs text-content-muted shrink-0">{label}</span>
+            <span className={`text-xs sm:text-sm text-content-primary text-right break-words min-w-0 ${mono ? 'font-mono text-[10px] sm:text-xs' : ''}`}>
                 {value}
             </span>
         </div>

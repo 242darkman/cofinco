@@ -137,21 +137,21 @@ Marie Sengele,marie@example.com,+242 06 234 5678,Brazzaville,ACTIVE,Standard,92,
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-gradient-to-br from-slate-900 to-slate-800 border border-slate-700 rounded-xl max-w-2xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="bg-gradient-to-br from-surface-base to-surface border border-edge rounded-xl max-w-2xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="bg-slate-900/95 backdrop-blur-sm border-b border-slate-700 p-6 flex items-center justify-between shrink-0">
+        <div className="bg-surface-base/95 backdrop-blur-sm border-b border-edge p-6 flex items-center justify-between shrink-0">
           <div>
-            <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-              <Upload className="text-cyan-400" size={28} />
+            <h2 className="text-2xl font-bold text-content-primary flex items-center gap-3">
+              <Upload className="text-accent" size={28} />
               Import CSV de clients
             </h2>
-            <p className="text-slate-400 text-sm mt-2">
+            <p className="text-content-muted text-sm mt-2">
               Importez plusieurs clients en masse via CSV
             </p>
           </div>
           <button
             onClick={handleCloseModal}
-            className="p-2 hover:bg-slate-700 rounded-lg transition text-slate-400 hover:text-white"
+            className="p-2 hover:bg-surface-elevated rounded-lg transition text-content-muted hover:text-content-primary"
           >
             <XCircle size={24} />
           </button>
@@ -163,12 +163,12 @@ Marie Sengele,marie@example.com,+242 06 234 5678,Brazzaville,ACTIVE,Standard,92,
           {/* Phase 1: IDLE - Upload & Instructions */}
           {phase === 'IDLE' && (
             <div className="space-y-6">
-              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
-                <h3 className="font-bold text-blue-400 mb-2 flex items-center gap-2">
+              <div className="bg-status-info-bg border border-status-info/30 rounded-lg p-4">
+                <h3 className="font-bold text-status-info mb-2 flex items-center gap-2">
                   <AlertCircle size={18} />
                   Format du fichier CSV
                 </h3>
-                <ul className="text-sm text-slate-300 space-y-1 ml-6 list-disc">
+                <ul className="text-sm text-content-secondary space-y-1 ml-6 list-disc">
                   <li>Colonnes obligatoires: <strong>nom, email, phone</strong></li>
                   <li>Séparateur: virgule (,)</li>
                   <li>Encodage: UTF-8</li>
@@ -178,16 +178,16 @@ Marie Sengele,marie@example.com,+242 06 234 5678,Brazzaville,ACTIVE,Standard,92,
               <div className="flex gap-3">
                 <button
                   onClick={downloadTemplate}
-                  className="flex-1 px-4 py-3 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-lg transition flex items-center justify-center gap-2"
+                  className="flex-1 px-4 py-3 bg-surface-elevated hover:bg-surface-subtle text-content-primary font-semibold rounded-lg transition flex items-center justify-center gap-2"
                 >
                   <Download size={20} />
                   Télécharger le modèle
                 </button>
               </div>
 
-              <div className="border-2 border-dashed border-slate-600 rounded-lg p-8 text-center hover:border-cyan-500 transition-colors">
-                <FileText size={48} className="mx-auto mb-4 text-slate-500" />
-                <p className="text-slate-300 mb-4">
+              <div className="border-2 border-dashed border-edge-strong rounded-lg p-8 text-center hover:border-accent transition-colors">
+                <FileText size={48} className="mx-auto mb-4 text-content-muted" />
+                <p className="text-content-secondary mb-4">
                   Sélectionnez un fichier CSV à analyser
                 </p>
                 <label className="cursor-pointer">
@@ -197,7 +197,7 @@ Marie Sengele,marie@example.com,+242 06 234 5678,Brazzaville,ACTIVE,Standard,92,
                     onChange={handleFileUpload}
                     className="hidden"
                   />
-                  <span className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-semibold rounded-lg inline-flex items-center gap-2 transition shadow-lg shadow-cyan-500/20">
+                  <span className="px-6 py-3 bg-gradient-to-r from-accent to-status-info hover:from-accent hover:to-status-info text-white font-semibold rounded-lg inline-flex items-center gap-2 transition shadow-lg shadow-accent/20">
                     <Upload size={20} />
                     Choisir un fichier
                   </span>
@@ -209,8 +209,8 @@ Marie Sengele,marie@example.com,+242 06 234 5678,Brazzaville,ACTIVE,Standard,92,
           {/* Phase 2: PARSING / UPLOADING */}
           {(phase === 'PARSING' || phase === 'UPLOADING') && (
              <div className="flex flex-col items-center justify-center py-12 space-y-4">
-                <Loader2 className="h-12 w-12 text-cyan-400 animate-spin" />
-                <p className="text-slate-300 text-lg">
+                <Loader2 className="h-12 w-12 text-accent animate-spin" />
+                <p className="text-content-secondary text-lg">
                   {phase === 'PARSING' ? 'Analyse du fichier...' : 'Importation des données en cours...'}
                 </p>
              </div>
@@ -220,31 +220,31 @@ Marie Sengele,marie@example.com,+242 06 234 5678,Brazzaville,ACTIVE,Standard,92,
           {phase === 'PREVIEW' && parsedData && (
             <div className="space-y-6">
                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-green-500/10 border border-green-500/20 p-4 rounded-xl text-center">
-                    <div className="text-3xl font-bold text-green-400 mb-1">{parsedData.valid.length}</div>
-                    <div className="text-sm text-green-300 font-medium">Clients Valides</div>
+                  <div className="bg-status-success-bg border border-status-success/20 p-4 rounded-xl text-center">
+                    <div className="text-3xl font-bold text-status-success mb-1">{parsedData.valid.length}</div>
+                    <div className="text-sm text-status-success font-medium">Clients Valides</div>
                   </div>
-                  <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-xl text-center">
-                    <div className="text-3xl font-bold text-red-400 mb-1">{parsedData.invalid.length}</div>
-                    <div className="text-sm text-red-300 font-medium">Clients Invalides</div>
+                  <div className="bg-status-danger-bg border border-status-danger/20 p-4 rounded-xl text-center">
+                    <div className="text-3xl font-bold text-status-danger mb-1">{parsedData.invalid.length}</div>
+                    <div className="text-sm text-status-danger font-medium">Clients Invalides</div>
                   </div>
                </div>
 
                {parsedData.invalid.length > 0 && (
-                 <div className="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
-                    <div className="bg-slate-900 px-4 py-2 border-b border-slate-800 font-semibold text-slate-300 flex items-center gap-2">
-                       <AlertCircle size={16} className="text-red-400"/>
+                 <div className="bg-surface-base rounded-lg border border-edge overflow-hidden">
+                    <div className="bg-surface-base px-4 py-2 border-b border-edge font-semibold text-content-secondary flex items-center gap-2">
+                       <AlertCircle size={16} className="text-status-danger"/>
                        Erreurs détectées ({parsedData.invalid.length})
                     </div>
                     <div className="max-h-48 overflow-y-auto p-4 space-y-3">
                        {parsedData.invalid.map((record, idx) => (
-                          <div key={idx} className="text-sm text-red-300 border-b border-white/5 pb-2 last:border-0">
-                             <span className="font-bold text-red-200">Ligne {record.row}: </span>
+                          <div key={idx} className="text-sm text-status-danger border-b border-white/5 pb-2 last:border-0">
+                             <span className="font-bold text-status-danger-text">Ligne {record.row}: </span>
                              {record.errors.join(', ')}
                           </div>
                        ))}
                     </div>
-                    <div className="bg-slate-900/50 px-4 py-2 text-xs text-slate-500 text-center">
+                    <div className="bg-surface-base/50 px-4 py-2 text-xs text-content-muted text-center">
                       Les lignes invalides seront ignorées lors de l'import.
                     </div>
                  </div>
@@ -253,14 +253,14 @@ Marie Sengele,marie@example.com,+242 06 234 5678,Brazzaville,ACTIVE,Standard,92,
                <div className="flex gap-3 pt-4">
                  <button 
                     onClick={() => setPhase('IDLE')}
-                    className="px-6 py-3 rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-800 transition"
+                    className="px-6 py-3 rounded-lg border border-edge-strong text-content-secondary hover:bg-surface transition"
                  >
                     Annuler
                  </button>
                  <button
                     onClick={handleConfirmImport}
                     disabled={parsedData.valid.length === 0}
-                    className="flex-1 px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white font-bold rounded-lg shadow-lg shadow-emerald-500/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition"
+                    className="flex-1 px-6 py-3 bg-gradient-to-r from-status-success to-status-success hover:from-status-success hover:to-status-success text-white font-bold rounded-lg shadow-lg shadow-status-success/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition"
                  >
                     Importer {parsedData.valid.length} clients
                     <ArrowRight size={20} />
@@ -273,28 +273,28 @@ Marie Sengele,marie@example.com,+242 06 234 5678,Brazzaville,ACTIVE,Standard,92,
           {phase === 'COMPLETE' && uploadResult && (
             <div className="text-center py-8 space-y-6">
               {uploadResult.successCount > 0 ? (
-                <div className="inline-flex items-center justify-center h-20 w-20 rounded-full bg-green-500/20 text-green-400 mb-4">
+                <div className="inline-flex items-center justify-center h-20 w-20 rounded-full bg-status-success-bg text-status-success mb-4">
                   <CheckCircle size={40} />
                 </div>
               ) : (
-                <div className="inline-flex items-center justify-center h-20 w-20 rounded-full bg-red-500/20 text-red-400 mb-4">
+                <div className="inline-flex items-center justify-center h-20 w-20 rounded-full bg-status-danger-bg text-status-danger mb-4">
                   <XCircle size={40} />
                 </div>
               )}
               
               <div>
-                <h3 className="text-2xl font-bold text-white mb-2">
+                <h3 className="text-2xl font-bold text-content-primary mb-2">
                   {uploadResult.successCount > 0 ? 'Import terminé !' : 'Échec de l\'import'}
                 </h3>
-                <p className="text-slate-400">
+                <p className="text-content-muted">
                   {uploadResult.successCount} client(s) ont été importés avec succès.
                 </p>
               </div>
 
               {uploadResult.errors.length > 0 && (
-                 <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 text-left max-w-lg mx-auto">
-                    <h4 className="font-bold text-red-400 mb-2">Erreurs :</h4>
-                    <ul className="list-disc list-inside text-sm text-red-300 space-y-1">
+                 <div className="bg-status-danger-bg border border-status-danger/20 rounded-lg p-4 text-left max-w-lg mx-auto">
+                    <h4 className="font-bold text-status-danger mb-2">Erreurs :</h4>
+                    <ul className="list-disc list-inside text-sm text-status-danger space-y-1">
                       {uploadResult.errors.map((err, i) => <li key={i}>{err}</li>)}
                     </ul>
                  </div>
@@ -302,7 +302,7 @@ Marie Sengele,marie@example.com,+242 06 234 5678,Brazzaville,ACTIVE,Standard,92,
 
               <button
                 onClick={handleCloseModal}
-                className="px-8 py-3 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-lg transition"
+                className="px-8 py-3 bg-surface-elevated hover:bg-surface-subtle text-content-primary font-semibold rounded-lg transition"
               >
                 Fermer
               </button>

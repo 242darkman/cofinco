@@ -372,35 +372,35 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
       <Modal isOpen={true} onClose={onClose} title="" size="md" className="overflow-hidden">
         <div className="relative">
           {/* Header avec montant */}
-          <div className="bg-gradient-to-br from-emerald-500/20 via-emerald-500/10 to-transparent -mx-6 -mt-6 px-6 pt-5 pb-4 border-b border-emerald-500/20">
+          <div className="bg-gradient-to-br from-status-success/20 via-emerald-500/10 to-transparent -mx-6 -mt-6 px-6 pt-5 pb-4 border-b border-status-success/20">
             <div className="flex items-start justify-between">
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                    <FileText size={16} className="text-emerald-400" />
+                  <div className="w-8 h-8 rounded-full bg-status-success-bg flex items-center justify-center">
+                    <FileText size={16} className="text-status-success" />
                   </div>
                   <div>
-                    <h2 className="text-sm font-bold text-white">Frais d'Engagement</h2>
-                    <p className="text-[10px] text-emerald-300/70">{demande.numeroDemande}</p>
+                    <h2 className="text-sm font-bold text-content-primary">Frais d'Engagement</h2>
+                    <p className="text-[10px] text-status-success/70">{demande.numeroDemande}</p>
                   </div>
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-2xl font-black text-emerald-400">{formatMoney(feeAmount)}</div>
-                <p className="text-[9px] text-slate-400 uppercase tracking-wide">
+                <div className="text-2xl font-black text-status-success">{formatMoney(feeAmount)}</div>
+                <p className="text-[9px] text-content-muted uppercase tracking-wide">
                   {feeSource === 'plan' ? 'Selon plan crédit' : feeSource === 'demande' ? 'Montant fixe' : '10% du crédit'}
                 </p>
               </div>
             </div>
 
             {/* Client info */}
-            <div className="mt-3 flex items-center gap-2 bg-slate-900/50 rounded-lg p-2">
-              <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center">
-                <User size={14} className="text-slate-400" />
+            <div className="mt-3 flex items-center gap-2 bg-surface-base/50 rounded-lg p-2">
+              <div className="w-8 h-8 rounded-full bg-surface-elevated flex items-center justify-center">
+                <User size={14} className="text-content-muted" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-white truncate">{clientName}</p>
-                <p className="text-[10px] text-slate-400">Crédit: {formatMoney(demande.montantDemande)}</p>
+                <p className="text-sm font-semibold text-content-primary truncate">{clientName}</p>
+                <p className="text-[10px] text-content-muted">Crédit: {formatMoney(demande.montantDemande)}</p>
               </div>
               <Badge value={clientAgence} variant="neutral" className="text-[9px]" />
             </div>
@@ -410,26 +410,26 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
           <div className="py-4 min-h-[220px]">
             {checkingSession ? (
               <div className="flex flex-col items-center justify-center py-8 gap-2">
-                <Loader2 size={24} className="text-emerald-500 animate-spin" />
-                <p className="text-sm text-slate-400">Vérification de la caisse...</p>
+                <Loader2 size={24} className="text-status-success animate-spin" />
+                <p className="text-sm text-content-muted">Vérification de la caisse...</p>
               </div>
             ) : step === 'caisse' ? (
               /* Étape 1: Sélection de caisse */
               <div className="space-y-3 animate-in fade-in duration-200">
                 <div className="text-center mb-4">
-                  <div className="w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto mb-2">
-                    <Wallet size={20} className="text-amber-400" />
+                  <div className="w-12 h-12 rounded-full bg-status-warning-bg border border-status-warning/20 flex items-center justify-center mx-auto mb-2">
+                    <Wallet size={20} className="text-status-warning" />
                   </div>
-                  <h3 className="text-sm font-bold text-white">Aucune caisse active</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">Sélectionnez une caisse pour encaisser</p>
+                  <h3 className="text-sm font-bold text-content-primary">Aucune caisse active</h3>
+                  <p className="text-xs text-content-muted mt-0.5">Sélectionnez une caisse pour encaisser</p>
                 </div>
 
                 {loadingCaisses ? (
                   <div className="flex items-center justify-center py-4">
-                    <Loader2 size={20} className="text-slate-500 animate-spin" />
+                    <Loader2 size={20} className="text-content-muted animate-spin" />
                   </div>
                 ) : agencyCaisses.length === 0 ? (
-                  <div className="text-center py-4 text-slate-500 text-sm">
+                  <div className="text-center py-4 text-content-muted text-sm">
                     Aucune caisse disponible
                   </div>
                 ) : (
@@ -439,35 +439,35 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
                       return (
                         <div
                           key={c.id}
-                          className="flex items-center justify-between p-2.5 rounded-lg border transition-all cursor-pointer bg-slate-800/50 border-slate-700/50 hover:border-slate-600"
+                          className="flex items-center justify-between p-2.5 rounded-lg border transition-all cursor-pointer bg-surface/50 border-edge-subtle hover:border-edge-strong"
                           onClick={() => handleSelectCaisse(c)}
                         >
                           <div className="flex items-center gap-2.5">
                             <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                              c.activeSession ? 'bg-emerald-500/20' : 'bg-slate-700/50'
+                              c.activeSession ? 'bg-status-success-bg' : 'bg-surface-elevated/50'
                             }`}>
-                              <CreditCard size={14} className={c.activeSession ? 'text-emerald-400' : 'text-slate-500'} />
+                              <CreditCard size={14} className={c.activeSession ? 'text-status-success' : 'text-content-muted'} />
                             </div>
                             <div>
-                              <p className="text-sm font-medium text-white">{c.nom}</p>
+                              <p className="text-sm font-medium text-content-primary">{c.nom}</p>
                               <div className="flex items-center gap-1.5 mt-0.5">
-                                <span className={`w-1.5 h-1.5 rounded-full ${c.activeSession ? 'bg-emerald-400' : 'bg-slate-500'}`} />
-                                <span className={`text-[10px] ${c.activeSession ? 'text-emerald-400' : 'text-slate-500'}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${c.activeSession ? 'bg-status-success' : 'bg-surface-muted0'}`} />
+                                <span className={`text-[10px] ${c.activeSession ? 'text-status-success' : 'text-content-muted'}`}>
                                   {c.activeSession ? 'Ouverte' : 'Fermée'}
                                 </span>
                                 {c.activeSession?.caissierNom && (
-                                  <span className="text-[10px] text-slate-500">• {c.activeSession.caissierNom}</span>
+                                  <span className="text-[10px] text-content-muted">• {c.activeSession.caissierNom}</span>
                                 )}
                                 {/* Afficher le solde reporté pour les caisses fermées */}
                                 {!c.activeSession && lastKnownBalance > 0 && (
-                                  <span className="text-[10px] text-cyan-400 font-medium">
+                                  <span className="text-[10px] text-accent font-medium">
                                     • Solde: {formatMoney(lastKnownBalance)}
                                   </span>
                                 )}
                               </div>
                             </div>
                           </div>
-                          <ChevronRight size={16} className="text-slate-500" />
+                          <ChevronRight size={16} className="text-content-muted" />
                         </div>
                       );
                     })}
@@ -478,23 +478,23 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
               /* Étape PIN: Authentification pour ouvrir une caisse fermée */
               <form onSubmit={handleOpenCaisseWithPin} className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-200">
                 <div className="text-center mb-2">
-                  <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-2">
-                    <Shield size={20} className="text-emerald-400" />
+                  <div className="w-12 h-12 rounded-full bg-status-success-bg border border-status-success/20 flex items-center justify-center mx-auto mb-2">
+                    <Shield size={20} className="text-status-success" />
                   </div>
-                  <h3 className="text-sm font-bold text-white">Ouverture Sécurisée</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Caisse: <span className="text-white font-medium">{selectedCaisse?.nom}</span>
+                  <h3 className="text-sm font-bold text-content-primary">Ouverture Sécurisée</h3>
+                  <p className="text-xs text-content-muted mt-0.5">
+                    Caisse: <span className="text-content-primary font-medium">{selectedCaisse?.nom}</span>
                   </p>
                 </div>
 
                 {/* Affichage du solde reporté */}
                 {selectedCaisse && (
-                  <div className="bg-cyan-500/10 border border-cyan-500/20 rounded-lg p-3 text-center">
-                    <p className="text-[10px] text-cyan-300/70 uppercase tracking-wide mb-1">Solde Reporté</p>
-                    <p className="text-lg font-bold text-cyan-400">
+                  <div className="bg-accent/10 border border-accent/20 rounded-lg p-3 text-center">
+                    <p className="text-[10px] text-accent/70 uppercase tracking-wide mb-1">Solde Reporté</p>
+                    <p className="text-lg font-bold text-accent">
                       {formatMoney(parseFloat(selectedCaisse.solde || '0'))}
                     </p>
-                    <p className="text-[10px] text-slate-500 mt-1">
+                    <p className="text-[10px] text-content-muted mt-1">
                       La caisse s'ouvrira avec ce montant (fonds existant)
                     </p>
                   </div>
@@ -503,21 +503,21 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
                 {/* Authentification dynamique */}
                 {checkingPinStatus ? (
                   <div className="flex items-center justify-center py-4">
-                    <Loader2 className="h-5 w-5 animate-spin text-slate-500" />
-                    <span className="ml-2 text-xs text-slate-500">Vérification...</span>
+                    <Loader2 className="h-5 w-5 animate-spin text-content-muted" />
+                    <span className="ml-2 text-xs text-content-muted">Vérification...</span>
                   </div>
                 ) : hasPinConfigured ? (
                   <>
                     {/* Utilisateur avec PIN - Afficher champ PIN */}
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <label className="text-xs font-bold text-slate-500 uppercase">Code PIN Agent</label>
+                        <label className="text-xs font-bold text-content-muted uppercase">Code PIN Agent</label>
                         {accessCodeValidated && (
-                          <span className="text-[10px] text-emerald-400 font-medium">Bypass activé</span>
+                          <span className="text-[10px] text-status-success font-medium">Bypass activé</span>
                         )}
                       </div>
                       <div className="relative">
-                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-content-muted" size={18} />
                         <input
                           type="password"
                           placeholder={accessCodeValidated ? "Non requis" : "••••••"}
@@ -526,15 +526,15 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
                           onChange={(e) => { setPin(e.target.value); setPinError(''); }}
                           disabled={accessCodeValidated}
                           autoFocus
-                          className={`w-full bg-slate-900 border border-slate-700 rounded-xl pl-12 pr-4 py-3.5 text-white tracking-[0.5em] font-mono text-xl text-center focus:border-emerald-500 outline-none transition-all placeholder-slate-700 ${accessCodeValidated ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          className={`w-full bg-surface-base border border-edge rounded-xl pl-12 pr-4 py-3.5 text-content-primary tracking-[0.5em] font-mono text-xl text-center focus:border-status-success outline-none transition-all placeholder-content-muted ${accessCodeValidated ? 'opacity-50 cursor-not-allowed' : ''}`}
                         />
                         {pin.length === 6 && !accessCodeValidated && (
-                          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-emerald-500 animate-in zoom-in">
+                          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-status-success animate-in zoom-in">
                             <CheckCircle2 size={20} />
                           </div>
                         )}
                         {accessCodeValidated && (
-                          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-emerald-500 animate-in zoom-in">
+                          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-status-success animate-in zoom-in">
                             <Shield size={20} />
                           </div>
                         )}
@@ -542,13 +542,13 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
                     </div>
 
                     {/* Code d'accès (fallback) */}
-                    <div className="border-t border-slate-800 pt-3">
-                      <p className="text-[10px] text-slate-600 mb-2">
+                    <div className="border-t border-edge pt-3">
+                      <p className="text-[10px] text-content-muted mb-2">
                         Pas accès à votre PIN ? Utilisez un code d'accès.
                       </p>
                       <div className="relative flex gap-2">
                         <div className="relative flex-1">
-                          <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+                          <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" size={16} />
                           <input
                             type="text"
                             placeholder="Code d'accès (8 car.)"
@@ -560,14 +560,14 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
                               setAccessCodeError('');
                             }}
                             disabled={accessCodeValidated}
-                            className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-3 py-2.5 text-white font-mono tracking-widest text-sm focus:border-amber-500 outline-none transition-all placeholder-slate-700 disabled:opacity-50"
+                            className="w-full bg-surface-base border border-edge rounded-xl pl-10 pr-3 py-2.5 text-content-primary font-mono tracking-widest text-sm focus:border-status-warning outline-none transition-all placeholder-content-muted disabled:opacity-50"
                           />
                         </div>
                         <button
                           type="button"
                           onClick={handleValidateAccessCode}
                           disabled={accessCodeLoading || accessCodeValidated || accessCode.length < 6}
-                          className="px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5"
+                          className="px-4 py-2 bg-status-warning hover:bg-status-warning disabled:bg-surface disabled:text-content-muted text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5"
                         >
                           {accessCodeLoading ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -579,7 +579,7 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
                         </button>
                       </div>
                       {accessCodeError && (
-                        <p className="text-xs text-red-400 flex items-center gap-1 mt-1">
+                        <p className="text-xs text-status-danger flex items-center gap-1 mt-1">
                           <AlertCircle size={12} />
                           {accessCodeError}
                         </p>
@@ -589,12 +589,12 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
                 ) : (
                   <>
                     {/* Utilisateur SANS PIN - Afficher uniquement code d'accès */}
-                    <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 mb-2">
+                    <div className="bg-status-warning-bg border border-status-warning/30 rounded-lg p-3 mb-2">
                       <div className="flex items-start gap-2">
-                        <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                        <AlertCircle className="w-4 h-4 text-status-warning shrink-0 mt-0.5" />
                         <div>
-                          <p className="text-xs font-semibold text-amber-300">PIN non configuré</p>
-                          <p className="text-[10px] text-amber-300/70 mt-0.5">
+                          <p className="text-xs font-semibold text-status-warning">PIN non configuré</p>
+                          <p className="text-[10px] text-status-warning/70 mt-0.5">
                             Utilisez un code d'accès pour ouvrir la caisse.
                           </p>
                         </div>
@@ -602,13 +602,13 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-xs font-bold text-amber-400 uppercase flex items-center gap-2">
+                      <label className="text-xs font-bold text-status-warning uppercase flex items-center gap-2">
                         <KeyRound size={14} />
                         Code d'accès requis
                       </label>
                       <div className="relative flex gap-2">
                         <div className="relative flex-1">
-                          <Shield className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-500" size={16} />
+                          <Shield className="absolute left-3 top-1/2 -translate-y-1/2 text-status-warning" size={16} />
                           <input
                             type="text"
                             placeholder="XXXXXXXX"
@@ -621,8 +621,8 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
                             }}
                             disabled={accessCodeValidated}
                             autoFocus
-                            className={`w-full bg-slate-900 border rounded-xl pl-10 pr-3 py-3 text-white font-mono tracking-[0.3em] text-lg focus:ring-2 focus:ring-amber-500/20 outline-none transition-all placeholder-slate-700 disabled:opacity-50 ${
-                              accessCodeValidated ? 'border-emerald-500' : 'border-amber-500/50 focus:border-amber-500'
+                            className={`w-full bg-surface-base border rounded-xl pl-10 pr-3 py-3 text-content-primary font-mono tracking-[0.3em] text-lg focus:ring-2 focus:ring-status-warning/20 outline-none transition-all placeholder-content-muted disabled:opacity-50 ${
+                              accessCodeValidated ? 'border-status-success' : 'border-status-warning/50 focus:border-status-warning'
                             }`}
                           />
                         </div>
@@ -630,7 +630,7 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
                           type="button"
                           onClick={handleValidateAccessCode}
                           disabled={accessCodeLoading || accessCodeValidated || accessCode.length < 6}
-                          className="px-4 py-2.5 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-sm font-bold rounded-xl transition-all flex items-center gap-2"
+                          className="px-4 py-2.5 bg-status-warning hover:bg-status-warning disabled:bg-surface disabled:text-content-muted text-white text-sm font-bold rounded-xl transition-all flex items-center gap-2"
                         >
                           {accessCodeLoading ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
@@ -645,13 +645,13 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
                         </button>
                       </div>
                       {accessCodeError && (
-                        <p className="text-xs text-red-400 flex items-center gap-1">
+                        <p className="text-xs text-status-danger flex items-center gap-1">
                           <AlertCircle size={12} />
                           {accessCodeError}
                         </p>
                       )}
                       {accessCodeValidated && (
-                        <p className="text-xs text-emerald-400 flex items-center gap-1">
+                        <p className="text-xs text-status-success flex items-center gap-1">
                           <CheckCircle2 size={12} />
                           Code validé - Vous pouvez ouvrir la caisse
                         </p>
@@ -661,7 +661,7 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
                 )}
 
                 {pinError && (
-                  <p className="text-xs text-red-400 flex items-center gap-1">
+                  <p className="text-xs text-status-danger flex items-center gap-1">
                     <AlertCircle size={12} />
                     {pinError}
                   </p>
@@ -690,7 +690,7 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
                       (!accessCodeValidated && (hasPinConfigured ? pin.length < 4 : true))
                     }
                     isLoading={pinLoading}
-                    className="flex-1 bg-emerald-600 hover:bg-emerald-500"
+                    className="flex-1 bg-status-success hover:bg-status-success"
                   >
                     <Lock size={14} className="mr-1" />
                     Ouvrir la caisse
@@ -702,7 +702,7 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
               <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-200">
                 {/* Méthodes de paiement */}
                 <div>
-                  <label className="text-xs font-semibold text-slate-400 mb-2 block">Mode de paiement</label>
+                  <label className="text-xs font-semibold text-content-muted mb-2 block">Mode de paiement</label>
                   <div className="grid grid-cols-2 gap-2">
                     {PAYMENT_METHODS.map((m) => {
                       const isSelected = method === m.value;
@@ -717,19 +717,19 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
                           className={`relative p-3 rounded-lg border-2 transition-all ${
                             isSelected
                               ? `border-${m.color}-500 bg-${m.color}-500/10`
-                              : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
+                              : 'border-edge bg-surface/50 hover:border-edge-strong'
                           }`}
                         >
                           <div className={`w-10 h-10 rounded-full mx-auto mb-1.5 flex items-center justify-center ${
-                            isSelected ? `bg-${m.color}-500/20` : 'bg-slate-700/50'
+                            isSelected ? `bg-${m.color}-500/20` : 'bg-surface-elevated/50'
                           }`}>
                             {img ? (
                               <img src={img} alt={m.label} className="h-6 w-6 object-contain" />
                             ) : Icon ? (
-                              <Icon size={18} className={isSelected ? `text-${m.color}-400` : 'text-slate-500'} />
+                              <Icon size={18} className={isSelected ? `text-${m.color}-400` : 'text-content-muted'} />
                             ) : null}
                           </div>
-                          <p className={`text-[10px] font-semibold ${isSelected ? 'text-white' : 'text-slate-400'}`}>
+                          <p className={`text-[10px] font-semibold ${isSelected ? 'text-content-primary' : 'text-content-muted'}`}>
                             {m.label}
                           </p>
                           {isSelected && (
@@ -744,19 +744,19 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
                 {/* Phone input for Mobile Money */}
                 {isMobileMoney && (
                   <div className="animate-in fade-in slide-in-from-top-2 duration-200">
-                    <label className="text-xs font-semibold text-slate-400 mb-2 block">Numéro de téléphone {method === 'mtn' ? 'MTN' : 'Airtel'}</label>
+                    <label className="text-xs font-semibold text-content-muted mb-2 block">Numéro de téléphone {method === 'mtn' ? 'MTN' : 'Airtel'}</label>
                     <div className="relative">
-                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" size={16} />
                       <input
                         type="tel"
                         value={phoneNumber}
                         onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
                         placeholder={method === 'mtn' ? '066 XXX XX XX' : '05X XXX XX XX'}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-10 pr-4 py-2.5 text-white text-sm placeholder-slate-500 focus:border-amber-500 outline-none transition-all"
+                        className="w-full bg-surface-base border border-edge rounded-lg pl-10 pr-4 py-2.5 text-content-primary text-sm placeholder-content-muted focus:border-status-warning outline-none transition-all"
                         maxLength={12}
                       />
                     </div>
-                    <p className="text-[10px] text-slate-500 mt-1">
+                    <p className="text-[10px] text-content-muted mt-1">
                       Le client recevra une notification pour confirmer le paiement
                     </p>
                   </div>
@@ -764,10 +764,10 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
 
 
                 {/* Récapitulatif */}
-                <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50">
+                <div className="bg-surface/50 rounded-lg p-3 border border-edge-subtle">
                   <div className="flex justify-between items-center text-sm">
-                    <span className="text-slate-400">Montant à encaisser</span>
-                    <span className="text-lg font-bold text-emerald-400">{formatMoney(feeAmount)}</span>
+                    <span className="text-content-muted">Montant à encaisser</span>
+                    <span className="text-lg font-bold text-status-success">{formatMoney(feeAmount)}</span>
                   </div>
                 </div>
 
@@ -780,7 +780,7 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
                     variant="primary"
                     size="sm"
                     onClick={() => setStep('confirm')}
-                    className="flex-1 bg-emerald-600 hover:bg-emerald-500"
+                    className="flex-1 bg-status-success hover:bg-status-success"
                     disabled={isMobileMoney && !phoneNumber.trim()}
                   >
                     Continuer
@@ -792,23 +792,23 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
               /* Étape Waiting: Attente confirmation Mobile Money */
               <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-200">
                 <div className="text-center">
-                  <div className="w-16 h-16 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto mb-3">
+                  <div className="w-16 h-16 rounded-full bg-status-warning-bg border border-status-warning/20 flex items-center justify-center mx-auto mb-3">
                     <div className="relative">
-                      <Smartphone size={28} className="text-amber-400" />
-                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 rounded-full flex items-center justify-center animate-pulse">
-                        <Clock size={10} className="text-white" />
+                      <Smartphone size={28} className="text-status-warning" />
+                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-status-warning rounded-full flex items-center justify-center animate-pulse">
+                        <Clock size={10} className="text-content-primary" />
                       </div>
                     </div>
                   </div>
-                  <h3 className="text-base font-bold text-white">Confirmation en attente</h3>
-                  <p className="text-xs text-slate-400 mt-1">
+                  <h3 className="text-base font-bold text-content-primary">Confirmation en attente</h3>
+                  <p className="text-xs text-content-muted mt-1">
                     Veuillez confirmer le paiement sur votre téléphone {method === 'mtn' ? 'MTN MoMo' : 'Airtel Money'}
                   </p>
                 </div>
 
-                <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
+                <div className="bg-status-warning-bg border border-status-warning/20 rounded-lg p-4">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-full bg-status-warning-bg flex items-center justify-center">
                       {method === 'mtn' ? (
                         <img src={mtnMomoLogo} alt="MTN" className="h-6 w-6 object-contain" />
                       ) : (
@@ -816,17 +816,17 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
                       )}
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-white">{phoneNumber}</p>
-                      <p className="text-[10px] text-amber-300">En attente de validation</p>
+                      <p className="text-sm font-semibold text-content-primary">{phoneNumber}</p>
+                      <p className="text-[10px] text-status-warning">En attente de validation</p>
                     </div>
                   </div>
-                  <div className="flex justify-between items-center pt-3 border-t border-amber-500/20">
-                    <span className="text-xs text-slate-400">Montant</span>
-                    <span className="text-lg font-bold text-amber-400">{formatMoney(feeAmount)}</span>
+                  <div className="flex justify-between items-center pt-3 border-t border-status-warning/20">
+                    <span className="text-xs text-content-muted">Montant</span>
+                    <span className="text-lg font-bold text-status-warning">{formatMoney(feeAmount)}</span>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-center gap-2 text-slate-500 text-xs">
+                <div className="flex items-center justify-center gap-2 text-content-muted text-xs">
                   <Loader2 size={14} className="animate-spin" />
                   <span>Veuillez patienter...</span>
                 </div>
@@ -845,42 +845,42 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
               /* Étape 3: Confirmation */
               <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-200">
                 <div className="text-center">
-                  <div className="w-14 h-14 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-3">
-                    <Sparkles size={24} className="text-emerald-400" />
+                  <div className="w-14 h-14 rounded-full bg-status-success-bg border border-status-success/20 flex items-center justify-center mx-auto mb-3">
+                    <Sparkles size={24} className="text-status-success" />
                   </div>
-                  <h3 className="text-base font-bold text-white">
+                  <h3 className="text-base font-bold text-content-primary">
                     {isMobileMoney ? 'Confirmer le paiement' : 'Envoyer en Caisse'}
                   </h3>
-                  <p className="text-xs text-slate-400 mt-1">
+                  <p className="text-xs text-content-muted mt-1">
                     {isMobileMoney ? 'Vérifiez les informations avant de payer' : 'Le caissier traitera le paiement en espèces'}
                   </p>
                 </div>
 
-                <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 divide-y divide-slate-700/50">
+                <div className="bg-surface/50 rounded-lg border border-edge-subtle divide-y divide-edge/50">
                   <div className="flex justify-between items-center p-3">
-                    <span className="text-xs text-slate-400">Client</span>
-                    <span className="text-sm font-medium text-white">{clientName}</span>
+                    <span className="text-xs text-content-muted">Client</span>
+                    <span className="text-sm font-medium text-content-primary">{clientName}</span>
                   </div>
                   <div className="flex justify-between items-center p-3">
-                    <span className="text-xs text-slate-400">Référence</span>
-                    <span className="text-sm font-mono text-slate-300">{demande.numeroDemande}</span>
+                    <span className="text-xs text-content-muted">Référence</span>
+                    <span className="text-sm font-mono text-content-secondary">{demande.numeroDemande}</span>
                   </div>
                   <div className="flex justify-between items-center p-3">
-                    <span className="text-xs text-slate-400">Mode de paiement</span>
+                    <span className="text-xs text-content-muted">Mode de paiement</span>
                     <Badge value={getMethodLabel()} variant="neutral" className="text-[10px]" />
                   </div>
                   {/* Mobile Money phone */}
                   {isMobileMoney && (
-                    <div className="flex justify-between items-center p-3 bg-amber-500/5">
-                      <span className="text-xs text-slate-400">Téléphone</span>
-                      <span className="text-sm font-mono text-amber-400">{phoneNumber}</span>
+                    <div className="flex justify-between items-center p-3 bg-status-warning/5">
+                      <span className="text-xs text-content-muted">Téléphone</span>
+                      <span className="text-sm font-mono text-status-warning">{phoneNumber}</span>
                     </div>
                   )}
-                  <div className="flex justify-between items-center p-3 bg-emerald-500/5">
-                    <span className="text-sm font-semibold text-white">
+                  <div className="flex justify-between items-center p-3 bg-status-success/5">
+                    <span className="text-sm font-semibold text-content-primary">
                       {isMobileMoney ? 'Total à payer' : 'Total à envoyer'}
                     </span>
-                    <span className="text-xl font-black text-emerald-400">{formatMoney(feeAmount)}</span>
+                    <span className="text-xl font-black text-status-success">{formatMoney(feeAmount)}</span>
                   </div>
                 </div>
 
@@ -901,7 +901,7 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
                     size="sm"
                     onClick={handlePayment}
                     isLoading={loading}
-                    className="flex-1 bg-emerald-600 hover:bg-emerald-500"
+                    className="flex-1 bg-status-success hover:bg-status-success"
                   >
                     <CheckCircle size={14} className="mr-1" />
                     {isMobileMoney ? `Payer ${formatMoney(feeAmount)}` : 'Envoyer en Caisse'}
@@ -918,8 +918,8 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
                 <div
                   key={i}
                   className={`h-1 rounded-full transition-all ${
-                    getStepIndex() === i ? 'w-6 bg-emerald-500' :
-                    getStepIndex() > i ? 'w-2 bg-emerald-500/50' : 'w-2 bg-slate-700'
+                    getStepIndex() === i ? 'w-6 bg-status-success' :
+                    getStepIndex() > i ? 'w-2 bg-status-success/50' : 'w-2 bg-surface-elevated'
                   }`}
                 />
               ))}

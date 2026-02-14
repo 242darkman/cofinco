@@ -29,7 +29,7 @@ export function Skeleton({
 
   const animationStyles = {
     pulse: 'animate-pulse',
-    wave: 'animate-shimmer bg-gradient-to-r from-slate-700 via-slate-600 to-slate-700 bg-[length:200%_100%]',
+    wave: 'animate-shimmer bg-gradient-to-r from-surface-elevated via-surface-subtle to-surface-elevated bg-[length:200%_100%]',
     none: '',
   };
 
@@ -41,7 +41,7 @@ export function Skeleton({
   return (
     <div
       className={`
-        bg-slate-700/50
+        bg-surface-elevated/50
         ${variantStyles[variant]}
         ${animationStyles[animation]}
         ${className}
@@ -77,7 +77,7 @@ export function SkeletonAvatar({ size = 40 }: { size?: number }) {
 export function SkeletonCard({ className = '' }: { className?: string }) {
   return (
     <div
-      className={`bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 ${className}`}
+      className={`bg-surface/50 border border-edge-subtle rounded-xl p-4 ${className}`}
       role="status"
       aria-label="Chargement de la carte..."
     >
@@ -89,7 +89,7 @@ export function SkeletonCard({ className = '' }: { className?: string }) {
         </div>
         <Skeleton variant="rounded" width={60} height={24} />
       </div>
-      <div className="mt-4 pt-3 border-t border-slate-700/50">
+      <div className="mt-4 pt-3 border-t border-edge-subtle">
         <div className="flex justify-between items-center">
           <Skeleton variant="text" width="30%" height="0.75rem" />
           <Skeleton variant="text" width="25%" height="0.875rem" />
@@ -102,7 +102,7 @@ export function SkeletonCard({ className = '' }: { className?: string }) {
 
 export function SkeletonTableRow({ columns = 5 }: { columns?: number }) {
   return (
-    <tr className="border-b border-slate-700/50">
+    <tr className="border-b border-edge-subtle">
       {Array.from({ length: columns }).map((_, i) => (
         <td key={i} className="px-4 py-3">
           <Skeleton variant="text" width={i === 0 ? '80%' : '60%'} height="1rem" />
@@ -122,9 +122,9 @@ export function SkeletonTable({
   className?: string;
 }) {
   return (
-    <div className={`overflow-hidden rounded-xl border border-slate-700/50 ${className}`} role="status" aria-label="Chargement du tableau...">
+    <div className={`overflow-hidden rounded-xl border border-edge-subtle ${className}`} role="status" aria-label="Chargement du tableau...">
       <table className="w-full">
-        <thead className="bg-slate-800/50">
+        <thead className="bg-surface/50">
           <tr>
             {Array.from({ length: columns }).map((_, i) => (
               <th key={i} className="px-4 py-3 text-left">
@@ -133,7 +133,7 @@ export function SkeletonTable({
             ))}
           </tr>
         </thead>
-        <tbody className="bg-slate-800/30">
+        <tbody className="bg-surface/30">
           {Array.from({ length: rows }).map((_, i) => (
             <SkeletonTableRow key={i} columns={columns} />
           ))}
@@ -146,7 +146,7 @@ export function SkeletonTable({
 
 export function SkeletonStatCard() {
   return (
-    <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4" role="status">
+    <div className="bg-surface/50 border border-edge-subtle rounded-xl p-4" role="status">
       <div className="flex items-center justify-between mb-2">
         <Skeleton variant="text" width="40%" height="0.75rem" />
         <Skeleton variant="circular" width={32} height={32} />
@@ -178,7 +178,7 @@ export function SkeletonList({
 // Member card skeleton for tontine
 export function SkeletonMemberCard() {
   return (
-    <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-3" role="status">
+    <div className="bg-surface/40 border border-edge-subtle rounded-lg p-3" role="status">
       <div className="flex items-start gap-3">
         <Skeleton variant="rounded" width={40} height={40} />
         <div className="flex-1 min-w-0">
@@ -192,7 +192,7 @@ export function SkeletonMemberCard() {
             </div>
             <Skeleton variant="circular" width={24} height={24} />
           </div>
-          <div className="mt-2 pt-2 border-t border-slate-700/50 flex justify-between">
+          <div className="mt-2 pt-2 border-t border-edge-subtle flex justify-between">
             <Skeleton variant="text" width="30%" height="0.75rem" />
             <Skeleton variant="text" width="25%" height="0.875rem" />
           </div>
@@ -206,7 +206,7 @@ export function SkeletonMemberCard() {
 // Contribution card skeleton
 export function SkeletonContributionCard() {
   return (
-    <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-3" role="status">
+    <div className="bg-surface/40 border border-edge-subtle rounded-lg p-3" role="status">
       <div className="flex justify-between items-start gap-3">
         <div className="flex-1 min-w-0 space-y-2">
           <div className="flex items-center gap-2">
@@ -244,18 +244,18 @@ export function SkeletonDashboard() {
 
       {/* Charts row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4">
+        <div className="bg-surface/50 border border-edge-subtle rounded-xl p-4">
           <Skeleton variant="text" width="40%" height="1rem" className="mb-4" />
           <Skeleton variant="rounded" width="100%" height={200} />
         </div>
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4">
+        <div className="bg-surface/50 border border-edge-subtle rounded-xl p-4">
           <Skeleton variant="text" width="35%" height="1rem" className="mb-4" />
           <Skeleton variant="rounded" width="100%" height={200} />
         </div>
       </div>
 
       {/* Recent activity */}
-      <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4">
+      <div className="bg-surface/50 border border-edge-subtle rounded-xl p-4">
         <Skeleton variant="text" width="30%" height="1rem" className="mb-4" />
         <SkeletonTable rows={5} columns={5} />
       </div>
@@ -267,7 +267,7 @@ export function SkeletonDashboard() {
 // P2.2: Client list item skeleton
 export function SkeletonClientItem() {
   return (
-    <div className="flex items-center gap-4 p-4 bg-slate-800/30 rounded-lg border border-slate-700/50" role="status">
+    <div className="flex items-center gap-4 p-4 bg-surface/30 rounded-lg border border-edge-subtle" role="status">
       <SkeletonAvatar size={48} />
       <div className="flex-1 min-w-0 space-y-2">
         <Skeleton variant="text" width="50%" height="1rem" />
@@ -288,7 +288,7 @@ export function SkeletonClientItem() {
 // P2.2: Credit list item skeleton
 export function SkeletonCreditItem() {
   return (
-    <div className="flex items-center gap-4 p-4 bg-slate-800/30 rounded-lg border border-slate-700/50" role="status">
+    <div className="flex items-center gap-4 p-4 bg-surface/30 rounded-lg border border-edge-subtle" role="status">
       <div className="w-12 h-12 flex items-center justify-center">
         <Skeleton variant="circular" width={40} height={40} />
       </div>

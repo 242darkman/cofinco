@@ -597,7 +597,7 @@ export default function CaisseDashboard({
 
   const tabs = [
     { key: 'dashboard', label: 'Dashboard', icon: Activity, disabled: false },
-    { key: 'demandes', label: 'Demandes', icon: ClipboardList, disabled: !isSessionOpen, badge: (pendingCaisseRequestsCount + pendingDisbursementsCount) > 0 ? (pendingCaisseRequestsCount + pendingDisbursementsCount) : undefined, badgeClassName: 'bg-cyan-500 text-white animate-pulse' },
+    { key: 'demandes', label: 'Demandes', icon: ClipboardList, disabled: !isSessionOpen, badge: (pendingCaisseRequestsCount + pendingDisbursementsCount) > 0 ? (pendingCaisseRequestsCount + pendingDisbursementsCount) : undefined, badgeClassName: 'bg-accent-secondary text-white animate-pulse' },
     { key: 'infos-client', label: 'Info Client', icon: Users, disabled: !isSessionOpen },
     { key: 'especes', label: 'Espèces', icon: Wallet, disabled: !isSessionOpen || isClosingWorkflow },
     { key: 'mobilemoney', label: 'Mobile Money', icon: Smartphone, disabled: !isSessionOpen || isClosingWorkflow },
@@ -649,7 +649,7 @@ export default function CaisseDashboard({
       // prets-decaissement is now integrated in the 'demandes' tab
       case 'historique':
         return (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 flex flex-col">
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 flex flex-col h-full">
             {/* Toggle between Today and Global History */}
             <div className="flex items-center justify-between mb-2 px-2 shrink-0">
               <div className="flex items-center gap-2">
@@ -658,17 +658,17 @@ export default function CaisseDashboard({
                   size="sm"
                   onClick={() => handleTabChange('dashboard')}
                   icon={ArrowRightLeft}
-                  className="rounded-full w-8 h-8 p-0 flex items-center justify-center transform rotate-180 text-slate-400 hover:text-white"
+                  className="rounded-full w-8 h-8 p-0 flex items-center justify-center transform rotate-180 text-content-muted hover:text-content-primary"
                 />
-                <h2 className="text-lg font-bold text-white">Historique</h2>
+                <h2 className="text-lg font-bold text-content-primary">Historique</h2>
               </div>
-              <div className="flex bg-slate-900 rounded-lg p-1 border border-slate-800">
+              <div className="flex bg-surface-base rounded-lg p-1 border border-edge">
                 <button
                   onClick={() => setHistoriqueMode('today')}
                   className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
                     historiqueMode === 'today'
-                      ? 'bg-cyan-500 text-white shadow-lg shadow-cyan-500/20'
-                      : 'text-slate-400 hover:text-white'
+                      ? 'bg-accent-secondary text-white shadow-lg shadow-accent/20'
+                      : 'text-content-muted hover:text-content-primary'
                   }`}
                 >
                   <Clock size={12} className="inline mr-1 mb-0.5" />
@@ -678,8 +678,8 @@ export default function CaisseDashboard({
                   onClick={() => setHistoriqueMode('global')}
                   className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
                     historiqueMode === 'global'
-                      ? 'bg-cyan-500 text-white shadow-lg shadow-cyan-500/20'
-                      : 'text-slate-400 hover:text-white'
+                      ? 'bg-accent-secondary text-white shadow-lg shadow-accent/20'
+                      : 'text-content-muted hover:text-content-primary'
                   }`}
                 >
                   <History size={12} className="inline mr-1 mb-0.5" />
@@ -689,7 +689,7 @@ export default function CaisseDashboard({
             </div>
 
             {historiqueMode === 'global' && currentSession?.caisseId ? (
-              <div>
+              <div className="flex-1 min-h-0">
                   <CaisseHistoriqueGlobal
                     caisseId={currentSession.caisseId}
                     caisseName={currentSession.caisseNom}
@@ -697,8 +697,9 @@ export default function CaisseDashboard({
                   />
               </div>
             ) : (
-              <div className="px-2">
+              <div className="flex-1 min-h-0 px-2">
                 <TransactionHistoryPage
+                  embedded
                   transactions={transactions.map(tx => ({
                     id: tx.id,
                     reference: tx.reference,
@@ -718,7 +719,6 @@ export default function CaisseDashboard({
                   }))}
                   isLoading={loadingTransactions}
                   onRefresh={() => refetchTransactions()}
-                  onBack={() => handleTabChange('dashboard')}
                 />
               </div>
             )}
@@ -751,14 +751,14 @@ export default function CaisseDashboard({
       case 'transferts':
         return <div className="animate-in fade-in slide-in-from-bottom-4 duration-300"><CaisseTransferts session={currentSession} soldeActuel={soldeActuel} onBack={() => handleTabChange('dashboard')} /></div>;
       case 'etats':
-        return <div className="animate-in fade-in slide-in-from-bottom-4 duration-300"><CaisseEtats onBack={() => handleTabChange('dashboard')} /></div>;
+        return <div className="h-full animate-in fade-in slide-in-from-bottom-4 duration-300"><CaisseEtats onBack={() => handleTabChange('dashboard')} /></div>;
 
       case 'supervision':
         return (
             <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
                  <div className="flex items-center gap-3">
                     <Button variant="ghost" size="sm" onClick={() => handleTabChange('dashboard')} icon={ArrowRightLeft} className="rounded-full w-8 h-8 p-0 flex items-center justify-center transform rotate-180" />
-                    <h2 className="text-lg font-bold text-white">Supervision</h2>
+                    <h2 className="text-lg font-bold text-content-primary">Supervision</h2>
                  </div>
                  <CaisseSupervision
                     activeSupervision={supervisionInfo}
@@ -771,7 +771,7 @@ export default function CaisseDashboard({
             <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
                  <div className="flex items-center gap-3">
                     <Button variant="ghost" size="sm" onClick={() => handleTabChange('dashboard')} icon={ArrowRightLeft} className="rounded-full w-8 h-8 p-0 flex items-center justify-center transform rotate-180" />
-                    <h2 className="text-lg font-bold text-white">Journal d'Audit</h2>
+                    <h2 className="text-lg font-bold text-content-primary">Journal d'Audit</h2>
                  </div>
                  <CaisseAuditLog />
             </div>
@@ -783,16 +783,16 @@ export default function CaisseDashboard({
             <div className="flex flex-col items-center justify-center min-h-[40vh] sm:min-h-[50vh] text-center space-y-6 animate-in fade-in slide-in-from-bottom-4">
               {pendingSession.statut === 'REQUESTING_FUNDS' ? (
                 <>
-                  <div className="p-8 rounded-[2rem] bg-amber-500/5 ring-1 ring-amber-500/10 shadow-2xl relative overflow-hidden group">
-                    <div className="absolute inset-0 bg-gradient-to-tr from-amber-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
-                    <Clock className="w-16 h-16 text-amber-500 relative z-10 animate-pulse" />
+                  <div className="p-8 rounded-[2rem] bg-status-warning/5 ring-1 ring-status-warning/10 shadow-2xl relative overflow-hidden group">
+                    <div className="absolute inset-0 bg-gradient-to-tr from-status-warning-bg to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+                    <Clock className="w-16 h-16 text-status-warning relative z-10 animate-pulse" />
                   </div>
                   <div className="space-y-3">
-                    <h2 className="text-3xl font-black text-white tracking-tight">Vérification Coffre</h2>
-                    <p className="text-slate-400 max-w-sm mx-auto font-medium leading-relaxed">
-                      Votre demande de <span className="text-amber-500 font-bold">{moneyFormatter.format(pendingSession.montantDemande || 0)} FCFA</span> est en cours d'examen par la supervision.
+                    <h2 className="text-3xl font-black text-content-primary tracking-tight">Vérification Coffre</h2>
+                    <p className="text-content-muted max-w-sm mx-auto font-medium leading-relaxed">
+                      Votre demande de <span className="text-status-warning font-bold">{moneyFormatter.format(pendingSession.montantDemande || 0)} FCFA</span> est en cours d'examen par la supervision.
                     </p>
-                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/10 rounded-full border border-amber-500/20 text-[10px] font-black text-amber-500 uppercase tracking-widest">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-status-warning-bg rounded-full border border-status-warning/20 text-[10px] font-black text-status-warning uppercase tracking-widest">
                        <Timer size={12} className="animate-spin" style={{ animationDuration: '3s' }} />
                        {isWebSocketConnected ? 'Temps Réel Actif' : 'Vérification Active'}
                     </div>
@@ -802,7 +802,7 @@ export default function CaisseDashboard({
                       size="lg"
                       variant="outline"
                       onClick={() => setShowOuverture(true)}
-                      className="w-full border-white/10 text-slate-400 hover:text-white hover:bg-white/5 rounded-2xl font-bold"
+                      className="w-full border-white/10 text-content-muted hover:text-content-primary hover:bg-white/5 rounded-2xl font-bold"
                     >
                       <Shield className="w-4 h-4 mr-2" />
                       Gérer la Demande
@@ -811,16 +811,16 @@ export default function CaisseDashboard({
                 </>
               ) : (
                 <>
-                  <div className="p-8 rounded-[2rem] bg-emerald-500/5 ring-1 ring-emerald-500/10 shadow-2xl relative overflow-hidden group">
-                    <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
-                    <Package className="w-16 h-16 text-emerald-500 relative z-10" />
+                  <div className="p-8 rounded-[2rem] bg-status-success/5 ring-1 ring-status-success/10 shadow-2xl relative overflow-hidden group">
+                    <div className="absolute inset-0 bg-gradient-to-tr from-status-success/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+                    <Package className="w-16 h-16 text-status-success relative z-10" />
                   </div>
                   <div className="space-y-3">
-                    <h2 className="text-3xl font-black text-white tracking-tight">Dotation Prête</h2>
-                    <p className="text-slate-400 max-w-sm mx-auto font-medium leading-relaxed">
-                      Le coffre a débloqué <span className="text-emerald-500 font-bold">{moneyFormatter.format(pendingSession.montantDemande || 0)} FCFA</span>. Vous devez confirmer le comptage pour activer votre session.
+                    <h2 className="text-3xl font-black text-content-primary tracking-tight">Dotation Prête</h2>
+                    <p className="text-content-muted max-w-sm mx-auto font-medium leading-relaxed">
+                      Le coffre a débloqué <span className="text-status-success font-bold">{moneyFormatter.format(pendingSession.montantDemande || 0)} FCFA</span>. Vous devez confirmer le comptage pour activer votre session.
                     </p>
-                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20 text-[10px] font-black text-emerald-500 uppercase tracking-widest">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-status-success-bg rounded-full border border-status-success/20 text-[10px] font-black text-status-success uppercase tracking-widest">
                        <Check size={12} />
                        Validation Coffre: Reçue
                     </div>
@@ -829,7 +829,7 @@ export default function CaisseDashboard({
                     <Button
                       size="lg"
                       onClick={() => setShowOuverture(true)}
-                      className="w-full bg-emerald-600 hover:bg-emerald-500 text-white shadow-xl shadow-emerald-500/20 rounded-2xl font-black py-6 text-lg"
+                      className="w-full bg-status-success hover:bg-status-success text-white shadow-xl shadow-status-success/20 rounded-2xl font-black py-6 text-lg"
                     >
                       <KeyRound className="w-5 h-5 mr-2" />
                       Ouvrir le Terminal
@@ -841,7 +841,7 @@ export default function CaisseDashboard({
               {isAdminRole(userRole) && (
                 <button
                   onClick={() => handleTabChange('supervision')}
-                  className="text-sm text-slate-500 hover:text-indigo-400 underline decoration-slate-900 hover:decoration-indigo-400/50 underline-offset-4 transition-all"
+                  className="text-sm text-content-muted hover:text-accent underline decoration-content-primary hover:decoration-accent/50 underline-offset-4 transition-all"
                 >
                   Accéder aux outils de supervision
                 </button>
@@ -861,17 +861,17 @@ export default function CaisseDashboard({
               {isCountPhase ? (
                 // Phase 1: Counting in progress
                 <>
-                  <div className="p-6 rounded-full bg-blue-500/10 ring-1 ring-blue-500/30 shadow-2xl relative overflow-hidden">
-                    <div className="absolute inset-0 animate-pulse bg-gradient-to-tr from-blue-500/10 to-blue-400/5" />
-                    <RefreshCw className="w-16 h-16 text-blue-400 relative z-10 animate-spin" style={{ animationDuration: '3s' }} />
+                  <div className="p-6 rounded-full bg-status-info-bg ring-1 ring-status-info/30 shadow-2xl relative overflow-hidden">
+                    <div className="absolute inset-0 animate-pulse bg-gradient-to-tr from-status-info/10 to-status-info/5" />
+                    <RefreshCw className="w-16 h-16 text-status-info relative z-10 animate-spin" style={{ animationDuration: '3s' }} />
                   </div>
                   <div className="space-y-2">
-                    <h2 className="text-2xl font-bold text-white">Session en Fermeture</h2>
-                    <p className="text-slate-400 max-w-md mx-auto">
-                      La session est <span className="text-blue-400 font-bold">gelée</span>. Veuillez compter vos billets et soumettre le comptage physique.
+                    <h2 className="text-2xl font-bold text-content-primary">Session en Fermeture</h2>
+                    <p className="text-content-muted max-w-md mx-auto">
+                      La session est <span className="text-status-info font-bold">gelée</span>. Veuillez compter vos billets et soumettre le comptage physique.
                     </p>
                     {currentSession.closingInitiatedAt && (
-                      <p className="text-xs text-slate-500">
+                      <p className="text-xs text-content-muted">
                         Fermeture initiée le {new Date(currentSession.closingInitiatedAt).toLocaleString('fr-FR')}
                       </p>
                     )}
@@ -880,7 +880,7 @@ export default function CaisseDashboard({
                     <Button
                       size="lg"
                       onClick={() => handleTabChange('rapprochement')}
-                      className="w-full bg-blue-600 hover:bg-blue-500 text-white shadow-[0_0_20px_rgba(59,130,246,0.2)] font-bold py-6 text-lg"
+                      className="w-full bg-status-info hover:bg-status-info text-white shadow-[0_0_20px_rgba(59,130,246,0.2)] font-bold py-6 text-lg"
                     >
                       <RefreshCw className="w-5 h-5 mr-2" />
                       Soumettre le Comptage
@@ -890,22 +890,22 @@ export default function CaisseDashboard({
               ) : isPendingCoffreValidation ? (
                 // Phase 2: Waiting for coffre validation
                 <>
-                  <div className="p-6 rounded-full bg-amber-500/10 ring-1 ring-amber-500/30 shadow-2xl relative overflow-hidden">
-                    <div className="absolute inset-0 animate-pulse bg-gradient-to-tr from-amber-500/10 to-amber-400/5" />
-                    <Clock className="w-16 h-16 text-amber-400 relative z-10 animate-pulse" />
+                  <div className="p-6 rounded-full bg-status-warning-bg ring-1 ring-status-warning/30 shadow-2xl relative overflow-hidden">
+                    <div className="absolute inset-0 animate-pulse bg-gradient-to-tr from-status-warning-bg to-status-warning/5" />
+                    <Clock className="w-16 h-16 text-status-warning relative z-10 animate-pulse" />
                   </div>
                   <div className="space-y-2">
-                    <h2 className="text-2xl font-bold text-white">Transfert en Attente</h2>
-                    <p className="text-slate-400 max-w-md mx-auto">
-                      Le transfert de <span className="text-amber-400 font-bold">{moneyFormatter.format(currentSession.montantVersCoffre || 0)} FCFA</span> vers le coffre est en attente de validation.
+                    <h2 className="text-2xl font-bold text-content-primary">Transfert en Attente</h2>
+                    <p className="text-content-muted max-w-md mx-auto">
+                      Le transfert de <span className="text-status-warning font-bold">{moneyFormatter.format(currentSession.montantVersCoffre || 0)} FCFA</span> vers le coffre est en attente de validation.
                     </p>
                     {currentSession.montantReporte && Number(currentSession.montantReporte) > 0 && (
-                      <p className="text-xs text-emerald-400">
+                      <p className="text-xs text-status-success">
                         Fonds reportés: {moneyFormatter.format(currentSession.montantReporte)} FCFA
                       </p>
                     )}
                     {currentSession.countSubmittedAt && (
-                      <p className="text-xs text-slate-500">
+                      <p className="text-xs text-content-muted">
                         Comptage soumis le {new Date(currentSession.countSubmittedAt).toLocaleString('fr-FR')}
                       </p>
                     )}
@@ -915,7 +915,7 @@ export default function CaisseDashboard({
                       size="lg"
                       variant="outline"
                       onClick={() => handleTabChange('rapprochement')}
-                      className="w-full border-amber-500/50 text-amber-400 hover:bg-amber-500/10"
+                      className="w-full border-status-warning/50 text-status-warning hover:bg-status-warning-bg"
                     >
                       <Clock className="w-5 h-5 mr-2" />
                       Voir le Détail
@@ -925,16 +925,16 @@ export default function CaisseDashboard({
               ) : (
                 // Phase 2: Ready to finalize
                 <>
-                  <div className="p-8 rounded-[2rem] bg-emerald-500/5 ring-1 ring-emerald-500/10 shadow-2xl relative overflow-hidden group">
-                    <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
-                    <Lock className="w-16 h-16 text-emerald-500 relative z-10" />
+                  <div className="p-8 rounded-[2rem] bg-status-success/5 ring-1 ring-status-success/10 shadow-2xl relative overflow-hidden group">
+                    <div className="absolute inset-0 bg-gradient-to-tr from-status-success/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+                    <Lock className="w-16 h-16 text-status-success relative z-10" />
                   </div>
                   <div className="space-y-3">
-                    <h2 className="text-3xl font-black text-white tracking-tight">Vault Compté</h2>
-                    <p className="text-slate-400 max-w-sm mx-auto font-medium leading-relaxed">
+                    <h2 className="text-3xl font-black text-content-primary tracking-tight">Vault Compté</h2>
+                    <p className="text-content-muted max-w-sm mx-auto font-medium leading-relaxed">
                       Le rapprochement physique a été enregistré avec succès. La session est prête pour l'archivage final.
                     </p>
-                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20 text-[10px] font-black text-emerald-500 uppercase tracking-widest">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-status-success-bg rounded-full border border-status-success/20 text-[10px] font-black text-status-success uppercase tracking-widest">
                        <Shield size={12} />
                        Comptage Physique: {moneyFormatter.format(currentSession.montantPhysique || 0)} F
                     </div>
@@ -943,7 +943,7 @@ export default function CaisseDashboard({
                     <Button
                       size="lg"
                       onClick={() => handleTabChange('rapprochement')}
-                      className="w-full bg-emerald-600 hover:bg-emerald-500 text-white shadow-xl shadow-emerald-500/20 rounded-2xl font-black py-6 text-lg"
+                      className="w-full bg-status-success hover:bg-status-success text-white shadow-xl shadow-status-success/20 rounded-2xl font-black py-6 text-lg"
                     >
                       <Check className="w-5 h-5 mr-2" />
                       Finaliser le Protocole
@@ -955,7 +955,7 @@ export default function CaisseDashboard({
               {isAdminRole(userRole) && (
                 <button
                   onClick={() => handleTabChange('supervision')}
-                  className="text-sm text-slate-500 hover:text-indigo-400 underline decoration-slate-900 hover:decoration-indigo-400/50 underline-offset-4 transition-all"
+                  className="text-sm text-content-muted hover:text-accent underline decoration-content-primary hover:decoration-accent/50 underline-offset-4 transition-all"
                 >
                   Accéder aux outils de supervision
                 </button>
@@ -967,13 +967,13 @@ export default function CaisseDashboard({
         if (!isSessionOpen) {
            return (
              <div className="flex flex-col items-center justify-center min-h-[40vh] sm:min-h-[50vh] text-center space-y-6 animate-in fade-in slide-in-from-bottom-4">
-                <div className="p-6 rounded-full bg-slate-900 ring-1 ring-slate-800 shadow-2xl relative overflow-hidden group">
-                  <div className="absolute inset-0 bg-gradient-to-tr from-slate-800/0 to-slate-700/0 group-hover:from-slate-800/20 group-hover:to-slate-700/20 transition-all duration-500" />
-                  <LockKeyhole className="w-16 h-16 text-slate-500 relative z-10" />
+                <div className="p-6 rounded-full bg-surface-base ring-1 ring-edge shadow-2xl relative overflow-hidden group">
+                  <div className="absolute inset-0 bg-gradient-to-tr from-surface/0 to-surface-elevated/0 group-hover:from-surface/20 group-hover:to-surface-elevated/20 transition-all duration-500" />
+                  <LockKeyhole className="w-16 h-16 text-content-muted relative z-10" />
                 </div>
                 <div className="space-y-2">
-                  <h2 className="text-2xl font-bold text-white">Session de Caisse Fermée</h2>
-                  <p className="text-slate-400 max-w-md mx-auto">
+                  <h2 className="text-2xl font-bold text-content-primary">Session de Caisse Fermée</h2>
+                  <p className="text-content-muted max-w-md mx-auto">
                     Les opérations d'encaissement et de décaissement sont verrouillées. Veuillez ouvrir une session pour commencer votre journée.
                   </p>
                 </div>
@@ -982,7 +982,7 @@ export default function CaisseDashboard({
                     <Button
                       size="lg"
                       onClick={() => setShowOuverture(true)}
-                      className="w-full bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.2)] font-bold py-6 text-lg"
+                      className="w-full bg-status-success hover:bg-status-success text-white shadow-[0_0_20px_rgba(16,185,129,0.2)] font-bold py-6 text-lg"
                     >
                       <KeyRound className="w-5 h-5 mr-2" />
                       Ouvrir ma Session
@@ -992,7 +992,7 @@ export default function CaisseDashboard({
                   {isAdminRole(userRole) && (
                     <button
                       onClick={() => handleTabChange('supervision')}
-                      className="text-sm text-slate-500 hover:text-indigo-400 underline decoration-slate-900 hover:decoration-indigo-400/50 underline-offset-4 transition-all"
+                      className="text-sm text-content-muted hover:text-accent underline decoration-content-primary hover:decoration-accent/50 underline-offset-4 transition-all"
                     >
                       Accéder aux outils de supervision sans ouvrir
                     </button>
@@ -1065,19 +1065,19 @@ export default function CaisseDashboard({
       {comptesEnAttenteCount > 0 && (
             <div
               onClick={() => setShowActivationDrawer(true)}
-              className="mt-3 flex items-center gap-3 px-4 py-3 rounded-xl bg-orange-500/10 border border-orange-500/30 cursor-pointer hover:bg-orange-500/15 transition-all group"
+              className="mt-3 flex items-center gap-3 px-4 py-3 rounded-xl bg-status-warning-bg border border-status-warning/30 cursor-pointer hover:bg-status-warning-bg transition-all group"
             >
-              <div className="relative p-2 rounded-lg bg-orange-500/20 text-orange-400 group-hover:scale-105 transition-transform">
+              <div className="relative p-2 rounded-lg bg-status-warning-bg text-status-warning group-hover:scale-105 transition-transform">
                 <UserCheck size={18} />
-                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 flex items-center justify-center bg-orange-500 text-white text-[9px] font-bold rounded-full">
+                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 flex items-center justify-center bg-status-warning text-white text-[9px] font-bold rounded-full">
                   {comptesEnAttenteCount}
                 </span>
               </div>
               <div className="flex-1 min-w-0">
-                <span className="text-sm font-semibold text-orange-300">Comptes à activer</span>
-                <p className="text-[10px] text-orange-400/70">Versement initial requis</p>
+                <span className="text-sm font-semibold text-status-warning">Comptes à activer</span>
+                <p className="text-[10px] text-status-warning/70">Versement initial requis</p>
               </div>
-              <ArrowRightLeft size={16} className="text-orange-400/50 group-hover:text-orange-400 group-hover:translate-x-1 transition-all" />
+              <ArrowRightLeft size={16} className="text-status-warning/50 group-hover:text-status-warning group-hover:translate-x-1 transition-all" />
             </div>
           )}
 
@@ -1189,7 +1189,7 @@ export default function CaisseDashboard({
   };
 
   return (
-    <div className="min-h-full bg-[#020617] text-slate-100 font-sans selection:bg-cyan-500/30">
+    <div className="min-h-full bg-surface-base text-content-primary font-sans selection:bg-accent-secondary/30">
         <UniversalPaymentSuccessModal
             isOpen={showHistoryReceipt}
             onClose={() => {
@@ -1200,7 +1200,7 @@ export default function CaisseDashboard({
             data={historyReceiptData}
         />
 
-      <div className="w-full min-h-full flex flex-col p-3 md:p-4">
+      <div className={`w-full flex flex-col p-3 md:p-4 ${activeTab === 'historique' || activeTab === 'etats' ? 'h-full overflow-hidden' : 'min-h-full'}`}>
         {/* App Header with contextual help */}
         <FeatureHeader
           featureKey="finance.caisse"
@@ -1208,27 +1208,27 @@ export default function CaisseDashboard({
             <>
               {FEATURE_DESCRIPTIONS['finance.caisse'].title}
               {currentSession?.caisseNom && (
-                <span className="ml-2 px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-400 text-[10px] font-bold uppercase tracking-wider border border-cyan-500/20">
+                <span className="ml-2 px-2 py-0.5 rounded-full bg-accent/10 text-accent text-[10px] font-bold uppercase tracking-wider border border-accent/20">
                   {currentSession.caisseNom}
                 </span>
               )}
               {hasPendingOpening && (
-                <span className="ml-2 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 text-[10px] font-black uppercase tracking-widest border border-amber-500/20">
+                <span className="ml-2 px-2 py-0.5 rounded-full bg-status-warning-bg text-status-warning text-[10px] font-black uppercase tracking-widest border border-status-warning/20">
                   Ouverture en cours
                 </span>
               )}
               {currentSession?.statut === 'OPEN' && (
-                <span className="ml-2 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-black uppercase tracking-widest border border-emerald-500/20">
+                <span className="ml-2 px-2 py-0.5 rounded-full bg-status-success-bg text-status-success text-[10px] font-black uppercase tracking-widest border border-status-success/20">
                   Ouverte
                 </span>
               )}
               {currentSession?.statut === 'CLOSING_COUNT' && (
-                <span className="ml-2 px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 text-[10px] font-black uppercase tracking-widest border border-blue-500/20 animate-pulse">
+                <span className="ml-2 px-2 py-0.5 rounded-full bg-status-info-bg text-status-info text-[10px] font-black uppercase tracking-widest border border-status-info/20 animate-pulse">
                   Phase: Comptage
                 </span>
               )}
               {currentSession?.statut === 'CLOSING_VALIDATION' && (
-                <span className="ml-2 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 text-[10px] font-black uppercase tracking-widest border border-amber-500/20 animate-pulse">
+                <span className="ml-2 px-2 py-0.5 rounded-full bg-status-warning-bg text-status-warning text-[10px] font-black uppercase tracking-widest border border-status-warning/20 animate-pulse">
                   Phase: Validation Coffre
                 </span>
               )}
@@ -1236,7 +1236,7 @@ export default function CaisseDashboard({
           }
           subtitle={FEATURE_DESCRIPTIONS['finance.caisse'].subtitle}
           helpText={FEATURE_DESCRIPTIONS['finance.caisse'].helpText}
-          icon={<Wallet size={24} className="text-cyan-400" />}
+          icon={<Wallet size={24} className="text-accent" />}
           actions={
             <div className="flex items-center gap-2">
               {supervisedSession && supervisionInfo && (
@@ -1244,7 +1244,7 @@ export default function CaisseDashboard({
                   variant="outline"
                   size="sm"
                   onClick={handleSupervisionEnd}
-                  className="border-amber-500/50 text-amber-400 hover:bg-amber-500/10"
+                  className="border-status-warning/50 text-status-warning hover:bg-status-warning-bg"
                 >
                   Quitter Supervision
                 </Button>
@@ -1254,7 +1254,7 @@ export default function CaisseDashboard({
                 <button
                   onClick={() => currentSession ? setShowPaiement(true) : alert('Caisse fermée')}
                   disabled={!currentSession || currentSession.statut === 'CLOSING_COUNT' || currentSession.statut === 'CLOSING_VALIDATION'}
-                  className={`w-9 h-9 rounded-full bg-[#1e293b] border border-[#334155] text-cyan-400 hover:bg-[#334155] hover:text-white flex items-center justify-center transition-all ${
+                  className={`w-9 h-9 rounded-full bg-surface-raised border border-edge-subtle text-accent hover:bg-surface-hover hover:text-content-primary flex items-center justify-center transition-all ${
                     currentSession?.statut === 'CLOSING_COUNT' || currentSession?.statut === 'CLOSING_VALIDATION'
                       ? 'opacity-50 cursor-not-allowed'
                       : ''
@@ -1266,7 +1266,7 @@ export default function CaisseDashboard({
               )}
               {!currentSession ? (
                 canOpenCaisse && (
-                  <Button variant="success" size="sm" icon={Unlock} onClick={() => setShowOuverture(true)} className="rounded-full shadow-lg shadow-emerald-500/20">
+                  <Button variant="success" size="sm" icon={Unlock} onClick={() => setShowOuverture(true)} className="rounded-full shadow-lg shadow-status-success/20">
                     Ouvrir
                   </Button>
                 )
@@ -1275,14 +1275,14 @@ export default function CaisseDashboard({
                   variant="primary"
                   size="sm"
                   onClick={() => handleTabChange('rapprochement')}
-                  className="rounded-full shadow-lg shadow-blue-500/20"
+                  className="rounded-full shadow-lg shadow-status-info/20"
                 >
                   <RefreshCw size={14} className="mr-1.5" />
                   Continuer
                 </Button>
               ) : (
                 canCloseCaisse && (
-                  <Button variant="danger" size="sm" onClick={handleFermetureCaisse} className="rounded-full shadow-lg shadow-red-500/20">
+                  <Button variant="danger" size="sm" onClick={handleFermetureCaisse} className="rounded-full shadow-lg shadow-status-danger/20">
                     <Lock size={14} className="mr-1.5" />
                     Fermer
                   </Button>
@@ -1294,38 +1294,38 @@ export default function CaisseDashboard({
         />
 
         {supervisedSession && supervisionInfo && (
-          <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-amber-500/10 border-y border-amber-500/20 -mx-4 md:-mx-6 mb-4 animate-in slide-in-from-top duration-500">
+          <div className="bg-gradient-to-r from-status-warning-bg via-amber-500/5 to-status-warning/10 border-y border-status-warning/20 -mx-4 md:-mx-6 mb-4 animate-in slide-in-from-top duration-500">
             {/* Main supervision banner */}
             <div className="px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               {/* Left side - Info */}
               <div className="flex items-start sm:items-center gap-3">
-                <div className="p-2 rounded-lg bg-amber-500/20 shrink-0">
-                  <Shield size={18} className="text-amber-400" />
+                <div className="p-2 rounded-lg bg-status-warning-bg shrink-0">
+                  <Shield size={18} className="text-status-warning" />
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-bold uppercase tracking-wider text-amber-400">
+                    <span className="text-xs font-bold uppercase tracking-wider text-status-warning">
                       Mode Supervision
                     </span>
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                       supervisionTimeRemaining <= 5
-                        ? 'bg-red-500/20 text-red-400 animate-pulse'
+                        ? 'bg-status-danger-bg text-status-danger animate-pulse'
                         : supervisionTimeRemaining <= 10
-                          ? 'bg-amber-500/20 text-amber-400'
-                          : 'bg-emerald-500/20 text-emerald-400'
+                          ? 'bg-status-warning-bg text-status-warning'
+                          : 'bg-status-success-bg text-status-success'
                     }`}>
                       <Timer size={10} className="inline mr-1" />
                       {supervisionTimeRemaining} min restantes
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 mt-1 text-xs text-amber-300/80 flex-wrap">
+                  <div className="flex items-center gap-2 mt-1 text-xs text-status-warning/80 flex-wrap">
                     <span>
                       <strong>{supervisionInfo.targetCaisseName}</strong>
                     </span>
                     <span className="opacity-50">•</span>
                     <span>{supervisionInfo.targetCaissierName}</span>
                     <span className="opacity-50">•</span>
-                    <span className="italic text-amber-300/60">{supervisionInfo.reason}</span>
+                    <span className="italic text-status-warning/60">{supervisionInfo.reason}</span>
                   </div>
                 </div>
               </div>
@@ -1337,7 +1337,7 @@ export default function CaisseDashboard({
                     variant="ghost"
                     size="sm"
                     onClick={handleExtendSupervision}
-                    className="text-amber-400 hover:bg-amber-500/20 text-xs"
+                    className="text-status-warning hover:bg-status-warning-bg text-xs"
                   >
                     <Timer size={14} className="mr-1" />
                     +15 min
@@ -1347,7 +1347,7 @@ export default function CaisseDashboard({
                   variant="outline"
                   size="sm"
                   onClick={handleSupervisionEnd}
-                  className="border-amber-500/50 text-amber-400 hover:bg-amber-500/10 text-xs"
+                  className="border-status-warning/50 text-status-warning hover:bg-status-warning-bg text-xs"
                 >
                   Quitter
                 </Button>
@@ -1355,9 +1355,9 @@ export default function CaisseDashboard({
             </div>
 
             {/* Warning footer */}
-            <div className="px-4 py-1.5 bg-amber-950/30 border-t border-amber-500/10 flex items-center gap-2">
-              <AlertCircle size={12} className="text-amber-500/60 shrink-0" />
-              <p className="text-[10px] text-amber-300/50 italic">
+            <div className="px-4 py-1.5 bg-status-warning-bg border-t border-status-warning/10 flex items-center gap-2">
+              <AlertCircle size={12} className="text-status-warning/60 shrink-0" />
+              <p className="text-[10px] text-status-warning/50 italic">
                 Les opérations sont enregistrées au nom de <strong>{supervisionInfo.targetCaissierName}</strong> avec mention "Supervisé par {supervisionInfo.supervisorName}"
               </p>
             </div>
@@ -1365,7 +1365,7 @@ export default function CaisseDashboard({
         )}
 
         {/* Tab Navigation (Sticky) */}
-        <div className="bg-[#020617]/90 backdrop-blur-xl -mx-4 px-4 py-2 mb-2 border-b border-[#1e293b]/50 sticky top-0 z-20">
+        <div className="bg-surface-base/90 backdrop-blur-xl -mx-4 px-4 py-2 mb-2 border-b border-edge/50 sticky top-0 z-20">
           <TabGroup
             activeTab={activeTab}
             onTabChange={handleTabChange}
@@ -1378,7 +1378,7 @@ export default function CaisseDashboard({
         </div>
 
         {/* Main Content - P2.1: Wrapped in Suspense for lazy loaded components */}
-        <div className="flex-1">
+        <div className="flex-1 min-h-0">
           <Suspense fallback={<TabLoadingFallback />}>
             {renderContent()}
           </Suspense>
@@ -1434,21 +1434,21 @@ export default function CaisseDashboard({
       {/* Session Inactivity Warning Modal */}
       {sessionTimeoutWarning && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-amber-500/50 rounded-xl p-6 max-w-sm mx-4 shadow-2xl shadow-amber-500/10">
+          <div className="bg-surface-base border border-status-warning/50 rounded-xl p-6 max-w-sm mx-4 shadow-2xl shadow-status-warning/10">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
-                <Timer className="w-5 h-5 text-amber-400" />
+              <div className="w-10 h-10 rounded-full bg-status-warning-bg flex items-center justify-center">
+                <Timer className="w-5 h-5 text-status-warning" />
               </div>
               <div>
-                <h3 className="text-white font-bold text-sm">Session inactive</h3>
-                <p className="text-slate-400 text-xs">Votre session sera fermée par inactivité</p>
+                <h3 className="text-content-primary font-bold text-sm">Session inactive</h3>
+                <p className="text-content-muted text-xs">Votre session sera fermée par inactivité</p>
               </div>
             </div>
             <div className="text-center mb-5">
-              <div className="text-4xl font-bold text-amber-400 font-mono">
+              <div className="text-4xl font-bold text-status-warning font-mono">
                 {Math.floor(timeoutRemaining / 60)}:{String(timeoutRemaining % 60).padStart(2, '0')}
               </div>
-              <p className="text-xs text-slate-500 mt-1">avant fermeture automatique</p>
+              <p className="text-xs text-content-muted mt-1">avant fermeture automatique</p>
             </div>
             <div className="flex gap-3">
               <button
@@ -1456,13 +1456,13 @@ export default function CaisseDashboard({
                   handleTabChange('rapprochement');
                   resetSessionTimeout();
                 }}
-                className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition"
+                className="flex-1 px-4 py-2 bg-surface-elevated hover:bg-surface-subtle text-content-primary rounded-lg text-sm font-medium transition"
               >
                 Fermer la session
               </button>
               <button
                 onClick={resetSessionTimeout}
-                className="flex-1 px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-sm font-bold transition"
+                className="flex-1 px-4 py-2 bg-accent-secondary hover:bg-accent-secondary-hover text-content-primary rounded-lg text-sm font-bold transition"
               >
                 Rester connecté
               </button>

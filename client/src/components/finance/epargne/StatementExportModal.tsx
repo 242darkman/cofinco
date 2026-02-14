@@ -5,8 +5,10 @@ import { useLanguage } from '../../../contexts/LanguageContext';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { addPdfLogoHeader } from '@/lib/pdf-logo';
+import { useBranding } from '@/contexts/BrandingContext';
 // P4.1: Lazy-load heavy export libraries
 import { loadPDFLibraries, loadExcelLibrary } from '@/lib/lazy-export';
+import { currencySymbol, currencyLabel } from '@shared/config/currency';
 
 interface StatementExportModalProps {
   isOpen: boolean;
@@ -17,6 +19,7 @@ interface StatementExportModalProps {
 
 export default function StatementExportModal({ isOpen, onClose, compte, transactions }: StatementExportModalProps) {
   const { t } = useLanguage();
+  const { branding } = useBranding();
   const [startDate, setStartDate] = useState(
     new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]
   );
@@ -55,6 +58,7 @@ export default function StatementExportModal({ isOpen, onClose, compte, transact
           title: 'Relevé de Compte',
           subtitle: `${clientName} — N° ${compteNum} — ${compte.typeCompte || compte.typeCompte}`,
           dateRight: `Période: ${format(new Date(startDate), 'dd/MM/yyyy')} au ${format(new Date(endDate), 'dd/MM/yyyy')}`,
+          appName: branding.appName,
         });
 
         // Filter transactions
@@ -79,7 +83,7 @@ export default function StatementExportModal({ isOpen, onClose, compte, transact
         
         autoTable(doc, {
           startY,
-          head: [['Date', 'Type', 'Référence', 'Description', 'Montant (FCFA)', 'Solde (FCFA)']],
+          head: [['Date', 'Type', 'Référence', 'Description', currencyLabel('Montant'), currencyLabel('Solde')]],
           body: tableBody,
           styles: { fontSize: 8, cellPadding: 2 },
           headStyles: { fillColor: [15, 23, 42], textColor: 255 },
@@ -102,8 +106,8 @@ export default function StatementExportModal({ isOpen, onClose, compte, transact
         const finalY = (doc as any).lastAutoTable.finalY + 10;
         
         doc.setFontSize(10);
-        doc.text(`Total Dépôts: ${totalDepots.toLocaleString('fr-FR')} FCFA`, 14, finalY);
-        doc.text(`Total Retraits: ${totalRetraits.toLocaleString('fr-FR')} FCFA`, 14, finalY + 6);
+        doc.text(`Total Dépôts: ${totalDepots.toLocaleString('fr-FR')} ${currencySymbol()}`, 14, finalY);
+        doc.text(`Total Retraits: ${totalRetraits.toLocaleString('fr-FR')} ${currencySymbol()}`, 14, finalY + 6);
         
         // Footer
         doc.setFontSize(8);
@@ -139,7 +143,7 @@ export default function StatementExportModal({ isOpen, onClose, compte, transact
 
       // Build header info rows
       const headerRows = [
-        ['COFINCO - Relevé de Compte'],
+        [`${branding.appName} - Relevé de Compte`],
         [],
         ['Client', `${compte.clients?.nom || ''} ${compte.clients?.prenom || ''}`],
         ['Compte N°', compte.numeroCompte || compte.numeroCompte],
@@ -150,7 +154,7 @@ export default function StatementExportModal({ isOpen, onClose, compte, transact
       ];
 
       // Table header
-      const tableHeader = ['Date', 'Type', 'Référence', 'Description', 'Montant (FCFA)', 'Solde (FCFA)'];
+      const tableHeader = ['Date', 'Type', 'Référence', 'Description', currencyLabel('Montant'), currencyLabel('Solde')];
 
       // Table rows
       const tableRows = filteredTransactions.map(t => [
@@ -222,23 +226,23 @@ export default function StatementExportModal({ isOpen, onClose, compte, transact
       <div className="space-y-6">
         {/* Period Selection */}
         <div className="space-y-4">
-          <label className="text-sm font-medium text-slate-300">Période</label>
+          <label className="text-sm font-medium text-content-secondary">Période</label>
           <div className="flex flex-wrap gap-2 mb-4">
             <button
               onClick={() => handleQuickSelect('month')}
-              className="px-3 py-1.5 text-xs font-medium rounded-full bg-slate-700 hover:bg-slate-600 text-slate-300 transition"
+              className="px-3 py-1.5 text-xs font-medium rounded-full bg-surface-elevated hover:bg-surface-subtle text-content-secondary transition"
             >
               Ce mois
             </button>
             <button
               onClick={() => handleQuickSelect('quarter')}
-              className="px-3 py-1.5 text-xs font-medium rounded-full bg-slate-700 hover:bg-slate-600 text-slate-300 transition"
+              className="px-3 py-1.5 text-xs font-medium rounded-full bg-surface-elevated hover:bg-surface-subtle text-content-secondary transition"
             >
               3 derniers mois
             </button>
             <button
               onClick={() => handleQuickSelect('year')}
-              className="px-3 py-1.5 text-xs font-medium rounded-full bg-slate-700 hover:bg-slate-600 text-slate-300 transition"
+              className="px-3 py-1.5 text-xs font-medium rounded-full bg-surface-elevated hover:bg-surface-subtle text-content-secondary transition"
             >
               Cette année
             </button>
@@ -246,7 +250,7 @@ export default function StatementExportModal({ isOpen, onClose, compte, transact
           
           <div className="grid grid-cols-2 gap-4">
             <div>
-               <label className="text-xs text-slate-400 mb-1 block">Date de début</label>
+               <label className="text-xs text-content-muted mb-1 block">Date de début</label>
                <Input
                  type="date"
                  value={startDate}
@@ -254,7 +258,7 @@ export default function StatementExportModal({ isOpen, onClose, compte, transact
                />
             </div>
             <div>
-               <label className="text-xs text-slate-400 mb-1 block">Date de fin</label>
+               <label className="text-xs text-content-muted mb-1 block">Date de fin</label>
                <Input
                  type="date"
                  value={endDate}
@@ -266,41 +270,41 @@ export default function StatementExportModal({ isOpen, onClose, compte, transact
         
         {/* Format Selection (Future proofing) */}
         <div>
-          <label className="text-sm font-medium text-slate-300 mb-2 block">Format</label>
+          <label className="text-sm font-medium text-content-secondary mb-2 block">Format</label>
           <div className="grid grid-cols-2 gap-4">
             <div 
               className={`
                 border rounded-lg p-3 cursor-pointer transition flex items-center gap-3
-                ${formatType === 'pdf' ? 'border-emerald-500 bg-emerald-500/10' : 'border-slate-700 hover:border-slate-600'}
+                ${formatType === 'pdf' ? 'border-status-success bg-status-success-bg' : 'border-edge hover:border-edge-strong'}
               `}
               onClick={() => setFormatType('pdf')}
             >
-              <FileText className={formatType === 'pdf' ? 'text-emerald-400' : 'text-slate-400'} size={20} />
+              <FileText className={formatType === 'pdf' ? 'text-status-success' : 'text-content-muted'} size={20} />
               <div>
-                <div className={`font-medium ${formatType === 'pdf' ? 'text-white' : 'text-slate-400'}`}>PDF</div>
-                <div className="text-[10px] text-slate-500">Document Adobe</div>
+                <div className={`font-medium ${formatType === 'pdf' ? 'text-content-primary' : 'text-content-muted'}`}>PDF</div>
+                <div className="text-[10px] text-content-muted">Document Adobe</div>
               </div>
-              {formatType === 'pdf' && <CheckCircle2 className="ml-auto text-emerald-500" size={16} />}
+              {formatType === 'pdf' && <CheckCircle2 className="ml-auto text-status-success" size={16} />}
             </div>
             
             <div
               className={`
                 border rounded-lg p-3 cursor-pointer transition flex items-center gap-3
-                ${formatType === 'excel' ? 'border-emerald-500 bg-emerald-500/10' : 'border-slate-700 hover:border-slate-600'}
+                ${formatType === 'excel' ? 'border-status-success bg-status-success-bg' : 'border-edge hover:border-edge-strong'}
               `}
               onClick={() => setFormatType('excel')}
             >
-              <Table2 className={formatType === 'excel' ? 'text-emerald-400' : 'text-slate-400'} size={20} />
+              <Table2 className={formatType === 'excel' ? 'text-status-success' : 'text-content-muted'} size={20} />
               <div>
-                <div className={`font-medium ${formatType === 'excel' ? 'text-white' : 'text-slate-400'}`}>Excel</div>
-                <div className="text-[10px] text-slate-500">Classeur Microsoft</div>
+                <div className={`font-medium ${formatType === 'excel' ? 'text-content-primary' : 'text-content-muted'}`}>Excel</div>
+                <div className="text-[10px] text-content-muted">Classeur Microsoft</div>
               </div>
-              {formatType === 'excel' && <CheckCircle2 className="ml-auto text-emerald-500" size={16} />}
+              {formatType === 'excel' && <CheckCircle2 className="ml-auto text-status-success" size={16} />}
             </div>
           </div>
         </div>
         
-        <div className="pt-4 border-t border-slate-700 flex justify-end gap-3">
+        <div className="pt-4 border-t border-edge flex justify-end gap-3">
           <Button variant="ghost" onClick={onClose} disabled={isGenerating}>
             Annuler
           </Button>

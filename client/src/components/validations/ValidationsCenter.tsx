@@ -41,24 +41,24 @@ export default function ValidationsCenter({ activeView }: ValidationsCenterProps
       label: 'Collectes Agents',
       badge: operationsCount,
       badgeClassName: activeTab === 'collectes'
-        ? 'bg-slate-900 text-white ring-1 ring-white/30'
-        : 'bg-red-500 text-white',
+        ? 'bg-surface-base text-content-primary ring-1 ring-white/30'
+        : 'bg-status-danger text-white',
     },
     {
       key: 'clotures' as const,
       label: 'Clotures Comptes',
       badge: closuresCount,
       badgeClassName: activeTab === 'clotures'
-        ? 'bg-slate-900 text-white ring-1 ring-white/30'
-        : 'bg-red-500 text-white',
+        ? 'bg-surface-base text-content-primary ring-1 ring-white/30'
+        : 'bg-status-danger text-white',
     },
     {
       key: 'ouvertures' as const,
       label: 'Creations Comptes',
       badge: openingsCount,
       badgeClassName: activeTab === 'ouvertures'
-        ? 'bg-slate-900 text-white ring-1 ring-white/30'
-        : 'bg-red-500 text-white',
+        ? 'bg-surface-base text-content-primary ring-1 ring-white/30'
+        : 'bg-status-danger text-white',
     },
   ];
 
@@ -67,23 +67,23 @@ export default function ValidationsCenter({ activeView }: ValidationsCenterProps
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 shrink-0">
         <div>
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight text-slate-800 dark:text-white flex items-center gap-2 sm:gap-3">
-            <ShieldCheck className="text-emerald-500 w-6 h-6 sm:w-8 sm:h-8" />
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight text-content-primary flex items-center gap-2 sm:gap-3">
+            <ShieldCheck className="text-status-success w-6 h-6 sm:w-8 sm:h-8" />
             Centre de Validations
             {totalCount > 0 && (
-              <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+              <span className="bg-status-danger text-white text-xs font-bold px-2 py-0.5 rounded-full">
                 {totalCount}
               </span>
             )}
           </h1>
-          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1">
+          <p className="text-xs sm:text-sm text-content-muted mt-1">
             Gerez toutes les validations en attente depuis un seul endroit.
           </p>
         </div>
 
         <button
           onClick={refresh}
-          className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-slate-700 dark:hover:text-white transition-colors self-end sm:self-auto"
+          className="p-2 rounded-lg hover:bg-surface-muted text-content-muted hover:text-content-secondary transition-colors self-end sm:self-auto"
           title="Rafraichir"
         >
           <RefreshCw size={18} />

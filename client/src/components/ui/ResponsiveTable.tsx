@@ -125,34 +125,34 @@ function ResponsiveTable<T extends Record<string, any>>({
   // Badge component
   const Badge = ({ value, className }: { value: any, className?: string }) => {
     const colorMap: Record<string, string> = {
-      Actif: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
-      Validé: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
-      'En cours': 'bg-blue-500/10 text-blue-500 border-blue-500/20',
-      Suspendu: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
-      Supprimé: 'bg-red-500/10 text-red-500 border-red-500/20',
-      Rejeté: 'bg-red-500/10 text-red-500 border-red-500/20',
-      Inactif: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
-      Standard: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
-      Premium: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
-      VIP: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-      'Approuvée': 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-      'Approuvé': 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-      'Déboursé': 'bg-sky-500/10 text-sky-400 border-sky-500/20',
-      'En attente': 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-      'En cours d\'analyse': 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
-      'Annulée': 'bg-slate-500/10 text-slate-400 border-slate-500/20',
-      'Rejetée': 'bg-red-500/10 text-red-400 border-red-500/20',
-      'Approuvée après réévaluation': 'bg-violet-500/10 text-violet-400 border-violet-500/20',
-      'Réévaluation en cours': 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
+      Actif: 'bg-status-success-bg text-status-success border-status-success/20',
+      Validé: 'bg-status-success-bg text-status-success border-status-success/20',
+      'En cours': 'bg-status-info-bg text-status-info border-status-info/20',
+      Suspendu: 'bg-status-warning-bg text-status-warning border-status-warning/20',
+      Supprimé: 'bg-status-danger-bg text-status-danger border-status-danger/20',
+      Rejeté: 'bg-status-danger-bg text-status-danger border-status-danger/20',
+      Inactif: 'bg-surface-subtle/30 text-content-muted border-edge-strong/20',
+      Standard: 'bg-surface-subtle/30 text-content-muted border-edge-strong/20',
+      Premium: 'bg-accent/10 text-accent border-accent/20',
+      VIP: 'bg-status-warning-bg text-status-warning border-status-warning/20',
+      'Approuvée': 'bg-status-success-bg text-status-success border-status-success/20',
+      'Approuvé': 'bg-status-success-bg text-status-success border-status-success/20',
+      'Déboursé': 'bg-status-info-bg text-status-info border-status-info/20',
+      'En attente': 'bg-status-warning-bg text-status-warning border-status-warning/20',
+      'En cours d\'analyse': 'bg-accent/10 text-accent border-accent/20',
+      'Annulée': 'bg-surface-subtle/30 text-content-muted border-edge-strong/20',
+      'Rejetée': 'bg-status-danger-bg text-status-danger border-status-danger/20',
+      'Approuvée après réévaluation': 'bg-status-info-bg text-status-info border-status-info/20',
+      'Réévaluation en cours': 'bg-accent/10 text-accent border-accent/20',
       // Opérations Terrain
-      'SUBMITTED': 'bg-amber-500/10 text-amber-500 border-amber-500/20',
-      'APPROVED': 'bg-blue-500/10 text-blue-500 border-blue-500/20',
-      'SETTLED': 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
-      'CANCELLED': 'bg-slate-500/10 text-slate-400 border-slate-500/20',
-      'REJECTED': 'bg-red-500/10 text-red-400 border-red-500/20',
+      'SUBMITTED': 'bg-status-warning-bg text-status-warning border-status-warning/20',
+      'APPROVED': 'bg-status-info-bg text-status-info border-status-info/20',
+      'SETTLED': 'bg-status-success-bg text-status-success border-status-success/20',
+      'CANCELLED': 'bg-surface-subtle/30 text-content-muted border-edge-strong/20',
+      'REJECTED': 'bg-status-danger-bg text-status-danger border-status-danger/20',
     };
 
-    const colorClass = colorMap[value] || 'bg-slate-500/10 text-slate-400 border-slate-500/20';
+    const colorClass = colorMap[value] || 'bg-surface-subtle/30 text-content-muted border-edge-strong/20';
 
     return (
       <span className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border transition-all duration-200 ${colorClass} ${className}`}>
@@ -164,7 +164,7 @@ function ResponsiveTable<T extends Record<string, any>>({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <svg className="animate-spin h-8 w-8 text-cyan-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <svg className="animate-spin h-8 w-8 text-accent" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
         </svg>
@@ -174,7 +174,7 @@ function ResponsiveTable<T extends Record<string, any>>({
 
   if (!data || data.length === 0) {
     return (
-      <div className="text-center py-12 text-slate-400">
+      <div className="text-center py-12 text-content-muted">
         <p>{emptyMessage}</p>
       </div>
     );
@@ -245,18 +245,18 @@ function ResponsiveTable<T extends Record<string, any>>({
 
       {/* Desktop View (Table) */}
       <div 
-        className={cn(`hidden ${mobileBreakpoint}:block overflow-auto bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700`, className)}
+        className={cn(`hidden ${mobileBreakpoint}:block overflow-auto bg-surface rounded-xl border border-edge`, className)}
         style={maxHeight ? { maxHeight } : undefined}
       >
         <table className={`w-full ${currentDensity.textSize}`}>
-          <thead className={cn("bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700", headerClassName)}>
+          <thead className={cn("bg-surface-base border-b border-edge", headerClassName)}>
             <tr>
               {columns.map((column) => {
                 const align = column.headerAlign || column.align || 'left';
                 return (
                   <th
                     key={column.key as string}
-                    className={`${currentDensity.headingPadding} font-semibold text-slate-600 dark:text-slate-300 ${
+                    className={`${currentDensity.headingPadding} font-semibold text-content-secondary ${
                       align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left'
                     }`}
                   >
@@ -270,7 +270,7 @@ function ResponsiveTable<T extends Record<string, any>>({
                 );
               })}
               {actions && (
-                <th className={`${currentDensity.headingPadding} text-left font-semibold text-slate-600 dark:text-slate-300`}>
+                <th className={`${currentDensity.headingPadding} text-left font-semibold text-content-secondary`}>
                   Actions
                 </th>
               )}
@@ -280,8 +280,8 @@ function ResponsiveTable<T extends Record<string, any>>({
             {data.map((item, index) => (
               <tr
                 key={index}
-                className={`border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${
-                  index % 2 === 0 ? 'bg-slate-50/50 dark:bg-slate-800/50' : ''
+                className={`border-b border-edge hover:bg-surface-elevated/50 transition-colors ${
+                  index % 2 === 0 ? 'bg-surface/50' : ''
                 } ${onRowClick ? 'cursor-pointer' : ''}`}
                 onClick={() => onRowClick?.(item, index)}
               >
@@ -295,7 +295,7 @@ function ResponsiveTable<T extends Record<string, any>>({
                     {column.badge ? (
                       <Badge value={getValue(item, column.key as string)} className={column.badgeClassName} />
                     ) : (
-                      <span className={column.primary ? 'font-semibold text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-300'}>
+                      <span className={column.primary ? 'font-semibold text-content-primary' : 'text-content-secondary'}>
                         {formatValue(item, column)}
                       </span>
                     )}
@@ -314,15 +314,15 @@ function ResponsiveTable<T extends Record<string, any>>({
 
       {/* Pagination Controls - Mobile First */}
       {pagination && pagination.totalPages > 1 && (
-        <div className="flex items-center justify-between px-3 sm:px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-b-xl">
-          <div className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+        <div className="flex items-center justify-between px-3 sm:px-4 py-3 border-t border-edge bg-surface rounded-b-xl">
+          <div className="text-xs sm:text-sm text-content-muted">
             <span className="hidden sm:inline">Page </span>{pagination.page}<span className="hidden sm:inline"> sur</span><span className="sm:hidden">/</span> {pagination.totalPages}
           </div>
           <div className="flex gap-2 sm:gap-3">
             <button
               onClick={() => pagination.onPageChange(Math.max(1, pagination.page - 1))}
               disabled={pagination.page === 1}
-              className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 sm:px-4 sm:py-2 flex items-center justify-center gap-1.5 text-sm font-medium border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 dark:text-slate-300 transition-all active:scale-95"
+              className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 sm:px-4 sm:py-2 flex items-center justify-center gap-1.5 text-sm font-medium border border-edge-strong rounded-lg hover:bg-surface-elevated disabled:opacity-40 disabled:cursor-not-allowed text-content-secondary transition-all active:scale-95"
               aria-label="Page précédente"
             >
               <ChevronLeft size={18} />
@@ -331,7 +331,7 @@ function ResponsiveTable<T extends Record<string, any>>({
             <button
               onClick={() => pagination.onPageChange(Math.min(pagination.totalPages, pagination.page + 1))}
               disabled={pagination.page === pagination.totalPages}
-              className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 sm:px-4 sm:py-2 flex items-center justify-center gap-1.5 text-sm font-medium border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 dark:text-slate-300 transition-all active:scale-95"
+              className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 sm:px-4 sm:py-2 flex items-center justify-center gap-1.5 text-sm font-medium border border-edge-strong rounded-lg hover:bg-surface-elevated disabled:opacity-40 disabled:cursor-not-allowed text-content-secondary transition-all active:scale-95"
               aria-label="Page suivante"
             >
               <span className="hidden sm:inline">Suivant</span>

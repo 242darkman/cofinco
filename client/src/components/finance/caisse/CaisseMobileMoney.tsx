@@ -152,8 +152,8 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete, us
   }, [suggestedAmount, typeDepot, typeRetrait]);
 
   const providers = [
-    { id: 'MTN' as Provider, name: 'MTN MoMo', color: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/50', logo: mtnLogo },
-    { id: 'AIRTEL' as Provider, name: 'Airtel Money', color: 'text-red-500', bg: 'bg-red-500/10', border: 'border-red-500/50', logo: airtelLogo }
+    { id: 'MTN' as Provider, name: 'MTN MoMo', color: 'text-status-warning', bg: 'bg-status-warning-bg', border: 'border-status-warning/50', logo: mtnLogo },
+    { id: 'AIRTEL' as Provider, name: 'Airtel Money', color: 'text-status-danger', bg: 'bg-status-danger-bg', border: 'border-status-danger/50', logo: airtelLogo }
   ];
 
   // Load security config on mount
@@ -482,7 +482,7 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete, us
   };
 
   return (
-    <div className="flex flex-col h-full font-sans selection:bg-emerald-500/30 overflow-hidden">
+    <div className="flex flex-col h-full font-sans selection:bg-status-success/30 overflow-hidden">
       {/* Modals */}
       <UniversalPaymentSuccessModal isOpen={showSuccessModal} onClose={handleCloseSuccess} term="Terminer" data={receiptData} />
       <PaymentStatusModal
@@ -513,9 +513,9 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete, us
 
       {/* Sandbox Banner - Compact */}
       {sandboxInfo?.isSandbox && (
-        <div className="bg-yellow-500/10 border-b border-yellow-500/20 px-3 py-1.5 flex items-center gap-2 shrink-0">
-          <AlertCircle size={12} className="text-yellow-400 shrink-0" />
-          <p className="text-[10px] text-yellow-400">
+        <div className="bg-status-warning-bg border-b border-status-warning/20 px-3 py-1.5 flex items-center gap-2 shrink-0">
+          <AlertCircle size={12} className="text-status-warning shrink-0" />
+          <p className="text-[10px] text-status-warning">
             <span className="font-bold">Sandbox:</span> Test avec {sandboxInfo.testNumbers?.SUCCESS_IMMEDIATE} (immédiat) ou {sandboxInfo.testNumbers?.SUCCESS_DELAYED} (30s)
           </p>
         </div>
@@ -529,20 +529,20 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete, us
           <div className="col-span-3 flex flex-col gap-2 h-full">
             {/* Search */}
             <div className="relative shrink-0">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 h-3.5 w-3.5" />
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-content-muted h-3.5 w-3.5" />
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && rechercherClient()}
                 placeholder="Client..."
-                className="w-full bg-slate-900 border border-slate-800 rounded-lg py-2 pl-8 pr-14 text-sm text-white focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 outline-none"
+                className="w-full bg-surface-base border border-edge rounded-lg py-2 pl-8 pr-14 text-sm text-content-primary focus:ring-1 focus:ring-accent focus:border-accent outline-none"
                 autoFocus
               />
               <button
                 onClick={rechercherClient}
                 disabled={loading || !searchTerm.trim()}
-                className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-700 text-white px-2 py-1 rounded font-bold transition-colors"
+                className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] bg-accent-secondary hover:bg-accent-secondary disabled:bg-surface-elevated text-content-primary px-2 py-1 rounded font-bold transition-colors"
               >
                 {loading ? <Loader2 size={10} className="animate-spin" /> : 'OK'}
               </button>
@@ -550,14 +550,14 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete, us
 
             {/* Client Card */}
             {selectedClient ? (
-              <Card className="flex-1 bg-slate-800/50 border-slate-700/50 p-3 flex flex-col">
+              <Card className="flex-1 bg-surface/50 border-edge-subtle p-3 flex flex-col">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white font-bold text-sm shrink-0">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-accent to-status-info flex items-center justify-center text-white font-bold text-sm shrink-0">
                     {selectedClient.nom.charAt(0)}{selectedClient.prenom.charAt(0)}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <h3 className="text-sm font-bold text-white">{selectedClient.nom} {selectedClient.prenom}</h3>
-                    <p className="text-xs text-slate-400 font-mono">{selectedClient.telephone || selectedClient.phone}</p>
+                    <h3 className="text-sm font-bold text-content-primary">{selectedClient.nom} {selectedClient.prenom}</h3>
+                    <p className="text-xs text-content-muted font-mono">{selectedClient.telephone || selectedClient.phone}</p>
                   </div>
                 </div>
 
@@ -565,48 +565,48 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete, us
                 {infoCardData && (
                   <div className={`p-2.5 rounded-lg border text-center mt-auto ${
                     infoCardData.amount !== null && infoCardData.amount > 0
-                    ? 'bg-purple-900/20 border-purple-500/30'
-                    : 'bg-slate-900/50 border-slate-800'
+                    ? 'bg-status-info-bg border-status-info/30'
+                    : 'bg-surface-base/50 border-edge'
                   }`}>
-                    <p className="text-[9px] text-slate-400 uppercase tracking-wider mb-0.5 truncate">{infoCardData.title}</p>
+                    <p className="text-[9px] text-content-muted uppercase tracking-wider mb-0.5 truncate">{infoCardData.title}</p>
                     {infoLoading ? (
-                      <Loader2 className="w-3 h-3 animate-spin mx-auto text-cyan-400" />
+                      <Loader2 className="w-3 h-3 animate-spin mx-auto text-accent" />
                     ) : (
-                      <p className={`font-mono text-sm font-bold ${infoCardData.amount !== null ? 'text-white' : 'text-slate-600'}`}>
+                      <p className={`font-mono text-sm font-bold ${infoCardData.amount !== null ? 'text-content-primary' : 'text-content-muted'}`}>
                         {infoCardData.amount !== null ? formatMoney(infoCardData.amount) : '-'}
                       </p>
                     )}
-                    {infoCardData.subtitle && <p className="text-[8px] text-slate-500 truncate">{infoCardData.subtitle}</p>}
+                    {infoCardData.subtitle && <p className="text-[8px] text-content-muted truncate">{infoCardData.subtitle}</p>}
                   </div>
                 )}
               </Card>
             ) : (
-              <div className="flex-1 rounded-xl border-2 border-dashed border-slate-800 flex items-center justify-center">
-                <p className="text-xs text-slate-600">Recherchez un client</p>
+              <div className="flex-1 rounded-xl border-2 border-dashed border-edge flex items-center justify-center">
+                <p className="text-xs text-content-muted">Recherchez un client</p>
               </div>
             )}
           </div>
 
           {/* RIGHT: Transaction Form (Full Width) */}
           <div className="col-span-9 h-full">
-            <Card className="h-full bg-slate-900/80 border-slate-800 p-0 flex flex-col overflow-hidden relative">
+            <Card className="h-full bg-surface-base/80 border-edge p-0 flex flex-col overflow-hidden relative">
               {!selectedClient && (
-                <div className="absolute inset-0 z-10 bg-slate-950/90 backdrop-blur-sm flex items-center justify-center">
-                  <p className="text-slate-500 text-xs bg-slate-900 px-3 py-1.5 rounded-full border border-slate-800">← Sélectionnez un client</p>
+                <div className="absolute inset-0 z-10 bg-surface-base/90 backdrop-blur-sm flex items-center justify-center">
+                  <p className="text-content-muted text-xs bg-surface-base px-3 py-1.5 rounded-full border border-edge">← Sélectionnez un client</p>
                 </div>
               )}
 
               {/* Header Row: Provider + Type */}
-              <div className="p-3 border-b border-slate-800 bg-slate-950/30 shrink-0">
+              <div className="p-3 border-b border-edge bg-surface-base/30 shrink-0">
                 <div className="flex items-center gap-4">
                   {/* Provider Toggle */}
-                  <div className="flex bg-slate-950 p-0.5 rounded-lg border border-slate-800">
+                  <div className="flex bg-surface-base p-0.5 rounded-lg border border-edge">
                     {providers.map(p => (
                       <button
                         key={p.id}
                         onClick={() => setProvider(p.id)}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
-                          provider === p.id ? 'bg-white text-slate-900' : 'text-slate-500 hover:text-slate-300'
+                          provider === p.id ? 'bg-surface text-content-primary' : 'text-content-muted hover:text-content-secondary'
                         }`}
                       >
                         <img src={p.logo} className="w-4 h-4 object-contain" alt="" />
@@ -616,15 +616,15 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete, us
                   </div>
 
                   {/* Type Selector */}
-                  <div className="flex-1 grid grid-cols-2 gap-0.5 bg-slate-950 p-0.5 rounded-lg border border-slate-800">
+                  <div className="flex-1 grid grid-cols-2 gap-0.5 bg-surface-base p-0.5 rounded-lg border border-edge">
                     {(['Dépôt', 'Retrait'] as TypeOperation[]).map(type => (
                       <button
                         key={type}
                         onClick={() => { setTypeOperation(type); setTypeDepot(null); setTypeRetrait(null); setMontant(''); }}
                         className={`flex items-center justify-center gap-1.5 rounded-md py-2 text-xs font-bold transition-all ${
                           typeOperation === type
-                          ? type === 'Dépôt' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'
-                          : 'text-slate-500 hover:text-slate-300'
+                          ? type === 'Dépôt' ? 'bg-status-success text-white' : 'bg-status-danger text-white'
+                          : 'text-content-muted hover:text-content-secondary'
                         }`}
                       >
                         {type === 'Dépôt' ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
@@ -640,7 +640,7 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete, us
                 {/* SubType Pills */}
                 {typeOperation && (
                   <div>
-                    <label className="text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-1.5 block">Destination</label>
+                    <label className="text-[9px] uppercase tracking-wider text-content-muted font-bold mb-1.5 block">Destination</label>
                     <div className="flex flex-wrap gap-1.5">
                       {(typeOperation === 'Dépôt'
                         ? ['Compte Courant', 'Compte Épargne', 'Compte Bloqué', 'Cotisation Tontine', 'Remboursement Crédit']
@@ -655,8 +655,8 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete, us
                           }}
                           className={`px-2.5 py-1 rounded-md text-[10px] font-medium border transition-all ${
                             (typeOperation === 'Dépôt' ? typeDepot : typeRetrait) === subType
-                            ? 'bg-slate-700 text-white border-slate-600'
-                            : 'bg-transparent border-slate-800 text-slate-500 hover:border-slate-700'
+                            ? 'bg-surface-elevated text-content-primary border-edge-strong'
+                            : 'bg-transparent border-edge text-content-muted hover:border-edge'
                           }`}
                         >
                           {subType.replace('Retrait ', '')}
@@ -669,37 +669,37 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete, us
                 {/* Inputs */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-[10px] text-slate-500 font-medium mb-1 block">Numéro Mobile</label>
+                    <label className="text-[10px] text-content-muted font-medium mb-1 block">Numéro Mobile</label>
                     <div className="relative">
-                      <Phone size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                      <Phone size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-content-muted" />
                       <input
                         type="tel"
                         value={phoneNumber}
                         onChange={(e) => setPhoneNumber(e.target.value)}
-                        className={`w-full bg-slate-950 border rounded-lg py-2 pl-8 pr-3 text-sm text-white focus:ring-1 focus:ring-cyan-500/50 outline-none font-mono ${
-                          phoneValidation?.warning ? 'border-yellow-500/50' : 'border-slate-800'
+                        className={`w-full bg-surface-base border rounded-lg py-2 pl-8 pr-3 text-sm text-content-primary focus:ring-1 focus:ring-accent/50 outline-none font-mono ${
+                          phoneValidation?.warning ? 'border-status-warning/50' : 'border-edge'
                         }`}
                         placeholder="+242..."
                       />
                     </div>
                     {phoneValidation?.warning && (
-                      <div className="mt-1.5 p-1.5 rounded bg-yellow-500/10 border border-yellow-500/20 text-[9px] text-yellow-400">
+                      <div className="mt-1.5 p-1.5 rounded bg-status-warning-bg border border-status-warning/20 text-[9px] text-status-warning">
                         <span className="font-bold">Sandbox:</span> {phoneValidation.warning}
-                        {phoneValidation.suggestion && <span className="block font-mono text-yellow-300">{phoneValidation.suggestion}</span>}
+                        {phoneValidation.suggestion && <span className="block font-mono text-status-warning">{phoneValidation.suggestion}</span>}
                       </div>
                     )}
                   </div>
                   <div>
-                    <label className="text-[10px] text-slate-500 font-medium mb-1 block">Montant</label>
+                    <label className="text-[10px] text-content-muted font-medium mb-1 block">Montant</label>
                     <div className="relative">
                       <input
                         type="number"
                         value={montant}
                         onChange={(e) => setMontant(e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2 pl-3 pr-14 text-sm text-white font-bold focus:ring-1 focus:ring-cyan-500/50 outline-none font-mono"
+                        className="w-full bg-surface-base border border-edge rounded-lg py-2 pl-3 pr-14 text-sm text-content-primary font-bold focus:ring-1 focus:ring-accent/50 outline-none font-mono"
                         placeholder="0"
                       />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-slate-500 font-bold">FCFA</span>
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-content-muted font-bold">FCFA</span>
                     </div>
                   </div>
                 </div>
@@ -707,10 +707,10 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete, us
                 {/* Confirmation Info - Compact */}
                 {typeOperation && montant && parseFloat(montant) > 0 && (
                   <div className={`p-2.5 rounded-lg border flex items-start gap-2 ${
-                    typeOperation === 'Dépôt' ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-rose-500/5 border-rose-500/20'
+                    typeOperation === 'Dépôt' ? 'bg-status-success/5 border-status-success/20' : 'bg-status-danger/5 border-status-danger/20'
                   }`}>
-                    <AlertCircle size={14} className={`shrink-0 mt-0.5 ${typeOperation === 'Dépôt' ? 'text-emerald-500' : 'text-rose-500'}`} />
-                    <p className="text-[10px] text-slate-400 leading-relaxed">
+                    <AlertCircle size={14} className={`shrink-0 mt-0.5 ${typeOperation === 'Dépôt' ? 'text-status-success' : 'text-status-danger'}`} />
+                    <p className="text-[10px] text-content-muted leading-relaxed">
                       {typeOperation === 'Dépôt'
                         ? `Collecte de ${formatMoney(parseFloat(montant))} sur ${phoneNumber || '...'}. Validation PIN ${provider} requise.`
                         : `Envoi de ${formatMoney(parseFloat(montant))} vers ${phoneNumber || '...'}. Vérifiez l'identité du bénéficiaire.`}
@@ -720,12 +720,12 @@ export default function CaisseMobileMoney({ sessionId, onTransactionComplete, us
               </div>
 
               {/* Footer Action */}
-              <div className="p-3 border-t border-slate-800 bg-slate-950/50 shrink-0">
+              <div className="p-3 border-t border-edge bg-surface-base/50 shrink-0">
                 <Button
                   onClick={handleSubmit}
                   disabled={loading || !montant || parseFloat(montant) <= 0 || !phoneNumber || !(typeOperation === 'Dépôt' ? typeDepot : typeRetrait)}
                   className={`w-full h-11 rounded-lg font-bold text-sm transition-all ${
-                    typeOperation === 'Dépôt' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-rose-600 hover:bg-rose-500'
+                    typeOperation === 'Dépôt' ? 'bg-status-success hover:bg-status-success' : 'bg-status-danger hover:bg-status-danger'
                   } disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
                   {loading ? (

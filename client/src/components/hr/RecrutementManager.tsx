@@ -256,12 +256,12 @@ export default function RecrutementManager({
       primary: true,
       format: (val: string, item: Candidat) => (
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+          <div className="w-10 h-10 bg-gradient-to-br from-status-info to-pink-500 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
             {item.nom.charAt(0)}{item.prenom.charAt(0)}
           </div>
           <div className="min-w-0">
-            <div className="font-semibold text-white text-sm truncate">{item.nom} {item.prenom}</div>
-            <div className="text-[10px] text-slate-400 flex items-center gap-1">
+            <div className="font-semibold text-content-primary text-sm truncate">{item.nom} {item.prenom}</div>
+            <div className="text-[10px] text-content-muted flex items-center gap-1">
               <Briefcase size={10} />
               {item.posteVise}
             </div>
@@ -274,7 +274,7 @@ export default function RecrutementManager({
       key: 'email',
       hideOnMobile: true,
       format: (val: string, item: Candidat) => (
-        <div className="text-xs text-slate-300 space-y-0.5">
+        <div className="text-xs text-content-secondary space-y-0.5">
           <div className="flex items-center gap-1"><Mail size={10} />{val}</div>
           {item.telephone && <div className="flex items-center gap-1"><Phone size={10} />{item.telephone}</div>}
         </div>
@@ -285,7 +285,7 @@ export default function RecrutementManager({
       key: 'experience',
       hideOnMobile: true,
       format: (val: string) => (
-        <span className="text-xs text-slate-300">{val || '-'}</span>
+        <span className="text-xs text-content-secondary">{val || '-'}</span>
       )
     },
     {
@@ -299,7 +299,7 @@ export default function RecrutementManager({
               value={item.statut}
               onChange={(e) => onUpdateStatus(item.id, e.target.value)}
               onClick={(e) => e.stopPropagation()}
-              className="px-2 py-1 bg-slate-700 border border-slate-600 rounded text-white text-[10px] focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="px-2 py-1 bg-surface-elevated border border-edge-strong rounded text-content-primary text-[10px] focus:outline-none focus:ring-1 focus:ring-status-info"
             >
               <option value={StatutCandidature.PENDING}>{STATUT_CANDIDATURE_LABELS[StatutCandidature.PENDING]}</option>
               <option value={StatutCandidature.INTERVIEW}>{STATUT_CANDIDATURE_LABELS[StatutCandidature.INTERVIEW]}</option>
@@ -316,30 +316,30 @@ export default function RecrutementManager({
     <div className="flex flex-col h-full space-y-2">
       {/* Stats Cards - Compact */}
       <div className="shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-2">
-        <Card className="p-3 bg-slate-800/50 border-slate-700/50 hover:bg-slate-800 transition-colors">
-          <div className="text-slate-400 text-[10px] uppercase font-bold tracking-wider mb-0.5">Total</div>
-          <div className="text-xl font-bold text-white leading-none">{stats.total}</div>
+        <Card className="p-3 bg-surface/50 border-edge-subtle hover:bg-surface transition-colors">
+          <div className="text-content-muted text-[10px] uppercase font-bold tracking-wider mb-0.5">Total</div>
+          <div className="text-xl font-bold text-content-primary leading-none">{stats.total}</div>
         </Card>
-        <Card className="p-3 bg-slate-800/50 border-slate-700/50 hover:bg-slate-800 transition-colors">
-          <div className="text-slate-400 text-[10px] uppercase font-bold tracking-wider mb-0.5">En Attente</div>
-          <div className="text-xl font-bold text-blue-400 leading-none">{stats.enAttente}</div>
+        <Card className="p-3 bg-surface/50 border-edge-subtle hover:bg-surface transition-colors">
+          <div className="text-content-muted text-[10px] uppercase font-bold tracking-wider mb-0.5">En Attente</div>
+          <div className="text-xl font-bold text-status-info leading-none">{stats.enAttente}</div>
         </Card>
-        <Card className="p-3 bg-slate-800/50 border-slate-700/50 hover:bg-slate-800 transition-colors">
-          <div className="text-slate-400 text-[10px] uppercase font-bold tracking-wider mb-0.5">Entretien</div>
-          <div className="text-xl font-bold text-yellow-400 leading-none">{stats.entretien}</div>
+        <Card className="p-3 bg-surface/50 border-edge-subtle hover:bg-surface transition-colors">
+          <div className="text-content-muted text-[10px] uppercase font-bold tracking-wider mb-0.5">Entretien</div>
+          <div className="text-xl font-bold text-status-warning leading-none">{stats.entretien}</div>
         </Card>
-        <Card className="p-3 bg-slate-800/50 border-slate-700/50 hover:bg-slate-800 transition-colors">
-          <div className="text-slate-400 text-[10px] uppercase font-bold tracking-wider mb-0.5">Acceptés</div>
-          <div className="text-xl font-bold text-green-400 leading-none">{stats.acceptes}</div>
+        <Card className="p-3 bg-surface/50 border-edge-subtle hover:bg-surface transition-colors">
+          <div className="text-content-muted text-[10px] uppercase font-bold tracking-wider mb-0.5">Acceptés</div>
+          <div className="text-xl font-bold text-status-success leading-none">{stats.acceptes}</div>
         </Card>
       </div>
 
       {/* Main Content - Flex Grow */}
-      <div className="flex-1 min-h-0 bg-slate-900 border border-slate-800 rounded-lg flex flex-col">
+      <div className="flex-1 min-h-0 bg-surface-base border border-edge rounded-lg flex flex-col">
         {/* Compact Header Toolbar */}
-        <div className="shrink-0 p-2 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
-           <h3 className="text-xs font-bold text-white flex items-center gap-2">
-              <Briefcase size={14} className="text-purple-400" />
+        <div className="shrink-0 p-2 border-b border-edge flex justify-between items-center bg-surface-base/50">
+           <h3 className="text-xs font-bold text-content-primary flex items-center gap-2">
+              <Briefcase size={14} className="text-status-info" />
               Candidatures
            </h3>
            {canCreateCandidats && (
@@ -365,7 +365,7 @@ export default function RecrutementManager({
             }}
             density="compact"
             className="border-0 rounded-none h-full"
-            headerClassName="bg-slate-900 sticky top-0"
+            headerClassName="bg-surface-base sticky top-0"
             onRowClick={(item) => handleSelectCandidat(item)}
           />
         </div>
@@ -443,7 +443,7 @@ export default function RecrutementManager({
             required
           />
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
+          <div className="flex justify-end gap-3 pt-4 border-t border-edge">
             <Button
               type="button"
               variant="secondary"
@@ -470,50 +470,50 @@ export default function RecrutementManager({
             {/* Info Summary */}
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
-                <span className="text-slate-500 text-xs">Poste visé</span>
-                <div className="text-white font-medium flex items-center gap-1.5">
-                  <Briefcase size={13} className="text-purple-400" />
+                <span className="text-content-muted text-xs">Poste visé</span>
+                <div className="text-content-primary font-medium flex items-center gap-1.5">
+                  <Briefcase size={13} className="text-status-info" />
                   {selectedCandidat.posteVise}
                 </div>
               </div>
               <div>
-                <span className="text-slate-500 text-xs">Statut</span>
+                <span className="text-content-muted text-xs">Statut</span>
                 <div className="mt-0.5">
                   <Badge variant={getStatutVariant(selectedCandidat.statut)} value={STATUT_CANDIDATURE_LABELS[selectedCandidat.statut as keyof typeof STATUT_CANDIDATURE_LABELS] || selectedCandidat.statut} size="sm" />
                 </div>
               </div>
               <div>
-                <span className="text-slate-500 text-xs">Email</span>
-                <div className="text-white flex items-center gap-1.5">
-                  <Mail size={13} className="text-slate-400" />
+                <span className="text-content-muted text-xs">Email</span>
+                <div className="text-content-primary flex items-center gap-1.5">
+                  <Mail size={13} className="text-content-muted" />
                   {selectedCandidat.email}
                 </div>
               </div>
               <div>
-                <span className="text-slate-500 text-xs">Téléphone</span>
-                <div className="text-white flex items-center gap-1.5">
-                  <Phone size={13} className="text-slate-400" />
+                <span className="text-content-muted text-xs">Téléphone</span>
+                <div className="text-content-primary flex items-center gap-1.5">
+                  <Phone size={13} className="text-content-muted" />
                   {selectedCandidat.telephone || '-'}
                 </div>
               </div>
               {selectedCandidat.experience && (
                 <div className="col-span-2">
-                  <span className="text-slate-500 text-xs">Expérience</span>
-                  <div className="text-slate-300 text-sm mt-0.5">{selectedCandidat.experience}</div>
+                  <span className="text-content-muted text-xs">Expérience</span>
+                  <div className="text-content-secondary text-sm mt-0.5">{selectedCandidat.experience}</div>
                 </div>
               )}
             </div>
 
             {/* CV Section */}
-            <div className="border-t border-slate-700 pt-4">
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <div className="border-t border-edge pt-4">
+              <h4 className="text-xs font-bold text-content-muted uppercase tracking-wider mb-2 flex items-center gap-1.5">
                 <FileText size={13} />
                 Curriculum Vitae
               </h4>
               {selectedCandidat.cvUrl ? (
-                <div className="flex items-center justify-between bg-slate-800/60 rounded-lg p-3">
-                  <div className="flex items-center gap-2 text-sm text-slate-300">
-                    <FileText size={16} className="text-green-400" />
+                <div className="flex items-center justify-between bg-surface/60 rounded-lg p-3">
+                  <div className="flex items-center gap-2 text-sm text-content-secondary">
+                    <FileText size={16} className="text-status-success" />
                     <span>CV uploadé</span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -522,7 +522,7 @@ export default function RecrutementManager({
                         href={cvDownloadUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="px-3 py-1.5 bg-cyan-600/20 text-cyan-400 rounded-md text-xs font-medium hover:bg-cyan-600/30 transition flex items-center gap-1.5"
+                        className="px-3 py-1.5 bg-accent-secondary/20 text-accent rounded-md text-xs font-medium hover:bg-accent-secondary-hover/30 transition flex items-center gap-1.5"
                       >
                         <ExternalLink size={12} />
                         Télécharger
@@ -532,7 +532,7 @@ export default function RecrutementManager({
                       <button
                         onClick={() => cvFileInputRef.current?.click()}
                         disabled={uploadingCv}
-                        className="px-3 py-1.5 bg-slate-700 text-slate-300 rounded-md text-xs font-medium hover:bg-slate-600 transition flex items-center gap-1.5 disabled:opacity-50"
+                        className="px-3 py-1.5 bg-surface-elevated text-content-secondary rounded-md text-xs font-medium hover:bg-surface-subtle transition flex items-center gap-1.5 disabled:opacity-50"
                       >
                         <Upload size={12} />
                         {uploadingCv ? 'Upload...' : 'Remplacer'}
@@ -541,13 +541,13 @@ export default function RecrutementManager({
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center justify-between bg-slate-800/40 border border-dashed border-slate-700 rounded-lg p-3">
-                  <span className="text-sm text-slate-500">Aucun CV uploadé</span>
+                <div className="flex items-center justify-between bg-surface/40 border border-dashed border-edge rounded-lg p-3">
+                  <span className="text-sm text-content-muted">Aucun CV uploadé</span>
                   {canEditCandidats && onUploadCv && (
                     <button
                       onClick={() => cvFileInputRef.current?.click()}
                       disabled={uploadingCv}
-                      className="px-3 py-1.5 bg-cyan-600 text-white rounded-md text-xs font-medium hover:bg-cyan-700 transition flex items-center gap-1.5 disabled:opacity-50"
+                      className="px-3 py-1.5 bg-accent-secondary text-content-primary rounded-md text-xs font-medium hover:bg-accent-secondary-hover transition flex items-center gap-1.5 disabled:opacity-50"
                     >
                       <Upload size={12} />
                       {uploadingCv ? 'Upload...' : 'Uploader CV'}
@@ -570,8 +570,8 @@ export default function RecrutementManager({
 
             {/* Interview Section */}
             {(selectedCandidat.statut === StatutCandidature.INTERVIEW || selectedCandidat.dateEntretien) && (
-              <div className="border-t border-slate-700 pt-4">
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+              <div className="border-t border-edge pt-4">
+                <h4 className="text-xs font-bold text-content-muted uppercase tracking-wider mb-3 flex items-center gap-1.5">
                   <Clock size={13} />
                   Entretien
                 </h4>
@@ -584,14 +584,14 @@ export default function RecrutementManager({
                     onChange={(e) => setInterviewData(prev => ({ ...prev, dateEntretien: e.target.value }))}
                   />
                   <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">
+                    <label className="block text-xs font-medium text-content-muted mb-1">
                       Notes d'entretien
                     </label>
                     <textarea
                       value={interviewData.notes}
                       onChange={(e) => setInterviewData(prev => ({ ...prev, notes: e.target.value }))}
                       placeholder="Observations, impressions, questions posées..."
-                      className="w-full p-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none resize-none text-sm"
+                      className="w-full p-3 bg-surface border border-edge rounded-lg text-content-primary placeholder-content-muted focus:border-accent focus:outline-none resize-none text-sm"
                       rows={3}
                     />
                   </div>
@@ -612,9 +612,9 @@ export default function RecrutementManager({
 
             {/* Hiring Approval Workflow Section */}
             {selectedCandidat.statut === StatutCandidature.ACCEPTED && (
-              <div className="border-t border-slate-700 pt-4">
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                  <ShieldCheck size={13} className="text-purple-400" />
+              <div className="border-t border-edge pt-4">
+                <h4 className="text-xs font-bold text-content-muted uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                  <ShieldCheck size={13} className="text-status-info" />
                   Workflow d'Approbation
                 </h4>
 
@@ -651,21 +651,21 @@ export default function RecrutementManager({
                 {/* Approval History Timeline */}
                 {approvalHistory.length > 0 && (
                   <div className="space-y-3 mb-4">
-                    <p className="text-xs text-slate-500 font-medium">Historique des approbations</p>
-                    <div className="relative pl-4 border-l-2 border-slate-700 space-y-3">
+                    <p className="text-xs text-content-muted font-medium">Historique des approbations</p>
+                    <div className="relative pl-4 border-l-2 border-edge space-y-3">
                       {approvalHistory.map((approval, index) => (
                         <div key={approval.id} className="relative">
                           <div className={`absolute -left-[21px] w-4 h-4 rounded-full border-2 ${
-                            approval.statut === 'APPROVED' ? 'bg-green-500 border-green-400' :
-                            approval.statut === 'REJECTED' ? 'bg-red-500 border-red-400' :
-                            'bg-slate-700 border-slate-600'
+                            approval.statut === 'APPROVED' ? 'bg-status-success border-status-success' :
+                            approval.statut === 'REJECTED' ? 'bg-status-danger border-status-danger' :
+                            'bg-surface-elevated border-edge-strong'
                           }`}>
-                            {approval.statut === 'APPROVED' && <CheckCircle size={10} className="text-white absolute top-0.5 left-0.5" />}
-                            {approval.statut === 'REJECTED' && <XCircle size={10} className="text-white absolute top-0.5 left-0.5" />}
+                            {approval.statut === 'APPROVED' && <CheckCircle size={10} className="text-content-primary absolute top-0.5 left-0.5" />}
+                            {approval.statut === 'REJECTED' && <XCircle size={10} className="text-content-primary absolute top-0.5 left-0.5" />}
                           </div>
-                          <div className="bg-slate-800/50 rounded-lg p-3 ml-2">
+                          <div className="bg-surface/50 rounded-lg p-3 ml-2">
                             <div className="flex items-center justify-between mb-1">
-                              <span className="text-xs font-medium text-white">
+                              <span className="text-xs font-medium text-content-primary">
                                 Niveau {approval.level} - {approval.approverRole}
                               </span>
                               <Badge
@@ -675,15 +675,15 @@ export default function RecrutementManager({
                               />
                             </div>
                             {approval.approverNom && (
-                              <p className="text-xs text-slate-400">
+                              <p className="text-xs text-content-muted">
                                 Par: {approval.approverPrenom} {approval.approverNom}
                               </p>
                             )}
                             {approval.commentaire && (
-                              <p className="text-xs text-slate-300 mt-1 italic">"{approval.commentaire}"</p>
+                              <p className="text-xs text-content-secondary mt-1 italic">"{approval.commentaire}"</p>
                             )}
                             {approval.decidedAt && (
-                              <p className="text-[10px] text-slate-500 mt-1">
+                              <p className="text-[10px] text-content-muted mt-1">
                                 {new Date(approval.decidedAt).toLocaleString('fr-FR')}
                               </p>
                             )}
@@ -696,13 +696,13 @@ export default function RecrutementManager({
 
                 {/* Approval Actions */}
                 {selectedCandidat.approvalStatus === 'IN_PROGRESS' && canApprove && (
-                  <div className="space-y-3 bg-slate-800/30 rounded-lg p-3">
-                    <p className="text-xs text-slate-400 font-medium">Soumettre votre décision</p>
+                  <div className="space-y-3 bg-surface/30 rounded-lg p-3">
+                    <p className="text-xs text-content-muted font-medium">Soumettre votre décision</p>
                     <textarea
                       value={approvalComment}
                       onChange={(e) => setApprovalComment(e.target.value)}
                       placeholder="Commentaire (optionnel)..."
-                      className="w-full p-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none resize-none text-sm"
+                      className="w-full p-2 bg-surface-base/50 border border-edge rounded-lg text-content-primary placeholder-content-muted focus:border-status-info focus:outline-none resize-none text-sm"
                       rows={2}
                     />
                     <div className="flex gap-2">
@@ -732,8 +732,8 @@ export default function RecrutementManager({
 
                 {/* Final Approved Info */}
                 {selectedCandidat.approvalStatus === 'APPROVED' && selectedCandidat.finalApprovedAt && (
-                  <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
-                    <p className="text-xs text-green-400 font-medium flex items-center gap-1.5">
+                  <div className="bg-status-success-bg border border-status-success/30 rounded-lg p-3">
+                    <p className="text-xs text-status-success font-medium flex items-center gap-1.5">
                       <CheckCircle size={14} />
                       Approbation finale le {new Date(selectedCandidat.finalApprovedAt).toLocaleDateString('fr-FR')}
                     </p>

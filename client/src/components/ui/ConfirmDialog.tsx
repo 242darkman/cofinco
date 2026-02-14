@@ -53,29 +53,29 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   const variantConfig = {
     danger: {
       icon: AlertTriangle,
-      iconColor: 'text-red-400',
-      iconBg: 'bg-red-500/20',
+      iconColor: 'text-status-danger',
+      iconBg: 'bg-status-danger-bg',
       buttonVariant: 'danger' as const,
       modalVariant: 'danger' as const,
     },
     warning: {
       icon: AlertTriangle,
-      iconColor: 'text-amber-400',
-      iconBg: 'bg-amber-500/20',
+      iconColor: 'text-status-warning',
+      iconBg: 'bg-status-warning-bg',
       buttonVariant: 'secondary' as const,
       modalVariant: 'warning' as const,
     },
     success: {
       icon: CheckCircle,
-      iconColor: 'text-emerald-400',
-      iconBg: 'bg-emerald-500/20',
+      iconColor: 'text-status-success',
+      iconBg: 'bg-status-success-bg',
       buttonVariant: 'success' as const,
       modalVariant: 'success' as const,
     },
     info: {
       icon: Info,
-      iconColor: 'text-cyan-400',
-      iconBg: 'bg-cyan-500/20',
+      iconColor: 'text-status-info',
+      iconBg: 'bg-status-info-bg',
       buttonVariant: 'primary' as const,
       modalVariant: 'default' as const,
     },
@@ -138,7 +138,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           </div>
 
           <div className="flex-1 text-center sm:text-left max-w-full overflow-hidden">
-            <div className="text-sm sm:text-base text-slate-300 leading-relaxed break-words">
+            <div className="text-sm sm:text-base text-content-secondary leading-relaxed break-words">
               {message}
             </div>
           </div>

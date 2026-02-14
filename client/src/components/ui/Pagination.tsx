@@ -68,9 +68,9 @@ export function Pagination({
     <div className={`flex flex-col sm:flex-row items-center justify-between gap-4 ${className}`}>
       {/* Info items (masquée sur très petit écran) */}
       {totalItems !== undefined && itemsPerPage !== undefined && (
-        <div className="text-sm text-slate-400 hidden sm:block">
-          Affichage <span className="text-white font-semibold">{startItem}-{endItem}</span> sur{' '}
-          <span className="text-white font-semibold">{totalItems}</span>
+        <div className="text-sm text-content-muted hidden sm:block">
+          Affichage <span className="text-content-primary font-semibold">{startItem}-{endItem}</span> sur{' '}
+          <span className="text-content-primary font-semibold">{totalItems}</span>
         </div>
       )}
 
@@ -80,7 +80,7 @@ export function Pagination({
         <button
           onClick={() => onPageChange(1)}
           disabled={!canGoPrevious}
-          className="hidden md:flex items-center justify-center w-8 h-8 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-700 text-slate-300"
+          className="hidden md:flex items-center justify-center w-8 h-8 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed hover:bg-surface-elevated text-content-secondary"
           title="Première page"
         >
           <ChevronsLeft size={18} />
@@ -90,7 +90,7 @@ export function Pagination({
         <button
           onClick={() => onPageChange(currentPage - 1)}
           disabled={!canGoPrevious}
-          className="flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-700 text-slate-300"
+          className="flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed hover:bg-surface-elevated text-content-secondary"
           title="Page précédente"
         >
           <ChevronLeft size={18} />
@@ -103,7 +103,7 @@ export function Pagination({
               return (
                 <span
                   key={`ellipsis-${index}`}
-                  className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center text-slate-500"
+                  className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center text-content-muted"
                 >
                   ...
                 </span>
@@ -119,8 +119,8 @@ export function Pagination({
                 onClick={() => onPageChange(pageNum)}
                 className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg text-sm font-semibold transition-all ${
                   isActive
-                    ? 'bg-blue-600 text-white shadow-lg'
-                    : 'text-slate-300 hover:bg-slate-700'
+                    ? 'bg-accent text-white shadow-lg'
+                    : 'text-content-secondary hover:bg-surface-elevated'
                 }`}
               >
                 {pageNum}
@@ -133,7 +133,7 @@ export function Pagination({
         <button
           onClick={() => onPageChange(currentPage + 1)}
           disabled={!canGoNext}
-          className="flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-700 text-slate-300"
+          className="flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed hover:bg-surface-elevated text-content-secondary"
           title="Page suivante"
         >
           <ChevronRight size={18} />
@@ -143,7 +143,7 @@ export function Pagination({
         <button
           onClick={() => onPageChange(totalPages)}
           disabled={!canGoNext}
-          className="hidden md:flex items-center justify-center w-8 h-8 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-700 text-slate-300"
+          className="hidden md:flex items-center justify-center w-8 h-8 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed hover:bg-surface-elevated text-content-secondary"
           title="Dernière page"
         >
           <ChevronsRight size={18} />
@@ -151,7 +151,7 @@ export function Pagination({
       </div>
 
       {/* Info mobile (visible seulement sur petit écran) */}
-      <div className="text-xs text-slate-400 sm:hidden">
+      <div className="text-xs text-content-muted sm:hidden">
         Page {currentPage}/{totalPages}
         {totalItems && ` · ${totalItems} éléments`}
       </div>

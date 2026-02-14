@@ -4,6 +4,8 @@
  * et le PDF par useReceiptPDF (html2canvas).
  */
 
+import { currencySymbol } from '@shared/config/currency';
+
 export interface BilletageRow {
   denomination: number;
   count: number;
@@ -56,16 +58,16 @@ export interface ClosureReportData {
 }
 
 export const DENOMINATIONS = [
-  { key: 'billets_10000', value: 10000, label: '10 000 FCFA' },
-  { key: 'billets_5000', value: 5000, label: '5 000 FCFA' },
-  { key: 'billets_1000', value: 1000, label: '1 000 FCFA' },
-  { key: 'billets_500', value: 500, label: '500 FCFA' },
-  { key: 'billets_200', value: 200, label: '200 FCFA' },
-  { key: 'billets_100', value: 100, label: '100 FCFA' },
-  { key: 'billets_50', value: 50, label: '50 FCFA' },
-  { key: 'pieces_20', value: 20, label: '20 FCFA' },
-  { key: 'pieces_10', value: 10, label: '10 FCFA' },
-  { key: 'pieces_5', value: 5, label: '5 FCFA' },
+  { key: 'billets_10000', value: 10000, label: `10 000 ${currencySymbol()}` },
+  { key: 'billets_5000', value: 5000, label: `5 000 ${currencySymbol()}` },
+  { key: 'billets_1000', value: 1000, label: `1 000 ${currencySymbol()}` },
+  { key: 'billets_500', value: 500, label: `500 ${currencySymbol()}` },
+  { key: 'billets_200', value: 200, label: `200 ${currencySymbol()}` },
+  { key: 'billets_100', value: 100, label: `100 ${currencySymbol()}` },
+  { key: 'billets_50', value: 50, label: `50 ${currencySymbol()}` },
+  { key: 'pieces_20', value: 20, label: `20 ${currencySymbol()}` },
+  { key: 'pieces_10', value: 10, label: `10 ${currencySymbol()}` },
+  { key: 'pieces_5', value: 5, label: `5 ${currencySymbol()}` },
 ];
 
 export const formatMoney = (amount: number): string => {
@@ -73,7 +75,7 @@ export const formatMoney = (amount: number): string => {
     style: 'decimal',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0
-  }).format(amount) + ' FCFA';
+  }).format(amount) + ' ' + currencySymbol();
 };
 
 export const formatDateTime = (dateStr: string): string => {

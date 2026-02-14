@@ -329,7 +329,7 @@ export default function AdminValidationTerrain() {
             e.stopPropagation();
             toggleSelect(item.id);
           }}
-          className="p-1 text-slate-400 hover:text-primary transition"
+          className="p-1 text-content-muted hover:text-primary transition"
         >
           {selectedIds.has(item.id) ? (
             <CheckSquare size={18} className="text-primary" />
@@ -345,7 +345,7 @@ export default function AdminValidationTerrain() {
       label: 'Montant',
       primary: true,
       format: (val: string) => (
-        <span className="font-bold text-emerald-600 dark:text-emerald-400">
+        <span className="font-bold text-status-success">
           {parseFloat(val).toLocaleString()} FCFA
         </span>
       ),
@@ -373,16 +373,16 @@ export default function AdminValidationTerrain() {
               <img
                 src={item.clients.photoProfile}
                 alt=""
-                className="w-8 h-8 rounded-full object-cover border border-slate-300 dark:border-slate-600"
+                className="w-8 h-8 rounded-full object-cover border border-edge-strong"
               />
               <div className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
-                <Eye size={12} className="text-white" />
+                <Eye size={12} className="text-content-primary" />
               </div>
             </button>
           )}
           <div className="flex flex-col">
             <span className="font-medium">{item.clients ? `${item.clients.nom} ${item.clients.prenom}` : 'Inconnu'}</span>
-            <span className="text-xs text-slate-500">{item.clients?.telephone || ''}</span>
+            <span className="text-xs text-content-muted">{item.clients?.telephone || ''}</span>
           </div>
         </div>
       ),
@@ -402,7 +402,7 @@ export default function AdminValidationTerrain() {
       format: (date: string) => (
         <div className="flex flex-col text-xs">
           <span className="font-medium">{format(new Date(date), 'dd MMM yyyy', { locale: fr })}</span>
-          <span className="text-slate-500">{format(new Date(date), 'HH:mm', { locale: fr })}</span>
+          <span className="text-content-muted">{format(new Date(date), 'HH:mm', { locale: fr })}</span>
         </div>
       ),
       icon: Clock,
@@ -414,8 +414,8 @@ export default function AdminValidationTerrain() {
        format: (obs: string | undefined, item: PaiementTerrain) => {
            if (!obs && !item.validationOTP) return null;
            return (
-             <div className="max-w-[150px] truncate text-xs text-slate-500 italic">
-               {item.validationOTP === 'REQUIRED' && <span className="text-amber-500 mr-1">[OTP manquant]</span>}
+             <div className="max-w-[150px] truncate text-xs text-content-muted italic">
+               {item.validationOTP === 'REQUIRED' && <span className="text-status-warning mr-1">[OTP manquant]</span>}
                {obs}
              </div>
            )
@@ -436,14 +436,14 @@ export default function AdminValidationTerrain() {
              {/* Agency Selector (Admin only) */}
              {isAdmin && (
                <div className="relative">
-                 <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                 <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" size={16} />
                  <select
                    value={selectedAgenceId || 'all'}
                    onChange={(e) => {
                      setSelectedAgenceId(e.target.value === 'all' ? null : e.target.value);
                      setPage(1); // Reset to page 1 on agency change
                    }}
-                   className="pl-9 pr-4 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary/50 outline-none transition-all appearance-none cursor-pointer"
+                   className="pl-9 pr-4 py-2 text-sm bg-surface border border-edge rounded-lg focus:ring-2 focus:ring-primary/50 outline-none transition-all appearance-none cursor-pointer"
                  >
                    <option value="all">Toutes les agences</option>
                    {agences.map((agence) => (
@@ -455,7 +455,7 @@ export default function AdminValidationTerrain() {
                </div>
              )}
              <div className="relative flex-1 sm:w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" size={16} />
                 <input 
                   type="text" 
                   placeholder="Rechercher un paiement..." 
@@ -464,7 +464,7 @@ export default function AdminValidationTerrain() {
                     setSearchTerm(e.target.value);
                     setPage(1); // Reset to page 1 on search
                   }}
-                  className="w-full pl-9 pr-4 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary/50 outline-none transition-all"
+                  className="w-full pl-9 pr-4 py-2 text-sm bg-surface border border-edge rounded-lg focus:ring-2 focus:ring-primary/50 outline-none transition-all"
                 />
              </div>
              <Button
@@ -481,38 +481,38 @@ export default function AdminValidationTerrain() {
 
        {/* Bulk Operations Toolbar */}
        {selectedCount > 0 && (
-         <div className="bg-slate-800/80 backdrop-blur-sm border border-slate-700 rounded-xl p-3 flex flex-wrap items-center gap-4">
+         <div className="bg-surface/80 backdrop-blur-sm border border-edge rounded-xl p-3 flex flex-wrap items-center gap-4">
            <button
              onClick={() => toggleSelectAll()}
-             className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-slate-700/50 transition"
+             className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-surface-elevated/50 transition"
            >
              {isAllSelected ? (
                <CheckSquare size={18} className="text-primary" />
              ) : isPartiallySelected ? (
                <MinusSquare size={18} className="text-primary" />
              ) : (
-               <Square size={18} className="text-slate-400" />
+               <Square size={18} className="text-content-muted" />
              )}
-             <span className="text-sm text-slate-300">
+             <span className="text-sm text-content-secondary">
                {isAllSelected ? 'Tout désélectionner' : 'Tout sélectionner'}
              </span>
            </button>
 
-           <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-700/50 rounded-lg">
-             <span className="text-sm font-medium text-white">{selectedCount}</span>
-             <span className="text-sm text-slate-400">sélectionné(s)</span>
+           <div className="flex items-center gap-2 px-3 py-1.5 bg-surface-elevated/50 rounded-lg">
+             <span className="text-sm font-medium text-content-primary">{selectedCount}</span>
+             <span className="text-sm text-content-muted">sélectionné(s)</span>
            </div>
 
            {bulkProcessing && bulkProgress && (
-             <div className="flex items-center gap-3 px-4 py-2 bg-indigo-600/20 rounded-lg border border-indigo-500/30">
-               <Loader2 className="animate-spin text-indigo-400" size={16} />
+             <div className="flex items-center gap-3 px-4 py-2 bg-accent/10 rounded-lg border border-accent/30">
+               <Loader2 className="animate-spin text-accent" size={16} />
                <div className="text-sm">
-                 <span className="text-white font-medium">{bulkProgress.current}</span>
-                 <span className="text-slate-400"> / {bulkProgress.total}</span>
+                 <span className="text-content-primary font-medium">{bulkProgress.current}</span>
+                 <span className="text-content-muted"> / {bulkProgress.total}</span>
                </div>
-               <div className="w-24 h-2 bg-slate-700 rounded-full overflow-hidden">
+               <div className="w-24 h-2 bg-surface-elevated rounded-full overflow-hidden">
                  <div
-                   className="h-full bg-indigo-500 transition-all duration-300"
+                   className="h-full bg-accent transition-all duration-300"
                    style={{ width: `${(bulkProgress.current / bulkProgress.total) * 100}%` }}
                  />
                </div>
@@ -540,7 +540,7 @@ export default function AdminValidationTerrain() {
                </Button>
                <button
                  onClick={clearSelection}
-                 className="px-3 py-1.5 text-sm text-slate-400 hover:text-white transition"
+                 className="px-3 py-1.5 text-sm text-content-muted hover:text-content-primary transition"
                >
                  Effacer
                </button>
@@ -628,10 +628,10 @@ export default function AdminValidationTerrain() {
           {detailPayment && (
               <div className="space-y-6">
                   {/* Header Amount */}
-                  <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-xl border border-slate-100 dark:border-slate-700 flex flex-col items-center justify-center text-center">
-                      <span className="text-slate-500 text-sm font-medium mb-1">Montant Transaction</span>
-                      <div className="text-4xl font-bold text-emerald-600 dark:text-emerald-400">
-                          {parseFloat(detailPayment.montant).toLocaleString()} <span className="text-xl text-emerald-600/60">FCFA</span>
+                  <div className="bg-surface-muted/50 p-6 rounded-xl border border-edge-subtle flex flex-col items-center justify-center text-center">
+                      <span className="text-content-muted text-sm font-medium mb-1">Montant Transaction</span>
+                      <div className="text-4xl font-bold text-status-success">
+                          {parseFloat(detailPayment.montant).toLocaleString()} <span className="text-xl text-status-success/60">FCFA</span>
                       </div>
                       <Badge value={detailPayment.statut} className="mt-3" />
                   </div>
@@ -640,20 +640,20 @@ export default function AdminValidationTerrain() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {/* Client Info */}
                       <div className="space-y-4">
-                          <h4 className="font-semibold text-slate-800 dark:text-slate-200 border-b border-slate-100 dark:border-slate-700 pb-2 flex items-center gap-2">
+                          <h4 className="font-semibold text-content-primary border-b border-edge-subtle pb-2 flex items-center gap-2">
                               <User size={18} className="text-primary" />
                               Information Client
                           </h4>
                           <div className="space-y-3 pl-2">
                               <div>
-                                  <label className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Client</label>
-                                  <p className="font-medium text-slate-800 dark:text-slate-200">
+                                  <label className="text-xs text-content-muted uppercase tracking-wider font-semibold">Client</label>
+                                  <p className="font-medium text-content-primary">
                                       {detailPayment.clients ? `${detailPayment.clients.nom} ${detailPayment.clients.prenom}` : 'Non spécifié'}
                                   </p>
                               </div>
                               <div>
-                                  <label className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Téléphone</label>
-                                  <p className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                                  <label className="text-xs text-content-muted uppercase tracking-wider font-semibold">Téléphone</label>
+                                  <p className="flex items-center gap-2 text-content-muted">
                                       <Smartphone size={14} />
                                       {detailPayment.clients?.telephone || 'N/A'}
                                   </p>
@@ -663,31 +663,31 @@ export default function AdminValidationTerrain() {
 
                       {/* Transaction Info */}
                       <div className="space-y-4">
-                          <h4 className="font-semibold text-slate-800 dark:text-slate-200 border-b border-slate-100 dark:border-slate-700 pb-2 flex items-center gap-2">
+                          <h4 className="font-semibold text-content-primary border-b border-edge-subtle pb-2 flex items-center gap-2">
                               <CreditCard size={18} className="text-primary" />
                               Détails Transaction
                           </h4>
                           <div className="space-y-3 pl-2">
                               <div className="grid grid-cols-2 gap-4">
                                   <div>
-                                      <label className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Type</label>
-                                      <p className="font-medium text-slate-800 dark:text-slate-200">{detailPayment.typePaiement}</p>
+                                      <label className="text-xs text-content-muted uppercase tracking-wider font-semibold">Type</label>
+                                      <p className="font-medium text-content-primary">{detailPayment.typePaiement}</p>
                                   </div>
                                   <div>
-                                      <label className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Mode</label>
-                                      <p className="font-medium text-slate-800 dark:text-slate-200">{detailPayment.methodePaiement}</p>
+                                      <label className="text-xs text-content-muted uppercase tracking-wider font-semibold">Mode</label>
+                                      <p className="font-medium text-content-primary">{detailPayment.methodePaiement}</p>
                                   </div>
                               </div>
                               <div>
-                                  <label className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Référence</label>
-                                  <p className="flex items-center gap-2 text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded w-fit text-sm">
+                                  <label className="text-xs text-content-muted uppercase tracking-wider font-semibold">Référence</label>
+                                  <p className="flex items-center gap-2 text-content-muted bg-surface-muted px-2 py-1 rounded w-fit text-sm">
                                       <Hash size={12} />
                                       {detailPayment.reference}
                                   </p>
                               </div>
                               <div>
-                                  <label className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Date & Heure</label>
-                                  <p className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                                  <label className="text-xs text-content-muted uppercase tracking-wider font-semibold">Date & Heure</label>
+                                  <p className="flex items-center gap-2 text-content-muted">
                                       <Calendar size={14} />
                                       {format(new Date(detailPayment.createdAt), 'dd MMMM yyyy à HH:mm', { locale: fr })}
                                   </p>
@@ -697,20 +697,20 @@ export default function AdminValidationTerrain() {
 
                       {/* Agent & Location */}
                       <div className="space-y-4">
-                          <h4 className="font-semibold text-slate-800 dark:text-slate-200 border-b border-slate-100 dark:border-slate-700 pb-2 flex items-center gap-2">
+                          <h4 className="font-semibold text-content-primary border-b border-edge-subtle pb-2 flex items-center gap-2">
                               <MapPin size={18} className="text-primary" />
                               Origine & Agent
                           </h4>
                           <div className="space-y-3 pl-2">
                               <div>
-                                  <label className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Agent Collecteur</label>
-                                  <p className="font-medium text-slate-800 dark:text-slate-200">
+                                  <label className="text-xs text-content-muted uppercase tracking-wider font-semibold">Agent Collecteur</label>
+                                  <p className="font-medium text-content-primary">
                                       {detailPayment.agentsTerrain ? `${detailPayment.agentsTerrain.nom} ${detailPayment.agentsTerrain.prenom}` : 'Non spécifié'}
                                   </p>
                               </div>
                               {detailPayment.latitude && detailPayment.longitude && (
                                   <div>
-                                      <label className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Localisation GPS</label>
+                                      <label className="text-xs text-content-muted uppercase tracking-wider font-semibold">Localisation GPS</label>
                                       <a 
                                         href={`https://www.google.com/maps?q=${detailPayment.latitude},${detailPayment.longitude}`} 
                                         target="_blank" 
@@ -727,20 +727,20 @@ export default function AdminValidationTerrain() {
 
                       {/* Observations / Validation Info */}
                       <div className="space-y-4">
-                          <h4 className="font-semibold text-slate-800 dark:text-slate-200 border-b border-slate-100 dark:border-slate-700 pb-2 flex items-center gap-2">
+                          <h4 className="font-semibold text-content-primary border-b border-edge-subtle pb-2 flex items-center gap-2">
                               <AlertCircle size={18} className="text-primary" />
                               Métadonnées
                           </h4>
                           <div className="space-y-3 pl-2">
                               {detailPayment.validationOTP === 'REQUIRED' && (
-                                  <div className="bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 p-2 rounded text-sm flex items-start gap-2">
+                                  <div className="bg-status-warning-bg text-status-warning p-2 rounded text-sm flex items-start gap-2">
                                       <AlertCircle size={16} className="shrink-0 mt-0.5" />
                                       Validation OTP requise pour cette transaction
                                   </div>
                               )}
                               <div>
-                                  <label className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Observations</label>
-                                  <p className="text-slate-600 dark:text-slate-300 italic text-sm">
+                                  <label className="text-xs text-content-muted uppercase tracking-wider font-semibold">Observations</label>
+                                  <p className="text-content-muted italic text-sm">
                                       {detailPayment.observations || "Aucune observation"}
                                   </p>
                               </div>
@@ -764,11 +764,11 @@ export default function AdminValidationTerrain() {
            }
        >
            <div className="space-y-4">
-               <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-lg flex items-start gap-3">
-                   <AlertCircle className="text-amber-500 shrink-0 mt-0.5" />
+               <div className="bg-status-warning-bg border border-status-warning/20 p-4 rounded-lg flex items-start gap-3">
+                   <AlertCircle className="text-status-warning shrink-0 mt-0.5" />
                    <div>
-                       <h4 className="font-bold text-amber-500 text-sm">Attention</h4>
-                       <p className="text-amber-600/80 text-sm mt-1">
+                       <h4 className="font-bold text-status-warning text-sm">Attention</h4>
+                       <p className="text-status-warning/80 text-sm mt-1">
                            Cette action est irréversible. Le paiement sera marqué comme "Annulé".
                        </p>
                    </div>

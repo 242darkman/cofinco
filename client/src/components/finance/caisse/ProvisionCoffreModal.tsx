@@ -102,7 +102,7 @@ export function ProvisionCoffreModal({
         {step === "form" ? (
           <form id="provision-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             
-            <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg flex items-center gap-3 text-blue-400">
+            <div className="p-3 bg-status-info-bg border border-status-info/20 rounded-lg flex items-center gap-3 text-status-info">
                 <Landmark size={20} />
                 <div className="text-sm">
                     Cette opération injecte des fonds externes (Banque, Capital...) directement dans le coffre.
@@ -134,32 +134,32 @@ export function ProvisionCoffreModal({
           </form>
         ) : (
           <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
-            <div className="rounded-lg bg-slate-800/50 border border-slate-700 p-4 space-y-3">
-              <h4 className="font-medium text-slate-200 border-b border-slate-700 pb-2">Récapitulatif</h4>
+            <div className="rounded-lg bg-surface/50 border border-edge p-4 space-y-3">
+              <h4 className="font-medium text-content-secondary border-b border-edge pb-2">Récapitulatif</h4>
               
               <div className="flex justify-between items-center py-1">
-                <span className="text-slate-400">Type</span>
-                <span className="text-emerald-400 font-medium">Approvisionnement Externe</span>
+                <span className="text-content-muted">Type</span>
+                <span className="text-status-success font-medium">Approvisionnement Externe</span>
               </div>
 
               <div className="flex justify-between items-center py-1">
-                <span className="text-slate-400">Montant</span>
-                <span className="text-white text-lg font-bold">{Number(montant).toLocaleString()} FCFA</span>
+                <span className="text-content-muted">Montant</span>
+                <span className="text-content-primary text-lg font-bold">{Number(montant).toLocaleString()} FCFA</span>
               </div>
 
               <div className="space-y-1 pt-1">
-                <span className="text-slate-400 text-xs uppercase block">Motif</span>
-                <span className="text-white">{getValues("motif")}</span>
+                <span className="text-content-muted text-xs uppercase block">Motif</span>
+                <span className="text-content-primary">{getValues("motif")}</span>
               </div>
             </div>
             
-            <p className="text-sm text-slate-400 text-center italic">
+            <p className="text-sm text-content-muted text-center italic">
               Cette action augmentera immédiatement le solde du coffre.
             </p>
           </div>
         )}
 
-        <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
+        <div className="flex justify-end gap-3 pt-4 border-t border-edge">
           {step === "form" ? (
             <>
               <Button variant="outline" onClick={handleClose}>

@@ -256,12 +256,12 @@ export function useEmployes() {
   };
 
   const getStatutColor = (statut: string) => {
-    if (statut === StatutUser.ACTIVE) return 'text-green-400 bg-green-500/20';
-    if (statut === 'Congé') return 'text-blue-400 bg-blue-500/20';
-    if (statut === StatutUser.SUSPENDED) return 'text-cyan-400 bg-cyan-500/20';
-    if (statut === StatutUser.INACTIVE) return 'text-slate-400 bg-slate-500/20';
-    if (statut === 'Démissionné') return 'text-blue-400 bg-blue-500/20';
-    return 'text-slate-400 bg-slate-500/20';
+    if (statut === StatutUser.ACTIVE) return 'text-status-success bg-status-success-bg';
+    if (statut === 'Congé') return 'text-status-info bg-status-info-bg';
+    if (statut === StatutUser.SUSPENDED) return 'text-accent bg-accent/10';
+    if (statut === StatutUser.INACTIVE) return 'text-content-muted bg-surface-subtle/40';
+    if (statut === 'Démissionné') return 'text-status-info bg-status-info-bg';
+    return 'text-content-muted bg-surface-subtle/40';
   };
 
   const getStats = () => ({

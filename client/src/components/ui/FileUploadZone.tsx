@@ -217,9 +217,9 @@ export function FileUploadZone({
         className={`
           relative border-2 border-dashed rounded-lg p-8 text-center cursor-pointer
           transition-all duration-200 ease-in-out
-          ${isDragging 
-            ? 'border-cyan-500 bg-cyan-500/10 scale-[1.02]' 
-            : 'border-gray-600 hover:border-cyan-500/50 hover:bg-gray-800/50'
+          ${isDragging
+            ? 'border-accent bg-accent/10 scale-[1.02]'
+            : 'border-edge-strong hover:border-accent/50 hover:bg-surface/50'
           }
         `}
       >
@@ -235,17 +235,17 @@ export function FileUploadZone({
         <div className="flex flex-col items-center gap-3">
           <div className={`
             p-4 rounded-full transition-colors
-            ${isDragging ? 'bg-cyan-500/20' : 'bg-gray-700/50'}
+            ${isDragging ? 'bg-accent/20' : 'bg-surface-elevated/50'}
           `}>
-            <Upload className={`w-8 h-8 ${isDragging ? 'text-cyan-400' : 'text-gray-400'}`} />
+            <Upload className={`w-8 h-8 ${isDragging ? 'text-accent' : 'text-content-muted'}`} />
           </div>
           
           <div>
-            <p className="text-lg font-medium text-gray-200">{label}</p>
-            <p className="text-sm text-gray-400 mt-1">{hint}</p>
+            <p className="text-lg font-medium text-content-secondary">{label}</p>
+            <p className="text-sm text-content-muted mt-1">{hint}</p>
           </div>
 
-          <div className="text-xs text-gray-500 space-y-1">
+          <div className="text-xs text-content-muted space-y-1">
             <p>Formats acceptés: {accept.replace(/\./g, '').toUpperCase()}</p>
             <p>Taille max: {maxSize}MB par fichier • Max {maxFiles} fichiers</p>
           </div>
@@ -261,7 +261,7 @@ export function FileUploadZone({
             return (
               <div
                 key={index}
-                className="flex items-center gap-3 p-3 bg-gray-800/50 rounded-lg border border-gray-700"
+                className="flex items-center gap-3 p-3 bg-surface/50 rounded-lg border border-edge"
               >
                 {/* Preview or Icon */}
                 <div className="flex-shrink-0">
@@ -272,26 +272,26 @@ export function FileUploadZone({
                       className="w-12 h-12 object-cover rounded"
                     />
                   ) : (
-                    <div className="w-12 h-12 bg-gray-700 rounded flex items-center justify-center">
-                      <FileIcon className="w-6 h-6 text-gray-400" />
+                    <div className="w-12 h-12 bg-surface-elevated rounded flex items-center justify-center">
+                      <FileIcon className="w-6 h-6 text-content-muted" />
                     </div>
                   )}
                 </div>
 
                 {/* File Info */}
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-200 truncate">
+                  <p className="text-sm font-medium text-content-secondary truncate">
                     {uploadedFile.file.name}
                   </p>
-                  <p className="text-xs text-gray-400">
+                  <p className="text-xs text-content-muted">
                     {formatFileSize(uploadedFile.file.size)}
                   </p>
 
                   {/* Progress Bar */}
                   {uploadedFile.status === 'uploading' && uploadedFile.progress !== undefined && (
-                    <div className="mt-2 w-full bg-gray-700 rounded-full h-1.5">
+                    <div className="mt-2 w-full bg-surface-elevated rounded-full h-1.5">
                       <div
-                        className="bg-cyan-500 h-1.5 rounded-full transition-all duration-300"
+                        className="bg-accent h-1.5 rounded-full transition-all duration-300"
                         style={{ width: `${uploadedFile.progress}%` }}
                       />
                     </div>
@@ -299,20 +299,20 @@ export function FileUploadZone({
 
                   {/* Error Message */}
                   {uploadedFile.error && (
-                    <p className="text-xs text-red-400 mt-1">{uploadedFile.error}</p>
+                    <p className="text-xs text-status-danger mt-1">{uploadedFile.error}</p>
                   )}
                 </div>
 
                 {/* Status Icon */}
                 <div className="flex-shrink-0">
                   {uploadedFile.status === 'uploading' && (
-                    <Loader2 className="w-5 h-5 text-cyan-400 animate-spin" />
+                    <Loader2 className="w-5 h-5 text-accent animate-spin" />
                   )}
                   {uploadedFile.status === 'success' && (
-                    <CheckCircle2 className="w-5 h-5 text-green-400" />
+                    <CheckCircle2 className="w-5 h-5 text-status-success" />
                   )}
                   {uploadedFile.status === 'error' && (
-                    <AlertCircle className="w-5 h-5 text-red-400" />
+                    <AlertCircle className="w-5 h-5 text-status-danger" />
                   )}
                   {uploadedFile.status === 'pending' && (
                     <button
@@ -320,9 +320,9 @@ export function FileUploadZone({
                         e.stopPropagation();
                         removeFile(index);
                       }}
-                      className="p-1 hover:bg-gray-700 rounded transition-colors"
+                      className="p-1 hover:bg-surface-elevated rounded transition-colors"
                     >
-                      <X className="w-4 h-4 text-gray-400" />
+                      <X className="w-4 h-4 text-content-muted" />
                     </button>
                   )}
                 </div>

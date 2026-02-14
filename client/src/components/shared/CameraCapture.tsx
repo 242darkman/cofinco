@@ -95,13 +95,13 @@ export default function CameraCapture({
 
   return (
     <div className="fixed inset-0 bg-black/95 flex flex-col items-center justify-center z-[70] p-4">
-      <div className="w-full max-w-2xl bg-slate-900 rounded-2xl overflow-hidden shadow-2xl border border-slate-700">
-        <div className="p-4 flex items-center justify-between border-b border-slate-700">
-          <h3 className="text-white font-bold text-lg flex items-center gap-2">
-            <Camera className="text-cyan-400" />
+      <div className="w-full max-w-2xl bg-surface-base rounded-2xl overflow-hidden shadow-2xl border border-edge">
+        <div className="p-4 flex items-center justify-between border-b border-edge">
+          <h3 className="text-content-primary font-bold text-lg flex items-center gap-2">
+            <Camera className="text-accent" />
             {title}
           </h3>
-          <button onClick={onClose} className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition">
+          <button onClick={onClose} className="p-2 text-content-muted hover:text-content-primary hover:bg-surface rounded-lg transition">
             <X size={24} />
           </button>
         </div>
@@ -110,7 +110,7 @@ export default function CameraCapture({
           aspectRatio === 'square' ? 'aspect-square max-h-[60vh] md:h-auto' : 'h-[60vh] md:h-auto md:aspect-video'
         }`}>
           {error ? (
-             <div className="text-center p-6 text-red-400">
+             <div className="text-center p-6 text-status-danger">
                <VideoOff size={48} className="mx-auto mb-4 opacity-50" />
                <p>{error}</p>
                <Button onClick={startCamera} variant="ghost" className="mt-4" icon={RotateCcw}>Réessayer</Button>
@@ -126,15 +126,15 @@ export default function CameraCapture({
                />
                {aspectRatio === 'square' && (
                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none border-2 border-transparent">
-                   <div className="w-64 h-64 border-2 border-dashed border-cyan-400/50 rounded-lg box-content shadow-[0_0_0_999px_rgba(0,0,0,0.5)]" />
+                   <div className="w-64 h-64 border-2 border-dashed border-accent/50 rounded-lg box-content shadow-[0_0_0_999px_rgba(0,0,0,0.5)]" />
                  </div>
                )}
              </>
           )}
         </div>
-        {subtitle && <p className="text-center text-slate-400 text-sm py-2 bg-slate-900">{subtitle}</p>}
+        {subtitle && <p className="text-center text-content-muted text-sm py-2 bg-surface-base">{subtitle}</p>}
 
-        <div className="p-6 bg-slate-900 flex justify-center gap-4 border-t border-slate-700">
+        <div className="p-6 bg-surface-base flex justify-center gap-4 border-t border-edge">
           <Button onClick={onClose} variant="secondary" icon={X}>Annuler</Button>
           <Button 
             onClick={handleCapture} 

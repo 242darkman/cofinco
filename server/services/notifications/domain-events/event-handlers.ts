@@ -138,7 +138,7 @@ export async function handleCreditRequestCreated(data: CreditRequestCreatedData)
     clientName: client.name,
     amount: data.montantDemande.toLocaleString("fr-FR"),
     creditNumber: data.numeroDemande,
-    agenceName: "COFIN&CO-M",
+    appName: "COFIN&CO-M",
   };
 
   await emitNotificationEvent("CREDIT_REQUEST_CREATED", data as any, {
@@ -1434,7 +1434,7 @@ export async function handleClientCreated(data: ClientCreatedData) {
 
   const payload = {
     clientName,
-    agenceName: data.agenceNom || undefined,
+    appName: data.agenceNom || undefined,
     accountNumber: data.numeroCompte || undefined,
   };
 
@@ -1500,7 +1500,7 @@ export async function handleEmployeeCreated(data: EmployeeCreatedData) {
     employeeName: [data.nom, data.prenom].filter(Boolean).join(" "),
     matricule: data.matricule,
     username: data.username || undefined,
-    agenceName: data.agenceNom || undefined,
+    appName: data.agenceNom || undefined,
   };
 
   await emitNotificationEvent("EMPLOYEE_CREATED", data as any, {

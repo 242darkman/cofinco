@@ -102,13 +102,13 @@ export default function BalanceHistoryChart({
     if (active && payload && payload.length) {
       const config = METRIC_CONFIG[activeMetric];
       return (
-        <div className="bg-slate-900/80 border border-slate-700/50 rounded-xl p-3 shadow-xl backdrop-blur-md">
-          <p className="text-slate-400 text-xs mb-1 font-medium">{label}</p>
+        <div className="bg-surface-base/80 border border-edge-subtle rounded-xl p-3 shadow-xl backdrop-blur-md">
+          <p className="text-content-muted text-xs mb-1 font-medium">{label}</p>
           <div className="flex items-baseline gap-1">
-            <span className="font-bold text-lg text-white tabular-nums">
+            <span className="font-bold text-lg text-content-primary tabular-nums">
               {formatValue(payload[0]?.value || 0)}
             </span>
-            <span className="text-xs text-slate-500 font-medium">FCFA</span>
+            <span className="text-xs text-content-muted font-medium">FCFA</span>
           </div>
         </div>
       );
@@ -128,24 +128,24 @@ export default function BalanceHistoryChart({
   // Loading State
   if (loading) {
     return (
-      <div className="h-[320px] bg-slate-900/50 border border-slate-800/50 rounded-2xl flex flex-col items-center justify-center animate-pulse">
-        <div className="w-12 h-12 rounded-full bg-slate-800 mb-3"></div>
-        <div className="h-4 w-32 bg-slate-800 rounded"></div>
+      <div className="h-[320px] bg-surface-base/50 border border-edge/50 rounded-2xl flex flex-col items-center justify-center animate-pulse">
+        <div className="w-12 h-12 rounded-full bg-surface mb-3"></div>
+        <div className="h-4 w-32 bg-surface rounded"></div>
       </div>
     );
   }
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm flex flex-col h-full min-h-[350px]">
+    <div className="bg-surface-base border border-edge rounded-2xl overflow-hidden shadow-sm flex flex-col h-full min-h-[350px]">
       {/* Header Area */}
       <div className="p-4 sm:p-5 pb-0">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-base font-bold text-white flex items-center gap-2">
+          <h3 className="text-base font-bold text-content-primary flex items-center gap-2">
             {displayTitle}
           </h3>
           
           {/* Period Selector - Segmented Control */}
-          <div className="flex bg-slate-800 rounded-lg p-1 border border-slate-700/50">
+          <div className="flex bg-surface rounded-lg p-1 border border-edge-subtle">
             {periods.map((p) => (
               <button
                 key={p.value}
@@ -153,8 +153,8 @@ export default function BalanceHistoryChart({
                 className={`
                   px-3 py-1 text-[10px] font-medium rounded-md transition-all duration-200
                   ${period === p.value 
-                    ? 'bg-slate-700 text-white shadow-sm' 
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'}
+                    ? 'bg-surface-elevated text-content-primary shadow-sm' 
+                    : 'text-content-muted hover:text-content-secondary hover:bg-surface-elevated/50'}
                 `}
               >
                 {p.label}
@@ -164,7 +164,7 @@ export default function BalanceHistoryChart({
         </div>
 
         {/* Segmented Control for Metrics */}
-        <div className="flex p-1 bg-slate-800/50 rounded-xl border border-slate-700/30 mb-6">
+        <div className="flex p-1 bg-surface/50 rounded-xl border border-edge-subtle mb-6">
           {(Object.keys(METRIC_CONFIG) as Metric[]).map((metric) => {
             const isActive = activeMetric === metric;
             const mConfig = METRIC_CONFIG[metric];
@@ -174,12 +174,12 @@ export default function BalanceHistoryChart({
                 onClick={() => setActiveMetric(metric)}
                 className={`
                   flex-1 py-2 text-sm font-medium rounded-lg transition-all duration-300 relative overflow-hidden
-                  ${isActive ? 'text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}
+                  ${isActive ? 'text-content-primary shadow-sm' : 'text-content-muted hover:text-content-secondary'}
                 `}
               >
                 {/* Background active indicator */}
                 {isActive && (
-                  <div className="absolute inset-0 bg-slate-700 rounded-lg animate-in fade-in zoom-in-95 duration-200"></div>
+                  <div className="absolute inset-0 bg-surface-elevated rounded-lg animate-in fade-in zoom-in-95 duration-200"></div>
                 )}
                 
                 {/* Content */}
@@ -194,12 +194,12 @@ export default function BalanceHistoryChart({
         {/* Current Stats Hero - Mobile First Layout */}
         <div className="flex items-baseline justify-between mb-2 px-1">
            <div>
-              <p className="text-sm text-slate-400 mb-1">{t('volumePortefeuille')}</p>
+              <p className="text-sm text-content-muted mb-1">{t('volumePortefeuille')}</p>
               <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                <span className="text-2xl sm:text-3xl font-black text-content-primary tracking-tight">
                   {formatValue(latestValue)}
                 </span>
-                <span className="text-sm font-medium text-slate-500">FCFA</span>
+                <span className="text-sm font-medium text-content-muted">FCFA</span>
               </div>
            </div>
 
@@ -207,8 +207,8 @@ export default function BalanceHistoryChart({
            <div className={`
              flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-xs font-bold
              ${trend >= 0 
-               ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
-               : 'bg-red-500/10 border-red-500/20 text-red-400'}
+               ? 'bg-status-success-bg border-status-success/20 text-status-success' 
+               : 'bg-status-danger-bg border-status-danger/20 text-status-danger'}
            `}>
              {trend >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
              <span>{trend >= 0 ? '+' : ''}{trendPercent.toFixed(1)}%</span>
@@ -229,15 +229,15 @@ export default function BalanceHistoryChart({
                 <stop offset="95%" stopColor={config.gradientColors[1]} stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid 
-              strokeDasharray="3 3" 
-              vertical={false} 
-              stroke="#334155" 
+            <CartesianGrid
+              strokeDasharray="3 3"
+              vertical={false}
+              stroke="var(--border-default)"
               opacity={0.4}
             />
             <XAxis
               dataKey="date"
-              stroke="#94a3b8"
+              stroke="var(--text-muted)"
               fontSize={11}
               tickLine={false}
               axisLine={false}
@@ -246,7 +246,7 @@ export default function BalanceHistoryChart({
               fontFamily="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
             />
             <YAxis
-              stroke="#94a3b8"
+              stroke="var(--text-muted)"
               fontSize={11}
               tickFormatter={(value) => {
                 if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
@@ -257,7 +257,7 @@ export default function BalanceHistoryChart({
               axisLine={false}
               domain={[minValue, maxValue]}
               width={60}
-              tick={{ fill: '#94a3b8', fontSize: 11 }}
+              tick={{ fill: 'var(--text-muted)', fontSize: 11 }}
             />
             <Tooltip
               content={<CustomTooltip />}

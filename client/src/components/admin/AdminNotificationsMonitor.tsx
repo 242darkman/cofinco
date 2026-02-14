@@ -161,8 +161,8 @@ export default function AdminNotificationsMonitor() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-6 h-6 animate-spin text-blue-400" />
-        <span className="ml-2 text-sm text-slate-400">Chargement...</span>
+        <Loader2 className="w-6 h-6 animate-spin text-status-info" />
+        <span className="ml-2 text-sm text-content-muted">Chargement...</span>
       </div>
     );
   }
@@ -212,7 +212,7 @@ export default function AdminNotificationsMonitor() {
                 <button
                   onClick={handleRetryDeadLetter}
                   disabled={retrying}
-                  className="text-xs text-orange-400 hover:text-orange-300 underline mt-1"
+                  className="text-xs text-status-warning hover:text-status-warning underline mt-1"
                 >
                   {retrying ? 'Relance...' : 'Relancer'}
                 </button>
@@ -225,45 +225,45 @@ export default function AdminNotificationsMonitor() {
       {/* Today's Stats + Channel Breakdown */}
       {metrics && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-3">
-            <h3 className="text-xs font-medium text-slate-400 mb-2 flex items-center gap-1.5">
+          <div className="bg-surface/50 rounded-lg border border-edge-subtle p-3">
+            <h3 className="text-xs font-medium text-content-muted mb-2 flex items-center gap-1.5">
               <BarChart3 className="w-3.5 h-3.5" /> Aujourd'hui
             </h3>
             <div className="flex items-center gap-6">
               <div>
-                <span className="text-xl font-bold text-green-400">{metrics.todaySent}</span>
-                <span className="text-xs text-slate-500 ml-1">envoyés</span>
+                <span className="text-xl font-bold text-status-success">{metrics.todaySent}</span>
+                <span className="text-xs text-content-muted ml-1">envoyés</span>
               </div>
               <div>
-                <span className="text-xl font-bold text-red-400">{metrics.todayFailed}</span>
-                <span className="text-xs text-slate-500 ml-1">échoués</span>
+                <span className="text-xl font-bold text-status-danger">{metrics.todayFailed}</span>
+                <span className="text-xs text-content-muted ml-1">échoués</span>
               </div>
               {metrics.todaySent + metrics.todayFailed > 0 && (
-                <div className="text-xs text-slate-500">
+                <div className="text-xs text-content-muted">
                   Taux: {((metrics.todaySent / (metrics.todaySent + metrics.todayFailed)) * 100).toFixed(1)}%
                 </div>
               )}
             </div>
           </div>
 
-          <div className="bg-slate-800/50 rounded-lg border border-slate-700/50 p-3">
-            <h3 className="text-xs font-medium text-slate-400 mb-2 flex items-center gap-1.5">
+          <div className="bg-surface/50 rounded-lg border border-edge-subtle p-3">
+            <h3 className="text-xs font-medium text-content-muted mb-2 flex items-center gap-1.5">
               <Send className="w-3.5 h-3.5" /> Par canal
             </h3>
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-1.5">
-                <MessageSquare className="w-3.5 h-3.5 text-blue-400" />
-                <span className="text-sm text-slate-300">SMS</span>
-                <span className="text-xs text-green-400">{metrics.byChannel.sms.sent}</span>
-                <span className="text-xs text-slate-600">/</span>
-                <span className="text-xs text-red-400">{metrics.byChannel.sms.failed}</span>
+                <MessageSquare className="w-3.5 h-3.5 text-status-info" />
+                <span className="text-sm text-content-secondary">SMS</span>
+                <span className="text-xs text-status-success">{metrics.byChannel.sms.sent}</span>
+                <span className="text-xs text-content-muted">/</span>
+                <span className="text-xs text-status-danger">{metrics.byChannel.sms.failed}</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <Mail className="w-3.5 h-3.5 text-purple-400" />
-                <span className="text-sm text-slate-300">Email</span>
-                <span className="text-xs text-green-400">{metrics.byChannel.email.sent}</span>
-                <span className="text-xs text-slate-600">/</span>
-                <span className="text-xs text-red-400">{metrics.byChannel.email.failed}</span>
+                <Mail className="w-3.5 h-3.5 text-status-info" />
+                <span className="text-sm text-content-secondary">Email</span>
+                <span className="text-xs text-status-success">{metrics.byChannel.email.sent}</span>
+                <span className="text-xs text-content-muted">/</span>
+                <span className="text-xs text-status-danger">{metrics.byChannel.email.failed}</span>
               </div>
             </div>
           </div>
@@ -271,10 +271,10 @@ export default function AdminNotificationsMonitor() {
       )}
 
       {/* Settings Toggle */}
-      <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
+      <div className="bg-surface/50 rounded-lg border border-edge-subtle">
         <button
           onClick={() => setShowSettings(!showSettings)}
-          className="w-full flex items-center justify-between p-3 text-sm text-slate-300 hover:bg-slate-700/30"
+          className="w-full flex items-center justify-between p-3 text-sm text-content-secondary hover:bg-surface-elevated/30"
         >
           <span className="font-medium">Configuration globale</span>
           {showSettings ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -284,39 +284,39 @@ export default function AdminNotificationsMonitor() {
             <SettingBadge label="SMS" enabled={settings.smsEnabled} />
             <SettingBadge label="Email" enabled={settings.emailEnabled} />
             <SettingBadge label="Push" enabled={settings.pushEnabled} />
-            <div className="text-slate-400">
-              Politique: <span className="text-slate-300">{settings.fallbackPolicy || 'SMS_ONLY'}</span>
+            <div className="text-content-muted">
+              Politique: <span className="text-content-secondary">{settings.fallbackPolicy || 'SMS_ONLY'}</span>
             </div>
-            <div className="text-slate-400">
-              OTP canal: <span className="text-slate-300">{settings.otpChannel || 'SMS'}</span>
+            <div className="text-content-muted">
+              OTP canal: <span className="text-content-secondary">{settings.otpChannel || 'SMS'}</span>
             </div>
-            <div className="text-slate-400">
-              OTP/min: <span className="text-slate-300">{settings.otpMaxPerMinute ?? 3}</span>
+            <div className="text-content-muted">
+              OTP/min: <span className="text-content-secondary">{settings.otpMaxPerMinute ?? 3}</span>
             </div>
-            <div className="text-slate-400">
-              Quota SMS/jour: <span className="text-slate-300">{settings.smsQuotaDaily ?? 1000}</span>
+            <div className="text-content-muted">
+              Quota SMS/jour: <span className="text-content-secondary">{settings.smsQuotaDaily ?? 1000}</span>
             </div>
-            <div className="text-slate-400">
-              Quota Email/jour: <span className="text-slate-300">{settings.emailQuotaDaily ?? 500}</span>
+            <div className="text-content-muted">
+              Quota Email/jour: <span className="text-content-secondary">{settings.emailQuotaDaily ?? 500}</span>
             </div>
           </div>
         )}
       </div>
 
       {/* Jobs Table */}
-      <div className="bg-slate-800/50 rounded-lg border border-slate-700/50">
-        <div className="flex items-center justify-between p-3 border-b border-slate-700/50">
-          <h3 className="text-sm font-medium text-slate-300">
+      <div className="bg-surface/50 rounded-lg border border-edge-subtle">
+        <div className="flex items-center justify-between p-3 border-b border-edge-subtle">
+          <h3 className="text-sm font-medium text-content-secondary">
             File d'attente
             {jobs.length > 0 && (
-              <span className="ml-2 text-xs text-slate-500">({jobs.length})</span>
+              <span className="ml-2 text-xs text-content-muted">({jobs.length})</span>
             )}
           </h3>
           <div className="flex items-center gap-2">
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="text-xs bg-slate-900 border border-slate-700 text-slate-300 rounded px-2 py-1"
+              className="text-xs bg-surface-base border border-edge text-content-secondary rounded px-2 py-1"
             >
               <option value="">Tous</option>
               <option value="QUEUED">En file</option>
@@ -327,7 +327,7 @@ export default function AdminNotificationsMonitor() {
             </select>
             <button
               onClick={fetchData}
-              className="p-1 text-slate-400 hover:text-slate-300"
+              className="p-1 text-content-muted hover:text-content-secondary"
               title="Rafraîchir"
             >
               <RefreshCw className="w-3.5 h-3.5" />
@@ -338,7 +338,7 @@ export default function AdminNotificationsMonitor() {
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="text-slate-500 border-b border-slate-700/50">
+              <tr className="text-content-muted border-b border-edge-subtle">
                 <th className="text-left p-2 font-medium">Canal</th>
                 <th className="text-left p-2 font-medium">Template</th>
                 <th className="text-left p-2 font-medium">Statut</th>
@@ -351,30 +351,30 @@ export default function AdminNotificationsMonitor() {
             <tbody>
               {paginatedJobs.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center text-slate-500 py-6">
+                  <td colSpan={7} className="text-center text-content-muted py-6">
                     Aucun job trouvé
                   </td>
                 </tr>
               ) : (
                 paginatedJobs.map((job) => (
-                  <tr key={job.id} className="border-b border-slate-800/50 hover:bg-slate-700/20">
+                  <tr key={job.id} className="border-b border-edge/50 hover:bg-surface-elevated/20">
                     <td className="p-2">
                       <span className={`inline-flex items-center gap-1 ${
-                        job.channel === 'SMS' ? 'text-blue-400' : 'text-purple-400'
+                        job.channel === 'SMS' ? 'text-status-info' : 'text-status-info'
                       }`}>
                         {job.channel === 'SMS' ? <MessageSquare className="w-3 h-3" /> : <Mail className="w-3 h-3" />}
                         {job.channel}
                       </span>
                     </td>
-                    <td className="p-2 text-slate-300 font-mono">{formatTemplateCode(job.templateCode)}</td>
+                    <td className="p-2 text-content-secondary font-mono">{formatTemplateCode(job.templateCode)}</td>
                     <td className="p-2">
                       <StatusBadge status={job.status} />
                     </td>
-                    <td className="p-2 text-slate-400">{job.attempts}/{job.maxAttempts}</td>
-                    <td className="p-2 text-red-400/70 max-w-48 truncate" title={job.lastError || ''}>
+                    <td className="p-2 text-content-muted">{job.attempts}/{job.maxAttempts}</td>
+                    <td className="p-2 text-status-danger/70 max-w-48 truncate" title={job.lastError || ''}>
                       {job.lastError || '-'}
                     </td>
-                    <td className="p-2 text-slate-500">
+                    <td className="p-2 text-content-muted">
                       {new Date(job.createdAt).toLocaleString('fr-FR', {
                         day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
                       })}
@@ -384,7 +384,7 @@ export default function AdminNotificationsMonitor() {
                         <button
                           onClick={() => handleRetryJob(job.id)}
                           disabled={retryingJobId === job.id}
-                          className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded bg-orange-900/30 text-orange-400 hover:bg-orange-900/50 hover:text-orange-300 disabled:opacity-50 transition-colors"
+                          className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded bg-status-warning-bg text-status-warning hover:bg-status-warning-bg hover:text-status-warning disabled:opacity-50 transition-colors"
                           title="Rejouer ce job"
                         >
                           <RefreshCw className={`w-3 h-3 ${retryingJobId === job.id ? 'animate-spin' : ''}`} />
@@ -401,15 +401,15 @@ export default function AdminNotificationsMonitor() {
 
         {/* Pagination for Jobs */}
         {totalJobsPages > 1 && (
-          <div className="flex items-center justify-between p-3 border-t border-slate-700/50">
-            <span className="text-xs text-slate-500">
+          <div className="flex items-center justify-between p-3 border-t border-edge-subtle">
+            <span className="text-xs text-content-muted">
               Page {jobsPage} sur {totalJobsPages}
             </span>
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setJobsPage(p => Math.max(1, p - 1))}
                 disabled={jobsPage === 1}
-                className="p-1.5 rounded hover:bg-slate-700/50 disabled:opacity-30 disabled:cursor-not-allowed text-slate-400"
+                className="p-1.5 rounded hover:bg-surface-elevated/50 disabled:opacity-30 disabled:cursor-not-allowed text-content-muted"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
@@ -430,8 +430,8 @@ export default function AdminNotificationsMonitor() {
                     onClick={() => setJobsPage(pageNum)}
                     className={`w-7 h-7 text-xs rounded ${
                       jobsPage === pageNum
-                        ? 'bg-indigo-600 text-white'
-                        : 'hover:bg-slate-700/50 text-slate-400'
+                        ? 'bg-accent text-white'
+                        : 'hover:bg-surface-elevated/50 text-content-muted'
                     }`}
                   >
                     {pageNum}
@@ -441,7 +441,7 @@ export default function AdminNotificationsMonitor() {
               <button
                 onClick={() => setJobsPage(p => Math.min(totalJobsPages, p + 1))}
                 disabled={jobsPage === totalJobsPages}
-                className="p-1.5 rounded hover:bg-slate-700/50 disabled:opacity-30 disabled:cursor-not-allowed text-slate-400"
+                className="p-1.5 rounded hover:bg-surface-elevated/50 disabled:opacity-30 disabled:cursor-not-allowed text-content-muted"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -452,22 +452,22 @@ export default function AdminNotificationsMonitor() {
 
       {/* Failed Jobs Detail */}
       {failedJobs.length > 0 && (
-        <div className="bg-slate-800/50 rounded-lg border border-red-900/30">
-          <div className="flex items-center gap-2 p-3 border-b border-red-900/30">
-            <AlertTriangle className="w-4 h-4 text-red-400" />
-            <h3 className="text-sm font-medium text-red-300">Jobs en erreur ({failedJobs.length})</h3>
+        <div className="bg-surface/50 rounded-lg border border-status-danger/30">
+          <div className="flex items-center gap-2 p-3 border-b border-status-danger/30">
+            <AlertTriangle className="w-4 h-4 text-status-danger" />
+            <h3 className="text-sm font-medium text-status-danger">Jobs en erreur ({failedJobs.length})</h3>
           </div>
-          <div className="divide-y divide-slate-800/50">
+          <div className="divide-y divide-edge/50">
             {paginatedFailedJobs.map((job) => (
               <div key={job.id} className="p-2 text-xs">
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-400">
+                  <span className="text-content-muted">
                     {job.channel} / {formatTemplateCode(job.templateCode)}
                   </span>
                   <StatusBadge status={job.status} />
                 </div>
                 {job.lastError && (
-                  <p className="text-red-400/70 mt-1 line-clamp-2">{job.lastError}</p>
+                  <p className="text-status-danger/70 mt-1 line-clamp-2">{job.lastError}</p>
                 )}
               </div>
             ))}
@@ -475,15 +475,15 @@ export default function AdminNotificationsMonitor() {
 
           {/* Pagination for Failed Jobs */}
           {totalFailedJobsPages > 1 && (
-            <div className="flex items-center justify-between p-3 border-t border-red-900/30">
-              <span className="text-xs text-slate-500">
+            <div className="flex items-center justify-between p-3 border-t border-status-danger/30">
+              <span className="text-xs text-content-muted">
                 Page {failedJobsPage} sur {totalFailedJobsPages}
               </span>
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => setFailedJobsPage(p => Math.max(1, p - 1))}
                   disabled={failedJobsPage === 1}
-                  className="p-1.5 rounded hover:bg-slate-700/50 disabled:opacity-30 disabled:cursor-not-allowed text-slate-400"
+                  className="p-1.5 rounded hover:bg-surface-elevated/50 disabled:opacity-30 disabled:cursor-not-allowed text-content-muted"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
@@ -504,8 +504,8 @@ export default function AdminNotificationsMonitor() {
                       onClick={() => setFailedJobsPage(pageNum)}
                       className={`w-7 h-7 text-xs rounded ${
                         failedJobsPage === pageNum
-                          ? 'bg-red-600 text-white'
-                          : 'hover:bg-slate-700/50 text-slate-400'
+                          ? 'bg-status-danger text-white'
+                          : 'hover:bg-surface-elevated/50 text-content-muted'
                       }`}
                     >
                       {pageNum}
@@ -515,7 +515,7 @@ export default function AdminNotificationsMonitor() {
                 <button
                   onClick={() => setFailedJobsPage(p => Math.min(totalFailedJobsPages, p + 1))}
                   disabled={failedJobsPage === totalFailedJobsPages}
-                  className="p-1.5 rounded hover:bg-slate-700/50 disabled:opacity-30 disabled:cursor-not-allowed text-slate-400"
+                  className="p-1.5 rounded hover:bg-surface-elevated/50 disabled:opacity-30 disabled:cursor-not-allowed text-content-muted"
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>
@@ -546,12 +546,12 @@ function MetricCard({
   action?: React.ReactNode;
 }) {
   const colorMap: Record<string, string> = {
-    slate: 'text-slate-400 bg-slate-800/50 border-slate-700/50',
-    yellow: 'text-yellow-400 bg-yellow-900/20 border-yellow-800/30',
-    blue: 'text-blue-400 bg-blue-900/20 border-blue-800/30',
-    green: 'text-green-400 bg-green-900/20 border-green-800/30',
-    red: 'text-red-400 bg-red-900/20 border-red-800/30',
-    orange: 'text-orange-400 bg-orange-900/20 border-orange-800/30',
+    slate: 'text-content-muted bg-surface/50 border-edge-subtle',
+    yellow: 'text-status-warning bg-status-warning-bg border-status-warning/30',
+    blue: 'text-status-info bg-status-info-bg border-status-info/30',
+    green: 'text-status-success bg-status-success-bg border-status-success/30',
+    red: 'text-status-danger bg-status-danger-bg border-status-danger/30',
+    orange: 'text-status-warning bg-status-warning-bg border-status-warning/30',
   };
 
   return (
@@ -568,14 +568,14 @@ function MetricCard({
 
 function StatusBadge({ status }: { status: string }) {
   const config: Record<string, { bg: string; text: string; label: string }> = {
-    QUEUED: { bg: 'bg-yellow-900/30', text: 'text-yellow-400', label: 'EN FILE' },
-    PROCESSING: { bg: 'bg-blue-900/30', text: 'text-blue-400', label: 'EN COURS' },
-    SENT: { bg: 'bg-green-900/30', text: 'text-green-400', label: 'ENVOYÉ' },
-    FAILED: { bg: 'bg-red-900/30', text: 'text-red-400', label: 'ÉCHOUÉ' },
-    DEAD_LETTER: { bg: 'bg-orange-900/30', text: 'text-orange-400', label: 'DEAD LETTER' },
+    QUEUED: { bg: 'bg-status-warning-bg', text: 'text-status-warning', label: 'EN FILE' },
+    PROCESSING: { bg: 'bg-status-info-bg', text: 'text-status-info', label: 'EN COURS' },
+    SENT: { bg: 'bg-status-success-bg', text: 'text-status-success', label: 'ENVOYÉ' },
+    FAILED: { bg: 'bg-status-danger-bg', text: 'text-status-danger', label: 'ÉCHOUÉ' },
+    DEAD_LETTER: { bg: 'bg-status-warning-bg', text: 'text-status-warning', label: 'DEAD LETTER' },
   };
 
-  const c = config[status] || { bg: 'bg-slate-800', text: 'text-slate-400', label: status };
+  const c = config[status] || { bg: 'bg-surface', text: 'text-content-muted', label: status };
 
   return (
     <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${c.bg} ${c.text}`}>
@@ -650,9 +650,9 @@ function formatTemplateCode(code: string): string {
 function SettingBadge({ label, enabled }: { label: string; enabled?: boolean }) {
   return (
     <div className="flex items-center gap-1.5">
-      <div className={`w-2 h-2 rounded-full ${enabled ? 'bg-green-400' : 'bg-slate-600'}`} />
-      <span className="text-slate-400">{label}</span>
-      <span className={enabled ? 'text-green-400' : 'text-slate-600'}>
+      <div className={`w-2 h-2 rounded-full ${enabled ? 'bg-status-success' : 'bg-surface-subtle'}`} />
+      <span className="text-content-muted">{label}</span>
+      <span className={enabled ? 'text-status-success' : 'text-content-muted'}>
         {enabled ? 'Actif' : 'Inactif'}
       </span>
     </div>

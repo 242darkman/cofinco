@@ -247,7 +247,7 @@ export default function Epargnes({ activeView }: EpargnesProps) {
           <ProtectedFeature requiredPermission={{ module: 'epargnes', action: 'create' }}>
             <button
               onClick={() => setShowAccountForm(true)}
-              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition shadow-sm shadow-blue-900/20 flex items-center gap-1.5 font-medium text-xs"
+              className="px-3 py-1.5 bg-status-info hover:bg-status-info text-white rounded-lg transition shadow-sm shadow-status-info/20 flex items-center gap-1.5 font-medium text-xs"
             >
               <Plus size={14} />
               Nouveau <span className="hidden sm:inline">Compte</span>
@@ -260,30 +260,30 @@ export default function Epargnes({ activeView }: EpargnesProps) {
       {/* 2. KPIs (Simplified & Compact) */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {/* Total Solde */}
-        <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 rounded-xl p-3 flex flex-col justify-between shadow-sm relative overflow-hidden group">
+        <div className="bg-gradient-to-br from-surface to-surface-base border border-edge rounded-xl p-3 flex flex-col justify-between shadow-sm relative overflow-hidden group">
           <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
             <DollarSign size={40} />
           </div>
           <div>
-            <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Solde Total</p>
-            <h3 className="text-xl font-bold text-white mt-0.5">{stats.soldeTotal.toLocaleString()} <span className="text-xs font-normal text-slate-400">FCFA</span></h3>
+            <p className="text-[10px] font-medium text-content-muted uppercase tracking-wider">Solde Total</p>
+            <h3 className="text-xl font-bold text-content-primary mt-0.5">{stats.soldeTotal.toLocaleString()} <span className="text-xs font-normal text-content-muted">FCFA</span></h3>
           </div>
           <div className="mt-2 flex items-center gap-1.5">
-            <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-            <p className="text-[10px] text-emerald-400 font-medium">Tous comptes confondus</p>
+            <div className="h-1.5 w-1.5 rounded-full bg-status-success animate-pulse"></div>
+            <p className="text-[10px] text-status-success font-medium">Tous comptes confondus</p>
           </div>
         </div>
 
         {/* Nombre de Comptes */}
         <div className="bg-surface-base border border-edge rounded-xl p-3 flex flex-col justify-between shadow-sm relative overflow-hidden">
-          <div className="absolute right-0 top-0 p-3 opacity-5 text-blue-500">
+          <div className="absolute right-0 top-0 p-3 opacity-5 text-status-info">
             <Users size={40} />
           </div>
           <div>
-             <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">Comptes {stats.activeLabel}</p>
-             <h3 className="text-xl font-bold text-slate-900 dark:text-white mt-0.5">{stats.totalComptes}</h3>
+             <p className="text-[10px] font-medium text-content-muted uppercase tracking-wider">Comptes {stats.activeLabel}</p>
+             <h3 className="text-xl font-bold text-content-primary mt-0.5">{stats.totalComptes}</h3>
           </div>
-          <div className="mt-2 text-[10px] text-blue-500 font-medium bg-blue-500/10 px-2 py-0.5 rounded-full w-fit">
+          <div className="mt-2 text-[10px] text-status-info font-medium bg-status-info-bg px-2 py-0.5 rounded-full w-fit">
             Actifs maintenant
           </div>
         </div>
@@ -292,21 +292,21 @@ export default function Epargnes({ activeView }: EpargnesProps) {
         <div className="bg-surface-base border border-edge rounded-xl p-3 flex flex-col justify-between shadow-sm">
             <div className="flex items-start justify-between">
                <div>
-                  <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">Flux du jour</p>
+                  <p className="text-[10px] font-medium text-content-muted uppercase tracking-wider">Flux du jour</p>
                   <div className="flex items-baseline gap-2 mt-0.5">
-                    <h3 className={`text-xl font-bold ${stats.fluxNet >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                    <h3 className={`text-xl font-bold ${stats.fluxNet >= 0 ? 'text-status-success' : 'text-status-danger'}`}>
                       {stats.fluxNet >= 0 ? '+' : ''}{stats.fluxNet.toLocaleString('fr-FR')}
                     </h3>
-                    <span className="text-[9px] text-slate-400">Net</span>
+                    <span className="text-[9px] text-content-muted">Net</span>
                   </div>
                </div>
-               <div className={`p-1.5 rounded-lg ${stats.fluxNet >= 0 ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}`}>
+               <div className={`p-1.5 rounded-lg ${stats.fluxNet >= 0 ? 'bg-status-success-bg text-status-success' : 'bg-status-danger-bg text-status-danger'}`}>
                   <Activity size={16} />
                </div>
             </div>
             <div className="mt-2 flex items-center justify-between text-[9px] font-medium">
-               <span className="text-emerald-600 dark:text-emerald-400 bg-emerald-500/5 px-1.5 py-0.5 rounded">+{stats.fluxEntrees.toLocaleString('fr-FR')}</span>
-               <span className="text-red-600 dark:text-red-400 bg-red-500/5 px-1.5 py-0.5 rounded">-{stats.fluxSorties.toLocaleString('fr-FR')}</span>
+               <span className="text-status-success bg-status-success/5 px-1.5 py-0.5 rounded">+{stats.fluxEntrees.toLocaleString('fr-FR')}</span>
+               <span className="text-status-danger bg-status-danger/5 px-1.5 py-0.5 rounded">-{stats.fluxSorties.toLocaleString('fr-FR')}</span>
             </div>
         </div>
       </div>
@@ -315,9 +315,9 @@ export default function Epargnes({ activeView }: EpargnesProps) {
       <div className="mt-6 bg-surface-base rounded-lg border border-edge shadow-sm overflow-hidden flex flex-col">
 
           {/* Toolbar: Tabs + Search + Filter combined */}
-          <div className="flex flex-col sm:flex-row items-center justify-between p-2 gap-2 border-b border-edge bg-slate-50 dark:bg-slate-900/50">
+          <div className="flex flex-col sm:flex-row items-center justify-between p-2 gap-2 border-b border-edge bg-surface-muted/50">
               {/* Tabs */}
-              <div className="flex bg-slate-200 dark:bg-slate-800 rounded-lg p-1 self-stretch sm:self-auto">
+              <div className="flex bg-surface-subtle rounded-lg p-1 self-stretch sm:self-auto">
                 {tabs.map((tab) => (
                   <button
                     key={tab.key}
@@ -325,8 +325,8 @@ export default function Epargnes({ activeView }: EpargnesProps) {
                     className={`
                       flex-1 sm:flex-none px-3 py-1 text-xs font-medium rounded-md transition-all duration-200 whitespace-nowrap
                       ${activeTab === tab.key
-                        ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
-                        : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                        ? 'bg-surface-elevated text-content-primary shadow-sm'
+                        : 'text-content-muted hover:text-content-secondary'
                       }
                     `}
                   >
@@ -339,13 +339,13 @@ export default function Epargnes({ activeView }: EpargnesProps) {
               {activeTab !== TypeCompte.BLOCKED && (
                 <div className="flex items-center gap-2 w-full sm:w-auto">
                   <div className="relative flex-1 sm:w-64">
-                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-content-muted" size={14} />
                       <input
                         type="text"
                         placeholder="Rechercher..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 pl-8 pr-3 py-1.5 text-xs transition-all"
+                        className="w-full bg-surface border border-edge rounded-lg text-content-primary placeholder-content-muted focus:ring-2 focus:ring-status-info/20 focus:border-status-info pl-8 pr-3 py-1.5 text-xs transition-all"
                       />
                   </div>
                   <div className="relative">
@@ -353,8 +353,8 @@ export default function Epargnes({ activeView }: EpargnesProps) {
                       onClick={() => setShowStatusDropdown(!showStatusDropdown)}
                       className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium border rounded-lg transition-colors ${
                         statusFilter !== 'all'
-                          ? 'text-blue-600 dark:text-blue-400 border-blue-300 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/30'
-                          : 'text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700'
+                          ? 'text-status-info border-status-info bg-status-info-bg'
+                          : 'text-content-muted border-edge bg-surface hover:bg-surface-muted-elevated'
                       }`}
                     >
                       <Filter size={12} />
@@ -365,7 +365,7 @@ export default function Epargnes({ activeView }: EpargnesProps) {
                     {showStatusDropdown && (
                       <>
                         <div className="fixed inset-0 z-40" onClick={() => setShowStatusDropdown(false)} />
-                        <div className="absolute right-0 top-full mt-1 z-50 min-w-[160px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-xl py-1 animate-in fade-in zoom-in-95 duration-100">
+                        <div className="absolute right-0 top-full mt-1 z-50 min-w-[160px] bg-surface border border-edge rounded-lg shadow-xl py-1 animate-in fade-in zoom-in-95 duration-100">
                           {ACCOUNT_STATUS_FILTER_OPTIONS.map((option) => (
                             <button
                               key={option.value}
@@ -375,8 +375,8 @@ export default function Epargnes({ activeView }: EpargnesProps) {
                               }}
                               className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
                                 statusFilter === option.value
-                                  ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium'
-                                  : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                                  ? 'bg-status-info-bg text-status-info font-medium'
+                                  : 'text-content-secondary hover:bg-surface-muted'
                               }`}
                             >
                               {option.label}

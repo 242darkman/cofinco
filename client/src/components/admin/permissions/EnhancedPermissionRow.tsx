@@ -134,20 +134,20 @@ export default function EnhancedPermissionRow({
   };
 
   // Determine row styling based on state
-  let borderColor = 'border-slate-800/50';
-  let bgHover = 'hover:bg-slate-800/40';
+  let borderColor = 'border-edge/50';
+  let bgHover = 'hover:bg-surface/40';
 
   if (isOverride) {
     if (permission.granted) {
-      borderColor = 'border-emerald-500/30';
-      bgHover = 'bg-emerald-500/5 hover:bg-emerald-500/10';
+      borderColor = 'border-status-success/30';
+      bgHover = 'bg-status-success/5 hover:bg-status-success-bg';
     } else {
-      borderColor = 'border-rose-500/30';
-      bgHover = 'bg-rose-500/5 hover:bg-rose-500/10';
+      borderColor = 'border-status-danger/30';
+      bgHover = 'bg-status-danger/5 hover:bg-status-danger/10';
     }
   } else if (isTemporary) {
-    borderColor = 'border-amber-500/30';
-    bgHover = 'bg-amber-500/5 hover:bg-amber-500/10';
+    borderColor = 'border-status-warning/30';
+    bgHover = 'bg-status-warning/5 hover:bg-status-warning-bg';
   }
 
   const loading = isLoading || toggleLoading;
@@ -158,7 +158,7 @@ export default function EnhancedPermissionRow({
         className={`
           flex items-center justify-between px-2 py-1.5 rounded border transition-all duration-200 group
           ${borderColor} ${bgHover}
-          ${wasRecentlyToggled ? 'bg-indigo-500/10 scale-[1.01]' : ''}
+          ${wasRecentlyToggled ? 'bg-accent/10 scale-[1.01]' : ''}
           ${loading ? 'opacity-70' : ''}
           ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
         `}
@@ -169,7 +169,7 @@ export default function EnhancedPermissionRow({
             {/* Permission Name */}
             <span
               className={`text-[10px] font-medium transition-colors truncate ${
-                permission.granted ? 'text-white' : 'text-slate-400'
+                permission.granted ? 'text-content-primary' : 'text-content-muted'
               }`}
             >
               {permission.name}
@@ -177,12 +177,12 @@ export default function EnhancedPermissionRow({
 
             {/* Recently Toggled Indicator */}
             {wasRecentlyToggled && (
-              <Sparkles size={8} className="text-indigo-400 animate-pulse shrink-0" />
+              <Sparkles size={8} className="text-accent animate-pulse shrink-0" />
             )}
 
             {/* Critical Indicator */}
             {isCritical && (
-              <span title="Permission critique"><AlertTriangle size={8} className="text-amber-400 shrink-0" /></span>
+              <span title="Permission critique"><AlertTriangle size={8} className="text-status-warning shrink-0" /></span>
             )}
 
             {/* Source Badge */}
@@ -196,7 +196,7 @@ export default function EnhancedPermissionRow({
           </div>
 
           {/* Permission Code */}
-          <code className="text-[8px] text-slate-600 font-mono block truncate">
+          <code className="text-[8px] text-content-muted font-mono block truncate">
             {permission.code}
           </code>
         </div>
@@ -207,7 +207,7 @@ export default function EnhancedPermissionRow({
           <button
             onClick={() => setShowExplanation(true)}
             title="Pourquoi cette permission ?"
-            className="p-0.5 text-slate-500 hover:text-indigo-400 hover:bg-indigo-500/10 rounded transition-colors"
+            className="p-0.5 text-content-muted hover:text-accent hover:bg-accent/10 rounded transition-colors"
           >
             <HelpCircle size={12} />
           </button>
@@ -215,7 +215,7 @@ export default function EnhancedPermissionRow({
           {/* Toggle */}
           {loading ? (
             <div className="w-7 h-4 flex items-center justify-center">
-              <Loader2 size={10} className="animate-spin text-indigo-400" />
+              <Loader2 size={10} className="animate-spin text-accent" />
             </div>
           ) : (
             <div
@@ -224,8 +224,8 @@ export default function EnhancedPermissionRow({
                 w-7 h-3.5 rounded-full relative transition-colors
                 ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}
                 ${isOverride || isTemporary
-                  ? (permission.granted ? 'bg-amber-500' : 'bg-rose-500')
-                  : (permission.granted ? 'bg-indigo-600' : 'bg-slate-600/50')
+                  ? (permission.granted ? 'bg-status-warning' : 'bg-status-danger')
+                  : (permission.granted ? 'bg-accent' : 'bg-surface-subtle/50')
                 }
               `}
             >
@@ -241,7 +241,7 @@ export default function EnhancedPermissionRow({
             <button
               onClick={handleResetClick}
               title="Rétablir au rôle"
-              className="p-0.5 text-slate-500 hover:text-white hover:bg-slate-700/50 rounded transition-colors"
+              className="p-0.5 text-content-muted hover:text-content-primary hover:bg-surface-elevated/50 rounded transition-colors"
             >
               <RotateCcw size={9} />
             </button>

@@ -70,8 +70,8 @@ const getUserPhotoUrl = (user: any): string => {
 function StatusDot({ hasExceptions, active, total }: { hasExceptions: boolean; active: number; total: number }) {
   return (
     <div className="flex items-center gap-1.5">
-      <span className="text-[10px] text-slate-400 font-medium">{active}/{total}</span>
-      <div className={`w-1.5 h-1.5 rounded-full ${hasExceptions ? 'bg-amber-500' : active === total ? 'bg-emerald-500' : active > 0 ? 'bg-indigo-500' : 'bg-slate-500'}`} />
+      <span className="text-[10px] text-content-muted font-medium">{active}/{total}</span>
+      <div className={`w-1.5 h-1.5 rounded-full ${hasExceptions ? 'bg-status-warning' : active === total ? 'bg-status-success' : active > 0 ? 'bg-accent' : 'bg-surface-muted0'}`} />
     </div>
   );
 }
@@ -233,46 +233,46 @@ export default function UserCustomPermissionsManager({
     return (
       <div className="flex flex-col h-full space-y-2 animate-in fade-in duration-300">
         {/* Header with Search - Compact */}
-        <div className="bg-slate-900 rounded-lg border border-slate-800 px-3 py-2 shrink-0">
+        <div className="bg-surface-base rounded-lg border border-edge px-3 py-2 shrink-0">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 bg-indigo-500/10 rounded-lg flex items-center justify-center shrink-0">
-                <Users size={14} className="text-indigo-400" />
+              <div className="w-7 h-7 bg-accent/10 rounded-lg flex items-center justify-center shrink-0">
+                <Users size={14} className="text-accent" />
               </div>
               <div>
-                <h2 className="text-sm font-bold text-white">Gestion des Exceptions</h2>
-                <p className="text-[10px] text-slate-500">Personnalisez les permissions utilisateur</p>
+                <h2 className="text-sm font-bold text-content-primary">Gestion des Exceptions</h2>
+                <p className="text-[10px] text-content-muted">Personnalisez les permissions utilisateur</p>
               </div>
             </div>
 
             {/* Stats - Compact */}
-            <div className="flex items-center gap-3 bg-slate-800/50 px-2.5 py-1.5 rounded-lg border border-slate-700">
+            <div className="flex items-center gap-3 bg-surface/50 px-2.5 py-1.5 rounded-lg border border-edge">
               <div className="text-center">
-                <div className="text-[9px] text-slate-500 uppercase">Utilisateurs</div>
-                <div className="text-sm font-bold text-indigo-400">{users.length}</div>
+                <div className="text-[9px] text-content-muted uppercase">Utilisateurs</div>
+                <div className="text-sm font-bold text-accent">{users.length}</div>
               </div>
-              <div className="h-6 w-px bg-slate-700"></div>
+              <div className="h-6 w-px bg-surface-elevated"></div>
               <div className="text-center">
-                <div className="text-[9px] text-slate-500 uppercase">Résultats</div>
-                <div className="text-sm font-bold text-slate-300">{filteredUsers.length}</div>
+                <div className="text-[9px] text-content-muted uppercase">Résultats</div>
+                <div className="text-sm font-bold text-content-secondary">{filteredUsers.length}</div>
               </div>
             </div>
           </div>
 
           {/* Search Bar - Compact */}
           <div className="mt-2 relative group">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-content-muted group-focus-within:text-accent transition-colors" />
             <input
               type="text"
               value={userSearchTerm}
               onChange={(e) => setUserSearchTerm(e.target.value)}
               placeholder="Rechercher par nom, identifiant ou rôle..."
-              className="w-full h-8 pl-8 pr-8 bg-slate-950 border border-slate-700 rounded-lg text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 transition-all"
+              className="w-full h-8 pl-8 pr-8 bg-surface-base border border-edge rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/20 transition-all"
             />
             {userSearchTerm && (
               <button
                 onClick={() => setUserSearchTerm('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors text-sm"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-content-muted hover:text-content-primary transition-colors text-sm"
               >
                 ×
               </button>
@@ -281,17 +281,17 @@ export default function UserCustomPermissionsManager({
         </div>
 
         {/* User List - Compact */}
-        <div className="bg-slate-900 rounded-lg border border-slate-800 overflow-hidden flex-1 min-h-0">
-          <div className="divide-y divide-slate-800/50 max-h-[calc(100vh-320px)] overflow-y-auto">
+        <div className="bg-surface-base rounded-lg border border-edge overflow-hidden flex-1 min-h-0">
+          <div className="divide-y divide-edge/50 max-h-[calc(100vh-320px)] overflow-y-auto">
             {paginatedUsers.map((user) => (
               <button
                 key={user.id}
                 onClick={() => handleUserSelect(user.id)}
-                className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-800/60 transition-colors text-left group"
+                className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-surface/60 transition-colors text-left group"
               >
                 {/* Avatar - Compact */}
                 <div className="relative shrink-0">
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-xs font-bold text-white shadow-lg shadow-indigo-500/20 group-hover:scale-105 transition-transform overflow-hidden">
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-accent to-status-info flex items-center justify-center text-xs font-bold text-white shadow-lg shadow-accent/20 group-hover:scale-105 transition-transform overflow-hidden">
                     {getUserPhotoUrl(user) ? (
                       <img
                         src={getUserPhotoUrl(user)}
@@ -307,10 +307,10 @@ export default function UserCustomPermissionsManager({
                 {/* User Info - Compact */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-semibold text-white group-hover:text-indigo-300 transition-colors truncate">
+                    <span className="text-xs font-semibold text-content-primary group-hover:text-accent transition-colors truncate">
                       {getUserFullName(user)}
                     </span>
-                    <span className="text-[10px] text-slate-500 truncate">@{user.username}</span>
+                    <span className="text-[10px] text-content-muted truncate">@{user.username}</span>
                   </div>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded-full border mt-0.5 inline-block ${getRoleBadgeStyle(user.role).classes}`}>
                     {getRoleBadgeStyle(user.role).label}
@@ -318,7 +318,7 @@ export default function UserCustomPermissionsManager({
                 </div>
 
                 {/* Arrow indicator */}
-                <div className="text-slate-600 group-hover:text-indigo-400 transition-colors shrink-0">
+                <div className="text-content-muted group-hover:text-accent transition-colors shrink-0">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="m9 18 6-6-6-6"/>
                   </svg>
@@ -328,19 +328,19 @@ export default function UserCustomPermissionsManager({
           </div>
 
           {filteredUsers.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-10 text-slate-500">
+            <div className="flex flex-col items-center justify-center py-10 text-content-muted">
               <Users size={28} className="mb-2 opacity-50" />
               <p className="text-xs font-medium">Aucun utilisateur trouvé</p>
-              <p className="text-[10px] text-slate-600 mt-0.5">Essayez un autre terme de recherche</p>
+              <p className="text-[10px] text-content-muted mt-0.5">Essayez un autre terme de recherche</p>
             </div>
           )}
         </div>
 
         {/* Pagination - Compact */}
         {/* Pagination - Compact & Advanced */}
-        <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+        <div className="p-3 bg-surface-base border border-edge rounded-lg flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
             {/* Page info & size selector */}
-            <div className="flex items-center gap-3 text-xs text-slate-500">
+            <div className="flex items-center gap-3 text-xs text-content-muted">
               <span className="hidden sm:inline">
                 {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, filteredUsers.length)} sur {filteredUsers.length}
               </span>
@@ -353,7 +353,7 @@ export default function UserCustomPermissionsManager({
                   setItemsPerPage(Number(e.target.value));
                   goToPage(1);
                 }}
-                className="px-2 py-1 bg-slate-950 border border-slate-700 rounded text-xs text-slate-300 focus:border-indigo-500 outline-none"
+                className="px-2 py-1 bg-surface-base border border-edge rounded text-xs text-content-secondary focus:border-accent outline-none"
               >
                 <option value={6}>6 / page</option>
                 <option value={8}>8 / page</option>
@@ -367,14 +367,14 @@ export default function UserCustomPermissionsManager({
               <button
                 onClick={() => goToPage(1)}
                 disabled={currentPage === 1}
-                className="p-1 rounded hover:bg-slate-800 text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                className="p-1 rounded hover:bg-surface text-content-muted hover:text-content-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               >
                 <ChevronsLeft size={16} />
               </button>
               <button
                 onClick={() => goToPage(currentPage - 1)}
                 disabled={currentPage === 1}
-                className="p-1 rounded hover:bg-slate-800 text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                className="p-1 rounded hover:bg-surface text-content-muted hover:text-content-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               >
                 <ChevronLeft size={16} />
               </button>
@@ -398,8 +398,8 @@ export default function UserCustomPermissionsManager({
                         onClick={() => goToPage(pageNum)}
                         className={`w-6 h-6 rounded text-xs font-medium transition-colors ${
                           currentPage === pageNum
-                            ? 'bg-indigo-600 text-white'
-                            : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                            ? 'bg-accent text-white'
+                            : 'text-content-muted hover:bg-surface hover:text-content-primary'
                         }`}
                       >
                         {pageNum}
@@ -411,14 +411,14 @@ export default function UserCustomPermissionsManager({
               <button
                 onClick={() => goToPage(currentPage + 1)}
                 disabled={currentPage === totalPages}
-                className="p-1 rounded hover:bg-slate-800 text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                className="p-1 rounded hover:bg-surface text-content-muted hover:text-content-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               >
                 <ChevronRight size={16} />
               </button>
               <button
                 onClick={() => goToPage(totalPages)}
                 disabled={currentPage === totalPages}
-                className="p-1 rounded hover:bg-slate-800 text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                className="p-1 rounded hover:bg-surface text-content-muted hover:text-content-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               >
                 <ChevronsRight size={16} />
               </button>
@@ -435,17 +435,17 @@ export default function UserCustomPermissionsManager({
     <div className="flex flex-col h-full animate-in fade-in duration-300 space-y-2">
 
       {/* STICKY HEADER - Compact */}
-      <div className="flex items-center justify-between px-2 py-1.5 bg-slate-900 border border-slate-800 rounded-lg shrink-0">
+      <div className="flex items-center justify-between px-2 py-1.5 bg-surface-base border border-edge rounded-lg shrink-0">
         <div className="flex items-center gap-2">
           <button
             onClick={handleBackToSelection}
-            className="w-6 h-6 rounded bg-slate-800/80 border border-slate-700 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+            className="w-6 h-6 rounded bg-surface/80 border border-edge flex items-center justify-center text-content-muted hover:text-content-primary hover:bg-surface-elevated transition-colors"
           >
             <ArrowLeft size={12} />
           </button>
 
           <div className="relative">
-            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-[10px] font-bold text-white shadow-lg shadow-indigo-500/20 overflow-hidden">
+            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-accent to-status-info flex items-center justify-center text-[10px] font-bold text-white shadow-lg shadow-accent/20 overflow-hidden">
               {getUserPhotoUrl(selectedUser) ? (
                 <img
                   src={getUserPhotoUrl(selectedUser)}
@@ -456,17 +456,17 @@ export default function UserCustomPermissionsManager({
                 getUserInitials(selectedUser)
               )}
             </div>
-            <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-emerald-500 border border-slate-900 rounded-full"></span>
+            <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-status-success border border-edge rounded-full"></span>
           </div>
 
           <div className="min-w-0">
-            <h3 className="text-xs font-bold text-white flex items-center gap-1.5 truncate">
+            <h3 className="text-xs font-bold text-content-primary flex items-center gap-1.5 truncate">
               {getUserFullName(selectedUser)}
               <span className={`text-[9px] font-normal px-1 py-0 rounded-full border shrink-0 ${getRoleBadgeStyle(selectedUser.role).classes}`}>
                 {getRoleBadgeStyle(selectedUser.role).label}
               </span>
             </h3>
-            <p className="text-[9px] text-emerald-400 flex items-center gap-1">
+            <p className="text-[9px] text-status-success flex items-center gap-1">
               <Wifi className="w-2 h-2" /> Sync
             </p>
           </div>
@@ -474,22 +474,22 @@ export default function UserCustomPermissionsManager({
 
         <div className="flex items-center gap-2">
           <div className="hidden md:flex items-center gap-2 text-right">
-            <div className="px-2 py-0.5 bg-slate-800/50 rounded border border-slate-700">
-              <div className="text-[8px] text-slate-500 uppercase">Exc.</div>
-              <div className={`text-[10px] font-bold ${totalExceptions > 0 ? 'text-amber-400' : 'text-slate-500'}`}>
+            <div className="px-2 py-0.5 bg-surface/50 rounded border border-edge">
+              <div className="text-[8px] text-content-muted uppercase">Exc.</div>
+              <div className={`text-[10px] font-bold ${totalExceptions > 0 ? 'text-status-warning' : 'text-content-muted'}`}>
                 {totalExceptions}
               </div>
             </div>
-            <div className="px-2 py-0.5 bg-slate-800/50 rounded border border-slate-700">
-              <div className="text-[8px] text-slate-500 uppercase">Actives</div>
-              <div className="text-[10px] font-bold text-indigo-400">{activePermissionsCount}</div>
+            <div className="px-2 py-0.5 bg-surface/50 rounded border border-edge">
+              <div className="text-[8px] text-content-muted uppercase">Actives</div>
+              <div className="text-[10px] font-bold text-accent">{activePermissionsCount}</div>
             </div>
           </div>
 
           <button
             onClick={handleReset}
             disabled={isResetting}
-            className="px-1.5 py-1 border border-slate-700 rounded text-[10px] text-slate-300 hover:bg-slate-800 transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-1.5 py-1 border border-edge rounded text-[10px] text-content-secondary hover:bg-surface transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isResetting ? (
               <Loader2 size={10} className="animate-spin" />
@@ -502,7 +502,7 @@ export default function UserCustomPermissionsManager({
       </div>
 
       {confirmMessage && (
-        <div className="px-2 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded flex items-center gap-1.5 text-[10px] text-emerald-400 animate-in fade-in slide-in-from-top-2 shrink-0">
+        <div className="px-2 py-1 bg-status-success-bg border border-status-success/20 rounded flex items-center gap-1.5 text-[10px] text-status-success animate-in fade-in slide-in-from-top-2 shrink-0">
           <CheckCircle size={10} /> {confirmMessage}
         </div>
       )}
@@ -511,13 +511,13 @@ export default function UserCustomPermissionsManager({
       <div className="grid grid-cols-12 gap-2 items-start flex-1 min-h-0">
 
         {/* SIDEBAR - Modules List - Compact */}
-        <div className="col-span-12 lg:col-span-3 bg-slate-900 rounded-lg border border-slate-800 overflow-hidden flex flex-col max-h-[350px] lg:max-h-[calc(100vh-280px)]">
-          <div className="px-2.5 py-1.5 bg-slate-800/50 border-b border-slate-700 flex items-center gap-1.5 shrink-0">
-            <Award size={12} className="text-slate-400" />
-            <span className="font-semibold text-slate-300 text-[11px]">Modules</span>
-            <span className="ml-auto text-[9px] text-slate-500">{modulesList.length}</span>
+        <div className="col-span-12 lg:col-span-3 bg-surface-base rounded-lg border border-edge overflow-hidden flex flex-col max-h-[350px] lg:max-h-[calc(100vh-280px)]">
+          <div className="px-2.5 py-1.5 bg-surface/50 border-b border-edge flex items-center gap-1.5 shrink-0">
+            <Award size={12} className="text-content-muted" />
+            <span className="font-semibold text-content-secondary text-[11px]">Modules</span>
+            <span className="ml-auto text-[9px] text-content-muted">{modulesList.length}</span>
           </div>
-          <div className="flex-1 overflow-y-auto divide-y divide-slate-800/50">
+          <div className="flex-1 overflow-y-auto divide-y divide-edge/50">
             {modulesList.map(module => {
               const isActive = activeModuleId === module.id;
 
@@ -526,16 +526,16 @@ export default function UserCustomPermissionsManager({
                   key={module.id}
                   onClick={() => setActiveModuleId(module.id)}
                   className={`
-                    w-full flex justify-between items-center px-2.5 py-1.5 hover:bg-slate-800/70 transition-colors text-left
-                    ${isActive ? 'bg-slate-800 border-l-2 border-indigo-500' : 'border-l-2 border-transparent'}
-                    ${module.hasExceptions && !isActive ? 'border-l-amber-500' : ''}
+                    w-full flex justify-between items-center px-2.5 py-1.5 hover:bg-surface/70 transition-colors text-left
+                    ${isActive ? 'bg-surface border-l-2 border-accent' : 'border-l-2 border-transparent'}
+                    ${module.hasExceptions && !isActive ? 'border-l-status-warning' : ''}
                   `}
                 >
                   <div className="flex items-center gap-1.5 min-w-0">
                     {module.hasExceptions && (
-                      <div className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0"></div>
+                      <div className="w-1.5 h-1.5 rounded-full bg-status-warning shrink-0"></div>
                     )}
-                    <span className={`text-[11px] font-medium truncate ${isActive ? 'text-white' : 'text-slate-300'}`}>
+                    <span className={`text-[11px] font-medium truncate ${isActive ? 'text-content-primary' : 'text-content-secondary'}`}>
                       {module.name}
                     </span>
                   </div>
@@ -547,22 +547,22 @@ export default function UserCustomPermissionsManager({
         </div>
 
         {/* MAIN CONTENT - Permissions Detail - Compact */}
-        <div className="col-span-12 lg:col-span-9 bg-slate-900 rounded-lg border border-slate-800 overflow-hidden flex flex-col max-h-[400px] lg:max-h-[calc(100vh-280px)]">
+        <div className="col-span-12 lg:col-span-9 bg-surface-base rounded-lg border border-edge overflow-hidden flex flex-col max-h-[400px] lg:max-h-[calc(100vh-280px)]">
           {/* Module Header + Search - Compact */}
-          <div className="px-2.5 py-2 border-b border-slate-800 bg-slate-800/30 shrink-0">
+          <div className="px-2.5 py-2 border-b border-edge bg-surface/30 shrink-0">
             <div className="flex items-center justify-between gap-2 mb-1.5">
               <div className="flex items-center gap-1.5 min-w-0">
-                <div className="w-5 h-5 bg-indigo-500/10 rounded flex items-center justify-center shrink-0">
-                  <Shield size={10} className="text-indigo-400" />
+                <div className="w-5 h-5 bg-accent/10 rounded flex items-center justify-center shrink-0">
+                  <Shield size={10} className="text-accent" />
                 </div>
                 <div className="min-w-0">
-                  <h3 className="text-[11px] font-bold text-white truncate">
+                  <h3 className="text-[11px] font-bold text-content-primary truncate">
                     {activeModule?.name || 'Sélectionnez un module'}
                   </h3>
-                  <p className="text-[9px] text-slate-500">
+                  <p className="text-[9px] text-content-muted">
                     {activeModule ? `${activeModule.activeCount}/${activeModule.permissions.length} actives` : ''}
                     {activeModule?.hasExceptions && (
-                      <span className="ml-1 text-amber-400">• {activeModule.exceptionCount} exc.</span>
+                      <span className="ml-1 text-status-warning">• {activeModule.exceptionCount} exc.</span>
                     )}
                   </p>
                 </div>
@@ -573,8 +573,8 @@ export default function UserCustomPermissionsManager({
                 className={`
                   px-1.5 py-1 rounded text-[9px] border flex items-center gap-1 transition-all whitespace-nowrap shrink-0
                   ${showOnlyCustom
-                    ? 'bg-amber-500/10 border-amber-500/40 text-amber-400'
-                    : 'bg-slate-900 border-slate-700 text-slate-400 hover:bg-slate-800'
+                    ? 'bg-status-warning-bg border-status-warning/40 text-status-warning'
+                    : 'bg-surface-base border-edge text-content-muted hover:bg-surface'
                   }
                 `}
               >
@@ -585,13 +585,13 @@ export default function UserCustomPermissionsManager({
 
             {/* Search - Compact */}
             <div className="relative">
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-500" size={10} />
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-content-muted" size={10} />
               <input
                 type="text"
                 value={permSearchTerm}
                 onChange={(e) => setPermSearchTerm(e.target.value)}
                 placeholder="Filtrer permissions..."
-                className="w-full bg-slate-900 border border-slate-700 rounded pl-6 pr-2 py-1 text-[10px] focus:ring-1 focus:ring-indigo-500 outline-none text-white placeholder:text-slate-500"
+                className="w-full bg-surface-base border border-edge rounded pl-6 pr-2 py-1 text-[10px] focus:ring-1 focus:ring-accent outline-none text-content-primary placeholder:text-content-muted"
               />
             </div>
           </div>
@@ -605,18 +605,18 @@ export default function UserCustomPermissionsManager({
                   const isCustom = status.source === 'custom';
 
                   let statusLabel = 'Hérité';
-                  let borderColor = 'border-slate-800/50';
-                  let bgHover = 'hover:bg-slate-800/40';
+                  let borderColor = 'border-edge/50';
+                  let bgHover = 'hover:bg-surface/40';
 
                   if (isCustom) {
                     if (status.granted) {
                       statusLabel = 'Forcé';
-                      borderColor = 'border-emerald-500/30';
-                      bgHover = 'bg-emerald-500/5 hover:bg-emerald-500/10';
+                      borderColor = 'border-status-success/30';
+                      bgHover = 'bg-status-success/5 hover:bg-status-success-bg';
                     } else {
                       statusLabel = 'Bloqué';
-                      borderColor = 'border-rose-500/30';
-                      bgHover = 'bg-rose-500/5 hover:bg-rose-500/10';
+                      borderColor = 'border-status-danger/30';
+                      bgHover = 'bg-status-danger/5 hover:bg-status-danger/10';
                     }
                   }
 
@@ -629,29 +629,29 @@ export default function UserCustomPermissionsManager({
                       className={`
                         flex items-center justify-between px-2 py-1.5 rounded border transition-all duration-200 group
                         ${borderColor} ${bgHover}
-                        ${wasRecentlyToggled ? 'bg-indigo-500/10 scale-[1.01]' : ''}
+                        ${wasRecentlyToggled ? 'bg-accent/10 scale-[1.01]' : ''}
                         ${isLoading ? 'opacity-70' : ''}
                       `}
                     >
                       <div className="flex-1 min-w-0 pr-1.5">
                         <div className="flex items-center gap-1">
-                          <span className={`text-[10px] font-medium transition-colors truncate ${status.granted ? 'text-white' : 'text-slate-400'}`}>
+                          <span className={`text-[10px] font-medium transition-colors truncate ${status.granted ? 'text-content-primary' : 'text-content-muted'}`}>
                             {perm.name}
                           </span>
                           {wasRecentlyToggled && (
-                            <Sparkles size={8} className="text-indigo-400 animate-pulse shrink-0" />
+                            <Sparkles size={8} className="text-accent animate-pulse shrink-0" />
                           )}
                           {isCustom && (
                             <span className={`text-[8px] px-1 py-0 rounded font-bold uppercase tracking-wide shrink-0 ${
                               status.granted
-                                ? 'bg-emerald-500/10 text-emerald-400'
-                                : 'bg-rose-500/10 text-rose-400'
+                                ? 'bg-status-success-bg text-status-success'
+                                : 'bg-status-danger/10 text-status-danger'
                             }`}>
                               {statusLabel}
                             </span>
                           )}
                         </div>
-                        <code className="text-[8px] text-slate-600 font-mono block truncate">
+                        <code className="text-[8px] text-content-muted font-mono block truncate">
                           {perm.code}
                         </code>
                       </div>
@@ -659,7 +659,7 @@ export default function UserCustomPermissionsManager({
                       <div className="flex items-center gap-1 shrink-0">
                         {isLoading ? (
                           <div className="w-7 h-4 flex items-center justify-center">
-                            <Loader2 size={10} className="animate-spin text-indigo-400" />
+                            <Loader2 size={10} className="animate-spin text-accent" />
                           </div>
                         ) : (
                           <div
@@ -667,8 +667,8 @@ export default function UserCustomPermissionsManager({
                             className={`
                               w-7 h-3.5 rounded-full relative cursor-pointer transition-colors
                               ${isCustom
-                                ? (status.granted ? 'bg-amber-500' : 'bg-rose-500')
-                                : (status.granted ? 'bg-indigo-600' : 'bg-slate-600/50')
+                                ? (status.granted ? 'bg-status-warning' : 'bg-status-danger')
+                                : (status.granted ? 'bg-accent' : 'bg-surface-subtle/50')
                               }
                             `}
                           >
@@ -683,7 +683,7 @@ export default function UserCustomPermissionsManager({
                           <button
                             onClick={() => handleTogglePermission(perm.id, perm.name, status.granted)}
                             title="Rétablir au rôle"
-                            className="p-0.5 text-slate-500 hover:text-white hover:bg-slate-700/50 rounded transition-colors"
+                            className="p-0.5 text-content-muted hover:text-content-primary hover:bg-surface-elevated/50 rounded transition-colors"
                           >
                             <RotateCcw size={9} />
                           </button>
@@ -694,7 +694,7 @@ export default function UserCustomPermissionsManager({
                 })}
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center h-full text-slate-500 py-6">
+              <div className="flex flex-col items-center justify-center h-full text-content-muted py-6">
                 <Shield size={24} className="mb-2 opacity-50" />
                 <p className="text-[10px] font-medium">
                   {permSearchTerm || showOnlyCustom ? 'Aucun résultat' : 'Aucune permission'}

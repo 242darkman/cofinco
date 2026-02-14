@@ -94,27 +94,27 @@ export default function AdminPasswordReset({ user, onClose, onSuccess }: AdminPa
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-800 rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-slate-800 border-b border-slate-700 p-6 flex items-center justify-between">
+      <div className="bg-surface rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-surface border-b border-edge p-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Key className="text-cyan-400" size={24} />
-            <h3 className="text-2xl font-bold text-white">
+            <Key className="text-accent" size={24} />
+            <h3 className="text-2xl font-bold text-content-primary">
               Réinitialiser Mot de Passe
             </h3>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-white transition"
+            className="text-content-muted hover:text-content-primary transition"
           >
             <X size={24} />
           </button>
         </div>
 
         <div className="p-6 space-y-6">
-          <div className="bg-slate-700/50 rounded-lg p-4">
-            <div className="text-sm text-slate-400">Utilisateur</div>
-            <div className="text-lg font-semibold text-white">{user.email}</div>
-            <div className="text-sm text-slate-300">
+          <div className="bg-surface-elevated/50 rounded-lg p-4">
+            <div className="text-sm text-content-muted">Utilisateur</div>
+            <div className="text-lg font-semibold text-content-primary">{user.email}</div>
+            <div className="text-sm text-content-secondary">
               {user.prenom || user.raw_user_meta_data?.prenom} {user.nom || user.raw_user_meta_data?.nom}
             </div>
           </div>
@@ -122,7 +122,7 @@ export default function AdminPasswordReset({ user, onClose, onSuccess }: AdminPa
           {!result && (
             <>
               <div>
-                <label className="block text-sm font-semibold text-white mb-3">
+                <label className="block text-sm font-semibold text-content-primary mb-3">
                   Méthode de réinitialisation
                 </label>
                 <div className="space-y-3">
@@ -130,17 +130,17 @@ export default function AdminPasswordReset({ user, onClose, onSuccess }: AdminPa
                     onClick={() => setMethod('temporary_password')}
                     className={`w-full p-4 rounded-lg border-2 text-left transition ${
                       method === 'temporary_password'
-                        ? 'border-cyan-500 bg-cyan-500/10'
-                        : 'border-slate-600 hover:border-slate-500'
+                        ? 'border-accent bg-accent/10'
+                        : 'border-edge-strong hover:border-edge-strong'
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <Key className="text-cyan-400" size={20} />
+                      <Key className="text-accent" size={20} />
                       <div>
-                        <div className="font-semibold text-white">
+                        <div className="font-semibold text-content-primary">
                           Mot de passe temporaire
                         </div>
-                        <div className="text-sm text-slate-400">
+                        <div className="text-sm text-content-muted">
                           Générer un mot de passe temporaire que vous communiquerez à l'utilisateur
                         </div>
                       </div>
@@ -151,17 +151,17 @@ export default function AdminPasswordReset({ user, onClose, onSuccess }: AdminPa
                     onClick={() => setMethod('email_link')}
                     className={`w-full p-4 rounded-lg border-2 text-left transition ${
                       method === 'email_link'
-                        ? 'border-blue-500 bg-blue-500/10'
-                        : 'border-slate-600 hover:border-slate-500'
+                        ? 'border-status-info bg-status-info-bg'
+                        : 'border-edge-strong hover:border-edge-strong'
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <Mail className="text-blue-400" size={20} />
+                      <Mail className="text-status-info" size={20} />
                       <div>
-                        <div className="font-semibold text-white">
+                        <div className="font-semibold text-content-primary">
                           Lien par email
                         </div>
-                        <div className="text-sm text-slate-400">
+                        <div className="text-sm text-content-muted">
                           Générer un lien de réinitialisation (à envoyer manuellement)
                         </div>
                       </div>
@@ -171,7 +171,7 @@ export default function AdminPasswordReset({ user, onClose, onSuccess }: AdminPa
               </div>
 
               {error && (
-                <div className="bg-blue-500/20 border border-blue-500 rounded-lg p-4 flex items-center gap-3 text-blue-400">
+                <div className="bg-status-info-bg border border-status-info rounded-lg p-4 flex items-center gap-3 text-status-info">
                   <AlertCircle size={20} />
                   <span>{error}</span>
                 </div>
@@ -180,7 +180,7 @@ export default function AdminPasswordReset({ user, onClose, onSuccess }: AdminPa
               <div className="flex gap-3 pt-4">
                 <button
                   onClick={onClose}
-                  className="flex-1 px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-bold transition"
+                  className="flex-1 px-6 py-3 bg-surface-elevated hover:bg-surface-subtle text-content-primary rounded-xl font-bold transition"
                 >
                   Annuler
                 </button>
@@ -188,13 +188,13 @@ export default function AdminPasswordReset({ user, onClose, onSuccess }: AdminPa
                   <button
                     onClick={handleReset}
                     disabled={loading}
-                    className="flex-1 px-6 py-3 bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-700 hover:to-emerald-700 text-white rounded-xl font-bold transition disabled:opacity-50 flex items-center justify-center gap-2"
+                    className="flex-1 px-6 py-3 bg-gradient-to-r from-accent to-status-success hover:from-accent hover:to-status-success text-white rounded-xl font-bold transition disabled:opacity-50 flex items-center justify-center gap-2"
                   >
                     <Key size={20} />
                     {loading ? 'Génération...' : 'Générer'}
                   </button>
                 ) : (
-                  <div className="flex-1 px-6 py-3 bg-amber-500/20 text-amber-400 rounded-xl font-bold flex items-center justify-center gap-2">
+                  <div className="flex-1 px-6 py-3 bg-status-warning-bg text-status-warning rounded-xl font-bold flex items-center justify-center gap-2">
                     <AlertTriangle size={20} />
                     Permission requise
                   </div>
@@ -205,30 +205,30 @@ export default function AdminPasswordReset({ user, onClose, onSuccess }: AdminPa
 
           {result && (
             <div className="space-y-4">
-              <div className="bg-green-500/20 border border-green-500 rounded-lg p-4">
-                <div className="flex items-center gap-3 text-green-400 mb-3">
+              <div className="bg-status-success-bg border border-status-success rounded-lg p-4">
+                <div className="flex items-center gap-3 text-status-success mb-3">
                   <Check size={20} />
                   <span className="font-semibold">{result.error}</span>
                 </div>
 
                 {result.method === 'temporary_password' && (
-                  <div className="bg-slate-700 rounded-lg p-4 space-y-3">
-                    <div className="text-sm text-slate-400">
+                  <div className="bg-surface-elevated rounded-lg p-4 space-y-3">
+                    <div className="text-sm text-content-muted">
                       Mot de passe temporaire généré :
                     </div>
                     <div className="flex items-center gap-2">
-                      <code className="flex-1 bg-slate-800 px-4 py-3 rounded-lg text-white font-mono text-lg">
+                      <code className="flex-1 bg-surface px-4 py-3 rounded-lg text-content-primary font-mono text-lg">
                         {result.password}
                       </code>
                       <button
                         onClick={() => copyToClipboard(result.password)}
-                        className="px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition flex items-center gap-2"
+                        className="px-4 py-3 bg-status-info hover:bg-status-info text-white rounded-lg transition flex items-center gap-2"
                       >
                         {copied ? <Check size={20} /> : <Copy size={20} />}
                         {copied ? 'Copié' : 'Copier'}
                       </button>
                     </div>
-                    <div className="text-sm text-cyan-400">
+                    <div className="text-sm text-accent">
                       Communiquez ce mot de passe à l'utilisateur de manière sécurisée.
                       Il devra le changer à sa prochaine connexion.
                     </div>
@@ -236,8 +236,8 @@ export default function AdminPasswordReset({ user, onClose, onSuccess }: AdminPa
                 )}
 
                 {result.method === 'email_link' && result.link && (
-                  <div className="bg-slate-700 rounded-lg p-4 space-y-3">
-                    <div className="text-sm text-slate-400">
+                  <div className="bg-surface-elevated rounded-lg p-4 space-y-3">
+                    <div className="text-sm text-content-muted">
                       Lien de réinitialisation :
                     </div>
                     <div className="flex items-center gap-2">
@@ -245,17 +245,17 @@ export default function AdminPasswordReset({ user, onClose, onSuccess }: AdminPa
                         type="text"
                         value={result.link}
                         readOnly
-                        className="flex-1 bg-slate-800 px-4 py-3 rounded-lg text-white text-sm"
+                        className="flex-1 bg-surface px-4 py-3 rounded-lg text-content-primary text-sm"
                       />
                       <button
                         onClick={() => copyToClipboard(result.link)}
-                        className="px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition flex items-center gap-2"
+                        className="px-4 py-3 bg-status-info hover:bg-status-info text-white rounded-lg transition flex items-center gap-2"
                       >
                         {copied ? <Check size={20} /> : <Copy size={20} />}
                         {copied ? 'Copié' : 'Copier'}
                       </button>
                     </div>
-                    <div className="text-sm text-blue-400">
+                    <div className="text-sm text-status-info">
                       Envoyez ce lien à l'utilisateur par email ou SMS
                     </div>
                   </div>
@@ -267,7 +267,7 @@ export default function AdminPasswordReset({ user, onClose, onSuccess }: AdminPa
                   onSuccess();
                   onClose();
                 }}
-                className="w-full px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold transition"
+                className="w-full px-6 py-3 bg-status-success hover:bg-status-success text-white rounded-xl font-bold transition"
               >
                 Terminé
               </button>

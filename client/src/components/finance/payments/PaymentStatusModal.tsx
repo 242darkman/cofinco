@@ -39,45 +39,45 @@ const statusConfig: Record<PaymentStatus, {
     icon: Clock,
     title: 'Initialisation',
     description: 'Préparation du paiement...',
-    color: 'text-slate-400',
-    bgColor: 'bg-slate-500/10',
+    color: 'text-content-muted',
+    bgColor: 'bg-surface-subtle/30',
     animate: true,
   },
   PENDING: {
     icon: Loader2,
     title: 'En attente',
     description: 'Confirmez le paiement sur votre téléphone',
-    color: 'text-cyan-400',
-    bgColor: 'bg-cyan-500/10',
+    color: 'text-accent',
+    bgColor: 'bg-accent/10',
     animate: true,
   },
   SUCCESS: {
     icon: CheckCircle2,
     title: 'Paiement confirmé',
     description: 'La transaction a été validée avec succès',
-    color: 'text-emerald-400',
-    bgColor: 'bg-emerald-500/10',
+    color: 'text-status-success',
+    bgColor: 'bg-status-success-bg',
   },
   FAILED: {
     icon: XCircle,
     title: 'Paiement échoué',
     description: 'La transaction n\'a pas pu être complétée',
-    color: 'text-red-400',
-    bgColor: 'bg-red-500/10',
+    color: 'text-status-danger',
+    bgColor: 'bg-status-danger-bg',
   },
   EXPIRED: {
     icon: Clock,
     title: 'Paiement expiré',
     description: 'Le délai de confirmation a expiré',
-    color: 'text-amber-400',
-    bgColor: 'bg-amber-500/10',
+    color: 'text-status-warning',
+    bgColor: 'bg-status-warning-bg',
   },
   REVERSED: {
     icon: AlertTriangle,
     title: 'Paiement annulé',
     description: 'La transaction a été annulée par le provider',
-    color: 'text-orange-400',
-    bgColor: 'bg-orange-500/10',
+    color: 'text-status-warning',
+    bgColor: 'bg-status-warning-bg',
   },
 };
 
@@ -113,12 +113,12 @@ export function PaymentStatusModal({
       />
 
       {/* Modal */}
-      <div className="relative bg-slate-900 rounded-2xl border border-slate-700/50 p-6 max-w-sm w-full mx-4 animate-in zoom-in-95 duration-200">
+      <div className="relative bg-surface-base rounded-2xl border border-edge-subtle p-6 max-w-sm w-full mx-4 animate-in zoom-in-95 duration-200">
         {/* Close button (hidden during pending) */}
         {!isPending && (
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+            className="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-surface text-content-muted hover:text-content-primary transition-colors"
           >
             <X size={18} />
           </button>
@@ -127,11 +127,11 @@ export function PaymentStatusModal({
         {/* Provider Logo */}
         <div className="flex justify-center mb-4">
           {provider === 'MTN' ? (
-            <div className="w-14 h-14 bg-yellow-500/10 rounded-full flex items-center justify-center">
+            <div className="w-14 h-14 bg-status-warning-bg rounded-full flex items-center justify-center">
               <MTNLogo className="h-8 w-8" />
             </div>
           ) : (
-            <div className="w-14 h-14 bg-red-500/10 rounded-full flex items-center justify-center">
+            <div className="w-14 h-14 bg-status-danger-bg rounded-full flex items-center justify-center">
               <AirtelLogo className="h-8 w-8" />
             </div>
           )}
@@ -153,34 +153,34 @@ export function PaymentStatusModal({
         </h3>
 
         {/* Status Description */}
-        <p className="text-sm text-slate-400 text-center mb-4">
+        <p className="text-sm text-content-muted text-center mb-4">
           {errorMessage || config.description}
         </p>
 
         {/* Amount */}
         <div className={`py-3 px-4 rounded-xl mb-4 ${config.bgColor} text-center`}>
-          <p className="text-xs text-slate-400 mb-1">Montant</p>
+          <p className="text-xs text-content-muted mb-1">Montant</p>
           <p className={`text-2xl font-bold ${config.color}`}>
             {amount.toLocaleString()} <span className="text-sm">FCFA</span>
           </p>
         </div>
 
         {/* Phone */}
-        <div className="flex items-center justify-center gap-2 text-sm text-slate-400 mb-2">
+        <div className="flex items-center justify-center gap-2 text-sm text-content-muted mb-2">
           <span>Téléphone:</span>
-          <span className="font-medium text-white">{phone}</span>
+          <span className="font-medium text-content-primary">{phone}</span>
         </div>
 
         {/* Reference */}
         {reference && (
-          <p className="text-[10px] text-slate-600 text-center mb-1">
+          <p className="text-[10px] text-content-muted text-center mb-1">
             Réf: {reference.slice(0, 8)}...
           </p>
         )}
 
         {/* Provider Transaction ID */}
         {providerTxnId && (
-          <p className="text-[10px] text-slate-500 text-center mb-4">
+          <p className="text-[10px] text-content-muted text-center mb-4">
             ID Provider: {providerTxnId}
           </p>
         )}
@@ -190,7 +190,7 @@ export function PaymentStatusModal({
           {isPending && (
             <button
               onClick={onClose}
-              className="w-full py-3 rounded-xl font-semibold text-slate-400 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-all"
+              className="w-full py-3 rounded-xl font-semibold text-content-muted bg-surface hover:bg-surface-elevated border border-edge transition-all"
             >
               Annuler
             </button>
@@ -201,14 +201,14 @@ export function PaymentStatusModal({
               {onViewDetails && (
                 <button
                   onClick={onViewDetails}
-                  className="w-full py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 transition-all"
+                  className="w-full py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-status-success to-accent hover:from-status-success hover:to-accent transition-all"
                 >
                   Voir les détails
                 </button>
               )}
               <button
                 onClick={onClose}
-                className="w-full py-3 rounded-xl font-semibold text-slate-400 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-all"
+                className="w-full py-3 rounded-xl font-semibold text-content-muted bg-surface hover:bg-surface-elevated border border-edge transition-all"
               >
                 Fermer
               </button>
@@ -220,10 +220,10 @@ export function PaymentStatusModal({
               {onRetry && (
                 <button
                   onClick={onRetry}
-                  className={`w-full py-3 rounded-xl font-semibold text-white bg-gradient-to-r ${
+                  className={`w-full py-3 rounded-xl font-semibold text-content-primary bg-gradient-to-r ${
                     provider === 'MTN'
-                      ? 'from-yellow-600 to-amber-600 hover:from-yellow-500 hover:to-amber-500'
-                      : 'from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500'
+                      ? 'from-status-warning to-status-warning hover:from-status-warning hover:to-status-warning'
+                      : 'from-status-danger to-status-danger hover:from-status-danger hover:to-status-danger'
                   } transition-all`}
                 >
                   Réessayer
@@ -231,7 +231,7 @@ export function PaymentStatusModal({
               )}
               <button
                 onClick={onClose}
-                className="w-full py-3 rounded-xl font-semibold text-slate-400 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-all"
+                className="w-full py-3 rounded-xl font-semibold text-content-muted bg-surface hover:bg-surface-elevated border border-edge transition-all"
               >
                 Fermer
               </button>

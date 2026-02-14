@@ -75,14 +75,14 @@ const MemberStatusBadge = ({ membre, tourActuel }: { membre: TontineMembre; tour
     // En avance
     const avance = toursPayes - tourActuel;
     return (
-      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 text-[10px] font-bold whitespace-nowrap">
+      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-status-info-bg text-status-info text-[10px] font-bold whitespace-nowrap">
         <CheckCheck size={12} /> +{avance} tour{avance > 1 ? 's' : ''}
       </span>
     );
   } else if (toursPayes >= tourActuel) {
     // À jour
     return (
-      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 text-[10px] font-bold whitespace-nowrap">
+      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-status-success-bg text-status-success text-[10px] font-bold whitespace-nowrap">
         <Check size={12} /> À jour
       </span>
     );
@@ -91,7 +91,7 @@ const MemberStatusBadge = ({ membre, tourActuel }: { membre: TontineMembre; tour
     const retard = tourActuel - toursPayes;
     const dette = retard * (membre.montantCotisation || 0);
     return (
-      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 text-[10px] font-bold whitespace-nowrap">
+      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-status-danger-bg text-status-danger text-[10px] font-bold whitespace-nowrap">
         <AlertTriangle size={12} /> -{retard} ({dette.toLocaleString('fr-FR')} F)
       </span>
     );
@@ -244,13 +244,13 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
   const getStatutColor = useCallback((statut: string) => {
     switch (statut) {
       case StatutMembreTontine.ACTIVE:
-        return 'text-green-400 bg-green-500/20';
+        return 'text-status-success bg-status-success-bg';
       case StatutMembreTontine.INACTIVE:
-        return 'text-cyan-400 bg-cyan-500/20';
+        return 'text-accent bg-accent/10';
       case StatutMembreTontine.EXCLUDED:
-        return 'text-red-400 bg-red-500/20';
+        return 'text-status-danger bg-status-danger-bg';
       default:
-        return 'text-slate-400 bg-slate-500/20';
+        return 'text-content-muted bg-surface-subtle/40';
     }
   }, []);
 
@@ -335,10 +335,10 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
       {/* Header */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-3">
-            <h3 className="text-lg font-bold text-white" id="membres-heading">
+            <h3 className="text-lg font-bold text-content-primary" id="membres-heading">
             Membres de la tontine
             </h3>
-            <span className={`text-xs px-2 py-0.5 rounded-full border ${isFull ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-slate-700 border-slate-600 text-slate-300'}`}>
+            <span className={`text-xs px-2 py-0.5 rounded-full border ${isFull ? 'bg-status-danger-bg border-status-danger/30 text-status-danger' : 'bg-surface-elevated border-edge-strong text-content-secondary'}`}>
                 {membres.length} / {maxMembres}
             </span>
         </div>
@@ -358,7 +358,7 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
                 onClick={handleExportPDF}
                 aria-label="Exporter en PDF"
                 title="Exporter PDF"
-                className="text-cyan-400"
+                className="text-accent"
               />
             </>
           )}
@@ -386,12 +386,12 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
         </div>
       ) : membres.length === 0 ? (
         <div
-          className="text-center py-12 border border-dashed border-slate-700 rounded-lg"
+          className="text-center py-12 border border-dashed border-edge rounded-lg"
           role="status"
         >
-          <User className="mx-auto text-slate-500 mb-3" size={48} aria-hidden="true" />
-          <p className="text-slate-400 font-medium">Aucun membre pour le moment</p>
-          <p className="text-slate-500 text-sm mt-1">Commencez par ajouter des participants</p>
+          <User className="mx-auto text-content-muted mb-3" size={48} aria-hidden="true" />
+          <p className="text-content-muted font-medium">Aucun membre pour le moment</p>
+          <p className="text-content-muted text-sm mt-1">Commencez par ajouter des participants</p>
         </div>
       ) : (
         <>
@@ -399,13 +399,13 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
             {paginatedMembres.map((membre) => (
               <Card
                 key={membre.id}
-                className="bg-slate-800/40 border-slate-700/50 p-3 hover:border-slate-600 transition-colors group"
+                className="bg-surface/40 border-edge-subtle p-3 hover:border-edge-strong transition-colors group"
                 role="listitem"
               >
                 <div className="flex items-start gap-3">
                   {/* Avatar / Position */}
                   <div className="shrink-0 relative">
-                    <div className="w-10 h-10 rounded-lg bg-slate-700 flex items-center justify-center text-slate-300 font-bold border border-slate-600">
+                    <div className="w-10 h-10 rounded-lg bg-surface-elevated flex items-center justify-center text-content-secondary font-bold border border-edge-strong">
                       {membre.client?.photoUrl ? (
                         <img
                           src={membre.client.photoUrl}
@@ -421,7 +421,7 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
                     </div>
                     {membre.aRecuBenefice && (
                       <div
-                        className="absolute -top-1.5 -right-1.5 bg-blue-500 text-white p-0.5 rounded-full border border-slate-800"
+                        className="absolute -top-1.5 -right-1.5 bg-status-info text-white p-0.5 rounded-full border border-edge"
                         title="A reçu le bénéfice"
                         aria-label="A reçu le bénéfice"
                       >
@@ -434,7 +434,7 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
                   <div className="flex-1 min-w-0 pt-0.5">
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <h4 className="font-bold text-white text-sm truncate leading-tight">
+                        <h4 className="font-bold text-content-primary text-sm truncate leading-tight">
                           {escapeHtml(membre.client?.nom) || 'Inconnu'}
                         </h4>
                         <div className="flex items-center gap-2 text-[10px] mt-0.5">
@@ -443,7 +443,7 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
                           >
                             {getStatutLabel(membre.status || membre.statut || StatutMembreTontine.ACTIVE)}
                           </span>
-                          <span className="text-slate-500">
+                          <span className="text-content-muted">
                             {new Date(membre.dateAdhesion || '').toLocaleDateString('fr-FR')}
                           </span>
                           {/* Status Badge Mobile-First */}
@@ -453,7 +453,7 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
 
                       <button
                         onClick={() => handleRemoveMembre(membre)}
-                        className="text-slate-600 hover:text-red-400 transition-colors p-1 rounded-lg hover:bg-red-500/10"
+                        className="text-content-muted hover:text-status-danger transition-colors p-1 rounded-lg hover:bg-status-danger-bg"
                         aria-label={`Retirer ${escapeHtml(membre.client?.nom || 'ce membre')}`}
                         type="button"
                       >
@@ -466,9 +466,9 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
                         <button 
                             onClick={() => handleOpenConfig(membre)}
                             className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] uppercase font-bold tracking-wider border transition-colors ${
-                                membre.cotisationAutomatique 
-                                ? 'bg-purple-500/10 text-purple-400 border-purple-500/30 hover:bg-purple-500/20' 
-                                : 'bg-slate-700/30 text-slate-500 border-slate-700 hover:bg-slate-700/50 hover:text-slate-300'
+                                membre.cotisationAutomatique
+                                ? 'bg-status-info-bg text-status-info border-status-info/30 hover:bg-status-info-bg/80'
+                                : 'bg-surface-elevated/30 text-content-muted border-edge hover:bg-surface-elevated/50 hover:text-content-secondary'
                             }`}
                         >
                             <Settings size={10} />
@@ -477,16 +477,16 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
                     </div>
 
                     {/* Stats de cotisations */}
-                    <div className="mt-2 grid grid-cols-2 gap-2 text-xs border-t border-slate-700/50 pt-2">
+                    <div className="mt-2 grid grid-cols-2 gap-2 text-xs border-t border-edge-subtle pt-2">
                       <div className="flex flex-col">
-                        <span className="text-slate-500">Total cotisé</span>
-                        <span className="font-bold text-green-400">
+                        <span className="text-content-muted">Total cotisé</span>
+                        <span className="font-bold text-status-success">
                           {Number(membre.totalCotisations || membre.montantTotalContribue || 0).toLocaleString('fr-FR')} FCFA
                         </span>
                       </div>
                       <div className="flex flex-col text-right">
-                        <span className="text-slate-500">Restant</span>
-                        <span className={`font-bold ${(membre.montantRestant || 0) > 0 ? 'text-amber-400' : 'text-green-400'}`}>
+                        <span className="text-content-muted">Restant</span>
+                        <span className={`font-bold ${(membre.montantRestant || 0) > 0 ? 'text-status-warning' : 'text-status-success'}`}>
                           {(membre.montantRestant || 0).toLocaleString('fr-FR')} FCFA
                         </span>
                       </div>
@@ -501,14 +501,14 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
                           nombreMembres={maxMembres}
                         />
                         <div className="flex items-center gap-2 text-[10px]">
-                          <span className="text-slate-400">
-                            Tours payés: <span className="text-cyan-400 font-bold">{membre.toursPayes}</span>
+                          <span className="text-content-muted">
+                            Tours payés: <span className="text-accent font-bold">{membre.toursPayes}</span>
                             {' / '}
-                            <span className="text-slate-500">{maxMembres}</span>
+                            <span className="text-content-muted">{maxMembres}</span>
                           </span>
-                          <span className="text-slate-600">|</span>
-                          <span className="text-slate-400">
-                            Restants: <span className={`font-bold ${(membre.toursRestants || 0) > 0 ? 'text-amber-400' : 'text-green-400'}`}>{membre.toursRestants || 0}</span>
+                          <span className="text-content-muted">|</span>
+                          <span className="text-content-muted">
+                            Restants: <span className={`font-bold ${(membre.toursRestants || 0) > 0 ? 'text-status-warning' : 'text-status-success'}`}>{membre.toursRestants || 0}</span>
                           </span>
                         </div>
                       </div>
@@ -543,13 +543,13 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
           aria-labelledby="add-member-title"
           onClick={(e) => e.target === e.currentTarget && handleCloseModal()}
         >
-          <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-md shadow-2xl flex flex-col max-h-[90vh]">
-            <div className="p-4 border-b border-slate-700 flex items-center justify-between shrink-0">
+          <div className="bg-surface-base border border-edge rounded-xl w-full max-w-md shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="p-4 border-b border-edge flex items-center justify-between shrink-0">
               <div>
-                <h2 id="add-member-title" className="text-lg font-bold text-white">
+                <h2 id="add-member-title" className="text-lg font-bold text-content-primary">
                   Nouveau Membre
                 </h2>
-                <div className="text-xs text-emerald-400 font-mono mt-0.5">
+                <div className="text-xs text-status-success font-mono mt-0.5">
                   Position #{membres.length + 1}
                 </div>
               </div>
@@ -564,13 +564,13 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
             <div className="p-4 flex-1 overflow-y-auto">
               <label
                 htmlFor="search-client"
-                className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2"
+                className="block text-xs font-semibold text-content-muted uppercase tracking-wider mb-2"
               >
                 Rechercher un client
               </label>
               <div className="relative mb-4">
                 <Search
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted"
                   size={16}
                   aria-hidden="true"
                 />
@@ -579,7 +579,7 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-slate-950 text-white pl-10 pr-4 py-2.5 rounded-lg border border-slate-800 focus:outline-none focus:border-emerald-500 transition-colors text-sm"
+                  className="w-full bg-surface-base text-content-primary pl-10 pr-4 py-2.5 rounded-lg border border-edge focus:outline-none focus:border-accent transition-colors text-sm"
                   placeholder="Nom, téléphone ou email..."
                   autoFocus
                   autoComplete="off"
@@ -597,7 +597,7 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
 
               <div className="space-y-2 max-h-[300px] overflow-y-auto" role="listbox" aria-label="Sélectionner un client">
                 {filteredClients.length === 0 ? (
-                  <div className="text-center py-8 text-slate-500 text-sm">
+                  <div className="text-center py-8 text-content-muted text-sm">
                     Aucun client trouvé
                   </div>
                 ) : (
@@ -610,24 +610,24 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
                       onClick={() => setSelectedClientId(client.id)}
                       className={`w-full text-left p-3 rounded-lg border transition-all flex items-center justify-between group ${
                         selectedClientId === client.id
-                          ? 'border-emerald-500 bg-emerald-500/10'
-                          : 'border-slate-800 hover:border-slate-600 bg-slate-800/30'
+                          ? 'border-accent bg-accent/10'
+                          : 'border-edge hover:border-edge-strong bg-surface/30'
                       }`}
                     >
                       <div>
                         <div
                           className={`font-semibold text-sm ${
-                            selectedClientId === client.id ? 'text-emerald-400' : 'text-slate-200'
+                            selectedClientId === client.id ? 'text-accent' : 'text-content-secondary'
                           }`}
                         >
                           {formatClientName(client.nom, client.prenom)}
                         </div>
-                        <div className="text-xs text-slate-500 mt-0.5">
+                        <div className="text-xs text-content-muted mt-0.5">
                           {escapeHtml(client.telephone || client.phone || client.email || '')}
                         </div>
                       </div>
                       {selectedClientId === client.id && (
-                        <CheckCircle size={16} className="text-emerald-500" aria-hidden="true" />
+                        <CheckCircle size={16} className="text-accent" aria-hidden="true" />
                       )}
                     </button>
                   ))
@@ -635,7 +635,7 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
               </div>
             </div>
 
-            <div className="p-4 border-t border-slate-700 bg-slate-900/50 shrink-0 flex gap-3">
+            <div className="p-4 border-t border-edge bg-surface-base/50 shrink-0 flex gap-3">
               <Button variant="ghost" fullWidth onClick={handleCloseModal} disabled={submitting}>
                 Annuler
               </Button>
@@ -671,19 +671,19 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
           className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"
           onClick={(e) => e.target === e.currentTarget && setConfigMember(null)}
         >
-          <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-sm shadow-2xl p-5 space-y-4 animate-in fade-in slide-in-from-bottom-4 zoom-in-95 duration-200">
+          <div className="bg-surface-base border border-edge rounded-xl w-full max-w-sm shadow-2xl p-5 space-y-4 animate-in fade-in slide-in-from-bottom-4 zoom-in-95 duration-200">
              <div className="flex justify-between items-start">
                  <div>
-                    <h3 className="font-bold text-white text-lg">Configuration Membre</h3>
-                    <p className="text-slate-400 text-xs">{formatClientName(configMember.client?.nom, configMember.client?.prenom)}</p>
+                    <h3 className="font-bold text-content-primary text-lg">Configuration Membre</h3>
+                    <p className="text-content-muted text-xs">{formatClientName(configMember.client?.nom, configMember.client?.prenom)}</p>
                  </div>
                  <IconButton icon={X} onClick={() => setConfigMember(null)} size="sm" aria-label="Fermer" />
              </div>
 
-             <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50 space-y-4">
+             <div className="bg-surface/50 rounded-lg p-3 border border-edge-subtle space-y-4">
                  <div className="flex items-center justify-between">
-                     <span className="text-sm font-medium text-slate-300 flex items-center gap-2">
-                         <Settings size={14} className="text-purple-400" />
+                     <span className="text-sm font-medium text-content-secondary flex items-center gap-2">
+                         <Settings size={14} className="text-status-info" />
                          Cotisation Auto
                      </span>
                      <label className="relative inline-flex items-center cursor-pointer">
@@ -694,20 +694,20 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
                             className="sr-only peer"
                             disabled={updatingConfig}
                         />
-                        <div className="w-9 h-5 bg-slate-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                        <div className="w-9 h-5 bg-edge-strong peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-accent rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:shadow-md after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent"></div>
                      </label>
                  </div>
 
                  {configMember.cotisationAutomatique && (
                      <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1">
-                         <span className="text-xs text-slate-500 font-bold uppercase tracking-wider block">Compte Source</span>
+                         <span className="text-xs text-content-muted font-bold uppercase tracking-wider block">Compte Source</span>
                          {loadingAccounts ? (
-                             <div className="h-9 bg-slate-700/50 rounded animate-pulse" />
+                             <div className="h-9 bg-surface-elevated/50 rounded animate-pulse" />
                          ) : (
                              <select 
                                 value={configMember.cotisationCompteId || ''}
                                 onChange={(e) => handleUpdateConfig(true, e.target.value)}
-                                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+                                className="w-full bg-surface-base border border-edge rounded-lg px-3 py-2 text-xs text-content-primary focus:outline-none focus:border-accent"
                                 disabled={updatingConfig}
                              >
                                 <option value="" disabled>Choisir un compte</option>
@@ -718,9 +718,9 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
                                 ))}
                              </select>
                          )}
-                         <div className="flex gap-2 p-2 bg-blue-500/10 border border-blue-500/20 rounded-md mt-2">
-                             <Wallet size={12} className="text-blue-400 mt-0.5" />
-                             <p className="text-[10px] text-blue-300 leading-tight">
+                         <div className="flex gap-2 p-2 bg-status-info-bg border border-status-info/20 rounded-md mt-2">
+                             <Wallet size={12} className="text-status-info mt-0.5" />
+                             <p className="text-[10px] text-status-info leading-tight">
                                 La cotisation sera prélevée automatiquement à chaque début de tour si le solde est suffisant.
                              </p>
                          </div>

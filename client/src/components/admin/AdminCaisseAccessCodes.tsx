@@ -86,15 +86,15 @@ export default function AdminCaisseAccessCodes({ onClose }: AdminCaisseAccessCod
   return (
     <div className="space-y-4">
       {/* Header - Clean & Professional */}
-      <Card className="bg-slate-900 border-slate-800 p-3 sm:p-4">
+      <Card className="bg-surface-base border-edge p-3 sm:p-4">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="p-2 bg-emerald-500/20 rounded-lg flex-shrink-0">
-              <Key className="text-emerald-400" size={18} />
+            <div className="p-2 bg-status-success-bg rounded-lg flex-shrink-0">
+              <Key className="text-status-success" size={18} />
             </div>
             <div className="min-w-0">
-              <h2 className="text-base sm:text-lg font-bold text-white truncate">Codes d'Accès Caisse</h2>
-              <p className="text-[10px] sm:text-xs text-slate-500 truncate">Gérer les codes de sécurité</p>
+              <h2 className="text-base sm:text-lg font-bold text-content-primary truncate">Codes d'Accès Caisse</h2>
+              <p className="text-[10px] sm:text-xs text-content-muted truncate">Gérer les codes de sécurité</p>
             </div>
           </div>
           <Button
@@ -102,7 +102,7 @@ export default function AdminCaisseAccessCodes({ onClose }: AdminCaisseAccessCod
             icon={ArrowLeft}
             onClick={onClose}
             size="sm"
-            className="flex-shrink-0 text-slate-400 hover:text-white"
+            className="flex-shrink-0 text-content-muted hover:text-content-primary"
           >
             <span className="hidden sm:inline">Retour</span>
           </Button>
@@ -121,7 +121,7 @@ export default function AdminCaisseAccessCodes({ onClose }: AdminCaisseAccessCod
 
       {/* Content */}
       {loading ? (
-        <Card className="bg-slate-900 border-slate-800 py-12">
+        <Card className="bg-surface-base border-edge py-12">
           <div className="flex justify-center">
             <LoadingSpinner size="lg" />
           </div>

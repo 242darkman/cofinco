@@ -14,8 +14,8 @@ export default function LoadingSpinner({ size = 'md', text }: LoadingSpinnerProp
 
   return (
     <div className="flex flex-col items-center justify-center gap-4 p-8">
-      <div className={`${sizeClasses[size]} border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin`}></div>
-      {text && <p className="text-slate-400 text-sm">{text}</p>}
+      <div className={`${sizeClasses[size]} border-4 border-status-info/20 border-t-status-info rounded-full animate-spin`}></div>
+      {text && <p className="text-content-muted text-sm">{text}</p>}
     </div>
   );
 }

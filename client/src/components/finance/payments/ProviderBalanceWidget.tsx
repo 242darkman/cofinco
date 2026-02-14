@@ -17,8 +17,8 @@ interface ProviderBalance {
 }
 
 const PROVIDER_STYLES: Record<string, { bg: string; border: string; text: string; logo: string }> = {
-  MTN: { bg: 'bg-yellow-500/10', border: 'border-yellow-500/30', text: 'text-yellow-400', logo: mtnLogo },
-  AIRTEL: { bg: 'bg-red-500/10', border: 'border-red-500/30', text: 'text-red-400', logo: airtelLogo },
+  MTN: { bg: 'bg-status-warning-bg', border: 'border-status-warning/30', text: 'text-status-warning', logo: mtnLogo },
+  AIRTEL: { bg: 'bg-status-danger-bg', border: 'border-status-danger/30', text: 'text-status-danger', logo: airtelLogo },
 };
 
 export default function ProviderBalanceWidget() {
@@ -39,11 +39,11 @@ export default function ProviderBalanceWidget() {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
-          <Wallet size={13} className="text-cyan-400" />
+        <h4 className="text-xs font-bold text-content-primary flex items-center gap-1.5">
+          <Wallet size={13} className="text-accent" />
           Soldes Providers
           {isSharedWallet && (
-            <span className="text-[9px] font-normal text-slate-500 flex items-center gap-0.5" title="pawaPay utilise un wallet partagé pour le Congo">
+            <span className="text-[9px] font-normal text-content-muted flex items-center gap-0.5" title="pawaPay utilise un wallet partagé pour le Congo">
               <Link2 size={9} />
               partagé
             </span>
@@ -52,7 +52,7 @@ export default function ProviderBalanceWidget() {
         <button
           onClick={() => refetch()}
           disabled={isLoading}
-          className="p-1 text-slate-400 hover:text-white rounded transition-colors disabled:opacity-50"
+          className="p-1 text-content-muted hover:text-content-primary rounded transition-colors disabled:opacity-50"
           title="Actualiser"
         >
           <RefreshCw size={12} className={isLoading ? 'animate-spin' : ''} />
@@ -60,23 +60,23 @@ export default function ProviderBalanceWidget() {
       </div>
 
       {isLoading && providers.length === 0 ? (
-        <div className="flex items-center justify-center py-4 text-slate-500 text-xs">
+        <div className="flex items-center justify-center py-4 text-content-muted text-xs">
           <RefreshCw className="animate-spin mr-2" size={12} />
           Chargement...
         </div>
       ) : isError ? (
-        <div className="text-center py-3 text-red-400 text-xs flex items-center justify-center gap-1">
+        <div className="text-center py-3 text-status-danger text-xs flex items-center justify-center gap-1">
           <AlertCircle size={12} />
           Erreur de connexion
         </div>
       ) : providers.length === 0 ? (
-        <div className="text-center py-3 text-slate-500 text-xs">
+        <div className="text-center py-3 text-content-muted text-xs">
           Aucun provider configuré
         </div>
       ) : (
         <div className="space-y-1.5">
           {providers.map((p) => {
-            const style = PROVIDER_STYLES[p.code] || { bg: 'bg-slate-500/10', border: 'border-slate-500/30', text: 'text-slate-400', logo: '' };
+            const style = PROVIDER_STYLES[p.code] || { bg: 'bg-surface-subtle/30', border: 'border-edge-strong/30', text: 'text-content-muted', logo: '' };
             return (
               <div
                 key={p.code}
@@ -90,17 +90,17 @@ export default function ProviderBalanceWidget() {
                       <span className={`font-bold text-xs ${style.text}`}>{p.code}</span>
                     )}
                     {p.accountStatus === 'ACTIVE' && (
-                      <CheckCircle2 size={11} className="text-emerald-400" />
+                      <CheckCircle2 size={11} className="text-status-success" />
                     )}
                   </div>
                   {p.error ? (
-                    <span className="text-[10px] text-red-400 truncate max-w-[120px]" title={p.error}>
+                    <span className="text-[10px] text-status-danger truncate max-w-[120px]" title={p.error}>
                       {p.error.length > 20 ? p.error.slice(0, 20) + '...' : p.error}
                     </span>
                   ) : (
-                    <span className="font-mono font-bold text-sm text-white">
+                    <span className="font-mono font-bold text-sm text-content-primary">
                       {p.balance ? parseFloat(p.balance).toLocaleString('fr-FR') : '---'}
-                      <span className="text-[10px] text-slate-400 ml-1">{p.currency || currencyCode()}</span>
+                      <span className="text-[10px] text-content-muted ml-1">{p.currency || currencyCode()}</span>
                     </span>
                   )}
                 </div>
@@ -111,7 +111,7 @@ export default function ProviderBalanceWidget() {
       )}
 
       {dataUpdatedAt > 0 && (
-        <p className="text-[9px] text-slate-600 text-right">
+        <p className="text-[9px] text-content-muted text-right">
           Maj: {new Date(dataUpdatedAt).toLocaleTimeString('fr-FR')}
         </p>
       )}

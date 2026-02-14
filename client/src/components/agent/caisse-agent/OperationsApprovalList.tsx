@@ -184,25 +184,25 @@ export default function OperationsApprovalList({ onModuleChange }: OperationsApp
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#020617]">
+      <div className="min-h-screen flex items-center justify-center bg-surface-base">
         <div className="flex flex-col items-center gap-4">
-          <RefreshCw className="w-8 h-8 text-cyan-500 animate-spin" />
-          <p className="text-slate-400 text-sm">Chargement des opérations...</p>
+          <RefreshCw className="w-8 h-8 text-accent animate-spin" />
+          <p className="text-content-muted text-sm">Chargement des opérations...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#020617] text-slate-100 font-sans">
+    <div className="min-h-screen bg-surface-base text-content-primary font-sans">
       <div className="w-full min-h-screen flex flex-col p-4 md:p-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-xl font-bold text-white">Approbation des opérations</h1>
-            <p className="text-sm text-slate-400">
+            <h1 className="text-xl font-bold text-content-primary">Approbation des opérations</h1>
+            <p className="text-sm text-content-muted">
               {pendingCount > 0 ? (
-                <span className="text-amber-400">{pendingCount} opération(s) en attente</span>
+                <span className="text-status-warning">{pendingCount} opération(s) en attente</span>
               ) : (
                 'Aucune opération en attente'
               )}
@@ -214,7 +214,7 @@ export default function OperationsApprovalList({ onModuleChange }: OperationsApp
               size="sm"
               icon={Filter}
               onClick={() => setShowFilters(!showFilters)}
-              className={showFilters ? 'bg-cyan-500/10 text-cyan-400' : ''}
+              className={showFilters ? 'bg-accent/10 text-accent' : ''}
             >
               Filtres
             </Button>
@@ -284,14 +284,14 @@ export default function OperationsApprovalList({ onModuleChange }: OperationsApp
           <Card
             variant="default"
             padding="sm"
-            className={`cursor-pointer transition-all ${filterStatut === StatutOperationTerrain.SUBMITTED ? 'border-amber-500/50 bg-amber-500/5' : ''}`}
+            className={`cursor-pointer transition-all ${filterStatut === StatutOperationTerrain.SUBMITTED ? 'border-status-warning/50 bg-status-warning/5' : ''}`}
             onClick={() => setFilterStatut(StatutOperationTerrain.SUBMITTED)}
           >
             <div className="flex items-center gap-2">
-              <Clock size={16} className="text-amber-400" />
-              <span className="text-sm text-slate-300">En attente</span>
+              <Clock size={16} className="text-status-warning" />
+              <span className="text-sm text-content-secondary">En attente</span>
             </div>
-            <p className="text-2xl font-bold text-amber-400 mt-1">
+            <p className="text-2xl font-bold text-status-warning mt-1">
               {operations.filter(op => op.statut === StatutOperationTerrain.SUBMITTED).length}
             </p>
           </Card>
@@ -299,14 +299,14 @@ export default function OperationsApprovalList({ onModuleChange }: OperationsApp
           <Card
             variant="default"
             padding="sm"
-            className={`cursor-pointer transition-all ${filterStatut === StatutOperationTerrain.APPROVED ? 'border-emerald-500/50 bg-emerald-500/5' : ''}`}
+            className={`cursor-pointer transition-all ${filterStatut === StatutOperationTerrain.APPROVED ? 'border-status-success/50 bg-status-success/5' : ''}`}
             onClick={() => setFilterStatut(StatutOperationTerrain.APPROVED)}
           >
             <div className="flex items-center gap-2">
-              <CheckCircle size={16} className="text-emerald-400" />
-              <span className="text-sm text-slate-300">Approuvées</span>
+              <CheckCircle size={16} className="text-status-success" />
+              <span className="text-sm text-content-secondary">Approuvées</span>
             </div>
-            <p className="text-2xl font-bold text-emerald-400 mt-1">
+            <p className="text-2xl font-bold text-status-success mt-1">
               {operations.filter(op => op.statut === StatutOperationTerrain.APPROVED).length}
             </p>
           </Card>
@@ -314,14 +314,14 @@ export default function OperationsApprovalList({ onModuleChange }: OperationsApp
           <Card
             variant="default"
             padding="sm"
-            className={`cursor-pointer transition-all ${filterStatut === StatutOperationTerrain.REJECTED ? 'border-red-500/50 bg-red-500/5' : ''}`}
+            className={`cursor-pointer transition-all ${filterStatut === StatutOperationTerrain.REJECTED ? 'border-status-danger/50 bg-status-danger/5' : ''}`}
             onClick={() => setFilterStatut(StatutOperationTerrain.REJECTED)}
           >
             <div className="flex items-center gap-2">
-              <XCircle size={16} className="text-red-400" />
-              <span className="text-sm text-slate-300">Rejetées</span>
+              <XCircle size={16} className="text-status-danger" />
+              <span className="text-sm text-content-secondary">Rejetées</span>
             </div>
-            <p className="text-2xl font-bold text-red-400 mt-1">
+            <p className="text-2xl font-bold text-status-danger mt-1">
               {operations.filter(op => op.statut === StatutOperationTerrain.REJECTED).length}
             </p>
           </Card>
@@ -347,42 +347,42 @@ export default function OperationsApprovalList({ onModuleChange }: OperationsApp
                 padding="md"
                 className={`transition-all ${
                   op.statut === StatutOperationTerrain.SUBMITTED
-                    ? 'border-amber-500/20 hover:border-amber-500/40'
-                    : 'hover:border-cyan-500/20'
+                    ? 'border-status-warning/20 hover:border-status-warning/40'
+                    : 'hover:border-accent/20'
                 }`}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-start gap-3">
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
                       op.type === 'COLLECT_CASH'
-                        ? 'bg-cyan-500/10 text-cyan-400'
-                        : 'bg-emerald-500/10 text-emerald-400'
+                        ? 'bg-accent/10 text-accent'
+                        : 'bg-status-success-bg text-status-success'
                     }`}>
                       {op.type === 'COLLECT_CASH' ? <ArrowDownRight size={20} /> : <ArrowUpRight size={20} />}
                     </div>
                     <div>
                       <div className="flex items-center gap-2 mb-1">
-                        <p className="text-sm font-medium text-white">
+                        <p className="text-sm font-medium text-content-primary">
                           {op.type === 'COLLECT_CASH' ? 'Collecte' : 'Remise'}
                         </p>
                         {getStatutBadge(op.statut)}
                       </div>
-                      <p className="text-xs text-slate-400">
+                      <p className="text-xs text-content-muted">
                         Réf: {op.reference}
                       </p>
                       {op.client && (
-                        <p className="text-xs text-slate-400 flex items-center gap-1 mt-1">
+                        <p className="text-xs text-content-muted flex items-center gap-1 mt-1">
                           <User size={12} />
                           Client: {formatClientName(op.client.nom, op.client.prenom)}
                         </p>
                       )}
                       {op.agent && (
-                        <p className="text-xs text-slate-400 flex items-center gap-1">
+                        <p className="text-xs text-content-muted flex items-center gap-1">
                           <User size={12} />
                           Agent: {formatClientName(op.agent.nom, op.agent.prenom)}
                         </p>
                       )}
-                      <p className="text-xs text-slate-500 flex items-center gap-1 mt-1">
+                      <p className="text-xs text-content-muted flex items-center gap-1 mt-1">
                         <Calendar size={12} />
                         {formatDate(op.submittedAt as unknown as string)}
                       </p>
@@ -391,7 +391,7 @@ export default function OperationsApprovalList({ onModuleChange }: OperationsApp
 
                   <div className="text-right">
                     <p className={`text-lg font-bold ${
-                      op.type === 'COLLECT_CASH' ? 'text-cyan-400' : 'text-emerald-400'
+                      op.type === 'COLLECT_CASH' ? 'text-accent' : 'text-status-success'
                     }`}>
                       {op.type === 'COLLECT_CASH' ? '+' : '-'}{formatMoney(op.montant as unknown as string)} XOF
                     </p>
@@ -417,7 +417,7 @@ export default function OperationsApprovalList({ onModuleChange }: OperationsApp
                         icon={XCircle}
                         onClick={() => setOperationToReject(op)}
                         disabled={processingId === op.id}
-                        className="border-red-500/50 text-red-400 hover:bg-red-500/10"
+                        className="border-status-danger/50 text-status-danger hover:bg-status-danger-bg"
                       >
                         Rejeter
                       </Button>

@@ -56,20 +56,20 @@ export default function ProspectionSupervisionPanel() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <BarChart3 size={20} className="text-cyan-400" />
-          <h2 className="text-lg font-bold text-white">Supervision Prospection</h2>
+          <BarChart3 size={20} className="text-accent" />
+          <h2 className="text-lg font-bold text-content-primary">Supervision Prospection</h2>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg">
-            <Calendar size={14} className="text-slate-400" />
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-surface border border-edge rounded-lg">
+            <Calendar size={14} className="text-content-muted" />
             <input
               type="month"
               value={period}
               onChange={(e) => setPeriod(e.target.value)}
-              className="bg-transparent text-sm text-white focus:outline-none"
+              className="bg-transparent text-sm text-content-primary focus:outline-none"
             />
           </div>
-          <button onClick={loadData} className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition">
+          <button onClick={loadData} className="p-2 text-content-muted hover:text-content-primary hover:bg-surface rounded-lg transition">
             <RefreshCw size={16} />
           </button>
         </div>
@@ -77,36 +77,36 @@ export default function ProspectionSupervisionPanel() {
 
       {/* Summary KPIs */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="p-3 bg-slate-800/80 border border-slate-700 rounded-xl">
-          <div className="flex items-center gap-1.5 text-slate-400 mb-1">
+        <div className="p-3 bg-surface/80 border border-edge rounded-xl">
+          <div className="flex items-center gap-1.5 text-content-muted mb-1">
             <Users size={14} />
             <span className="text-[10px] font-medium uppercase">Total Prospects</span>
           </div>
-          <p className="text-xl font-bold text-white">{totalProspects}</p>
+          <p className="text-xl font-bold text-content-primary">{totalProspects}</p>
         </div>
-        <div className="p-3 bg-slate-800/80 border border-slate-700 rounded-xl">
-          <div className="flex items-center gap-1.5 text-slate-400 mb-1">
+        <div className="p-3 bg-surface/80 border border-edge rounded-xl">
+          <div className="flex items-center gap-1.5 text-content-muted mb-1">
             <Award size={14} />
             <span className="text-[10px] font-medium uppercase">Convertis</span>
           </div>
-          <p className="text-xl font-bold text-purple-400">{totalConverted}</p>
+          <p className="text-xl font-bold text-status-info">{totalConverted}</p>
         </div>
-        <div className="p-3 bg-slate-800/80 border border-slate-700 rounded-xl">
-          <div className="flex items-center gap-1.5 text-slate-400 mb-1">
+        <div className="p-3 bg-surface/80 border border-edge rounded-xl">
+          <div className="flex items-center gap-1.5 text-content-muted mb-1">
             <TrendingUp size={14} />
             <span className="text-[10px] font-medium uppercase">Taux Conversion</span>
           </div>
-          <p className="text-xl font-bold text-cyan-400">{avgConversion}%</p>
+          <p className="text-xl font-bold text-accent">{avgConversion}%</p>
         </div>
       </div>
 
       {/* Agent Performance Table */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 size={24} className="animate-spin text-cyan-400" />
+          <Loader2 size={24} className="animate-spin text-accent" />
         </div>
       ) : data.length === 0 ? (
-        <div className="text-center py-8 text-slate-400">
+        <div className="text-center py-8 text-content-muted">
           <p className="text-sm">Aucune donnée pour cette période</p>
         </div>
       ) : (
@@ -114,32 +114,32 @@ export default function ProspectionSupervisionPanel() {
           {data
             .sort((a, b) => b.totalProspects - a.totalProspects)
             .map((agent, idx) => (
-            <div key={agent.agentId} className="p-3 bg-slate-800/80 border border-slate-700 rounded-xl">
+            <div key={agent.agentId} className="p-3 bg-surface/80 border border-edge rounded-xl">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 flex items-center justify-center rounded-full bg-slate-700 text-[10px] font-bold text-slate-300">
+                  <span className="w-6 h-6 flex items-center justify-center rounded-full bg-surface-elevated text-[10px] font-bold text-content-secondary">
                     {idx + 1}
                   </span>
-                  <span className="text-sm font-medium text-white">{agent.agentNom}</span>
+                  <span className="text-sm font-medium text-content-primary">{agent.agentNom}</span>
                 </div>
-                <span className="text-xs font-medium text-cyan-400">{agent.conversionRate.toFixed(1)}%</span>
+                <span className="text-xs font-medium text-accent">{agent.conversionRate.toFixed(1)}%</span>
               </div>
 
               {/* Progress bar */}
-              <div className="h-2 bg-slate-700 rounded-full overflow-hidden mb-2">
+              <div className="h-2 bg-surface-elevated rounded-full overflow-hidden mb-2">
                 <div
-                  className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full transition-all"
+                  className="h-full bg-gradient-to-r from-accent to-status-info rounded-full transition-all"
                   style={{ width: `${(agent.totalProspects / maxProspects) * 100}%` }}
                 />
               </div>
 
               {/* Stats row */}
               <div className="flex items-center gap-3 text-[10px]">
-                <span className="text-blue-400">{agent.totalProspects} prospects</span>
-                <span className="text-emerald-400">{agent.interested} intéressés</span>
-                <span className="text-purple-400">{agent.converted} convertis</span>
-                <span className="text-amber-400">{agent.toFollowUp} à suivre</span>
-                <span className="text-red-400">{agent.refused} refusés</span>
+                <span className="text-status-info">{agent.totalProspects} prospects</span>
+                <span className="text-status-success">{agent.interested} intéressés</span>
+                <span className="text-status-info">{agent.converted} convertis</span>
+                <span className="text-status-warning">{agent.toFollowUp} à suivre</span>
+                <span className="text-status-danger">{agent.refused} refusés</span>
               </div>
             </div>
           ))}

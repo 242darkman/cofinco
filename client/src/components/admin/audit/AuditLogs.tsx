@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Shield, Filter, Download, Search, AlertTriangle, CheckCircle, XCircle, Clock, FileSpreadsheet, FileText } from 'lucide-react';
 import { addPdfLogoHeader } from '@/lib/pdf-logo';
+import { useBranding } from '@/contexts/BrandingContext';
 import { auditApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { ALL_STATUS_LABELS } from '../../../lib/status-labels';
@@ -34,6 +35,7 @@ const formatLogDate = (log: any) => {
 };
 
 export default function AuditLogs() {
+  const { branding } = useBranding();
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -105,7 +107,7 @@ export default function AuditLogs() {
     const separator = ';';
     
     let csvContent = BOM;
-    csvContent += `JOURNAL D'AUDIT - COFIN${separator}${separator}${separator}${separator}${separator}${separator}\n`;
+    csvContent += `JOURNAL D'AUDIT - ${branding.appName}${separator}${separator}${separator}${separator}${separator}${separator}\n`;
     csvContent += `Date d'export: ${dateExport}${separator}${separator}${separator}${separator}${separator}${separator}\n`;
     csvContent += `Total: ${stats.total} | Succès: ${stats.success} | Échecs: ${stats.failure}${separator}${separator}${separator}${separator}${separator}${separator}\n`;
     csvContent += `${separator}${separator}${separator}${separator}${separator}${separator}\n`;
@@ -119,7 +121,7 @@ export default function AuditLogs() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `COFIN_Audit_Logs_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `${branding.appName}_Audit_Logs_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
     URL.revokeObjectURL(url);
     setShowExportMenu(false);
@@ -135,6 +137,7 @@ export default function AuditLogs() {
       title: "JOURNAL D'AUDIT",
       subtitle: `Total: ${stats.total} | Succès: ${stats.success} | Échecs: ${stats.failure}`,
       dateRight: `Export: ${dateExport}`,
+      appName: branding.appName,
     });
 
     const tableData = filteredLogs.slice(0, 50).map((log, idx) => [
@@ -155,13 +158,13 @@ export default function AuditLogs() {
       alternateRowStyles: { fillColor: [240, 240, 240] }
     });
     
-    doc.save(`COFIN_Audit_Logs_${new Date().toISOString().split('T')[0]}.pdf`);
+    doc.save(`${branding.appName}_Audit_Logs_${new Date().toISOString().split('T')[0]}.pdf`);
     setShowExportMenu(false);
   };
 
   const exportToJSON = () => {
     const exportData = {
-      titre: "Journal d'Audit COFIN",
+      titre: `Journal d'Audit ${branding.appName}`,
       dateExport: new Date().toISOString(),
       statistiques: stats,
       logs: filteredLogs.map(log => ({
@@ -179,7 +182,7 @@ export default function AuditLogs() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `COFIN_Audit_Logs_${new Date().toISOString().split('T')[0]}.json`;
+    link.download = `${branding.appName}_Audit_Logs_${new Date().toISOString().split('T')[0]}.json`;
     link.click();
     URL.revokeObjectURL(url);
     setShowExportMenu(false);
@@ -187,29 +190,29 @@ export default function AuditLogs() {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'success': return <CheckCircle className="text-green-400" size={20} />;
-      case 'failure': return <XCircle className="text-blue-400" size={20} />;
-      case 'pending': return <Clock className="text-cyan-400" size={20} />;
+      case 'success': return <CheckCircle className="text-status-success" size={20} />;
+      case 'failure': return <XCircle className="text-status-info" size={20} />;
+      case 'pending': return <Clock className="text-accent" size={20} />;
       default: return null;
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'success': return 'bg-green-500/20 text-green-400';
-      case 'failure': return 'bg-blue-500/20 text-blue-400';
-      case 'pending': return 'bg-cyan-500/20 text-cyan-400';
-      default: return 'bg-slate-500/20 text-slate-400';
+      case 'success': return 'bg-status-success-bg text-status-success';
+      case 'failure': return 'bg-status-info-bg text-status-info';
+      case 'pending': return 'bg-accent/10 text-accent';
+      default: return 'bg-surface-subtle/40 text-content-muted';
     }
   };
 
   return (
     <div className="space-y-6">
-      <div className="bg-gradient-to-br from-emerald-600 to-cyan-600 rounded-2xl p-6 text-white">
+      <div className="bg-gradient-to-br from-status-success to-accent rounded-2xl p-6 text-white">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-3xl font-bold mb-2">Journal d'Audit</h2>
-            <p className="text-emerald-100">Suivi complet des actions système</p>
+            <p className="text-status-success-text">Suivi complet des actions système</p>
           </div>
           <div className="relative">
             <button 
@@ -220,35 +223,35 @@ export default function AuditLogs() {
               Exporter
             </button>
             {showExportMenu && (
-              <div className="absolute right-0 top-full mt-2 bg-slate-800 rounded-xl shadow-xl border border-slate-700 overflow-hidden z-50 min-w-[200px]">
+              <div className="absolute right-0 top-full mt-2 bg-surface rounded-xl shadow-xl border border-edge overflow-hidden z-50 min-w-[200px]">
                 <button
                   onClick={exportToCSV}
-                  className="w-full px-4 py-3 text-left hover:bg-slate-700 transition flex items-center gap-3 text-white"
+                  className="w-full px-4 py-3 text-left hover:bg-surface-elevated transition flex items-center gap-3 text-content-primary"
                 >
-                  <FileSpreadsheet size={18} className="text-green-400" />
+                  <FileSpreadsheet size={18} className="text-status-success" />
                   <div>
                     <div className="font-semibold">Excel (CSV)</div>
-                    <div className="text-xs text-slate-400">Tableur compatible Excel</div>
+                    <div className="text-xs text-content-muted">Tableur compatible Excel</div>
                   </div>
                 </button>
                 <button
                   onClick={exportToPDF}
-                  className="w-full px-4 py-3 text-left hover:bg-slate-700 transition flex items-center gap-3 text-white border-t border-slate-700"
+                  className="w-full px-4 py-3 text-left hover:bg-surface-elevated transition flex items-center gap-3 text-content-primary border-t border-edge"
                 >
-                  <FileText size={18} className="text-red-400" />
+                  <FileText size={18} className="text-status-danger" />
                   <div>
                     <div className="font-semibold">PDF</div>
-                    <div className="text-xs text-slate-400">Document formaté</div>
+                    <div className="text-xs text-content-muted">Document formaté</div>
                   </div>
                 </button>
                 <button
                   onClick={exportToJSON}
-                  className="w-full px-4 py-3 text-left hover:bg-slate-700 transition flex items-center gap-3 text-white border-t border-slate-700"
+                  className="w-full px-4 py-3 text-left hover:bg-surface-elevated transition flex items-center gap-3 text-content-primary border-t border-edge"
                 >
-                  <Shield size={18} className="text-blue-400" />
+                  <Shield size={18} className="text-status-info" />
                   <div>
                     <div className="font-semibold">JSON</div>
-                    <div className="text-xs text-slate-400">Données structurées</div>
+                    <div className="text-xs text-content-muted">Données structurées</div>
                   </div>
                 </button>
               </div>
@@ -258,7 +261,7 @@ export default function AuditLogs() {
       </div>
 
       <div className="grid md:grid-cols-4 gap-4">
-        <div className="bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl p-4 text-white">
+        <div className="bg-gradient-to-br from-status-info to-accent rounded-xl p-4 text-white">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm opacity-90">Total Actions</span>
             <Shield size={24} />
@@ -266,7 +269,7 @@ export default function AuditLogs() {
           <div className="text-3xl font-bold">{stats.total.toLocaleString()}</div>
         </div>
 
-        <div className="bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl p-4 text-white">
+        <div className="bg-gradient-to-br from-status-success to-status-success rounded-xl p-4 text-white">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm opacity-90">Succès</span>
             <CheckCircle size={24} />
@@ -274,7 +277,7 @@ export default function AuditLogs() {
           <div className="text-3xl font-bold">{stats.success.toLocaleString()}</div>
         </div>
 
-        <div className="bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl p-4 text-white">
+        <div className="bg-gradient-to-br from-status-info to-accent rounded-xl p-4 text-white">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm opacity-90">Échecs</span>
             <XCircle size={24} />
@@ -282,7 +285,7 @@ export default function AuditLogs() {
           <div className="text-3xl font-bold">{stats.failure.toLocaleString()}</div>
         </div>
 
-        <div className="bg-gradient-to-br from-cyan-500 to-emerald-500 rounded-xl p-4 text-white">
+        <div className="bg-gradient-to-br from-accent to-status-success rounded-xl p-4 text-white">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm opacity-90">En Attente</span>
             <Clock size={24} />
@@ -291,17 +294,17 @@ export default function AuditLogs() {
         </div>
       </div>
 
-      <div className="bg-slate-800 rounded-2xl p-6">
+      <div className="bg-surface rounded-2xl p-6">
         <div className="flex flex-wrap gap-4 mb-6">
           <div className="flex-1 min-w-[200px]">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={20} />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-content-muted" size={20} />
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Rechercher..."
-                className="w-full pl-10 pr-4 py-3 bg-slate-700 text-white rounded-xl border border-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full pl-10 pr-4 py-3 bg-surface-elevated text-content-primary rounded-xl border border-edge-strong focus:outline-none focus:ring-2 focus:ring-status-success"
               />
             </div>
           </div>
@@ -309,7 +312,7 @@ export default function AuditLogs() {
           <select
             value={filterAction}
             onChange={(e) => setFilterAction(e.target.value)}
-            className="px-4 py-3 bg-slate-700 text-white rounded-xl border border-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className="px-4 py-3 bg-surface-elevated text-content-primary rounded-xl border border-edge-strong focus:outline-none focus:ring-2 focus:ring-status-success"
           >
             <option value="all">Toutes les actions</option>
             <option value="CREATE">Créations</option>
@@ -323,7 +326,7 @@ export default function AuditLogs() {
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-4 py-3 bg-slate-700 text-white rounded-xl border border-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className="px-4 py-3 bg-surface-elevated text-content-primary rounded-xl border border-edge-strong focus:outline-none focus:ring-2 focus:ring-status-success"
           >
             <option value="all">Tous les statuts</option>
             <option value="success">Succès</option>
@@ -335,7 +338,7 @@ export default function AuditLogs() {
             type="date"
             value={dateDebut}
             onChange={(e) => setDateDebut(e.target.value)}
-            className="px-4 py-3 bg-slate-700 text-white rounded-xl border border-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className="px-4 py-3 bg-surface-elevated text-content-primary rounded-xl border border-edge-strong focus:outline-none focus:ring-2 focus:ring-status-success"
             placeholder="Date début"
           />
 
@@ -343,13 +346,13 @@ export default function AuditLogs() {
             type="date"
             value={dateFin}
             onChange={(e) => setDateFin(e.target.value)}
-            className="px-4 py-3 bg-slate-700 text-white rounded-xl border border-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className="px-4 py-3 bg-surface-elevated text-content-primary rounded-xl border border-edge-strong focus:outline-none focus:ring-2 focus:ring-status-success"
             placeholder="Date fin"
           />
 
           <button
             onClick={fetchLogs}
-            className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition flex items-center gap-2"
+            className="px-6 py-3 bg-status-success hover:bg-status-success text-white rounded-xl transition flex items-center gap-2"
           >
             <Filter size={18} />
             Filtrer
@@ -358,46 +361,46 @@ export default function AuditLogs() {
 
         {loading ? (
           <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto"></div>
-            <p className="text-slate-400 mt-4">Chargement des logs...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-status-success mx-auto"></div>
+            <p className="text-content-muted mt-4">Chargement des logs...</p>
           </div>
         ) : (
           <div>
             <table className="w-full">
-              <thead className="bg-slate-700">
+              <thead className="bg-surface-elevated">
                 <tr>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">Date/Heure</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">Utilisateur</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">Action</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">Entité</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">IP</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">Statut</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">Détails</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-content-secondary">Date/Heure</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-content-secondary">Utilisateur</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-content-secondary">Action</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-content-secondary">Entité</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-content-secondary">IP</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-content-secondary">Statut</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-content-secondary">Détails</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-700">
+              <tbody className="divide-y divide-edge">
                 {filteredLogs.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-12 text-center text-slate-400">
+                    <td colSpan={7} className="px-4 py-12 text-center text-content-muted">
                       Aucun log trouvé
                     </td>
                   </tr>
                 ) : (
                   filteredLogs.map((log) => (
-                    <tr key={log.id} className="hover:bg-slate-700/50 transition">
-                      <td className="px-4 py-3 text-slate-300 text-sm">
+                    <tr key={log.id} className="hover:bg-surface-elevated/50 transition">
+                      <td className="px-4 py-3 text-content-secondary text-sm">
                         {formatLogDate(log)}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="text-white font-semibold">{log.userEmail || 'Système'}</div>
+                        <div className="text-content-primary font-semibold">{log.userEmail || 'Système'}</div>
                       </td>
                       <td className="px-4 py-3">
-                        <span className="px-3 py-1 rounded-lg text-xs font-semibold bg-blue-500/20 text-blue-400">
+                        <span className="px-3 py-1 rounded-lg text-xs font-semibold bg-status-info-bg text-status-info">
                           {log.action}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-slate-300">{log.entityType || log.resource || 'N/A'}</td>
-                      <td className="px-4 py-3 text-slate-400 font-mono text-xs">{log.ipAddress || '-'}</td>
+                      <td className="px-4 py-3 text-content-secondary">{log.entityType || log.resource || 'N/A'}</td>
+                      <td className="px-4 py-3 text-content-muted font-mono text-xs">{log.ipAddress || '-'}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           {getStatusIcon(log.status || '' )}
@@ -408,7 +411,7 @@ export default function AuditLogs() {
                       </td>
                       <td className="px-4 py-3">
                         {log.errorMessage && (
-                          <div className="flex items-center gap-2 text-blue-400 text-sm">
+                          <div className="flex items-center gap-2 text-status-info text-sm">
                             <AlertTriangle size={16} />
                             <span className="truncate max-w-xs">{log.errorMessage}</span>
                           </div>

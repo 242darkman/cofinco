@@ -17,16 +17,16 @@ interface FluxRowProps {
 const FluxRow = memo(function FluxRow({ libelle, montant, type }: FluxRowProps) {
   const isEntree = type === 'entree';
   return (
-    <div className="flex justify-between items-center py-1.5 px-2 hover:bg-slate-700/30 rounded text-xs">
+    <div className="flex justify-between items-center py-1.5 px-2 hover:bg-surface-elevated/30 rounded text-xs">
       <div className="flex items-center gap-2">
         {isEntree ? (
-          <ArrowUpRight size={12} className="text-emerald-400" />
+          <ArrowUpRight size={12} className="text-status-success" />
         ) : (
-          <ArrowDownRight size={12} className="text-red-400" />
+          <ArrowDownRight size={12} className="text-status-danger" />
         )}
-        <span className="text-slate-300">{libelle}</span>
+        <span className="text-content-secondary">{libelle}</span>
       </div>
-      <span className={`font-mono ${isEntree ? 'text-emerald-400' : 'text-red-400'}`}>
+      <span className={`font-mono ${isEntree ? 'text-status-success' : 'text-status-danger'}`}>
         {isEntree ? '+' : '-'}{Math.abs(montant).toLocaleString()}
       </span>
     </div>
@@ -233,7 +233,7 @@ export default function TableauTresorerie() {
           {icon}
           <span className="text-xs font-bold text-white">{title}</span>
         </div>
-        <span className={`text-sm font-bold ${total >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
+        <span className={`text-sm font-bold ${total >= 0 ? 'text-status-success' : 'text-status-danger'}`}>
           {total >= 0 ? '+' : ''}{total.toLocaleString()} FCFA
         </span>
       </div>
@@ -249,7 +249,7 @@ export default function TableauTresorerie() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl p-3">
+      <div className="bg-gradient-to-r from-accent to-status-info rounded-xl p-3">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-2">
             <Wallet className="w-5 h-5 text-white" />
@@ -259,12 +259,14 @@ export default function TableauTresorerie() {
             </div>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" icon={Download} onClick={handleExportExcel} className="bg-white/20 border-transparent text-white hover:bg-white/30">
+            <button onClick={handleExportExcel} className="bg-white/20 hover:bg-white/30 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors">
+              <Download className="w-4 h-4" />
               Excel
-            </Button>
-            <Button variant="outline" size="sm" icon={Printer} onClick={handleExportPDF} className="bg-white/20 border-transparent text-white hover:bg-white/30">
+            </button>
+            <button onClick={handleExportPDF} className="bg-white/20 hover:bg-white/30 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors">
+              <Printer className="w-4 h-4" />
               PDF
-            </Button>
+            </button>
           </div>
         </div>
       </div>
@@ -272,21 +274,21 @@ export default function TableauTresorerie() {
       {/* Filtres */}
       <div className="flex flex-wrap gap-3 items-end">
         <div className="flex-1 min-w-[140px] max-w-[180px]">
-          <label className="block text-[10px] font-medium text-slate-400 mb-1">Date Début</label>
+          <label className="block text-[10px] font-medium text-content-muted mb-1">Date Début</label>
           <input
             type="date"
             value={dateDebut}
             onChange={(e) => setDateDebut(e.target.value)}
-            className="w-full bg-slate-800 text-white text-xs px-3 py-2 rounded-lg border border-slate-700 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+            className="w-full bg-surface text-content-primary text-xs px-3 py-2 rounded-lg border border-edge focus:outline-none focus:ring-1 focus:ring-accent"
           />
         </div>
         <div className="flex-1 min-w-[140px] max-w-[180px]">
-          <label className="block text-[10px] font-medium text-slate-400 mb-1">Date Fin</label>
+          <label className="block text-[10px] font-medium text-content-muted mb-1">Date Fin</label>
           <input
             type="date"
             value={dateFin}
             onChange={(e) => setDateFin(e.target.value)}
-            className="w-full bg-slate-800 text-white text-xs px-3 py-2 rounded-lg border border-slate-700 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+            className="w-full bg-surface text-content-primary text-xs px-3 py-2 rounded-lg border border-edge focus:outline-none focus:ring-1 focus:ring-accent"
           />
         </div>
         <Button variant="primary" size="sm" icon={RefreshCw} onClick={fetchTresorerie} disabled={loading}>
@@ -296,34 +298,34 @@ export default function TableauTresorerie() {
 
       {loading ? (
         <div className="text-center py-12">
-          <RefreshCw className="animate-spin w-8 h-8 text-cyan-500 mx-auto mb-3" />
-          <p className="text-slate-400 text-sm">Calcul des flux...</p>
+          <RefreshCw className="animate-spin w-8 h-8 text-accent mx-auto mb-3" />
+          <p className="text-content-muted text-sm">Calcul des flux...</p>
         </div>
       ) : data ? (
         <>
           {/* Synthèse */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Card variant="default" padding="sm" className="bg-emerald-500/10 border-emerald-500/30">
-              <div className="text-[10px] text-slate-400 mb-1">Flux Exploitation</div>
-              <div className={`text-lg font-bold ${totalExploitation >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+            <Card variant="default" padding="sm" className="bg-status-success-bg border-status-success/30">
+              <div className="text-[10px] text-content-muted mb-1">Flux Exploitation</div>
+              <div className={`text-lg font-bold ${totalExploitation >= 0 ? 'text-status-success' : 'text-status-danger'}`}>
                 {totalExploitation >= 0 ? '+' : ''}{totalExploitation.toLocaleString()}
               </div>
             </Card>
-            <Card variant="default" padding="sm" className="bg-blue-500/10 border-blue-500/30">
-              <div className="text-[10px] text-slate-400 mb-1">Flux Investissement</div>
-              <div className={`text-lg font-bold ${totalInvestissement >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+            <Card variant="default" padding="sm" className="bg-status-info-bg border-status-info/30">
+              <div className="text-[10px] text-content-muted mb-1">Flux Investissement</div>
+              <div className={`text-lg font-bold ${totalInvestissement >= 0 ? 'text-status-success' : 'text-status-danger'}`}>
                 {totalInvestissement >= 0 ? '+' : ''}{totalInvestissement.toLocaleString()}
               </div>
             </Card>
-            <Card variant="default" padding="sm" className="bg-purple-500/10 border-purple-500/30">
-              <div className="text-[10px] text-slate-400 mb-1">Flux Financement</div>
-              <div className={`text-lg font-bold ${totalFinancement >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+            <Card variant="default" padding="sm" className="bg-status-info-bg border-status-info/30">
+              <div className="text-[10px] text-content-muted mb-1">Flux Financement</div>
+              <div className={`text-lg font-bold ${totalFinancement >= 0 ? 'text-status-success' : 'text-status-danger'}`}>
                 {totalFinancement >= 0 ? '+' : ''}{totalFinancement.toLocaleString()}
               </div>
             </Card>
-            <Card variant="default" padding="sm" className={variationTresorerie >= 0 ? 'bg-emerald-500/20 border-emerald-500/50' : 'bg-red-500/20 border-red-500/50'}>
-              <div className="text-[10px] text-slate-400 mb-1">Variation Totale</div>
-              <div className={`text-lg font-bold ${variationTresorerie >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+            <Card variant="default" padding="sm" className={variationTresorerie >= 0 ? 'bg-status-success-bg border-status-success/50' : 'bg-status-danger-bg border-status-danger/50'}>
+              <div className="text-[10px] text-content-muted mb-1">Variation Totale</div>
+              <div className={`text-lg font-bold ${variationTresorerie >= 0 ? 'text-status-success' : 'text-status-danger'}`}>
                 {variationTresorerie >= 0 ? '+' : ''}{variationTresorerie.toLocaleString()}
               </div>
             </Card>
@@ -335,41 +337,41 @@ export default function TableauTresorerie() {
               'A - Exploitation',
               data.exploitation,
               totalExploitation,
-              'bg-gradient-to-r from-emerald-600 to-emerald-700',
+              'bg-gradient-to-r from-status-success to-status-success',
               <TrendingUp size={14} className="text-white" />
             )}
             {renderFluxSection(
               'B - Investissement',
               data.investissement,
               totalInvestissement,
-              'bg-gradient-to-r from-blue-600 to-blue-700',
+              'bg-gradient-to-r from-status-info to-status-info',
               <Wallet size={14} className="text-white" />
             )}
             {renderFluxSection(
               'C - Financement',
               data.financement,
               totalFinancement,
-              'bg-gradient-to-r from-purple-600 to-purple-700',
+              'bg-gradient-to-r from-status-info to-status-info',
               <DollarSign size={14} className="text-white" />
             )}
           </div>
 
           {/* Soldes */}
           <Card variant="default" padding="sm">
-            <div className="flex justify-between items-center py-2 border-b border-slate-700">
-              <span className="text-sm text-slate-400">Trésorerie début de période</span>
-              <span className="text-sm font-bold text-white">{data.soldeDebut.toLocaleString()} FCFA</span>
+            <div className="flex justify-between items-center py-2 border-b border-edge">
+              <span className="text-sm text-content-muted">Trésorerie début de période</span>
+              <span className="text-sm font-bold text-content-primary">{data.soldeDebut.toLocaleString()} FCFA</span>
             </div>
             <div className="flex justify-between items-center py-2">
-              <span className="text-sm text-slate-400">Trésorerie fin de période</span>
-              <span className="text-sm font-bold text-cyan-400">{data.soldeFin.toLocaleString()} FCFA</span>
+              <span className="text-sm text-content-muted">Trésorerie fin de période</span>
+              <span className="text-sm font-bold text-accent">{data.soldeFin.toLocaleString()} FCFA</span>
             </div>
           </Card>
         </>
       ) : (
         <Card variant="default" padding="lg" className="text-center">
-          <Wallet className="w-12 h-12 mx-auto mb-3 text-slate-600" />
-          <p className="text-slate-400">Aucune donnée de trésorerie disponible</p>
+          <Wallet className="w-12 h-12 mx-auto mb-3 text-content-muted" />
+          <p className="text-content-muted">Aucune donnée de trésorerie disponible</p>
         </Card>
       )}
     </div>

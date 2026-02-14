@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { CreditCard, FileText, ClipboardCheck, BarChart3, TrendingUp, AlertCircle, Clock, CheckCircle, WifiOff, Eye, Trash2, DollarSign, XCircle, RefreshCw, Users, ArrowRight, Calendar, Play, UserCheck } from 'lucide-react';
 import { Card, Button, PageHeader, TabGroup, StatCard, ResponsiveTable, Badge, LoadingScreen, IconButton, ConfirmDialog, FeatureHeader, FEATURE_DESCRIPTIONS } from '../../ui';
 import { useCreditCounts } from '../../../hooks/credits/useCreditCounts';
@@ -28,21 +28,51 @@ import { toast } from 'sonner';
 import { PipelineFunnel } from './PipelineFunnel';
 import { differenceInDays } from 'date-fns';
 import { useWebSocket } from '../../../hooks/useWebSocket';
+import { useLocation } from 'wouter';
+import { useCurrency } from '../../../contexts/CurrencyContext';
 
 type TabId = 'dashboard' | 'credits' | 'approbation' | 'commission' | 'demandes' | 'enquetes' | 'reevaluations' | 'remboursements' | 'echeancier' | 'archives';
+
+/** Maps tab keys to URL slugs */
+const TAB_TO_SLUG: Record<TabId, string> = {
+  dashboard: 'synthese',
+  credits: 'portefeuille',
+  demandes: 'a-traiter',
+  enquetes: 'enquetes',
+  approbation: 'approbation',
+  commission: 'comite',
+  reevaluations: 'reevaluations',
+  remboursements: 'remboursements',
+  echeancier: 'echeancier',
+  archives: 'archives',
+};
+
+/** Reverse: subModule (from URL) → tab key */
+const SUBMODULE_TO_TAB: Record<string, TabId> = {
+  dashboard: 'dashboard',
+  credits: 'credits',
+  demandes: 'demandes',
+  enquetes: 'enquetes',
+  approbation: 'approbation',
+  commission: 'commission',
+  reevaluations: 'reevaluations',
+  remboursements: 'remboursements',
+  echeancier: 'echeancier',
+  archives: 'archives',
+};
 
 // Helper to get static configuration
 const getTabConfig = () => [
   { key: 'dashboard', label: 'Synthèse', icon: BarChart3 },
   { key: 'credits', label: 'Crédits', icon: CreditCard },
-  { key: 'demandes', label: 'À traiter', icon: FileText, badgeColors: 'bg-blue-100 text-blue-800' }, // New demands, rejected, cancelled
-  { key: 'enquetes', label: 'Enquêtes', icon: ClipboardCheck, badgeColors: 'bg-yellow-100 text-yellow-800' }, // Only "A enquêter" (ready for investigation)
-{ key: 'approbation', label: 'Approbation', icon: CheckCircle, badgeColors: 'bg-red-100 text-red-800' }, // Was "Approuvées" inside Demandes, now "Enquêtes terminées" waiting for approval
-  { key: 'commission', label: "Comité", icon: Users, badgeColors: 'bg-purple-100 text-purple-800' }, // Approved demands waiting for disbursement
-  { key: 'reevaluations', label: 'Réévaluations', icon: RefreshCw, badgeColors: 'bg-gray-100 text-gray-800' }, // Credit reevaluation workflow
+  { key: 'demandes', label: 'À traiter', icon: FileText, badgeClassName: 'bg-status-warning text-white font-bold' },
+  { key: 'enquetes', label: 'Enquêtes', icon: ClipboardCheck, badgeClassName: 'bg-status-warning text-white font-bold' },
+  { key: 'approbation', label: 'Approbation', icon: CheckCircle, badgeClassName: 'bg-status-danger text-white font-bold' },
+  { key: 'commission', label: "Comité", icon: Users, badgeClassName: 'bg-status-info text-white font-bold' },
+  { key: 'reevaluations', label: 'Réévaluations', icon: RefreshCw, badgeClassName: 'bg-surface-elevated text-content-primary' },
   { key: 'remboursements', label: 'Remboursements', icon: TrendingUp },
   { key: 'echeancier', label: 'Échéancier', icon: Calendar },
-  { key: 'archives', label: 'Archives', icon: XCircle, badgeColors: 'bg-slate-100 text-slate-800' } // Cancelled / Rejected
+  { key: 'archives', label: 'Archives', icon: XCircle, badgeClassName: 'bg-surface-muted text-content-primary' }
 ];
 
 interface CreditsProps {
@@ -52,7 +82,22 @@ interface CreditsProps {
 }
 
 export default function CreditsRefactored({ userRole, activeView, onModuleChange }: CreditsProps) {
-  const [activeTab, setActiveTab] = useState<TabId>('dashboard');
+  const { currency } = useCurrency();
+  const [, setLocation] = useLocation();
+
+  // Derive active tab from URL (activeView = subModule from routes-config)
+  const activeTab: TabId = useMemo(() => {
+    if (activeView && SUBMODULE_TO_TAB[activeView]) {
+      return SUBMODULE_TO_TAB[activeView];
+    }
+    return 'dashboard';
+  }, [activeView]);
+
+  // Navigate via URL when tab changes
+  const setActiveTab = useCallback((tab: TabId) => {
+    const slug = TAB_TO_SLUG[tab];
+    setLocation(`/credits/${slug}`);
+  }, [setLocation]);
   const [selectedCredit, setSelectedCredit] = useState<string | null>(null);
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [showEnqueteForm, setShowEnqueteForm] = useState(false);
@@ -89,26 +134,12 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
     }
   };
 
+  // Redirect bare /credits → /credits/synthese
   useEffect(() => {
-    if (activeView) {
-      switch (activeView) {
-        case 'credits-list':
-          setActiveTab('dashboard');
-          break;
-        case 'credits-demandes':
-          setActiveTab('demandes');
-          break;
-        case 'credits-commission':
-          setActiveTab('commission');
-          break;
-        case 'credits-remboursements':
-          setActiveTab('remboursements');
-          break;
-        default:
-          setActiveTab('dashboard');
-      }
+    if (!activeView) {
+      setLocation('/credits/synthese', { replace: true });
     }
-  }, [activeView]);
+  }, [activeView, setLocation]);
 
   // Hooks
   const credits = useCredits();
@@ -343,27 +374,27 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
 
   const formatMoneyPlain = (amount: number | null | undefined) => {
     const value = amount || 0;
-    return new Intl.NumberFormat('fr-FR').format(value) + ' FCFA';
+    return new Intl.NumberFormat('fr-FR').format(value) + ' ' + currency.symbol;
   };
 
   const formatMoney = (amount: number | null | undefined) => {
     const value = amount || 0;
     const isLarge = value >= 1000000;
-    
+
     return (
       <div className="flex items-baseline justify-end gap-1 font-mono tracking-tight leading-none group-hover:scale-105 transition-transform duration-200">
         <span className={`text-sm font-bold ${
-          isLarge 
-            ? 'text-cyan-600 dark:text-cyan-400' 
-            : 'text-slate-900 dark:text-white'
+          isLarge
+            ? 'text-accent'
+            : 'text-content-primary'
         }`}>
           {new Intl.NumberFormat('fr-FR', {
             minimumFractionDigits: 0,
             maximumFractionDigits: 0
           }).format(value)}
         </span>
-        <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase select-none">
-          FCFA
+        <span className="text-[10px] font-semibold text-content-muted uppercase select-none">
+          {currency.symbol}
         </span>
       </div>
     );
@@ -374,12 +405,12 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
   const formatCompactMoney = (amount: number | null | undefined) => {
     const value = amount || 0;
     if (value >= 1000000000) {
-      return (value / 1000000000).toFixed(1).replace('.', ',') + ' Md FCFA';
+      return (value / 1000000000).toFixed(1).replace('.', ',') + ` Md ${currency.symbol}`;
     }
     if (value >= 1000000) {
-      return (value / 1000000).toFixed(1).replace('.', ',') + ' M FCFA';
+      return (value / 1000000).toFixed(1).replace('.', ',') + ` M ${currency.symbol}`;
     }
-    return new Intl.NumberFormat('fr-FR').format(value) + ' FCFA';
+    return new Intl.NumberFormat('fr-FR').format(value) + ' ' + currency.symbol;
   };
 
   const isLoading = credits.loading || demandes.loading || enquetes.loading;
@@ -402,23 +433,23 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
             <img 
               src={photoUrl} 
               alt={name} 
-              className="w-8 h-8 rounded-full object-cover border border-slate-700/50 shadow-sm"
+              className="w-8 h-8 rounded-full object-cover border border-edge-subtle shadow-sm"
             />
           ) : (
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white border border-white/10 shadow-sm ${
-              item.statut === StatutCredit.ACTIVE ? 'bg-emerald-600/80' :
-              item.statut === StatutCredit.LATE ? 'bg-red-600/80' : 'bg-slate-700'
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-content-primary border border-white/10 shadow-sm ${
+              item.statut === StatutCredit.ACTIVE ? 'bg-status-success/80' :
+              item.statut === StatutCredit.LATE ? 'bg-status-danger/80' : 'bg-surface-elevated'
             }`}>
               {initials}
             </div>
           )}
         </div>
         <div className="flex flex-col min-w-0">
-          <span className="font-medium truncate text-slate-200 group-hover:text-white transition-colors">
+          <span className="font-medium truncate text-content-secondary group-hover:text-content-primary transition-colors">
             {name}
           </span>
           {client?.phone && (
-            <span className="text-[10px] text-slate-500 font-mono truncate">
+            <span className="text-[10px] text-content-muted font-mono truncate">
               {client.phone}
             </span>
           )}
@@ -442,7 +473,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
       }
     },
     { key: 'progression', label: 'Échéances', format: (val, item) => `${item.nombreEcheancesPayees || 0}/${item.nombreEcheancesTotal || 0}` },
-    { key: 'joursRetard', label: 'Retard', format: (val) => (val || 0) > 0 ? <span className="text-red-400 font-bold">{val}j</span> : <span className="text-slate-500">0j</span> }
+    { key: 'joursRetard', label: 'Retard', format: (val) => (val || 0) > 0 ? <span className="text-status-danger font-bold">{val}j</span> : <span className="text-content-muted">0j</span> }
   ];
 
   const demandeColumns: TableColumn<any>[] = [
@@ -473,7 +504,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
         <span className="flex items-center gap-2">
           {val}
           {item.statut === StatutDemande.APPROVED_AFTER_REEVALUATION && (
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-violet-500/20 text-violet-400 border border-violet-500/30">
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-accent/10 text-accent border border-accent/30">
               <RefreshCw size={10} />
               Réévalué
             </span>
@@ -501,19 +532,19 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
         'INVESTIGATION_COMPLETE': 'Terminée',
       };
       const colors: Record<string, string> = {
-        'READY_FOR_INVESTIGATION': 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-        'ASSIGNED': 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-        'UNDER_INVESTIGATION': 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
-        'INVESTIGATION_COMPLETE': 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+        'READY_FOR_INVESTIGATION': 'bg-status-warning-bg text-status-warning border-status-warning/20',
+        'ASSIGNED': 'bg-status-info-bg text-status-info border-status-info/20',
+        'UNDER_INVESTIGATION': 'bg-accent/10 text-accent border-accent/20',
+        'INVESTIGATION_COMPLETE': 'bg-status-success-bg text-status-success border-status-success/20',
       };
       const icons: Record<string, React.ReactNode> = {
-        'READY_FOR_INVESTIGATION': <Clock size={10} className="text-amber-400" />,
-        'ASSIGNED': <UserCheck size={10} className="text-blue-400" />,
-        'UNDER_INVESTIGATION': <Play size={10} className="text-cyan-400" />,
-        'INVESTIGATION_COMPLETE': <CheckCircle size={10} className="text-emerald-400" />,
+        'READY_FOR_INVESTIGATION': <Clock size={10} className="text-status-warning" />,
+        'ASSIGNED': <UserCheck size={10} className="text-status-info" />,
+        'UNDER_INVESTIGATION': <Play size={10} className="text-accent" />,
+        'INVESTIGATION_COMPLETE': <CheckCircle size={10} className="text-status-success" />,
       };
       const label = translations[effectiveStatus] || val;
-      const colorClass = colors[effectiveStatus] || 'bg-slate-500/10 text-slate-400 border-slate-500/20';
+      const colorClass = colors[effectiveStatus] || 'bg-surface-subtle/30 text-content-muted border-edge-strong/20';
       return (
         <span className={`inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${colorClass}`}>
           {icons[effectiveStatus]}
@@ -531,7 +562,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
         title={FEATURE_DESCRIPTIONS['finance.credits'].title}
         subtitle={FEATURE_DESCRIPTIONS['finance.credits'].subtitle}
         helpText={FEATURE_DESCRIPTIONS['finance.credits'].helpText}
-        icon={<CreditCard size={24} className="text-indigo-400" />}
+        icon={<CreditCard size={24} className="text-accent" />}
         actions={
           <div className="flex items-center gap-3">
             {pendingCount > 0 && (
@@ -557,7 +588,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
       />
 
       {/* Sticky Tabs Row */}
-      <div className="bg-[#020617]/90 backdrop-blur-xl -mx-6 px-6 py-2 mb-6 border-b border-[#1e293b]/50 sticky top-0 z-20">
+      <div className="bg-surface-base/90 backdrop-blur-xl -mx-6 px-6 py-2 mb-6 border-b border-edge-subtle sticky top-0 z-20">
          <TabGroup 
             activeTab={activeTab} 
             onTabChange={(key) => setActiveTab(key as TabId)}
@@ -576,8 +607,8 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
           {/* 1. Pipeline Funnel (Compact) */}
           <section>
             <div className="flex items-center gap-2 mb-2">
-               <TrendingUp className="text-blue-400" size={16} />
-               <h3 className="text-sm font-bold text-white uppercase tracking-wider">Pipeline Crédit</h3>
+               <TrendingUp className="text-status-info" size={16} />
+               <h3 className="text-sm font-bold text-content-primary uppercase tracking-wider">Pipeline Crédit</h3>
             </div>
             <PipelineFunnel steps={funnelData} />
           </section>
@@ -588,8 +619,8 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
             {/* Left Col: Actions Requises (2/3 width) - Smart Feed */}
             <div className="lg:col-span-2 space-y-3">
               <div className="flex items-center gap-2">
-                <AlertCircle className="text-amber-400" size={16} />
-                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Actions & Activités</h3>
+                <AlertCircle className="text-status-warning" size={16} />
+                <h3 className="text-sm font-bold text-content-primary uppercase tracking-wider">Actions & Activités</h3>
               </div>
               
               <div className="space-y-3">
@@ -599,8 +630,8 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
                     {/* High Priority Group */}
                     {actionItems.high.length > 0 && (
                        <div className="space-y-2">
-                          <div className="text-xs font-bold text-red-400 uppercase tracking-widest flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+                          <div className="text-xs font-bold text-status-danger uppercase tracking-widest flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-status-danger animate-pulse"></div>
                             Priorité Haute ({actionItems.high.length})
                           </div>
                           <div className="grid gap-2">
@@ -611,23 +642,23 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
                                      setSelectedDemande(item);
                                      setShowApprovalModal(true);
                                   }}
-                                  className="bg-slate-800/50 hover:bg-slate-800 border border-red-500/20 hover:border-red-500/50 rounded-lg p-3 cursor-pointer transition-all flex items-center justify-between group"
+                                  className="bg-surface/50 hover:bg-surface border border-status-danger/20 hover:border-status-danger/50 rounded-lg p-3 cursor-pointer transition-all flex items-center justify-between group"
                                >
                                   <div className="flex items-center gap-3">
                                      {renderClientName({ clients: item.clients })}
-                                     <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20">
+                                     <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-status-warning-bg text-status-warning border border-status-warning/20">
                                         {item.label}
                                      </span>
                                   </div>
                                   <div className="flex items-center gap-4">
                                      <div className="text-right">
-                                        <div className="text-sm font-bold text-white">{formatMoney(item.montantDemande)}</div>
-                                        <div className="text-[10px] text-slate-500 flex items-center justify-end gap-1">
+                                        <div className="text-sm font-bold text-content-primary">{formatMoney(item.montantDemande)}</div>
+                                        <div className="text-[10px] text-content-muted flex items-center justify-end gap-1">
                                            <Clock size={10} />
                                            {item.updatedAt ? differenceInDays(new Date(), new Date(item.updatedAt || new Date().toISOString())) + 'j' : '0j'}
                                         </div>
                                      </div>
-                                     <ArrowRight size={16} className="text-slate-600 group-hover:text-white transition-colors" />
+                                     <ArrowRight size={16} className="text-content-muted group-hover:text-content-primary transition-colors" />
                                   </div>
                                </div>
                             ))}
@@ -638,8 +669,8 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
                     {/* Medium Priority */}
                      {actionItems.medium.length > 0 && (
                        <div className="space-y-2 pt-2">
-                          <div className="text-xs font-bold text-blue-400 uppercase tracking-widest flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                          <div className="text-xs font-bold text-status-info uppercase tracking-widest flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-status-info"></div>
                             Priorité Moyenne ({actionItems.medium.length})
                           </div>
                           <div className="grid gap-2">
@@ -650,14 +681,14 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
                                      setSelectedDemande(item);
                                      if (item.statut === StatutDemande.READY_FOR_INVESTIGATION) setShowEnqueteForm(true);
                                   }}
-                                  className="bg-slate-800/30 hover:bg-slate-800 border border-slate-700/50 hover:border-blue-500/30 rounded-lg p-3 cursor-pointer transition-all flex items-center justify-between group"
+                                  className="bg-surface/30 hover:bg-surface border border-edge-subtle hover:border-status-info/30 rounded-lg p-3 cursor-pointer transition-all flex items-center justify-between group"
                                 >
                                    <div className="flex items-center gap-3">
                                       {renderClientName({ clients: item.clients })}
-                                      <span className="text-xs text-slate-500">{item.label}</span>
+                                      <span className="text-xs text-content-muted">{item.label}</span>
                                    </div>
                                    <div className="text-right">
-                                      <div className="text-sm font-medium text-slate-300">{formatMoney(item.montantDemande)}</div>
+                                      <div className="text-sm font-medium text-content-secondary">{formatMoney(item.montantDemande)}</div>
                                    </div>
                                 </div>
                              ))}
@@ -667,29 +698,29 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
                   </>
                 ) : (
                   /* EMPTY STATE: RECENT ACTIVITY FEED */
-                  <div className="bg-slate-800/30 border border-slate-700/30 rounded-xl p-4">
-                     <div className="flex items-center gap-2 mb-4 text-slate-400">
-                        <CheckCircle size={18} className="text-emerald-500" />
+                  <div className="bg-surface/30 border border-edge-subtle rounded-xl p-4">
+                     <div className="flex items-center gap-2 mb-4 text-content-muted">
+                        <CheckCircle size={18} className="text-status-success" />
                         <span className="text-sm font-medium">Aucune action requise. Voici les dernières activités :</span>
                      </div>
                      <div className="space-y-0 relative">
                         {/* Timeline line */}
-                        <div className="absolute left-[19px] top-2 bottom-2 w-px bg-slate-700/50"></div>
+                        <div className="absolute left-[19px] top-2 bottom-2 w-px bg-surface-elevated/50"></div>
 
                         {demandes.demandes
                           .sort((a, b) => new Date(b.updatedAt || b.createdAt || new Date().toISOString()).getTime() - new Date(a.updatedAt || a.createdAt || new Date().toISOString()).getTime())
                           .slice(0, 3)
                           .map((item, idx) => (
                              <div key={item.id} className="relative flex gap-4 pb-4 last:pb-0 group">
-                                <div className="z-10 w-10 h-10 rounded-full flex items-center justify-center bg-slate-800 border border-slate-700 shadow-sm group-hover:border-slate-600 transition-colors">
-                                   <Clock size={16} className="text-slate-400" />
+                                <div className="z-10 w-10 h-10 rounded-full flex items-center justify-center bg-surface border border-edge shadow-sm group-hover:border-edge-strong transition-colors">
+                                   <Clock size={16} className="text-content-muted" />
                                 </div>
                                 <div className="flex-1 pt-1">
-                                   <div className="text-sm text-slate-200">
-                                      <span className="font-bold text-white">{formatClientName(item.clients?.nom, item.clients?.prenom)}</span>
-                                      <span className="mx-1 text-slate-500">•</span>
+                                   <div className="text-sm text-content-secondary">
+                                      <span className="font-bold text-content-primary">{formatClientName(item.clients?.nom, item.clients?.prenom)}</span>
+                                      <span className="mx-1 text-content-muted">•</span>
                                       {item.deletedAt ? (
-                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500/10 text-red-500 border border-red-500/20">
+                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-status-danger-bg text-status-danger border border-status-danger/20">
                                             <Trash2 size={10} />
                                             Supprimé
                                         </span>
@@ -697,7 +728,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
                                         <Badge value={item.statut} size="sm" variant="outline" className="border-0 bg-transparent p-0" />
                                       )}
                                    </div>
-                                   <div className="text-xs text-slate-500 mt-1">
+                                   <div className="text-xs text-content-muted mt-1">
                                       {item.updatedAt ? new Date(item.updatedAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }) : 'Date inconnue'}
                                    </div>
                                 </div>
@@ -713,40 +744,40 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
             {/* Right Col: Stats & KPIs - Compact & Aligned */}
             <div className="space-y-3">
               <div className="flex items-center gap-2">
-                 <BarChart3 className="text-purple-400" size={16} />
-                 <h3 className="text-sm font-bold text-white uppercase tracking-wider">Performance</h3>
+                 <BarChart3 className="text-status-info" size={16} />
+                 <h3 className="text-sm font-bold text-content-primary uppercase tracking-wider">Performance</h3>
               </div>
               
               <div className="grid grid-cols-2 lg:grid-cols-1 gap-2">
-                 <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-3 flex flex-col">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Pipeline</span>
-                    <div className="text-lg font-black text-white">{formatCompactMoney(kpis.pipelineVolume).replace(' FCFA', '')}</div>
-                    <span className="text-[10px] text-slate-400">Potentiel à venir</span>
+                 <div className="bg-surface/40 border border-edge-subtle rounded-lg p-3 flex flex-col">
+                    <span className="text-[10px] font-bold text-content-muted uppercase tracking-widest mb-1">Pipeline</span>
+                    <div className="text-lg font-black text-content-primary">{formatCompactMoney(kpis.pipelineVolume).replace(` ${currency.symbol}`, '')}</div>
+                    <span className="text-[10px] text-content-muted">Potentiel à venir</span>
                  </div>
 
-                 <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-3 flex flex-col">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Transformation</span>
-                    <div className="text-lg font-black text-white">{kpis.transformationRate.toFixed(1)}%</div>
-                    <span className="text-[10px] text-slate-400">Dossiers décaissés</span>
+                 <div className="bg-surface/40 border border-edge-subtle rounded-lg p-3 flex flex-col">
+                    <span className="text-[10px] font-bold text-content-muted uppercase tracking-widest mb-1">Transformation</span>
+                    <div className="text-lg font-black text-content-primary">{kpis.transformationRate.toFixed(1)}%</div>
+                    <span className="text-[10px] text-content-muted">Dossiers décaissés</span>
                  </div>
 
-                 <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-3 flex flex-col col-span-2 lg:col-span-1">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Délai Moyen</span>
+                 <div className="bg-surface/40 border border-edge-subtle rounded-lg p-3 flex flex-col col-span-2 lg:col-span-1">
+                    <span className="text-[10px] font-bold text-content-muted uppercase tracking-widest mb-1">Délai Moyen</span>
                     <div className="flex items-end justify-between">
-                       <div className="text-lg font-black text-white">{kpis.avgDelay}j</div>
-                       <span className="text-[10px] text-slate-400 text-right">Demande à<br/>Décaissement</span>
+                       <div className="text-lg font-black text-content-primary">{kpis.avgDelay}j</div>
+                       <span className="text-[10px] text-content-muted text-right">Demande à<br/>Décaissement</span>
                     </div>
                  </div>
               </div>
 
-              <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/50 rounded-lg p-3 mt-1">
+              <div className="bg-gradient-to-br from-surface to-surface-base border border-edge-subtle rounded-lg p-3 mt-1">
                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-[10px] text-slate-400">Total Crédits</span>
-                    <span className="text-xs font-bold text-white">{formatMoneyPlain(stats.montantTotalCredits)}</span>
+                    <span className="text-[10px] text-content-muted">Total Crédits</span>
+                    <span className="text-xs font-bold text-content-primary">{formatMoneyPlain(stats.montantTotalCredits)}</span>
                  </div>
                  <div className="flex justify-between items-center">
-                    <span className="text-[10px] text-slate-400">Actifs</span>
-                    <span className="text-xs font-bold text-emerald-400">{stats.creditsActifs} dossiers</span>
+                    <span className="text-[10px] text-content-muted">Actifs</span>
+                    <span className="text-xs font-bold text-status-success">{stats.creditsActifs} dossiers</span>
                  </div>
               </div>
             </div>
@@ -779,7 +810,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
 
       {/* Approbation Tab (Enquêtes terminées) */}
       {activeTab === 'approbation' && (
-        <Card variant="default" padding="none" className="overflow-hidden border-slate-700/50 shadow-xl">
+        <Card variant="default" padding="none" className="overflow-hidden border-edge-subtle shadow-xl">
           <ResponsiveTable
             data={demandes.demandes
               .filter(d => d.statut === StatutDemande.PENDING_APPROVAL)
@@ -819,7 +850,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
 
       {/* Commission Crédit Tab (Approuvées -> À décaisser) */}
       {activeTab === 'commission' && (
-        <Card variant="default" padding="none" className="overflow-hidden border-slate-700/50 shadow-xl">
+        <Card variant="default" padding="none" className="overflow-hidden border-edge-subtle shadow-xl">
           <ResponsiveTable
             data={demandes.demandes
               .filter(d => d.statut === StatutDemande.APPROVED || d.statut === StatutDemande.APPROVED_AFTER_REEVALUATION)
@@ -857,7 +888,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
                  <ProtectedFeature requiredPermission={{ module: 'credits', action: 'approve' }}>
                    <Button 
                       size="sm" 
-                      className="bg-emerald-600 hover:bg-emerald-500 text-white"
+                      className="bg-status-success hover:bg-status-success text-white"
                       onClick={(e) => { 
                         e.stopPropagation();
                         setSelectedDemande(item);
@@ -876,7 +907,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
 
       {/* Archives Tab (Rejetées, Annulées) */}
       {activeTab === 'archives' && (
-        <Card variant="default" padding="none" className="overflow-hidden border-slate-700/50 shadow-xl">
+        <Card variant="default" padding="none" className="overflow-hidden border-edge-subtle shadow-xl">
           <ResponsiveTable
             data={demandes.demandes
               .filter(d => ([StatutDemande.REJECTED, StatutDemande.CANCELLED] as string[]).includes(d.statut) || !!d.deletedAt)
@@ -885,7 +916,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
               .slice((demandesPage - 1) * ITEMS_PER_PAGE, demandesPage * ITEMS_PER_PAGE)}
             columns={[
               ...demandeColumns,
-              { key: 'motifRejet', label: 'Motif', format: (val) => <span className="text-slate-500 italic truncate max-w-[200px] block">{val || '-'}</span> }
+              { key: 'motifRejet', label: 'Motif', format: (val) => <span className="text-content-muted italic truncate max-w-[200px] block">{val || '-'}</span> }
             ]}
             loading={isLoading}
             onRowClick={(item) => {
@@ -920,7 +951,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
 
       {/* Demandes Tab (À traiter: En attente, Rejetée, Annulée) */}
       {activeTab === 'demandes' && (
-        <Card variant="default" padding="none" className="overflow-hidden border-slate-700/50 shadow-xl">
+        <Card variant="default" padding="none" className="overflow-hidden border-edge-subtle shadow-xl">
           <ResponsiveTable
             data={demandes.demandes
               .filter(d => ([StatutDemande.PENDING_FEES] as string[]).includes(d.statut) && !d.deletedAt)
@@ -947,7 +978,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
               <div className="flex gap-1">
                  {item.statut === StatutDemande.PENDING_FEES && (
                     caisseStatuses[item.id]?.hasPending ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/20">
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-semibold bg-status-warning-bg text-status-warning border border-status-warning/20">
                         <Clock size={11} />
                         En attente caisse
                       </span>
@@ -982,7 +1013,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
                       icon={Trash2}
                       size="sm"
                       variant="ghost"
-                      className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                      className="text-status-danger hover:text-status-danger hover:bg-status-danger-bg"
                       onClick={(e) => {
                         e.stopPropagation();
                         setDemandeToDelete(item.id);
@@ -997,7 +1028,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
                           icon={XCircle}
                           size="sm"
                           variant="ghost"
-                          className="text-orange-400 hover:text-orange-300 hover:bg-orange-500/10"
+                          className="text-status-warning hover:text-status-warning hover:bg-status-warning-bg"
                           onClick={(e) => {
                             e.stopPropagation();
                             setDemandeToCancel(item.id);

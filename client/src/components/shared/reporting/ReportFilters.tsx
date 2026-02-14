@@ -21,24 +21,24 @@ export default function ReportFilters({
   return (
     <Card variant="glass" padding="none" className="overflow-hidden">
       {/* Header with Title and Actions integrated */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-edge/50 bg-slate-900/50">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-edge/50 bg-surface-base/50">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center text-indigo-400">
+          <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center text-accent">
             <Filter size={16} />
           </div>
           <h3 className="text-sm font-semibold text-content-primary">Paramètres</h3>
         </div>
         
         {/* Format Selector as Segmented Control in Header */}
-        <div className="bg-slate-950/80 p-0.5 rounded-lg border border-slate-800 flex">
+        <div className="bg-surface-base/80 p-0.5 rounded-lg border border-edge flex">
           {(['pdf', 'excel', 'csv'] as const).map((fmt) => (
             <button
               key={fmt}
               onClick={() => setFormat(fmt)}
               className={`px-3 py-1 text-[10px] font-bold uppercase rounded-md transition-all ${
                 format === fmt 
-                  ? 'bg-indigo-600 text-white shadow-sm' 
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                  ? 'bg-accent text-white shadow-sm'
+                  : 'text-content-muted hover:text-content-secondary hover:bg-surface/50'
               }`}
             >
               {fmt}
@@ -51,7 +51,7 @@ export default function ReportFilters({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Date Range - Compact */}
           <div className="space-y-2">
-            <label className="text-[10px] uppercase font-bold text-slate-500 flex items-center gap-1.5">
+            <label className="text-[10px] uppercase font-bold text-content-muted flex items-center gap-1.5">
               <Calendar size={12} /> Période d'analyse
             </label>
             <div className="flex items-center gap-2">
@@ -60,16 +60,16 @@ export default function ReportFilters({
                   type="date"
                   value={dateRange.start}
                   onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-                  className="w-full bg-slate-950 text-slate-200 text-xs px-3 py-2 rounded-lg border border-slate-800 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                  className="w-full bg-surface-base text-content-secondary text-xs px-3 py-2 rounded-lg border border-edge focus:ring-1 focus:ring-accent focus:border-accent outline-none"
                 />
               </div>
-              <span className="text-slate-600">→</span>
+              <span className="text-content-muted">→</span>
               <div className="relative flex-1">
                 <input
                   type="date"
                   value={dateRange.end}
                   onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-                  className="w-full bg-slate-950 text-slate-200 text-xs px-3 py-2 rounded-lg border border-slate-800 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                  className="w-full bg-surface-base text-content-secondary text-xs px-3 py-2 rounded-lg border border-edge focus:ring-1 focus:ring-accent focus:border-accent outline-none"
                 />
               </div>
             </div>
@@ -77,16 +77,16 @@ export default function ReportFilters({
 
           {/* Options - Grid instead of stacked */}
           <div className="space-y-2">
-            <label className="text-[10px] uppercase font-bold text-slate-500">Options</label>
+            <label className="text-[10px] uppercase font-bold text-content-muted">Options</label>
             <div className="grid grid-cols-2 gap-2">
               <div 
                 className={`flex items-center justify-between px-3 py-2 rounded-lg border transition-all ${
                   filters.includeTransactions 
-                    ? 'bg-indigo-500/5 border-indigo-500/20' 
-                    : 'bg-slate-950 border-slate-800'
+                    ? 'bg-accent/5 border-accent/20' 
+                    : 'bg-surface-base border-edge'
                 }`}
               >
-                <span className="text-xs text-slate-300">Transactions</span>
+                <span className="text-xs text-content-secondary">Transactions</span>
                 <Switch 
                   checked={filters.includeTransactions} 
                   onChange={(c) => setFilters({ ...filters, includeTransactions: c })} 
@@ -96,11 +96,11 @@ export default function ReportFilters({
               <div 
                 className={`flex items-center justify-between px-3 py-2 rounded-lg border transition-all ${
                   filters.includeStats 
-                    ? 'bg-indigo-500/5 border-indigo-500/20' 
-                    : 'bg-slate-950 border-slate-800'
+                    ? 'bg-accent/5 border-accent/20' 
+                    : 'bg-surface-base border-edge'
                 }`}
               >
-                <span className="text-xs text-slate-300">Statistiques</span>
+                <span className="text-xs text-content-secondary">Statistiques</span>
                 <Switch 
                   checked={filters.includeStats} 
                   onChange={(c) => setFilters({ ...filters, includeStats: c })} 
@@ -113,11 +113,11 @@ export default function ReportFilters({
       </div>
 
       {/* Footer Actions */}
-      <div className="px-4 py-3 bg-slate-950/30 border-t border-edge/50 flex items-center justify-end gap-3">
+      <div className="px-4 py-3 bg-surface-base/30 border-t border-edge/50 flex items-center justify-end gap-3">
         <Button 
           variant="secondary" 
           icon={Printer} 
-          className="border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800"
+          className="border-edge text-content-secondary hover:text-content-primary hover:bg-surface"
           onClick={onPrint}
           disabled={loading}
         >
@@ -127,7 +127,7 @@ export default function ReportFilters({
           onClick={onGenerate}
           isLoading={loading}
           variant="primary"
-          className="bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 border-0 shadow-lg shadow-indigo-900/20"
+          className="bg-gradient-to-r from-accent to-accent hover:from-accent hover:to-accent border-0 shadow-lg shadow-accent/20"
           icon={Download}
         >
           Générer ({format.toUpperCase()})

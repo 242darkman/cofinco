@@ -78,13 +78,13 @@ export default function SalaryAdvances() {
       key: 'employeNom',
       label: 'Employé',
       primary: true,
-      render: (val: string) => <span className="font-medium text-white">{val}</span>,
+      render: (val: string) => <span className="font-medium text-content-primary">{val}</span>,
     },
     {
       key: 'montant',
       label: 'Montant',
       render: (val: number) => (
-        <span className="font-bold text-emerald-400">{val.toLocaleString()} FCFA</span>
+        <span className="font-bold text-status-success">{val.toLocaleString()} FCFA</span>
       ),
     },
     {
@@ -92,7 +92,7 @@ export default function SalaryAdvances() {
       label: 'Motif',
       hideOnMobile: true,
       render: (val: string) => (
-        <span className="text-slate-400 text-xs line-clamp-1 max-w-[200px]" title={val}>{val}</span>
+        <span className="text-content-muted text-xs line-clamp-1 max-w-[200px]" title={val}>{val}</span>
       ),
     },
     {
@@ -100,7 +100,7 @@ export default function SalaryAdvances() {
       label: 'Date',
       hideOnMobile: true,
       render: (val: string) => (
-        <span className="text-slate-500 text-xs font-mono">
+        <span className="text-content-muted text-xs font-mono">
           {new Date(val).toLocaleDateString('fr-FR')}
         </span>
       ),
@@ -132,7 +132,7 @@ export default function SalaryAdvances() {
                       icon={CheckCircle}
                       onClick={(e) => { e.stopPropagation(); approveAvance(item.id); }}
                       title="Approuver"
-                      className="text-emerald-400 hover:bg-emerald-500/10 h-7 w-7 p-0"
+                      className="text-status-success hover:bg-status-success-bg h-7 w-7 p-0"
                     />
                     <Button
                       variant="ghost"
@@ -140,7 +140,7 @@ export default function SalaryAdvances() {
                       icon={XCircle}
                       onClick={(e) => { e.stopPropagation(); setRejectModal({ id: item.id }); }}
                       title="Rejeter"
-                      className="text-red-400 hover:bg-red-500/10 h-7 w-7 p-0"
+                      className="text-status-danger hover:bg-status-danger-bg h-7 w-7 p-0"
                     />
                   </>
                 )}
@@ -151,7 +151,7 @@ export default function SalaryAdvances() {
                     icon={Banknote}
                     onClick={(e) => { e.stopPropagation(); payAvance(item.id); }}
                     title="Marquer payée"
-                    className="text-blue-400 hover:bg-blue-500/10 h-7 w-7 p-0"
+                    className="text-status-info hover:bg-status-info-bg h-7 w-7 p-0"
                   />
                 )}
                 {item.statut === 'PAID' && (
@@ -161,7 +161,7 @@ export default function SalaryAdvances() {
                     icon={ArrowDownCircle}
                     onClick={(e) => { e.stopPropagation(); deductAvance({ id: item.id }); }}
                     title="Déduire du salaire"
-                    className="text-amber-400 hover:bg-amber-500/10 h-7 w-7 p-0"
+                    className="text-status-warning hover:bg-status-warning-bg h-7 w-7 p-0"
                   />
                 )}
               </div>
@@ -174,9 +174,9 @@ export default function SalaryAdvances() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="shrink-0 p-2 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
-        <h3 className="font-bold text-white flex items-center gap-2 text-xs">
-          <Banknote size={14} className="text-amber-400" />
+      <div className="shrink-0 p-2 border-b border-edge flex justify-between items-center bg-surface-base/50">
+        <h3 className="font-bold text-content-primary flex items-center gap-2 text-xs">
+          <Banknote size={14} className="text-status-warning" />
           Avances sur Salaire
         </h3>
         {isRH && (
@@ -202,25 +202,25 @@ export default function SalaryAdvances() {
           maxHeight="100%"
           density="compact"
           className="border-0 rounded-none h-full"
-          headerClassName="bg-slate-900 sticky top-0"
+          headerClassName="bg-surface-base sticky top-0"
         />
       </div>
 
       {/* Create Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setShowCreateModal(false)}>
-          <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-            <div className="p-4 border-b border-slate-800 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-white">Nouvelle Avance sur Salaire</h3>
-              <button onClick={() => setShowCreateModal(false)} className="text-slate-500 hover:text-white">
+          <div className="bg-surface-base border border-edge rounded-xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-edge flex items-center justify-between">
+              <h3 className="text-sm font-bold text-content-primary">Nouvelle Avance sur Salaire</h3>
+              <button onClick={() => setShowCreateModal(false)} className="text-content-muted hover:text-content-primary">
                 <X size={18} />
               </button>
             </div>
             <div className="p-4 space-y-3">
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Employé *</label>
+                <label className="block text-xs font-medium text-content-muted mb-1">Employé *</label>
                 <select
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:ring-1 focus:ring-emerald-500/50 outline-none"
+                  className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-sm text-content-primary focus:ring-1 focus:ring-status-success/50 outline-none"
                   value={formEmployeId}
                   onChange={(e) => setFormEmployeId(e.target.value)}
                 >
@@ -233,10 +233,10 @@ export default function SalaryAdvances() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Montant (FCFA) *</label>
+                <label className="block text-xs font-medium text-content-muted mb-1">Montant (FCFA) *</label>
                 <input
                   type="number"
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:ring-1 focus:ring-emerald-500/50 outline-none font-mono"
+                  className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-sm text-content-primary focus:ring-1 focus:ring-status-success/50 outline-none font-mono"
                   value={formMontant}
                   onChange={(e) => setFormMontant(e.target.value)}
                   placeholder="Ex: 150000"
@@ -244,9 +244,9 @@ export default function SalaryAdvances() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Motif *</label>
+                <label className="block text-xs font-medium text-content-muted mb-1">Motif *</label>
                 <textarea
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:ring-1 focus:ring-emerald-500/50 outline-none resize-none"
+                  className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-sm text-content-primary focus:ring-1 focus:ring-status-success/50 outline-none resize-none"
                   rows={2}
                   value={formMotif}
                   onChange={(e) => setFormMotif(e.target.value)}
@@ -254,16 +254,16 @@ export default function SalaryAdvances() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Date remboursement souhaitée</label>
+                <label className="block text-xs font-medium text-content-muted mb-1">Date remboursement souhaitée</label>
                 <input
                   type="date"
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:ring-1 focus:ring-emerald-500/50 outline-none font-mono"
+                  className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-sm text-content-primary focus:ring-1 focus:ring-status-success/50 outline-none font-mono"
                   value={formDateRemboursement}
                   onChange={(e) => setFormDateRemboursement(e.target.value)}
                 />
               </div>
             </div>
-            <div className="p-4 border-t border-slate-800 flex justify-end gap-2">
+            <div className="p-4 border-t border-edge flex justify-end gap-2">
               <Button variant="ghost" size="sm" onClick={() => setShowCreateModal(false)}>
                 Annuler
               </Button>
@@ -283,14 +283,14 @@ export default function SalaryAdvances() {
       {/* Reject Modal */}
       {rejectModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setRejectModal(null)}>
-          <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
-            <div className="p-4 border-b border-slate-800">
-              <h3 className="text-sm font-bold text-red-400">Rejeter l'avance</h3>
+          <div className="bg-surface-base border border-edge rounded-xl shadow-2xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-edge">
+              <h3 className="text-sm font-bold text-status-danger">Rejeter l'avance</h3>
             </div>
             <div className="p-4">
-              <label className="block text-xs font-medium text-slate-400 mb-1">Motif de rejet *</label>
+              <label className="block text-xs font-medium text-content-muted mb-1">Motif de rejet *</label>
               <textarea
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:ring-1 focus:ring-red-500/50 outline-none resize-none"
+                className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-sm text-content-primary focus:ring-1 focus:ring-status-danger/50 outline-none resize-none"
                 rows={3}
                 value={rejectMotif}
                 onChange={(e) => setRejectMotif(e.target.value)}
@@ -298,7 +298,7 @@ export default function SalaryAdvances() {
                 autoFocus
               />
             </div>
-            <div className="p-4 border-t border-slate-800 flex justify-end gap-2">
+            <div className="p-4 border-t border-edge flex justify-end gap-2">
               <Button variant="ghost" size="sm" onClick={() => { setRejectModal(null); setRejectMotif(''); }}>
                 Annuler
               </Button>

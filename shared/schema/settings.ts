@@ -18,7 +18,7 @@ function generateAgenceCode(): string {
 // System Settings table
 export const systemSettings = pgTable("system_settings", {
   id: uuid("id").primaryKey().defaultRandom(),
-  agenceName: text("agence_name").default("COFIN&CO-M"),
+  appName: text("app_name").default("COFIN&CO-M"),
   agenceCode: text("agence_code").$defaultFn(generateAgenceCode).unique(),
   devise: text("devise").default(DEFAULT_CURRENCY.code),
   pays: text("pays").default("République du Congo"),
@@ -109,6 +109,8 @@ export const uiCustomization = pgTable("ui_customization", {
   sidebarCollapsedDefault: boolean("sidebar_collapsed_default").default(false),
   showAnimations: boolean("show_animations").default(true),
   compactMode: boolean("compact_mode").default(false),
+  fontFamily: text("font_family").default("Inter"),
+  borderRadius: text("border_radius").default("lg"),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 

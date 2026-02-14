@@ -54,13 +54,13 @@ export default function RejectOperationModal({
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Warning */}
-        <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg flex items-start gap-3">
-          <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+        <div className="p-4 bg-status-danger-bg border border-status-danger/20 rounded-lg flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-status-danger flex-shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm font-medium text-red-300">
+            <p className="text-sm font-medium text-status-danger">
               Cette action est irréversible
             </p>
-            <p className="text-xs text-slate-400 mt-1">
+            <p className="text-xs text-content-muted mt-1">
               L'agent sera notifié du rejet et aucune écriture comptable ne sera effectuée.
             </p>
           </div>
@@ -70,15 +70,15 @@ export default function RejectOperationModal({
         <div className="p-3 bg-surface-elevated rounded-lg border border-edge">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-white">
+              <p className="text-sm font-medium text-content-primary">
                 {operation.type === 'COLLECT_CASH' ? 'Collecte' : 'Remise'}
               </p>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-content-muted">
                 Réf: {operation.reference}
               </p>
             </div>
             <p className={`text-lg font-bold ${
-              operation.type === 'COLLECT_CASH' ? 'text-cyan-400' : 'text-emerald-400'
+              operation.type === 'COLLECT_CASH' ? 'text-accent' : 'text-status-success'
             }`}>
               {formatMoney(operation.montant as unknown as string)} XOF
             </p>
@@ -87,8 +87,8 @@ export default function RejectOperationModal({
 
         {/* Reason selection */}
         <div className="space-y-2">
-          <label className="text-sm font-medium text-slate-300">
-            Motif du rejet <span className="text-red-400">*</span>
+          <label className="text-sm font-medium text-content-secondary">
+            Motif du rejet <span className="text-status-danger">*</span>
           </label>
           <div className="space-y-2">
             {COMMON_REASONS.map((reason) => (
@@ -96,8 +96,8 @@ export default function RejectOperationModal({
                 key={reason}
                 className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
                   selectedReason === reason
-                    ? 'border-cyan-500/50 bg-cyan-500/10'
-                    : 'border-edge hover:border-slate-600'
+                    ? 'border-accent/50 bg-accent/10'
+                    : 'border-edge hover:border-edge-strong'
                 }`}
               >
                 <input
@@ -106,9 +106,9 @@ export default function RejectOperationModal({
                   value={reason}
                   checked={selectedReason === reason}
                   onChange={(e) => setSelectedReason(e.target.value)}
-                  className="w-4 h-4 text-cyan-500 bg-slate-700 border-slate-600 focus:ring-cyan-500"
+                  className="w-4 h-4 text-accent bg-surface-elevated border-edge-strong focus:ring-accent"
                 />
-                <span className="text-sm text-slate-300">{reason}</span>
+                <span className="text-sm text-content-secondary">{reason}</span>
               </label>
             ))}
           </div>
@@ -117,15 +117,15 @@ export default function RejectOperationModal({
         {/* Custom reason textarea */}
         {selectedReason === 'Autre' && (
           <div className="space-y-2 animate-in slide-in-from-top duration-200">
-            <label className="text-sm font-medium text-slate-300">
-              Précisez le motif <span className="text-red-400">*</span>
+            <label className="text-sm font-medium text-content-secondary">
+              Précisez le motif <span className="text-status-danger">*</span>
             </label>
             <textarea
               value={customReason}
               onChange={(e) => setCustomReason(e.target.value)}
               placeholder="Décrivez la raison du rejet..."
               rows={3}
-              className="w-full px-3 py-2 bg-surface-elevated border border-edge rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 resize-none"
+              className="w-full px-3 py-2 bg-surface-elevated border border-edge rounded-lg text-content-primary placeholder-content-muted focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
               required={selectedReason === 'Autre'}
             />
           </div>

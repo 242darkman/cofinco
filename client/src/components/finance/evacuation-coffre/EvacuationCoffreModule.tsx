@@ -191,16 +191,16 @@ export { api as evacuationCoffreApi };
 
 // Status badge config
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ElementType }> = {
-  [StatutEvacuationCoffre.DRAFT]: { label: 'Brouillon', color: 'bg-slate-500/15 text-slate-400 border-slate-500/30', icon: FileText },
-  [StatutEvacuationCoffre.SUBMITTED]: { label: 'Soumise', color: 'bg-blue-500/15 text-blue-400 border-blue-500/30', icon: Send },
-  [StatutEvacuationCoffre.APPROVED]: { label: 'Approuvée', color: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30', icon: CheckCircle },
-  [StatutEvacuationCoffre.PREPARED]: { label: 'Préparée', color: 'bg-indigo-500/15 text-indigo-400 border-indigo-500/30', icon: Package },
-  [StatutEvacuationCoffre.IN_TRANSIT]: { label: 'En transit', color: 'bg-amber-500/15 text-amber-400 border-amber-500/30', icon: Truck },
-  [StatutEvacuationCoffre.DEPOSITED]: { label: 'Déposée', color: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30', icon: Banknote },
-  [StatutEvacuationCoffre.RECONCILED]: { label: 'Réconciliée', color: 'bg-green-500/15 text-green-400 border-green-500/30', icon: CheckCircle },
-  [StatutEvacuationCoffre.DISCREPANCY]: { label: 'Écart', color: 'bg-red-500/15 text-red-400 border-red-500/30', icon: AlertTriangle },
-  [StatutEvacuationCoffre.REJECTED]: { label: 'Rejetée', color: 'bg-red-500/15 text-red-400 border-red-500/30', icon: Ban },
-  [StatutEvacuationCoffre.CANCELLED]: { label: 'Annulée', color: 'bg-slate-500/15 text-slate-500 border-slate-500/30', icon: X },
+  [StatutEvacuationCoffre.DRAFT]: { label: 'Brouillon', color: 'bg-surface-subtle/35 text-content-muted border-edge-strong/30', icon: FileText },
+  [StatutEvacuationCoffre.SUBMITTED]: { label: 'Soumise', color: 'bg-status-info-bg text-status-info border-status-info/30', icon: Send },
+  [StatutEvacuationCoffre.APPROVED]: { label: 'Approuvée', color: 'bg-status-success-bg text-status-success border-status-success/30', icon: CheckCircle },
+  [StatutEvacuationCoffre.PREPARED]: { label: 'Préparée', color: 'bg-accent/15 text-accent border-accent/30', icon: Package },
+  [StatutEvacuationCoffre.IN_TRANSIT]: { label: 'En transit', color: 'bg-status-warning-bg text-status-warning border-status-warning/30', icon: Truck },
+  [StatutEvacuationCoffre.DEPOSITED]: { label: 'Déposée', color: 'bg-accent-secondary/15 text-accent border-accent/30', icon: Banknote },
+  [StatutEvacuationCoffre.RECONCILED]: { label: 'Réconciliée', color: 'bg-status-success-bg text-status-success border-status-success/30', icon: CheckCircle },
+  [StatutEvacuationCoffre.DISCREPANCY]: { label: 'Écart', color: 'bg-status-danger-bg text-status-danger border-status-danger/30', icon: AlertTriangle },
+  [StatutEvacuationCoffre.REJECTED]: { label: 'Rejetée', color: 'bg-status-danger-bg text-status-danger border-status-danger/30', icon: Ban },
+  [StatutEvacuationCoffre.CANCELLED]: { label: 'Annulée', color: 'bg-surface-subtle/35 text-content-muted border-edge-strong/30', icon: X },
 };
 
 const DESTINATION_LABELS: Record<string, { label: string; icon: React.ElementType }> = {
@@ -210,7 +210,7 @@ const DESTINATION_LABELS: Record<string, { label: string; icon: React.ElementTyp
 };
 
 function StatusBadge({ statut }: { statut: string }) {
-  const config = STATUS_CONFIG[statut] || { label: statut, color: 'bg-slate-500/15 text-slate-400', icon: Clock };
+  const config = STATUS_CONFIG[statut] || { label: statut, color: 'bg-surface-subtle/35 text-content-muted', icon: Clock };
   const Icon = config.icon;
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${config.color}`}>
@@ -224,7 +224,7 @@ function DestinationBadge({ type }: { type: string }) {
   const config = DESTINATION_LABELS[type] || { label: type, icon: Building2 };
   const Icon = config.icon;
   return (
-    <span className="inline-flex items-center gap-1 text-[10px] text-slate-400">
+    <span className="inline-flex items-center gap-1 text-[10px] text-content-muted">
       <Icon size={11} />
       {config.label}
     </span>
@@ -457,7 +457,7 @@ export default function EvacuationCoffreModule({
       <button
         key="view"
         onClick={() => handleViewDetails(e)}
-        className="p-1 text-slate-400 hover:text-blue-400 transition"
+        className="p-1 text-content-muted hover:text-status-info transition"
         title="Voir détails"
       >
         <Eye size={14} />
@@ -469,7 +469,7 @@ export default function EvacuationCoffreModule({
         <button
           key="submit"
           onClick={() => setConfirmAction({ type: 'submit', evacuation: e })}
-          className="p-1 text-slate-400 hover:text-blue-400 transition"
+          className="p-1 text-content-muted hover:text-status-info transition"
           title="Soumettre"
         >
           <Send size={14} />
@@ -479,7 +479,7 @@ export default function EvacuationCoffreModule({
         <button
           key="cancel"
           onClick={() => setConfirmAction({ type: 'cancel', evacuation: e })}
-          className="p-1 text-slate-400 hover:text-red-400 transition"
+          className="p-1 text-content-muted hover:text-status-danger transition"
           title="Annuler"
         >
           <Ban size={14} />
@@ -492,7 +492,7 @@ export default function EvacuationCoffreModule({
         <button
           key="approve"
           onClick={() => setConfirmAction({ type: 'approve', evacuation: e })}
-          className="p-1 text-slate-400 hover:text-emerald-400 transition"
+          className="p-1 text-content-muted hover:text-status-success transition"
           title="Approuver"
         >
           <CheckCircle size={14} />
@@ -502,7 +502,7 @@ export default function EvacuationCoffreModule({
         <button
           key="reject"
           onClick={() => setConfirmAction({ type: 'reject', evacuation: e })}
-          className="p-1 text-slate-400 hover:text-red-400 transition"
+          className="p-1 text-content-muted hover:text-status-danger transition"
           title="Rejeter"
         >
           <Ban size={14} />
@@ -527,45 +527,45 @@ export default function EvacuationCoffreModule({
     <div className="space-y-3">
       {/* Stats Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg p-2.5">
-          <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-1">Total</div>
-          <div className="text-sm font-bold text-white">{formatMoney(totalMontant)}</div>
-          <div className="text-[10px] text-slate-500">{totalCount} évacuation{totalCount !== 1 ? 's' : ''}</div>
+        <div className="bg-surface/40 border border-edge-subtle rounded-lg p-2.5">
+          <div className="text-[9px] font-bold text-content-muted uppercase tracking-widest mb-1">Total</div>
+          <div className="text-sm font-bold text-content-primary">{formatMoney(totalMontant)}</div>
+          <div className="text-[10px] text-content-muted">{totalCount} évacuation{totalCount !== 1 ? 's' : ''}</div>
         </div>
-        <div className="bg-slate-800/40 border border-amber-500/20 rounded-lg p-2.5">
-          <div className="text-[9px] font-bold text-amber-500 uppercase tracking-widest mb-1">En attente</div>
-          <div className="text-sm font-bold text-amber-400">{formatMoney(pendingMontant)}</div>
-          <div className="text-[10px] text-slate-500">{pendingCount} évacuation{pendingCount !== 1 ? 's' : ''}</div>
+        <div className="bg-surface/40 border border-status-warning/20 rounded-lg p-2.5">
+          <div className="text-[9px] font-bold text-status-warning uppercase tracking-widest mb-1">En attente</div>
+          <div className="text-sm font-bold text-status-warning">{formatMoney(pendingMontant)}</div>
+          <div className="text-[10px] text-content-muted">{pendingCount} évacuation{pendingCount !== 1 ? 's' : ''}</div>
         </div>
-        <div className="bg-slate-800/40 border border-blue-500/20 rounded-lg p-2.5">
-          <div className="text-[9px] font-bold text-blue-500 uppercase tracking-widest mb-1">En transit</div>
-          <div className="text-sm font-bold text-blue-400">{formatMoney(inTransitMontant)}</div>
-          <div className="text-[10px] text-slate-500">{inTransitCount} évacuation{inTransitCount !== 1 ? 's' : ''}</div>
+        <div className="bg-surface/40 border border-status-info/20 rounded-lg p-2.5">
+          <div className="text-[9px] font-bold text-status-info uppercase tracking-widest mb-1">En transit</div>
+          <div className="text-sm font-bold text-status-info">{formatMoney(inTransitMontant)}</div>
+          <div className="text-[10px] text-content-muted">{inTransitCount} évacuation{inTransitCount !== 1 ? 's' : ''}</div>
         </div>
-        <div className="bg-slate-800/40 border border-green-500/20 rounded-lg p-2.5">
-          <div className="text-[9px] font-bold text-green-500 uppercase tracking-widest mb-1">Réconciliées</div>
-          <div className="text-sm font-bold text-green-400">{formatMoney(reconciledMontant)}</div>
-          <div className="text-[10px] text-slate-500">{reconciledCount} évacuation{reconciledCount !== 1 ? 's' : ''}</div>
+        <div className="bg-surface/40 border border-status-success/20 rounded-lg p-2.5">
+          <div className="text-[9px] font-bold text-status-success uppercase tracking-widest mb-1">Réconciliées</div>
+          <div className="text-sm font-bold text-status-success">{formatMoney(reconciledMontant)}</div>
+          <div className="text-[10px] text-content-muted">{reconciledCount} évacuation{reconciledCount !== 1 ? 's' : ''}</div>
         </div>
       </div>
 
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex-1 min-w-[200px] relative">
-          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-content-muted" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
             placeholder="Rechercher par référence..."
-            className="w-full pl-8 pr-3 py-1.5 bg-slate-800/60 border border-slate-700/50 rounded-lg text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500/50"
+            className="w-full pl-8 pr-3 py-1.5 bg-surface/60 border border-edge-subtle rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-status-info/50"
           />
         </div>
 
         <select
           value={statutFilter}
           onChange={(e) => { setStatutFilter(e.target.value); setCurrentPage(1); }}
-          className="px-2.5 py-1.5 bg-slate-800/60 border border-slate-700/50 rounded-lg text-xs text-slate-300 focus:outline-none focus:border-blue-500/50"
+          className="px-2.5 py-1.5 bg-surface/60 border border-edge-subtle rounded-lg text-xs text-content-secondary focus:outline-none focus:border-status-info/50"
         >
           <option value="all">Tous statuts</option>
           {Object.entries(STATUS_CONFIG).map(([key, config]) => (
@@ -576,7 +576,7 @@ export default function EvacuationCoffreModule({
         <select
           value={destinationFilter}
           onChange={(e) => { setDestinationFilter(e.target.value); setCurrentPage(1); }}
-          className="px-2.5 py-1.5 bg-slate-800/60 border border-slate-700/50 rounded-lg text-xs text-slate-300 focus:outline-none focus:border-blue-500/50"
+          className="px-2.5 py-1.5 bg-surface/60 border border-edge-subtle rounded-lg text-xs text-content-secondary focus:outline-none focus:border-status-info/50"
         >
           <option value="all">Toutes destinations</option>
           {Object.entries(DESTINATION_LABELS).map(([key, config]) => (
@@ -587,7 +587,7 @@ export default function EvacuationCoffreModule({
         <button
           onClick={() => loadData(true)}
           disabled={refreshing}
-          className="p-1.5 text-slate-400 hover:text-white transition disabled:opacity-50"
+          className="p-1.5 text-content-muted hover:text-content-primary transition disabled:opacity-50"
           title="Rafraîchir"
         >
           <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
@@ -606,16 +606,16 @@ export default function EvacuationCoffreModule({
       {/* List */}
       {evacuations.length === 0 ? (
         <div className="text-center py-12">
-          <Vault size={32} className="mx-auto mb-3 text-slate-600" />
-          <p className="text-sm text-slate-500">Aucune évacuation trouvée</p>
-          <p className="text-xs text-slate-600 mt-1">Créez une nouvelle évacuation pour commencer</p>
+          <Vault size={32} className="mx-auto mb-3 text-content-muted" />
+          <p className="text-sm text-content-muted">Aucune évacuation trouvée</p>
+          <p className="text-xs text-content-muted mt-1">Créez une nouvelle évacuation pour commencer</p>
         </div>
       ) : (
         <div className="space-y-1.5">
           {evacuations.map((evacuation) => (
             <div
               key={evacuation.id}
-              className="bg-slate-800/30 border border-slate-700/40 rounded-lg p-2.5 hover:border-slate-600/50 transition cursor-pointer"
+              className="bg-surface/30 border border-edge/40 rounded-lg p-2.5 hover:border-edge-strong/50 transition cursor-pointer"
               onClick={() => handleViewDetails(evacuation)}
             >
               <div className="flex items-center justify-between gap-2">
@@ -625,10 +625,10 @@ export default function EvacuationCoffreModule({
                   </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold text-white truncate">{evacuation.reference}</span>
+                      <span className="text-xs font-semibold text-content-primary truncate">{evacuation.reference}</span>
                       <DestinationBadge type={evacuation.typeDestination} />
                     </div>
-                    <div className="flex items-center gap-2 mt-0.5 text-[10px] text-slate-500">
+                    <div className="flex items-center gap-2 mt-0.5 text-[10px] text-content-muted">
                       <span>{evacuation.coffreSource?.nom || 'Coffre'}</span>
                       <ArrowUpRight size={10} />
                       <span>{getDestinationInfo(evacuation)}</span>
@@ -639,7 +639,7 @@ export default function EvacuationCoffreModule({
                 </div>
 
                 <div className="flex items-center gap-3 shrink-0">
-                  <span className="text-sm font-bold text-white tabular-nums">
+                  <span className="text-sm font-bold text-content-primary tabular-nums">
                     {formatMoney(evacuation.montant)}
                   </span>
                   <div onClick={(e) => e.stopPropagation()}>
@@ -718,7 +718,7 @@ export default function EvacuationCoffreModule({
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
                 placeholder="Motif du rejet (obligatoire)..."
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-red-500/50"
+                className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-status-danger/50"
                 rows={3}
               />
             </div>
@@ -741,7 +741,7 @@ export default function EvacuationCoffreModule({
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)}
                 placeholder="Motif d'annulation (obligatoire)..."
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-red-500/50"
+                className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-status-danger/50"
                 rows={3}
               />
             </div>

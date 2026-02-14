@@ -9,8 +9,8 @@ import mtnLogo from '@/assets/logos/mtn-logo.png';
 import airtelLogo from '@/assets/logos/airtel-logo.png';
 
 const MOBILE_OPERATORS = [
-  { id: 'MTN', name: 'MTN Mobile Money', color: 'bg-yellow-500', logo: mtnLogo },
-  { id: 'AIRTEL', name: 'Airtel Money', color: 'bg-red-500', logo: airtelLogo },
+  { id: 'MTN', name: 'MTN Mobile Money', color: 'bg-status-warning-bg0', logo: mtnLogo },
+  { id: 'AIRTEL', name: 'Airtel Money', color: 'bg-status-danger', logo: airtelLogo },
 ] as const;
 import { Card, Button, Badge, IconButton } from '../../ui';
 import { tontineMembreApi, tontineApi } from '../../../lib/api-client';
@@ -234,7 +234,7 @@ export default function TontineDistributions({ tontineId, montantContribution, t
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-lg font-bold text-white">Distributions</h3>
+        <h3 className="text-lg font-bold text-content-primary">Distributions</h3>
         <Button
           onClick={() => {
             fetchData();
@@ -251,22 +251,22 @@ export default function TontineDistributions({ tontineId, montantContribution, t
 
       {/* Alert if no cycle */}
       {!currentCycle && (
-        <Card className="bg-slate-800/50 border-slate-700/50 p-4 text-center">
-          <Clock className="mx-auto text-slate-500 mb-2" size={24} />
-          <p className="text-slate-400 text-sm">Générez d'abord un cycle pour effectuer des distributions</p>
+        <Card className="bg-surface/50 border-edge-subtle p-4 text-center">
+          <Clock className="mx-auto text-content-muted mb-2" size={24} />
+          <p className="text-content-muted text-sm">Générez d'abord un cycle pour effectuer des distributions</p>
         </Card>
       )}
 
       {/* Alert if insufficient balance */}
       {currentCycle && soldeInsuffisant && membresEligibles.length > 0 && (
-        <Card className="bg-amber-900/20 border-amber-500/30 p-3">
+        <Card className="bg-status-warning/10 border-status-warning/30 p-3">
           <div className="flex items-start gap-3">
-            <AlertTriangle size={18} className="text-amber-400 shrink-0 mt-0.5" />
+            <AlertTriangle size={18} className="text-status-warning shrink-0 mt-0.5" />
             <div>
-              <div className="font-semibold text-amber-400 text-sm">Solde insuffisant</div>
-              <div className="text-xs text-slate-400 mt-1">
-                Solde: <span className="text-white">{soldeDisponible.toLocaleString()} FCFA</span> •
-                Requis: <span className="text-white">{montantEstime.toLocaleString()} FCFA</span>
+              <div className="font-semibold text-status-warning text-sm">Solde insuffisant</div>
+              <div className="text-xs text-content-muted mt-1">
+                Solde: <span className="text-content-primary">{soldeDisponible.toLocaleString()} FCFA</span> •
+                Requis: <span className="text-content-primary">{montantEstime.toLocaleString()} FCFA</span>
               </div>
             </div>
           </div>
@@ -274,13 +274,13 @@ export default function TontineDistributions({ tontineId, montantContribution, t
       )}
 
       {/* Balance indicator */}
-      <Card className="bg-slate-800/30 border-slate-700/50 p-3">
+      <Card className="bg-surface/30 border-edge-subtle p-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-slate-400">
+          <div className="flex items-center gap-2 text-content-muted">
             <Wallet size={16} />
             <span className="text-xs font-medium uppercase tracking-wider">Solde Disponible</span>
           </div>
-          <div className={`font-bold text-lg ${soldeInsuffisant ? 'text-amber-400' : 'text-emerald-400'}`}>
+          <div className={`font-bold text-lg ${soldeInsuffisant ? 'text-status-warning' : 'text-status-success'}`}>
             {soldeDisponible.toLocaleString()} FCFA
           </div>
         </div>
@@ -289,23 +289,23 @@ export default function TontineDistributions({ tontineId, montantContribution, t
       {/* Next beneficiary card */}
       {nextTurn && currentCycle && (
         <Card className={`p-4 ${soldeInsuffisant
-          ? 'bg-gradient-to-r from-amber-900/30 to-slate-900/40 border-amber-500/30'
-          : 'bg-gradient-to-r from-emerald-900/40 to-slate-900/40 border-emerald-500/30'}`}>
+          ? 'bg-gradient-to-r from-status-warning/10 to-surface-base/40 border-status-warning/30'
+          : 'bg-gradient-to-r from-status-success/10 to-surface-base/40 border-status-success/30'}`}>
           <div className="flex justify-between items-start">
             <div>
-              <div className={`text-xs font-bold uppercase tracking-wider mb-1 ${soldeInsuffisant ? 'text-amber-400' : 'text-emerald-400'}`}>
+              <div className={`text-xs font-bold uppercase tracking-wider mb-1 ${soldeInsuffisant ? 'text-status-warning' : 'text-status-success'}`}>
                 Prochain Bénéficiaire (Tour #{nextTurn.turnNumber})
               </div>
-              <div className="text-lg font-bold text-white flex items-center gap-2">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${soldeInsuffisant ? 'bg-amber-500/20 text-amber-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+              <div className="text-lg font-bold text-content-primary flex items-center gap-2">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${soldeInsuffisant ? 'bg-status-warning-bg text-status-warning' : 'bg-status-success-bg text-status-success'}`}>
                   <User size={16} />
                 </div>
                 {getMemberName(nextTurn.beneficiaryMemberId)}
               </div>
             </div>
             <div className="text-right">
-              <div className="text-xs text-slate-400 mb-0.5">Montant estimé</div>
-              <div className={`text-xl font-bold ${soldeInsuffisant ? 'text-amber-400' : 'text-emerald-400'}`}>
+              <div className="text-xs text-content-muted mb-0.5">Montant estimé</div>
+              <div className={`text-xl font-bold ${soldeInsuffisant ? 'text-status-warning' : 'text-status-success'}`}>
                 {montantEstime.toLocaleString()} FCFA
               </div>
             </div>
@@ -316,18 +316,18 @@ export default function TontineDistributions({ tontineId, montantContribution, t
       {/* Pending distributions */}
       {pendingDistributions.length > 0 && (
         <div className="space-y-2">
-          <div className="text-xs font-semibold text-amber-400 uppercase tracking-wider">En attente</div>
+          <div className="text-xs font-semibold text-status-warning uppercase tracking-wider">En attente</div>
           {pendingDistributions.map(dist => {
             const memberId = dist.beneficiaryMemberId;
             const status = getDistributionStatus(dist);
             const statusCfg = statusConfig[status] || statusConfig.DRAFT;
 
             return (
-              <Card key={dist.id} className="bg-amber-900/10 border-amber-500/20 p-3">
+              <Card key={dist.id} className="bg-status-warning-bg border-status-warning/20 p-3">
                 <div className="flex justify-between items-center">
                   <div>
-                    <div className="font-medium text-white text-sm">{memberId ? getMemberName(memberId) : 'Inconnu'}</div>
-                    <div className="text-xs text-slate-500">{getDistributionAmount(dist).toLocaleString()} FCFA</div>
+                    <div className="font-medium text-content-primary text-sm">{memberId ? getMemberName(memberId) : 'Inconnu'}</div>
+                    <div className="text-xs text-content-muted">{getDistributionAmount(dist).toLocaleString()} FCFA</div>
                   </div>
                   <Badge variant={statusCfg.variant} className="text-[10px]" value={statusCfg.label} />
                 </div>
@@ -339,11 +339,11 @@ export default function TontineDistributions({ tontineId, montantContribution, t
 
       {/* Completed distributions */}
       {loading && successDistributions.length === 0 ? (
-        <div className="text-center py-8 text-slate-400">Chargement...</div>
+        <div className="text-center py-8 text-content-muted">Chargement...</div>
       ) : successDistributions.length === 0 ? (
-        <div className="text-center py-8 border border-dashed border-slate-700 rounded-lg">
-          <DollarSign className="mx-auto text-slate-500 mb-3" size={32} />
-          <p className="text-slate-400 text-sm">Aucune distribution effectuée</p>
+        <div className="text-center py-8 border border-dashed border-edge rounded-lg">
+          <DollarSign className="mx-auto text-content-muted mb-3" size={32} />
+          <p className="text-content-muted text-sm">Aucune distribution effectuée</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -354,25 +354,25 @@ export default function TontineDistributions({ tontineId, montantContribution, t
             const method = getPayoutMethod(dist);
 
             return (
-              <Card key={dist.id} className="bg-slate-800/40 border-slate-700/50 p-3">
+              <Card key={dist.id} className="bg-surface/40 border-edge-subtle p-3">
                 <div className="flex justify-between items-start">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <Badge variant={statusCfg.variant} className="text-[10px]" value={statusCfg.label} />
-                      <span className="text-xs text-slate-500">
+                      <span className="text-xs text-content-muted">
                         {getDistributionDate(dist) && new Date(getDistributionDate(dist)).toLocaleDateString('fr-FR')}
                       </span>
                     </div>
-                    <div className="font-medium text-white text-sm truncate">
+                    <div className="font-medium text-content-primary text-sm truncate">
                       {memberId ? getMemberName(memberId) : 'Inconnu'}
                     </div>
-                    <div className="text-xs text-slate-500 flex items-center gap-1">
+                    <div className="text-xs text-content-muted flex items-center gap-1">
                       {method === 'MOBILE_MONEY' ? <Smartphone size={10} /> : <Banknote size={10} />}
                       {payoutMethodLabels[method] || method}
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="font-bold text-emerald-400">{getDistributionAmount(dist).toLocaleString()} FCFA</div>
+                    <div className="font-bold text-status-success">{getDistributionAmount(dist).toLocaleString()} FCFA</div>
                   </div>
                 </div>
               </Card>
@@ -384,31 +384,31 @@ export default function TontineDistributions({ tontineId, montantContribution, t
       {/* Distribution Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-md shadow-2xl flex flex-col max-h-[90vh]">
-            <div className="p-4 border-b border-slate-700 flex items-center justify-between shrink-0">
-              <h2 className="text-lg font-bold text-white">Nouvelle Distribution</h2>
+          <div className="bg-surface-base border border-edge rounded-xl w-full max-w-md shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="p-4 border-b border-edge flex items-center justify-between shrink-0">
+              <h2 className="text-lg font-bold text-content-primary">Nouvelle Distribution</h2>
               <IconButton icon={X} onClick={() => setShowModal(false)} size="sm" aria-label="Fermer" />
             </div>
 
             <div className="p-4 overflow-y-auto flex-1 space-y-4">
               {soldeInsuffisant && (
-                <div className="p-3 bg-amber-900/30 border border-amber-500/30 rounded-lg">
-                  <div className="flex items-center gap-2 text-amber-400 font-semibold text-sm">
+                <div className="p-3 bg-status-warning/15 border border-status-warning/30 rounded-lg">
+                  <div className="flex items-center gap-2 text-status-warning font-semibold text-sm">
                     <AlertTriangle size={16} />
                     Solde insuffisant
                   </div>
-                  <div className="text-xs text-slate-300 mt-1">
-                    Manquant: <span className="font-bold text-amber-400">{(montantEstime - soldeDisponible).toLocaleString()} FCFA</span>
+                  <div className="text-xs text-content-secondary mt-1">
+                    Manquant: <span className="font-bold text-status-warning">{(montantEstime - soldeDisponible).toLocaleString()} FCFA</span>
                   </div>
                 </div>
               )}
 
               <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Bénéficiaire</label>
+                <label className="block text-xs font-semibold text-content-muted uppercase tracking-wider mb-2">Bénéficiaire</label>
                 <select
                   value={selectedMembreId}
                   onChange={(e) => setSelectedMembreId(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2.5 text-white focus:border-emerald-500 focus:outline-none text-sm"
+                  className="w-full bg-surface-base border border-edge rounded-lg px-3 py-2.5 text-content-primary focus:border-accent focus:outline-none text-sm"
                 >
                   <option value="">Sélectionner...</option>
                   {membresEligibles.map(m => (
@@ -420,18 +420,18 @@ export default function TontineDistributions({ tontineId, montantContribution, t
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Montant</label>
+                <label className="block text-xs font-semibold text-content-muted uppercase tracking-wider mb-2">Montant</label>
                 <div className={`p-3 rounded-lg font-bold text-lg text-center ${
                   soldeInsuffisant
-                    ? 'bg-amber-500/10 border border-amber-500/30 text-amber-400'
-                    : 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
+                    ? 'bg-status-warning-bg border border-status-warning/30 text-status-warning'
+                    : 'bg-status-success-bg border border-status-success/30 text-status-success'
                 }`}>
                   {montantEstime.toLocaleString()} FCFA
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Mode de paiement</label>
+                <label className="block text-xs font-semibold text-content-muted uppercase tracking-wider mb-2">Mode de paiement</label>
                 <div className="grid grid-cols-3 gap-2">
                   {(['CASH', 'MOBILE_MONEY', 'WALLET'] as const).map(method => (
                     <button
@@ -440,8 +440,8 @@ export default function TontineDistributions({ tontineId, montantContribution, t
                       onClick={() => setPayoutMethod(method)}
                       className={`flex flex-col items-center justify-center gap-1 p-2 rounded-lg border text-xs font-medium transition ${
                         payoutMethod === method
-                          ? 'bg-emerald-600 border-emerald-500 text-white'
-                          : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+                          ? 'bg-accent border-accent text-white'
+                          : 'bg-surface border-edge text-content-secondary hover:bg-surface-elevated'
                       }`}
                     >
                       {method === 'CASH' ? <Banknote size={16} /> : method === 'MOBILE_MONEY' ? <Smartphone size={16} /> : <Wallet size={16} />}
@@ -453,7 +453,7 @@ export default function TontineDistributions({ tontineId, montantContribution, t
 
               {payoutMethod === 'MOBILE_MONEY' && (
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Opérateur</label>
+                  <label className="block text-xs font-semibold text-content-muted uppercase tracking-wider mb-2">Opérateur</label>
                   <div className="grid grid-cols-2 gap-2">
                     {MOBILE_OPERATORS.map(op => (
                       <button
@@ -462,8 +462,8 @@ export default function TontineDistributions({ tontineId, montantContribution, t
                         onClick={() => setProvider(op.id)}
                         className={`flex items-center gap-2 p-2.5 rounded-lg border text-sm font-medium transition ${
                           provider === op.id
-                            ? 'bg-emerald-600 border-emerald-500 text-white'
-                            : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+                            ? 'bg-accent border-accent text-white'
+                            : 'bg-surface border-edge text-content-secondary hover:bg-surface-elevated'
                         }`}
                       >
                         <img src={op.logo} alt={op.name} className="w-6 h-6 rounded-full object-contain bg-white/10" />
@@ -475,18 +475,18 @@ export default function TontineDistributions({ tontineId, montantContribution, t
               )}
 
               <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Notes (optionnel)</label>
+                <label className="block text-xs font-semibold text-content-muted uppercase tracking-wider mb-2">Notes (optionnel)</label>
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Commentaire..."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white focus:border-emerald-500 focus:outline-none text-sm"
+                  className="w-full bg-surface-base border border-edge rounded-lg px-3 py-2 text-content-primary focus:border-accent focus:outline-none text-sm"
                   rows={2}
                 />
               </div>
             </div>
 
-            <div className="p-4 border-t border-slate-700 bg-slate-900/50 shrink-0 flex gap-3">
+            <div className="p-4 border-t border-edge bg-surface-base/50 shrink-0 flex gap-3">
               <Button variant="ghost" fullWidth onClick={() => setShowModal(false)}>
                 Annuler
               </Button>

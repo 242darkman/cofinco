@@ -250,19 +250,19 @@ export default function ForgotPasswordModal({ isOpen, onClose }: ForgotPasswordM
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="relative w-full max-w-md bg-gradient-to-br from-slate-800 via-slate-800/95 to-slate-900 rounded-2xl shadow-2xl border border-blue-500/20 overflow-hidden"
+          className="relative w-full max-w-md bg-gradient-to-br from-surface via-surface/95 to-surface-base rounded-2xl shadow-2xl border border-status-info/20 overflow-hidden"
         >
           {/* Header */}
-          <div className="px-6 py-4 border-b border-slate-700/50 flex items-center justify-between">
+          <div className="px-6 py-4 border-b border-edge-subtle flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-status-info to-status-info flex items-center justify-center shadow-lg">
                 <KeyRound className="text-white" size={20} />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-white">
+                <h2 className="text-lg font-semibold text-content-primary">
                   {step === 'success' ? 'Mot de passe réinitialisé' : 'Mot de passe oublié'}
                 </h2>
-                <p className="text-sm text-slate-400">
+                <p className="text-sm text-content-muted">
                   {step === 'identifier' && 'Entrez votre email ou téléphone'}
                   {step === 'otp' && 'Vérification de sécurité'}
                   {step === 'newPassword' && 'Créez un nouveau mot de passe'}
@@ -272,9 +272,9 @@ export default function ForgotPasswordModal({ isOpen, onClose }: ForgotPasswordM
             </div>
             <button
               onClick={onClose}
-              className="p-2 rounded-lg hover:bg-slate-700/50 transition-colors"
+              className="p-2 rounded-lg hover:bg-surface-elevated/50 transition-colors"
             >
-              <X className="text-slate-400" size={20} />
+              <X className="text-content-muted" size={20} />
             </button>
           </div>
 
@@ -290,7 +290,7 @@ export default function ForgotPasswordModal({ isOpen, onClose }: ForgotPasswordM
                   exit={{ opacity: 0, x: -20 }}
                   className="space-y-4"
                 >
-                  <p className="text-slate-300 text-sm">
+                  <p className="text-content-secondary text-sm">
                     Entrez l'adresse email ou le numéro de téléphone associé à votre compte.
                     Un code de vérification vous sera envoyé.
                   </p>
@@ -309,10 +309,10 @@ export default function ForgotPasswordModal({ isOpen, onClose }: ForgotPasswordM
                     <motion.div
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/30"
+                      className="flex items-center gap-2 p-3 rounded-lg bg-status-danger-bg border border-status-danger/30"
                     >
-                      <AlertCircle className="text-red-400 flex-shrink-0" size={16} />
-                      <p className="text-sm text-red-300">{error}</p>
+                      <AlertCircle className="text-status-danger flex-shrink-0" size={16} />
+                      <p className="text-sm text-status-danger">{error}</p>
                     </motion.div>
                   )}
 
@@ -340,10 +340,10 @@ export default function ForgotPasswordModal({ isOpen, onClose }: ForgotPasswordM
                   className="space-y-5"
                 >
                   <div className="text-center">
-                    <p className="text-slate-300 text-sm">
-                      Un code à 6 chiffres a été envoyé à <span className="font-medium text-white">{identifier}</span>
+                    <p className="text-content-secondary text-sm">
+                      Un code à 6 chiffres a été envoyé à <span className="font-medium text-content-primary">{identifier}</span>
                     </p>
-                    <p className="text-slate-400 text-xs mt-1">
+                    <p className="text-content-muted text-xs mt-1">
                       Le code expire dans 5 minutes
                     </p>
                   </div>
@@ -361,8 +361,8 @@ export default function ForgotPasswordModal({ isOpen, onClose }: ForgotPasswordM
                         onChange={(e) => handleOtpChange(index, e.target.value)}
                         onKeyDown={(e) => handleOtpKeyDown(index, e)}
                         onPaste={handleOtpPaste}
-                        className="w-11 h-12 text-center text-xl font-semibold rounded-lg bg-slate-700/50 border border-slate-600
-                                 text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 transition-all"
+                        className="w-11 h-12 text-center text-xl font-semibold rounded-lg bg-surface-elevated/50 border border-edge-strong
+                                 text-content-primary focus:border-status-info focus:ring-2 focus:ring-status-info/30 transition-all"
                       />
                     ))}
                   </div>
@@ -370,14 +370,14 @@ export default function ForgotPasswordModal({ isOpen, onClose }: ForgotPasswordM
                   {/* Resend button */}
                   <div className="text-center">
                     {resendCountdown > 0 ? (
-                      <p className="text-slate-400 text-sm">
+                      <p className="text-content-muted text-sm">
                         Renvoyer le code dans {resendCountdown}s
                       </p>
                     ) : (
                       <button
                         onClick={handleResendOtp}
                         disabled={loading}
-                        className="text-blue-400 hover:text-blue-300 text-sm font-medium transition-colors"
+                        className="text-status-info hover:text-status-info text-sm font-medium transition-colors"
                       >
                         Renvoyer le code
                       </button>
@@ -385,9 +385,9 @@ export default function ForgotPasswordModal({ isOpen, onClose }: ForgotPasswordM
                   </div>
 
                   {/* New Password Fields */}
-                  <div className="pt-4 border-t border-slate-700/50 space-y-4">
-                    <h3 className="text-white font-medium flex items-center gap-2">
-                      <Lock size={16} className="text-blue-400" />
+                  <div className="pt-4 border-t border-edge-subtle space-y-4">
+                    <h3 className="text-content-primary font-medium flex items-center gap-2">
+                      <Lock size={16} className="text-status-info" />
                       Nouveau mot de passe
                     </h3>
 
@@ -420,13 +420,13 @@ export default function ForgotPasswordModal({ isOpen, onClose }: ForgotPasswordM
                     <motion.div
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/30"
+                      className="flex items-center gap-2 p-3 rounded-lg bg-status-danger-bg border border-status-danger/30"
                     >
-                      <AlertCircle className="text-red-400 flex-shrink-0" size={16} />
+                      <AlertCircle className="text-status-danger flex-shrink-0" size={16} />
                       <div>
-                        <p className="text-sm text-red-300">{error}</p>
+                        <p className="text-sm text-status-danger">{error}</p>
                         {attemptsRemaining !== null && attemptsRemaining > 0 && (
-                          <p className="text-xs text-amber-400 mt-1">
+                          <p className="text-xs text-status-warning mt-1">
                             {attemptsRemaining} tentative{attemptsRemaining > 1 ? 's' : ''} restante{attemptsRemaining > 1 ? 's' : ''}
                           </p>
                         )}
@@ -471,15 +471,15 @@ export default function ForgotPasswordModal({ isOpen, onClose }: ForgotPasswordM
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     transition={{ type: 'spring', stiffness: 200, damping: 10 }}
-                    className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-emerald-400 to-green-500 flex items-center justify-center shadow-lg shadow-emerald-500/40"
+                    className="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-br from-status-success to-status-success flex items-center justify-center shadow-lg shadow-status-success/40"
                   >
                     <CheckCircle className="text-white" size={40} />
                   </motion.div>
 
-                  <h3 className="text-xl font-bold text-white mb-2">
+                  <h3 className="text-xl font-bold text-content-primary mb-2">
                     Mot de passe réinitialisé !
                   </h3>
-                  <p className="text-slate-400 mb-6">
+                  <p className="text-content-muted mb-6">
                     Votre mot de passe a été modifié avec succès.
                     <br />
                     Vous pouvez maintenant vous connecter.

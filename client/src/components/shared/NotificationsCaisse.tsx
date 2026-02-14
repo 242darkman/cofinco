@@ -125,10 +125,10 @@ export default function NotificationsCaisse({ onClose, compact = false }: Notifi
 
   const getPriorityColor = (priorite: string) => {
     switch (priorite) {
-      case 'Urgente': return 'text-red-400 bg-red-500/10 border-red-500/20';
-      case 'Haute': return 'text-orange-400 bg-orange-500/10 border-orange-500/20';
-      case 'Normal': return 'text-blue-400 bg-blue-500/10 border-blue-500/20';
-      default: return 'text-slate-400 bg-slate-500/10 border-slate-500/20';
+      case 'Urgente': return 'text-status-danger bg-status-danger-bg border-status-danger/20';
+      case 'Haute': return 'text-status-warning bg-status-warning-bg border-status-warning/20';
+      case 'Normal': return 'text-status-info bg-status-info-bg border-status-info/20';
+      default: return 'text-content-muted bg-surface-subtle/30 border-edge-strong/20';
     }
   };
 
@@ -141,23 +141,23 @@ export default function NotificationsCaisse({ onClose, compact = false }: Notifi
         <Card.Header className="flex justify-between items-center pb-2">
            <div className="flex items-center gap-2">
              <div className="relative">
-               <Bell className="text-blue-400" size={20} />
+               <Bell className="text-status-info" size={20} />
                {nonLuesCount > 0 && (
-                 <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                 <span className="absolute -top-1.5 -right-1.5 bg-status-danger text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
                    {nonLuesCount}
                  </span>
                )}
              </div>
-             <h3 className="font-bold text-white">Notifications Caisse</h3>
+             <h3 className="font-bold text-content-primary">Notifications Caisse</h3>
            </div>
            {onClose && <Button variant="ghost" size="sm" onClick={onClose} icon={X} />}
         </Card.Header>
         
         <Card.Content className="space-y-2 max-h-[300px] overflow-y-auto px-1">
           {loading ? (
-             <div className="text-center py-4 text-slate-500">Chargement...</div>
+             <div className="text-center py-4 text-content-muted">Chargement...</div>
           ) : notifications.length === 0 ? (
-             <div className="text-center py-4 text-slate-500 flex flex-col items-center">
+             <div className="text-center py-4 text-content-muted flex flex-col items-center">
                 <CheckCircle size={24} className="mb-2 opacity-50"/>
                 <span className="text-sm">Aucune notification</span>
              </div>
@@ -165,8 +165,8 @@ export default function NotificationsCaisse({ onClose, compact = false }: Notifi
              notifications.slice(0, 5).map(notif => (
                <div 
                  key={notif.id}
-                 className={`p-3 rounded-lg border cursor-pointer hover:bg-slate-700/50 transition ${
-                    notif.statut === 'Non lue' ? 'bg-slate-700/30 border-blue-500/30' : 'bg-transparent border-slate-700'
+                 className={`p-3 rounded-lg border cursor-pointer hover:bg-surface-elevated/50 transition ${
+                    notif.statut === 'Non lue' ? 'bg-surface-elevated/30 border-status-info/30' : 'bg-transparent border-edge'
                  }`}
                  onClick={() => setSelectedNotif(notif)}
                >
@@ -174,20 +174,20 @@ export default function NotificationsCaisse({ onClose, compact = false }: Notifi
                     <span className={`text-[10px] px-1.5 py-0.5 rounded border ${getPriorityColor(notif.priorite)}`}>
                       {notif.priorite}
                     </span>
-                    <span className="text-xs text-slate-400">{new Date(notif.createdAt).toLocaleDateString()}</span>
+                    <span className="text-xs text-content-muted">{new Date(notif.createdAt).toLocaleDateString()}</span>
                  </div>
-                 <p className="text-sm font-semibold text-white truncate">{notif.titre}</p>
+                 <p className="text-sm font-semibold text-content-primary truncate">{notif.titre}</p>
                  <div className="flex justify-between items-center mt-2">
-                    <span className="text-xs text-slate-400 truncate max-w-[120px]">{notif.clientNom}</span>
-                    <span className="text-sm font-mono text-green-400">{(notif.montant || 0).toLocaleString()} FCFA</span>
+                    <span className="text-xs text-content-muted truncate max-w-[120px]">{notif.clientNom}</span>
+                    <span className="text-sm font-mono text-status-success">{(notif.montant || 0).toLocaleString()} FCFA</span>
                  </div>
                </div>
              ))
           )}
         </Card.Content>
         {notifications.length > 5 && (
-           <div className="p-3 border-t border-slate-700 text-center">
-              <Button variant="ghost" size="sm" className="w-full text-blue-400" onClick={onClose}>
+           <div className="p-3 border-t border-edge text-center">
+              <Button variant="ghost" size="sm" className="w-full text-status-info" onClick={onClose}>
                  Voir tout ({notifications.length})
               </Button>
            </div>
@@ -211,13 +211,13 @@ export default function NotificationsCaisse({ onClose, compact = false }: Notifi
         />
       </div>
 
-      <div className="flex-1 overflow-hidden min-h-0 bg-slate-900/50 rounded-lg border border-slate-700 flex flex-col">
+      <div className="flex-1 overflow-hidden min-h-0 bg-surface-base/50 rounded-lg border border-edge flex flex-col">
          {loading ? (
             <div className="flex items-center justify-center h-full">
-               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-status-info"></div>
             </div>
          ) : notifications.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-slate-500">
+            <div className="flex flex-col items-center justify-center h-full text-content-muted">
                <CheckCircle size={48} className="mb-4 opacity-20"/>
                <p>Aucune notification</p>
             </div>
@@ -226,10 +226,10 @@ export default function NotificationsCaisse({ onClose, compact = false }: Notifi
                {notifications.map(notif => (
                  <div 
                    key={notif.id}
-                   className={`group p-4 rounded-lg border transition-all hover:bg-slate-800 ${
+                   className={`group p-4 rounded-lg border transition-all hover:bg-surface ${
                      notif.statut === 'Non lue' 
-                       ? 'bg-slate-800/50 border-blue-500/40 shadow-[inset_4px_0_0_0_#3b82f6]' 
-                       : 'bg-slate-900 border-slate-700 opacity-80 hover:opacity-100'
+                       ? 'bg-surface/50 border-status-info/40 shadow-[inset_4px_0_0_0_#3b82f6]' 
+                       : 'bg-surface-base border-edge opacity-80 hover:opacity-100'
                    }`}
                    onClick={() => setSelectedNotif(notif)}
                  >
@@ -239,13 +239,13 @@ export default function NotificationsCaisse({ onClose, compact = false }: Notifi
                              <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${getPriorityColor(notif.priorite)}`}>
                                {notif.priorite}
                              </span>
-                             {notif.statut === 'Non lue' && <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>}
-                             <span className="text-xs text-slate-500 flex items-center gap-1">
+                             {notif.statut === 'Non lue' && <span className="w-2 h-2 rounded-full bg-status-info animate-pulse"></span>}
+                             <span className="text-xs text-content-muted flex items-center gap-1">
                                 <Clock size={12}/> {new Date(notif.createdAt).toLocaleString()}
                              </span>
                           </div>
-                          <h4 className="font-bold text-white text-lg mb-1">{notif.titre}</h4>
-                          <div className="flex flex-wrap gap-4 text-sm text-slate-400">
+                          <h4 className="font-bold text-content-primary text-lg mb-1">{notif.titre}</h4>
+                          <div className="flex flex-wrap gap-4 text-sm text-content-muted">
                              <span className="flex items-center gap-1"><User size={14}/> {notif.clientNom}</span>
                              <span className="flex items-center gap-1"><PhoneIcon size={14}/> {notif.clientPhone}</span>
                              <span className="flex items-center gap-1"><CreditCard size={14}/> {notif.numeroCompte}</span>
@@ -253,8 +253,8 @@ export default function NotificationsCaisse({ onClose, compact = false }: Notifi
                        </div>
                        
                        <div className="flex flex-col items-end gap-2 w-full md:w-auto">
-                          <span className="text-xl font-bold text-emerald-400 font-mono">
-                             {(notif.montant || 0).toLocaleString()} <span className="text-sm text-emerald-600">FCFA</span>
+                          <span className="text-xl font-bold text-status-success font-mono">
+                             {(notif.montant || 0).toLocaleString()} <span className="text-sm text-status-success">FCFA</span>
                           </span>
                           <div className="flex gap-2 w-full md:w-auto">
                              <Button 
@@ -308,27 +308,27 @@ export default function NotificationsCaisse({ onClose, compact = false }: Notifi
       */}
       {selectedNotif && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 animate-in fade-in duration-200">
-           <Card className="w-full max-w-lg shadow-2xl border-slate-600">
-              <Card.Header className="flex justify-between items-center bg-slate-800">
+           <Card className="w-full max-w-lg shadow-2xl border-edge-strong">
+              <Card.Header className="flex justify-between items-center bg-surface">
                  <h3 className="font-bold text-lg">Détails Notification</h3>
                  <Button variant="ghost" size="sm" icon={X} onClick={() => setSelectedNotif(null)}/>
               </Card.Header>
               <Card.Content className="space-y-4">
-                 <div className="p-3 bg-slate-700/50 rounded-lg">
-                    <p className="text-sm__ text-slate-400 mb-1">Message</p>
-                    <p className="text-white text-lg">{selectedNotif.message}</p>
+                 <div className="p-3 bg-surface-elevated/50 rounded-lg">
+                    <p className="text-sm__ text-content-muted mb-1">Message</p>
+                    <p className="text-content-primary text-lg">{selectedNotif.message}</p>
                  </div>
                  
                  <div className="grid grid-cols-2 gap-4">
                     <div>
-                       <p className="text-xs text-slate-500 uppercase">Client</p>
-                       <p className="font-semibold text-white">{selectedNotif.clientNom}</p>
-                       <p className="text-sm text-slate-400">{selectedNotif.clientPhone}</p>
+                       <p className="text-xs text-content-muted uppercase">Client</p>
+                       <p className="font-semibold text-content-primary">{selectedNotif.clientNom}</p>
+                       <p className="text-sm text-content-muted">{selectedNotif.clientPhone}</p>
                     </div>
                     <div>
-                       <p className="text-xs text-slate-500 uppercase">Compte</p>
-                       <p className="font-semibold text-white">{selectedNotif.numeroCompte}</p>
-                       <p className="text-sm text-slate-400">{selectedNotif.typeCompte}</p>
+                       <p className="text-xs text-content-muted uppercase">Compte</p>
+                       <p className="font-semibold text-content-primary">{selectedNotif.numeroCompte}</p>
+                       <p className="text-sm text-content-muted">{selectedNotif.typeCompte}</p>
                     </div>
                  </div>
 

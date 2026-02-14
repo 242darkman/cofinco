@@ -38,18 +38,18 @@ export type AccountViewRole = 'client' | 'staff';
 const TYPE_STYLES: Record<AccountType, { icon: LucideIcon; badgeClassName: string; accentClassName: string }> = {
   Courant: {
     icon: Wallet,
-    badgeClassName: 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30',
-    accentClassName: 'text-emerald-400',
+    badgeClassName: 'bg-status-success-bg text-status-success border border-status-success/30',
+    accentClassName: 'text-status-success',
   },
   Épargne: {
     icon: PiggyBank,
-    badgeClassName: 'bg-amber-500/15 text-amber-300 border border-amber-500/30',
-    accentClassName: 'text-amber-400',
+    badgeClassName: 'bg-status-warning-bg text-status-warning border border-status-warning/30',
+    accentClassName: 'text-status-warning',
   },
   Bloqué: {
     icon: Lock,
-    badgeClassName: 'bg-red-500/15 text-red-300 border border-red-500/30',
-    accentClassName: 'text-red-400',
+    badgeClassName: 'bg-status-danger-bg text-status-danger border border-status-danger/30',
+    accentClassName: 'text-status-danger',
   },
 };
 

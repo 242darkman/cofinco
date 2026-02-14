@@ -75,7 +75,7 @@ function SignalQualityIndicator({
           <div
             key={i}
             className={`w-1.5 rounded-sm transition-all duration-300 ${
-              bar.active ? info.color.replace('text-', 'bg-') : 'bg-slate-600'
+              bar.active ? info.color.replace('text-', 'bg-') : 'bg-surface-subtle'
             }`}
             style={{ height: bar.height }}
           />
@@ -86,18 +86,18 @@ function SignalQualityIndicator({
         <div className="flex items-center gap-2">
           <span className={`text-sm font-semibold ${info.color}`}>{info.label}</span>
           {isRefining && (
-            <span className="text-xs text-cyan-400 flex items-center gap-1">
+            <span className="text-xs text-accent flex items-center gap-1">
               <TrendingUp size={10} className="animate-bounce" />
               Raffinement...
             </span>
           )}
         </div>
-        <div className="text-xs text-slate-400">
+        <div className="text-xs text-content-muted">
           {accuracy !== null ? (
             <span>
-              Précision: <span className="text-white font-mono">±{Math.round(accuracy)}m</span>
+              Précision: <span className="text-content-primary font-mono">±{Math.round(accuracy)}m</span>
               {improvement && (
-                <span className="text-green-400 ml-2">
+                <span className="text-status-success ml-2">
                   (-{improvement.percent}% depuis {improvement.from}m)
                 </span>
               )}
@@ -130,12 +130,12 @@ function CaptureProgress({
   return (
     <div className="space-y-2">
       {/* Barre de progression principale */}
-      <div className="relative h-2.5 bg-slate-700 rounded-full overflow-hidden">
+      <div className="relative h-2.5 bg-surface-elevated rounded-full overflow-hidden">
         <div
           className={`absolute inset-y-0 left-0 rounded-full transition-all duration-300 ${
             isRefining
-              ? 'bg-gradient-to-r from-cyan-500 to-green-500'
-              : 'bg-gradient-to-r from-green-600 to-green-400'
+              ? 'bg-gradient-to-r from-accent to-status-success'
+              : 'bg-gradient-to-r from-status-success to-status-success'
           }`}
           style={{ width: `${progress}%` }}
         />
@@ -153,20 +153,20 @@ function CaptureProgress({
       <div className="flex items-center justify-between text-xs">
         <div className="flex items-center gap-2">
           {isRefining ? (
-            <Zap size={12} className="text-cyan-400" />
+            <Zap size={12} className="text-accent" />
           ) : (
-            <Target size={12} className="text-green-400 animate-pulse" />
+            <Target size={12} className="text-status-success animate-pulse" />
           )}
-          <span className="text-slate-300">{statusMessage}</span>
+          <span className="text-content-secondary">{statusMessage}</span>
         </div>
-        <div className="flex items-center gap-3 text-slate-500">
+        <div className="flex items-center gap-3 text-content-muted">
           {refinementCount > 0 && (
-            <span className="text-cyan-400">
+            <span className="text-accent">
               {refinementCount} lecture{refinementCount > 1 ? 's' : ''}
             </span>
           )}
           {accuracy !== null && (
-            <span className="font-mono text-white">±{Math.round(accuracy)}m</span>
+            <span className="font-mono text-content-primary">±{Math.round(accuracy)}m</span>
           )}
         </div>
       </div>
@@ -202,17 +202,17 @@ function GpsTips({ isLoading, hasError, quality }: { isLoading: boolean; hasErro
   if (tips.length === 0) return null;
 
   return (
-    <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+    <div className="bg-status-info-bg border border-status-info/30 rounded-lg p-3">
       <div className="flex items-start gap-2">
-        <Clock size={16} className="text-blue-400 flex-shrink-0 mt-0.5" />
+        <Clock size={16} className="text-status-info flex-shrink-0 mt-0.5" />
         <div className="flex-1 min-w-0">
-          <div className="text-xs font-semibold text-blue-400 mb-1.5">
+          <div className="text-xs font-semibold text-status-info mb-1.5">
             {isLoading ? 'Conseils pour une capture rapide:' : 'Suggestions:'}
           </div>
-          <ul className="text-xs text-blue-300 space-y-1">
+          <ul className="text-xs text-status-info space-y-1">
             {tips.map((tip, i) => (
               <li key={i} className="flex items-start gap-1.5">
-                <span className="text-blue-400 mt-0.5">•</span>
+                <span className="text-status-info mt-0.5">•</span>
                 <span>{tip}</span>
               </li>
             ))}
@@ -257,11 +257,11 @@ function CoordsDisplay({
   return (
     <div className="space-y-3">
       {/* Badge de succès */}
-      <div className="flex items-center gap-2 bg-green-500/10 px-3 py-2 rounded-lg border border-green-500/30">
-        <CheckCircle size={18} className="text-green-400" />
+      <div className="flex items-center gap-2 bg-status-success-bg px-3 py-2 rounded-lg border border-status-success/30">
+        <CheckCircle size={18} className="text-status-success" />
         <div className="flex-1">
-          <span className="text-sm font-medium text-green-400">Position GPS capturée</span>
-          {formattedTime && <span className="text-xs text-green-300 ml-2">à {formattedTime}</span>}
+          <span className="text-sm font-medium text-status-success">Position GPS capturée</span>
+          {formattedTime && <span className="text-xs text-status-success ml-2">à {formattedTime}</span>}
         </div>
       </div>
 
@@ -274,46 +274,46 @@ function CoordsDisplay({
 
       {/* Coordonnées en grille */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        <div className="bg-slate-700/50 p-3 rounded-lg">
+        <div className="bg-surface-elevated/50 p-3 rounded-lg">
           <div className="flex items-center gap-2 mb-1">
-            <Navigation size={12} className="text-cyan-400" />
-            <span className="text-xs text-slate-400">Latitude</span>
+            <Navigation size={12} className="text-accent" />
+            <span className="text-xs text-content-muted">Latitude</span>
           </div>
-          <div className="text-white font-mono text-sm">{latitude.toFixed(6)}</div>
-          <div className="text-xs text-slate-500 mt-0.5">{formatDMS(latitude, true)}</div>
+          <div className="text-content-primary font-mono text-sm">{latitude.toFixed(6)}</div>
+          <div className="text-xs text-content-muted mt-0.5">{formatDMS(latitude, true)}</div>
         </div>
 
-        <div className="bg-slate-700/50 p-3 rounded-lg">
+        <div className="bg-surface-elevated/50 p-3 rounded-lg">
           <div className="flex items-center gap-2 mb-1">
-            <Navigation size={12} className="text-cyan-400 rotate-90" />
-            <span className="text-xs text-slate-400">Longitude</span>
+            <Navigation size={12} className="text-accent rotate-90" />
+            <span className="text-xs text-content-muted">Longitude</span>
           </div>
-          <div className="text-white font-mono text-sm">{longitude.toFixed(6)}</div>
-          <div className="text-xs text-slate-500 mt-0.5">{formatDMS(longitude, false)}</div>
+          <div className="text-content-primary font-mono text-sm">{longitude.toFixed(6)}</div>
+          <div className="text-xs text-content-muted mt-0.5">{formatDMS(longitude, false)}</div>
         </div>
       </div>
 
       {/* Précision visuelle */}
-      <div className="bg-slate-700/30 p-3 rounded-lg">
+      <div className="bg-surface-elevated/30 p-3 rounded-lg">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-xs text-slate-400">Rayon de précision</span>
-          <span className="text-xs font-mono text-white">±{Math.round(accuracy)}m</span>
+          <span className="text-xs text-content-muted">Rayon de précision</span>
+          <span className="text-xs font-mono text-content-primary">±{Math.round(accuracy)}m</span>
         </div>
-        <div className="relative h-2 bg-slate-600 rounded-full overflow-hidden">
+        <div className="relative h-2 bg-surface-subtle rounded-full overflow-hidden">
           <div
             className={`h-full rounded-full transition-all duration-500 ${
               accuracy <= 10
-                ? 'bg-green-500'
+                ? 'bg-status-success'
                 : accuracy <= 30
-                ? 'bg-emerald-500'
+                ? 'bg-status-success'
                 : accuracy <= 100
-                ? 'bg-amber-500'
-                : 'bg-red-500'
+                ? 'bg-status-warning'
+                : 'bg-status-danger'
             }`}
             style={{ width: `${Math.max(5, 100 - Math.min(accuracy, 100))}%` }}
           />
         </div>
-        <div className="flex justify-between text-xs text-slate-500 mt-1">
+        <div className="flex justify-between text-xs text-content-muted mt-1">
           <span>Faible</span>
           <span>Excellente</span>
         </div>
@@ -428,12 +428,12 @@ export default function GpsCapture({
 
   if (!isSupported) {
     return (
-      <div className={`bg-red-500/10 border border-red-500/30 rounded-lg p-4 ${className}`}>
+      <div className={`bg-status-danger-bg border border-status-danger/30 rounded-lg p-4 ${className}`}>
         <div className="flex items-center gap-3">
-          <AlertCircle className="text-red-400" size={24} />
+          <AlertCircle className="text-status-danger" size={24} />
           <div>
-            <div className="text-sm font-semibold text-red-400">GPS non disponible</div>
-            <div className="text-xs text-red-300">Votre navigateur ne supporte pas la géolocalisation.</div>
+            <div className="text-sm font-semibold text-status-danger">GPS non disponible</div>
+            <div className="text-xs text-status-danger">Votre navigateur ne supporte pas la géolocalisation.</div>
           </div>
         </div>
       </div>
@@ -441,16 +441,16 @@ export default function GpsCapture({
   }
 
   return (
-    <div className={`bg-slate-800 rounded-lg border border-slate-700 overflow-hidden ${className}`}>
+    <div className={`bg-surface rounded-lg border border-edge overflow-hidden ${className}`}>
       {/* En-tête */}
-      <div className="px-4 py-3 bg-slate-800/80 border-b border-slate-700">
+      <div className="px-4 py-3 bg-surface/80 border-b border-edge">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <MapPin size={18} className="text-cyan-400" />
-            <span className="text-sm font-semibold text-slate-200">Géolocalisation du site</span>
+            <MapPin size={18} className="text-accent" />
+            <span className="text-sm font-semibold text-content-secondary">Géolocalisation du site</span>
           </div>
           {loading && accuracy !== null && (
-            <span className="text-xs text-cyan-400 font-mono">±{Math.round(accuracy)}m</span>
+            <span className="text-xs text-accent font-mono">±{Math.round(accuracy)}m</span>
           )}
         </div>
       </div>
@@ -461,12 +461,12 @@ export default function GpsCapture({
           <button
             type="button"
             onClick={getCurrentPosition}
-            className="w-full px-4 py-4 bg-gradient-to-r from-green-600/20 to-emerald-600/20 hover:from-green-600/30 hover:to-emerald-600/30 text-green-400 rounded-lg transition-all flex items-center justify-center gap-3 border border-green-500/30 hover:border-green-500/50 active:scale-[0.98] min-h-[56px]"
+            className="w-full px-4 py-4 bg-gradient-to-r from-status-success/20 to-status-success/20 hover:from-status-success/30 hover:to-status-success/30 text-status-success rounded-lg transition-all flex items-center justify-center gap-3 border border-status-success/30 hover:border-status-success/50 active:scale-[0.98] min-h-[56px]"
           >
             <Zap size={22} />
             <div className="text-left">
               <span className="font-semibold block">Capturer la position GPS</span>
-              <span className="text-xs text-green-300">Raffinement automatique jusqu'à ±{desiredAccuracy}m</span>
+              <span className="text-xs text-status-success">Raffinement automatique jusqu'à ±{desiredAccuracy}m</span>
             </div>
           </button>
         )}
@@ -478,16 +478,16 @@ export default function GpsCapture({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="relative">
-                  <Loader2 size={20} className="text-green-400 animate-spin" />
+                  <Loader2 size={20} className="text-status-success animate-spin" />
                 </div>
-                <span className="text-sm font-medium text-green-400">
+                <span className="text-sm font-medium text-status-success">
                   {accuracy !== null ? 'Raffinement en cours...' : 'Acquisition GPS...'}
                 </span>
               </div>
               <button
                 type="button"
                 onClick={cancelCapture}
-                className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition"
+                className="p-1.5 text-content-muted hover:text-content-primary hover:bg-surface-elevated rounded transition"
               >
                 <X size={16} />
               </button>
@@ -533,7 +533,7 @@ export default function GpsCapture({
             <button
               type="button"
               onClick={getCurrentPosition}
-              className="w-full px-3 py-2 bg-slate-700/50 hover:bg-slate-700 text-slate-300 rounded-lg transition flex items-center justify-center gap-2 text-sm"
+              className="w-full px-3 py-2 bg-surface-elevated/50 hover:bg-surface-elevated text-content-secondary rounded-lg transition flex items-center justify-center gap-2 text-sm"
             >
               <RefreshCw size={14} />
               <span>Recapturer la position</span>
@@ -549,12 +549,12 @@ export default function GpsCapture({
         {/* Erreur */}
         {!loading && error && errorMessage && (
           <div className="space-y-4">
-            <div className="bg-red-500/10 border border-red-500/40 rounded-lg p-4">
+            <div className="bg-status-danger-bg border border-status-danger/40 rounded-lg p-4">
               <div className="flex items-start gap-3">
-                <AlertCircle size={20} className="text-red-400 flex-shrink-0 mt-0.5" />
+                <AlertCircle size={20} className="text-status-danger flex-shrink-0 mt-0.5" />
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold text-red-400">{errorMessage.title}</div>
-                  <div className="text-xs text-red-300 mt-1">{errorMessage.message}</div>
+                  <div className="text-sm font-semibold text-status-danger">{errorMessage.title}</div>
+                  <div className="text-xs text-status-danger mt-1">{errorMessage.message}</div>
                 </div>
               </div>
             </div>
@@ -562,7 +562,7 @@ export default function GpsCapture({
             <button
               type="button"
               onClick={getCurrentPosition}
-              className="w-full px-4 py-3 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition flex items-center justify-center gap-2 border border-red-500/30"
+              className="w-full px-4 py-3 bg-status-danger-bg hover:bg-status-danger/30 text-status-danger rounded-lg transition flex items-center justify-center gap-2 border border-status-danger/30"
             >
               <RefreshCw size={16} />
               <span className="font-medium">{errorMessage.action}</span>

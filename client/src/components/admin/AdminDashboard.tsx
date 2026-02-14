@@ -146,10 +146,10 @@ export default function AdminDashboard() {
       <div className="lg:col-span-5 flex flex-col gap-4 h-full">
         
         {/* System Health */}
-        <Card variant="glass" padding="sm" className="shrink-0 bg-slate-900/50">
+        <Card variant="glass" padding="sm" className="shrink-0 bg-surface-base/50">
           <div className="flex items-center gap-2 mb-3">
-            <Database className="w-4 h-4 text-emerald-400" />
-            <h3 className="text-xs font-bold text-slate-100 uppercase tracking-wider">État du Système</h3>
+            <Database className="w-4 h-4 text-status-success" />
+            <h3 className="text-xs font-bold text-content-primary uppercase tracking-wider">État du Système</h3>
           </div>
           <div className="grid grid-cols-2 gap-2">
              <HealthTile 
@@ -181,11 +181,11 @@ export default function AdminDashboard() {
         </Card>
 
         {/* Roles Distribution */}
-        <Card variant="default" padding="none" className="flex-1 min-h-0 flex flex-col overflow-hidden bg-slate-900/40 border-slate-800">
-           <div className="p-3 border-b border-slate-800 shrink-0 flex justify-between items-center">
+        <Card variant="default" padding="none" className="flex-1 min-h-0 flex flex-col overflow-hidden bg-surface-base/40 border-edge">
+           <div className="p-3 border-b border-edge shrink-0 flex justify-between items-center">
               <div className="flex items-center gap-2">
-                <Shield className="w-4 h-4 text-indigo-400" />
-                <h3 className="text-xs font-bold text-slate-100 uppercase tracking-wider">Rôles</h3>
+                <Shield className="w-4 h-4 text-accent" />
+                <h3 className="text-xs font-bold text-content-primary uppercase tracking-wider">Rôles</h3>
               </div>
               
               {/* Roles Pagination Controls */}
@@ -194,16 +194,16 @@ export default function AdminDashboard() {
                       <button 
                         onClick={() => setRolesPage(p => Math.max(1, p - 1))}
                         disabled={rolesPage === 1}
-                        className="p-1 hovered:bg-slate-700/50 rounded disabled:opacity-30"
+                        className="p-1 hovered:bg-surface-elevated/50 rounded disabled:opacity-30"
                       >
-                          <ChevronLeft size={14} className="text-slate-400" />
+                          <ChevronLeft size={14} className="text-content-muted" />
                       </button>
                       <button 
                         onClick={() => setRolesPage(p => Math.min(rolesTotalPages, p + 1))}
                         disabled={rolesPage === rolesTotalPages}
-                        className="p-1 hovered:bg-slate-700/50 rounded disabled:opacity-30"
+                        className="p-1 hovered:bg-surface-elevated/50 rounded disabled:opacity-30"
                       >
-                           <ChevronRight size={14} className="text-slate-400" />
+                           <ChevronRight size={14} className="text-content-muted" />
                       </button>
                   </div>
               )}
@@ -212,18 +212,18 @@ export default function AdminDashboard() {
            <div className="p-2 flex-1 flex flex-col gap-2 overflow-hidden justify-start">
              {currentRoles.length > 0 ? (
                currentRoles.map(([role, count]) => (
-                 <div key={role} className="flex items-center justify-between p-2 rounded-lg bg-slate-800/50 border border-slate-700/50 transition-colors">
+                 <div key={role} className="flex items-center justify-between p-2 rounded-lg bg-surface/50 border border-edge-subtle transition-colors">
                    <div className="flex items-center gap-2 truncate">
-                      <div className="w-1.5 h-1.5 rounded-full bg-indigo-500/50"></div>
-                      <span className="text-xs font-medium text-slate-300 truncate">{role}</span>
+                      <div className="w-1.5 h-1.5 rounded-full bg-accent/50"></div>
+                      <span className="text-xs font-medium text-content-secondary truncate">{role}</span>
                    </div>
-                   <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-indigo-500/10 text-indigo-400 rounded-md text-[10px] font-bold border border-indigo-500/20">
+                   <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-accent/10 text-accent rounded-md text-[10px] font-bold border border-accent/20">
                      {count}
                    </span>
                  </div>
                ))
              ) : (
-               <div className="flex flex-col items-center justify-center h-full text-slate-500">
+               <div className="flex flex-col items-center justify-center h-full text-content-muted">
                   <UserCheck size={20} className="mb-1 opacity-20" />
                   <p className="text-[10px]">Aucune donnée</p>
                </div>
@@ -234,31 +234,31 @@ export default function AdminDashboard() {
 
       {/* RIGHT COLUMN: Activity Feed (4 cols) */}
       <div className="lg:col-span-4 h-full flex flex-col">
-         <div className="bg-slate-900/80 border border-slate-700 rounded-t-xl p-3 flex items-center justify-between shrink-0 backdrop-blur-sm">
+         <div className="bg-surface-base/80 border border-edge rounded-t-xl p-3 flex items-center justify-between shrink-0 backdrop-blur-sm">
             <div className="flex items-center gap-2">
-               <Activity className="w-4 h-4 text-amber-400" />
-               <h3 className="text-xs font-bold text-slate-100 uppercase tracking-wider">Activité</h3>
+               <Activity className="w-4 h-4 text-status-warning" />
+               <h3 className="text-xs font-bold text-content-primary uppercase tracking-wider">Activité</h3>
             </div>
             
             <div className="flex items-center gap-2">
-                <div className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] text-slate-400 font-mono">
+                <div className="px-2 py-0.5 rounded bg-surface border border-edge text-[10px] text-content-muted font-mono">
                    Live
                 </div>
                 {/* Activity Pagination */}
                 {activityTotalPages > 1 && (
-                    <div className="flex gap-1 ml-2 border-l border-slate-700 pl-2">
+                    <div className="flex gap-1 ml-2 border-l border-edge pl-2">
                         <button 
                              onClick={() => setActivityPage(p => Math.max(1, p - 1))}
                              disabled={activityPage === 1}
-                             className="p-0.5 hover:text-white text-slate-500 disabled:opacity-30"
+                             className="p-0.5 hover:text-content-primary text-content-muted disabled:opacity-30"
                         >
                             <ChevronLeft size={14} />
                         </button>
-                        <span className="text-[10px] text-slate-500 font-mono">{activityPage}/{activityTotalPages}</span>
+                        <span className="text-[10px] text-content-muted font-mono">{activityPage}/{activityTotalPages}</span>
                         <button 
                              onClick={() => setActivityPage(p => Math.min(activityTotalPages, p + 1))}
                              disabled={activityPage === activityTotalPages}
-                             className="p-0.5 hover:text-white text-slate-500 disabled:opacity-30"
+                             className="p-0.5 hover:text-content-primary text-content-muted disabled:opacity-30"
                         >
                              <ChevronRight size={14} />
                         </button>
@@ -267,15 +267,15 @@ export default function AdminDashboard() {
             </div>
          </div>
          
-         <div className="flex-1 bg-slate-900/40 border-x border-b border-slate-700 rounded-b-xl overflow-hidden p-2 flex flex-col gap-2">
+         <div className="flex-1 bg-surface-base/40 border-x border-b border-edge rounded-b-xl overflow-hidden p-2 flex flex-col gap-2">
              {currentActivity.length > 0 ? (
                  currentActivity.map((log) => (
-                     <div key={log.id} className="p-2.5 rounded-lg bg-slate-800/40 border border-slate-700/50 hover:bg-slate-800/80 transition-all group shrink-0">
+                     <div key={log.id} className="p-2.5 rounded-lg bg-surface/40 border border-edge-subtle hover:bg-surface/80 transition-all group shrink-0">
                         <div className="flex justify-between items-start mb-0.5">
-                           <span className="text-[11px] font-bold text-indigo-400 truncate max-w-[120px]">
+                           <span className="text-[11px] font-bold text-accent truncate max-w-[120px]">
                                {log.userName}
                            </span>
-                            <span className="text-[10px] text-slate-500 font-mono whitespace-nowrap">
+                            <span className="text-[10px] text-content-muted font-mono whitespace-nowrap">
                                 {(() => {
                                   try {
                                     const date = new Date(log.createdAt);
@@ -288,18 +288,18 @@ export default function AdminDashboard() {
                                 })()}
                             </span>
                         </div>
-                        <p className="text-[11px] text-slate-300 font-medium mb-0.5 truncate">
+                        <p className="text-[11px] text-content-secondary font-medium mb-0.5 truncate">
                             {log.action}
                         </p>
                         {log.details && (
-                           <p className="text-[10px] text-slate-500 truncate opacity-70">
+                           <p className="text-[10px] text-content-muted truncate opacity-70">
                                {log.details}
                            </p>
                         )}
                      </div>
                  ))
              ) : (
-                 <div className="flex flex-col items-center justify-center h-full text-slate-500">
+                 <div className="flex flex-col items-center justify-center h-full text-content-muted">
                     <HistoryIcon />
                     <p className="text-xs mt-2">Aucune activité</p>
                  </div>
@@ -320,17 +320,17 @@ const CompactStatBox = memo(function CompactStatBox({
     icon: any, label: string, value: number, subValue?: string, color: 'primary' | 'success' | 'warning' | 'neutral', className?: string
 }) {
   const colorStyles = {
-    primary: 'bg-gradient-to-br from-blue-500/10 to-indigo-500/5 border-blue-500/20 text-blue-100',
-    success: 'bg-gradient-to-br from-emerald-500/10 to-teal-500/5 border-emerald-500/20 text-emerald-100',
-    warning: 'bg-gradient-to-br from-amber-500/10 to-orange-500/5 border-amber-500/20 text-amber-100',
-    neutral: 'bg-gradient-to-br from-slate-700/30 to-slate-800/30 border-slate-700/50 text-slate-200'
+    primary: 'bg-gradient-to-br from-status-info/10 to-accent/5 border-status-info/20 text-status-info-text',
+    success: 'bg-gradient-to-br from-status-success/10 to-accent/5 border-status-success/20 text-status-success-text',
+    warning: 'bg-gradient-to-br from-status-warning/10 to-status-warning/5 border-status-warning/20 text-status-warning-text',
+    neutral: 'bg-gradient-to-br from-surface-elevated/30 to-surface/30 border-edge-subtle text-content-secondary'
   };
 
   const iconColors = {
-      primary: 'text-blue-400',
-      success: 'text-emerald-400',
-      warning: 'text-amber-400',
-      neutral: 'text-slate-400'
+      primary: 'text-status-info',
+      success: 'text-status-success',
+      warning: 'text-status-warning',
+      neutral: 'text-content-muted'
   };
 
   return (
@@ -354,21 +354,21 @@ const CompactStatBox = memo(function CompactStatBox({
 const HealthTile = memo(function HealthTile({ label, status, value, icon: Icon, alert }: { label: string, status: boolean, value?: string, icon: any, alert?: boolean }) {
     return (
         <div className={`p-2.5 rounded-lg border flex items-center justify-between ${
-            alert ? 'bg-red-500/10 border-red-500/30' : 'bg-slate-800/40 border-slate-700/50'
+            alert ? 'bg-status-danger-bg border-status-danger/30' : 'bg-surface/40 border-edge-subtle'
         }`}>
             <div className="flex items-center gap-2.5">
-                <div className={`p-1 rounded-md ${status ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
+                <div className={`p-1 rounded-md ${status ? 'bg-status-success-bg text-status-success' : 'bg-status-danger-bg text-status-danger'}`}>
                     <Icon size={12} />
                 </div>
                 <div>
-                    <p className="text-[9px] text-slate-500 font-bold uppercase">{label}</p>
-                    <p className={`text-[11px] font-bold ${alert ? 'text-red-400' : 'text-slate-200'}`}>{value || (status ? 'OK' : 'Erreur')}</p>
+                    <p className="text-[9px] text-content-muted font-bold uppercase">{label}</p>
+                    <p className={`text-[11px] font-bold ${alert ? 'text-status-danger' : 'text-content-secondary'}`}>{value || (status ? 'OK' : 'Erreur')}</p>
                 </div>
             </div>
             {status ? (
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]"></div>
+                <div className="w-1.5 h-1.5 rounded-full bg-status-success shadow-[0_0_8px_rgba(16,185,129,0.6)]"></div>
             ) : (
-                <div className="w-1.5 h-1.5 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)] animate-pulse"></div>
+                <div className="w-1.5 h-1.5 rounded-full bg-status-danger shadow-[0_0_8px_rgba(239,68,68,0.6)] animate-pulse"></div>
             )}
         </div>
     );

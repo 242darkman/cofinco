@@ -27,29 +27,29 @@ interface AuditLogPagination {
 
 const ACTION_COLORS: Record<string, string> = {
   // Session lifecycle
-  OPENED: 'bg-green-500/10 text-green-400 border-green-500/20',
-  OUVERTURE: 'bg-green-500/10 text-green-400 border-green-500/20',
-  DIRECT_OPEN: 'bg-green-500/10 text-green-400 border-green-500/20',
-  'OUVERTURE DIRECTE': 'bg-green-500/10 text-green-400 border-green-500/20',
-  CLOSED: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
-  FERMETURE: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
-  TIMEOUT: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-  ADMIN_CLOSED: 'bg-red-500/10 text-red-400 border-red-500/20',
+  OPENED: 'bg-status-success-bg text-status-success border-status-success/20',
+  OUVERTURE: 'bg-status-success-bg text-status-success border-status-success/20',
+  DIRECT_OPEN: 'bg-status-success-bg text-status-success border-status-success/20',
+  'OUVERTURE DIRECTE': 'bg-status-success-bg text-status-success border-status-success/20',
+  CLOSED: 'bg-surface-subtle/30 text-content-muted border-edge-strong/20',
+  FERMETURE: 'bg-surface-subtle/30 text-content-muted border-edge-strong/20',
+  TIMEOUT: 'bg-status-warning-bg text-status-warning border-status-warning/20',
+  ADMIN_CLOSED: 'bg-status-danger-bg text-status-danger border-status-danger/20',
   // Requests
-  REQUEST_SUBMITTED: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-  REQUEST_APPROVED: 'bg-green-500/10 text-green-400 border-green-500/20',
-  REQUEST_REJECTED: 'bg-red-500/10 text-red-400 border-red-500/20',
-  REQUEST_CANCELLED: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  REQUEST_SUBMITTED: 'bg-status-info-bg text-status-info border-status-info/20',
+  REQUEST_APPROVED: 'bg-status-success-bg text-status-success border-status-success/20',
+  REQUEST_REJECTED: 'bg-status-danger-bg text-status-danger border-status-danger/20',
+  REQUEST_CANCELLED: 'bg-status-warning-bg text-status-warning border-status-warning/20',
   // Operations
-  HEARTBEAT: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-  CLOSING_COUNT: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
-  CLOSING_VALIDATION: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
-  CLOSING_INITIATED: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
-  CLOSING_CANCELLED: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-  COUNT_SUBMITTED: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
-  SUPERVISOR_TAKEOVER: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
-  FUNDS_RECEIVED: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-  FUNDS_SENT: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
+  HEARTBEAT: 'bg-status-info-bg text-status-info border-status-info/20',
+  CLOSING_COUNT: 'bg-status-info-bg text-status-info border-status-info/20',
+  CLOSING_VALIDATION: 'bg-status-info-bg text-status-info border-status-info/20',
+  CLOSING_INITIATED: 'bg-accent/10 text-accent border-accent/20',
+  CLOSING_CANCELLED: 'bg-status-warning-bg text-status-warning border-status-warning/20',
+  COUNT_SUBMITTED: 'bg-accent/10 text-accent border-accent/20',
+  SUPERVISOR_TAKEOVER: 'bg-status-warning-bg text-status-warning border-status-warning/20',
+  FUNDS_RECEIVED: 'bg-status-success-bg text-status-success border-status-success/20',
+  FUNDS_SENT: 'bg-accent/10 text-accent border-accent/20',
 };
 
 const ACTION_LABELS: Record<string, string> = {
@@ -116,7 +116,7 @@ export default function CaisseAuditLog() {
   // Restrict access to admins only
   if (!isAdmin) {
     return (
-      <div className="flex flex-col items-center justify-center h-full py-16 text-slate-500">
+      <div className="flex flex-col items-center justify-center h-full py-16 text-content-muted">
         <Lock size={48} className="mb-4 opacity-30" />
         <p className="text-lg font-medium">Accès restreint</p>
         <p className="text-sm mt-1">Seuls les administrateurs peuvent consulter le journal d'audit.</p>
@@ -150,21 +150,21 @@ export default function CaisseAuditLog() {
     fetchLogs();
   }, [fetchLogs]);
 
-  const getActionStyle = (action: string) => ACTION_COLORS[action] || 'bg-slate-500/10 text-slate-400 border-slate-500/20';
+  const getActionStyle = (action: string) => ACTION_COLORS[action] || 'bg-surface-subtle/30 text-content-muted border-edge-strong/20';
   const getActionLabel = (action: string) => ACTION_LABELS[action] || action;
   const getStatusLabel = (status: string) => STATUS_LABELS[status] || status;
 
   return (
     <div className="flex flex-col h-full space-y-3">
       {/* Filters */}
-      <Card className="p-4 bg-slate-800/50 border-slate-700/50">
+      <Card className="p-4 bg-surface/50 border-edge-subtle">
         <div className="grid grid-cols-[1fr_auto_auto_auto] gap-3 items-end">
           <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">Action</label>
+            <label className="block text-xs font-medium text-content-muted mb-1.5">Action</label>
             <select
               value={filterAction}
               onChange={(e) => setFilterAction(e.target.value)}
-              className="w-full h-10 px-3 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500 transition-colors"
+              className="w-full h-10 px-3 bg-surface-base border border-edge rounded-lg text-sm text-content-primary focus:outline-none focus:border-accent transition-colors"
             >
               <option value="">Toutes les actions</option>
               <option value="OUVERTURE DIRECTE">Ouverture directe</option>
@@ -184,26 +184,26 @@ export default function CaisseAuditLog() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">Du</label>
+            <label className="block text-xs font-medium text-content-muted mb-1.5">Du</label>
             <input
               type="date"
               value={filterDateFrom}
               onChange={(e) => setFilterDateFrom(e.target.value)}
-              className="h-10 px-3 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500 transition-colors"
+              className="h-10 px-3 bg-surface-base border border-edge rounded-lg text-sm text-content-primary focus:outline-none focus:border-accent transition-colors"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">Au</label>
+            <label className="block text-xs font-medium text-content-muted mb-1.5">Au</label>
             <input
               type="date"
               value={filterDateTo}
               onChange={(e) => setFilterDateTo(e.target.value)}
-              className="h-10 px-3 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500 transition-colors"
+              className="h-10 px-3 bg-surface-base border border-edge rounded-lg text-sm text-content-primary focus:outline-none focus:border-accent transition-colors"
             />
           </div>
           <button
             onClick={() => fetchLogs()}
-            className="h-10 w-10 flex items-center justify-center bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg transition-colors"
+            className="h-10 w-10 flex items-center justify-center bg-accent-secondary hover:bg-accent-secondary text-content-primary rounded-lg transition-colors"
           >
             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
           </button>
@@ -214,10 +214,10 @@ export default function CaisseAuditLog() {
       <div className="flex-1 min-h-0 overflow-y-auto space-y-1.5">
         {loading && logs.length === 0 ? (
           <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500" />
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" />
           </div>
         ) : logs.length === 0 ? (
-          <div className="text-center py-12 text-slate-500 text-sm">
+          <div className="text-center py-12 text-content-muted text-sm">
             <Shield size={32} className="mx-auto mb-2 opacity-30" />
             Aucun log d'audit trouvé
           </div>
@@ -225,7 +225,7 @@ export default function CaisseAuditLog() {
           logs.map((log) => (
             <div
               key={log.id}
-              className="bg-slate-800/50 border border-slate-700/50 rounded-lg hover:bg-slate-800/70 transition"
+              className="bg-surface/50 border border-edge-subtle rounded-lg hover:bg-surface/70 transition"
             >
               <button
                 onClick={() => setExpandedId(expandedId === log.id ? null : log.id)}
@@ -237,49 +237,49 @@ export default function CaisseAuditLog() {
                 </span>
 
                 {/* User */}
-                <span className="text-xs text-slate-300 truncate flex-1">
+                <span className="text-xs text-content-secondary truncate flex-1">
                   {log.userName ? `${log.userName} ${log.userPrenom || ''}`.trim() : 'Système'}
                 </span>
 
                 {/* Status transition */}
                 {log.statutAvant && log.statutApres && (
-                  <span className="text-[10px] text-slate-500 hidden sm:inline">
+                  <span className="text-[10px] text-content-muted hidden sm:inline">
                     {getStatusLabel(log.statutAvant)} → {getStatusLabel(log.statutApres)}
                   </span>
                 )}
 
                 {/* Date */}
-                <span className="text-[10px] text-slate-500 whitespace-nowrap">
+                <span className="text-[10px] text-content-muted whitespace-nowrap">
                   {formatDate(log.createdAt, { format: 'datetime' })}
                 </span>
 
                 {/* Expand icon */}
                 {expandedId === log.id ? (
-                  <ChevronUp size={14} className="text-slate-500 flex-shrink-0" />
+                  <ChevronUp size={14} className="text-content-muted flex-shrink-0" />
                 ) : (
-                  <ChevronDown size={14} className="text-slate-500 flex-shrink-0" />
+                  <ChevronDown size={14} className="text-content-muted flex-shrink-0" />
                 )}
               </button>
 
               {/* Expanded Details */}
               {expandedId === log.id && (
-                <div className="px-3 pb-3 border-t border-slate-700/50">
+                <div className="px-3 pb-3 border-t border-edge-subtle">
                   <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
                     <div>
-                      <span className="text-slate-500">Session ID</span>
-                      <div className="text-slate-300 font-mono text-[10px] truncate">{log.sessionId}</div>
+                      <span className="text-content-muted">Session ID</span>
+                      <div className="text-content-secondary font-mono text-[10px] truncate">{log.sessionId}</div>
                     </div>
                     {log.ipAddress && (
                       <div>
-                        <span className="text-slate-500">Adresse IP</span>
-                        <div className="text-slate-300 font-mono text-[10px]">{log.ipAddress}</div>
+                        <span className="text-content-muted">Adresse IP</span>
+                        <div className="text-content-secondary font-mono text-[10px]">{log.ipAddress}</div>
                       </div>
                     )}
                   </div>
                   {log.details && Object.keys(log.details).length > 0 && (
                     <div className="mt-2">
-                      <span className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">Détails</span>
-                      <pre className="mt-1 p-2 bg-slate-900 rounded text-[10px] text-slate-400 overflow-x-auto max-h-32 font-mono">
+                      <span className="text-[10px] text-content-muted uppercase tracking-wider font-bold">Détails</span>
+                      <pre className="mt-1 p-2 bg-surface-base rounded text-[10px] text-content-muted overflow-x-auto max-h-32 font-mono">
                         {JSON.stringify(log.details, null, 2)}
                       </pre>
                     </div>
@@ -292,15 +292,15 @@ export default function CaisseAuditLog() {
       </div>
 
       {/* Pagination - Always visible */}
-      <div className="shrink-0 flex items-center justify-between py-3 px-1 border-t border-slate-700/50 mt-2">
-        <span className="text-xs text-slate-400">
+      <div className="shrink-0 flex items-center justify-between py-3 px-1 border-t border-edge-subtle mt-2">
+        <span className="text-xs text-content-muted">
           {pagination.total} entrée{pagination.total > 1 ? 's' : ''} au total
         </span>
         <div className="flex items-center gap-1">
           <button
             onClick={() => fetchLogs(1)}
             disabled={pagination.page <= 1}
-            className="px-2 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            className="px-2 py-1.5 text-xs bg-surface hover:bg-surface-elevated text-content-secondary rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             title="Première page"
           >
             «
@@ -308,24 +308,24 @@ export default function CaisseAuditLog() {
           <button
             onClick={() => fetchLogs(pagination.page - 1)}
             disabled={pagination.page <= 1}
-            className="px-3 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            className="px-3 py-1.5 text-xs bg-surface hover:bg-surface-elevated text-content-secondary rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           >
             Préc.
           </button>
-          <span className="px-3 py-1.5 text-xs text-slate-300 bg-slate-900 rounded-lg min-w-[80px] text-center">
+          <span className="px-3 py-1.5 text-xs text-content-secondary bg-surface-base rounded-lg min-w-[80px] text-center">
             {pagination.page} / {pagination.totalPages || 1}
           </span>
           <button
             onClick={() => fetchLogs(pagination.page + 1)}
             disabled={pagination.page >= pagination.totalPages}
-            className="px-3 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            className="px-3 py-1.5 text-xs bg-surface hover:bg-surface-elevated text-content-secondary rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           >
             Suiv.
           </button>
           <button
             onClick={() => fetchLogs(pagination.totalPages)}
             disabled={pagination.page >= pagination.totalPages}
-            className="px-2 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            className="px-2 py-1.5 text-xs bg-surface hover:bg-surface-elevated text-content-secondary rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             title="Dernière page"
           >
             »

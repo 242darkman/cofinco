@@ -237,9 +237,9 @@ export function useHrSyncStatus() {
   }[syncStatus];
 
   const statusColor = {
-    idle: isConnected ? 'text-green-600' : 'text-gray-400',
-    syncing: 'text-blue-600',
-    synced: 'text-green-600',
+    idle: isConnected ? 'text-status-success' : 'text-content-muted',
+    syncing: 'text-status-info',
+    synced: 'text-status-success',
   }[syncStatus];
 
   return {

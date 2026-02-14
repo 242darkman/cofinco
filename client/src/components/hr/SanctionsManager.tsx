@@ -338,12 +338,12 @@ export default function SanctionsManager({
       primary: true,
       format: (val: string, item: Sanction) => (
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-orange-500/10 rounded-lg">
-            <AlertTriangle size={18} className="text-orange-400" />
+          <div className="p-2 bg-status-warning-bg rounded-lg">
+            <AlertTriangle size={18} className="text-status-warning" />
           </div>
           <div className="min-w-0">
-            <div className="font-semibold text-white text-sm truncate">{val}</div>
-            <div className="text-[10px] text-slate-400">{item.type}</div>
+            <div className="font-semibold text-content-primary text-sm truncate">{val}</div>
+            <div className="text-[10px] text-content-muted">{item.type}</div>
           </div>
         </div>
       )
@@ -353,8 +353,8 @@ export default function SanctionsManager({
       key: 'date',
       hideOnMobile: true,
       format: (val: string) => (
-        <div className="flex items-center gap-1 text-xs text-slate-300">
-          <Calendar size={12} className="text-slate-500" />
+        <div className="flex items-center gap-1 text-xs text-content-secondary">
+          <Calendar size={12} className="text-content-muted" />
           <span>{new Date(val).toLocaleDateString('fr-FR')}</span>
         </div>
       )
@@ -380,7 +380,7 @@ export default function SanctionsManager({
       format: (_: any, item: Sanction) => {
         if (!onUpdateStatus) return null;
         const actions = getNextActions(item.statutWorkflow || 'DRAFT');
-        if (actions.length === 0) return <span className="text-[10px] text-slate-500">Terminé</span>;
+        if (actions.length === 0) return <span className="text-[10px] text-content-muted">Terminé</span>;
 
         return (
           <div className="flex gap-1">
@@ -388,7 +388,7 @@ export default function SanctionsManager({
               <button
                 key={status}
                 onClick={(e) => { e.stopPropagation(); handleWorkflowAction(item.id, status); }}
-                className="px-2 py-1 text-[10px] font-medium rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition flex items-center gap-1"
+                className="px-2 py-1 text-[10px] font-medium rounded bg-surface hover:bg-surface-elevated text-content-secondary hover:text-content-primary transition flex items-center gap-1"
                 title={label}
               >
                 <Icon size={12} />
@@ -406,16 +406,16 @@ export default function SanctionsManager({
       {/* Header with Tabs */}
       <div className="shrink-0 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 p-1">
         <div className="flex items-center gap-4">
-          <h3 className="text-sm font-bold text-white flex items-center gap-2">
-            <AlertTriangle size={16} className="text-orange-400" />
+          <h3 className="text-sm font-bold text-content-primary flex items-center gap-2">
+            <AlertTriangle size={16} className="text-status-warning" />
             Sanctions Disciplinaires
           </h3>
           {canManageRules && (
-            <div className="flex gap-1 bg-slate-800/50 rounded-lg p-0.5">
+            <div className="flex gap-1 bg-surface/50 rounded-lg p-0.5">
               <button
                 onClick={() => setActiveTab('list')}
                 className={`px-3 py-1 text-xs font-medium rounded-md transition ${
-                  activeTab === 'list' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'
+                  activeTab === 'list' ? 'bg-surface-elevated text-content-primary' : 'text-content-muted hover:text-content-primary'
                 }`}
               >
                 Liste
@@ -423,7 +423,7 @@ export default function SanctionsManager({
               <button
                 onClick={() => setActiveTab('rules')}
                 className={`px-3 py-1 text-xs font-medium rounded-md transition flex items-center gap-1 ${
-                  activeTab === 'rules' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'
+                  activeTab === 'rules' ? 'bg-surface-elevated text-content-primary' : 'text-content-muted hover:text-content-primary'
                 }`}
               >
                 <Settings size={12} />
@@ -448,7 +448,7 @@ export default function SanctionsManager({
 
       {/* Main Content */}
       {activeTab === 'list' ? (
-        <div className="flex-1 min-h-0 bg-slate-900 border border-slate-800 rounded-lg flex flex-col">
+        <div className="flex-1 min-h-0 bg-surface-base border border-edge rounded-lg flex flex-col">
           <div className="flex-1 overflow-hidden">
             <ResponsiveTable
               data={paginatedSanctions}
@@ -470,15 +470,15 @@ export default function SanctionsManager({
               }}
               density="compact"
               className="border-0 rounded-none h-full"
-              headerClassName="bg-slate-900 sticky top-0"
+              headerClassName="bg-surface-base sticky top-0"
             />
           </div>
         </div>
       ) : (
         /* Escalation Rules Panel */
-        <div className="flex-1 min-h-0 bg-slate-900 border border-slate-800 rounded-lg flex flex-col overflow-hidden">
-          <div className="p-4 border-b border-slate-800">
-            <p className="text-xs text-slate-400">
+        <div className="flex-1 min-h-0 bg-surface-base border border-edge rounded-lg flex flex-col overflow-hidden">
+          <div className="p-4 border-b border-edge">
+            <p className="text-xs text-content-muted">
               Configurez les règles d'escalade automatique des sanctions. Lorsqu'un employé accumule un certain nombre de sanctions,
               la gravité peut être automatiquement augmentée.
             </p>
@@ -486,46 +486,46 @@ export default function SanctionsManager({
           <div className="flex-1 overflow-auto p-4 space-y-3">
             {loadingRules ? (
               <div className="flex items-center justify-center py-8">
-                <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                <div className="w-6 h-6 border-2 border-status-warning border-t-transparent rounded-full animate-spin" />
               </div>
             ) : escalationRules.length === 0 ? (
               <div className="text-center py-8">
-                <Zap size={32} className="mx-auto text-slate-600 mb-2" />
-                <p className="text-sm text-slate-500">Aucune règle d'escalade configurée</p>
-                <p className="text-xs text-slate-600 mt-1">Créez une règle pour automatiser les escalades de gravité</p>
+                <Zap size={32} className="mx-auto text-content-muted mb-2" />
+                <p className="text-sm text-content-muted">Aucune règle d'escalade configurée</p>
+                <p className="text-xs text-content-muted mt-1">Créez une règle pour automatiser les escalades de gravité</p>
               </div>
             ) : (
               escalationRules.map((rule) => (
                 <div
                   key={rule.id}
                   className={`p-3 rounded-lg border ${
-                    rule.actif ? 'bg-slate-800/50 border-slate-700' : 'bg-slate-900/50 border-slate-800 opacity-60'
+                    rule.actif ? 'bg-surface/50 border-edge' : 'bg-surface-base/50 border-edge opacity-60'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-2">
-                        <TrendingUp size={14} className="text-orange-400" />
-                        <span className="text-sm font-medium text-white">
+                        <TrendingUp size={14} className="text-status-warning" />
+                        <span className="text-sm font-medium text-content-primary">
                           {rule.sanctionCountThreshold} sanctions en {rule.periodMonths} mois
                         </span>
                         {!rule.actif && <Badge variant="neutral" value="Inactif" size="xs" />}
                         {rule.autoApply && <Badge variant="warning" value="Auto" size="xs" />}
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-slate-400">
+                      <div className="flex items-center gap-2 text-xs text-content-muted">
                         <Badge variant={getGraviteColor(rule.sourceGravite)} value={rule.sourceGravite} size="xs" />
                         <ArrowRight size={12} />
                         <Badge variant={getGraviteColor(rule.escalateToGravite)} value={rule.escalateToGravite} size="xs" />
                       </div>
                       {rule.notificationRequired && (
-                        <p className="text-[10px] text-slate-500 mt-1">Notification requise</p>
+                        <p className="text-[10px] text-content-muted mt-1">Notification requise</p>
                       )}
                     </div>
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => handleToggleRuleActive(rule)}
                         className={`p-1.5 rounded transition ${
-                          rule.actif ? 'text-green-400 hover:bg-green-500/10' : 'text-slate-500 hover:bg-slate-700'
+                          rule.actif ? 'text-status-success hover:bg-status-success-bg' : 'text-content-muted hover:bg-surface-elevated'
                         }`}
                         title={rule.actif ? 'Désactiver' : 'Activer'}
                       >
@@ -533,13 +533,13 @@ export default function SanctionsManager({
                       </button>
                       <button
                         onClick={() => handleEditRule(rule)}
-                        className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition"
+                        className="p-1.5 text-content-muted hover:text-content-primary hover:bg-surface-elevated rounded transition"
                       >
                         <Pencil size={14} />
                       </button>
                       <button
                         onClick={() => handleDeleteRule(rule.id)}
-                        className="p-1.5 text-red-400 hover:bg-red-500/10 rounded transition"
+                        className="p-1.5 text-status-danger hover:bg-status-danger-bg rounded transition"
                       >
                         <Trash2 size={14} />
                       </button>
@@ -624,7 +624,7 @@ export default function SanctionsManager({
             required
           />
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
+          <div className="flex justify-end gap-3 pt-4 border-t border-edge">
             <Button
               type="button"
               variant="secondary"
@@ -647,14 +647,14 @@ export default function SanctionsManager({
         size="sm"
       >
         <div className="space-y-4">
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-content-muted">
             Veuillez indiquer le motif de l'appel de la sanction.
           </p>
           <textarea
             value={appealReason}
             onChange={(e) => setAppealReason(e.target.value)}
             placeholder="Motif de l'appel..."
-            className="w-full p-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-blue-500 focus:outline-none resize-none"
+            className="w-full p-3 bg-surface border border-edge rounded-lg text-content-primary placeholder-content-muted focus:border-status-info focus:outline-none resize-none"
             rows={3}
             required
           />
@@ -684,24 +684,24 @@ export default function SanctionsManager({
           onClick={() => setSelectedSanction(null)}
         >
           <div
-            className="bg-slate-900 rounded-t-2xl sm:rounded-xl border-t sm:border border-slate-700 w-full sm:max-w-lg max-h-[90vh] sm:max-h-[80vh] overflow-hidden flex flex-col"
+            className="bg-surface-base rounded-t-2xl sm:rounded-xl border-t sm:border border-edge w-full sm:max-w-lg max-h-[90vh] sm:max-h-[80vh] overflow-hidden flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex flex-col border-b border-slate-700">
+            <div className="flex flex-col border-b border-edge">
               <div className="flex justify-center pt-2 sm:hidden">
-                <div className="w-10 h-1 bg-slate-600 rounded-full"></div>
+                <div className="w-10 h-1 bg-surface-subtle rounded-full"></div>
               </div>
               <div className="p-4 flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <div className="p-2.5 bg-orange-500/20 rounded-xl flex-shrink-0">
-                    <AlertTriangle size={24} className="text-orange-400" />
+                  <div className="p-2.5 bg-status-warning-bg rounded-xl flex-shrink-0">
+                    <AlertTriangle size={24} className="text-status-warning" />
                   </div>
                   <div className="min-w-0">
-                    <h3 className="text-base font-bold text-white truncate">{selectedSanction.employeNom}</h3>
-                    <p className="text-xs text-slate-400">{selectedSanction.type}</p>
+                    <h3 className="text-base font-bold text-content-primary truncate">{selectedSanction.employeNom}</h3>
+                    <p className="text-xs text-content-muted">{selectedSanction.type}</p>
                   </div>
                 </div>
-                <button onClick={() => setSelectedSanction(null)} className="p-2 hover:bg-slate-800 rounded-lg transition text-slate-400 hover:text-white flex-shrink-0">
+                <button onClick={() => setSelectedSanction(null)} className="p-2 hover:bg-surface rounded-lg transition text-content-muted hover:text-content-primary flex-shrink-0">
                   <X size={20} />
                 </button>
               </div>
@@ -709,38 +709,38 @@ export default function SanctionsManager({
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               <div className="grid grid-cols-2 gap-2">
-                <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-                  <Calendar size={16} className="mx-auto text-cyan-400 mb-1" />
-                  <p className="text-[10px] text-slate-400">Date</p>
-                  <p className="text-xs font-semibold text-white">{new Date(selectedSanction.date).toLocaleDateString('fr-FR')}</p>
+                <div className="bg-surface/50 rounded-lg p-3 text-center">
+                  <Calendar size={16} className="mx-auto text-accent mb-1" />
+                  <p className="text-[10px] text-content-muted">Date</p>
+                  <p className="text-xs font-semibold text-content-primary">{new Date(selectedSanction.date).toLocaleDateString('fr-FR')}</p>
                 </div>
-                <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-                  <p className="text-[10px] text-slate-400 mb-1">Gravité</p>
+                <div className="bg-surface/50 rounded-lg p-3 text-center">
+                  <p className="text-[10px] text-content-muted mb-1">Gravité</p>
                   <Badge variant={getGraviteColor(selectedSanction.gravite)} value={selectedSanction.gravite} size="sm" />
                 </div>
               </div>
 
-              <div className="bg-slate-800/30 rounded-lg p-3">
-                <p className="text-[10px] text-slate-400 mb-1">Motif</p>
-                <p className="text-sm text-slate-300">{selectedSanction.motif}</p>
+              <div className="bg-surface/30 rounded-lg p-3">
+                <p className="text-[10px] text-content-muted mb-1">Motif</p>
+                <p className="text-sm text-content-secondary">{selectedSanction.motif}</p>
               </div>
 
-              <div className="bg-slate-800/30 rounded-lg p-3">
-                <p className="text-[10px] text-slate-400 mb-1">Workflow</p>
+              <div className="bg-surface/30 rounded-lg p-3">
+                <p className="text-[10px] text-content-muted mb-1">Workflow</p>
                 <Badge variant={WORKFLOW_COLORS[selectedSanction.statutWorkflow || 'DRAFT'] as any || 'neutral'} value={WORKFLOW_LABELS[selectedSanction.statutWorkflow || 'DRAFT'] || 'Brouillon'} size="sm" />
               </div>
 
               {selectedSanction.appealReason && (
-                <div className="bg-slate-800/30 rounded-lg p-3">
-                  <p className="text-[10px] text-slate-400 mb-1">Motif d'appel</p>
-                  <p className="text-sm text-slate-300">{selectedSanction.appealReason}</p>
+                <div className="bg-surface/30 rounded-lg p-3">
+                  <p className="text-[10px] text-content-muted mb-1">Motif d'appel</p>
+                  <p className="text-sm text-content-secondary">{selectedSanction.appealReason}</p>
                 </div>
               )}
 
               {/* Documents section */}
-              <div className="bg-slate-800/30 rounded-lg p-3">
+              <div className="bg-surface/30 rounded-lg p-3">
                 <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2 text-sm text-slate-400">
+                  <div className="flex items-center gap-2 text-sm text-content-muted">
                     <Paperclip size={14} />
                     <span>Documents joints</span>
                   </div>
@@ -762,7 +762,7 @@ export default function SanctionsManager({
                       <button
                         onClick={() => fileInputRef.current?.click()}
                         disabled={uploadingDoc}
-                        className="flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 rounded-md transition disabled:opacity-50"
+                        className="flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-status-info bg-status-info-bg hover:bg-status-info-bg rounded-md transition disabled:opacity-50"
                       >
                         <Upload size={10} />
                         {uploadingDoc ? 'Upload...' : 'Ajouter'}
@@ -773,7 +773,7 @@ export default function SanctionsManager({
 
                 {loadingDocs ? (
                   <div className="flex items-center justify-center py-3">
-                    <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                    <div className="w-4 h-4 border-2 border-status-info border-t-transparent rounded-full animate-spin"></div>
                   </div>
                 ) : sanctionDocs.length > 0 ? (
                   <div className="space-y-1.5">
@@ -783,31 +783,31 @@ export default function SanctionsManager({
                         href={doc.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-2 p-2 bg-slate-800/50 rounded-lg hover:bg-slate-700/50 transition group"
+                        className="flex items-center gap-2 p-2 bg-surface/50 rounded-lg hover:bg-surface-elevated/50 transition group"
                       >
-                        <FileText size={14} className="text-slate-400 flex-shrink-0" />
-                        <span className="text-xs text-slate-300 truncate flex-1">
+                        <FileText size={14} className="text-content-muted flex-shrink-0" />
+                        <span className="text-xs text-content-secondary truncate flex-1">
                           {doc.fileName.replace(/^\d+-/, '')}
                         </span>
-                        <ExternalLink size={12} className="text-slate-500 group-hover:text-blue-400 flex-shrink-0" />
+                        <ExternalLink size={12} className="text-content-muted group-hover:text-status-info flex-shrink-0" />
                       </a>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-slate-500 text-center py-2">Aucun document</p>
+                  <p className="text-xs text-content-muted text-center py-2">Aucun document</p>
                 )}
               </div>
             </div>
 
-            <div className="p-4 border-t border-slate-700 bg-slate-900 flex justify-between items-center gap-2">
+            <div className="p-4 border-t border-edge bg-surface-base flex justify-between items-center gap-2">
               <div className="flex gap-2">
                 {canCreateSanctions && onUpdate && (selectedSanction.statutWorkflow || 'DRAFT') === 'DRAFT' && (
-                  <Button variant="ghost" size="sm" icon={Pencil} onClick={() => handleEditOpen(selectedSanction)} className="text-blue-400 hover:bg-blue-500/10">
+                  <Button variant="ghost" size="sm" icon={Pencil} onClick={() => handleEditOpen(selectedSanction)} className="text-status-info hover:bg-status-info-bg">
                     Modifier
                   </Button>
                 )}
                 {canCreateSanctions && onDelete && (
-                  <Button variant="ghost" size="sm" icon={Trash2} onClick={() => { setConfirmDelete(selectedSanction); setSelectedSanction(null); }} className="text-red-400 hover:bg-red-500/10">
+                  <Button variant="ghost" size="sm" icon={Trash2} onClick={() => { setConfirmDelete(selectedSanction); setSelectedSanction(null); }} className="text-status-danger hover:bg-status-danger-bg">
                     Supprimer
                   </Button>
                 )}
@@ -827,7 +827,7 @@ export default function SanctionsManager({
           </div>
           <FormField label="Date" name="date" type="date" value={editData.date} onChange={(e) => setEditData({ ...editData, date: e.target.value })} required />
           <TextareaField label="Motif" name="motif" value={editData.motif} onChange={(e) => setEditData({ ...editData, motif: e.target.value })} rows={4} required />
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
+          <div className="flex justify-end gap-3 pt-4 border-t border-edge">
             <Button type="button" variant="secondary" onClick={() => setEditingSanction(null)}>Annuler</Button>
             <Button type="submit" variant="primary">Enregistrer</Button>
           </div>
@@ -837,14 +837,14 @@ export default function SanctionsManager({
       {/* Delete Confirmation */}
       {confirmDelete && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setConfirmDelete(null)}>
-          <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
-            <div className="p-4 border-b border-slate-800">
-              <h3 className="text-sm font-bold text-red-400">Supprimer la sanction</h3>
+          <div className="bg-surface-base border border-edge rounded-xl shadow-2xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-edge">
+              <h3 className="text-sm font-bold text-status-danger">Supprimer la sanction</h3>
             </div>
-            <div className="p-4 text-sm text-slate-300">
-              Voulez-vous vraiment supprimer la sanction de <span className="font-bold text-white">"{confirmDelete.employeNom}"</span> ({confirmDelete.type}) ?
+            <div className="p-4 text-sm text-content-secondary">
+              Voulez-vous vraiment supprimer la sanction de <span className="font-bold text-content-primary">"{confirmDelete.employeNom}"</span> ({confirmDelete.type}) ?
             </div>
-            <div className="p-4 border-t border-slate-800 flex justify-end gap-2">
+            <div className="p-4 border-t border-edge flex justify-end gap-2">
               <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(null)}>Annuler</Button>
               <Button variant="danger" size="sm" onClick={handleDeleteConfirm}>Supprimer</Button>
             </div>
@@ -860,8 +860,8 @@ export default function SanctionsManager({
         size="md"
       >
         <div className="space-y-4">
-          <div className="bg-slate-800/30 rounded-lg p-3 text-xs text-slate-400">
-            <Zap size={14} className="inline mr-1 text-orange-400" />
+          <div className="bg-surface/30 rounded-lg p-3 text-xs text-content-muted">
+            <Zap size={14} className="inline mr-1 text-status-warning" />
             Cette règle définit quand une sanction doit être automatiquement escaladée à un niveau de gravité supérieur.
           </div>
 
@@ -919,9 +919,9 @@ export default function SanctionsManager({
                 type="checkbox"
                 checked={ruleFormData.notificationRequired}
                 onChange={(e) => setRuleFormData({ ...ruleFormData, notificationRequired: e.target.checked })}
-                className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-orange-500 focus:ring-orange-500"
+                className="w-4 h-4 rounded border-edge-strong bg-surface text-status-warning focus:ring-status-warning"
               />
-              <span className="text-sm text-slate-300">Notification requise lors de l'escalade</span>
+              <span className="text-sm text-content-secondary">Notification requise lors de l'escalade</span>
             </label>
 
             <label className="flex items-center gap-3 cursor-pointer">
@@ -929,16 +929,16 @@ export default function SanctionsManager({
                 type="checkbox"
                 checked={ruleFormData.autoApply}
                 onChange={(e) => setRuleFormData({ ...ruleFormData, autoApply: e.target.checked })}
-                className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-orange-500 focus:ring-orange-500"
+                className="w-4 h-4 rounded border-edge-strong bg-surface text-status-warning focus:ring-status-warning"
               />
               <div>
-                <span className="text-sm text-slate-300">Application automatique</span>
-                <p className="text-[10px] text-slate-500">L'escalade sera appliquée automatiquement sans approbation</p>
+                <span className="text-sm text-content-secondary">Application automatique</span>
+                <p className="text-[10px] text-content-muted">L'escalade sera appliquée automatiquement sans approbation</p>
               </div>
             </label>
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
+          <div className="flex justify-end gap-3 pt-4 border-t border-edge">
             <Button variant="secondary" onClick={() => { setShowRuleForm(false); setEditingRule(null); }}>
               Annuler
             </Button>

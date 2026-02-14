@@ -194,15 +194,15 @@ export default function AdminBlockingRules() {
   const getRuleTypeColor = (type: string) => {
     switch (type) {
       case 'IP':
-        return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+        return 'bg-status-info-bg text-status-info border-status-info/30';
       case 'DEVICE':
-        return 'bg-purple-500/20 text-purple-400 border-purple-500/30';
+        return 'bg-status-info-bg text-status-info border-status-info/30';
       case 'GEO':
-        return 'bg-green-500/20 text-green-400 border-green-500/30';
+        return 'bg-status-success-bg text-status-success border-status-success/30';
       case 'USER_AGENT':
-        return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
+        return 'bg-status-warning-bg text-status-warning border-status-warning/30';
       default:
-        return 'bg-slate-500/20 text-slate-400 border-slate-500/30';
+        return 'bg-surface-subtle/40 text-content-muted border-edge-strong/30';
     }
   };
 
@@ -215,8 +215,8 @@ export default function AdminBlockingRules() {
         subtitle={FEATURE_DESCRIPTIONS['admin.blocking-rules'].subtitle}
         helpText={FEATURE_DESCRIPTIONS['admin.blocking-rules'].helpText}
         icon={
-          <div className="p-2 sm:p-3 bg-red-500/20 rounded-xl">
-            <Shield className="text-red-400" size={22} />
+          <div className="p-2 sm:p-3 bg-status-danger-bg rounded-xl">
+            <Shield className="text-status-danger" size={22} />
           </div>
         }
         actions={
@@ -238,28 +238,28 @@ export default function AdminBlockingRules() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Card className="bg-slate-800 border-slate-700 p-3 text-center">
-          <p className="text-2xl font-bold text-white">{rules.length}</p>
-          <p className="text-xs text-slate-400">Total règles</p>
+        <Card className="bg-surface border-edge p-3 text-center">
+          <p className="text-2xl font-bold text-content-primary">{rules.length}</p>
+          <p className="text-xs text-content-muted">Total règles</p>
         </Card>
-        <Card className="bg-slate-800 border-slate-700 p-3 text-center">
-          <p className="text-2xl font-bold text-emerald-400">{rules.filter((r) => r.isActive).length}</p>
-          <p className="text-xs text-slate-400">Actives</p>
+        <Card className="bg-surface border-edge p-3 text-center">
+          <p className="text-2xl font-bold text-status-success">{rules.filter((r) => r.isActive).length}</p>
+          <p className="text-xs text-content-muted">Actives</p>
         </Card>
-        <Card className="bg-slate-800 border-slate-700 p-3 text-center">
-          <p className="text-2xl font-bold text-blue-400">{rules.filter((r) => r.ruleType === 'IP').length}</p>
-          <p className="text-xs text-slate-400">Blocages IP</p>
+        <Card className="bg-surface border-edge p-3 text-center">
+          <p className="text-2xl font-bold text-status-info">{rules.filter((r) => r.ruleType === 'IP').length}</p>
+          <p className="text-xs text-content-muted">Blocages IP</p>
         </Card>
-        <Card className="bg-slate-800 border-slate-700 p-3 text-center">
-          <p className="text-2xl font-bold text-amber-400">
+        <Card className="bg-surface border-edge p-3 text-center">
+          <p className="text-2xl font-bold text-status-warning">
             {rules.reduce((sum, r) => sum + r.hitCount, 0)}
           </p>
-          <p className="text-xs text-slate-400">Blocages effectués</p>
+          <p className="text-xs text-content-muted">Blocages effectués</p>
         </Card>
       </div>
 
       {/* Filters */}
-      <Card className="bg-slate-900 border-slate-800 p-3 sm:p-4">
+      <Card className="bg-surface-base border-edge p-3 sm:p-4">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1">
             <SearchInput
@@ -298,15 +298,15 @@ export default function AdminBlockingRules() {
       </Card>
 
       {/* Rules List */}
-      <Card className="bg-slate-900 border-slate-800 overflow-hidden">
+      <Card className="bg-surface-base border-edge overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="animate-spin text-indigo-400" size={32} />
+            <Loader2 className="animate-spin text-accent" size={32} />
           </div>
         ) : filteredRules.length === 0 ? (
           <div className="text-center py-12">
-            <Ban size={48} className="mx-auto mb-4 text-slate-500 opacity-50" />
-            <p className="text-slate-400">Aucune règle de blocage</p>
+            <Ban size={48} className="mx-auto mb-4 text-content-muted opacity-50" />
+            <p className="text-content-muted">Aucune règle de blocage</p>
             {canManageRules && (
               <Button
                 variant="primary"
@@ -322,7 +322,7 @@ export default function AdminBlockingRules() {
             )}
           </div>
         ) : (
-          <div className="divide-y divide-slate-800">
+          <div className="divide-y divide-edge">
             {filteredRules.map((rule) => {
               const Icon = RULE_TYPE_ICONS[rule.ruleType] || Globe;
               const isExpired = rule.expiresAt && new Date(rule.expiresAt) < new Date();
@@ -330,7 +330,7 @@ export default function AdminBlockingRules() {
               return (
                 <div
                   key={rule.id}
-                  className={`p-4 hover:bg-slate-800/50 transition ${
+                  className={`p-4 hover:bg-surface/50 transition ${
                     !rule.isActive || isExpired ? 'opacity-60' : ''
                   }`}
                 >
@@ -341,7 +341,7 @@ export default function AdminBlockingRules() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-mono text-white font-medium truncate">
+                          <span className="font-mono text-content-primary font-medium truncate">
                             {rule.pattern}
                           </span>
                           <span
@@ -352,23 +352,23 @@ export default function AdminBlockingRules() {
                             {rule.ruleType}
                           </span>
                           {!rule.isActive && (
-                            <span className="px-2 py-0.5 text-[10px] rounded-full bg-slate-600/50 text-slate-400 border border-slate-500/30">
+                            <span className="px-2 py-0.5 text-[10px] rounded-full bg-surface-subtle/50 text-content-muted border border-edge-strong/30">
                               Désactivée
                             </span>
                           )}
                           {isExpired && (
-                            <span className="px-2 py-0.5 text-[10px] rounded-full bg-red-500/20 text-red-400 border border-red-500/30">
+                            <span className="px-2 py-0.5 text-[10px] rounded-full bg-status-danger-bg text-status-danger border border-status-danger/30">
                               Expirée
                             </span>
                           )}
                         </div>
                         {rule.description && (
-                          <p className="text-sm text-slate-400 mt-1">{rule.description}</p>
+                          <p className="text-sm text-content-muted mt-1">{rule.description}</p>
                         )}
                         {rule.reason && (
-                          <p className="text-xs text-amber-400/80 mt-1">Raison: {rule.reason}</p>
+                          <p className="text-xs text-status-warning/80 mt-1">Raison: {rule.reason}</p>
                         )}
-                        <div className="flex flex-wrap gap-3 mt-2 text-xs text-slate-500">
+                        <div className="flex flex-wrap gap-3 mt-2 text-xs text-content-muted">
                           <span className="flex items-center gap-1">
                             <Ban size={12} />
                             {rule.hitCount} blocages
@@ -395,8 +395,8 @@ export default function AdminBlockingRules() {
                           onClick={() => toggleActive(rule)}
                           className={`p-2 rounded-lg transition ${
                             rule.isActive
-                              ? 'text-emerald-400 hover:bg-emerald-500/20'
-                              : 'text-slate-400 hover:bg-slate-700'
+                              ? 'text-status-success hover:bg-status-success-bg'
+                              : 'text-content-muted hover:bg-surface-elevated'
                           }`}
                           title={rule.isActive ? 'Désactiver' : 'Activer'}
                         >
@@ -404,14 +404,14 @@ export default function AdminBlockingRules() {
                         </button>
                         <button
                           onClick={() => startEdit(rule)}
-                          className="p-2 text-slate-400 hover:text-blue-400 hover:bg-blue-500/20 rounded-lg transition"
+                          className="p-2 text-content-muted hover:text-status-info hover:bg-status-info-bg rounded-lg transition"
                           title="Modifier"
                         >
                           <Edit2 size={16} />
                         </button>
                         <button
                           onClick={() => deleteRule(rule)}
-                          className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/20 rounded-lg transition"
+                          className="p-2 text-content-muted hover:text-status-danger hover:bg-status-danger-bg rounded-lg transition"
                           title="Supprimer"
                         >
                           <Trash2 size={16} />
@@ -448,7 +448,7 @@ export default function AdminBlockingRules() {
             }))}
           />
 
-          <div className="text-xs text-slate-400 bg-slate-800/50 p-2 rounded-lg">
+          <div className="text-xs text-content-muted bg-surface/50 p-2 rounded-lg">
             {RULE_TYPE_OPTIONS.find((o) => o.value === formData.ruleType)?.description}
           </div>
 

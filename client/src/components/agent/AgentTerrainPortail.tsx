@@ -95,7 +95,7 @@ export default function AgentTerrainPortail({ agentId }: { agentId?: string }) {
   const OfflineDaySessionWrapper = useCallback(({ agentId: _agentId }: any) => {
     const numericAgentId = user?.id ? parseInt(user.id, 10) : 0;
     const agencyId = user?.agenceId || '';
-    if (!numericAgentId) return <div className="text-center py-12 text-slate-400">Chargement du profil...</div>;
+    if (!numericAgentId) return <div className="text-center py-12 text-content-muted">Chargement du profil...</div>;
     return <OfflineDaySession agentId={numericAgentId} agenceId={agencyId} />;
   }, [user]);
 
@@ -123,19 +123,19 @@ export default function AgentTerrainPortail({ agentId }: { agentId?: string }) {
   return (
     <div className="space-y-4">
       {/* Navbar Compact */}
-      <div className="bg-slate-800/80 backdrop-blur border border-slate-700 rounded-xl p-2 sticky top-0 z-20 flex items-center justify-between gap-3 shadow-lg shadow-black/20">
+      <div className="bg-surface/80 backdrop-blur border border-edge rounded-xl p-2 sticky top-0 z-20 flex items-center justify-between gap-3 shadow-lg shadow-black/20">
         
         {/* Mobile Menu Trigger */}
         <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
           <SheetTrigger asChild>
-            <button className="md:hidden p-2 text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg">
+            <button className="md:hidden p-2 text-content-muted hover:text-content-primary hover:bg-surface-elevated/50 rounded-lg">
               <Menu size={20} />
             </button>
           </SheetTrigger>
-          <SheetContent side="left" className="w-[280px] bg-slate-900 border-r-slate-800 p-0">
-            <SheetHeader className="p-4 border-b border-slate-800 text-left">
-              <SheetTitle className="text-white flex items-center gap-2">
-                <LayoutDashboard className="text-cyan-400" size={20} />
+          <SheetContent side="left" className="w-[280px] bg-surface-base border-r-edge p-0">
+            <SheetHeader className="p-4 border-b border-edge text-left">
+              <SheetTitle className="text-content-primary flex items-center gap-2">
+                <LayoutDashboard className="text-accent" size={20} />
                 Menu Agent
               </SheetTitle>
             </SheetHeader>
@@ -148,13 +148,13 @@ export default function AgentTerrainPortail({ agentId }: { agentId?: string }) {
                      key={module.id}
                      onClick={() => handleModuleChange(module.id)}
                      className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left transition-all mb-1 ${
-                       isActive ? 'bg-cyan-600/20 text-cyan-400 border border-cyan-500/30' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                       isActive ? 'bg-accent-secondary/20 text-accent border border-accent/30' : 'text-content-muted hover:bg-surface hover:text-content-primary'
                      }`}
                    >
                      <Icon size={18} />
                      <span className="text-sm font-medium">{module.name}</span>
                      {module.badge != null && module.badge > 0 && (
-                       <span className="ml-auto bg-violet-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                       <span className="ml-auto bg-accent text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
                          {module.badge > 99 ? '99+' : module.badge}
                        </span>
                      )}
@@ -167,15 +167,15 @@ export default function AgentTerrainPortail({ agentId }: { agentId?: string }) {
 
         {/* Current Module Title (Mobile) */}
         <div className="flex items-center gap-2 md:hidden">
-           <ActiveIcon size={18} className="text-cyan-400" />
-           <span className="text-sm font-bold text-white">{activeModuleName}</span>
+           <ActiveIcon size={18} className="text-accent" />
+           <span className="text-sm font-bold text-content-primary">{activeModuleName}</span>
         </div>
 
         {/* Desktop Horizontal Scroll Menu */}
         <div className="hidden md:flex flex-1 items-center gap-1 min-w-0">
           <button 
             onClick={() => scroll('left')}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/50 transition-colors flex-shrink-0"
+            className="p-1.5 rounded-lg text-content-muted hover:text-content-primary hover:bg-surface-elevated/50 transition-colors flex-shrink-0"
           >
             <ChevronLeft size={16} />
           </button>
@@ -195,8 +195,8 @@ export default function AgentTerrainPortail({ agentId }: { agentId?: string }) {
                   className={`
                     relative flex items-center gap-2 px-3 py-2 rounded-lg whitespace-nowrap transition-all border shrink-0
                     ${isActive
-                      ? 'bg-cyan-600 border-cyan-500 text-white shadow-md shadow-cyan-900/20'
-                      : 'bg-transparent border-transparent text-slate-400 hover:bg-slate-700/50 hover:text-white'
+                      ? 'bg-accent-secondary border-accent text-white shadow-md shadow-accent/20'
+                      : 'bg-transparent border-transparent text-content-muted hover:bg-surface-elevated/50 hover:text-content-primary'
                     }
                   `}
                 >
@@ -204,7 +204,7 @@ export default function AgentTerrainPortail({ agentId }: { agentId?: string }) {
                   <span className="text-xs font-semibold">{module.name}</span>
                   {module.badge != null && module.badge > 0 && (
                     <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center ${
-                      isActive ? 'bg-white/20 text-white' : 'bg-violet-500 text-white'
+                      isActive ? 'bg-white/20 text-white' : 'bg-accent text-white'
                     }`}>
                       {module.badge > 99 ? '99+' : module.badge}
                     </span>
@@ -216,7 +216,7 @@ export default function AgentTerrainPortail({ agentId }: { agentId?: string }) {
 
           <button 
             onClick={() => scroll('right')}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/50 transition-colors flex-shrink-0"
+            className="p-1.5 rounded-lg text-content-muted hover:text-content-primary hover:bg-surface-elevated/50 transition-colors flex-shrink-0"
           >
             <ChevronRight size={16} />
           </button>
@@ -229,8 +229,8 @@ export default function AgentTerrainPortail({ agentId }: { agentId?: string }) {
               onClick={() => setShowAgentSelector(!showAgentSelector)}
               className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-bold transition ${
                 selectedAgent 
-                  ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400' 
-                  : 'bg-slate-700/50 border-slate-600 text-slate-400 hover:text-white'
+                  ? 'bg-accent/10 border-accent/30 text-accent' 
+                  : 'bg-surface-elevated/50 border-edge-strong text-content-muted hover:text-content-primary'
               }`}
             >
               <UserCircle size={16} />
@@ -243,51 +243,51 @@ export default function AgentTerrainPortail({ agentId }: { agentId?: string }) {
             {showAgentSelector && (
               <>
                 <div className="fixed inset-0 z-30" onClick={() => setShowAgentSelector(false)} />
-                <div className="absolute right-0 top-full mt-2 w-72 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-40 overflow-hidden ring-1 ring-black/50">
-                  <div className="p-2 border-b border-slate-700 bg-slate-900 sticky top-0">
+                <div className="absolute right-0 top-full mt-2 w-72 bg-surface-base border border-edge rounded-xl shadow-2xl z-40 overflow-hidden ring-1 ring-black/50">
+                  <div className="p-2 border-b border-edge bg-surface-base sticky top-0">
                     <div className="relative">
-                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                      <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-content-muted" size={14} />
                       <input
                         autoFocus
                         type="text"
                         placeholder="Rechercher un agent..."
                         value={agentSearchQuery}
                         onChange={(e) => setAgentSearchQuery(e.target.value)}
-                        className="w-full pl-8 pr-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white placeholder:text-slate-500 focus:border-cyan-500 focus:outline-none"
+                        className="w-full pl-8 pr-3 py-1.5 bg-surface border border-edge rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:border-accent focus:outline-none"
                       />
                     </div>
                   </div>
                   <div className="max-h-60 overflow-y-auto p-1">
                     {loadingAgents ? (
-                      <div className="p-4 text-center text-slate-500 text-xs">Chargement...</div>
+                      <div className="p-4 text-center text-content-muted text-xs">Chargement...</div>
                     ) : filteredAgents.length === 0 ? (
-                      <div className="p-4 text-center text-slate-500 text-xs">Aucun agent trouvé</div>
+                      <div className="p-4 text-center text-content-muted text-xs">Aucun agent trouvé</div>
                     ) : (
                       filteredAgents.map((agent) => (
                         <button
                           key={agent.id}
                           onClick={() => { setSelectedAgentId(agent.id); setShowAgentSelector(false); setAgentSearchQuery(''); }}
                           className={`w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg transition group ${
-                            selectedAgentId === agent.id ? 'bg-cyan-500/20 text-cyan-400' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                            selectedAgentId === agent.id ? 'bg-accent/10 text-accent' : 'text-content-secondary hover:bg-surface hover:text-content-primary'
                           }`}
                         >
-                          <div className={`p-1.5 rounded-full ${selectedAgentId === agent.id ? 'bg-cyan-500/20' : 'bg-slate-700 group-hover:bg-slate-600'}`}>
+                          <div className={`p-1.5 rounded-full ${selectedAgentId === agent.id ? 'bg-accent/10' : 'bg-surface-elevated group-hover:bg-surface-subtle'}`}>
                              <UserCircle size={14} />
                           </div>
                           <div className="flex-1 min-w-0">
                             <span className="truncate block text-xs font-bold">{agent.prenom} {agent.nom}</span>
-                            {agent.zoneAffectation && <span className="text-[10px] text-slate-500 truncate block">{agent.zoneAffectation}</span>}
+                            {agent.zoneAffectation && <span className="text-[10px] text-content-muted truncate block">{agent.zoneAffectation}</span>}
                           </div>
-                          {selectedAgentId === agent.id && <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />}
+                          {selectedAgentId === agent.id && <div className="w-1.5 h-1.5 rounded-full bg-accent" />}
                         </button>
                       ))
                     )}
                   </div>
                   {selectedAgentId && (
-                     <div className="p-2 border-t border-slate-700 bg-slate-900/50">
+                     <div className="p-2 border-t border-edge bg-surface-base/50">
                         <button 
                           onClick={() => { setSelectedAgentId(null); setShowAgentSelector(false); }}
-                          className="w-full py-1.5 text-xs text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition flex items-center justify-center gap-1"
+                          className="w-full py-1.5 text-xs text-content-muted hover:text-content-primary hover:bg-surface rounded-lg transition flex items-center justify-center gap-1"
                         >
                            <X size={12} /> Désélectionner
                         </button>
@@ -313,7 +313,7 @@ export default function AgentTerrainPortail({ agentId }: { agentId?: string }) {
             onAgentChange={setSelectedAgentId}
           />
         ) : (
-          <Card className="p-12 text-center text-slate-400 border-dashed">
+          <Card className="p-12 text-center text-content-muted border-dashed">
             <p>Module non disponible</p>
           </Card>
         )}

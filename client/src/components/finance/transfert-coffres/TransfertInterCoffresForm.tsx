@@ -114,7 +114,7 @@ export default function TransfertInterCoffresForm({
 
     // Montant minimum recommandé
     if (montantNum > 0 && montantNum < 10000) {
-      result.warnings.push('Montant inférieur au minimum recommandé (10 000 XAF)');
+      result.warnings.push(`Montant inférieur au minimum recommandé (10 000 ${currencyCode()})`);
     }
 
     // Montant élevé
@@ -243,24 +243,24 @@ export default function TransfertInterCoffresForm({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
-      <div className="bg-slate-900 border border-slate-800 w-full max-w-2xl max-h-[95vh] sm:rounded-2xl rounded-t-3xl shadow-2xl flex flex-col animate-in slide-in-from-bottom-5 duration-300">
+    <div className="fixed inset-0 bg-surface-base/90 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+      <div className="bg-surface-base border border-edge w-full max-w-2xl max-h-[95vh] sm:rounded-2xl rounded-t-3xl shadow-2xl flex flex-col animate-in slide-in-from-bottom-5 duration-300">
         {/* Header */}
-        <header className="p-5 border-b border-slate-800 flex items-center justify-between sticky top-0 bg-slate-900/95 backdrop-blur z-10 rounded-t-3xl sm:rounded-t-2xl">
+        <header className="p-5 border-b border-edge flex items-center justify-between sticky top-0 bg-surface-base/95 backdrop-blur z-10 rounded-t-3xl sm:rounded-t-2xl">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 border border-emerald-500/30">
-              <Vault size={20} className="text-emerald-400" />
+            <div className="p-2 rounded-xl bg-gradient-to-br from-status-success/20 to-accent/20 border border-status-success/30">
+              <Vault size={20} className="text-status-success" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white">Nouveau Transfert Inter-Coffres</h2>
-              <p className="text-xs text-slate-400">Initier un mouvement sécurisé entre coffres-forts</p>
+              <h2 className="text-lg font-bold text-content-primary">Nouveau Transfert Inter-Coffres</h2>
+              <p className="text-xs text-content-muted">Initier un mouvement sécurisé entre coffres-forts</p>
             </div>
           </div>
           <Button
             variant="ghost"
             size="sm"
             onClick={onClose}
-            className="rounded-full text-slate-400 hover:text-white h-10 w-10 p-0"
+            className="rounded-full text-content-muted hover:text-content-primary h-10 w-10 p-0"
           >
             <X size={20} />
           </Button>
@@ -270,20 +270,20 @@ export default function TransfertInterCoffresForm({
         <form onSubmit={(e) => handleSubmit(e, false)} className="flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar">
           {/* Source & Destination */}
           <section className="space-y-4">
-            <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wide flex items-center gap-2">
-              <ArrowRight size={16} className="text-cyan-400" />
+            <h3 className="text-sm font-semibold text-content-secondary uppercase tracking-wide flex items-center gap-2">
+              <ArrowRight size={16} className="text-accent" />
               Coffres Source et Destination
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Source */}
               <div className="space-y-2">
-                <label className="text-xs font-medium text-slate-400 uppercase">Coffre Source *</label>
+                <label className="text-xs font-medium text-content-muted uppercase">Coffre Source *</label>
                 <select
                   value={coffreSourceId}
                   onChange={(e) => setCoffreSourceId(e.target.value)}
-                  className={`w-full px-4 py-3 bg-slate-950 border rounded-xl text-white focus:ring-2 focus:ring-cyan-500/30 outline-none transition-all ${
-                    errors.coffreSource ? 'border-red-500' : 'border-slate-700 focus:border-cyan-500'
+                  className={`w-full px-4 py-3 bg-surface-base border rounded-xl text-content-primary focus:ring-2 focus:ring-accent/30 outline-none transition-all ${
+                    errors.coffreSource ? 'border-status-danger' : 'border-edge focus:border-accent'
                   }`}
                 >
                   <option value="">Sélectionner...</option>
@@ -294,21 +294,21 @@ export default function TransfertInterCoffresForm({
                   ))}
                 </select>
                 {coffreSource && (
-                  <div className="text-xs text-slate-500">
-                    Solde: <span className="text-emerald-400 font-medium">{formatMoney(parseFloat(coffreSource.solde))}</span>
+                  <div className="text-xs text-content-muted">
+                    Solde: <span className="text-status-success font-medium">{formatMoney(parseFloat(coffreSource.solde))}</span>
                   </div>
                 )}
-                {errors.coffreSource && <p className="text-xs text-red-400">{errors.coffreSource}</p>}
+                {errors.coffreSource && <p className="text-xs text-status-danger">{errors.coffreSource}</p>}
               </div>
 
               {/* Destination */}
               <div className="space-y-2">
-                <label className="text-xs font-medium text-slate-400 uppercase">Coffre Destination *</label>
+                <label className="text-xs font-medium text-content-muted uppercase">Coffre Destination *</label>
                 <select
                   value={coffreDestinationId}
                   onChange={(e) => setCoffreDestinationId(e.target.value)}
-                  className={`w-full px-4 py-3 bg-slate-950 border rounded-xl text-white focus:ring-2 focus:ring-cyan-500/30 outline-none transition-all ${
-                    errors.coffreDestination ? 'border-red-500' : 'border-slate-700 focus:border-cyan-500'
+                  className={`w-full px-4 py-3 bg-surface-base border rounded-xl text-content-primary focus:ring-2 focus:ring-accent/30 outline-none transition-all ${
+                    errors.coffreDestination ? 'border-status-danger' : 'border-edge focus:border-accent'
                   }`}
                 >
                   <option value="">Sélectionner...</option>
@@ -319,8 +319,8 @@ export default function TransfertInterCoffresForm({
                   ))}
                 </select>
                 {coffreDestination && (
-                  <div className="text-xs text-slate-500">
-                    Solde actuel: <span className="text-white">{formatMoney(parseFloat(coffreDestination.solde))}</span>
+                  <div className="text-xs text-content-muted">
+                    Solde actuel: <span className="text-content-primary">{formatMoney(parseFloat(coffreDestination.solde))}</span>
                     {coffreDestination.plafondEncaisse && (
                       <span className="ml-2">
                         / Plafond: {formatMoney(parseFloat(coffreDestination.plafondEncaisse))}
@@ -328,42 +328,42 @@ export default function TransfertInterCoffresForm({
                     )}
                   </div>
                 )}
-                {errors.coffreDestination && <p className="text-xs text-red-400">{errors.coffreDestination}</p>}
+                {errors.coffreDestination && <p className="text-xs text-status-danger">{errors.coffreDestination}</p>}
               </div>
             </div>
           </section>
 
           {/* Montant */}
           <section className="space-y-2">
-            <label className="text-xs font-medium text-slate-400 uppercase">Montant (XAF) *</label>
+            <label className="text-xs font-medium text-content-muted uppercase">Montant ({currencyCode()}) *</label>
             <div className="relative">
               <input
                 type="number"
                 value={montant}
                 onChange={(e) => setMontant(e.target.value)}
                 placeholder="0"
-                className={`w-full pl-4 pr-16 py-4 bg-slate-950 border rounded-xl text-2xl font-bold text-white focus:ring-2 focus:ring-cyan-500/30 outline-none transition-all ${
-                  errors.montant ? 'border-red-500' : 'border-slate-700 focus:border-cyan-500'
+                className={`w-full pl-4 pr-16 py-4 bg-surface-base border rounded-xl text-2xl font-bold text-content-primary focus:ring-2 focus:ring-accent/30 outline-none transition-all ${
+                  errors.montant ? 'border-status-danger' : 'border-edge focus:border-accent'
                 }`}
               />
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-slate-500">XAF</span>
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-content-muted">{currencyCode()}</span>
             </div>
-            {errors.montant && <p className="text-xs text-red-400">{errors.montant}</p>}
+            {errors.montant && <p className="text-xs text-status-danger">{errors.montant}</p>}
 
             {/* Validation messages */}
             {validation.errors.length > 0 && (
-              <div className="mt-2 p-3 bg-red-500/10 border border-red-500/30 rounded-xl space-y-1">
+              <div className="mt-2 p-3 bg-status-danger-bg border border-status-danger/30 rounded-xl space-y-1">
                 {validation.errors.map((err, i) => (
-                  <p key={i} className="text-xs text-red-400 flex items-center gap-2">
+                  <p key={i} className="text-xs text-status-danger flex items-center gap-2">
                     <AlertTriangle size={12} /> {err}
                   </p>
                 ))}
               </div>
             )}
             {validation.warnings.length > 0 && (
-              <div className="mt-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-1">
+              <div className="mt-2 p-3 bg-status-warning-bg border border-status-warning/30 rounded-xl space-y-1">
                 {validation.warnings.map((warn, i) => (
-                  <p key={i} className="text-xs text-amber-400 flex items-center gap-2">
+                  <p key={i} className="text-xs text-status-warning flex items-center gap-2">
                     <AlertTriangle size={12} /> {warn}
                   </p>
                 ))}
@@ -373,19 +373,19 @@ export default function TransfertInterCoffresForm({
 
           {/* Motif */}
           <section className="space-y-2">
-            <label className="text-xs font-medium text-slate-400 uppercase">Motif du transfert *</label>
+            <label className="text-xs font-medium text-content-muted uppercase">Motif du transfert *</label>
             <textarea
               value={motif}
               onChange={(e) => setMotif(e.target.value)}
               placeholder="Décrivez la raison de ce transfert (min. 10 caractères)..."
               rows={3}
-              className={`w-full px-4 py-3 bg-slate-950 border rounded-xl text-white placeholder-slate-600 focus:ring-2 focus:ring-cyan-500/30 outline-none resize-none transition-all ${
-                errors.motif ? 'border-red-500' : 'border-slate-700 focus:border-cyan-500'
+              className={`w-full px-4 py-3 bg-surface-base border rounded-xl text-content-primary placeholder-content-muted focus:ring-2 focus:ring-accent/30 outline-none resize-none transition-all ${
+                errors.motif ? 'border-status-danger' : 'border-edge focus:border-accent'
               }`}
             />
             <div className="flex justify-between text-xs">
-              {errors.motif && <p className="text-red-400">{errors.motif}</p>}
-              <p className={`ml-auto ${motif.length >= 10 ? 'text-emerald-400' : 'text-slate-500'}`}>
+              {errors.motif && <p className="text-status-danger">{errors.motif}</p>}
+              <p className={`ml-auto ${motif.length >= 10 ? 'text-status-success' : 'text-content-muted'}`}>
                 {motif.length}/10 min
               </p>
             </div>
@@ -393,28 +393,28 @@ export default function TransfertInterCoffresForm({
 
           {/* Date & Heure */}
           <section className="space-y-4">
-            <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wide flex items-center gap-2">
-              <Calendar size={16} className="text-cyan-400" />
+            <h3 className="text-sm font-semibold text-content-secondary uppercase tracking-wide flex items-center gap-2">
+              <Calendar size={16} className="text-accent" />
               Date et Heure
             </h3>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-xs font-medium text-slate-400 uppercase">Date du transfert *</label>
+                <label className="text-xs font-medium text-content-muted uppercase">Date du transfert *</label>
                 <input
                   type="date"
                   value={dateTransfert}
                   onChange={(e) => setDateTransfert(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500 outline-none"
+                  className="w-full px-4 py-3 bg-surface-base border border-edge rounded-xl text-content-primary focus:ring-2 focus:ring-accent/30 focus:border-accent outline-none"
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-xs font-medium text-slate-400 uppercase">Heure de départ prévue</label>
+                <label className="text-xs font-medium text-content-muted uppercase">Heure de départ prévue</label>
                 <input
                   type="time"
                   value={heureDepart}
                   onChange={(e) => setHeureDepart(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500 outline-none"
+                  className="w-full px-4 py-3 bg-surface-base border border-edge rounded-xl text-content-primary focus:ring-2 focus:ring-accent/30 focus:border-accent outline-none"
                 />
               </div>
             </div>
@@ -422,14 +422,14 @@ export default function TransfertInterCoffresForm({
 
           {/* Conditionnement */}
           <section className="space-y-4">
-            <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wide flex items-center gap-2">
-              <Package size={16} className="text-cyan-400" />
+            <h3 className="text-sm font-semibold text-content-secondary uppercase tracking-wide flex items-center gap-2">
+              <Package size={16} className="text-accent" />
               Conditionnement & Sécurité
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-xs font-medium text-slate-400 uppercase">Type de conditionnement *</label>
+                <label className="text-xs font-medium text-content-muted uppercase">Type de conditionnement *</label>
                 <div className="grid grid-cols-2 gap-2">
                   {['Sac scellé', 'Mallette', 'Enveloppe', 'Autre'].map((type) => (
                     <button
@@ -438,8 +438,8 @@ export default function TransfertInterCoffresForm({
                       onClick={() => setTypeConditionnement(type)}
                       className={`px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
                         typeConditionnement === type
-                          ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/50'
-                          : 'bg-slate-800 text-slate-400 border border-slate-700 hover:border-slate-600'
+                          ? 'bg-accent/10 text-accent border border-accent/50'
+                          : 'bg-surface text-content-muted border border-edge hover:border-edge-strong'
                       }`}
                     >
                       {type}
@@ -450,17 +450,17 @@ export default function TransfertInterCoffresForm({
 
               {typeConditionnement === 'Sac scellé' && (
                 <div className="space-y-2">
-                  <label className="text-xs font-medium text-slate-400 uppercase">Numéro de scellé *</label>
+                  <label className="text-xs font-medium text-content-muted uppercase">Numéro de scellé *</label>
                   <input
                     type="text"
                     value={numeroScelle}
                     onChange={(e) => setNumeroScelle(e.target.value)}
                     placeholder="Ex: SC-2026-00123"
-                    className={`w-full px-4 py-3 bg-slate-950 border rounded-xl text-white placeholder-slate-600 focus:ring-2 focus:ring-cyan-500/30 outline-none ${
-                      errors.numeroScelle ? 'border-red-500' : 'border-slate-700 focus:border-cyan-500'
+                    className={`w-full px-4 py-3 bg-surface-base border rounded-xl text-content-primary placeholder-content-muted focus:ring-2 focus:ring-accent/30 outline-none ${
+                      errors.numeroScelle ? 'border-status-danger' : 'border-edge focus:border-accent'
                     }`}
                   />
-                  {errors.numeroScelle && <p className="text-xs text-red-400">{errors.numeroScelle}</p>}
+                  {errors.numeroScelle && <p className="text-xs text-status-danger">{errors.numeroScelle}</p>}
                 </div>
               )}
             </div>
@@ -469,8 +469,8 @@ export default function TransfertInterCoffresForm({
           {/* Agents de Transport */}
           <section className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wide flex items-center gap-2">
-                <Users size={16} className="text-cyan-400" />
+              <h3 className="text-sm font-semibold text-content-secondary uppercase tracking-wide flex items-center gap-2">
+                <Users size={16} className="text-accent" />
                 Agents de Transport (min. 2)
               </h3>
               <Button
@@ -478,14 +478,14 @@ export default function TransfertInterCoffresForm({
                 variant="ghost"
                 size="sm"
                 onClick={addAgent}
-                className="text-cyan-400 hover:bg-cyan-500/10"
+                className="text-accent hover:bg-accent/10"
               >
                 <Plus size={16} className="mr-1" /> Ajouter
               </Button>
             </div>
 
             {errors.agentsTransport && (
-              <p className="text-xs text-red-400 flex items-center gap-1">
+              <p className="text-xs text-status-danger flex items-center gap-1">
                 <AlertTriangle size={12} /> {errors.agentsTransport}
               </p>
             )}
@@ -499,14 +499,14 @@ export default function TransfertInterCoffresForm({
                       value={agent.nom}
                       onChange={(e) => updateAgent(index, 'nom', e.target.value)}
                       placeholder="Nom complet"
-                      className="w-full px-3 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500 outline-none"
+                      className="w-full px-3 py-2.5 bg-surface-base border border-edge rounded-xl text-sm text-content-primary placeholder-content-muted focus:ring-2 focus:ring-accent/30 focus:border-accent outline-none"
                     />
                     <input
                       type="text"
                       value={agent.contact}
                       onChange={(e) => updateAgent(index, 'contact', e.target.value)}
                       placeholder="Téléphone"
-                      className="w-full px-3 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500 outline-none"
+                      className="w-full px-3 py-2.5 bg-surface-base border border-edge rounded-xl text-sm text-content-primary placeholder-content-muted focus:ring-2 focus:ring-accent/30 focus:border-accent outline-none"
                     />
                   </div>
                   {agentsTransport.length > 2 && (
@@ -515,7 +515,7 @@ export default function TransfertInterCoffresForm({
                       variant="ghost"
                       size="sm"
                       onClick={() => removeAgent(index)}
-                      className="text-red-400 hover:bg-red-500/10 h-10 w-10 p-0 rounded-xl"
+                      className="text-status-danger hover:bg-status-danger-bg h-10 w-10 p-0 rounded-xl"
                     >
                       <Trash2 size={16} />
                     </Button>
@@ -527,15 +527,15 @@ export default function TransfertInterCoffresForm({
 
           {/* Summary */}
           {coffreSource && coffreDestination && parseFloat(montant) > 0 && (
-            <section className="p-4 bg-slate-800/50 border border-slate-700 rounded-xl space-y-3">
-              <h4 className="text-sm font-semibold text-white">Résumé du transfert</h4>
+            <section className="p-4 bg-surface/50 border border-edge rounded-xl space-y-3">
+              <h4 className="text-sm font-semibold text-content-primary">Résumé du transfert</h4>
               <div className="flex items-center gap-3 text-sm">
-                <span className="text-slate-400">{coffreSource.agenceNom || coffreSource.nom}</span>
-                <ArrowRight size={16} className="text-cyan-400" />
-                <span className="text-white font-medium">{coffreDestination.agenceNom || coffreDestination.nom}</span>
+                <span className="text-content-muted">{coffreSource.agenceNom || coffreSource.nom}</span>
+                <ArrowRight size={16} className="text-accent" />
+                <span className="text-content-primary font-medium">{coffreDestination.agenceNom || coffreDestination.nom}</span>
               </div>
-              <div className="text-2xl font-bold text-white">{formatMoney(parseFloat(montant))}</div>
-              <div className="text-xs text-slate-400">
+              <div className="text-2xl font-bold text-content-primary">{formatMoney(parseFloat(montant))}</div>
+              <div className="text-xs text-content-muted">
                 Conditionnement: {typeConditionnement}
                 {numeroScelle && ` - Scellé: ${numeroScelle}`}
               </div>
@@ -544,13 +544,13 @@ export default function TransfertInterCoffresForm({
         </form>
 
         {/* Footer */}
-        <footer className="p-5 border-t border-slate-800 bg-slate-900/95 backdrop-blur sticky bottom-0">
+        <footer className="p-5 border-t border-edge bg-surface-base/95 backdrop-blur sticky bottom-0">
           <div className="flex flex-col sm:flex-row gap-3">
             <Button
               type="button"
               variant="outline"
               onClick={onClose}
-              className="w-full sm:w-auto border-slate-700 text-slate-300 hover:bg-slate-800"
+              className="w-full sm:w-auto border-edge text-content-secondary hover:bg-surface"
               disabled={loading}
             >
               Annuler
@@ -560,7 +560,7 @@ export default function TransfertInterCoffresForm({
                 type="button"
                 onClick={(e) => handleSubmit(e, false)}
                 disabled={loading || !validation.valid}
-                className="flex-1 bg-slate-700 hover:bg-slate-600 text-white"
+                className="flex-1 bg-surface-elevated hover:bg-surface-subtle text-content-primary"
               >
                 <FileText size={18} className="mr-2" />
                 Sauvegarder brouillon
@@ -569,7 +569,7 @@ export default function TransfertInterCoffresForm({
                 type="button"
                 onClick={(e) => handleSubmit(e, true)}
                 disabled={loading || !validation.valid}
-                className="flex-1 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white shadow-lg shadow-emerald-500/20"
+                className="flex-1 bg-gradient-to-r from-status-success to-accent hover:from-status-success hover:to-accent text-white shadow-lg shadow-status-success/20"
               >
                 <Send size={18} className="mr-2" />
                 {loading ? 'Traitement...' : 'Soumettre'}

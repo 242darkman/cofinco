@@ -230,13 +230,13 @@ export default function WorkScheduleGrid({ employeId, agenceId }: WorkScheduleGr
     <div className="space-y-4 sm:space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Calendar className="w-6 h-6 text-blue-400" />
-          <h3 className="text-base sm:text-lg font-bold text-white">Emploi du Temps</h3>
+          <Calendar className="w-6 h-6 text-status-info" />
+          <h3 className="text-base sm:text-lg font-bold text-content-primary">Emploi du Temps</h3>
         </div>
         <div className="flex items-center gap-2">
           {templates.length > 0 && (
             <select
-              className="bg-slate-700 text-white text-sm px-3 py-2 rounded-lg border border-slate-600 focus:border-blue-500"
+              className="bg-surface-elevated text-content-primary text-sm px-3 py-2 rounded-lg border border-edge-strong focus:border-status-info"
               onChange={(e) => handleApplyTemplate(e.target.value)}
               defaultValue=""
             >
@@ -260,8 +260,8 @@ export default function WorkScheduleGrid({ employeId, agenceId }: WorkScheduleGr
 
       {/* Save Template Modal */}
       {showSaveTemplate && (
-        <Card className="p-4 bg-slate-750 border border-blue-500/30">
-          <h4 className="text-sm font-bold text-white mb-3">Sauvegarder comme modèle</h4>
+        <Card className="p-4 bg-surface border border-status-info/30">
+          <h4 className="text-sm font-bold text-content-primary mb-3">Sauvegarder comme modèle</h4>
           <div className="space-y-3">
             <FormField
               name="templateName"
@@ -301,57 +301,57 @@ export default function WorkScheduleGrid({ employeId, agenceId }: WorkScheduleGr
             {JOURS.map((jour, index) => {
               const horairesDuJour = getHoraireForDay(index);
               return (
-                <div key={index} className="bg-slate-800 rounded-lg p-3">
+                <div key={index} className="bg-surface rounded-lg p-3">
                   <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-bold text-white text-sm">{jour}</h4>
+                    <h4 className="font-bold text-content-primary text-sm">{jour}</h4>
                     <button
                       onClick={() => handleAddJour(index)}
-                      className="p-1 hover:bg-slate-700 rounded transition"
+                      className="p-1 hover:bg-surface-elevated rounded transition"
                     >
-                      <Plus size={16} className="text-emerald-400" />
+                      <Plus size={16} className="text-status-success" />
                     </button>
                   </div>
 
                   {horairesDuJour.length === 0 ? (
-                    <div className="text-xs text-slate-500 text-center py-2">Repos</div>
+                    <div className="text-xs text-content-muted text-center py-2">Repos</div>
                   ) : (
                     <div className="space-y-2">
                       {horairesDuJour.map((horaire, hIndex) => {
                         const globalIndex = horaires.findIndex(h => h === horaire);
                         return (
-                          <div key={hIndex} className="bg-slate-700 rounded p-2 space-y-2">
+                          <div key={hIndex} className="bg-surface-elevated rounded p-2 space-y-2">
                             <div className="flex items-center gap-2">
-                              <Clock size={12} className="text-slate-400" />
+                              <Clock size={12} className="text-content-muted" />
                               <input
                                 type="time"
                                 value={horaire.heureDebut}
                                 onChange={(e) => handleUpdateHoraire(globalIndex, 'heureDebut', e.target.value)}
-                                className="bg-slate-600 text-white text-xs px-2 py-1 rounded flex-1"
+                                className="bg-surface-subtle text-content-primary text-xs px-2 py-1 rounded flex-1"
                               />
-                              <span className="text-slate-400 text-xs">→</span>
+                              <span className="text-content-muted text-xs">→</span>
                               <input
                                 type="time"
                                 value={horaire.heureFin}
                                 onChange={(e) => handleUpdateHoraire(globalIndex, 'heureFin', e.target.value)}
-                                className="bg-slate-600 text-white text-xs px-2 py-1 rounded flex-1"
+                                className="bg-surface-subtle text-content-primary text-xs px-2 py-1 rounded flex-1"
                               />
                             </div>
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-1">
-                                <span className="text-xs text-slate-400">Pause:</span>
+                                <span className="text-xs text-content-muted">Pause:</span>
                                 <input
                                   type="number"
                                   value={horaire.pauseMinutes}
                                   onChange={(e) => handleUpdateHoraire(globalIndex, 'pauseMinutes', parseInt(e.target.value))}
-                                  className="bg-slate-600 text-white text-xs px-2 py-1 rounded w-16"
+                                  className="bg-surface-subtle text-content-primary text-xs px-2 py-1 rounded w-16"
                                 />
-                                <span className="text-xs text-slate-400">min</span>
+                                <span className="text-xs text-content-muted">min</span>
                               </div>
                               <button
                                 onClick={() => handleDeleteHoraire(globalIndex)}
-                                className="p-1 hover:bg-slate-600 rounded transition"
+                                className="p-1 hover:bg-surface-subtle rounded transition"
                               >
-                                <Trash2 size={12} className="text-red-400" />
+                                <Trash2 size={12} className="text-status-danger" />
                               </button>
                             </div>
                           </div>

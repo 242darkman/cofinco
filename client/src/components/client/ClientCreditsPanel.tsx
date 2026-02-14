@@ -60,10 +60,10 @@ function normalizeEcheance(raw: any) {
 
 function getEcheanceIcon(statut: string) {
   switch (statut) {
-    case 'PAID': case 'SETTLED': return <CheckCircle2 size={14} className="text-emerald-400" />;
-    case 'LATE': return <AlertTriangle size={14} className="text-red-400" />;
-    case 'PARTIALLY_PAID': return <AlertCircle size={14} className="text-orange-400" />;
-    default: return <Clock size={14} className="text-blue-400" />;
+    case 'PAID': case 'SETTLED': return <CheckCircle2 size={14} className="text-status-success" />;
+    case 'LATE': return <AlertTriangle size={14} className="text-status-danger" />;
+    case 'PARTIALLY_PAID': return <AlertCircle size={14} className="text-status-warning" />;
+    default: return <Clock size={14} className="text-status-info" />;
   }
 }
 
@@ -108,7 +108,7 @@ function CreditSchedule({ creditId }: { creditId: string }) {
 
   if (echeances.length === 0) {
     return (
-      <div className="p-4 text-center text-slate-500 text-sm">
+      <div className="p-4 text-center text-content-muted text-sm">
         Aucun echéancier généré
       </div>
     );
@@ -118,11 +118,11 @@ function CreditSchedule({ creditId }: { creditId: string }) {
   const late = echeances.filter((e: any) => e.statut === 'LATE').length;
 
   return (
-    <div className="border-t border-slate-700/50 bg-slate-900/30">
+    <div className="border-t border-edge-subtle bg-surface-base/30">
       {/* Schedule summary */}
-      <div className="flex items-center gap-3 px-3 py-2 text-[10px] uppercase tracking-wider text-slate-500">
+      <div className="flex items-center gap-3 px-3 py-2 text-[10px] uppercase tracking-wider text-content-muted">
         <span>{paid}/{echeances.length} payées</span>
-        {late > 0 && <span className="text-red-400 font-semibold">{late} en retard</span>}
+        {late > 0 && <span className="text-status-danger font-semibold">{late} en retard</span>}
       </div>
 
       {/* Schedule rows */}
@@ -136,7 +136,7 @@ function CreditSchedule({ creditId }: { creditId: string }) {
           return (
             <div
               key={ech.id}
-              className="flex items-center gap-2 px-3 py-2 border-t border-slate-800/50 text-sm hover:bg-slate-800/20"
+              className="flex items-center gap-2 px-3 py-2 border-t border-edge/50 text-sm hover:bg-surface/20"
             >
               {/* Icon + Number */}
               <div className="w-6 text-center shrink-0">
@@ -144,29 +144,29 @@ function CreditSchedule({ creditId }: { creditId: string }) {
               </div>
 
               {/* Date */}
-              <div className="w-20 sm:w-24 shrink-0 text-slate-400 text-xs">
+              <div className="w-20 sm:w-24 shrink-0 text-content-muted text-xs">
                 {ech.dateEcheance ? new Date(ech.dateEcheance).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }) : '-'}
               </div>
 
               {/* Amount + paid bar */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-200 text-xs font-medium truncate">
+                  <span className="text-content-secondary text-xs font-medium truncate">
                     {formatMoney(ech.montantTotal, { compact: true })}
                   </span>
                   {ech.montantPaye > 0 && ech.statut !== 'PAID' && ech.statut !== 'SETTLED' && (
-                    <span className="text-[10px] text-slate-500 ml-1">
+                    <span className="text-[10px] text-content-muted ml-1">
                       payé: {formatMoney(ech.montantPaye, { compact: true })}
                     </span>
                   )}
                 </div>
                 {/* Micro progress bar */}
-                <div className="h-1 bg-slate-800 rounded-full mt-1 overflow-hidden">
+                <div className="h-1 bg-surface rounded-full mt-1 overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all ${
-                      ech.statut === 'LATE' ? 'bg-red-500' :
-                      ech.statut === 'PARTIALLY_PAID' ? 'bg-orange-500' :
-                      paidPercent >= 100 ? 'bg-emerald-500' : 'bg-blue-500'
+                      ech.statut === 'LATE' ? 'bg-status-danger' :
+                      ech.statut === 'PARTIALLY_PAID' ? 'bg-status-warning' :
+                      paidPercent >= 100 ? 'bg-status-success' : 'bg-status-info'
                     }`}
                     style={{ width: `${paidPercent}%` }}
                   />
@@ -176,7 +176,7 @@ function CreditSchedule({ creditId }: { creditId: string }) {
               {/* Status badge + days info */}
               <div className="shrink-0 flex items-center gap-1.5">
                 {daysInfo && (
-                  <span className={`text-[10px] font-medium ${ech.statut === 'LATE' ? 'text-red-400' : 'text-blue-400'}`}>
+                  <span className={`text-[10px] font-medium ${ech.statut === 'LATE' ? 'text-status-danger' : 'text-status-info'}`}>
                     {daysInfo}
                   </span>
                 )}
@@ -208,17 +208,17 @@ function CreditCard_({ credit, defaultExpanded }: { credit: any; defaultExpanded
   const statusColor = CREDIT_STATUS_COLORS[c.statut as keyof typeof CREDIT_STATUS_COLORS] || '';
 
   return (
-    <div className="rounded-lg border border-slate-700/50 bg-slate-800/30 overflow-hidden">
+    <div className="rounded-lg border border-edge-subtle bg-surface/30 overflow-hidden">
       {/* Header */}
       <div className="p-3 sm:p-4">
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
-              <CreditCard size={14} className="text-blue-400 shrink-0" />
-              <span className="text-sm font-bold text-white truncate">{c.numeroCredit || 'Crédit'}</span>
+              <CreditCard size={14} className="text-status-info shrink-0" />
+              <span className="text-sm font-bold text-content-primary truncate">{c.numeroCredit || 'Crédit'}</span>
             </div>
             {c.typeCredit && (
-              <span className="text-[10px] text-slate-500">{c.typeCredit}{c.objetCredit ? ` - ${c.objetCredit}` : ''}</span>
+              <span className="text-[10px] text-content-muted">{c.typeCredit}{c.objetCredit ? ` - ${c.objetCredit}` : ''}</span>
             )}
           </div>
           <span className={`text-[10px] px-2 py-0.5 rounded-full border shrink-0 font-medium ${statusColor}`}>
@@ -229,15 +229,15 @@ function CreditCard_({ credit, defaultExpanded }: { credit: any; defaultExpanded
         {/* Amount + Progress */}
         <div className="mb-3">
           <div className="flex items-baseline justify-between mb-1">
-            <span className="text-lg font-bold text-white">{formatMoney(montantNum)}</span>
-            <span className="text-xs text-slate-400">{progressPct.toFixed(0)}% remboursé</span>
+            <span className="text-lg font-bold text-content-primary">{formatMoney(montantNum)}</span>
+            <span className="text-xs text-content-muted">{progressPct.toFixed(0)}% remboursé</span>
           </div>
-          <div className="h-2 bg-slate-700/50 rounded-full overflow-hidden">
+          <div className="h-2 bg-surface-elevated/50 rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-500 ${
-                c.statut === 'LATE' ? 'bg-gradient-to-r from-red-600 to-red-400' :
-                c.statut === 'PAID' ? 'bg-gradient-to-r from-emerald-600 to-emerald-400' :
-                'bg-gradient-to-r from-blue-600 to-cyan-400'
+                c.statut === 'LATE' ? 'bg-gradient-to-r from-status-danger to-status-danger' :
+                c.statut === 'PAID' ? 'bg-gradient-to-r from-status-success to-status-success' :
+                'bg-gradient-to-r from-status-info to-accent-secondary'
               }`}
               style={{ width: `${progressPct}%` }}
             />
@@ -246,35 +246,35 @@ function CreditCard_({ credit, defaultExpanded }: { credit: any; defaultExpanded
 
         {/* Key info grid */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-          <div className="bg-slate-900/40 rounded-md p-2">
-            <div className="text-[10px] text-slate-500 mb-0.5 flex items-center gap-1">
+          <div className="bg-surface-base/40 rounded-md p-2">
+            <div className="text-[10px] text-content-muted mb-0.5 flex items-center gap-1">
               <TrendingDown size={10} /> Solde restant
             </div>
-            <span className="font-semibold text-white">{formatMoney(soldeNum, { compact: true })}</span>
+            <span className="font-semibold text-content-primary">{formatMoney(soldeNum, { compact: true })}</span>
           </div>
-          <div className="bg-slate-900/40 rounded-md p-2">
-            <div className="text-[10px] text-slate-500 mb-0.5 flex items-center gap-1">
+          <div className="bg-surface-base/40 rounded-md p-2">
+            <div className="text-[10px] text-content-muted mb-0.5 flex items-center gap-1">
               <Percent size={10} /> Taux
             </div>
-            <span className="font-semibold text-white">{c.taux}%</span>
+            <span className="font-semibold text-content-primary">{c.taux}%</span>
           </div>
-          <div className="bg-slate-900/40 rounded-md p-2">
-            <div className="text-[10px] text-slate-500 mb-0.5 flex items-center gap-1">
+          <div className="bg-surface-base/40 rounded-md p-2">
+            <div className="text-[10px] text-content-muted mb-0.5 flex items-center gap-1">
               <Calendar size={10} /> Durée
             </div>
-            <span className="font-semibold text-white">{c.duree} éch.</span>
+            <span className="font-semibold text-content-primary">{c.duree} éch.</span>
           </div>
-          <div className="bg-slate-900/40 rounded-md p-2">
-            <div className="text-[10px] text-slate-500 mb-0.5 flex items-center gap-1">
+          <div className="bg-surface-base/40 rounded-md p-2">
+            <div className="text-[10px] text-content-muted mb-0.5 flex items-center gap-1">
               <DollarSign size={10} /> Échéance
             </div>
-            <span className="font-semibold text-white">{formatMoney(c.montantEcheance, { compact: true })}</span>
+            <span className="font-semibold text-content-primary">{formatMoney(c.montantEcheance, { compact: true })}</span>
           </div>
         </div>
 
         {/* Next due date */}
         {c.prochaineEcheance && (
-          <div className="mt-2 flex items-center gap-1.5 text-[11px] text-slate-400">
+          <div className="mt-2 flex items-center gap-1.5 text-[11px] text-content-muted">
             <Clock size={12} />
             Prochaine échéance: {new Date(c.prochaineEcheance).toLocaleDateString('fr-FR')}
           </div>
@@ -283,7 +283,7 @@ function CreditCard_({ credit, defaultExpanded }: { credit: any; defaultExpanded
         {/* Expand toggle */}
         <button
           onClick={() => setExpanded(!expanded)}
-          className="mt-3 w-full flex items-center justify-center gap-1 text-xs text-slate-400 hover:text-cyan-400 transition-colors py-1"
+          className="mt-3 w-full flex items-center justify-center gap-1 text-xs text-content-muted hover:text-accent transition-colors py-1"
         >
           <FileText size={12} />
           {expanded ? 'Masquer' : 'Voir'} l'échéancier
@@ -318,7 +318,7 @@ export default function ClientCreditsPanel({ clientId, isOpen, onClose }: Client
       onClose={onClose}
       title={
         <div className="flex items-center gap-2">
-          <CreditCard size={18} className="text-blue-400" />
+          <CreditCard size={18} className="text-status-info" />
           Crédits du client
         </div>
       }
@@ -336,9 +336,9 @@ export default function ClientCreditsPanel({ clientId, isOpen, onClose }: Client
         {/* Empty state */}
         {!isLoading && credits.length === 0 && (
           <div className="text-center py-12">
-            <CreditCard size={48} className="text-slate-600 mx-auto mb-3" />
-            <p className="text-slate-400 font-medium">Aucun crédit</p>
-            <p className="text-slate-500 text-sm mt-1">Ce client n'a aucun crédit enregistré.</p>
+            <CreditCard size={48} className="text-content-muted mx-auto mb-3" />
+            <p className="text-content-muted font-medium">Aucun crédit</p>
+            <p className="text-content-muted text-sm mt-1">Ce client n'a aucun crédit enregistré.</p>
           </div>
         )}
 
@@ -346,30 +346,30 @@ export default function ClientCreditsPanel({ clientId, isOpen, onClose }: Client
         {!isLoading && credits.length > 0 && (
           <>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <div className="bg-slate-800/50 rounded-xl p-3 border border-slate-700/50 text-center">
-                <p className="text-[10px] text-slate-500 uppercase mb-0.5">Crédits actifs</p>
-                <p className="text-xl font-bold text-white">{activeCredits.length}</p>
+              <div className="bg-surface/50 rounded-xl p-3 border border-edge-subtle text-center">
+                <p className="text-[10px] text-content-muted uppercase mb-0.5">Crédits actifs</p>
+                <p className="text-xl font-bold text-content-primary">{activeCredits.length}</p>
               </div>
-              <div className="bg-slate-800/50 rounded-xl p-3 border border-slate-700/50 text-center">
-                <p className="text-[10px] text-slate-500 uppercase mb-0.5">Solde restant</p>
-                <p className="text-xl font-bold text-white">{formatMoney(totalSoldeRestant, { compact: true })}</p>
+              <div className="bg-surface/50 rounded-xl p-3 border border-edge-subtle text-center">
+                <p className="text-[10px] text-content-muted uppercase mb-0.5">Solde restant</p>
+                <p className="text-xl font-bold text-content-primary">{formatMoney(totalSoldeRestant, { compact: true })}</p>
               </div>
-              <div className={`bg-slate-800/50 rounded-xl p-3 border text-center ${lateCount > 0 ? 'border-red-500/30' : 'border-slate-700/50'}`}>
-                <p className="text-[10px] text-slate-500 uppercase mb-0.5">En retard</p>
-                <p className={`text-xl font-bold ${lateCount > 0 ? 'text-red-400' : 'text-emerald-400'}`}>{lateCount}</p>
+              <div className={`bg-surface/50 rounded-xl p-3 border text-center ${lateCount > 0 ? 'border-status-danger/30' : 'border-edge-subtle'}`}>
+                <p className="text-[10px] text-content-muted uppercase mb-0.5">En retard</p>
+                <p className={`text-xl font-bold ${lateCount > 0 ? 'text-status-danger' : 'text-status-success'}`}>{lateCount}</p>
               </div>
             </div>
 
             {/* Global progress */}
             {totalDueAll > 0 && (
-              <div className="bg-slate-800/30 rounded-lg p-3 border border-slate-700/30">
-                <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
+              <div className="bg-surface/30 rounded-lg p-3 border border-edge-subtle">
+                <div className="flex items-center justify-between text-xs text-content-muted mb-1">
                   <span>Progression globale</span>
                   <span>{Math.max(0, (1 - totalSoldeRestant / totalDueAll) * 100).toFixed(0)}%</span>
                 </div>
-                <div className="h-2.5 bg-slate-700/50 rounded-full overflow-hidden">
+                <div className="h-2.5 bg-surface-elevated/50 rounded-full overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-gradient-to-r from-blue-600 to-cyan-400 transition-all"
+                    className="h-full rounded-full bg-gradient-to-r from-status-info to-accent-secondary transition-all"
                     style={{ width: `${Math.max(0, Math.min(100, (1 - totalSoldeRestant / totalDueAll) * 100))}%` }}
                   />
                 </div>
@@ -379,7 +379,7 @@ export default function ClientCreditsPanel({ clientId, isOpen, onClose }: Client
             {/* Active credits */}
             {activeCredits.length > 0 && (
               <div className="space-y-3">
-                <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                <h4 className="text-xs font-semibold text-content-muted uppercase tracking-wider">
                   Crédits actifs ({activeCredits.length})
                 </h4>
                 {activeCredits.map((credit, idx) => (
@@ -391,7 +391,7 @@ export default function ClientCreditsPanel({ clientId, isOpen, onClose }: Client
             {/* Closed credits */}
             {closedCredits.length > 0 && (
               <div className="space-y-3">
-                <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                <h4 className="text-xs font-semibold text-content-muted uppercase tracking-wider">
                   Crédits soldés/clôturés ({closedCredits.length})
                 </h4>
                 {closedCredits.map(credit => (

@@ -366,26 +366,26 @@ export default function ScheduledTransferFormModal({ isOpen, onClose, onSuccess,
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-      <div className="w-full max-w-2xl bg-slate-950 border border-slate-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+      <div className="w-full max-w-2xl bg-surface-base border border-edge rounded-2xl shadow-2xl flex flex-col overflow-hidden">
 
         {/* HEADER */}
-        <div className="bg-slate-900 border-b border-slate-800 px-6 py-4 flex justify-between items-center">
+        <div className="bg-surface-base border-b border-edge px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-500/20 rounded-xl">
-              <Clock className="w-5 h-5 text-indigo-400" />
+            <div className="p-2 bg-accent/10 rounded-xl">
+              <Clock className="w-5 h-5 text-accent" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white">
+              <h2 className="text-lg font-bold text-content-primary">
                 {isEditing ? 'Modifier le virement' : 'Virement Programmé'}
               </h2>
-              <p className="text-xs text-slate-400">Automatisation des transferts</p>
+              <p className="text-xs text-content-muted">Automatisation des transferts</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
+            className="p-2 hover:bg-surface rounded-lg transition-colors"
           >
-            <X className="w-5 h-5 text-slate-500 hover:text-white" />
+            <X className="w-5 h-5 text-content-muted hover:text-content-primary" />
           </button>
         </div>
 
@@ -396,25 +396,25 @@ export default function ScheduledTransferFormModal({ isOpen, onClose, onSuccess,
           <div className="flex flex-col md:flex-row items-stretch gap-3">
             {/* Source Account */}
             <div className="flex-1 space-y-1.5">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">
+              <label className="text-[10px] font-bold text-content-muted uppercase tracking-wider ml-1">
                 Compte Source
               </label>
               <div className="relative">
                 {selectedSource ? (
-                  <div className="h-14 flex items-center gap-2 px-3 bg-slate-900 border border-emerald-500/50 rounded-xl">
-                    <User className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                  <div className="h-14 flex items-center gap-2 px-3 bg-surface-base border border-status-success/50 rounded-xl">
+                    <User className="w-4 h-4 text-status-info flex-shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-white font-medium truncate">{getNumero(selectedSource)}</p>
-                      <p className="text-[10px] text-slate-400 truncate">{getOwnerName(selectedSource)}</p>
+                      <p className="text-sm text-content-primary font-medium truncate">{getNumero(selectedSource)}</p>
+                      <p className="text-[10px] text-content-muted truncate">{getOwnerName(selectedSource)}</p>
                     </div>
-                    <span className="text-xs text-emerald-400 font-medium">{formatMoney(getSolde(selectedSource))}</span>
-                    <button onClick={clearSource} className="p-1 hover:bg-slate-800 rounded">
-                      <X className="w-3 h-3 text-slate-500" />
+                    <span className="text-xs text-status-success font-medium">{formatMoney(getSolde(selectedSource))}</span>
+                    <button onClick={clearSource} className="p-1 hover:bg-surface rounded">
+                      <X className="w-3 h-3 text-content-muted" />
                     </button>
                   </div>
                 ) : (
                   <>
-                    <Wallet className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <Wallet className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-content-muted" />
                     <input
                       type="text"
                       value={sourceSearch}
@@ -425,25 +425,25 @@ export default function ScheduledTransferFormModal({ isOpen, onClose, onSuccess,
                       onFocus={() => setShowSourceDropdown(true)}
                       onBlur={() => setTimeout(() => setShowSourceDropdown(false), 200)}
                       placeholder="Rechercher..."
-                      className="w-full h-12 bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-4 text-white text-sm placeholder:text-slate-600 focus:border-indigo-500 outline-none"
+                      className="w-full h-12 bg-surface-base border border-edge rounded-xl pl-10 pr-4 text-content-primary text-sm placeholder:text-content-muted focus:border-accent outline-none"
                     />
                     {searchingSource && (
-                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-400 animate-spin" />
+                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-accent animate-spin" />
                     )}
                     {showSourceDropdown && sourceComptes.length > 0 && (
-                      <div className="absolute z-20 w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-xl max-h-48 overflow-y-auto">
+                      <div className="absolute z-20 w-full mt-1 bg-surface border border-edge rounded-xl shadow-xl max-h-48 overflow-y-auto">
                         {sourceComptes.map((compte) => (
                           <button
                             key={compte.id}
                             onClick={() => handleSelectSource(compte)}
-                            className="w-full px-3 py-2 text-left hover:bg-slate-700 flex items-center gap-3 transition-colors first:rounded-t-xl last:rounded-b-xl"
+                            className="w-full px-3 py-2 text-left hover:bg-surface-elevated flex items-center gap-3 transition-colors first:rounded-t-xl last:rounded-b-xl"
                           >
-                            <User className="w-4 h-4 text-slate-400" />
+                            <User className="w-4 h-4 text-content-muted" />
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm text-white truncate">{getOwnerName(compte)}</p>
-                              <p className="text-xs text-slate-500">{getNumero(compte)}</p>
+                              <p className="text-sm text-content-primary truncate">{getOwnerName(compte)}</p>
+                              <p className="text-xs text-content-muted">{getNumero(compte)}</p>
                             </div>
-                            <p className="text-xs font-medium text-emerald-400">{formatMoney(getSolde(compte))}</p>
+                            <p className="text-xs font-medium text-status-success">{formatMoney(getSolde(compte))}</p>
                           </button>
                         ))}
                       </div>
@@ -451,50 +451,50 @@ export default function ScheduledTransferFormModal({ isOpen, onClose, onSuccess,
                   </>
                 )}
               </div>
-              {errors.source && <p className="text-[10px] text-red-400 ml-1">{errors.source}</p>}
+              {errors.source && <p className="text-[10px] text-status-danger ml-1">{errors.source}</p>}
             </div>
 
             {/* Arrow Connector */}
             <div className="flex items-center justify-center pt-6">
-              <div className="hidden md:flex p-2 text-slate-600">
+              <div className="hidden md:flex p-2 text-content-muted">
                 <ArrowRight className="w-5 h-5" />
               </div>
-              <div className="md:hidden p-2 text-slate-600 rotate-90">
+              <div className="md:hidden p-2 text-content-muted rotate-90">
                 <ArrowRight className="w-5 h-5" />
               </div>
             </div>
 
             {/* Destination Account */}
             <div className="flex-1 space-y-1.5">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">
+              <label className="text-[10px] font-bold text-content-muted uppercase tracking-wider ml-1">
                 Bénéficiaire
               </label>
               <div className="relative">
                 {selectedDest ? (
-                  <div className="h-14 flex items-center gap-2 px-3 bg-slate-900 border border-emerald-500/50 rounded-xl">
-                    <User className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                  <div className="h-14 flex items-center gap-2 px-3 bg-surface-base border border-status-success/50 rounded-xl">
+                    <User className="w-4 h-4 text-status-success flex-shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-white font-medium truncate">{getNumero(selectedDest)}</p>
-                      <p className="text-[10px] text-slate-400 truncate">{getOwnerName(selectedDest)}</p>
+                      <p className="text-sm text-content-primary font-medium truncate">{getNumero(selectedDest)}</p>
+                      <p className="text-[10px] text-content-muted truncate">{getOwnerName(selectedDest)}</p>
                     </div>
-                    <button onClick={clearDest} className="p-1 hover:bg-slate-800 rounded">
-                      <X className="w-3 h-3 text-slate-500" />
+                    <button onClick={clearDest} className="p-1 hover:bg-surface rounded">
+                      <X className="w-3 h-3 text-content-muted" />
                     </button>
                   </div>
                 ) : destAccountNumber && destVerified?.found ? (
-                  <div className="h-14 flex items-center gap-2 px-3 bg-slate-900 border border-emerald-500/50 rounded-xl">
-                    <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                  <div className="h-14 flex items-center gap-2 px-3 bg-surface-base border border-status-success/50 rounded-xl">
+                    <CheckCircle className="w-4 h-4 text-status-success flex-shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-white font-medium truncate">{destAccountNumber}</p>
-                      <p className="text-[10px] text-slate-400 truncate">{destVerified.ownerName || 'Titulaire vérifié'}</p>
+                      <p className="text-sm text-content-primary font-medium truncate">{destAccountNumber}</p>
+                      <p className="text-[10px] text-content-muted truncate">{destVerified.ownerName || 'Titulaire vérifié'}</p>
                     </div>
-                    <button onClick={clearDest} className="p-1 hover:bg-slate-800 rounded">
-                      <X className="w-3 h-3 text-slate-500" />
+                    <button onClick={clearDest} className="p-1 hover:bg-surface rounded">
+                      <X className="w-3 h-3 text-content-muted" />
                     </button>
                   </div>
                 ) : (
                   <>
-                    <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-content-muted" />
                     <input
                       type="text"
                       value={destSearch || destAccountNumber}
@@ -513,30 +513,30 @@ export default function ScheduledTransferFormModal({ isOpen, onClose, onSuccess,
                       onFocus={() => setShowDestDropdown(true)}
                       onBlur={() => setTimeout(() => setShowDestDropdown(false), 200)}
                       placeholder="Nom ou N° compte..."
-                      className="w-full h-12 bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-10 text-white text-sm placeholder:text-slate-600 focus:border-indigo-500 outline-none"
+                      className="w-full h-12 bg-surface-base border border-edge rounded-xl pl-10 pr-10 text-content-primary text-sm placeholder:text-content-muted focus:border-accent outline-none"
                     />
                     {(searchingDest || verifyingDest) && (
-                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-400 animate-spin" />
+                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-accent animate-spin" />
                     )}
                     {destVerified && !verifyingDest && destAccountNumber && (
                       destVerified.found ? (
-                        <CheckCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-emerald-400" />
+                        <CheckCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-status-success" />
                       ) : (
-                        <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-red-400" />
+                        <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-status-danger" />
                       )
                     )}
                     {showDestDropdown && destComptes.length > 0 && (
-                      <div className="absolute z-20 w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-xl max-h-48 overflow-y-auto">
+                      <div className="absolute z-20 w-full mt-1 bg-surface border border-edge rounded-xl shadow-xl max-h-48 overflow-y-auto">
                         {destComptes.map((compte) => (
                           <button
                             key={compte.id}
                             onClick={() => handleSelectDest(compte)}
-                            className="w-full px-3 py-2 text-left hover:bg-slate-700 flex items-center gap-3 transition-colors first:rounded-t-xl last:rounded-b-xl"
+                            className="w-full px-3 py-2 text-left hover:bg-surface-elevated flex items-center gap-3 transition-colors first:rounded-t-xl last:rounded-b-xl"
                           >
-                            <User className="w-4 h-4 text-slate-400" />
+                            <User className="w-4 h-4 text-content-muted" />
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm text-white truncate">{getOwnerName(compte)}</p>
-                              <p className="text-xs text-slate-500">{getNumero(compte)}</p>
+                              <p className="text-sm text-content-primary truncate">{getOwnerName(compte)}</p>
+                              <p className="text-xs text-content-muted">{getNumero(compte)}</p>
                             </div>
                           </button>
                         ))}
@@ -545,7 +545,7 @@ export default function ScheduledTransferFormModal({ isOpen, onClose, onSuccess,
                   </>
                 )}
               </div>
-              {errors.dest && <p className="text-[10px] text-red-400 ml-1">{errors.dest}</p>}
+              {errors.dest && <p className="text-[10px] text-status-danger ml-1">{errors.dest}</p>}
             </div>
           </div>
 
@@ -553,11 +553,11 @@ export default function ScheduledTransferFormModal({ isOpen, onClose, onSuccess,
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Montant */}
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">
+              <label className="text-[10px] font-bold text-content-muted uppercase tracking-wider ml-1">
                 Montant (FCFA)
               </label>
               <div className="relative">
-                <Banknote className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <Banknote className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-content-muted" />
                 <input
                   type="text"
                   inputMode="numeric"
@@ -567,34 +567,34 @@ export default function ScheduledTransferFormModal({ isOpen, onClose, onSuccess,
                     setMontant(val);
                   }}
                   placeholder="0"
-                  className="w-full h-12 bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-16 text-white font-bold placeholder:text-slate-600 focus:border-indigo-500 outline-none"
+                  className="w-full h-12 bg-surface-base border border-edge rounded-xl pl-10 pr-16 text-content-primary font-bold placeholder:text-content-muted focus:border-accent outline-none"
                 />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 text-sm">FCFA</span>
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-content-muted text-sm">FCFA</span>
               </div>
-              {errors.montant && <p className="text-[10px] text-red-400 ml-1">{errors.montant}</p>}
+              {errors.montant && <p className="text-[10px] text-status-danger ml-1">{errors.montant}</p>}
             </div>
 
             {/* Date & Heure Début (Cron Trigger) */}
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">
+              <label className="text-[10px] font-bold text-content-muted uppercase tracking-wider ml-1">
                 Démarrer le
               </label>
               <input
                 type="datetime-local"
                 value={startDateTime}
                 onChange={(e) => setStartDateTime(e.target.value)}
-                className="w-full h-12 bg-slate-900 border border-slate-700 rounded-xl px-4 text-white text-sm focus:border-indigo-500 outline-none"
+                className="w-full h-12 bg-surface-base border border-edge rounded-xl px-4 text-content-primary text-sm focus:border-accent outline-none"
               />
-              {errors.startDateTime && <p className="text-[10px] text-red-400 ml-1">{errors.startDateTime}</p>}
+              {errors.startDateTime && <p className="text-[10px] text-status-danger ml-1">{errors.startDateTime}</p>}
             </div>
           </div>
 
           {/* 3. FRÉQUENCE (Segmented Control - Single Line) */}
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">
+            <label className="text-[10px] font-bold text-content-muted uppercase tracking-wider ml-1">
               Répétition
             </label>
-            <div className="grid grid-cols-4 gap-1.5 bg-slate-900 p-1.5 rounded-xl border border-slate-700">
+            <div className="grid grid-cols-4 gap-1.5 bg-surface-base p-1.5 rounded-xl border border-edge">
               {FREQUENCES.map((freq) => (
                 <button
                   key={freq.value}
@@ -603,8 +603,8 @@ export default function ScheduledTransferFormModal({ isOpen, onClose, onSuccess,
                   className={`
                     h-10 rounded-lg text-xs font-bold transition-all flex items-center justify-center
                     ${frequence === freq.value
-                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/25'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800'}
+                      ? 'bg-accent text-white shadow-lg shadow-accent/25'
+                      : 'text-content-muted hover:text-content-primary hover:bg-surface'}
                   `}
                 >
                   <span className="hidden sm:inline">{freq.label}</span>
@@ -616,13 +616,13 @@ export default function ScheduledTransferFormModal({ isOpen, onClose, onSuccess,
         </div>
 
         {/* FOOTER */}
-        <div className="p-6 bg-slate-900 border-t border-slate-800 space-y-4">
+        <div className="p-6 bg-surface-base border-t border-edge space-y-4">
           {/* Cron Summary Banner */}
-          <div className="flex items-start gap-3 p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
-            <Repeat className="w-4 h-4 text-indigo-400 mt-0.5 flex-shrink-0" />
+          <div className="flex items-start gap-3 p-3 bg-accent/10 border border-accent/20 rounded-xl">
+            <Repeat className="w-4 h-4 text-accent mt-0.5 flex-shrink-0" />
             <div className="text-xs">
-              <span className="font-bold text-indigo-400 block mb-0.5">Résumé de la planification</span>
-              <span className="text-indigo-200">{getCronSummary()}</span>
+              <span className="font-bold text-accent block mb-0.5">Résumé de la planification</span>
+              <span className="text-accent">{getCronSummary()}</span>
             </div>
           </div>
 
@@ -630,14 +630,14 @@ export default function ScheduledTransferFormModal({ isOpen, onClose, onSuccess,
           <div className="flex items-center justify-end gap-3">
             <button
               onClick={onClose}
-              className="px-5 py-2.5 text-sm font-medium text-slate-400 hover:text-white transition-colors"
+              className="px-5 py-2.5 text-sm font-medium text-content-muted hover:text-content-primary transition-colors"
             >
               Annuler
             </button>
             <button
               onClick={handleSubmit}
               disabled={!isValid || loading}
-              className="h-12 px-8 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold text-sm shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+              className="h-12 px-8 bg-accent hover:bg-accent-primary-hover disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold text-sm shadow-lg shadow-accent/25 flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
             >
               {loading ? (
                 <>

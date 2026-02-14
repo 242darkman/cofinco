@@ -57,12 +57,12 @@ export default function DocumentPreviewModal({
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm">
-      <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-3xl max-h-[90vh] mx-4 flex flex-col shadow-2xl">
+      <div className="bg-surface-base border border-edge rounded-xl w-full max-w-3xl max-h-[90vh] mx-4 flex flex-col shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-700 shrink-0">
+        <div className="flex items-center justify-between p-4 border-b border-edge shrink-0">
           <div className="flex items-center gap-2 min-w-0">
-            <FileText size={16} className="text-indigo-400 shrink-0" />
-            <h3 className="text-sm font-bold text-white truncate">{documentName}</h3>
+            <FileText size={16} className="text-accent shrink-0" />
+            <h3 className="text-sm font-bold text-content-primary truncate">{documentName}</h3>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {url && (
@@ -70,7 +70,7 @@ export default function DocumentPreviewModal({
                 href={url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition"
+                className="p-2 text-content-muted hover:text-content-primary hover:bg-surface rounded-lg transition"
                 title="Ouvrir dans un nouvel onglet"
               >
                 <ExternalLink size={16} />
@@ -80,7 +80,7 @@ export default function DocumentPreviewModal({
               <a
                 href={url}
                 download={documentName}
-                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition"
+                className="p-2 text-content-muted hover:text-content-primary hover:bg-surface rounded-lg transition"
                 title="Télécharger"
               >
                 <Download size={16} />
@@ -88,7 +88,7 @@ export default function DocumentPreviewModal({
             )}
             <button
               onClick={onClose}
-              className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition"
+              className="p-2 text-content-muted hover:text-content-primary hover:bg-surface rounded-lg transition"
             >
               <X size={16} />
             </button>
@@ -99,10 +99,10 @@ export default function DocumentPreviewModal({
         <div className="flex-1 overflow-hidden p-2 min-h-0">
           {loading ? (
             <div className="flex items-center justify-center h-64">
-              <Loader size={24} className="animate-spin text-cyan-400" />
+              <Loader size={24} className="animate-spin text-accent" />
             </div>
           ) : error ? (
-            <div className="flex flex-col items-center justify-center h-64 text-slate-400">
+            <div className="flex flex-col items-center justify-center h-64 text-content-muted">
               <FileText size={32} className="mb-2 opacity-30" />
               <p className="text-sm">{error}</p>
               {url && (
@@ -110,7 +110,7 @@ export default function DocumentPreviewModal({
                   href={url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="mt-3 px-4 py-2 bg-cyan-600 text-white rounded-lg text-sm font-medium hover:bg-cyan-700 transition"
+                  className="mt-3 px-4 py-2 bg-accent-secondary text-white rounded-lg text-sm font-medium hover:bg-accent-secondary-hover transition"
                 >
                   Ouvrir le lien externe
                 </a>
@@ -119,7 +119,7 @@ export default function DocumentPreviewModal({
           ) : isPdf && url ? (
             <iframe
               src={url}
-              className="w-full h-full rounded-lg border border-slate-700 bg-white"
+              className="w-full h-full rounded-lg border border-edge bg-surface"
               style={{ minHeight: '500px' }}
               title={documentName}
             />
@@ -132,14 +132,14 @@ export default function DocumentPreviewModal({
               />
             </div>
           ) : url ? (
-            <div className="flex flex-col items-center justify-center h-64 text-slate-400">
+            <div className="flex flex-col items-center justify-center h-64 text-content-muted">
               <FileText size={48} className="mb-3 opacity-30" />
               <p className="text-sm mb-3">Aperçu non disponible pour ce type de fichier</p>
               <a
                 href={url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-4 py-2 bg-cyan-600 text-white rounded-lg text-sm font-medium hover:bg-cyan-700 transition flex items-center gap-2"
+                className="px-4 py-2 bg-accent-secondary text-white rounded-lg text-sm font-medium hover:bg-accent-secondary-hover transition flex items-center gap-2"
               >
                 <Download size={14} />
                 Télécharger

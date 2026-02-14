@@ -245,44 +245,44 @@ const AdminMaintenanceMode: React.FC = () => {
       className={cn(
         "group relative p-2 rounded-lg border transition-all cursor-pointer",
         module.isLocked
-          ? "bg-amber-500/5 border-amber-500/20 hover:border-amber-500/40"
-          : "bg-slate-800/30 border-slate-700/50 hover:border-emerald-500/40"
+          ? "bg-status-warning/5 border-status-warning/20 hover:border-status-warning/40"
+          : "bg-surface/30 border-edge-subtle hover:border-status-success/40"
       )}
       onClick={() => toggleModuleLock(module.id, module.isLocked, module.moduleName)}
     >
       <div className="flex items-center gap-2">
         <div className={cn(
           "w-6 h-6 rounded flex items-center justify-center shrink-0",
-          module.isLocked ? "bg-amber-500/20" : "bg-emerald-500/20"
+          module.isLocked ? "bg-status-warning-bg" : "bg-status-success-bg"
         )}>
           {module.isLocked ? (
-            <Lock size={12} className="text-amber-400" />
+            <Lock size={12} className="text-status-warning" />
           ) : (
-            <CheckCircle size={12} className="text-emerald-400" />
+            <CheckCircle size={12} className="text-status-success" />
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-[11px] font-medium text-white truncate">{module.moduleName}</p>
+          <p className="text-[11px] font-medium text-content-primary truncate">{module.moduleName}</p>
           <p className={cn(
             "text-[9px] -mt-0.5",
-            module.isLocked ? "text-amber-400/70" : "text-emerald-400/70"
+            module.isLocked ? "text-status-warning/70" : "text-status-success/70"
           )}>
             {module.isLocked ? 'Verrouillé' : 'Actif'}
           </p>
         </div>
         <div className={cn(
           "w-5 h-5 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity",
-          module.isLocked ? "bg-emerald-500/20" : "bg-amber-500/20"
+          module.isLocked ? "bg-status-success-bg" : "bg-status-warning-bg"
         )}>
           {module.isLocked ? (
-            <Unlock size={10} className="text-emerald-400" />
+            <Unlock size={10} className="text-status-success" />
           ) : (
-            <Lock size={10} className="text-amber-400" />
+            <Lock size={10} className="text-status-warning" />
           )}
         </div>
       </div>
       {module.isLocked && module.reason && (
-        <p className="text-[9px] text-slate-500 mt-1 truncate pl-8">{module.reason}</p>
+        <p className="text-[9px] text-content-muted mt-1 truncate pl-8">{module.reason}</p>
       )}
     </div>
   );
@@ -293,24 +293,24 @@ const AdminMaintenanceMode: React.FC = () => {
       className={cn(
         "flex items-center justify-between gap-3 px-3 py-1.5 rounded-lg border transition-all",
         module.isLocked
-          ? "bg-amber-500/5 border-amber-500/20"
-          : "bg-slate-800/30 border-slate-700/50"
+          ? "bg-status-warning/5 border-status-warning/20"
+          : "bg-surface/30 border-edge-subtle"
       )}
     >
       <div className="flex items-center gap-2.5 flex-1 min-w-0">
         <div className={cn(
           "w-6 h-6 rounded flex items-center justify-center shrink-0",
-          module.isLocked ? "bg-amber-500/20" : "bg-emerald-500/20"
+          module.isLocked ? "bg-status-warning-bg" : "bg-status-success-bg"
         )}>
           {module.isLocked ? (
-            <Lock size={10} className="text-amber-400" />
+            <Lock size={10} className="text-status-warning" />
           ) : (
-            <CheckCircle size={10} className="text-emerald-400" />
+            <CheckCircle size={10} className="text-status-success" />
           )}
         </div>
-        <span className="text-xs font-medium text-white truncate">{module.moduleName}</span>
+        <span className="text-xs font-medium text-content-primary truncate">{module.moduleName}</span>
         {module.reason && (
-          <span className="text-[10px] text-slate-500 truncate hidden sm:inline">- {module.reason}</span>
+          <span className="text-[10px] text-content-muted truncate hidden sm:inline">- {module.reason}</span>
         )}
       </div>
       <button
@@ -319,8 +319,8 @@ const AdminMaintenanceMode: React.FC = () => {
         className={cn(
           "px-2 py-1 text-[10px] font-medium rounded-md border transition-all flex items-center gap-1.5",
           module.isLocked
-            ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
-            : "bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20",
+            ? "bg-status-success-bg border-status-success/30 text-status-success hover:bg-status-success-bg"
+            : "bg-status-warning-bg border-status-warning/30 text-status-warning hover:bg-status-warning-bg",
           "disabled:opacity-50 disabled:cursor-not-allowed"
         )}
       >
@@ -333,33 +333,33 @@ const AdminMaintenanceMode: React.FC = () => {
   return (
     <div className="space-y-2">
       {/* Compact Header with Stats */}
-      <div className="bg-linear-to-r from-blue-600/90 to-emerald-600/90 rounded-lg p-2.5">
+      <div className="bg-linear-to-r from-status-info to-status-success rounded-lg p-2.5">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <div className="p-1.5 bg-white/20 rounded-md">
-              <Shield size={16} className="text-white" />
+              <Shield size={16} className="text-content-primary" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-white leading-none">Maintenance</h2>
-              <p className="text-[10px] text-blue-100/90 leading-tight mt-0.5">Gestion des accès</p>
+              <h2 className="text-sm font-bold text-content-primary leading-none">Maintenance</h2>
+              <p className="text-[10px] text-status-info-text leading-tight mt-0.5">Gestion des accès</p>
             </div>
           </div>
 
           {/* Inline Stats */}
           <div className="flex items-center gap-3 bg-black/10 px-3 py-1 rounded-full backdrop-blur-sm">
             <div className="text-center">
-              <span className="text-sm font-bold text-white">{modules.length}</span>
-              <span className="text-[9px] text-blue-100/80 ml-1">Total</span>
+              <span className="text-sm font-bold text-content-primary">{modules.length}</span>
+              <span className="text-[9px] text-status-info-text ml-1">Total</span>
             </div>
             <div className="w-px h-3 bg-white/20" />
             <div className="text-center">
-              <span className="text-sm font-bold text-amber-300">{lockedCount}</span>
-              <span className="text-[9px] text-amber-200/80 ml-1">Lock</span>
+              <span className="text-sm font-bold text-status-warning">{lockedCount}</span>
+              <span className="text-[9px] text-status-warning-text/80 ml-1">Lock</span>
             </div>
             <div className="w-px h-3 bg-white/20" />
             <div className="text-center">
-              <span className="text-sm font-bold text-emerald-300">{activeCount}</span>
-              <span className="text-[9px] text-emerald-200/80 ml-1">Actifs</span>
+              <span className="text-sm font-bold text-status-success">{activeCount}</span>
+              <span className="text-[9px] text-status-success-text/80 ml-1">Actifs</span>
             </div>
           </div>
         </div>
@@ -370,23 +370,23 @@ const AdminMaintenanceMode: React.FC = () => {
         <Card className={cn(
           "p-2 border",
           platformModule.isLocked
-            ? "bg-red-950/30 border-red-500/30"
-            : "bg-slate-900/50 border-slate-700/50"
+            ? "bg-status-danger-bg border-status-danger/30"
+            : "bg-surface-base/50 border-edge-subtle"
         )}>
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <div className={cn(
                 "p-1.5 rounded-md",
-                platformModule.isLocked ? "bg-red-500/20" : "bg-emerald-500/20"
+                platformModule.isLocked ? "bg-status-danger-bg" : "bg-status-success-bg"
               )}>
-                <Power size={14} className={platformModule.isLocked ? "text-red-400" : "text-emerald-400"} />
+                <Power size={14} className={platformModule.isLocked ? "text-status-danger" : "text-status-success"} />
               </div>
               <div className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-2">
-                <h3 className="text-xs font-bold text-white">
+                <h3 className="text-xs font-bold text-content-primary">
                   {platformModule.isLocked ? 'PLATEFORME VERROUILLÉE' : 'Plateforme Opérationnelle'}
                 </h3>
                 {platformModule.isLocked && platformModule.reason && (
-                  <span className="text-[10px] text-red-400/70">{platformModule.reason}</span>
+                  <span className="text-[10px] text-status-danger/70">{platformModule.reason}</span>
                 )}
               </div>
             </div>
@@ -411,25 +411,25 @@ const AdminMaintenanceMode: React.FC = () => {
       <div className="flex flex-col sm:flex-row gap-2 shrink-0">
         {/* Search */}
         <div className="relative flex-1">
-          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-content-muted" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Rechercher..."
-            className="w-full h-8 pl-8 pr-3 bg-slate-800/50 border border-slate-700 rounded-md text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500"
+            className="w-full h-8 pl-8 pr-3 bg-surface/50 border border-edge rounded-md text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-accent"
           />
         </div>
 
         {/* Filter Chips - Compact */}
-        <div className="flex items-center gap-1.5 bg-slate-800/30 p-1 rounded-md border border-slate-700/30">
+        <div className="flex items-center gap-1.5 bg-surface/30 p-1 rounded-md border border-edge-subtle">
           <button
             onClick={() => setShowLocked(!showLocked)}
             className={cn(
               "h-6 px-2 flex items-center gap-1 text-[10px] font-medium rounded transition-colors",
               showLocked
-                ? "bg-amber-500/20 text-amber-400"
-                : "text-slate-500 hover:text-slate-300"
+                ? "bg-status-warning-bg text-status-warning"
+                : "text-content-muted hover:text-content-secondary"
             )}
           >
             <Lock size={10} />
@@ -440,8 +440,8 @@ const AdminMaintenanceMode: React.FC = () => {
             className={cn(
               "h-6 px-2 flex items-center gap-1 text-[10px] font-medium rounded transition-colors",
               showActive
-                ? "bg-emerald-500/20 text-emerald-400"
-                : "text-slate-500 hover:text-slate-300"
+                ? "bg-status-success-bg text-status-success"
+                : "text-content-muted hover:text-content-secondary"
             )}
           >
             <CheckCircle size={10} />
@@ -450,12 +450,12 @@ const AdminMaintenanceMode: React.FC = () => {
         </div>
 
         {/* View Toggle */}
-        <div className="flex items-center bg-slate-800/50 border border-slate-700 rounded-md p-0.5">
+        <div className="flex items-center bg-surface/50 border border-edge rounded-md p-0.5">
           <button
             onClick={() => setViewMode('grid')}
             className={cn(
               "h-7 w-7 flex items-center justify-center rounded transition-colors",
-              viewMode === 'grid' ? "bg-indigo-500 text-white" : "text-slate-400 hover:text-white"
+              viewMode === 'grid' ? "bg-accent text-white" : "text-content-muted hover:text-white"
             )}
           >
             <Grid3X3 size={12} />
@@ -464,7 +464,7 @@ const AdminMaintenanceMode: React.FC = () => {
             onClick={() => setViewMode('list')}
             className={cn(
               "h-7 w-7 flex items-center justify-center rounded transition-colors",
-              viewMode === 'list' ? "bg-indigo-500 text-white" : "text-slate-400 hover:text-white"
+              viewMode === 'list' ? "bg-accent text-white" : "text-content-muted hover:text-white"
             )}
           >
             <List size={12} />
@@ -476,7 +476,7 @@ const AdminMaintenanceMode: React.FC = () => {
           <button
             onClick={bulkUnlockAll}
             disabled={saving || lockedCount === 0}
-            className="h-8 w-8 flex items-center justify-center bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-md hover:bg-emerald-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="h-8 w-8 flex items-center justify-center bg-status-success-bg border border-status-success/30 text-status-success rounded-md hover:bg-status-success-bg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             title="Tout débloquer"
           >
             <LockOpen size={14} />
@@ -484,7 +484,7 @@ const AdminMaintenanceMode: React.FC = () => {
           <button
             onClick={bulkLockAll}
             disabled={saving || activeCount === 0}
-            className="h-8 w-8 flex items-center justify-center bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-md hover:bg-amber-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="h-8 w-8 flex items-center justify-center bg-status-warning-bg border border-status-warning/30 text-status-warning rounded-md hover:bg-status-warning-bg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             title="Tout bloquer"
           >
             <Lock size={14} />
@@ -494,8 +494,8 @@ const AdminMaintenanceMode: React.FC = () => {
 
       {/* Modules Display */}
       {filteredModules.length === 0 ? (
-        <Card className="bg-slate-900/50 border-slate-800 p-8">
-          <div className="text-center text-slate-500">
+        <Card className="bg-surface-base/50 border-edge p-8">
+          <div className="text-center text-content-muted">
             <Shield size={32} className="mx-auto mb-2 opacity-50" />
             <p className="text-sm">Aucun module trouvé</p>
           </div>
@@ -516,8 +516,8 @@ const AdminMaintenanceMode: React.FC = () => {
 
       {/* Pagination Controls */}
       {totalPages > 1 && (
-        <div className="p-2 border-t border-slate-700 bg-slate-800/30 flex flex-col sm:flex-row items-center justify-between gap-3 rounded-b-lg">
-          <div className="flex items-center gap-3 text-xs text-slate-500">
+        <div className="p-2 border-t border-edge bg-surface/30 flex flex-col sm:flex-row items-center justify-between gap-3 rounded-b-lg">
+          <div className="flex items-center gap-3 text-xs text-content-muted">
             <span className="hidden sm:inline">
               {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, filteredModules.length)} sur {filteredModules.length}
             </span>
@@ -527,7 +527,7 @@ const AdminMaintenanceMode: React.FC = () => {
                 setItemsPerPage(Number(e.target.value));
                 goToPage(1);
               }}
-              className="px-2 py-1 bg-slate-900 border border-slate-700 rounded text-[10px] text-slate-300 focus:border-indigo-500 outline-none"
+              className="px-2 py-1 bg-surface-base border border-edge rounded text-[10px] text-content-secondary focus:border-accent outline-none"
             >
               <option value={8}>8 / page</option>
               <option value={12}>12 / page</option>
@@ -540,31 +540,31 @@ const AdminMaintenanceMode: React.FC = () => {
             <button
               onClick={() => goToPage(1)}
               disabled={currentPage === 1}
-              className="p-1 rounded hover:bg-slate-700 text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="p-1 rounded hover:bg-surface-elevated text-content-muted hover:text-content-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               <ChevronsLeft size={14} />
             </button>
             <button
               onClick={() => goToPage(currentPage - 1)}
               disabled={currentPage === 1}
-              className="p-1 rounded hover:bg-slate-700 text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="p-1 rounded hover:bg-surface-elevated text-content-muted hover:text-content-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               <ChevronLeft size={14} />
             </button>
-            <span className="text-xs text-slate-400 font-medium px-2">
+            <span className="text-xs text-content-muted font-medium px-2">
               {currentPage} / {totalPages}
             </span>
             <button
               onClick={() => goToPage(currentPage + 1)}
               disabled={currentPage === totalPages}
-              className="p-1 rounded hover:bg-slate-700 text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="p-1 rounded hover:bg-surface-elevated text-content-muted hover:text-content-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               <ChevronRight size={14} />
             </button>
             <button
               onClick={() => goToPage(totalPages)}
               disabled={currentPage === totalPages}
-              className="p-1 rounded hover:bg-slate-700 text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="p-1 rounded hover:bg-surface-elevated text-content-muted hover:text-content-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               <ChevronsRight size={14} />
             </button>
@@ -573,9 +573,9 @@ const AdminMaintenanceMode: React.FC = () => {
       )}
 
       {/* Important Note - Compact Footer */}
-      <div className="flex items-center gap-2 p-2.5 bg-amber-500/5 border border-amber-500/20 rounded-lg">
-        <AlertTriangle size={14} className="text-amber-400 shrink-0" />
-        <p className="text-[10px] text-amber-300/80">
+      <div className="flex items-center gap-2 p-2.5 bg-status-warning/5 border border-status-warning/20 rounded-lg">
+        <AlertTriangle size={14} className="text-status-warning shrink-0" />
+        <p className="text-[10px] text-status-warning/80">
           Le verrouillage empêche l'accès aux utilisateurs non-admin.
         </p>
       </div>
@@ -591,7 +591,7 @@ const AdminMaintenanceMode: React.FC = () => {
       >
         {(pendingModuleId || (platformModule && !platformModule.isLocked) || activeCount > 0) && confirmState.isOpen && (
           <div className="mt-4">
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">
+            <label className="block text-xs font-medium text-content-muted mb-1.5">
               Raison du verrouillage
             </label>
             <input
@@ -599,7 +599,7 @@ const AdminMaintenanceMode: React.FC = () => {
               value={lockReason}
               onChange={(e) => setLockReason(e.target.value)}
               placeholder="Ex: Maintenance planifiée..."
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:border-indigo-500 outline-none"
+              className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-sm text-content-primary placeholder-content-muted focus:border-accent outline-none"
             />
           </div>
         )}

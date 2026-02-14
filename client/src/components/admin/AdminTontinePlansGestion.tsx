@@ -6,6 +6,7 @@ import { toast, handleApiError } from '../../lib/toast';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import { usePermissions } from '../auth/ProtectedFeature';
+import { useCurrency } from '../../contexts/CurrencyContext';
 
 interface TontinePlan {
   id: string;
@@ -28,6 +29,7 @@ interface AdminTontinePlansGestionProps {
 
 export default function AdminTontinePlansGestion({ showForm: externalShowForm, onHideForm, onLaunchTontine }: AdminTontinePlansGestionProps) {
   const { hasPermission } = usePermissions();
+  const { currency, label } = useCurrency();
   const canManagePlans = hasPermission('tontines', 'manage') || hasPermission('admin', 'manage');
 
   const { confirmState, openConfirm, closeConfirm, handleConfirm } = useConfirmDialog();
@@ -164,13 +166,13 @@ export default function AdminTontinePlansGestion({ showForm: externalShowForm, o
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {plans.map((plan) => (
-            <Card key={plan.id} className="p-5 bg-slate-900 border-slate-800 hover:border-teal-500/50 transition-all duration-300 flex flex-col h-full group">
+            <Card key={plan.id} className="p-5 bg-surface-base border-edge hover:border-accent/50 transition-all duration-300 flex flex-col h-full group">
               <div className="flex justify-between items-start mb-4 gap-3 h-14">
                 <div className="flex-1 min-w-0">
-                  <h4 className="font-bold text-white text-base leading-tight line-clamp-2 group-hover:text-teal-400 transition-colors">
+                  <h4 className="font-bold text-content-primary text-base leading-tight line-clamp-2 group-hover:text-accent transition-colors">
                     {plan.nom}
                   </h4>
-                  <p className="text-xs text-slate-400 line-clamp-1 mt-1 font-medium">
+                  <p className="text-xs text-content-muted line-clamp-1 mt-1 font-medium">
                     {plan.description}
                   </p>
                 </div>
@@ -182,18 +184,18 @@ export default function AdminTontinePlansGestion({ showForm: externalShowForm, o
                 />
               </div>
 
-              <div className="space-y-3 mb-6 bg-slate-800/30 p-3 rounded-lg border border-slate-800/50">
+              <div className="space-y-3 mb-6 bg-surface/30 p-3 rounded-lg border border-edge/50">
                 <div className="flex justify-between text-sm items-baseline">
-                  <span className="text-slate-500 font-medium">Cotisation:</span>
-                  <span className="font-bold text-teal-400 text-base">{plan.montant_cotisation.toLocaleString()} FCFA</span>
+                  <span className="text-content-muted font-medium">Cotisation:</span>
+                  <span className="font-bold text-accent text-base">{plan.montant_cotisation.toLocaleString()} {currency.symbol}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-500 font-medium">Membres:</span>
-                  <span className="text-slate-200 font-semibold">{plan.nombre_membres}</span>
+                  <span className="text-content-muted font-medium">Membres:</span>
+                  <span className="text-content-secondary font-semibold">{plan.nombre_membres}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-500 font-medium">Fréquence:</span>
-                  <span className="text-slate-200 font-semibold">{plan.frequence}</span>
+                  <span className="text-content-muted font-medium">Fréquence:</span>
+                  <span className="text-content-secondary font-semibold">{plan.frequence}</span>
                 </div>
               </div>
 
@@ -205,7 +207,7 @@ export default function AdminTontinePlansGestion({ showForm: externalShowForm, o
                     fullWidth
                     icon={Rocket}
                     onClick={() => onLaunchTontine(plan)}
-                    className="shadow-lg shadow-teal-500/20"
+                    className="shadow-lg shadow-accent/20"
                   >
                     Lancer une tontine
                   </Button>
@@ -213,13 +215,13 @@ export default function AdminTontinePlansGestion({ showForm: externalShowForm, o
               )}
 
               {canManagePlans && (
-                <div className="flex gap-2 border-t border-slate-800 pt-4 mt-auto">
+                <div className="flex gap-2 border-t border-edge pt-4 mt-auto">
                   <Button
                     variant="secondary"
                     size="sm"
                     icon={Edit}
                     onClick={() => handleEdit(plan)}
-                    className="flex-1 justify-center bg-slate-800/50 border-slate-700 hover:bg-slate-700 hover:text-white"
+                    className="flex-1 justify-center bg-surface/50 border-edge hover:bg-surface-elevated hover:text-content-primary"
                   >
                     Modifier
                   </Button>
@@ -228,7 +230,7 @@ export default function AdminTontinePlansGestion({ showForm: externalShowForm, o
                     size="sm"
                     icon={Trash2}
                     onClick={() => handleDelete(plan.id)}
-                    className="text-slate-500 hover:text-red-400 hover:bg-red-400/10 border border-transparent hover:border-red-400/20"
+                    className="text-content-muted hover:text-status-danger hover:bg-status-danger-bg border border-transparent hover:border-status-danger/20"
                   />
                 </div>
               )}
@@ -266,7 +268,7 @@ export default function AdminTontinePlansGestion({ showForm: externalShowForm, o
               className="sm:col-span-2"
             />
             <FormField
-              label="Montant cotisation (FCFA)"
+              label={label('Montant cotisation')}
               name="montant_cotisation"
               type="number"
               value={formData.montant_cotisation}
@@ -309,12 +311,12 @@ export default function AdminTontinePlansGestion({ showForm: externalShowForm, o
               onChange={(e) => setFormData({ ...formData, taux_plateforme: e.target.value })}
             />
             <div className="flex items-center pt-8">
-              <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
+              <label className="flex items-center gap-2 text-content-secondary cursor-pointer">
                 <input
                   type="checkbox"
                   checked={formData.actif}
                   onChange={(e) => setFormData({ ...formData, actif: e.target.checked })}
-                  className="w-4 h-4 rounded bg-slate-800 border-slate-700 text-teal-500 focus:ring-teal-500"
+                  className="w-4 h-4 rounded bg-surface border-edge text-accent focus:ring-accent"
                 />
                 <span>Modèle actif</span>
               </label>

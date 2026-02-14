@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { useBranding } from '../contexts/BrandingContext';
 import { exportToCSV, exportToPDF } from '../lib/exportUtils';
 
 export function useComplianceReports() {
+  const { branding } = useBranding();
   const [loading, setLoading] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState('current_month');
 
@@ -26,7 +28,7 @@ export function useComplianceReports() {
         titre: 'RAPPORT DE CONFORMITÉ OHADA',
         periode: getPeriodLabel(),
         date_generation: new Date().toLocaleString('fr-FR'),
-        organisme: 'COFIN - République du Congo',
+        organisme: `${branding.appName} - République du Congo`,
         sections: [
           {
             titre: 'Traçabilité des Écritures Comptables',
@@ -70,7 +72,8 @@ export function useComplianceReports() {
       await exportToPDF([report], `rapport_ohada_${Date.now()}`, 'Rapport de Conformité OHADA', {
         saveToLoge: true,
         logeCategorie: 'comptabilite',
-        logeTags: ['ohada', 'conformite', 'comptabilite']
+        logeTags: ['ohada', 'conformite', 'comptabilite'],
+        appName: branding.appName,
       });
       alert('Rapport OHADA généré et archivé dans la Loge !');
     } catch (error) {
@@ -94,7 +97,7 @@ export function useComplianceReports() {
         titre: 'RAPPORT FISCAL DGI - RÉPUBLIQUE DU CONGO',
         periode: getPeriodLabel(),
         date_generation: new Date().toLocaleString('fr-FR'),
-        contribuable: 'COFIN Platform',
+        contribuable: `${branding.appName} Platform`,
         sections: [
           {
             titre: 'Déclarations TVA',

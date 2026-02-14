@@ -131,17 +131,17 @@ export default function WeightVerificationPanel({ initialBilletage, compact = fa
   const denomsToShow = compact ? BANKNOTE_KEYS : Object.keys(DENOMINATION_LABELS);
 
   return (
-    <Card padding="sm" className="bg-slate-800/80 border-slate-700">
+    <Card padding="sm" className="bg-surface/80 border-edge">
       <div className="flex items-center gap-2 mb-3">
-        <Scale size={16} className="text-cyan-400" />
-        <h4 className="text-xs font-bold text-white uppercase tracking-wide">Vérification Poids Billets</h4>
+        <Scale size={16} className="text-accent" />
+        <h4 className="text-xs font-bold text-content-primary uppercase tracking-wide">Vérification Poids Billets</h4>
       </div>
 
       {/* Denomination inputs */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 mb-3">
         {denomsToShow.map(key => (
           <div key={key}>
-            <label className="block text-[9px] text-slate-500 mb-0.5">
+            <label className="block text-[9px] text-content-muted mb-0.5">
               {DENOMINATION_LABELS[key] || key}
             </label>
             <input
@@ -150,22 +150,22 @@ export default function WeightVerificationPanel({ initialBilletage, compact = fa
               value={billetage[key] || ''}
               placeholder="0"
               onChange={(e) => updateDenom(key, e.target.value)}
-              className="w-full px-2 py-1 bg-slate-900 border border-slate-700 rounded text-xs text-white font-mono focus:ring-1 focus:ring-cyan-500/50 outline-none"
+              className="w-full px-2 py-1 bg-surface-base border border-edge rounded text-xs text-content-primary font-mono focus:ring-1 focus:ring-accent/50 outline-none"
             />
           </div>
         ))}
       </div>
 
       {/* Total + Weight input */}
-      <div className="flex flex-wrap items-end gap-3 mb-3 p-2 bg-slate-900/50 rounded border border-slate-700/50">
+      <div className="flex flex-wrap items-end gap-3 mb-3 p-2 bg-surface-base/50 rounded border border-edge-subtle">
         <div>
-          <span className="text-[10px] text-slate-500">Valeur déclarée:</span>
-          <p className="text-sm font-bold text-white font-mono">
-            {totalValue.toLocaleString('fr-FR')} <span className="text-[10px] text-slate-400">CDF</span>
+          <span className="text-[10px] text-content-muted">Valeur déclarée:</span>
+          <p className="text-sm font-bold text-content-primary font-mono">
+            {totalValue.toLocaleString('fr-FR')} <span className="text-[10px] text-content-muted">CDF</span>
           </p>
         </div>
         <div className="flex-1 min-w-[140px]">
-          <label className="block text-[10px] text-slate-400 mb-0.5">Poids réel mesuré (g)</label>
+          <label className="block text-[10px] text-content-muted mb-0.5">Poids réel mesuré (g)</label>
           <input
             type="number"
             step="0.01"
@@ -173,7 +173,7 @@ export default function WeightVerificationPanel({ initialBilletage, compact = fa
             value={actualWeight}
             placeholder="Ex: 1250.50"
             onChange={(e) => { setActualWeight(e.target.value); setResult(null); }}
-            className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded text-sm text-white font-mono focus:ring-1 focus:ring-cyan-500/50 outline-none"
+            className="w-full px-2 py-1.5 bg-surface-base border border-edge rounded text-sm text-content-primary font-mono focus:ring-1 focus:ring-accent/50 outline-none"
           />
         </div>
         <Button
@@ -191,9 +191,9 @@ export default function WeightVerificationPanel({ initialBilletage, compact = fa
       {/* Result */}
       {result && (
         <div className={`p-3 rounded-lg border ${
-          result.status === 'OK' ? 'bg-emerald-500/10 border-emerald-500/30' :
-          result.status === 'SUSPECT' ? 'bg-red-500/10 border-red-500/30' :
-          'bg-amber-500/10 border-amber-500/30'
+          result.status === 'OK' ? 'bg-status-success-bg border-status-success/30' :
+          result.status === 'SUSPECT' ? 'bg-status-danger-bg border-status-danger/30' :
+          'bg-status-warning-bg border-status-warning/30'
         }`}>
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
@@ -203,8 +203,8 @@ export default function WeightVerificationPanel({ initialBilletage, compact = fa
                 return (
                   <>
                     <Icon size={16} className={
-                      result.status === 'OK' ? 'text-emerald-400' :
-                      result.status === 'SUSPECT' ? 'text-red-400' : 'text-amber-400'
+                      result.status === 'OK' ? 'text-status-success' :
+                      result.status === 'SUSPECT' ? 'text-status-danger' : 'text-status-warning'
                     } />
                     <Badge variant={cfg.variant} value={cfg.label} size="sm" />
                   </>
@@ -212,7 +212,7 @@ export default function WeightVerificationPanel({ initialBilletage, compact = fa
               })()}
             </div>
             <span className={`font-mono text-sm font-bold ${
-              result.withinTolerance ? 'text-emerald-400' : 'text-amber-400'
+              result.withinTolerance ? 'text-status-success' : 'text-status-warning'
             }`}>
               {result.differencePercent}% écart
             </span>
@@ -220,23 +220,23 @@ export default function WeightVerificationPanel({ initialBilletage, compact = fa
 
           <div className="grid grid-cols-3 gap-3 text-xs">
             <div>
-              <span className="text-slate-500">Poids attendu</span>
-              <p className="font-mono text-white">{result.expectedWeightGrams.toLocaleString('fr-FR')} g</p>
+              <span className="text-content-muted">Poids attendu</span>
+              <p className="font-mono text-content-primary">{result.expectedWeightGrams.toLocaleString('fr-FR')} g</p>
             </div>
             <div>
-              <span className="text-slate-500">Poids réel</span>
-              <p className="font-mono text-white">{result.actualWeightGrams.toLocaleString('fr-FR')} g</p>
+              <span className="text-content-muted">Poids réel</span>
+              <p className="font-mono text-content-primary">{result.actualWeightGrams.toLocaleString('fr-FR')} g</p>
             </div>
             <div>
-              <span className="text-slate-500">Différence</span>
-              <p className={`font-mono ${result.withinTolerance ? 'text-emerald-400' : 'text-amber-400'}`}>
+              <span className="text-content-muted">Différence</span>
+              <p className={`font-mono ${result.withinTolerance ? 'text-status-success' : 'text-status-warning'}`}>
                 {result.differenceGrams.toLocaleString('fr-FR')} g
               </p>
             </div>
           </div>
 
           {result.valueDifference > 0 && (
-            <p className="text-[10px] text-slate-400 mt-2">
+            <p className="text-[10px] text-content-muted mt-2">
               Estimation par poids : {result.estimatedValueFromWeight.toLocaleString('fr-FR')} CDF
               (écart valeur : {result.valueDifference.toLocaleString('fr-FR')} CDF)
             </p>

@@ -34,16 +34,16 @@ export default function FileBrowser({
   // Breadcrumb item rendering
   const renderBreadcrumbs = () => (
     <div className="flex items-center gap-2 text-sm overflow-x-auto whitespace-nowrap pb-2 md:pb-0 scrollbar-hide">
-      <button onClick={navigateToRoot} className="text-blue-500 hover:underline flex items-center gap-1 shrink-0">
+      <button onClick={navigateToRoot} className="text-status-info hover:underline flex items-center gap-1 shrink-0">
         <Home className="w-4 h-4" />
         Accueil
       </button>
       {currentPath.map((p, i) => (
         <React.Fragment key={i}>
-          <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+          <ChevronRight className="w-4 h-4 text-content-muted shrink-0" />
           <button 
             onClick={() => navigateToPath(i)}
-            className="text-blue-500 hover:underline shrink-0"
+            className="text-status-info hover:underline shrink-0"
           >
             {p}
           </button>
@@ -53,9 +53,9 @@ export default function FileBrowser({
   );
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 flex flex-col h-full">
+    <div className="bg-surface rounded-xl shadow-lg border border-edge flex flex-col h-full">
       {/* Toolbar */}
-      <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex flex-col md:flex-row gap-4 justify-between">
+      <div className="p-4 border-b border-edge flex flex-col md:flex-row gap-4 justify-between">
         {renderBreadcrumbs()}
         
         <div className="flex items-center gap-2 justify-end">
@@ -86,7 +86,7 @@ export default function FileBrowser({
       <div className="p-4 flex-1">
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <RefreshCw className="w-8 h-8 text-blue-500 animate-spin" />
+            <RefreshCw className="w-8 h-8 text-status-info animate-spin" />
           </div>
         ) : documents.length === 0 ? (
           <EmptyState
@@ -101,30 +101,30 @@ export default function FileBrowser({
               return (
                 <div
                   key={doc.id}
-                  className="group bg-slate-50 dark:bg-slate-700/50 rounded-xl p-4 hover:bg-slate-100 dark:hover:bg-slate-700 transition cursor-pointer relative"
+                  className="group bg-surface-muted-elevated/50 rounded-xl p-4 hover:bg-surface-muted-elevated transition cursor-pointer relative"
                   onDoubleClick={() => onOpenFolder(doc)}
                 >
                   <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition flex gap-1 z-10">
                     <button
                       onClick={(e) => { e.stopPropagation(); onSelectDoc(doc); }}
-                      className="p-1.5 bg-white dark:bg-slate-600 rounded-lg shadow hover:bg-slate-50 dark:hover:bg-slate-500"
+                      className="p-1.5 bg-surface rounded-lg shadow hover:bg-surface-muted"
                     >
-                      <Eye className="w-3.5 h-3.5 text-slate-500 dark:text-slate-300" />
+                      <Eye className="w-3.5 h-3.5 text-content-muted" />
                     </button>
                     {canDeleteFiles && (
                       <button
                         onClick={(e) => { e.stopPropagation(); onDeleteDoc(doc); }}
-                        className="p-1.5 bg-white dark:bg-slate-600 rounded-lg shadow hover:bg-red-50 dark:hover:bg-red-900/30"
+                        className="p-1.5 bg-surface rounded-lg shadow hover:bg-status-danger-bg"
                       >
-                        <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                        <Trash2 className="w-3.5 h-3.5 text-status-danger" />
                       </button>
                     )}
                   </div>
-                  <div className={`p-3 rounded-lg mb-3 flex justify-center ${doc.type === 'dossier' ? 'bg-yellow-100 dark:bg-yellow-900/30' : 'bg-blue-100 dark:bg-blue-900/30'}`}>
-                    <FileIcon className={`w-8 h-8 ${doc.type === 'dossier' ? 'text-yellow-500' : 'text-blue-500'}`} />
+                  <div className={`p-3 rounded-lg mb-3 flex justify-center ${doc.type === 'dossier' ? 'bg-status-warning-bg' : 'bg-status-info-bg'}`}>
+                    <FileIcon className={`w-8 h-8 ${doc.type === 'dossier' ? 'text-status-warning' : 'text-status-info'}`} />
                   </div>
-                  <p className="font-medium text-sm text-slate-700 dark:text-white truncate text-center">{doc.nom}</p>
-                  <p className="text-xs text-slate-400 mt-1 text-center">
+                  <p className="font-medium text-sm text-content-secondary truncate text-center">{doc.nom}</p>
+                  <p className="text-xs text-content-muted mt-1 text-center">
                     {doc.type === 'dossier' ? 'Dossier' : formatFileSize(doc.taille || 0)}
                   </p>
                 </div>
@@ -132,23 +132,23 @@ export default function FileBrowser({
             })}
           </div>
         ) : (
-          <div className="divide-y divide-slate-200 dark:divide-slate-700">
+          <div className="divide-y divide-edge">
             {documents.map(doc => {
               const FileIcon = doc.type === 'dossier' ? Folder : getFileIcon(doc.mimeType);
               return (
                 <div
                   key={doc.id}
-                  className="flex items-center gap-4 py-3 px-4 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition cursor-pointer group"
+                  className="flex items-center gap-4 py-3 px-4 hover:bg-surface-muted-elevated/50 transition cursor-pointer group"
                   onDoubleClick={() => onOpenFolder(doc)}
                 >
-                  <div className={`p-2 rounded-lg ${doc.type === 'dossier' ? 'bg-yellow-100 dark:bg-yellow-900/30' : 'bg-blue-100 dark:bg-blue-900/30'}`}>
-                    <FileIcon className={`w-5 h-5 ${doc.type === 'dossier' ? 'text-yellow-500' : 'text-blue-500'}`} />
+                  <div className={`p-2 rounded-lg ${doc.type === 'dossier' ? 'bg-status-warning-bg' : 'bg-status-info-bg'}`}>
+                    <FileIcon className={`w-5 h-5 ${doc.type === 'dossier' ? 'text-status-warning' : 'text-status-info'}`} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-slate-700 dark:text-white truncate">{doc.nom}</p>
-                    <p className="text-xs text-slate-400">{doc.type === 'dossier' ? 'Dossier' : doc.mimeType}</p>
+                    <p className="font-medium text-content-secondary truncate">{doc.nom}</p>
+                    <p className="text-xs text-content-muted">{doc.type === 'dossier' ? 'Dossier' : doc.mimeType}</p>
                   </div>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 hidden sm:block">
+                  <p className="text-sm text-content-muted hidden sm:block">
                     {doc.type === 'dossier' ? '--' : formatFileSize(doc.taille || 0)}
                   </p>
                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition sm:opacity-100">
@@ -165,7 +165,7 @@ export default function FileBrowser({
                         icon={Trash2}
                         size="sm"
                         variant="ghost"
-                        className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                        className="text-status-danger hover:text-status-danger hover:bg-status-danger-bg"
                         aria-label="Supprimer"
                       />
                     )}

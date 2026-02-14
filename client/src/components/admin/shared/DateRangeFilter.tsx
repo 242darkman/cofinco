@@ -172,11 +172,11 @@ export default function DateRangeFilter({
         onClick={() => setIsOpen(!isOpen)}
         className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition text-sm min-w-[200px] ${
           hasValue
-            ? 'bg-indigo-500/20 border-indigo-500/50 text-white'
-            : 'bg-slate-700 border-slate-600 text-slate-300 hover:border-slate-500'
+            ? 'bg-accent/10 border-accent/50 text-content-primary'
+            : 'bg-surface-elevated border-edge-strong text-content-secondary hover:border-edge-strong'
         }`}
       >
-        <Calendar size={16} className={hasValue ? 'text-indigo-400' : 'text-slate-400'} />
+        <Calendar size={16} className={hasValue ? 'text-accent' : 'text-content-muted'} />
         <span className="flex-1 text-left truncate">{displayValue()}</span>
         {hasValue ? (
           <button
@@ -184,7 +184,7 @@ export default function DateRangeFilter({
               e.stopPropagation();
               handleClear();
             }}
-            className="p-0.5 hover:bg-slate-600 rounded"
+            className="p-0.5 hover:bg-surface-subtle rounded"
           >
             <X size={14} />
           </button>
@@ -195,16 +195,16 @@ export default function DateRangeFilter({
 
       {/* Dropdown */}
       {isOpen && (
-        <div className="absolute left-0 top-full mt-2 w-80 bg-slate-800 rounded-xl border border-slate-700 shadow-xl z-50 overflow-hidden">
+        <div className="absolute left-0 top-full mt-2 w-80 bg-surface rounded-xl border border-edge shadow-xl z-50 overflow-hidden">
           {/* Presets */}
-          <div className="p-3 border-b border-slate-700">
-            <p className="text-xs text-slate-400 mb-2 font-medium">Raccourcis</p>
+          <div className="p-3 border-b border-edge">
+            <p className="text-xs text-content-muted mb-2 font-medium">Raccourcis</p>
             <div className="flex flex-wrap gap-2">
               {presets.map((preset) => (
                 <button
                   key={preset.label}
                   onClick={() => handlePresetClick(preset)}
-                  className="px-3 py-1.5 text-xs bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition"
+                  className="px-3 py-1.5 text-xs bg-surface-elevated hover:bg-surface-subtle text-content-primary rounded-lg transition"
                 >
                   {preset.label}
                 </button>
@@ -214,26 +214,26 @@ export default function DateRangeFilter({
 
           {/* Custom Range */}
           <div className="p-3 space-y-3">
-            <p className="text-xs text-slate-400 font-medium">Période personnalisée</p>
+            <p className="text-xs text-content-muted font-medium">Période personnalisée</p>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs text-slate-400 mb-1">Date début</label>
+                <label className="block text-xs text-content-muted mb-1">Date début</label>
                 <input
                   type="date"
                   value={localStart}
                   onChange={(e) => setLocalStart(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3 py-2 bg-surface-elevated border border-edge-strong rounded-lg text-content-primary text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                 />
               </div>
               <div>
-                <label className="block text-xs text-slate-400 mb-1">Date fin</label>
+                <label className="block text-xs text-content-muted mb-1">Date fin</label>
                 <input
                   type="date"
                   value={localEnd}
                   onChange={(e) => setLocalEnd(e.target.value)}
                   min={localStart || undefined}
-                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3 py-2 bg-surface-elevated border border-edge-strong rounded-lg text-content-primary text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                 />
               </div>
             </div>
@@ -241,13 +241,13 @@ export default function DateRangeFilter({
             <div className="flex justify-end gap-2 pt-2">
               <button
                 onClick={handleClear}
-                className="px-3 py-1.5 text-sm text-slate-400 hover:text-white transition"
+                className="px-3 py-1.5 text-sm text-content-muted hover:text-content-primary transition"
               >
                 Effacer
               </button>
               <button
                 onClick={handleApply}
-                className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm transition"
+                className="px-4 py-1.5 bg-accent hover:bg-accent-primary-hover text-white rounded-lg text-sm transition"
               >
                 Appliquer
               </button>

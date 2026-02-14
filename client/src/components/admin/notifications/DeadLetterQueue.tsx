@@ -61,10 +61,10 @@ const CHANNEL_ICONS: Record<string, React.ElementType> = {
 };
 
 const CHANNEL_COLORS: Record<string, string> = {
-  SMS: 'text-cyan-400 bg-cyan-500/20',
-  EMAIL: 'text-blue-400 bg-blue-500/20',
-  PUSH: 'text-purple-400 bg-purple-500/20',
-  IN_APP: 'text-emerald-400 bg-emerald-500/20',
+  SMS: 'text-accent bg-accent/10',
+  EMAIL: 'text-status-info bg-status-info-bg',
+  PUSH: 'text-status-info bg-status-info-bg',
+  IN_APP: 'text-status-success bg-status-success-bg',
 };
 
 export default function DeadLetterQueue({
@@ -178,17 +178,17 @@ export default function DeadLetterQueue({
   };
 
   return (
-    <div className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
+    <div className="bg-surface/50 rounded-xl border border-edge overflow-hidden">
       {/* Header */}
-      <div className="p-4 border-b border-slate-700">
+      <div className="p-4 border-b border-edge">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-red-500/20 rounded-lg">
-              <AlertTriangle className="text-red-400" size={20} />
+            <div className="p-2 bg-status-danger-bg rounded-lg">
+              <AlertTriangle className="text-status-danger" size={20} />
             </div>
             <div>
-              <h3 className="font-semibold text-white">File d'échecs (Dead Letter Queue)</h3>
-              <p className="text-sm text-slate-400">
+              <h3 className="font-semibold text-content-primary">File d'échecs (Dead Letter Queue)</h3>
+              <p className="text-sm text-content-muted">
                 {total} notification(s) en échec
               </p>
             </div>
@@ -197,7 +197,7 @@ export default function DeadLetterQueue({
           <button
             onClick={loadNotifications}
             disabled={loading}
-            className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition"
+            className="p-2 text-content-muted hover:text-content-primary hover:bg-surface-elevated rounded-lg transition"
           >
             <RefreshCcw size={18} className={loading ? 'animate-spin' : ''} />
           </button>
@@ -214,7 +214,7 @@ export default function DeadLetterQueue({
           <select
             value={filters.channel || ''}
             onChange={(e) => setFilters((prev) => ({ ...prev, channel: e.target.value }))}
-            className="px-3 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 text-sm"
+            className="px-3 py-2 bg-surface-elevated text-content-primary rounded-lg border border-edge-strong text-sm"
           >
             <option value="">Tous les canaux</option>
             <option value="SMS">SMS</option>
@@ -227,22 +227,22 @@ export default function DeadLetterQueue({
             value={filters.search || ''}
             onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
             placeholder="Rechercher..."
-            className="flex-1 min-w-[150px] px-3 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 text-sm"
+            className="flex-1 min-w-[150px] px-3 py-2 bg-surface-elevated text-content-primary rounded-lg border border-edge-strong text-sm"
           />
         </div>
       </div>
 
       {/* Bulk Actions */}
       {selectedIds.size > 0 && (
-        <div className="p-3 bg-slate-900/50 border-b border-slate-700 flex items-center gap-3">
-          <span className="text-sm text-white">{selectedIds.size} sélectionné(s)</span>
+        <div className="p-3 bg-surface-base/50 border-b border-edge flex items-center gap-3">
+          <span className="text-sm text-content-primary">{selectedIds.size} sélectionné(s)</span>
 
           <div className="flex-1" />
 
           <button
             onClick={handleRetry}
             disabled={retrying}
-            className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm transition disabled:opacity-50"
+            className="flex items-center gap-2 px-3 py-1.5 bg-status-success hover:bg-status-success text-white rounded-lg text-sm transition disabled:opacity-50"
           >
             {retrying ? <Loader2 className="animate-spin" size={14} /> : <RefreshCcw size={14} />}
             Réessayer
@@ -251,7 +251,7 @@ export default function DeadLetterQueue({
           <button
             onClick={handleDelete}
             disabled={deleting}
-            className="flex items-center gap-2 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm transition disabled:opacity-50"
+            className="flex items-center gap-2 px-3 py-1.5 bg-status-danger hover:bg-status-danger text-white rounded-lg text-sm transition disabled:opacity-50"
           >
             {deleting ? <Loader2 className="animate-spin" size={14} /> : <Trash2 size={14} />}
             Supprimer
@@ -259,7 +259,7 @@ export default function DeadLetterQueue({
 
           <button
             onClick={handleExport}
-            className="flex items-center gap-2 px-3 py-1.5 bg-slate-600 hover:bg-slate-500 text-white rounded-lg text-sm transition"
+            className="flex items-center gap-2 px-3 py-1.5 bg-surface-subtle hover:bg-surface-muted0 text-content-primary rounded-lg text-sm transition"
           >
             <Download size={14} />
             Exporter
@@ -271,19 +271,19 @@ export default function DeadLetterQueue({
       <div className="max-h-[500px] overflow-auto">
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="animate-spin text-indigo-400" size={32} />
+            <Loader2 className="animate-spin text-accent" size={32} />
           </div>
         ) : notifications.length === 0 ? (
           <div className="text-center py-12">
-            <AlertTriangle size={48} className="mx-auto mb-4 text-slate-500 opacity-50" />
-            <p className="text-slate-400">Aucune notification en échec</p>
+            <AlertTriangle size={48} className="mx-auto mb-4 text-content-muted opacity-50" />
+            <p className="text-content-muted">Aucune notification en échec</p>
           </div>
         ) : (
           <table className="w-full">
-            <thead className="bg-slate-700/50 sticky top-0">
+            <thead className="bg-surface-elevated/50 sticky top-0">
               <tr>
                 <th className="px-4 py-3 text-left">
-                  <button onClick={toggleSelectAll} className="text-slate-400 hover:text-white">
+                  <button onClick={toggleSelectAll} className="text-content-muted hover:text-content-primary">
                     {selectedIds.size === notifications.length ? (
                       <CheckSquare size={18} />
                     ) : (
@@ -291,29 +291,29 @@ export default function DeadLetterQueue({
                     )}
                   </button>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-400">Canal</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-400">Destinataire</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-400">Erreur</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-400">Tentatives</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-slate-400">Date</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-slate-400">Actions</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-content-muted">Canal</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-content-muted">Destinataire</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-content-muted">Erreur</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-content-muted">Tentatives</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-content-muted">Date</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-content-muted">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-700/50">
+            <tbody className="divide-y divide-edge/50">
               {notifications.map((notif) => {
                 const Icon = CHANNEL_ICONS[notif.channel];
                 const isExpanded = expandedId === notif.id;
 
                 return (
                   <React.Fragment key={notif.id}>
-                    <tr className="hover:bg-slate-700/30 transition">
+                    <tr className="hover:bg-surface-elevated/30 transition">
                       <td className="px-4 py-3">
                         <button
                           onClick={() => toggleSelect(notif.id)}
-                          className="text-slate-400 hover:text-white"
+                          className="text-content-muted hover:text-content-primary"
                         >
                           {selectedIds.has(notif.id) ? (
-                            <CheckSquare size={18} className="text-indigo-400" />
+                            <CheckSquare size={18} className="text-accent" />
                           ) : (
                             <Square size={18} />
                           )}
@@ -325,26 +325,26 @@ export default function DeadLetterQueue({
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <span className="text-white text-sm">{notif.recipient}</span>
-                        <p className="text-xs text-slate-500">{notif.templateCode}</p>
+                        <span className="text-content-primary text-sm">{notif.recipient}</span>
+                        <p className="text-xs text-content-muted">{notif.templateCode}</p>
                       </td>
                       <td className="px-4 py-3">
-                        <span className="text-red-400 text-sm truncate max-w-[200px] block">
+                        <span className="text-status-danger text-sm truncate max-w-[200px] block">
                           {notif.errorMessage}
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <span className="text-slate-300 text-sm">
+                        <span className="text-content-secondary text-sm">
                           {notif.attempts}/{notif.maxAttempts}
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <span className="text-slate-400 text-xs">{formatDate(notif.lastAttemptAt)}</span>
+                        <span className="text-content-muted text-xs">{formatDate(notif.lastAttemptAt)}</span>
                       </td>
                       <td className="px-4 py-3 text-right">
                         <button
                           onClick={() => setExpandedId(isExpanded ? null : notif.id)}
-                          className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition"
+                          className="p-1.5 text-content-muted hover:text-content-primary hover:bg-surface-elevated rounded transition"
                         >
                           <Eye size={16} />
                         </button>
@@ -353,16 +353,16 @@ export default function DeadLetterQueue({
 
                     {isExpanded && (
                       <tr>
-                        <td colSpan={7} className="px-4 py-4 bg-slate-900/50">
+                        <td colSpan={7} className="px-4 py-4 bg-surface-base/50">
                           <div className="space-y-3">
                             <div>
-                              <h4 className="text-xs text-slate-400 mb-1">Payload</h4>
-                              <pre className="text-xs text-slate-300 bg-slate-800 p-3 rounded-lg overflow-auto max-h-32">
+                              <h4 className="text-xs text-content-muted mb-1">Payload</h4>
+                              <pre className="text-xs text-content-secondary bg-surface p-3 rounded-lg overflow-auto max-h-32">
                                 {JSON.stringify(notif.payload, null, 2)}
                               </pre>
                             </div>
                             {notif.correlationId && (
-                              <p className="text-xs text-slate-500">
+                              <p className="text-xs text-content-muted">
                                 Correlation ID: {notif.correlationId}
                               </p>
                             )}
@@ -380,22 +380,22 @@ export default function DeadLetterQueue({
 
       {/* Pagination */}
       {total > (filters.limit || 20) && (
-        <div className="p-4 border-t border-slate-700 flex items-center justify-between">
-          <span className="text-sm text-slate-400">
+        <div className="p-4 border-t border-edge flex items-center justify-between">
+          <span className="text-sm text-content-muted">
             Page {filters.page} sur {Math.ceil(total / (filters.limit || 20))}
           </span>
           <div className="flex gap-2">
             <button
               onClick={() => setFilters((prev) => ({ ...prev, page: (prev.page || 1) - 1 }))}
               disabled={(filters.page || 1) <= 1}
-              className="px-3 py-1.5 bg-slate-700 text-white rounded-lg disabled:opacity-50 text-sm"
+              className="px-3 py-1.5 bg-surface-elevated text-content-primary rounded-lg disabled:opacity-50 text-sm"
             >
               Précédent
             </button>
             <button
               onClick={() => setFilters((prev) => ({ ...prev, page: (prev.page || 1) + 1 }))}
               disabled={(filters.page || 1) >= Math.ceil(total / (filters.limit || 20))}
-              className="px-3 py-1.5 bg-slate-700 text-white rounded-lg disabled:opacity-50 text-sm"
+              className="px-3 py-1.5 bg-surface-elevated text-content-primary rounded-lg disabled:opacity-50 text-sm"
             >
               Suivant
             </button>

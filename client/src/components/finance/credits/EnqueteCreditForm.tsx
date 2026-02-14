@@ -636,20 +636,20 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
   return (
     <>
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
-      <div className="bg-gradient-to-br from-slate-900 to-slate-800 border border-slate-700 rounded-xl max-w-4xl w-full max-h-[95vh] overflow-y-auto shadow-2xl">
-        <div className="sticky top-0 bg-slate-900/95 backdrop-blur-sm border-b border-slate-700 px-4 py-3 flex items-center justify-between z-10">
+      <div className="bg-gradient-to-br from-surface-base to-surface border border-edge rounded-xl max-w-4xl w-full max-h-[95vh] overflow-y-auto shadow-2xl">
+        <div className="sticky top-0 bg-surface-base/95 backdrop-blur-sm border-b border-edge px-4 py-3 flex items-center justify-between z-10">
           <div>
-            <h2 className="text-lg font-bold text-white">
+            <h2 className="text-lg font-bold text-content-primary">
               {readOnly ? 'Détails de l\'Enquête' : 'Enquête de Crédit'}
             </h2>
-            <p className="text-slate-400 text-xs">
+            <p className="text-content-muted text-xs">
               Client : {clientNom || (selectedClient ? formatClientName(selectedClient.nom, (selectedClient as any).prenom) : 'Non sélectionné')}
-              {readOnly && <span className="ml-2 text-emerald-400">(Lecture seule)</span>}
+              {readOnly && <span className="ml-2 text-status-success">(Lecture seule)</span>}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 hover:bg-slate-700 rounded-lg transition text-slate-400 hover:text-white"
+            className="p-1.5 hover:bg-surface-elevated rounded-lg transition text-content-muted hover:text-content-primary"
             data-testid="button-close-enquete"
           >
             <X size={20} />
@@ -659,15 +659,15 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
           <fieldset disabled={readOnly} className="space-y-4">
           {!clientId && (
-            <div className="bg-slate-800 p-3 rounded-lg border border-slate-700">
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+            <div className="bg-surface p-3 rounded-lg border border-edge">
+              <label className="block text-xs font-semibold text-content-secondary mb-1.5">
                 <User size={14} className="inline mr-1.5" />
                 Sélectionner le Client à Enquêter *
               </label>
               <select
                 value={formData.client_id}
                 onChange={handleClientChange}
-                className={`w-full bg-slate-700 border ${!formData.client_id ? 'border-slate-600' : 'border-cyan-500'} rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                className={`w-full bg-surface-elevated border ${!formData.client_id ? 'border-edge-strong' : 'border-accent'} rounded-lg px-3 py-2 text-sm text-content-primary focus:outline-none focus:ring-2 focus:ring-accent`}
                 data-testid="select-client"
               >
                 <option value="">-- Choisir un client --</option>
@@ -677,26 +677,26 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
               </select>
 
               {selectedClient && (
-                <div className="mt-2 flex items-center gap-3 p-2 bg-slate-700/50 rounded-lg">
-                  <div className="w-10 h-10 bg-slate-600 rounded-full flex items-center justify-center overflow-hidden border border-slate-500">
+                <div className="mt-2 flex items-center gap-3 p-2 bg-surface-elevated/50 rounded-lg">
+                  <div className="w-10 h-10 bg-surface-subtle rounded-full flex items-center justify-center overflow-hidden border border-edge-strong">
                     {selectedClient.photoUrl ? (
                       <img src={selectedClient.photoUrl} alt={selectedClient.nom} className="w-full h-full object-cover" />
                     ) : (
-                      <span className="text-sm font-bold text-white">{selectedClient.nom.charAt(0)}</span>
+                      <span className="text-sm font-bold text-content-primary">{selectedClient.nom.charAt(0)}</span>
                     )}
                   </div>
                   <div>
-                    <h3 className="font-semibold text-white text-sm">{formatClientName(selectedClient.nom, (selectedClient as any).prenom)}</h3>
-                    <p className="text-xs text-cyan-400">Client sélectionné</p>
+                    <h3 className="font-semibold text-content-primary text-sm">{formatClientName(selectedClient.nom, (selectedClient as any).prenom)}</h3>
+                    <p className="text-xs text-accent">Client sélectionné</p>
                   </div>
                 </div>
               )}
             </div>
           )}
 
-          <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg px-3 py-2 flex gap-2 items-center">
-            <AlertCircle className="text-blue-400 flex-shrink-0" size={16} />
-            <div className="text-xs text-blue-300">
+          <div className="bg-status-info-bg border border-status-info/30 rounded-lg px-3 py-2 flex gap-2 items-center">
+            <AlertCircle className="text-status-info flex-shrink-0" size={16} />
+            <div className="text-xs text-status-info">
               Cette enquête sera évaluée par un agent terrain puis approuvée par le chef d'agence ou le responsable crédit.
             </div>
           </div>
@@ -714,23 +714,23 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
 
           {/* Affichage de l'adresse résolue via Hook */}
           {geoLocation.latitude && geoLocation.longitude && (
-             <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-lg px-3 py-2">
-                <div className="text-[10px] font-semibold text-cyan-400 mb-1">Adresse du site</div>
+             <div className="bg-accent/10 border border-accent/30 rounded-lg px-3 py-2">
+                <div className="text-[10px] font-semibold text-accent mb-1">Adresse du site</div>
                 <LocationDisplay
                   latitude={geoLocation.latitude}
                   longitude={geoLocation.longitude}
-                  className="text-white text-sm"
+                  className="text-content-primary text-sm"
                 />
              </div>
           )}
 
             {/* GPS Security Warning */}
             {geoLocation.distanceFromClient !== null && geoLocation.distanceFromClient !== undefined && geoLocation.distanceFromClient > 200 && (
-              <div className="bg-red-500/10 border border-red-500/50 rounded-lg px-3 py-2 flex items-start gap-2 animate-pulse">
-                 <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={16} />
+              <div className="bg-status-danger-bg border border-status-danger/50 rounded-lg px-3 py-2 flex items-start gap-2 animate-pulse">
+                 <AlertCircle className="text-status-danger flex-shrink-0 mt-0.5" size={16} />
                  <div>
-                    <h4 className="text-red-400 font-bold text-xs">Alerte de Sécurité GPS</h4>
-                    <p className="text-red-300 text-[11px] mt-0.5">
+                    <h4 className="text-status-danger font-bold text-xs">Alerte de Sécurité GPS</h4>
+                    <p className="text-status-danger text-[11px] mt-0.5">
                       Position à <span className="font-bold">{Math.round(geoLocation.distanceFromClient)}m</span> de l'adresse connue du client.
                     </p>
                  </div>
@@ -738,7 +738,7 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
             )}
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">
+            <label className="block text-xs font-semibold text-content-secondary mb-1">
               <DollarSign size={14} className="inline mr-1" />
               Montant du crédit demandé (FCFA) *
             </label>
@@ -748,25 +748,25 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
               step="1000"
               value={formData.montant_demande}
               onChange={(e) => handleChange('montant_demande', e.target.value)}
-              className={`w-full bg-slate-800 text-white px-3 py-2 rounded-lg border text-sm ${
-                errors.montant_demande ? 'border-cyan-500' : 'border-slate-600'
-              } focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+              className={`w-full bg-surface text-content-primary px-3 py-2 rounded-lg border text-sm ${
+                errors.montant_demande ? 'border-accent' : 'border-edge-strong'
+              } focus:outline-none focus:ring-2 focus:ring-accent`}
               placeholder="500000"
               data-testid="input-montant-demande"
             />
-            {errors.montant_demande && <p className="text-cyan-400 text-xs mt-0.5">{errors.montant_demande}</p>}
+            {errors.montant_demande && <p className="text-accent text-xs mt-0.5">{errors.montant_demande}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
+              <label className="block text-xs font-semibold text-content-secondary mb-1">
                 <Briefcase size={14} className="inline mr-1" />
                 Catégorie d'activité *
               </label>
               <select
                 value={formData.categorie_activite}
                 onChange={(e) => handleCategorieChange(e.target.value)}
-                className="w-full bg-slate-800 text-white px-3 py-2 rounded-lg border border-slate-600 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                className="w-full bg-surface text-content-primary px-3 py-2 rounded-lg border border-edge-strong text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                 data-testid="select-categorie-activite"
               >
                 <option value="">Sélectionner...</option>
@@ -777,16 +777,16 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
+              <label className="block text-xs font-semibold text-content-secondary mb-1">
                 <Briefcase size={14} className="inline mr-1" />
                 Type d'activité *
               </label>
               <select
                 value={formData.type_activite}
                 onChange={(e) => handleChange('type_activite', e.target.value)}
-                className={`w-full bg-slate-800 text-white px-3 py-2 rounded-lg border text-sm ${
-                  errors.type_activite ? 'border-cyan-500' : 'border-slate-600'
-                } focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                className={`w-full bg-surface text-content-primary px-3 py-2 rounded-lg border text-sm ${
+                  errors.type_activite ? 'border-accent' : 'border-edge-strong'
+                } focus:outline-none focus:ring-2 focus:ring-accent`}
                 disabled={!formData.categorie_activite}
                 data-testid="select-type-activite"
               >
@@ -795,12 +795,12 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
                   <option key={type} value={type}>{type}</option>
                 ))}
               </select>
-              {errors.type_activite && <p className="text-cyan-400 text-xs mt-0.5">{errors.type_activite}</p>}
+              {errors.type_activite && <p className="text-accent text-xs mt-0.5">{errors.type_activite}</p>}
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">
+            <label className="block text-xs font-semibold text-content-secondary mb-1">
               <Calendar size={14} className="inline mr-1" />
               Ancienneté dans l'activité *
             </label>
@@ -810,15 +810,15 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
                 min="0"
                 value={seniorityValue}
                 onChange={(e) => setSeniorityValue(e.target.value)}
-                className={`flex-1 bg-slate-800 text-white px-3 py-2 rounded-lg border text-sm ${
-                  errors.anciennete_activite ? 'border-cyan-500' : 'border-slate-600'
-                } focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                className={`flex-1 bg-surface text-content-primary px-3 py-2 rounded-lg border text-sm ${
+                  errors.anciennete_activite ? 'border-accent' : 'border-edge-strong'
+                } focus:outline-none focus:ring-2 focus:ring-accent`}
                 placeholder={seniorityUnit === 'days' ? '90' : seniorityUnit === 'months' ? '6' : '2'}
               />
               <select
                 value={seniorityUnit}
                 onChange={(e) => setSeniorityUnit(e.target.value as 'days' | 'months' | 'years')}
-                className="bg-slate-800 text-white px-3 py-2 rounded-lg border border-slate-600 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 min-w-[100px]"
+                className="bg-surface text-content-primary px-3 py-2 rounded-lg border border-edge-strong text-sm focus:outline-none focus:ring-2 focus:ring-accent min-w-[100px]"
               >
                 <option value="days">Jours</option>
                 <option value="months">Mois</option>
@@ -826,33 +826,33 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
               </select>
             </div>
             {seniorityValue && (
-              <div className="mt-1 text-xs text-cyan-400 flex items-center gap-1">
+              <div className="mt-1 text-xs text-accent flex items-center gap-1">
                 <CheckCircle size={10} />
                 <span className="font-medium">{formatConversion(parseFloat(seniorityValue), seniorityUnit)}</span>
               </div>
             )}
-            {errors.anciennete_activite && <p className="text-cyan-400 text-xs mt-0.5">{errors.anciennete_activite}</p>}
+            {errors.anciennete_activite && <p className="text-accent text-xs mt-0.5">{errors.anciennete_activite}</p>}
           </div>
 
-          <div className="bg-slate-800 p-3 rounded-lg border border-slate-700">
+          <div className="bg-surface p-3 rounded-lg border border-edge">
             <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-semibold text-slate-300 flex items-center gap-1">
+              <label className="text-xs font-semibold text-content-secondary flex items-center gap-1">
                 <TrendingUp size={14} />
                 Calcul du Revenu Mensuel
               </label>
               {formData.revenu_mensuel_declare && initialData?.revenus_mensuels && (
-                <span className="text-[10px] text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded">Pré-rempli depuis demande</span>
+                <span className="text-[10px] text-accent bg-accent/10 px-1.5 py-0.5 rounded">Pré-rempli depuis demande</span>
               )}
             </div>
 
-            <div className="flex bg-slate-700/50 p-0.5 rounded-lg w-fit mb-3">
+            <div className="flex bg-surface-elevated/50 p-0.5 rounded-lg w-fit mb-3">
               <button
                 type="button"
                 onClick={() => handleChange('type_revenu', 'Mensuel')}
                 className={`px-3 py-1.5 rounded text-xs font-medium transition ${
                   formData.type_revenu === 'Mensuel'
-                    ? 'bg-cyan-600 text-white shadow'
-                    : 'text-slate-400 hover:text-white'
+                    ? 'bg-accent-secondary text-content-primary shadow'
+                    : 'text-content-muted hover:text-content-primary'
                 }`}
               >
                 Revenu Mensuel
@@ -862,8 +862,8 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
                 onClick={() => handleChange('type_revenu', 'Journalier')}
                 className={`px-3 py-1.5 rounded text-xs font-medium transition ${
                   formData.type_revenu === 'Journalier'
-                    ? 'bg-cyan-600 text-white shadow'
-                    : 'text-slate-400 hover:text-white'
+                    ? 'bg-accent-secondary text-content-primary shadow'
+                    : 'text-content-muted hover:text-content-primary'
                 }`}
               >
                 Revenu Journalier
@@ -873,7 +873,7 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
             {formData.type_revenu === 'Journalier' ? (
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] text-slate-400 mb-0.5">Revenu journalier (FCFA)</label>
+                  <label className="block text-[10px] text-content-muted mb-0.5">Revenu journalier (FCFA)</label>
                   <input
                     type="number"
                     min="0"
@@ -887,54 +887,54 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
                         revenu_mensuel_declare: mensuel
                       }));
                     }}
-                    className="w-full bg-slate-700 text-white px-3 py-2 rounded-lg border border-slate-600 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                    className="w-full bg-surface-elevated text-content-primary px-3 py-2 rounded-lg border border-edge-strong text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                     placeholder="10000"
                     data-testid="input-revenu-journalier"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] text-slate-400 mb-0.5">Revenu mensuel calculé *</label>
+                  <label className="block text-[10px] text-content-muted mb-0.5">Revenu mensuel calculé *</label>
                   <div className="relative">
                     <input
                       type="number"
                       readOnly
                       value={formData.revenu_mensuel_declare}
-                      className="w-full bg-slate-800 text-white px-3 py-2 rounded-lg border border-slate-700 text-sm font-semibold cursor-not-allowed"
+                      className="w-full bg-surface text-content-primary px-3 py-2 rounded-lg border border-edge text-sm font-semibold cursor-not-allowed"
                       placeholder="260000"
                       data-testid="input-revenu-mensuel"
                     />
-                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-cyan-400">Auto</span>
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-accent">Auto</span>
                   </div>
                 </div>
               </div>
             ) : (
               <div>
-                <label className="block text-[10px] text-slate-400 mb-0.5">Revenu mensuel fixe (FCFA) *</label>
+                <label className="block text-[10px] text-content-muted mb-0.5">Revenu mensuel fixe (FCFA) *</label>
                 <input
                   type="number"
                   min="0"
                   value={formData.revenu_mensuel_declare}
                   onChange={(e) => handleChange('revenu_mensuel_declare', e.target.value)}
-                  className={`w-full bg-slate-700 text-white px-3 py-2 rounded-lg border text-sm font-semibold ${
-                    errors.revenu_mensuel_declare ? 'border-cyan-500' : 'border-cyan-500/50'
-                  } focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                  className={`w-full bg-surface-elevated text-content-primary px-3 py-2 rounded-lg border text-sm font-semibold ${
+                    errors.revenu_mensuel_declare ? 'border-accent' : 'border-accent/50'
+                  } focus:outline-none focus:ring-2 focus:ring-accent`}
                   placeholder="260000"
                   data-testid="input-revenu-mensuel-fixe"
                 />
-                {errors.revenu_mensuel_declare && <p className="text-cyan-400 text-xs mt-0.5">{errors.revenu_mensuel_declare}</p>}
+                {errors.revenu_mensuel_declare && <p className="text-accent text-xs mt-0.5">{errors.revenu_mensuel_declare}</p>}
               </div>
             )}
 
             {formData.type_revenu === 'Journalier' && formData.revenu_journalier && (
-              <div className="mt-2 text-xs text-slate-400 bg-slate-700/30 px-2 py-1.5 rounded flex items-center gap-1.5">
-                <TrendingUp size={12} className="text-cyan-400" />
-                <span>{parseFloat(formData.revenu_journalier).toLocaleString()} × 26j = <span className="text-cyan-400 font-semibold">{(parseFloat(formData.revenu_journalier) * 26).toLocaleString()} FCFA/mois</span></span>
+              <div className="mt-2 text-xs text-content-muted bg-surface-elevated/30 px-2 py-1.5 rounded flex items-center gap-1.5">
+                <TrendingUp size={12} className="text-accent" />
+                <span>{parseFloat(formData.revenu_journalier).toLocaleString()} × 26j = <span className="text-accent font-semibold">{(parseFloat(formData.revenu_journalier) * 26).toLocaleString()} FCFA/mois</span></span>
               </div>
             )}
 
             {/* Live Scoring */}
             {formData.revenu_mensuel_declare && formData.montant_demande && (
-               <div className="mt-3 p-2 bg-slate-700/30 rounded-lg border border-slate-600">
+               <div className="mt-3 p-2 bg-surface-elevated/30 rounded-lg border border-edge-strong">
                   {(() => {
                       const rev = parseFloat(formData.revenu_mensuel_declare) || 0;
                       const charges = parseFloat(formData.charges_mensuelles) || 0;
@@ -942,14 +942,14 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
                       const revenuNet = rev - charges;
                       const echeance = montant / 6; // 6 mois estimation
                       const tauxEndettement = revenuNet > 0 ? (echeance / revenuNet) * 100 : 100;
-                      let scoreColor = 'text-red-400';
+                      let scoreColor = 'text-status-danger';
                       let scoreText = 'Risqué';
-                      if (tauxEndettement < 33) { scoreColor = 'text-green-400'; scoreText = 'Bon'; }
-                      else if (tauxEndettement < 45) { scoreColor = 'text-amber-400'; scoreText = 'Correct'; }
+                      if (tauxEndettement < 33) { scoreColor = 'text-status-success'; scoreText = 'Bon'; }
+                      else if (tauxEndettement < 45) { scoreColor = 'text-status-warning'; scoreText = 'Correct'; }
 
                       return (
                         <div className="flex justify-between items-center text-xs">
-                           <span className="text-slate-400">Capacité nette: <span className="text-white font-mono">{revenuNet.toLocaleString()}</span></span>
+                           <span className="text-content-muted">Capacité nette: <span className="text-content-primary font-mono">{revenuNet.toLocaleString()}</span></span>
                            <span className={`font-bold ${scoreColor}`}>Endettement: {tauxEndettement.toFixed(0)}% ({scoreText})</span>
                         </div>
                       );
@@ -961,14 +961,14 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="md:col-span-2">
               <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-semibold text-slate-300 flex items-center gap-1">
+                <label className="text-xs font-semibold text-content-secondary flex items-center gap-1">
                   <FileText size={14} />
                   Description de l'activité *
                 </label>
                 <span className={`text-[10px] ${
-                  formData.description_activite.length >= 10 ? 'text-green-400' :
-                  formData.description_activite.length >= 5 ? 'text-amber-400' :
-                  'text-slate-500'
+                  formData.description_activite.length >= 10 ? 'text-status-success' :
+                  formData.description_activite.length >= 5 ? 'text-status-warning' :
+                  'text-content-muted'
                 }`}>
                   {formData.description_activite.length}/10
                 </span>
@@ -977,23 +977,23 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
                 value={formData.description_activite}
                 onChange={(e) => handleChange('description_activite', e.target.value)}
                 rows={2}
-                className={`w-full bg-slate-800 text-white px-3 py-2 rounded-lg border text-sm ${
-                  errors.description_activite ? 'border-cyan-500' : 'border-slate-600'
-                } focus:outline-none focus:ring-2 focus:ring-cyan-500`}
+                className={`w-full bg-surface text-content-primary px-3 py-2 rounded-lg border text-sm ${
+                  errors.description_activite ? 'border-accent' : 'border-edge-strong'
+                } focus:outline-none focus:ring-2 focus:ring-accent`}
                 placeholder="Produits, emplacement, clientèle..."
                 data-testid="textarea-description"
               />
-              {errors.description_activite && <p className="text-cyan-400 text-xs mt-0.5">{errors.description_activite}</p>}
+              {errors.description_activite && <p className="text-accent text-xs mt-0.5">{errors.description_activite}</p>}
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-semibold text-slate-300 flex items-center gap-1">
+                <label className="text-xs font-semibold text-content-secondary flex items-center gap-1">
                   <DollarSign size={14} />
                   Charges mensuelles
                 </label>
                 {initialData?.charges_mensuelles && (
-                  <span className="text-[10px] text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded">Pré-rempli</span>
+                  <span className="text-[10px] text-accent bg-accent/10 px-1.5 py-0.5 rounded">Pré-rempli</span>
                 )}
               </div>
               <input
@@ -1001,8 +1001,8 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
                 min="0"
                 value={formData.charges_mensuelles}
                 onChange={(e) => handleChange('charges_mensuelles', e.target.value)}
-                className={`w-full bg-slate-800 text-white px-3 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 ${
-                  initialData?.charges_mensuelles ? 'border-cyan-500/50' : 'border-slate-600'
+                className={`w-full bg-surface text-content-primary px-3 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-accent ${
+                  initialData?.charges_mensuelles ? 'border-accent/50' : 'border-edge-strong'
                 }`}
                 placeholder="50000"
                 data-testid="input-charges"
@@ -1010,17 +1010,17 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
             </div>
           </div>
 
-          <div className="bg-slate-800 p-3 rounded-lg border border-slate-700">
-            <label className="block text-xs font-semibold text-slate-300 mb-2">
+          <div className="bg-surface p-3 rounded-lg border border-edge">
+            <label className="block text-xs font-semibold text-content-secondary mb-2">
               <Camera size={14} className="inline mr-1" />
               Photos de l'activité
               {!readOnly && (
-                <span className="ml-1.5 text-slate-500 font-normal">
+                <span className="ml-1.5 text-content-muted font-normal">
                   ({formData.photos_activite.length}/{MAX_PHOTOS})
                 </span>
               )}
               {readOnly && formData.photos_activite.length > 0 && (
-                <span className="ml-1.5 text-slate-500 font-normal">
+                <span className="ml-1.5 text-content-muted font-normal">
                   ({formData.photos_activite.length})
                 </span>
               )}
@@ -1029,9 +1029,9 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
             <div className="flex flex-wrap gap-2">
               {!readOnly && formData.photos_activite.length < MAX_PHOTOS && (
                 <>
-                  <label className="flex flex-col items-center justify-center w-20 h-20 bg-slate-700/50 border-2 border-dashed border-slate-600 rounded-lg cursor-pointer hover:border-cyan-500 transition">
-                    <Upload size={18} className="text-slate-400 mb-1" />
-                    <span className="text-[10px] text-slate-400">Upload</span>
+                  <label className="flex flex-col items-center justify-center w-20 h-20 bg-surface-elevated/50 border-2 border-dashed border-edge-strong rounded-lg cursor-pointer hover:border-accent transition">
+                    <Upload size={18} className="text-content-muted mb-1" />
+                    <span className="text-[10px] text-content-muted">Upload</span>
                     <input
                       type="file"
                       accept="image/*"
@@ -1044,17 +1044,17 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
                   <button
                     type="button"
                     onClick={() => setIsCameraOpen(true)}
-                    className="flex flex-col items-center justify-center w-20 h-20 bg-slate-700/50 border-2 border-dashed border-slate-600 rounded-lg cursor-pointer hover:border-cyan-500 transition"
+                    className="flex flex-col items-center justify-center w-20 h-20 bg-surface-elevated/50 border-2 border-dashed border-edge-strong rounded-lg cursor-pointer hover:border-accent transition"
                   >
-                    <Camera size={18} className="text-slate-400 mb-1" />
-                    <span className="text-[10px] text-slate-400">Camera</span>
+                    <Camera size={18} className="text-content-muted mb-1" />
+                    <span className="text-[10px] text-content-muted">Camera</span>
                   </button>
                 </>
               )}
 
               {!readOnly && formData.photos_activite.length >= MAX_PHOTOS && (
-                <div className="flex items-center justify-center w-20 h-20 bg-slate-700/30 border-2 border-dashed border-slate-700 rounded-lg">
-                  <span className="text-[10px] text-slate-500 text-center px-1">Max {MAX_PHOTOS} photos</span>
+                <div className="flex items-center justify-center w-20 h-20 bg-surface-elevated/30 border-2 border-dashed border-edge rounded-lg">
+                  <span className="text-[10px] text-content-muted text-center px-1">Max {MAX_PHOTOS} photos</span>
                 </div>
               )}
 
@@ -1073,22 +1073,22 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
                     <button
                       type="button"
                       onClick={() => removePhoto(index)}
-                      className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-[10px]"
+                      className="absolute -top-1 -right-1 w-5 h-5 bg-status-danger rounded-full flex items-center justify-center text-white text-[10px]"
                     >×</button>
                   )}
                 </div>
               ))}
 
               {readOnly && formData.photos_activite.length === 0 && (
-                <p className="text-xs text-slate-500 italic">Aucune photo d'activité</p>
+                <p className="text-xs text-content-muted italic">Aucune photo d'activité</p>
               )}
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {/* Autres crédits */}
-            <div className="bg-slate-800 p-3 rounded-lg border border-slate-700">
-              <label className="block text-xs font-semibold text-slate-300 mb-2">Autres crédits en cours</label>
+            <div className="bg-surface p-3 rounded-lg border border-edge">
+              <label className="block text-xs font-semibold text-content-secondary mb-2">Autres crédits en cours</label>
 
               <div className="space-y-2 mb-2">
                 <input
@@ -1096,7 +1096,7 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
                   value={autreCredit.organisme}
                   onChange={(e) => setAutreCredit({ ...autreCredit, organisme: e.target.value })}
                   placeholder="Nom de l'organisme"
-                  className="w-full bg-slate-700 text-white px-2 py-1.5 rounded text-xs border border-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                  className="w-full bg-surface-elevated text-content-primary px-2 py-1.5 rounded text-xs border border-edge-strong focus:outline-none focus:ring-1 focus:ring-accent"
                 />
                 <div className="flex gap-1.5">
                   <input
@@ -1104,13 +1104,13 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
                     value={autreCredit.montant}
                     onChange={(e) => setAutreCredit({ ...autreCredit, montant: e.target.value })}
                     placeholder="Montant FCFA"
-                    className="flex-1 min-w-0 bg-slate-700 text-white px-2 py-1.5 rounded text-xs border border-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                    className="flex-1 min-w-0 bg-surface-elevated text-content-primary px-2 py-1.5 rounded text-xs border border-edge-strong focus:outline-none focus:ring-1 focus:ring-accent"
                   />
                   <button
                     type="button"
                     onClick={ajouterAutreCredit}
                     disabled={!autreCredit.organisme || !autreCredit.montant}
-                    className="bg-cyan-600 hover:bg-cyan-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white w-8 h-8 rounded text-sm font-bold flex items-center justify-center shrink-0 transition"
+                    className="bg-accent-secondary hover:bg-accent-secondary-hover disabled:bg-surface-subtle disabled:cursor-not-allowed text-content-primary w-8 h-8 rounded text-sm font-bold flex items-center justify-center shrink-0 transition"
                   >+</button>
                 </div>
               </div>
@@ -1118,9 +1118,9 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
               {formData.autres_credits.length > 0 && (
                 <div className="space-y-1">
                   {formData.autres_credits.map((credit, index) => (
-                    <div key={index} className="flex items-center justify-between bg-slate-700/50 px-2 py-1.5 rounded text-xs gap-2">
-                      <span className="text-white truncate flex-1"><span className="text-amber-400 font-medium">{credit.organisme}</span> - {parseInt(credit.montant).toLocaleString()} FCFA</span>
-                      <button type="button" onClick={() => retirerAutreCredit(index)} className="text-red-400 hover:text-red-300 shrink-0 w-5 h-5 flex items-center justify-center">×</button>
+                    <div key={index} className="flex items-center justify-between bg-surface-elevated/50 px-2 py-1.5 rounded text-xs gap-2">
+                      <span className="text-content-primary truncate flex-1"><span className="text-status-warning font-medium">{credit.organisme}</span> - {parseInt(credit.montant).toLocaleString()} FCFA</span>
+                      <button type="button" onClick={() => retirerAutreCredit(index)} className="text-status-danger hover:text-status-danger shrink-0 w-5 h-5 flex items-center justify-center">×</button>
                     </div>
                   ))}
                 </div>
@@ -1128,14 +1128,14 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
             </div>
 
             {/* Garanties */}
-            <div className="bg-slate-800 p-3 rounded-lg border border-slate-700">
-              <label className="block text-xs font-semibold text-slate-300 mb-2">Garanties proposées</label>
+            <div className="bg-surface p-3 rounded-lg border border-edge">
+              <label className="block text-xs font-semibold text-content-secondary mb-2">Garanties proposées</label>
 
               <div className="space-y-2 mb-2">
                 <select
                   value={garantie.type}
                   onChange={(e) => setGarantie({ ...garantie, type: e.target.value })}
-                  className="w-full bg-slate-700 text-white px-2 py-1.5 rounded text-xs border border-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                  className="w-full bg-surface-elevated text-content-primary px-2 py-1.5 rounded text-xs border border-edge-strong focus:outline-none focus:ring-1 focus:ring-accent"
                 >
                   <option value="">-- Type de garantie --</option>
                   {typesGaranties.map(type => (
@@ -1148,13 +1148,13 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
                     value={garantie.description}
                     onChange={(e) => setGarantie({ ...garantie, description: e.target.value })}
                     placeholder="Description de la garantie"
-                    className="flex-1 min-w-0 bg-slate-700 text-white px-2 py-1.5 rounded text-xs border border-slate-600 focus:outline-none focus:ring-1 focus:ring-cyan-500"
+                    className="flex-1 min-w-0 bg-surface-elevated text-content-primary px-2 py-1.5 rounded text-xs border border-edge-strong focus:outline-none focus:ring-1 focus:ring-accent"
                   />
                   <button
                     type="button"
                     onClick={ajouterGarantie}
                     disabled={!garantie.type || !garantie.description}
-                    className="bg-cyan-600 hover:bg-cyan-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white w-8 h-8 rounded text-sm font-bold flex items-center justify-center shrink-0 transition"
+                    className="bg-accent-secondary hover:bg-accent-secondary-hover disabled:bg-surface-subtle disabled:cursor-not-allowed text-content-primary w-8 h-8 rounded text-sm font-bold flex items-center justify-center shrink-0 transition"
                   >+</button>
                 </div>
               </div>
@@ -1162,9 +1162,9 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
               {formData.garanties_proposees.length > 0 && (
                 <div className="space-y-1">
                   {formData.garanties_proposees.map((g, index) => (
-                    <div key={index} className="flex items-center justify-between bg-slate-700/50 px-2 py-1.5 rounded text-xs gap-2">
-                      <span className="text-white truncate flex-1"><span className="text-cyan-400 font-medium">{g.type}</span> - {g.description}</span>
-                      <button type="button" onClick={() => retirerGarantie(index)} className="text-red-400 hover:text-red-300 shrink-0 w-5 h-5 flex items-center justify-center">×</button>
+                    <div key={index} className="flex items-center justify-between bg-surface-elevated/50 px-2 py-1.5 rounded text-xs gap-2">
+                      <span className="text-content-primary truncate flex-1"><span className="text-accent font-medium">{g.type}</span> - {g.description}</span>
+                      <button type="button" onClick={() => retirerGarantie(index)} className="text-status-danger hover:text-status-danger shrink-0 w-5 h-5 flex items-center justify-center">×</button>
                     </div>
                   ))}
                 </div>
@@ -1176,12 +1176,12 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
 
           {/* Missing fields indicator - only show in edit mode */}
           {!readOnly && !isFormValid() && getMissingFields().length > 0 && (
-            <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2">
-              <p className="text-amber-400 text-xs font-medium flex items-center gap-1.5">
+            <div className="bg-status-warning-bg border border-status-warning/30 rounded-lg px-3 py-2">
+              <p className="text-status-warning text-xs font-medium flex items-center gap-1.5">
                 <AlertCircle size={14} />
                 Champs obligatoires manquants :
               </p>
-              <p className="text-amber-300/80 text-xs mt-1">
+              <p className="text-status-warning/80 text-xs mt-1">
                 {getMissingFields().join(' • ')}
               </p>
             </div>
@@ -1193,7 +1193,7 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
               <button
                 type="button"
                 onClick={onClose}
-                className="w-full px-4 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg font-medium text-sm transition"
+                className="w-full px-4 py-2.5 bg-accent-secondary hover:bg-accent-secondary-hover text-content-primary rounded-lg font-medium text-sm transition"
               >
                 Fermer
               </button>
@@ -1203,7 +1203,7 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
                 <button
                   type="button"
                   onClick={onClose}
-                  className="flex-1 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium text-sm transition"
+                  className="flex-1 px-4 py-2.5 bg-surface-elevated hover:bg-surface-subtle text-content-primary rounded-lg font-medium text-sm transition"
                 >
                   Annuler
                 </button>
@@ -1212,8 +1212,8 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
                   disabled={!isFormValid() || isSaving}
                   className={`flex-1 px-4 py-2.5 rounded-lg font-medium text-sm transition flex items-center justify-center gap-1.5 ${
                     isFormValid() && !isSaving
-                      ? 'bg-cyan-600 hover:bg-cyan-700 text-white cursor-pointer'
-                      : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                      ? 'bg-accent-secondary hover:bg-accent-secondary-hover text-content-primary cursor-pointer'
+                      : 'bg-surface-elevated text-content-muted cursor-not-allowed'
                   }`}
                   data-testid="button-submit-enquete"
                 >

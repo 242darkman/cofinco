@@ -140,9 +140,9 @@ export default function FormationsManager({
   };
 
   const getScoreColor = (score: number) => {
-    if (score >= 80) return 'text-emerald-400';
-    if (score >= 50) return 'text-amber-400';
-    return 'text-rose-400';
+    if (score >= 80) return 'text-status-success';
+    if (score >= 50) return 'text-status-warning';
+    return 'text-status-danger';
   };
 
   // Pagination
@@ -214,12 +214,12 @@ export default function FormationsManager({
       primary: true,
       format: (val: string, item: Formation) => (
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-blue-500/10 rounded-lg">
-            <GraduationCap size={18} className="text-blue-400" />
+          <div className="p-2 bg-status-info-bg rounded-lg">
+            <GraduationCap size={18} className="text-status-info" />
           </div>
           <div className="min-w-0">
-            <div className="font-semibold text-white text-sm truncate">{val}</div>
-            <div className="text-[10px] text-slate-400">Formateur: {item.formateur}</div>
+            <div className="font-semibold text-content-primary text-sm truncate">{val}</div>
+            <div className="text-[10px] text-content-muted">Formateur: {item.formateur}</div>
           </div>
         </div>
       )
@@ -229,8 +229,8 @@ export default function FormationsManager({
       key: 'dateDebut',
       hideOnMobile: true,
       format: (val: string, item: Formation) => (
-        <div className="flex items-center gap-1 text-xs text-slate-300">
-          <Calendar size={12} className="text-slate-500" />
+        <div className="flex items-center gap-1 text-xs text-content-secondary">
+          <Calendar size={12} className="text-content-muted" />
           <span>{val} - {item.duree}</span>
         </div>
       )
@@ -240,10 +240,10 @@ export default function FormationsManager({
       key: 'participants',
       format: (val: number, item: Formation) => (
         <div className="flex items-center gap-1 text-xs">
-          <UsersIcon size={12} className="text-purple-400" />
-          <span className="font-semibold text-purple-300">{val || 0}</span>
+          <UsersIcon size={12} className="text-status-info" />
+          <span className="font-semibold text-status-info">{val || 0}</span>
           {item.capaciteMax && (
-            <span className="text-slate-500">/ {item.capaciteMax}</span>
+            <span className="text-content-muted">/ {item.capaciteMax}</span>
           )}
         </div>
       )
@@ -261,8 +261,8 @@ export default function FormationsManager({
     <div className="flex flex-col h-full space-y-2">
       {/* Compact Header Toolbar */}
       <div className="shrink-0 flex justify-between items-center p-1">
-        <h3 className="text-sm font-bold text-white flex items-center gap-2">
-           <GraduationCap size={16} className="text-blue-400" />
+        <h3 className="text-sm font-bold text-content-primary flex items-center gap-2">
+           <GraduationCap size={16} className="text-status-info" />
            Formations
         </h3>
         {canCreateFormations && (
@@ -274,7 +274,7 @@ export default function FormationsManager({
       </div>
 
       {/* Main Content - Flex Grow */}
-      <div className="flex-1 min-h-0 bg-slate-900 border border-slate-800 rounded-lg flex flex-col">
+      <div className="flex-1 min-h-0 bg-surface-base border border-edge rounded-lg flex flex-col">
         <div className="flex-1 overflow-hidden">
           <ResponsiveTable
             data={paginatedFormations}
@@ -290,7 +290,7 @@ export default function FormationsManager({
             }}
             density="compact"
             className="border-0 rounded-none h-full"
-            headerClassName="bg-slate-900 sticky top-0"
+            headerClassName="bg-surface-base sticky top-0"
           />
         </div>
       </div>
@@ -343,22 +343,22 @@ export default function FormationsManager({
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-white mb-2">
+            <label className="block text-sm font-semibold text-content-primary mb-2">
               Participants ({selectedParticipants.length} sélectionnés)
             </label>
-            <div className="max-h-48 overflow-y-auto bg-slate-700 rounded-lg p-3 space-y-2">
+            <div className="max-h-48 overflow-y-auto bg-surface-elevated rounded-lg p-3 space-y-2">
               {employes.map((emp) => (
                 <label
                   key={emp.id}
-                  className="flex items-center gap-3 p-2 hover:bg-slate-600 rounded cursor-pointer"
+                  className="flex items-center gap-3 p-2 hover:bg-surface-subtle rounded cursor-pointer"
                 >
                   <input
                     type="checkbox"
                     checked={selectedParticipants.includes(emp.id)}
                     onChange={() => onToggleParticipant(emp.id)}
-                    className="w-4 h-4 rounded border-slate-500 text-blue-600 focus:ring-blue-500"
+                    className="w-4 h-4 rounded border-edge-strong text-status-info focus:ring-status-info"
                   />
-                  <span className="text-sm text-white">
+                  <span className="text-sm text-content-primary">
                     {emp.nom} {emp.prenom} - {emp.poste}
                   </span>
                 </label>
@@ -366,7 +366,7 @@ export default function FormationsManager({
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
+          <div className="flex justify-end gap-3 pt-4 border-t border-edge">
             <Button
               type="button"
               variant="secondary"
@@ -388,33 +388,33 @@ export default function FormationsManager({
           onClick={closeDetailModal}
         >
           <div 
-            className="bg-slate-900 rounded-t-2xl sm:rounded-xl border-t sm:border border-slate-700 w-full sm:max-w-2xl max-h-[90vh] sm:max-h-[80vh] overflow-hidden flex flex-col"
+            className="bg-surface-base rounded-t-2xl sm:rounded-xl border-t sm:border border-edge w-full sm:max-w-2xl max-h-[90vh] sm:max-h-[80vh] overflow-hidden flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header - Mobile optimized with drag indicator */}
-            <div className="flex flex-col border-b border-slate-700">
+            <div className="flex flex-col border-b border-edge">
               {/* Mobile drag indicator */}
               <div className="flex justify-center pt-2 sm:hidden">
-                <div className="w-10 h-1 bg-slate-600 rounded-full"></div>
+                <div className="w-10 h-1 bg-surface-subtle rounded-full"></div>
               </div>
               
               <div className="p-4 flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <div className="p-2.5 sm:p-3 bg-blue-500/20 rounded-xl flex-shrink-0">
-                    <GraduationCap size={24} className="text-blue-400" />
+                  <div className="p-2.5 sm:p-3 bg-status-info-bg rounded-xl flex-shrink-0">
+                    <GraduationCap size={24} className="text-status-info" />
                   </div>
                   <div className="min-w-0">
-                    <h3 className="text-base sm:text-lg font-bold text-white truncate">
+                    <h3 className="text-base sm:text-lg font-bold text-content-primary truncate">
                       {selectedFormation.titre}
                     </h3>
-                    <p className="text-xs sm:text-sm text-slate-400">
+                    <p className="text-xs sm:text-sm text-content-muted">
                       Formateur: {selectedFormation.formateur}
                     </p>
                   </div>
                 </div>
                 <button 
                   onClick={closeDetailModal}
-                  className="p-2 hover:bg-slate-800 rounded-lg transition text-slate-400 hover:text-white flex-shrink-0"
+                  className="p-2 hover:bg-surface rounded-lg transition text-content-muted hover:text-content-primary flex-shrink-0"
                   aria-label="Fermer"
                 >
                   <X size={20} />
@@ -426,79 +426,79 @@ export default function FormationsManager({
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {/* Info cards - Mobile: stack, Desktop: grid */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-                <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-                  <Calendar size={16} className="mx-auto text-cyan-400 mb-1" />
-                  <p className="text-[10px] sm:text-xs text-slate-400">Date</p>
-                  <p className="text-xs sm:text-sm font-semibold text-white">{selectedFormation.dateDebut}</p>
+                <div className="bg-surface/50 rounded-lg p-3 text-center">
+                  <Calendar size={16} className="mx-auto text-accent mb-1" />
+                  <p className="text-[10px] sm:text-xs text-content-muted">Date</p>
+                  <p className="text-xs sm:text-sm font-semibold text-content-primary">{selectedFormation.dateDebut}</p>
                 </div>
-                <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-                  <Clock size={16} className="mx-auto text-emerald-400 mb-1" />
-                  <p className="text-[10px] sm:text-xs text-slate-400">Durée</p>
-                  <p className="text-xs sm:text-sm font-semibold text-white">{selectedFormation.duree}</p>
+                <div className="bg-surface/50 rounded-lg p-3 text-center">
+                  <Clock size={16} className="mx-auto text-status-success mb-1" />
+                  <p className="text-[10px] sm:text-xs text-content-muted">Durée</p>
+                  <p className="text-xs sm:text-sm font-semibold text-content-primary">{selectedFormation.duree}</p>
                 </div>
-                <div className="bg-slate-800/50 rounded-lg p-3 text-center">
-                  <UsersIcon size={16} className="mx-auto text-purple-400 mb-1" />
-                  <p className="text-[10px] sm:text-xs text-slate-400">Participants</p>
-                  <p className="text-xs sm:text-sm font-semibold text-white">
+                <div className="bg-surface/50 rounded-lg p-3 text-center">
+                  <UsersIcon size={16} className="mx-auto text-status-info mb-1" />
+                  <p className="text-[10px] sm:text-xs text-content-muted">Participants</p>
+                  <p className="text-xs sm:text-sm font-semibold text-content-primary">
                     {selectedFormation.participants || 0}
-                    {selectedFormation.capaciteMax && <span className="text-slate-500">/{selectedFormation.capaciteMax}</span>}
+                    {selectedFormation.capaciteMax && <span className="text-content-muted">/{selectedFormation.capaciteMax}</span>}
                   </p>
                 </div>
-                <div className="bg-slate-800/50 rounded-lg p-3 text-center">
+                <div className="bg-surface/50 rounded-lg p-3 text-center">
                   <Badge variant={getStatutColor(selectedFormation.statut)} value={selectedFormation.statut} size="sm" />
                 </div>
               </div>
 
               {/* Lieu si disponible */}
               {selectedFormation.lieu && (
-                <div className="flex items-center gap-2 text-sm text-slate-300 bg-slate-800/30 rounded-lg p-3">
-                  <MapPin size={16} className="text-rose-400 flex-shrink-0" />
+                <div className="flex items-center gap-2 text-sm text-content-secondary bg-surface/30 rounded-lg p-3">
+                  <MapPin size={16} className="text-status-danger flex-shrink-0" />
                   <span>{selectedFormation.lieu}</span>
                 </div>
               )}
 
               {/* Description si disponible */}
               {selectedFormation.description && (
-                <div className="bg-slate-800/30 rounded-lg p-3">
-                  <div className="flex items-center gap-2 text-sm text-slate-400 mb-2">
+                <div className="bg-surface/30 rounded-lg p-3">
+                  <div className="flex items-center gap-2 text-sm text-content-muted mb-2">
                     <FileText size={14} />
                     <span>Description</span>
                   </div>
-                  <p className="text-sm text-slate-300">{selectedFormation.description}</p>
+                  <p className="text-sm text-content-secondary">{selectedFormation.description}</p>
                 </div>
               )}
 
               {/* Liste des participants */}
-              <div className="bg-slate-800/30 rounded-lg p-3">
+              <div className="bg-surface/30 rounded-lg p-3">
                 <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2 text-sm text-slate-400">
+                  <div className="flex items-center gap-2 text-sm text-content-muted">
                     <UsersIcon size={14} />
                     <span>Participants inscrits</span>
                   </div>
-                  <span className="text-xs text-purple-400 font-bold">
+                  <span className="text-xs text-status-info font-bold">
                     {participants.length} inscrit(s)
                   </span>
                 </div>
 
                 {loadingParticipants ? (
                   <div className="flex items-center justify-center py-6">
-                    <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                    <div className="w-6 h-6 border-2 border-status-info border-t-transparent rounded-full animate-spin"></div>
                   </div>
                 ) : participants.length > 0 ? (
                   <div className="space-y-2 max-h-72 overflow-y-auto">
                     {participants.map((participant) => (
                       <div
                         key={participant.employeId}
-                        className="bg-slate-800/50 rounded-lg overflow-hidden"
+                        className="bg-surface/50 rounded-lg overflow-hidden"
                       >
                         <div className="flex items-center gap-3 p-2">
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-status-info to-pink-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                             {participant.employeNom?.split(' ').map(n => n[0]).join('').slice(0, 2) || <User size={14} />}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <p className="text-sm text-white truncate">{participant.employeNom}</p>
+                            <p className="text-sm text-content-primary truncate">{participant.employeNom}</p>
                             {participant.dateInscription && (
-                              <p className="text-[10px] text-slate-500">
+                              <p className="text-[10px] text-content-muted">
                                 Inscrit le {new Date(participant.dateInscription).toLocaleDateString('fr-FR')}
                               </p>
                             )}
@@ -530,7 +530,7 @@ export default function FormationsManager({
                                       setEvalForm({ scoreEvaluation: 70, recommandation: 'SATISFAISANT', competencesAcquises: '', evaluation: '' });
                                     }
                                   }}
-                                  className="flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 rounded-md transition"
+                                  className="flex items-center gap-1 px-2 py-1 text-[10px] font-semibold text-status-warning bg-status-warning-bg hover:bg-status-warning-bg rounded-md transition"
                                 >
                                   <Star size={10} />
                                   Evaluer
@@ -551,7 +551,7 @@ export default function FormationsManager({
                                 return participant.competencesAcquises.split(',');
                               }
                             })().map((c: string, i: number) => (
-                              <span key={i} className="px-1.5 py-0.5 bg-blue-500/10 text-blue-300 text-[9px] rounded-full">
+                              <span key={i} className="px-1.5 py-0.5 bg-status-info-bg text-status-info text-[9px] rounded-full">
                                 {c.trim()}
                               </span>
                             ))}
@@ -560,15 +560,15 @@ export default function FormationsManager({
 
                         {/* Inline evaluation form */}
                         {evaluatingParticipant === participant.employeId && selectedFormation && (
-                          <div className="border-t border-slate-700/50 p-3 space-y-3 bg-slate-800/30">
-                            <div className="flex items-center gap-2 text-xs text-amber-400 font-semibold">
+                          <div className="border-t border-edge-subtle p-3 space-y-3 bg-surface/30">
+                            <div className="flex items-center gap-2 text-xs text-status-warning font-semibold">
                               <Award size={12} />
                               Evaluation de {participant.employeNom}
                             </div>
 
                             {/* Score slider */}
                             <div>
-                              <label className="text-[10px] text-slate-400 block mb-1">
+                              <label className="text-[10px] text-content-muted block mb-1">
                                 Score: <span className={`font-bold ${getScoreColor(evalForm.scoreEvaluation)}`}>{evalForm.scoreEvaluation}/100</span>
                               </label>
                               <input
@@ -577,9 +577,9 @@ export default function FormationsManager({
                                 max="100"
                                 value={evalForm.scoreEvaluation}
                                 onChange={(e) => setEvalForm(f => ({ ...f, scoreEvaluation: parseInt(e.target.value) }))}
-                                className="w-full h-1.5 bg-slate-700 rounded-full appearance-none cursor-pointer accent-amber-500"
+                                className="w-full h-1.5 bg-surface-elevated rounded-full appearance-none cursor-pointer accent-amber-500"
                               />
-                              <div className="flex justify-between text-[9px] text-slate-600 mt-0.5">
+                              <div className="flex justify-between text-[9px] text-content-muted mt-0.5">
                                 <span>0</span>
                                 <span>50</span>
                                 <span>100</span>
@@ -588,11 +588,11 @@ export default function FormationsManager({
 
                             {/* Recommandation dropdown */}
                             <div>
-                              <label className="text-[10px] text-slate-400 block mb-1">Recommandation</label>
+                              <label className="text-[10px] text-content-muted block mb-1">Recommandation</label>
                               <select
                                 value={evalForm.recommandation}
                                 onChange={(e) => setEvalForm(f => ({ ...f, recommandation: e.target.value }))}
-                                className="w-full bg-slate-700 border border-slate-600 text-white text-xs rounded-lg px-2 py-1.5 focus:ring-1 focus:ring-amber-500 focus:border-amber-500"
+                                className="w-full bg-surface-elevated border border-edge-strong text-content-primary text-xs rounded-lg px-2 py-1.5 focus:ring-1 focus:ring-status-warning focus:border-status-warning"
                               >
                                 <option value="EXCELLENT">Excellent</option>
                                 <option value="SATISFAISANT">Satisfaisant</option>
@@ -603,24 +603,24 @@ export default function FormationsManager({
 
                             {/* Competences */}
                             <div>
-                              <label className="text-[10px] text-slate-400 block mb-1">Compétences acquises (séparées par virgule)</label>
+                              <label className="text-[10px] text-content-muted block mb-1">Compétences acquises (séparées par virgule)</label>
                               <input
                                 type="text"
                                 value={evalForm.competencesAcquises}
                                 onChange={(e) => setEvalForm(f => ({ ...f, competencesAcquises: e.target.value }))}
                                 placeholder="Ex: Excel avancé, Gestion projet, ..."
-                                className="w-full bg-slate-700 border border-slate-600 text-white text-xs rounded-lg px-2 py-1.5 placeholder-slate-500 focus:ring-1 focus:ring-amber-500"
+                                className="w-full bg-surface-elevated border border-edge-strong text-content-primary text-xs rounded-lg px-2 py-1.5 placeholder-content-muted focus:ring-1 focus:ring-status-warning"
                               />
                             </div>
 
                             {/* Commentaire */}
                             <div>
-                              <label className="text-[10px] text-slate-400 block mb-1">Commentaire (optionnel)</label>
+                              <label className="text-[10px] text-content-muted block mb-1">Commentaire (optionnel)</label>
                               <textarea
                                 value={evalForm.evaluation}
                                 onChange={(e) => setEvalForm(f => ({ ...f, evaluation: e.target.value }))}
                                 rows={2}
-                                className="w-full bg-slate-700 border border-slate-600 text-white text-xs rounded-lg px-2 py-1.5 placeholder-slate-500 focus:ring-1 focus:ring-amber-500 resize-none"
+                                className="w-full bg-surface-elevated border border-edge-strong text-content-primary text-xs rounded-lg px-2 py-1.5 placeholder-content-muted focus:ring-1 focus:ring-status-warning resize-none"
                                 placeholder="Observations sur le participant..."
                               />
                             </div>
@@ -630,7 +630,7 @@ export default function FormationsManager({
                               <button
                                 type="button"
                                 onClick={() => setEvaluatingParticipant(null)}
-                                className="px-3 py-1 text-xs text-slate-400 hover:text-white transition"
+                                className="px-3 py-1 text-xs text-content-muted hover:text-content-primary transition"
                               >
                                 Annuler
                               </button>
@@ -638,7 +638,7 @@ export default function FormationsManager({
                                 type="button"
                                 disabled={submittingEval}
                                 onClick={() => handleEvaluateSubmit(selectedFormation.id, participant.employeId)}
-                                className="px-3 py-1 text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-black rounded-lg transition disabled:opacity-50"
+                                className="px-3 py-1 text-xs font-semibold bg-status-warning hover:bg-status-warning text-black rounded-lg transition disabled:opacity-50"
                               >
                                 {submittingEval ? 'Enregistrement...' : 'Enregistrer'}
                               </button>
@@ -649,7 +649,7 @@ export default function FormationsManager({
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-6 text-slate-500 text-sm">
+                  <div className="text-center py-6 text-content-muted text-sm">
                     Aucun participant inscrit
                   </div>
                 )}
@@ -671,15 +671,15 @@ export default function FormationsManager({
             </div>
 
             {/* Footer - Edit/Delete actions */}
-            <div className="p-4 border-t border-slate-700 bg-slate-900 flex justify-between items-center gap-2">
+            <div className="p-4 border-t border-edge bg-surface-base flex justify-between items-center gap-2">
               <div className="flex gap-2">
                 {canCreateFormations && onUpdate && selectedFormation.statut !== 'CANCELLED' && (
-                  <Button variant="ghost" size="sm" icon={Pencil} onClick={() => handleEdit(selectedFormation)} className="text-blue-400 hover:bg-blue-500/10">
+                  <Button variant="ghost" size="sm" icon={Pencil} onClick={() => handleEdit(selectedFormation)} className="text-status-info hover:bg-status-info-bg">
                     Modifier
                   </Button>
                 )}
                 {canCreateFormations && onDelete && (
-                  <Button variant="ghost" size="sm" icon={Trash2} onClick={() => { setConfirmDelete(selectedFormation); setSelectedFormation(null); }} className="text-red-400 hover:bg-red-500/10">
+                  <Button variant="ghost" size="sm" icon={Trash2} onClick={() => { setConfirmDelete(selectedFormation); setSelectedFormation(null); }} className="text-status-danger hover:bg-status-danger-bg">
                     Supprimer
                   </Button>
                 )}
@@ -703,7 +703,7 @@ export default function FormationsManager({
           </div>
           <FormField label="Lieu" name="lieu" type="text" value={editData.lieu} onChange={(e) => setEditData({ ...editData, lieu: e.target.value })} />
           <FormField label="Description" name="description" type="textarea" value={editData.description} onChange={(e) => setEditData({ ...editData, description: e.target.value })} />
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
+          <div className="flex justify-end gap-3 pt-4 border-t border-edge">
             <Button type="button" variant="secondary" onClick={() => setEditingFormation(null)}>Annuler</Button>
             <Button type="submit" variant="primary">Enregistrer</Button>
           </div>
@@ -713,14 +713,14 @@ export default function FormationsManager({
       {/* Confirmation Suppression */}
       {confirmDelete && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setConfirmDelete(null)}>
-          <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
-            <div className="p-4 border-b border-slate-800">
-              <h3 className="text-sm font-bold text-red-400">Supprimer la formation</h3>
+          <div className="bg-surface-base border border-edge rounded-xl shadow-2xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-edge">
+              <h3 className="text-sm font-bold text-status-danger">Supprimer la formation</h3>
             </div>
-            <div className="p-4 text-sm text-slate-300">
-              Voulez-vous vraiment supprimer la formation <span className="font-bold text-white">"{confirmDelete.titre}"</span> ?
+            <div className="p-4 text-sm text-content-secondary">
+              Voulez-vous vraiment supprimer la formation <span className="font-bold text-content-primary">"{confirmDelete.titre}"</span> ?
             </div>
-            <div className="p-4 border-t border-slate-800 flex justify-end gap-2">
+            <div className="p-4 border-t border-edge flex justify-end gap-2">
               <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(null)}>Annuler</Button>
               <Button variant="danger" size="sm" onClick={handleDelete}>Supprimer</Button>
             </div>

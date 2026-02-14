@@ -163,7 +163,7 @@ export default function AdminCurrencySettings() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" />
       </div>
     );
   }
@@ -172,12 +172,12 @@ export default function AdminCurrencySettings() {
     <div className="space-y-6 max-w-2xl">
       {/* En-tete */}
       <div className="flex items-start gap-3">
-        <div className="p-2 bg-indigo-500/10 rounded-lg">
-          <Coins size={24} className="text-indigo-400" />
+        <div className="p-2 bg-accent/10 rounded-lg">
+          <Coins size={24} className="text-accent" />
         </div>
         <div>
-          <h2 className="text-lg font-semibold text-gray-100">Devise de l'application</h2>
-          <p className="text-sm text-gray-400 mt-1">
+          <h2 className="text-lg font-semibold text-content-primary">Devise de l'application</h2>
+          <p className="text-sm text-content-muted mt-1">
             Configure la devise utilisee pour tous les montants affiches, les rapports,
             les PDFs et les notifications. Le changement s'applique immediatement a tous les utilisateurs connectes.
           </p>
@@ -185,19 +185,19 @@ export default function AdminCurrencySettings() {
       </div>
 
       {/* Devise actuelle */}
-      <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
-        <div className="flex items-center gap-2 text-sm text-gray-400 mb-2">
+      <div className="bg-surface/50 border border-edge rounded-lg p-4">
+        <div className="flex items-center gap-2 text-sm text-content-muted mb-2">
           <Globe size={14} />
           Devise active
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-2xl font-bold text-white">
+          <span className="text-2xl font-bold text-content-primary">
             {activeCurrency?.symbol}
           </span>
-          <span className="px-2 py-0.5 bg-indigo-500/20 text-indigo-300 text-xs rounded-full font-mono">
+          <span className="px-2 py-0.5 bg-accent/10 text-accent text-xs rounded-full font-mono">
             {activeCurrency?.code}
           </span>
-          <span className="text-sm text-gray-400">
+          <span className="text-sm text-content-muted">
             &middot; {activeCurrency?.decimals === 0 ? 'Pas de decimales' : `${activeCurrency?.decimals} decimales`}
             &middot; Locale: {activeCurrency?.locale}
           </span>
@@ -207,13 +207,13 @@ export default function AdminCurrencySettings() {
       {/* Selection + actions */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <label className="block text-sm font-medium text-gray-300">
+          <label className="block text-sm font-medium text-content-secondary">
             Changer la devise
           </label>
           <button
             type="button"
             onClick={openCreate}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-300 bg-indigo-500/10 border border-indigo-500/30 rounded-lg hover:bg-indigo-500/20 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-accent bg-accent/10 border border-accent/30 rounded-lg hover:bg-accent/10 transition-colors"
           >
             <Plus size={14} />
             Ajouter
@@ -229,13 +229,13 @@ export default function AdminCurrencySettings() {
               className={`
                 group relative flex flex-col items-start p-3 rounded-lg border transition-all text-left
                 ${selectedCode === preset.code
-                  ? 'border-indigo-500 bg-indigo-500/10 ring-1 ring-indigo-500/50'
-                  : 'border-gray-700 bg-gray-800/50 hover:border-gray-600'
+                  ? 'border-accent bg-accent/10 ring-1 ring-accent/50'
+                  : 'border-edge bg-surface/50 hover:border-edge-strong'
                 }
               `}
             >
               {selectedCode === preset.code && (
-                <Check size={14} className="absolute top-2 right-2 text-indigo-400" />
+                <Check size={14} className="absolute top-2 right-2 text-accent" />
               )}
 
               {/* Edit/Delete icons — top right, visible on hover */}
@@ -243,7 +243,7 @@ export default function AdminCurrencySettings() {
                 <span
                   role="button"
                   onClick={(e) => { e.stopPropagation(); openEdit(preset); }}
-                  className="p-1 rounded hover:bg-gray-600/50 text-gray-400 hover:text-gray-200"
+                  className="p-1 rounded hover:bg-surface-elevated/50 text-content-muted hover:text-content-secondary"
                 >
                   <Pencil size={12} />
                 </span>
@@ -251,19 +251,19 @@ export default function AdminCurrencySettings() {
                   <span
                     role="button"
                     onClick={(e) => { e.stopPropagation(); handleDelete(preset); }}
-                    className="p-1 rounded hover:bg-red-500/20 text-gray-400 hover:text-red-400"
+                    className="p-1 rounded hover:bg-status-danger-bg text-content-muted hover:text-status-danger"
                   >
                     {deletingId === preset.id
-                      ? <div className="animate-spin rounded-full h-3 w-3 border-b border-red-400" />
+                      ? <div className="animate-spin rounded-full h-3 w-3 border-b border-status-danger" />
                       : <Trash2 size={12} />
                     }
                   </span>
                 )}
               </div>
 
-              <span className="text-lg font-bold text-white">{preset.symbol}</span>
-              <span className="text-xs font-mono text-gray-400 mt-0.5">{preset.code}</span>
-              <span className="text-xs text-gray-500 mt-1">
+              <span className="text-lg font-bold text-content-primary">{preset.symbol}</span>
+              <span className="text-xs font-mono text-content-muted mt-0.5">{preset.code}</span>
+              <span className="text-xs text-content-muted mt-1">
                 {preset.decimals === 0 ? 'Entier' : `${preset.decimals} dec.`}
                 {' '}&middot;{' '}
                 {preset.symbolPosition === 'after' ? 'Apres' : 'Avant'}
@@ -275,19 +275,19 @@ export default function AdminCurrencySettings() {
 
       {/* Formulaire ajout/edition */}
       {showForm && (
-        <div className="bg-gray-800/80 border border-gray-600 rounded-lg p-4 space-y-4">
+        <div className="bg-surface/80 border border-edge-strong rounded-lg p-4 space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-gray-200">
+            <h3 className="text-sm font-semibold text-content-secondary">
               {editingId ? 'Modifier la devise' : 'Nouvelle devise'}
             </h3>
-            <button type="button" onClick={closeForm} className="p-1 text-gray-400 hover:text-gray-200">
+            <button type="button" onClick={closeForm} className="p-1 text-content-muted hover:text-content-secondary">
               <X size={16} />
             </button>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Code ISO 4217</label>
+              <label className="block text-xs text-content-muted mb-1">Code ISO 4217</label>
               <input
                 type="text"
                 value={formData.code}
@@ -295,37 +295,37 @@ export default function AdminCurrencySettings() {
                 placeholder="GBP"
                 maxLength={5}
                 disabled={!!editingId}
-                className="w-full px-3 py-2 bg-gray-900/50 border border-gray-600 rounded-lg text-sm text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none disabled:opacity-50"
+                className="w-full px-3 py-2 bg-surface-base/50 border border-edge-strong rounded-lg text-sm text-content-primary placeholder-content-muted focus:border-accent focus:outline-none disabled:opacity-50"
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Symbole</label>
+              <label className="block text-xs text-content-muted mb-1">Symbole</label>
               <input
                 type="text"
                 value={formData.symbol}
                 onChange={(e) => setFormData(prev => ({ ...prev, symbol: e.target.value }))}
                 placeholder="£"
                 maxLength={10}
-                className="w-full px-3 py-2 bg-gray-900/50 border border-gray-600 rounded-lg text-sm text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none"
+                className="w-full px-3 py-2 bg-surface-base/50 border border-edge-strong rounded-lg text-sm text-content-primary placeholder-content-muted focus:border-accent focus:outline-none"
               />
             </div>
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Position du symbole</label>
+              <label className="block text-xs text-content-muted mb-1">Position du symbole</label>
               <select
                 value={formData.symbolPosition}
                 onChange={(e) => setFormData(prev => ({ ...prev, symbolPosition: e.target.value as 'before' | 'after' }))}
-                className="w-full px-3 py-2 bg-gray-900/50 border border-gray-600 rounded-lg text-sm text-white focus:border-indigo-500 focus:outline-none"
+                className="w-full px-3 py-2 bg-surface-base/50 border border-edge-strong rounded-lg text-sm text-content-primary focus:border-accent focus:outline-none"
               >
                 <option value="after">Apres (1 000 €)</option>
                 <option value="before">Avant ($1,000)</option>
               </select>
             </div>
             <div>
-              <label className="block text-xs text-gray-400 mb-1">Decimales</label>
+              <label className="block text-xs text-content-muted mb-1">Decimales</label>
               <select
                 value={formData.decimals}
                 onChange={(e) => setFormData(prev => ({ ...prev, decimals: Number(e.target.value) }))}
-                className="w-full px-3 py-2 bg-gray-900/50 border border-gray-600 rounded-lg text-sm text-white focus:border-indigo-500 focus:outline-none"
+                className="w-full px-3 py-2 bg-surface-base/50 border border-edge-strong rounded-lg text-sm text-content-primary focus:border-accent focus:outline-none"
               >
                 <option value={0}>0 (entier)</option>
                 <option value={2}>2 (centimes)</option>
@@ -333,13 +333,13 @@ export default function AdminCurrencySettings() {
               </select>
             </div>
             <div className="col-span-2">
-              <label className="block text-xs text-gray-400 mb-1">Locale</label>
+              <label className="block text-xs text-content-muted mb-1">Locale</label>
               <input
                 type="text"
                 value={formData.locale}
                 onChange={(e) => setFormData(prev => ({ ...prev, locale: e.target.value }))}
                 placeholder="fr-FR"
-                className="w-full px-3 py-2 bg-gray-900/50 border border-gray-600 rounded-lg text-sm text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none"
+                className="w-full px-3 py-2 bg-surface-base/50 border border-edge-strong rounded-lg text-sm text-content-primary placeholder-content-muted focus:border-accent focus:outline-none"
               />
             </div>
           </div>
@@ -348,7 +348,7 @@ export default function AdminCurrencySettings() {
             <button
               type="button"
               onClick={closeForm}
-              className="px-4 py-2 text-sm text-gray-400 hover:text-gray-200 transition-colors"
+              className="px-4 py-2 text-sm text-content-muted hover:text-content-secondary transition-colors"
             >
               Annuler
             </button>
@@ -356,7 +356,7 @@ export default function AdminCurrencySettings() {
               type="button"
               onClick={handleFormSubmit}
               disabled={formSaving || !formData.code || !formData.symbol}
-              className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-accent hover:bg-accent-primary-hover text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <Save size={14} />
               {formSaving ? 'Enregistrement...' : editingId ? 'Mettre a jour' : 'Creer'}
@@ -367,21 +367,21 @@ export default function AdminCurrencySettings() {
 
       {/* Apercu */}
       {selectedPreset && hasChanged && (
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
+        <div className="bg-status-warning-bg border border-status-warning/30 rounded-lg p-4">
           <div className="flex items-start gap-2">
-            <AlertTriangle size={16} className="text-amber-400 mt-0.5 shrink-0" />
+            <AlertTriangle size={16} className="text-status-warning mt-0.5 shrink-0" />
             <div className="text-sm">
-              <p className="text-amber-300 font-medium">Apercu du changement</p>
-              <p className="text-gray-400 mt-1">
+              <p className="text-status-warning font-medium">Apercu du changement</p>
+              <p className="text-content-muted mt-1">
                 Les montants seront affiches comme suit :
               </p>
-              <div className="mt-2 space-y-1 text-gray-300 font-mono text-xs">
+              <div className="mt-2 space-y-1 text-content-secondary font-mono text-xs">
                 <div>1 234 567 &rarr; {selectedPreset.symbolPosition === 'after'
                   ? `1 234 567 ${selectedPreset.symbol}`
                   : `${selectedPreset.symbol} 1,234,567${selectedPreset.decimals > 0 ? '.' + '0'.repeat(selectedPreset.decimals) : ''}`
                 }</div>
               </div>
-              <p className="text-amber-400/80 text-xs mt-3">
+              <p className="text-status-warning/80 text-xs mt-3">
                 Ce changement affecte uniquement l'affichage. Les soldes et ecritures comptables en base ne sont pas convertis.
               </p>
             </div>
@@ -398,8 +398,8 @@ export default function AdminCurrencySettings() {
           className={`
             px-5 py-2.5 rounded-lg text-sm font-medium transition-all
             ${hasChanged
-              ? 'bg-indigo-600 hover:bg-indigo-500 text-white'
-              : 'bg-gray-700 text-gray-500 cursor-not-allowed'
+              ? 'bg-accent hover:bg-accent-primary-hover text-white'
+              : 'bg-surface-elevated text-content-muted cursor-not-allowed'
             }
           `}
         >

@@ -5,6 +5,7 @@ import { Employe } from '../../hooks/hr/useEmployes';
 import { Button, SelectField, Modal, FormField, Switch, TextareaField } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { toast } from '../../lib/toast';
+import { useCurrency } from '../../contexts/CurrencyContext';
 
 interface AvantagesManagerProps {
   avantages: Avantage[];
@@ -15,10 +16,10 @@ interface AvantagesManagerProps {
 }
 
 const TYPE_COLORS: Record<string, { bg: string; text: string }> = {
-  Prime: { bg: 'bg-emerald-500/10 border-emerald-500/30', text: 'text-emerald-400' },
-  Assurance: { bg: 'bg-blue-500/10 border-blue-500/30', text: 'text-blue-400' },
-  'Avantage en nature': { bg: 'bg-amber-500/10 border-amber-500/30', text: 'text-amber-400' },
-  Autre: { bg: 'bg-slate-500/10 border-slate-500/30', text: 'text-slate-400' },
+  Prime: { bg: 'bg-status-success-bg border-status-success/30', text: 'text-status-success' },
+  Assurance: { bg: 'bg-status-info-bg border-status-info/30', text: 'text-status-info' },
+  'Avantage en nature': { bg: 'bg-status-warning-bg border-status-warning/30', text: 'text-status-warning' },
+  Autre: { bg: 'bg-surface-subtle/30 border-edge-strong/30', text: 'text-content-muted' },
 };
 
 const FREQUENCE_LABELS: Record<string, string> = {
@@ -72,6 +73,7 @@ export default function AvantagesManager({
   onDelete,
 }: AvantagesManagerProps) {
   const { hasPermission } = usePermissions();
+  const { currency, label } = useCurrency();
   const canManage = hasPermission('rh', 'edit') || hasPermission('avantages', 'create');
 
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -187,7 +189,7 @@ export default function AvantagesManager({
     if ((av.modeCalcul || 'FIXE') === 'POURCENTAGE') {
       return `${Number(av.pourcentage) || 0}%`;
     }
-    return `${(av.montantParDefaut || 0).toLocaleString()} FCFA`;
+    return `${(av.montantParDefaut || 0).toLocaleString()} ${currency.symbol}`;
   };
 
   return (
@@ -195,9 +197,9 @@ export default function AvantagesManager({
       {/* Header */}
       <div className="shrink-0 flex items-center justify-between gap-2 mb-2">
         <div className="flex items-center gap-2 min-w-0">
-          <Gift size={18} className="text-cyan-400 shrink-0" />
-          <h3 className="text-sm font-bold text-white whitespace-nowrap">Avantages</h3>
-          <span className="text-[10px] text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded-full font-medium">
+          <Gift size={18} className="text-accent shrink-0" />
+          <h3 className="text-sm font-bold text-content-primary whitespace-nowrap">Avantages</h3>
+          <span className="text-[10px] text-content-muted bg-surface px-1.5 py-0.5 rounded-full font-medium">
             {avantages.length}
           </span>
         </div>
@@ -211,8 +213,8 @@ export default function AvantagesManager({
                   onClick={() => setFilterType(type)}
                   className={`px-2 py-1 text-[10px] font-medium rounded-md transition ${
                     filterType === type
-                      ? 'bg-cyan-600 text-white'
-                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                      ? 'bg-accent-secondary text-content-primary'
+                      : 'bg-surface text-content-muted hover:bg-surface-elevated'
                   }`}
                 >
                   {type}
@@ -224,7 +226,7 @@ export default function AvantagesManager({
           {canManage && onCreate && (
             <button
               onClick={() => { resetForm(); setShowCreateModal(true); }}
-              className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg transition"
+              className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold bg-accent-secondary hover:bg-accent-secondary text-content-primary rounded-lg transition"
             >
               <Plus size={14} />
               <span className="hidden sm:inline">Nouveau</span>
@@ -247,7 +249,7 @@ export default function AvantagesManager({
               return (
                 <div
                   key={avantage.id}
-                  className="bg-slate-900 border border-slate-800 rounded-lg p-3 hover:border-slate-700 transition group flex flex-col"
+                  className="bg-surface-base border border-edge rounded-lg p-3 hover:border-edge transition group flex flex-col"
                 >
                   {/* Top: Badges + Amount */}
                   <div className="flex items-start justify-between gap-2 mb-2">
@@ -256,43 +258,43 @@ export default function AvantagesManager({
                         {avantage.type}
                       </span>
                       {freq !== 'MENSUEL' && (
-                        <span className="text-[9px] px-1 py-0.5 bg-violet-900/30 text-violet-400 rounded border border-violet-500/20">
+                        <span className="text-[9px] px-1 py-0.5 bg-accent/10 text-accent rounded border border-accent/20">
                           {FREQUENCE_LABELS[freq] || freq}
                         </span>
                       )}
                       {avantage.autoAttribution && (
-                        <span className="text-[9px] px-1 py-0.5 bg-cyan-900/30 text-cyan-400 rounded border border-cyan-500/20">
+                        <span className="text-[9px] px-1 py-0.5 bg-accent/10 text-accent rounded border border-accent/20">
                           Auto
                         </span>
                       )}
                     </div>
-                    <span className="font-mono font-bold text-emerald-400 text-xs whitespace-nowrap flex items-center gap-0.5">
+                    <span className="font-mono font-bold text-status-success text-xs whitespace-nowrap flex items-center gap-0.5">
                       {isPercentage && <Percent size={10} />}
                       {getAmountDisplay(avantage)}
                     </span>
                   </div>
 
                   {/* Name + Description */}
-                  <h4 className="text-white font-semibold text-sm leading-tight mb-0.5 line-clamp-1">{avantage.nom}</h4>
-                  <p className="text-[10px] text-slate-500 line-clamp-2 mb-2 min-h-[2.5em]">
+                  <h4 className="text-content-primary font-semibold text-sm leading-tight mb-0.5 line-clamp-1">{avantage.nom}</h4>
+                  <p className="text-[10px] text-content-muted line-clamp-2 mb-2 min-h-[2.5em]">
                     {avantage.description || 'Aucune description'}
                   </p>
 
                   {/* Footer: Contracts + count + fiscal */}
-                  <div className="mt-auto flex flex-col gap-1.5 pt-2 border-t border-slate-800">
+                  <div className="mt-auto flex flex-col gap-1.5 pt-2 border-t border-edge">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1 min-w-0 flex-wrap">
                         {eligibleContrats && eligibleContrats.length > 0 ? (
                           eligibleContrats.map(c => (
-                            <span key={c} className="text-[9px] px-1.5 py-0.5 bg-slate-800 text-slate-400 rounded font-medium">
+                            <span key={c} className="text-[9px] px-1.5 py-0.5 bg-surface text-content-muted rounded font-medium">
                               {c}
                             </span>
                           ))
                         ) : (
-                          <span className="text-[9px] text-slate-600 italic">Tous contrats</span>
+                          <span className="text-[9px] text-content-muted italic">Tous contrats</span>
                         )}
                       </div>
-                      <span className="flex items-center gap-1 text-[10px] text-slate-500 shrink-0" title={`${eligibleCount} employé(s) éligible(s)`}>
+                      <span className="flex items-center gap-1 text-[10px] text-content-muted shrink-0" title={`${eligibleCount} employé(s) éligible(s)`}>
                         <Users size={10} />
                         {eligibleCount}
                       </span>
@@ -301,12 +303,12 @@ export default function AvantagesManager({
                     {(!avantage.imposable || !avantage.soumisCnss) && (
                       <div className="flex items-center gap-1">
                         {!avantage.imposable && (
-                          <span className="text-[8px] px-1 py-0.5 bg-green-900/30 text-green-500 rounded border border-green-500/20">
+                          <span className="text-[8px] px-1 py-0.5 bg-status-success-bg text-status-success rounded border border-status-success/20">
                             Non imposable
                           </span>
                         )}
                         {!avantage.soumisCnss && (
-                          <span className="text-[8px] px-1 py-0.5 bg-blue-900/30 text-blue-500 rounded border border-blue-500/20">
+                          <span className="text-[8px] px-1 py-0.5 bg-status-info-bg text-status-info rounded border border-status-info/20">
                             Exempt CNSS
                           </span>
                         )}
@@ -320,7 +322,7 @@ export default function AvantagesManager({
                       {onUpdate && (
                         <button
                           onClick={() => handleEditOpen(avantage)}
-                          className="flex-1 flex items-center justify-center gap-1 py-1.5 text-[10px] font-medium text-slate-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-md transition"
+                          className="flex-1 flex items-center justify-center gap-1 py-1.5 text-[10px] font-medium text-content-muted hover:text-status-info hover:bg-status-info-bg rounded-md transition"
                         >
                           <Pencil size={12} />
                           Modifier
@@ -329,7 +331,7 @@ export default function AvantagesManager({
                       {onDelete && (
                         <button
                           onClick={() => setConfirmDelete(avantage)}
-                          className="flex-1 flex items-center justify-center gap-1 py-1.5 text-[10px] font-medium text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-md transition"
+                          className="flex-1 flex items-center justify-center gap-1 py-1.5 text-[10px] font-medium text-content-muted hover:text-status-danger hover:bg-status-danger-bg rounded-md transition"
                         >
                           <Trash2 size={12} />
                           Supprimer
@@ -342,13 +344,13 @@ export default function AvantagesManager({
             })}
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center py-16 text-slate-600">
+          <div className="flex flex-col items-center justify-center py-16 text-content-muted">
             <Gift size={36} className="opacity-20 mb-2" />
             <p className="text-sm">{filterType !== 'Tous' ? `Aucun avantage de type "${filterType}"` : 'Aucun avantage configuré'}</p>
             {canManage && onCreate && (
               <button
                 onClick={() => { resetForm(); setShowCreateModal(true); }}
-                className="mt-3 text-xs text-cyan-400 hover:text-cyan-300 font-medium"
+                className="mt-3 text-xs text-accent hover:text-accent font-medium"
               >
                 Créer un avantage
               </button>
@@ -416,13 +418,13 @@ export default function AvantagesManager({
               value={formData.modeCalcul}
               onChange={(e) => set({ modeCalcul: e.target.value })}
               options={[
-                { value: 'FIXE', label: 'Montant fixe (FCFA)' },
+                { value: 'FIXE', label: label('Montant fixe') },
                 { value: 'POURCENTAGE', label: '% du salaire de base' },
               ]}
             />
             {formData.modeCalcul === 'FIXE' ? (
               <FormField
-                label="Montant par défaut (FCFA)"
+                label={label('Montant par défaut')}
                 name="montantParDefaut"
                 type="number"
                 value={formData.montantParDefaut.toString()}
@@ -445,7 +447,7 @@ export default function AvantagesManager({
 
           {formData.modeCalcul === 'POURCENTAGE' && (
             <FormField
-              label="Plafond max (FCFA, optionnel)"
+              label={`Plafond max (${currency.symbol}, optionnel)`}
               name="plafond"
               type="number"
               value={formData.plafond ? formData.plafond.toString() : ''}
@@ -486,9 +488,9 @@ export default function AvantagesManager({
 
           {/* Section 4: Éligibilité — inline */}
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1.5">
+            <label className="block text-xs font-medium text-content-secondary mb-1.5">
               Contrats éligibles
-              <span className="text-slate-500 ml-1 font-normal">(vide = tous)</span>
+              <span className="text-content-muted ml-1 font-normal">(vide = tous)</span>
             </label>
             <div className="flex items-center gap-2 flex-wrap">
               {CONTRACT_TYPES.map(ct => (
@@ -498,8 +500,8 @@ export default function AvantagesManager({
                   onClick={() => toggleContrat(ct)}
                   className={`px-2.5 py-1 text-[11px] font-medium rounded-md border transition ${
                     formData.eligibleContrats.includes(ct)
-                      ? 'bg-cyan-600/20 border-cyan-500/50 text-cyan-400'
-                      : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
+                      ? 'bg-accent-secondary/20 border-accent/50 text-accent'
+                      : 'bg-surface border-edge text-content-muted hover:bg-surface-elevated'
                   }`}
                 >
                   {ct}
@@ -509,18 +511,18 @@ export default function AvantagesManager({
           </div>
 
           {/* Section 5: Toggles — compact row */}
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 bg-slate-800/40 rounded-lg px-3 py-2.5 border border-slate-700/30">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 bg-surface/40 rounded-lg px-3 py-2.5 border border-edge-subtle">
             <label className="flex items-center gap-2 cursor-pointer">
               <Switch checked={formData.autoAttribution} onChange={(v) => set({ autoAttribution: v })} size="sm" />
-              <span className="text-xs text-slate-300">Auto-attribution</span>
+              <span className="text-xs text-content-secondary">Auto-attribution</span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
               <Switch checked={formData.imposable} onChange={(v) => set({ imposable: v })} size="sm" />
-              <span className="text-xs text-slate-300">Imposable (IPR)</span>
+              <span className="text-xs text-content-secondary">Imposable (IPR)</span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
               <Switch checked={formData.soumisCnss} onChange={(v) => set({ soumisCnss: v })} size="sm" />
-              <span className="text-xs text-slate-300">Soumis CNSS</span>
+              <span className="text-xs text-content-secondary">Soumis CNSS</span>
             </label>
           </div>
 
@@ -539,14 +541,14 @@ export default function AvantagesManager({
       {/* Delete Confirmation */}
       {confirmDelete && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setConfirmDelete(null)}>
-          <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
-            <div className="p-4 border-b border-slate-800">
-              <h3 className="text-sm font-bold text-red-400">Supprimer l'avantage</h3>
+          <div className="bg-surface-base border border-edge rounded-xl shadow-2xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-edge">
+              <h3 className="text-sm font-bold text-status-danger">Supprimer l'avantage</h3>
             </div>
-            <div className="p-4 text-sm text-slate-300">
-              Voulez-vous vraiment supprimer l'avantage <span className="font-bold text-white">"{confirmDelete.nom}"</span> ?
+            <div className="p-4 text-sm text-content-secondary">
+              Voulez-vous vraiment supprimer l'avantage <span className="font-bold text-content-primary">"{confirmDelete.nom}"</span> ?
             </div>
-            <div className="p-4 border-t border-slate-800 flex justify-end gap-2">
+            <div className="p-4 border-t border-edge flex justify-end gap-2">
               <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(null)}>Annuler</Button>
               <Button variant="danger" size="sm" onClick={handleDeleteConfirm}>Supprimer</Button>
             </div>

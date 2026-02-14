@@ -2369,7 +2369,7 @@ async function seedCoreSettings(context: SeedContext, dryRun: boolean): Promise<
       await db.delete(systemSettings);
     }
     await db.insert(systemSettings).values({
-      agenceName: 'COFIN&CO-M',
+      appName: 'COFIN&CO-M',
       agenceCode: 'COF-PROD',
       devise: 'XAF',
       pays: 'République du Congo',
@@ -2445,11 +2445,13 @@ async function seedCoreSettings(context: SeedContext, dryRun: boolean): Promise<
     await db.insert(uiCustomization).values({
       theme: 'light',
       primaryColor: '#0f766e',
-      accentColor: '#f97316',
+      accentColor: '#c2410c',
       langue: 'fr',
       sidebarCollapsedDefault: false,
       showAnimations: true,
       compactMode: false,
+      fontFamily: 'Inter',
+      borderRadius: 'lg',
     });
     results.push({ table: 'uiCustomization', action: 'created', count: 1 });
   } else {
@@ -3733,9 +3735,9 @@ async function seedNotificationSystem(context: SeedContext, dryRun: boolean): Pr
       code: 'CLIENT_CREATED',
       nom: 'Bienvenue nouveau client',
       subject: 'Bienvenue chez COFIN&CO-M !',
-      contenuHtml: emailWrap('<h2 style="color:#0f766e;margin:0 0 16px">Bienvenue {{clientName}} !</h2><p style="color:#495057;line-height:1.6">Nous sommes ravis de vous accueillir au sein de la famille <strong>COFIN&amp;CO-M</strong>. Votre inscription a ete enregistree avec succes.</p>{{#if accountNumber}}<table role="presentation" style="background:#f0fdf4;border-radius:8px;padding:20px;width:100%;margin:20px 0" cellpadding="0" cellspacing="0"><tr><td style="padding:8px 20px"><span style="color:#868e96;font-size:13px">Numero de compte</span><br><strong style="color:#1b2d4b;font-size:20px">{{accountNumber}}</strong></td></tr></table>{{/if}}{{#if agenceName}}<p style="color:#495057;line-height:1.6">Votre agence de rattachement : <strong>{{agenceName}}</strong></p>{{/if}}<p style="color:#495057;line-height:1.6">Rendez-vous a votre agence pour decouvrir nos produits d\'epargne, de credit et de tontine.</p><p style="color:#868e96;font-size:13px;margin-top:24px">Merci de votre confiance. A bientot !</p>'),
+      contenuHtml: emailWrap('<h2 style="color:#0f766e;margin:0 0 16px">Bienvenue {{clientName}} !</h2><p style="color:#495057;line-height:1.6">Nous sommes ravis de vous accueillir au sein de la famille <strong>COFIN&amp;CO-M</strong>. Votre inscription a ete enregistree avec succes.</p>{{#if accountNumber}}<table role="presentation" style="background:#f0fdf4;border-radius:8px;padding:20px;width:100%;margin:20px 0" cellpadding="0" cellspacing="0"><tr><td style="padding:8px 20px"><span style="color:#868e96;font-size:13px">Numero de compte</span><br><strong style="color:#1b2d4b;font-size:20px">{{accountNumber}}</strong></td></tr></table>{{/if}}{{#if agenceName}}<p style="color:#495057;line-height:1.6">Votre agence de rattachement : <strong>{{appName}}</strong></p>{{/if}}<p style="color:#495057;line-height:1.6">Rendez-vous a votre agence pour decouvrir nos produits d\'epargne, de credit et de tontine.</p><p style="color:#868e96;font-size:13px;margin-top:24px">Merci de votre confiance. A bientot !</p>'),
       contenuText: 'Bienvenue {{clientName}} chez COFIN&CO-M ! Votre inscription est confirmee.{{#if accountNumber}} Compte: {{accountNumber}}.{{/if}} Rendez-vous a votre agence pour decouvrir nos services.',
-      placeholders: 'clientName,agenceName,accountNumber',
+      placeholders: 'clientName,appName,accountNumber',
       description: 'Email de bienvenue pour un nouveau client',
     },
     {
@@ -3760,9 +3762,9 @@ async function seedNotificationSystem(context: SeedContext, dryRun: boolean): Pr
       code: 'EMPLOYEE_CREATED',
       nom: 'Bienvenue nouvel employe',
       subject: 'Bienvenue dans l\'equipe COFIN&CO-M !',
-      contenuHtml: emailWrap('<h2 style="color:#0f766e;margin:0 0 16px">Bienvenue {{employeeName}} !</h2><p style="color:#495057;line-height:1.6">Nous sommes heureux de vous accueillir dans l\'equipe <strong>COFIN&amp;CO-M</strong>.</p><table role="presentation" style="background:#f0fdf4;border-radius:8px;padding:20px;width:100%;margin:20px 0" cellpadding="0" cellspacing="0"><tr><td style="padding:8px 20px"><span style="color:#868e96;font-size:13px">Matricule</span><br><strong style="color:#1b2d4b;font-size:18px">{{matricule}}</strong></td></tr>{{#if username}}<tr><td style="padding:8px 20px;border-top:1px solid #e9ecef"><span style="color:#868e96;font-size:13px">Identifiant</span><br><strong style="color:#1b2d4b;font-size:18px">{{username}}</strong></td></tr>{{/if}}{{#if agenceName}}<tr><td style="padding:8px 20px;border-top:1px solid #e9ecef"><span style="color:#868e96;font-size:13px">Agence</span><br><strong style="color:#1b2d4b;font-size:18px">{{agenceName}}</strong></td></tr>{{/if}}</table><p style="color:#495057;line-height:1.6">Connectez-vous a la plateforme avec votre identifiant et le mot de passe qui vous a ete communique. Changez votre mot de passe a la premiere connexion.</p><p style="color:#868e96;font-size:13px;margin-top:24px">Bonne integration au sein de l\'equipe !</p>'),
+      contenuHtml: emailWrap('<h2 style="color:#0f766e;margin:0 0 16px">Bienvenue {{employeeName}} !</h2><p style="color:#495057;line-height:1.6">Nous sommes heureux de vous accueillir dans l\'equipe <strong>COFIN&amp;CO-M</strong>.</p><table role="presentation" style="background:#f0fdf4;border-radius:8px;padding:20px;width:100%;margin:20px 0" cellpadding="0" cellspacing="0"><tr><td style="padding:8px 20px"><span style="color:#868e96;font-size:13px">Matricule</span><br><strong style="color:#1b2d4b;font-size:18px">{{matricule}}</strong></td></tr>{{#if username}}<tr><td style="padding:8px 20px;border-top:1px solid #e9ecef"><span style="color:#868e96;font-size:13px">Identifiant</span><br><strong style="color:#1b2d4b;font-size:18px">{{username}}</strong></td></tr>{{/if}}{{#if agenceName}}<tr><td style="padding:8px 20px;border-top:1px solid #e9ecef"><span style="color:#868e96;font-size:13px">Agence</span><br><strong style="color:#1b2d4b;font-size:18px">{{appName}}</strong></td></tr>{{/if}}</table><p style="color:#495057;line-height:1.6">Connectez-vous a la plateforme avec votre identifiant et le mot de passe qui vous a ete communique. Changez votre mot de passe a la premiere connexion.</p><p style="color:#868e96;font-size:13px;margin-top:24px">Bonne integration au sein de l\'equipe !</p>'),
       contenuText: 'Bienvenue {{employeeName}} chez COFIN&CO-M ! Matricule: {{matricule}}.{{#if username}} Identifiant: {{username}}.{{/if}} Changez votre mot de passe a la premiere connexion.',
-      placeholders: 'employeeName,matricule,username,agenceName',
+      placeholders: 'employeeName,matricule,username,appName',
       description: 'Email de bienvenue pour un nouvel employe',
     },
     {

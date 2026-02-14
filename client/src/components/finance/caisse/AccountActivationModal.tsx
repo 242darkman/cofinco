@@ -171,49 +171,49 @@ export function AccountActivationModal({
       aria-modal="true"
     >
       <div
-        className="bg-slate-900 rounded-2xl max-w-md w-full mx-4 border border-slate-800 shadow-2xl animate-in zoom-in-95 slide-in-from-bottom-4 duration-300"
+        className="bg-surface-base rounded-2xl max-w-md w-full mx-4 border border-edge shadow-2xl animate-in zoom-in-95 slide-in-from-bottom-4 duration-300"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-800">
+        <div className="flex items-center justify-between p-4 border-b border-edge">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center">
-              <UserCheck className="w-5 h-5 text-orange-500" />
+            <div className="w-10 h-10 rounded-full bg-status-warning-bg flex items-center justify-center">
+              <UserCheck className="w-5 h-5 text-status-warning" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white">Activation de Compte</h2>
-              <p className="text-xs text-slate-500">Encaisser le dépôt initial</p>
+              <h2 className="text-lg font-bold text-content-primary">Activation de Compte</h2>
+              <p className="text-xs text-content-muted">Encaisser le dépôt initial</p>
             </div>
           </div>
           <button
             type="button"
             onClick={handleCloseClick}
             disabled={loading}
-            className="p-2 text-slate-400 hover:text-white rounded-full hover:bg-slate-800 transition-colors disabled:opacity-50"
+            className="p-2 text-content-muted hover:text-content-primary rounded-full hover:bg-surface transition-colors disabled:opacity-50"
           >
             <X size={20} />
           </button>
         </div>
 
         {/* Account Info */}
-        <div className="p-4 bg-slate-800/50 border-b border-slate-800">
+        <div className="p-4 bg-surface/50 border-b border-edge">
           <div className="flex justify-between items-center">
             <div>
-              <h3 className="font-medium text-white">
+              <h3 className="font-medium text-content-primary">
                 {account.client.nom} {account.client.prenom}
               </h3>
               <div className="flex items-center gap-2 mt-1">
-                <span className="text-xs px-2 py-0.5 rounded-full bg-slate-700 text-slate-300">
+                <span className="text-xs px-2 py-0.5 rounded-full bg-surface-elevated text-content-secondary">
                   {getStatusLabel(account.typeCompte, ACCOUNT_TYPE_LABELS)}
                 </span>
-                <span className="text-xs text-slate-500 font-mono">
+                <span className="text-xs text-content-muted font-mono">
                   {account.numeroCompte}
                 </span>
               </div>
             </div>
             <div className="text-right">
-              <p className="text-xs text-slate-500">Montant attendu</p>
-              <p className="text-lg font-bold text-slate-300">
+              <p className="text-xs text-content-muted">Montant attendu</p>
+              <p className="text-lg font-bold text-content-secondary">
                 {formatMoney(account.montantInitial)}
               </p>
             </div>
@@ -224,8 +224,8 @@ export function AccountActivationModal({
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
           {/* Amount Input */}
           <div className="space-y-2">
-            <label className="flex items-center gap-2 text-sm font-medium text-slate-300">
-              <Banknote size={16} className="text-emerald-500" />
+            <label className="flex items-center gap-2 text-sm font-medium text-content-secondary">
+              <Banknote size={16} className="text-status-success" />
               Montant à encaisser
             </label>
             <div className="relative">
@@ -235,10 +235,10 @@ export function AccountActivationModal({
                 onChange={(e) => setMontant(e.target.value)}
                 placeholder="0"
                 disabled={loading}
-                className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white text-lg font-bold placeholder:text-slate-600 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors disabled:opacity-50"
+                className="w-full px-4 py-3 bg-surface border border-edge rounded-xl text-content-primary text-lg font-bold placeholder:text-content-muted focus:border-status-success focus:ring-1 focus:ring-status-success transition-colors disabled:opacity-50"
                 autoFocus
               />
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 font-medium">
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-content-muted font-medium">
                 FCFA
               </span>
             </div>
@@ -246,7 +246,7 @@ export function AccountActivationModal({
             {/* Amount difference indicator */}
             {isValidAmount && amountDifference !== 0 && (
               <div className={`flex items-center gap-2 text-xs ${
-                amountDifference > 0 ? 'text-emerald-400' : 'text-amber-400'
+                amountDifference > 0 ? 'text-status-success' : 'text-status-warning'
               }`}>
                 <AlertTriangle size={12} />
                 {amountDifference > 0
@@ -259,31 +259,31 @@ export function AccountActivationModal({
 
           {/* Error Display */}
           {error && (
-            <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm">
+            <div className="flex items-center gap-2 p-3 bg-status-danger-bg border border-status-danger/30 rounded-xl text-status-danger text-sm">
               <AlertTriangle size={16} />
               {error}
             </div>
           )}
 
           {/* Summary */}
-          <div className="bg-slate-800/50 rounded-xl p-4 space-y-2">
+          <div className="bg-surface/50 rounded-xl p-4 space-y-2">
             <div className="flex justify-between text-sm">
-              <span className="text-slate-400">Client</span>
-              <span className="text-white font-medium">{account.client.nom} {account.client.prenom}</span>
+              <span className="text-content-muted">Client</span>
+              <span className="text-content-primary font-medium">{account.client.nom} {account.client.prenom}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-slate-400">Compte</span>
-              <span className="text-white font-mono">{account.numeroCompte}</span>
+              <span className="text-content-muted">Compte</span>
+              <span className="text-content-primary font-mono">{account.numeroCompte}</span>
             </div>
             {caisseName && (
               <div className="flex justify-between text-sm">
-                <span className="text-slate-400">Caisse de réception</span>
-                <span className="text-cyan-400 font-medium">{caisseName}</span>
+                <span className="text-content-muted">Caisse de réception</span>
+                <span className="text-accent font-medium">{caisseName}</span>
               </div>
             )}
-            <div className="flex justify-between text-sm border-t border-slate-700 pt-2 mt-2">
-              <span className="text-slate-400">Total à encaisser</span>
-              <span className="text-emerald-400 font-bold text-lg">
+            <div className="flex justify-between text-sm border-t border-edge pt-2 mt-2">
+              <span className="text-content-muted">Total à encaisser</span>
+              <span className="text-status-success font-bold text-lg">
                 {isValidAmount ? formatMoney(parsedMontant) : '—'}
               </span>
             </div>
@@ -295,7 +295,7 @@ export function AccountActivationModal({
               type="button"
               onClick={handleCloseClick}
               disabled={loading}
-              className="flex-1 px-4 py-2.5 text-slate-300 bg-slate-800 hover:bg-slate-700 rounded-lg font-medium transition-colors disabled:opacity-50"
+              className="flex-1 px-4 py-2.5 text-content-secondary bg-surface hover:bg-surface-elevated rounded-lg font-medium transition-colors disabled:opacity-50"
             >
               Annuler
             </button>
@@ -311,7 +311,7 @@ export function AccountActivationModal({
                 e.stopPropagation();
                 handleSubmit(e);
               }}
-              className="flex-1 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium shadow-lg shadow-emerald-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+              className="flex-1 px-4 py-2.5 bg-status-success hover:bg-status-success text-white rounded-lg font-medium shadow-lg shadow-status-success/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
             >
               {loading ? (
                 <>

@@ -427,18 +427,18 @@ export default function TransfertInterCoffresModule({
     { 
       key: 'reference', 
       label: 'Référence',
-      format: (val: string) => <span className="font-mono text-xs text-slate-400">{val}</span>
+      format: (val: string) => <span className="font-mono text-xs text-content-muted">{val}</span>
     },
     { 
       key: 'parcours', 
       label: 'Parcours',
       format: (_: any, row: TransfertInterCoffre) => (
         <div className="flex items-center gap-2">
-          <span className="text-slate-400">
+          <span className="text-content-muted">
             {row.coffreSource?.agenceNom || 'Source'}
           </span>
-          <ArrowRight size={12} className="text-slate-600" />
-          <span className="text-white font-medium">
+          <ArrowRight size={12} className="text-content-muted" />
+          <span className="text-content-primary font-medium">
             {row.coffreDestination?.agenceNom || 'Dest'}
           </span>
         </div>
@@ -448,19 +448,19 @@ export default function TransfertInterCoffresModule({
       key: 'montant', 
       label: 'Montant', 
       align: 'right' as const,
-      format: (val: string) => <span className="font-bold text-white">{formatMoney(parseFloat(val))}</span>
+      format: (val: string) => <span className="font-bold text-content-primary">{formatMoney(parseFloat(val))}</span>
     },
     { 
       key: 'typeTransfert', 
       label: 'Type', 
       align: 'center' as const,
-      format: (val: string) => <span className="text-xs text-slate-400">{val.replace(/_/g, ' → ')}</span>
+      format: (val: string) => <span className="text-xs text-content-muted">{val.replace(/_/g, ' → ')}</span>
     },
     { 
       key: 'dateTransfert', 
       label: 'Date', 
       align: 'center' as const,
-      format: (val: string) => <span className="text-slate-400">{new Date(val).toLocaleDateString('fr-FR')}</span>
+      format: (val: string) => <span className="text-content-muted">{new Date(val).toLocaleDateString('fr-FR')}</span>
     },
     { 
       key: 'statut', 
@@ -474,7 +474,7 @@ export default function TransfertInterCoffresModule({
 
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+    <div className="min-h-screen bg-gradient-to-br from-surface-base via-surface-base to-surface-base">
       <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
         {/* Header */}
         <header className="flex flex-col gap-4">
@@ -485,17 +485,17 @@ export default function TransfertInterCoffresModule({
                   variant="ghost"
                   size="sm"
                   onClick={onBack}
-                  className="rounded-full hover:bg-slate-800 text-slate-400 h-10 w-10 p-0"
+                  className="rounded-full hover:bg-surface text-content-muted h-10 w-10 p-0"
                   aria-label="Retour"
                 >
                   <ArrowLeft size={20} />
                 </Button>
               )}
               <div>
-                <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
+                <h1 className="text-xl sm:text-2xl font-bold text-content-primary">
                   Transferts Inter-Coffres
                 </h1>
-                <p className="text-sm text-slate-400 hidden sm:block">
+                <p className="text-sm text-content-muted hidden sm:block">
                   Gestion sécurisée des mouvements de fonds entre coffres-forts
                 </p>
               </div>
@@ -507,14 +507,14 @@ export default function TransfertInterCoffresModule({
                 size="sm"
                 onClick={handleRefresh}
                 disabled={refreshing}
-                className="h-10 w-10 p-0 rounded-full text-slate-400 hover:bg-slate-800"
+                className="h-10 w-10 p-0 rounded-full text-content-muted hover:bg-surface"
                 aria-label="Actualiser"
               >
                 <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
               </Button>
               <Button
                 onClick={() => setShowCreateForm(true)}
-                className="bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white shadow-lg shadow-emerald-500/20"
+                className="bg-gradient-to-r from-status-success to-accent hover:from-status-success/90 hover:to-accent/90 text-white shadow-lg shadow-status-success/20"
               >
                 <Plus size={18} className="mr-2 hidden sm:inline" />
                 <span className="hidden sm:inline">Nouveau Transfert</span>
@@ -526,72 +526,72 @@ export default function TransfertInterCoffresModule({
 
         {/* Stats Cards - Compact */}
         <section className="grid grid-cols-2 lg:grid-cols-4 gap-2" aria-label="Statistiques">
-          <div className="bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-slate-700/50 rounded-lg p-3">
+          <div className="bg-gradient-to-br from-surface/50 to-surface-base/50 border border-edge-subtle rounded-lg p-3">
             <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-slate-700/50">
-                <Vault size={16} className="text-slate-300" />
+              <div className="p-1.5 rounded-lg bg-surface-elevated/50">
+                <Vault size={16} className="text-content-secondary" />
               </div>
               <div className="flex flex-col">
-                <span className="text-[10px] text-slate-400 uppercase tracking-wide leading-tight">Solde Coffres</span>
-                <span className="text-sm font-bold text-white leading-tight">
+                <span className="text-[10px] text-content-muted uppercase tracking-wide leading-tight">Solde Coffres</span>
+                <span className="text-sm font-bold text-content-primary leading-tight">
                   {loading ? "..." : formatMoney(computedStats.soldeTotalCoffres)}
                 </span>
               </div>
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-amber-900/20 to-amber-950/20 border border-amber-700/30 rounded-lg p-3">
+          <div className="bg-gradient-to-br from-status-warning/10 to-status-warning/10 border border-status-warning/20 rounded-lg p-3">
             <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-amber-500/20">
-                <Clock size={16} className="text-amber-400" />
+              <div className="p-1.5 rounded-lg bg-status-warning-bg">
+                <Clock size={16} className="text-status-warning" />
               </div>
               <div className="flex flex-col">
-                <span className="text-[10px] text-amber-400/80 uppercase tracking-wide leading-tight">En Attente</span>
-                <span className="text-sm font-bold text-amber-400 leading-tight">
+                <span className="text-[10px] text-status-warning/80 uppercase tracking-wide leading-tight">En Attente</span>
+                <span className="text-sm font-bold text-status-warning leading-tight">
                    {loading ? "..." : formatMoney(computedStats.enAttenteMontant)}
                 </span>
-                <span className="text-[9px] text-amber-400/50 leading-tight">{computedStats.enAttente} transfert{computedStats.enAttente !== 1 ? 's' : ''}</span>
+                <span className="text-[9px] text-status-warning/50 leading-tight">{computedStats.enAttente} transfert{computedStats.enAttente !== 1 ? 's' : ''}</span>
               </div>
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-blue-900/20 to-blue-950/20 border border-blue-700/30 rounded-lg p-3">
+          <div className="bg-gradient-to-br from-status-info/10 to-status-info/10 border border-status-info/30/30 rounded-lg p-3">
             <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-blue-500/20">
-                <Truck size={16} className="text-blue-400" />
+              <div className="p-1.5 rounded-lg bg-status-info-bg">
+                <Truck size={16} className="text-status-info" />
               </div>
               <div className="flex flex-col">
-                <span className="text-[10px] text-blue-400/80 uppercase tracking-wide leading-tight">En Transit</span>
-                <span className="text-sm font-bold text-blue-400 leading-tight">
+                <span className="text-[10px] text-status-info/80 uppercase tracking-wide leading-tight">En Transit</span>
+                <span className="text-sm font-bold text-status-info leading-tight">
                    {loading ? "..." : formatMoney(computedStats.enTransitMontant)}
                 </span>
-                <span className="text-[9px] text-blue-400/50 leading-tight">{computedStats.enTransit} transfert{computedStats.enTransit !== 1 ? 's' : ''}</span>
+                <span className="text-[9px] text-status-info/50 leading-tight">{computedStats.enTransit} transfert{computedStats.enTransit !== 1 ? 's' : ''}</span>
               </div>
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-emerald-900/20 to-emerald-950/20 border border-emerald-700/30 rounded-lg p-3">
+          <div className="bg-gradient-to-br from-status-success/10 to-status-success/10 border border-status-success/20 rounded-lg p-3">
             <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-emerald-500/20">
-                <CheckCircle size={16} className="text-emerald-400" />
+              <div className="p-1.5 rounded-lg bg-status-success-bg">
+                <CheckCircle size={16} className="text-status-success" />
               </div>
               <div className="flex flex-col">
-                <span className="text-[10px] text-emerald-400/80 uppercase tracking-wide leading-tight">Reçus</span>
-                <span className="text-sm font-bold text-emerald-400 leading-tight">
+                <span className="text-[10px] text-status-success/80 uppercase tracking-wide leading-tight">Reçus</span>
+                <span className="text-sm font-bold text-status-success leading-tight">
                    {loading ? "..." : formatMoney(computedStats.recusMontant)}
                 </span>
-                <span className="text-[9px] text-emerald-400/50 leading-tight">{computedStats.recus} transfert{computedStats.recus !== 1 ? 's' : ''}</span>
+                <span className="text-[9px] text-status-success/50 leading-tight">{computedStats.recus} transfert{computedStats.recus !== 1 ? 's' : ''}</span>
               </div>
             </div>
           </div>
         </section>
 
         {/* Filters */}
-        <section className="bg-slate-900/50 border border-slate-800 rounded-lg p-3">
+        <section className="bg-surface-base/50 border border-edge rounded-lg p-3">
           <div className="flex flex-col sm:flex-row gap-2">
             {/* Search */}
             <div className="relative flex-1">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" />
               <input
                 type="text"
                 placeholder="Rechercher par référence..."
@@ -600,7 +600,7 @@ export default function TransfertInterCoffresModule({
                   setSearchQuery(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="w-full pl-9 pr-4 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500 outline-none transition-all"
+                className="w-full pl-9 pr-4 py-2 bg-surface-base border border-edge rounded-lg text-sm text-content-primary placeholder-content-muted focus:ring-2 focus:ring-accent/30 focus:border-accent outline-none transition-all"
               />
             </div>
 
@@ -611,7 +611,7 @@ export default function TransfertInterCoffresModule({
                 setStatutFilter(e.target.value);
                 setCurrentPage(1);
               }}
-              className="px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500 outline-none transition-all"
+              className="px-3 py-2 bg-surface-base border border-edge rounded-lg text-sm text-content-primary focus:ring-2 focus:ring-accent/30 focus:border-accent outline-none transition-all"
             >
               <option value="all">Tous les statuts</option>
               <option value="DRAFT">Brouillon</option>
@@ -634,9 +634,9 @@ export default function TransfertInterCoffresModule({
                   setDateDebutFilter(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="px-2 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white focus:ring-2 focus:ring-cyan-500/30 outline-none"
+                className="px-2 py-2 bg-surface-base border border-edge rounded-lg text-sm text-content-primary focus:ring-2 focus:ring-accent/30 outline-none"
               />
-              <span className="text-slate-500 text-xs">→</span>
+              <span className="text-content-muted text-xs">→</span>
               <input
                 type="date"
                 value={dateFinFilter}
@@ -644,14 +644,14 @@ export default function TransfertInterCoffresModule({
                   setDateFinFilter(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="px-2 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white focus:ring-2 focus:ring-cyan-500/30 outline-none"
+                className="px-2 py-2 bg-surface-base border border-edge rounded-lg text-sm text-content-primary focus:ring-2 focus:ring-accent/30 outline-none"
               />
             </div>
           </div>
         </section>
 
         {/* Transfers List - ResponsiveTable */}
-        <section className="bg-slate-900/50 border border-slate-800 rounded-lg overflow-hidden">
+        <section className="bg-surface-base/50 border border-edge rounded-lg overflow-hidden">
              <ResponsiveTable
                 data={transferts}
                 columns={tableColumns}
@@ -670,7 +670,7 @@ export default function TransfertInterCoffresModule({
                           <Tooltip content="Voir les détails" position="top">
                             <button
                               onClick={(e) => { e.stopPropagation(); handleViewDetails(transfert); }}
-                              className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-700/50 transition-colors"
+                              className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-content-muted hover:text-content-secondary hover:bg-surface-elevated/50 transition-colors"
                               aria-label="Voir les détails"
                             >
                               <Eye size={16} />
@@ -683,7 +683,7 @@ export default function TransfertInterCoffresModule({
                               <Button
                                 size="sm"
                                 onClick={(e) => { e.stopPropagation(); handleApprove(transfert); }}
-                                className="h-7 px-3 text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-sm"
+                                className="h-7 px-3 text-xs bg-status-success hover:bg-status-success text-white font-semibold shadow-sm"
                               >
                                 <CheckCircle size={12} fill="currentColor" className="mr-1" />
                                 Valider N1
@@ -695,7 +695,7 @@ export default function TransfertInterCoffresModule({
                               <Button
                                 size="sm"
                                 onClick={(e) => { e.stopPropagation(); handleApprove(transfert); }}
-                                className="h-7 px-3 text-xs bg-blue-600 hover:bg-blue-500 text-white font-semibold shadow-sm"
+                                className="h-7 px-3 text-xs bg-status-info hover:bg-status-info text-white font-semibold shadow-sm"
                               >
                                 <Shield size={12} fill="currentColor" className="mr-1" />
                                 Valider N2
@@ -707,7 +707,7 @@ export default function TransfertInterCoffresModule({
                               <Button
                                 size="sm"
                                 onClick={(e) => { e.stopPropagation(); handleDispatch(transfert); }}
-                                className="h-7 px-3 text-xs bg-amber-600 hover:bg-amber-500 text-white font-semibold shadow-sm"
+                                className="h-7 px-3 text-xs bg-status-warning hover:bg-status-warning text-white font-semibold shadow-sm"
                               >
                                 <Truck size={12} fill="currentColor" className="mr-1" />
                                 Expédier
@@ -719,7 +719,7 @@ export default function TransfertInterCoffresModule({
                               <Button
                                 size="sm"
                                 onClick={(e) => { e.stopPropagation(); handleReceive(transfert); }}
-                                className="h-7 px-3 text-xs bg-cyan-600 hover:bg-cyan-500 text-white font-semibold shadow-sm"
+                                className="h-7 px-3 text-xs bg-accent-secondary hover:bg-accent-secondary text-content-primary font-semibold shadow-sm"
                               >
                                 <Package size={12} fill="currentColor" className="mr-1" />
                                 Recevoir
@@ -797,11 +797,11 @@ export default function TransfertInterCoffresModule({
                 <div className="space-y-4">
                   <p>Êtes-vous sûr de vouloir annuler le transfert {confirmAction?.transfert.reference} ?</p>
                   <div>
-                    <label className="text-xs text-slate-400 uppercase block mb-2">Motif d'annulation *</label>
+                    <label className="text-xs text-content-muted uppercase block mb-2">Motif d'annulation *</label>
                     <textarea
                       value={cancelReason}
                       onChange={(e) => setCancelReason(e.target.value)}
-                      className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white"
+                      className="w-full px-3 py-2 bg-surface-base border border-edge rounded-lg text-sm text-content-primary"
                       rows={3}
                       placeholder="Minimum 10 caractères..."
                     />

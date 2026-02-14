@@ -147,7 +147,7 @@ export default function AgentTerrainProfile({ agentId, onClose, onEdit }: AgentT
   if (loading) {
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
-        <div className="text-white animate-pulse">Chargement...</div>
+        <div className="text-content-primary animate-pulse">Chargement...</div>
       </div>
     );
   }
@@ -175,10 +175,10 @@ export default function AgentTerrainProfile({ agentId, onClose, onEdit }: AgentT
                 <img
                   src={resolveStorageUrl(photoUrl)}
                   alt={`${agent.nom} ${agent.prenom}`}
-                  className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-blue-500/30 shadow-lg shadow-blue-500/20"
+                  className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-status-info/30 shadow-lg shadow-status-info/20"
                 />
               ) : (
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center text-white font-bold text-sm sm:text-base shrink-0 shadow-lg shadow-blue-500/20">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-status-info to-accent flex items-center justify-center text-white font-bold text-sm sm:text-base shrink-0 shadow-lg shadow-status-info/20">
                   {agent.nom?.charAt(0)}{agent.prenom?.charAt(0)}
                 </div>
               )}
@@ -195,9 +195,9 @@ export default function AgentTerrainProfile({ agentId, onClose, onEdit }: AgentT
                 className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer"
               >
                 {uploadingPhoto ? (
-                  <Loader2 size={16} className="text-white animate-spin" />
+                  <Loader2 size={16} className="text-content-primary animate-spin" />
                 ) : (
-                  <Camera size={16} className="text-white" />
+                  <Camera size={16} className="text-content-primary" />
                 )}
               </button>
             </div>
@@ -251,7 +251,7 @@ export default function AgentTerrainProfile({ agentId, onClose, onEdit }: AgentT
                 </Card.Header>
                 <div className="space-y-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400 shrink-0">
+                    <div className="w-8 h-8 rounded-lg bg-status-info-bg flex items-center justify-center text-status-info shrink-0">
                        <Phone size={16} />
                     </div>
                     <div className="min-w-0">
@@ -261,7 +261,7 @@ export default function AgentTerrainProfile({ agentId, onClose, onEdit }: AgentT
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-cyan-500/10 flex items-center justify-center text-cyan-400 shrink-0">
+                    <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center text-accent shrink-0">
                        <MapPin size={16} />
                     </div>
                     <div className="min-w-0">
@@ -271,7 +271,7 @@ export default function AgentTerrainProfile({ agentId, onClose, onEdit }: AgentT
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-400 shrink-0">
+                    <div className="w-8 h-8 rounded-lg bg-status-info-bg flex items-center justify-center text-status-info shrink-0">
                        <Calendar size={16} />
                     </div>
                     <div className="min-w-0">
@@ -306,13 +306,13 @@ export default function AgentTerrainProfile({ agentId, onClose, onEdit }: AgentT
               </Card>
 
               <div className="grid grid-cols-2 gap-3">
-                <Card padding="sm" className="bg-gradient-to-br from-blue-500/10 to-blue-600/10 border-blue-500/20">
-                   <div className="text-blue-400 mb-1"><Users size={20} /></div>
+                <Card padding="sm" className="bg-gradient-to-br from-status-info/10 to-status-info/10 border-status-info/20">
+                   <div className="text-status-info mb-1"><Users size={20} /></div>
                    <div className="text-2xl font-bold text-content-primary">{agent.nombreClients || 0}</div>
                    <div className="text-xs text-content-muted">Clients Portefeuille</div>
                 </Card>
-                <Card padding="sm" className="bg-gradient-to-br from-emerald-500/10 to-emerald-600/10 border-emerald-500/20">
-                   <div className="text-emerald-400 mb-1"><DollarSign size={20} /></div>
+                <Card padding="sm" className="bg-gradient-to-br from-status-success/10 to-status-success/10 border-status-success/20">
+                   <div className="text-status-success mb-1"><DollarSign size={20} /></div>
                    <div className="text-lg font-bold text-content-primary truncate">{stats.collecteTotal.toLocaleString()} FCFA</div>
                    <div className="text-xs text-content-muted">Collecte Totale</div>
                 </Card>
@@ -391,7 +391,7 @@ export default function AgentTerrainProfile({ agentId, onClose, onEdit }: AgentT
                    </div>
                    <div className="w-full bg-surface-elevated rounded-full h-2 overflow-hidden mb-1">
                       <div
-                         className="h-full rounded-full bg-gradient-to-r from-teal-500 to-emerald-500 transition-all duration-500 ease-out"
+                         className="h-full rounded-full bg-gradient-to-r from-accent to-status-success transition-all duration-500 ease-out"
                          style={{ width: `${tauxReussite}%` }}
                       />
                    </div>

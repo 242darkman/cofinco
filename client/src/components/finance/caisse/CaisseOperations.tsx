@@ -424,14 +424,14 @@ export default function CaisseOperations({ sessionId }: CaisseOperationsProps) {
     if (!successMessage) return null;
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-        <div className="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-[24px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+        <div className="bg-surface-base border border-edge w-full max-w-sm rounded-[24px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
           <div className="p-6 relative flex flex-col items-center text-center space-y-6">
-             <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center ring-1 ring-emerald-500/50 mb-2">
-                 <CheckCircle className="text-emerald-500" size={32} />
+             <div className="w-16 h-16 rounded-full bg-status-success-bg flex items-center justify-center ring-1 ring-status-success/50 mb-2">
+                 <CheckCircle className="text-status-success" size={32} />
              </div>
              <div>
-                <h3 className="text-2xl font-bold text-white mb-2">Succès !</h3>
-                <p className="text-slate-400">Transaction enregistrée.</p>
+                <h3 className="text-2xl font-bold text-content-primary mb-2">Succès !</h3>
+                <p className="text-content-muted">Transaction enregistrée.</p>
              </div>
              <div className="space-y-3 w-full">
                 <div className="grid grid-cols-2 gap-3">
@@ -439,7 +439,7 @@ export default function CaisseOperations({ sessionId }: CaisseOperationsProps) {
                     variant="primary"
                     onClick={handlePrintTicket}
                     disabled={isPrinting}
-                    className="h-12 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white"
+                    className="h-12 rounded-xl bg-status-success hover:bg-status-success text-white"
                   >
                     {isPrinting ? <Loader className="animate-spin" /> : 'Reçu Ticket'}
                   </Button>
@@ -447,7 +447,7 @@ export default function CaisseOperations({ sessionId }: CaisseOperationsProps) {
                     variant="primary"
                     onClick={handlePrintInvoice}
                     disabled={isInvoicePrinting}
-                    className="h-12 rounded-xl bg-blue-600 hover:bg-blue-500 text-white"
+                    className="h-12 rounded-xl bg-status-info hover:bg-status-info text-white"
                   >
                     {isInvoicePrinting ? <Loader className="animate-spin" /> : 'Facture A4'}
                   </Button>
@@ -463,7 +463,7 @@ export default function CaisseOperations({ sessionId }: CaisseOperationsProps) {
   };
 
   return (
-    <div className="flex flex-col min-h-[85vh] font-sans selection:bg-cyan-500/30">
+    <div className="flex flex-col min-h-[85vh] font-sans selection:bg-accent-secondary/30">
       {printData && (
         <div
           aria-hidden="true"
@@ -498,21 +498,21 @@ export default function CaisseOperations({ sessionId }: CaisseOperationsProps) {
       <ConfirmDialog isOpen={showConfirmDialog} title="Confirmer" message={`Valider le ${direction.toLowerCase()} de ${formatMoney(parseFloat(montant || '0'))} ?`} onConfirm={confirmerOperation} onClose={() => setShowConfirmDialog(false)} />
 
       <div className="w-full max-w-md mx-auto flex-1 flex flex-col">
-        <Card className="flex-1 flex flex-col bg-slate-900/95 backdrop-blur-xl border border-slate-800/50 shadow-2xl rounded-[32px] overflow-hidden">
+        <Card className="flex-1 flex flex-col bg-surface-base/95 backdrop-blur-xl border border-edge/50 shadow-2xl rounded-[32px] overflow-hidden">
             
             {/* Header */}
             <div className="px-6 pt-8 pb-4 flex items-center justify-between">
                 {selectedClient ? (
-                     <button onClick={reinitialiserFormulaire} className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors">
+                     <button onClick={reinitialiserFormulaire} className="flex items-center gap-2 text-content-muted hover:text-content-primary transition-colors">
                         <ArrowLeft size={20} /> <span className="text-sm font-medium">Retour</span>
                      </button>
                 ) : (
                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center text-cyan-400"><Wallet size={16} /></div>
-                        <span className="font-bold text-slate-200">Caisse Espèces</span>
+                        <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center text-accent"><Wallet size={16} /></div>
+                        <span className="font-bold text-content-secondary">Caisse Espèces</span>
                     </div>
                 )}
-                {selectedClient && <div className="px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-bold uppercase tracking-wider">Mode Transaction</div>}
+                {selectedClient && <div className="px-3 py-1 rounded-full bg-accent/10 border border-accent/20 text-accent text-xs font-bold uppercase tracking-wider">Mode Transaction</div>}
             </div>
 
             <div className="p-6 flex-1 flex flex-col space-y-6 overflow-y-auto custom-scrollbar">
@@ -520,13 +520,13 @@ export default function CaisseOperations({ sessionId }: CaisseOperationsProps) {
               {!selectedClient ? (
                 /* Step 1: Search */
                 <div className="flex-1 flex flex-col justify-center animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <h2 className="text-3xl font-bold text-white text-center mb-2">Quel client ?</h2>
-                    <p className="text-slate-400 text-center mb-8">Recherchez un client pour commencer</p>
+                    <h2 className="text-3xl font-bold text-content-primary text-center mb-2">Quel client ?</h2>
+                    <p className="text-content-muted text-center mb-8">Recherchez un client pour commencer</p>
                     <div className="relative group mb-6">
-                        <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none"><Search className="text-slate-500" size={24} /></div>
-                        <input type="text" autoFocus value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && rechercherClient()} placeholder="Nom, téléphone, compte..." className="w-full pl-14 pr-6 py-6 bg-slate-800/50 border border-slate-700/50 rounded-3xl focus:border-cyan-500 focus:bg-slate-800 text-xl text-white outline-none transition-all shadow-inner placeholder:text-slate-600" />
+                        <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none"><Search className="text-content-muted" size={24} /></div>
+                        <input type="text" autoFocus value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && rechercherClient()} placeholder="Nom, téléphone, compte..." className="w-full pl-14 pr-6 py-6 bg-surface/50 border border-edge-subtle rounded-3xl focus:border-accent focus:bg-surface text-xl text-content-primary outline-none transition-all shadow-inner placeholder:text-content-muted" />
                     </div>
-                    <Button onClick={rechercherClient} disabled={searchLoading || !searchTerm.trim()} className="w-full py-5 rounded-2xl text-lg font-bold shadow-lg shadow-cyan-900/20 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 transition-all active:scale-[0.98]">
+                    <Button onClick={rechercherClient} disabled={searchLoading || !searchTerm.trim()} className="w-full py-5 rounded-2xl text-lg font-bold shadow-lg shadow-accent/20 bg-gradient-to-r from-accent to-status-info hover:from-accent hover:to-status-info transition-all active:scale-[0.98]">
                         {searchLoading ? <Loader className="animate-spin mx-auto" /> : 'Continuer'}
                     </Button>
                 </div>
@@ -535,29 +535,29 @@ export default function CaisseOperations({ sessionId }: CaisseOperationsProps) {
                 <div className="flex flex-col gap-6 animate-in fade-in duration-500 pb-20">
                     
                     {/* Client Card */}
-                    <div className="p-4 rounded-3xl bg-slate-800/40 border border-slate-700/50 flex items-center gap-4">
-                        <div className="w-14 h-14 rounded-full bg-slate-700 overflow-hidden flex-shrink-0 border-2 border-slate-600">
-                             {selectedClient.photo_url ? <img src={selectedClient.photo_url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-slate-400 font-bold text-lg">{selectedClient.nom[0]}</div>}
+                    <div className="p-4 rounded-3xl bg-surface/40 border border-edge-subtle flex items-center gap-4">
+                        <div className="w-14 h-14 rounded-full bg-surface-elevated overflow-hidden flex-shrink-0 border-2 border-edge-strong">
+                             {selectedClient.photo_url ? <img src={selectedClient.photo_url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-content-muted font-bold text-lg">{selectedClient.nom[0]}</div>}
                         </div>
                         <div className="flex-1 min-w-0">
-                            <h3 className="font-bold text-white truncate">{selectedClient.nom} {selectedClient.prenom}</h3>
-                            <p className="text-slate-400 text-sm truncate">{selectedClient.telephone} • {selectedClient.numeroCompte || 'Sans compte'}</p>
+                            <h3 className="font-bold text-content-primary truncate">{selectedClient.nom} {selectedClient.prenom}</h3>
+                            <p className="text-content-muted text-sm truncate">{selectedClient.telephone} • {selectedClient.numeroCompte || 'Sans compte'}</p>
                         </div>
                     </div>
 
                     {/* Direction Switch */}
-                    <div className="grid grid-cols-2 gap-3 p-1.5 bg-slate-800/50 rounded-2xl border border-slate-800">
-                        <button onClick={() => { setDirection('Dépôt'); setSelectedDestination(null); setMontant(''); }} className={`relative flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all ${direction === 'Dépôt' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-900/20' : 'text-slate-400 hover:text-emerald-400'}`}>
+                    <div className="grid grid-cols-2 gap-3 p-1.5 bg-surface/50 rounded-2xl border border-edge">
+                        <button onClick={() => { setDirection('Dépôt'); setSelectedDestination(null); setMontant(''); }} className={`relative flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all ${direction === 'Dépôt' ? 'bg-status-success text-white shadow-lg shadow-status-success/20' : 'text-content-muted hover:text-status-success'}`}>
                             <ArrowDownLeft size={20} /> Dépôt
                         </button>
-                        <button onClick={() => { setDirection('Retrait'); setSelectedDestination(null); setMontant(''); }} className={`relative flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all ${direction === 'Retrait' ? 'bg-red-500 text-white shadow-lg shadow-red-900/20' : 'text-slate-400 hover:text-red-400'}`}>
+                        <button onClick={() => { setDirection('Retrait'); setSelectedDestination(null); setMontant(''); }} className={`relative flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all ${direction === 'Retrait' ? 'bg-status-danger text-white shadow-lg shadow-status-danger/20' : 'text-content-muted hover:text-status-danger'}`}>
                              Retrait <ArrowUpRight size={20} />
                         </button>
                     </div>
 
                     {/* Dynamic Destination Grid */}
                     <div className="space-y-3">
-                         <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Destination</label>
+                         <label className="text-xs font-bold text-content-muted uppercase tracking-wider ml-1">Destination</label>
                          <div className="grid grid-cols-2 gap-3">
                             {availableDestinations.map(opt => (
                                 <button
@@ -572,29 +572,29 @@ export default function CaisseOperations({ sessionId }: CaisseOperationsProps) {
                                     }}
                                     className={`relative p-4 rounded-2xl border-2 text-left transition-all duration-200 group overflow-hidden flex flex-col justify-between h-28 ${
                                         selectedDestination?.id === opt.id
-                                        ? 'border-cyan-500 bg-cyan-950/20 shadow-lg shadow-cyan-900/20'
-                                        : 'border-slate-800 bg-slate-900/50 hover:border-slate-700 hover:bg-slate-800'
+                                        ? 'border-accent bg-accent/10 shadow-lg shadow-accent/20'
+                                        : 'border-edge bg-surface-base/50 hover:border-edge hover:bg-surface'
                                     }`}
                                 >
                                     <div className="flex items-start justify-between w-full">
-                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${selectedDestination?.id === opt.id ? 'bg-cyan-500 text-white' : 'bg-slate-800 text-slate-400'}`}>
+                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${selectedDestination?.id === opt.id ? 'bg-accent-secondary text-content-primary' : 'bg-surface text-content-muted'}`}>
                                             {opt.type === 'Compte' && <CreditCard size={16} />}
                                             {opt.type === 'Credit' && <ShieldCheck size={16} />}
                                             {opt.type === 'Tontine' && <Users size={16} />}
                                         </div>
-                                        {selectedDestination?.id === opt.id && <CheckCircle size={18} className="text-cyan-500" />}
+                                        {selectedDestination?.id === opt.id && <CheckCircle size={18} className="text-accent" />}
                                     </div>
                                     <div>
-                                        <span className={`block font-bold text-sm leading-tight ${selectedDestination?.id === opt.id ? 'text-white' : 'text-slate-300'}`}>
+                                        <span className={`block font-bold text-sm leading-tight ${selectedDestination?.id === opt.id ? 'text-content-primary' : 'text-content-secondary'}`}>
                                             {opt.label}
                                         </span>
-                                        {opt.balance && <span className="text-[10px] text-slate-500 font-medium truncate block mt-1">{opt.type === 'Compte' ? formatMoney(opt.balance) : opt.balance}</span>}
+                                        {opt.balance && <span className="text-[10px] text-content-muted font-medium truncate block mt-1">{opt.type === 'Compte' ? formatMoney(opt.balance) : opt.balance}</span>}
                                     </div>
                                 </button>
                             ))}
                             
                             {availableDestinations.length === 0 && (
-                                <div className="col-span-2 py-8 text-center text-slate-500 border border-dashed border-slate-800 rounded-2xl">
+                                <div className="col-span-2 py-8 text-center text-content-muted border border-dashed border-edge rounded-2xl">
                                     Aucune destination disponible pour ce mode.
                                 </div>
                             )}
@@ -604,23 +604,23 @@ export default function CaisseOperations({ sessionId }: CaisseOperationsProps) {
                     {/* Amount Input */}
                     {selectedDestination && (
                         <div className="space-y-3 animate-in slide-in-from-bottom-4 fade-in duration-300">
-                             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Montant (FCFA)</label>
+                             <label className="text-xs font-bold text-content-muted uppercase tracking-wider ml-1">Montant (FCFA)</label>
                              <div className="relative">
                                 <input
                                     type="number"
                                     value={montant}
                                     onChange={(e) => { setMontant(e.target.value); setMontantError(null); }}
                                     placeholder="0"
-                                    className="w-full bg-slate-950 border-2 border-slate-800 focus:border-cyan-500/50 rounded-2xl py-5 text-4xl font-mono font-bold text-white text-center outline-none transition-colors"
+                                    className="w-full bg-surface-base border-2 border-edge focus:border-accent/50 rounded-2xl py-5 text-4xl font-mono font-bold text-content-primary text-center outline-none transition-colors"
                                 />
                              </div>
-                             {montantError && <p className="text-red-400 text-xs text-center font-bold">{montantError}</p>}
+                             {montantError && <p className="text-status-danger text-xs text-center font-bold">{montantError}</p>}
                              
                              {/* Valid Button */}
                             <Button
                                 onClick={preparerOperation}
                                 disabled={loading}
-                                className="w-full py-5 mt-4 text-base font-bold rounded-2xl shadow-xl shadow-cyan-900/20 active:scale-[0.98] transition-all bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white"
+                                className="w-full py-5 mt-4 text-base font-bold rounded-2xl shadow-xl shadow-accent/20 active:scale-[0.98] transition-all bg-gradient-to-r from-accent to-status-info hover:from-accent hover:to-status-info text-white"
                             >
                                 {loading ? <Loader className="animate-spin mx-auto" /> : `Confirmer l'opération`}
                             </Button>

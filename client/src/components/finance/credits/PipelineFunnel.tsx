@@ -40,9 +40,9 @@ export function PipelineFunnel({ steps }: PipelineFunnelProps) {
       count: steps.demandes.count,
       amount: steps.demandes.amount,
       icon: FileText,
-      color: 'text-slate-400',
-      bgColor: 'bg-slate-500',
-      borderColor: 'border-slate-500' // Gris
+      color: 'text-content-muted',
+      bgColor: 'bg-surface-muted0',
+      borderColor: 'border-edge-strong' // Gris
     },
     {
       id: 'frais',
@@ -50,9 +50,9 @@ export function PipelineFunnel({ steps }: PipelineFunnelProps) {
       count: steps.frais.count,
       amount: steps.frais.amount,
       icon: Banknote,
-      color: 'text-blue-400',
-      bgColor: 'bg-blue-500',
-      borderColor: 'border-blue-500' // Bleu
+      color: 'text-status-info',
+      bgColor: 'bg-status-info',
+      borderColor: 'border-status-info' // Bleu
     },
     {
       id: 'enquete',
@@ -60,9 +60,9 @@ export function PipelineFunnel({ steps }: PipelineFunnelProps) {
       count: steps.enquetes.count,
       amount: steps.enquetes.amount,
       icon: Search,
-      color: 'text-indigo-400',
-      bgColor: 'bg-indigo-500',
-      borderColor: 'border-indigo-500', // Violet
+      color: 'text-accent',
+      bgColor: 'bg-accent',
+      borderColor: 'border-accent', // Violet
       overdue: steps.enquetes.overdue > 0
     },
     {
@@ -71,9 +71,9 @@ export function PipelineFunnel({ steps }: PipelineFunnelProps) {
       count: steps.comite.count,
       amount: steps.comite.amount,
       icon: Users,
-      color: 'text-purple-400',
-      bgColor: 'bg-purple-500',
-      borderColor: 'border-purple-500' // Violet Foncé
+      color: 'text-status-info',
+      bgColor: 'bg-status-info',
+      borderColor: 'border-status-info' // Violet Foncé
     },
     {
       id: 'decaissement',
@@ -81,9 +81,9 @@ export function PipelineFunnel({ steps }: PipelineFunnelProps) {
       count: steps.decaissement.count,
       amount: steps.decaissement.amount,
       icon: DollarSign,
-      color: 'text-emerald-400',
-      bgColor: 'bg-emerald-500',
-      borderColor: 'border-emerald-500' // Vert
+      color: 'text-status-success',
+      bgColor: 'bg-status-success',
+      borderColor: 'border-status-success' // Vert
     }
   ];
 
@@ -95,25 +95,25 @@ export function PipelineFunnel({ steps }: PipelineFunnelProps) {
   };
 
   return (
-    <div className="w-full grid grid-cols-5 gap-2 mb-4 bg-slate-900/50 p-2 rounded-xl border border-slate-800/50">
+    <div className="w-full grid grid-cols-5 gap-2 mb-4 bg-surface-base/50 p-2 rounded-xl border border-edge/50">
       {funnelSteps.map((step, index) => (
         <div 
           key={step.id} 
-          className={`relative flex items-center justify-between p-2 lg:p-3 bg-slate-800/50 rounded-lg border transition-all cursor-default group overflow-hidden ${
-             step.count > 0 ? 'border-slate-700/50 hover:bg-slate-800 hover:border-slate-600' : 'border-transparent opacity-70 hover:opacity-100'
-          } ${step.overdue ? 'shadow-[0_0_10px_rgba(249,115,22,0.1)] border-orange-500/50' : ''}`}
+          className={`relative flex items-center justify-between p-2 lg:p-3 bg-surface/50 rounded-lg border transition-all cursor-default group overflow-hidden ${
+             step.count > 0 ? 'border-edge-subtle hover:bg-surface hover:border-edge-strong' : 'border-transparent opacity-70 hover:opacity-100'
+          } ${step.overdue ? 'shadow-[0_0_10px_rgba(249,115,22,0.1)] border-status-warning/50' : ''}`}
         >
           {/* Connector arrow visually managed by Grid gap usually, but could be absolute if needed. 
               In compact mode, simple gap is cleaner. */}
           
           <div className="flex flex-col min-w-0">
              <div className="flex items-center gap-1.5 mb-0.5">
-                {step.overdue ? <AlertTriangle size={12} className="text-orange-500 animate-pulse" /> : <step.icon size={12} className={step.color} />}
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 truncate">{step.label}</span>
+                {step.overdue ? <AlertTriangle size={12} className="text-status-warning animate-pulse" /> : <step.icon size={12} className={step.color} />}
+                <span className="text-[10px] font-bold uppercase tracking-wider text-content-muted truncate">{step.label}</span>
              </div>
              <div className="flex items-baseline gap-2">
-                <span className="text-lg font-bold text-white leading-none">{step.count}</span>
-                {step.amount > 0 && <span className="text-[10px] text-slate-400 font-mono hidden xl:inline-block">{formatAmount(step.amount)}</span>}
+                <span className="text-lg font-bold text-content-primary leading-none">{step.count}</span>
+                {step.amount > 0 && <span className="text-[10px] text-content-muted font-mono hidden xl:inline-block">{formatAmount(step.amount)}</span>}
              </div>
           </div>
 

@@ -189,7 +189,7 @@ export default function RessourcesHumaines() {
     if (loading && activeTab === 'list') {
       return (
         <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-500"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div>
         </div>
       );
     }
@@ -265,7 +265,7 @@ export default function RessourcesHumaines() {
               onUpdate={updateAvantage}
               onDelete={deleteAvantage}
             />
-            <div className="border-t border-slate-700/50 pt-4">
+            <div className="border-t border-edge-subtle pt-4">
               <ProspectionPrimeConfig />
             </div>
           </div>
@@ -295,15 +295,15 @@ export default function RessourcesHumaines() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#020617] overflow-y-auto overflow-x-hidden">
+    <div className="flex flex-col h-full bg-surface-base overflow-y-auto overflow-x-hidden">
       {/* Header & Tabs Section - Fixed */}
-      <div className="shrink-0 space-y-2 p-2 sm:p-4 pb-0 bg-[#020617] border-b border-slate-800/50">
+      <div className="shrink-0 space-y-2 p-2 sm:p-4 pb-0 bg-surface-base border-b border-edge/50">
         <FeatureHeader
           featureKey="hr.employees"
           title={
             <>
               {FEATURE_DESCRIPTIONS['hr.employees'].title}
-              <span className="ml-2 px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-400 text-[10px] font-medium tracking-wide">
+              <span className="ml-2 px-2 py-0.5 rounded-full bg-surface border border-edge text-content-muted text-[10px] font-medium tracking-wide">
                 {employes.length} collab.
               </span>
             </>
@@ -316,7 +316,7 @@ export default function RessourcesHumaines() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setShowImportModal(true)}
-                  className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-xs font-medium transition flex items-center gap-1.5"
+                  className="px-3 py-1.5 bg-surface-elevated hover:bg-surface-subtle text-content-primary rounded-lg text-xs font-medium transition flex items-center gap-1.5"
                   title="Importer des employés depuis un fichier CSV"
                 >
                   <Upload size={14} />
@@ -327,7 +327,7 @@ export default function RessourcesHumaines() {
                     setEditingEmploye(null);
                     setShowForm(true);
                   }}
-                  className="px-3 py-1.5 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg text-xs font-bold shadow-lg shadow-cyan-500/20 transition flex items-center gap-1.5 self-start sm:self-auto"
+                  className="px-3 py-1.5 bg-accent-secondary hover:bg-accent-secondary-hover text-content-primary rounded-lg text-xs font-bold shadow-lg shadow-accent/20 transition flex items-center gap-1.5 self-start sm:self-auto"
                 >
                   <UserPlus size={14} />
                   <span>Nouvel Employé</span>

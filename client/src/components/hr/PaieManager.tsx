@@ -167,7 +167,7 @@ export default function PaieManager() {
 
   const myColumns = [
     { key: 'mois', label: 'Mois', primary: true, format: (val: string) => <span className="font-medium">{formatMoisLabel(val)}</span> },
-    { key: 'salaireNet', label: 'Net à Payer', format: (val: string) => <span className="font-bold text-emerald-600 dark:text-emerald-400">{formatMoney(val)}</span> },
+    { key: 'salaireNet', label: 'Net à Payer', format: (val: string) => <span className="font-bold text-status-success">{formatMoney(val)}</span> },
     { key: 'statut', label: 'Statut', format: (val: string) => {
       const cfg = RUN_STATUS_CONFIG[val] || { variant: 'warning' as const, label: val };
       return <Badge variant={cfg.variant} value={cfg.label} />;
@@ -182,15 +182,15 @@ export default function PaieManager() {
   // Runs list columns
   const runColumns = [
     { key: 'period', label: 'Période', primary: true, format: (val: string) => <span className="font-mono font-medium">{val}</span> },
-    { key: 'version', label: 'V.', format: (val: number) => <span className="font-mono text-xs text-slate-400">v{val}</span> },
+    { key: 'version', label: 'V.', format: (val: number) => <span className="font-mono text-xs text-content-muted">v{val}</span> },
     { key: 'status', label: 'Statut', format: (val: string) => {
       const cfg = RUN_STATUS_CONFIG[val] || { variant: 'warning' as const, label: val };
       return <Badge variant={cfg.variant} value={cfg.label} />;
     }},
-    { key: 'employeeCount', label: 'Employés', hideOnMobile: true, format: (val: number) => <span className="text-slate-300">{val}</span> },
-    { key: 'totalNet', label: 'Net Total', format: (val: string) => <span className="font-bold text-emerald-400">{formatMoney(val)}</span> },
+    { key: 'employeeCount', label: 'Employés', hideOnMobile: true, format: (val: number) => <span className="text-content-secondary">{val}</span> },
+    { key: 'totalNet', label: 'Net Total', format: (val: string) => <span className="font-bold text-status-success">{formatMoney(val)}</span> },
     { key: 'issueCount', label: '', hideOnMobile: true, format: (val: number) => val > 0 ? (
-      <span className="flex items-center gap-1 text-amber-400 text-xs"><AlertTriangle size={12} />{val}</span>
+      <span className="flex items-center gap-1 text-status-warning text-xs"><AlertTriangle size={12} />{val}</span>
     ) : null },
   ];
 
@@ -214,14 +214,14 @@ export default function PaieManager() {
     if (loadingDetail) {
       return (
         <div className="flex items-center justify-center py-20">
-          <Loader2 className="animate-spin text-emerald-500" size={24} />
-          <span className="ml-2 text-slate-400 text-sm">Chargement du run...</span>
+          <Loader2 className="animate-spin text-status-success" size={24} />
+          <span className="ml-2 text-content-muted text-sm">Chargement du run...</span>
         </div>
       );
     }
 
     if (!run) {
-      return <div className="text-center py-10 text-slate-500 text-sm">Run introuvable.</div>;
+      return <div className="text-center py-10 text-content-muted text-sm">Run introuvable.</div>;
     }
 
     const statusCfg = RUN_STATUS_CONFIG[run.status] || { variant: 'warning' as const, label: run.status };
@@ -233,26 +233,26 @@ export default function PaieManager() {
         <div className="flex items-center justify-between flex-wrap gap-2">
           <button
             onClick={() => setSelectedRunId(null)}
-            className="flex items-center gap-1 text-sm text-slate-400 hover:text-white transition-colors"
+            className="flex items-center gap-1 text-sm text-content-muted hover:text-content-primary transition-colors"
           >
             <ArrowLeft size={16} /> Retour aux runs
           </button>
           <div className="flex items-center gap-2">
             {run.status === 'DRAFT' && canValidate && !hasBlockingIssues && (
               <Button size="sm" variant="outline" icon={ShieldCheck} onClick={() => handleValidateRun(run.id)} isLoading={isValidating}
-                className="h-7 text-[11px] border-blue-500/50 text-blue-400 hover:bg-blue-500/10">
+                className="h-7 text-[11px] border-status-info/50 text-status-info hover:bg-status-info-bg">
                 Valider le Run
               </Button>
             )}
             {run.status === 'VALIDATED' && canPay && (
               <Button size="sm" variant="outline" icon={CreditCard} onClick={() => handlePayRun(run.id)} isLoading={isPaying}
-                className="h-7 text-[11px] border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10">
+                className="h-7 text-[11px] border-status-success/50 text-status-success hover:bg-status-success-bg">
                 Payer le Run
               </Button>
             )}
             {['DRAFT', 'VALIDATED', 'PAID'].includes(run.status) && canGeneratePaie && (
               <Button size="sm" variant="outline" icon={RotateCcw} onClick={() => handleRerunOpen(run.id)} isLoading={isRerunning}
-                className="h-7 text-[11px] border-amber-500/50 text-amber-400 hover:bg-amber-500/10">
+                className="h-7 text-[11px] border-status-warning/50 text-status-warning hover:bg-status-warning-bg">
                 Re-run
               </Button>
             )}
@@ -263,17 +263,17 @@ export default function PaieManager() {
         </div>
 
         {/* Run summary card */}
-        <Card padding="sm" className="bg-slate-800/80 border-slate-700">
+        <Card padding="sm" className="bg-surface/80 border-edge">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-600 to-emerald-500 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-status-info to-status-success flex items-center justify-center">
                 <Calculator size={20} className="text-white" />
               </div>
               <div>
-                <h3 className="font-bold text-white text-sm">
-                  Run {run.period} <span className="text-slate-400 font-normal text-xs">v{run.version}</span>
+                <h3 className="font-bold text-content-primary text-sm">
+                  Run {run.period} <span className="text-content-muted font-normal text-xs">v{run.version}</span>
                 </h3>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-content-muted">
                   {run.employeeCount} employé(s) • Créé le {new Date(run.createdAt).toLocaleDateString('fr-FR')}
                 </p>
               </div>
@@ -281,32 +281,32 @@ export default function PaieManager() {
             <div className="flex items-center gap-4">
               <Badge variant={statusCfg.variant} value={statusCfg.label} />
               <div className="text-right">
-                <div className="text-xs text-slate-400">Net total</div>
-                <div className="font-bold text-emerald-400 font-mono">{formatMoney(run.totalNet)}</div>
+                <div className="text-xs text-content-muted">Net total</div>
+                <div className="font-bold text-status-success font-mono">{formatMoney(run.totalNet)}</div>
               </div>
             </div>
           </div>
           {/* Totals row */}
-          <div className="grid grid-cols-4 gap-3 mt-3 pt-3 border-t border-slate-700/50">
+          <div className="grid grid-cols-4 gap-3 mt-3 pt-3 border-t border-edge-subtle">
             <div>
-              <div className="text-[10px] text-slate-500 uppercase">Brut</div>
-              <div className="font-mono text-sm text-white">{formatMoney(run.totalBrut)}</div>
+              <div className="text-[10px] text-content-muted uppercase">Brut</div>
+              <div className="font-mono text-sm text-content-primary">{formatMoney(run.totalBrut)}</div>
             </div>
             <div>
-              <div className="text-[10px] text-slate-500 uppercase">Charges Sal.</div>
-              <div className="font-mono text-sm text-red-400">{formatMoney(run.totalChargesSalariales)}</div>
+              <div className="text-[10px] text-content-muted uppercase">Charges Sal.</div>
+              <div className="font-mono text-sm text-status-danger">{formatMoney(run.totalChargesSalariales)}</div>
             </div>
             <div>
-              <div className="text-[10px] text-slate-500 uppercase">Charges Pat.</div>
-              <div className="font-mono text-sm text-slate-400">{formatMoney(run.totalChargesPatronales)}</div>
+              <div className="text-[10px] text-content-muted uppercase">Charges Pat.</div>
+              <div className="font-mono text-sm text-content-muted">{formatMoney(run.totalChargesPatronales)}</div>
             </div>
             <div>
-              <div className="text-[10px] text-slate-500 uppercase">Net</div>
-              <div className="font-mono text-sm text-emerald-400 font-bold">{formatMoney(run.totalNet)}</div>
+              <div className="text-[10px] text-content-muted uppercase">Net</div>
+              <div className="font-mono text-sm text-status-success font-bold">{formatMoney(run.totalNet)}</div>
             </div>
           </div>
           {run.rerunReason && (
-            <div className="mt-2 px-2 py-1 bg-amber-500/10 border border-amber-500/20 rounded text-xs text-amber-400 flex items-center gap-1">
+            <div className="mt-2 px-2 py-1 bg-status-warning-bg border border-status-warning/20 rounded text-xs text-status-warning flex items-center gap-1">
               <RefreshCw size={12} /> Re-run de v{(run.version || 1) - 1}: {run.rerunReason}
             </div>
           )}
@@ -314,8 +314,8 @@ export default function PaieManager() {
 
         {/* Issues */}
         {issues.length > 0 && (
-          <Card padding="sm" className="bg-amber-900/10 border-amber-900/20">
-            <h4 className="text-xs font-bold text-amber-400 flex items-center gap-1 mb-2">
+          <Card padding="sm" className="bg-status-warning-bg border-status-warning/20">
+            <h4 className="text-xs font-bold text-status-warning flex items-center gap-1 mb-2">
               <AlertTriangle size={14} />
               Alertes ({issues.length})
             </h4>
@@ -323,12 +323,12 @@ export default function PaieManager() {
               {issues.map((issue) => (
                 <div key={issue.id} className={`text-xs px-2 py-1 rounded flex items-center gap-2 ${
                   issue.severity === 'BLOCKING'
-                    ? 'bg-red-500/10 text-red-400'
-                    : 'bg-amber-500/10 text-amber-400'
+                    ? 'bg-status-danger-bg text-status-danger'
+                    : 'bg-status-warning-bg text-status-warning'
                 }`}>
                   {issue.severity === 'BLOCKING' ? <AlertCircle size={12} /> : <AlertTriangle size={12} />}
                   <span className="flex-1">{issue.message}</span>
-                  {issue.resolved && <CheckCircle size={12} className="text-emerald-400" />}
+                  {issue.resolved && <CheckCircle size={12} className="text-status-success" />}
                 </div>
               ))}
             </div>
@@ -336,10 +336,10 @@ export default function PaieManager() {
         )}
 
         {/* Bulletins table */}
-        <Card padding="none" className="bg-slate-900/50 border-slate-800">
-          <div className="p-3 border-b border-slate-800">
-            <h4 className="text-sm font-bold text-white flex items-center gap-2">
-              <FileText size={16} className="text-blue-400" />
+        <Card padding="none" className="bg-surface-base/50 border-edge">
+          <div className="p-3 border-b border-edge">
+            <h4 className="text-sm font-bold text-content-primary flex items-center gap-2">
+              <FileText size={16} className="text-status-info" />
               Bulletins ({bulletins.length})
             </h4>
           </div>
@@ -348,9 +348,9 @@ export default function PaieManager() {
               data={bulletins}
               columns={[
                 { key: 'employeNom', label: 'Employé', primary: true },
-                { key: 'salaireBaseSnapshot', label: 'Base', hideOnMobile: true, format: (val: number) => <span className="font-mono text-slate-300">{formatMoney(val)}</span> },
-                { key: 'salaireBrut', label: 'Brut', hideOnMobile: true, format: (val: string) => <span className="font-mono text-slate-300">{formatMoney(val)}</span> },
-                { key: 'salaireNet', label: 'Net', format: (val: string) => <span className="font-bold text-emerald-400">{formatMoney(val)}</span> },
+                { key: 'salaireBaseSnapshot', label: 'Base', hideOnMobile: true, format: (val: number) => <span className="font-mono text-content-secondary">{formatMoney(val)}</span> },
+                { key: 'salaireBrut', label: 'Brut', hideOnMobile: true, format: (val: string) => <span className="font-mono text-content-secondary">{formatMoney(val)}</span> },
+                { key: 'salaireNet', label: 'Net', format: (val: string) => <span className="font-bold text-status-success">{formatMoney(val)}</span> },
                 { key: 'actions', label: '', format: (_val: any, item: BulletinPaie) => (
                   <Button variant="ghost" size="sm" icon={Eye} onClick={(e: React.MouseEvent) => { e.stopPropagation(); setViewerBulletinId(item.id); }} />
                 )},
@@ -359,11 +359,11 @@ export default function PaieManager() {
               density="compact"
               maxHeight="400px"
               className="border-0 rounded-none"
-              headerClassName="bg-slate-900 sticky top-0"
+              headerClassName="bg-surface-base sticky top-0"
               onRowClick={(item: BulletinPaie) => setViewerBulletinId(item.id)}
             />
           ) : (
-            <div className="text-center py-8 text-slate-500 text-xs">
+            <div className="text-center py-8 text-content-muted text-xs">
               Aucun bulletin dans ce run.
             </div>
           )}
@@ -389,11 +389,11 @@ export default function PaieManager() {
       )}
 
       {activeTab === 'config' && isRH ? (
-        <div className="flex-1 min-h-0 bg-slate-900 border border-slate-800 rounded-lg overflow-y-auto">
+        <div className="flex-1 min-h-0 bg-surface-base border border-edge rounded-lg overflow-y-auto">
           <PayrollConfigPanel />
         </div>
       ) : activeTab === 'avances' && isRH ? (
-        <div className="flex-1 min-h-0 bg-slate-900 border border-slate-800 rounded-lg flex flex-col overflow-hidden">
+        <div className="flex-1 min-h-0 bg-surface-base border border-edge rounded-lg flex flex-col overflow-hidden">
           <SalaryAdvances />
         </div>
       ) : activeTab === 'generate' && isRH ? (
@@ -403,20 +403,20 @@ export default function PaieManager() {
           ) : (
             <div className="space-y-3">
               {/* Generation Card */}
-              <Card variant="default" padding="sm" className="relative overflow-hidden bg-slate-800/80 border-slate-700">
+              <Card variant="default" padding="sm" className="relative overflow-hidden bg-surface/80 border-edge">
                 <div className="absolute top-0 right-0 p-2 opacity-5">
                   <Calculator size={80} />
                 </div>
                 <div className="relative z-10 flex flex-col md:flex-row items-center gap-4 p-2">
                   <div className="flex-1 space-y-1">
-                    <h3 className="text-base font-bold text-white flex items-center gap-2">
-                      <Play className="text-emerald-400" size={18} />
+                    <h3 className="text-base font-bold text-content-primary flex items-center gap-2">
+                      <Play className="text-status-success" size={18} />
                       Génération de la Paie
                     </h3>
-                    <p className="text-xs text-slate-400">Sélectionnez le mois et lancez un run de paie</p>
+                    <p className="text-xs text-content-muted">Sélectionnez le mois et lancez un run de paie</p>
                     <input
                       type="month"
-                      className="mt-2 w-full max-w-xs px-3 py-2 border rounded text-sm bg-slate-900 border-slate-700 text-white focus:ring-1 focus:ring-emerald-500/50 outline-none font-mono"
+                      className="mt-2 w-full max-w-xs px-3 py-2 border rounded text-sm bg-surface-base border-edge text-content-primary focus:ring-1 focus:ring-status-success/50 outline-none font-mono"
                       value={selectedMonth}
                       onChange={(e) => setSelectedMonth(e.target.value)}
                     />
@@ -427,7 +427,7 @@ export default function PaieManager() {
                       disabled={isGenerating}
                       variant="success"
                       size="sm"
-                      className="shadow-lg shadow-emerald-500/10 h-9"
+                      className="shadow-lg shadow-status-success/10 h-9"
                       icon={Play}
                       isLoading={isGenerating}
                     >
@@ -438,20 +438,20 @@ export default function PaieManager() {
               </Card>
 
               {/* Runs table */}
-              <Card padding="none" className="bg-slate-900/50 border-slate-800 flex flex-col">
-                <div className="p-3 border-b border-slate-800 flex items-center justify-between">
-                  <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                    <Clock size={16} className="text-blue-400" />
+              <Card padding="none" className="bg-surface-base/50 border-edge flex flex-col">
+                <div className="p-3 border-b border-edge flex items-center justify-between">
+                  <h4 className="text-sm font-bold text-content-primary flex items-center gap-2">
+                    <Clock size={16} className="text-status-info" />
                     Runs de paie — {selectedMonth}
                   </h4>
                   {runsDuMois.length > 0 && (
-                    <span className="text-[10px] text-slate-400">{runsDuMois.length} run(s)</span>
+                    <span className="text-[10px] text-content-muted">{runsDuMois.length} run(s)</span>
                   )}
                 </div>
                 <div className="flex-1 overflow-hidden">
                   {loadingRuns ? (
                     <div className="flex items-center justify-center py-10">
-                      <Loader2 className="animate-spin text-slate-500" size={20} />
+                      <Loader2 className="animate-spin text-content-muted" size={20} />
                     </div>
                   ) : runsDuMois.length > 0 ? (
                     <ResponsiveTable
@@ -461,11 +461,11 @@ export default function PaieManager() {
                       density="compact"
                       maxHeight="300px"
                       className="border-0 rounded-none"
-                      headerClassName="bg-slate-900 sticky top-0"
+                      headerClassName="bg-surface-base sticky top-0"
                       onRowClick={(item: PayrollRun) => setSelectedRunId(item.id)}
                     />
                   ) : (
-                    <div className="text-center py-8 text-slate-500 text-xs">
+                    <div className="text-center py-8 text-content-muted text-xs">
                       Aucun run généré pour {selectedMonth}. Cliquez sur "Lancer le Traitement".
                     </div>
                   )}
@@ -474,8 +474,8 @@ export default function PaieManager() {
 
               {/* Info cards */}
               <div className="grid lg:grid-cols-2 gap-3">
-                <Card variant="glass" className="bg-gradient-to-br from-blue-900/20 to-slate-900/40 border-slate-800" padding="sm">
-                  <div className="flex items-center gap-2 font-bold text-blue-400 text-xs uppercase tracking-wide mb-3">
+                <Card variant="glass" className="bg-gradient-to-br from-status-info/10 to-surface-base/40 border-edge" padding="sm">
+                  <div className="flex items-center gap-2 font-bold text-status-info text-xs uppercase tracking-wide mb-3">
                     <AlertCircle size={14} />
                     Cycle de Paie
                   </div>
@@ -486,20 +486,20 @@ export default function PaieManager() {
                       ['3', 'Paiement', 'marque comme payé + écriture GL de décaissement'],
                       ['4', 'Re-run', 'contrepasse le GL existant et recalcule (v+1)'],
                     ].map(([n, title, desc]) => (
-                      <div key={n} className="flex gap-2 text-xs text-slate-300">
-                        <span className="text-blue-500 font-bold">{n}.</span>
-                        <p><span className="text-white font-medium">{title}</span> — {desc}</p>
+                      <div key={n} className="flex gap-2 text-xs text-content-secondary">
+                        <span className="text-status-info font-bold">{n}.</span>
+                        <p><span className="text-content-primary font-medium">{title}</span> — {desc}</p>
                       </div>
                     ))}
                   </div>
                 </Card>
 
-                <Card className="bg-emerald-900/10 border-emerald-900/20" padding="sm">
+                <Card className="bg-status-success-bg border-status-success/20" padding="sm">
                   <div className="flex items-start gap-2">
-                    <Download className="text-emerald-500 mt-0.5" size={16} />
+                    <Download className="text-status-success mt-0.5" size={16} />
                     <div className="flex-1">
-                      <h4 className="font-bold text-white text-xs">Export Comptable</h4>
-                      <p className="text-[10px] text-emerald-400/70 mt-0.5 mb-2">Sélectionnez un run pour exporter les bulletins au format CSV.</p>
+                      <h4 className="font-bold text-content-primary text-xs">Export Comptable</h4>
+                      <p className="text-[10px] text-status-success/70 mt-0.5 mb-2">Sélectionnez un run pour exporter les bulletins au format CSV.</p>
                     </div>
                   </div>
                 </Card>
@@ -509,18 +509,18 @@ export default function PaieManager() {
         </div>
       ) : (
         /* Mes Bulletins tab */
-        <div className="flex-1 min-h-0 bg-slate-900 border border-slate-800 rounded-lg flex flex-col">
-          <div className="shrink-0 p-2 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
-            <h3 className="font-bold text-white flex items-center gap-2 text-xs">
-              <FileText size={14} className="text-cyan-400" />
+        <div className="flex-1 min-h-0 bg-surface-base border border-edge rounded-lg flex flex-col">
+          <div className="shrink-0 p-2 border-b border-edge flex justify-between items-center bg-surface-base/50">
+            <h3 className="font-bold text-content-primary flex items-center gap-2 text-xs">
+              <FileText size={14} className="text-accent" />
               Mes Bulletins
             </h3>
             <div className="flex items-center gap-1.5">
-              <Calendar size={13} className="text-slate-500" />
+              <Calendar size={13} className="text-content-muted" />
               <select
                 value={selectedYear}
                 onChange={(e) => { setSelectedYear(Number(e.target.value)); setMyPage(0); }}
-                className="bg-slate-800 border border-slate-700 rounded text-xs text-white px-2 py-1 outline-none focus:ring-1 focus:ring-cyan-500/50"
+                className="bg-surface border border-edge rounded text-xs text-content-primary px-2 py-1 outline-none focus:ring-1 focus:ring-accent/50"
               >
                 {availableYears.map(y => (
                   <option key={y} value={y}>{y}</option>
@@ -537,30 +537,30 @@ export default function PaieManager() {
               maxHeight="100%"
               density="compact"
               className="border-0 rounded-none h-full"
-              headerClassName="bg-slate-900 sticky top-0"
+              headerClassName="bg-surface-base sticky top-0"
               onRowClick={(item: BulletinPaie) => setViewerBulletinId(item.id)}
             />
           </div>
           {filteredBulletins.length > MY_PAGE_SIZE && (
-            <div className="shrink-0 px-3 py-1.5 border-t border-slate-800 flex items-center justify-between bg-slate-900/50">
-              <span className="text-[10px] text-slate-500">
+            <div className="shrink-0 px-3 py-1.5 border-t border-edge flex items-center justify-between bg-surface-base/50">
+              <span className="text-[10px] text-content-muted">
                 {filteredBulletins.length} bulletin{filteredBulletins.length > 1 ? 's' : ''} en {selectedYear}
               </span>
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => setMyPage(p => Math.max(0, p - 1))}
                   disabled={myPage === 0}
-                  className="p-0.5 rounded hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed text-slate-400"
+                  className="p-0.5 rounded hover:bg-surface disabled:opacity-30 disabled:cursor-not-allowed text-content-muted"
                 >
                   <ChevronLeft size={16} />
                 </button>
-                <span className="text-[10px] text-slate-400 font-mono px-1">
+                <span className="text-[10px] text-content-muted font-mono px-1">
                   {myPage + 1}/{myTotalPages}
                 </span>
                 <button
                   onClick={() => setMyPage(p => Math.min(myTotalPages - 1, p + 1))}
                   disabled={myPage >= myTotalPages - 1}
-                  className="p-0.5 rounded hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed text-slate-400"
+                  className="p-0.5 rounded hover:bg-surface disabled:opacity-30 disabled:cursor-not-allowed text-content-muted"
                 >
                   <ChevronRight size={16} />
                 </button>
@@ -573,17 +573,17 @@ export default function PaieManager() {
       {/* Re-run Dialog */}
       {rerunDialogOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-slate-800 border border-slate-700 rounded-lg p-5 w-full max-w-md mx-4 shadow-xl">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2 mb-3">
-              <RotateCcw size={16} className="text-amber-400" />
+          <div className="bg-surface border border-edge rounded-lg p-5 w-full max-w-md mx-4 shadow-xl">
+            <h3 className="text-sm font-bold text-content-primary flex items-center gap-2 mb-3">
+              <RotateCcw size={16} className="text-status-warning" />
               Re-run de paie
             </h3>
-            <p className="text-xs text-slate-400 mb-3">
+            <p className="text-xs text-content-muted mb-3">
               Le run actuel sera annulé et les écritures GL seront contrepassées. Un nouveau run sera généré avec recalcul complet.
             </p>
-            <label className="block text-xs text-slate-300 mb-1 font-medium">Motif du re-run *</label>
+            <label className="block text-xs text-content-secondary mb-1 font-medium">Motif du re-run *</label>
             <textarea
-              className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded text-sm text-white placeholder-slate-500 focus:ring-1 focus:ring-amber-500/50 outline-none resize-none"
+              className="w-full px-3 py-2 bg-surface-base border border-edge-strong rounded text-sm text-content-primary placeholder-content-muted focus:ring-1 focus:ring-status-warning/50 outline-none resize-none"
               rows={3}
               placeholder="Ex: Correction prime ancienneté employé X..."
               value={rerunReason}
@@ -597,7 +597,7 @@ export default function PaieManager() {
                 onClick={handleRerunSubmit}
                 isLoading={isRerunning}
                 disabled={!rerunReason.trim() || isRerunning}
-                className="bg-amber-600 hover:bg-amber-700"
+                className="bg-status-warning hover:bg-status-warning"
               >
                 Confirmer le Re-run
               </Button>

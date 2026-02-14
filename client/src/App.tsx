@@ -23,6 +23,7 @@ import NetworkOverlay from './components/shared/NetworkOverlay';
 import NetworkBanner from './components/shared/NetworkBanner';
 import SessionExpirationWarning from './components/shared/SessionExpirationWarning';
 import { useOfflineBus } from './hooks/useOfflineBus';
+import { useBranding } from './contexts/BrandingContext';
 
 // Lazy load heavy components
 const COFINPlatform = lazy(() => import('./COFINPlatform'));
@@ -40,6 +41,7 @@ function App() {
   const [sessionExpiredMessage, setSessionExpiredMessage] = useState<string | null>(null);
   const { isServerReachable, isChecking, checkHealth } = useServerHealth();
   const { status: networkStatus, isOffline, isApiDown, forceRetry } = useNetwork();
+  const { branding } = useBranding();
   const [location, setLocation] = useLocation();
   const queryClient = useQueryClient();
 
@@ -189,7 +191,7 @@ function App() {
   if (isLoading) {
     return (
       <>
-        <LoadingScreen showLogo={true} message="Chargement de COFIN&CO-M..." />
+        <LoadingScreen showLogo={true} message={`Chargement de ${branding?.appName ?? 'l\'application'}...`} />
         <NetworkOverlay isOpen={showNetworkOverlay} isChecking={isChecking} onRetry={forceRetry} />
       </>
     );
@@ -232,16 +234,16 @@ function App() {
           sidebar={null}
           header={(
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center p-1">
+              <div className="w-8 h-8 bg-surface rounded-lg flex items-center justify-center p-1">
                 <img
                   src="/cofin-logo.png"
-                  alt="COFIN Logo"
+                  alt={`${branding?.appName ?? 'App'} Logo`}
                   className="w-full h-full object-contain"
                 />
               </div>
               <div>
-                <h1 className="text-lg font-bold text-white">Connexion réussie</h1>
-                <p className="text-sm text-slate-400">Bienvenue, {currentUser?.prenom || currentUser?.username || 'Utilisateur'}</p>
+                <h1 className="text-lg font-bold text-content-primary">Connexion réussie</h1>
+                <p className="text-sm text-content-muted">Bienvenue, {currentUser?.prenom || currentUser?.username || 'Utilisateur'}</p>
               </div>
             </div>
           )}
@@ -250,14 +252,14 @@ function App() {
             <div className="text-center">
               <div className="relative mb-6">
                 <div
-                  className="w-24 h-24 mx-auto rounded-full border-4 border-emerald-500 flex items-center justify-center"
+                  className="w-24 h-24 mx-auto rounded-full border-4 border-status-success flex items-center justify-center"
                   style={{
                     animation: 'scaleIn 0.3s ease-out',
                     boxShadow: '0 0 30px rgba(16, 185, 129, 0.4)',
                   }}
                 >
                   <svg
-                    className="w-12 h-12 text-emerald-500"
+                    className="w-12 h-12 text-status-success"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -272,8 +274,8 @@ function App() {
                   </svg>
                 </div>
               </div>
-              <h3 className="text-2xl font-bold text-white mb-2">Connecté</h3>
-              <p className="text-slate-400">Chargement de l’espace de travail…</p>
+              <h3 className="text-2xl font-bold text-content-primary mb-2">Connecté</h3>
+              <p className="text-content-muted">Chargement de l’espace de travail…</p>
             </div>
           </div>
           <style>{`

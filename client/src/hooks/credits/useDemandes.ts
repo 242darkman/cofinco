@@ -381,17 +381,17 @@ export function useDemandes() {
   const getStatutColor = (statut: string) => {
     const normalized = normalizeStatut(statut);
     const colors: Record<string, string> = {
-      [StatutDemande.PENDING_FEES]: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-      [StatutDemande.READY_FOR_INVESTIGATION]: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-      [StatutDemande.UNDER_INVESTIGATION]: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
-      [StatutDemande.INVESTIGATION_COMPLETE]: 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30',
-      [StatutDemande.APPROVED]: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-      [StatutDemande.REJECTED]: 'bg-red-500/20 text-red-400 border-red-500/30',
-      [StatutDemande.DISBURSED]: 'bg-green-500/20 text-green-400 border-green-500/30',
-      [StatutDemande.CLOSED]: 'bg-slate-500/20 text-slate-400 border-slate-500/30',
-      [StatutDemande.CANCELLED]: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
+      [StatutDemande.PENDING_FEES]: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+      [StatutDemande.READY_FOR_INVESTIGATION]: 'bg-status-info-bg text-status-info border-status-info/30',
+      [StatutDemande.UNDER_INVESTIGATION]: 'bg-accent/10 text-accent border-accent/30',
+      [StatutDemande.INVESTIGATION_COMPLETE]: 'bg-accent/10 text-accent border-accent/30',
+      [StatutDemande.APPROVED]: 'bg-status-success-bg text-status-success border-status-success/30',
+      [StatutDemande.REJECTED]: 'bg-status-danger-bg text-status-danger border-status-danger/30',
+      [StatutDemande.DISBURSED]: 'bg-status-success-bg text-status-success border-status-success/30',
+      [StatutDemande.CLOSED]: 'bg-surface-subtle/40 text-content-muted border-edge-strong/30',
+      [StatutDemande.CANCELLED]: 'bg-surface-subtle/40 text-content-muted border-edge-subtle',
     };
-    return colors[normalized] || 'bg-slate-500/20 text-slate-400 border-slate-500/30';
+    return colors[normalized] || 'bg-surface-subtle/40 text-content-muted border-edge-strong/30';
   };
 
   return {

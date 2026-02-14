@@ -33,7 +33,7 @@ export default function MapViewToggle({
   }
 
   return (
-    <div className={`flex items-center bg-slate-700/50 rounded-lg p-1 ${className}`}>
+    <div className={`flex items-center bg-surface-elevated/50 rounded-lg p-1 ${className}`}>
       {options.map((option) => (
         <button
           key={option.mode}
@@ -41,8 +41,8 @@ export default function MapViewToggle({
           disabled={disabled}
           className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition disabled:opacity-50 ${
             viewMode === option.mode
-              ? 'bg-indigo-600 text-white shadow'
-              : 'text-slate-300 hover:text-white hover:bg-slate-600/50'
+              ? 'bg-accent text-white shadow'
+              : 'text-content-secondary hover:text-content-primary hover:bg-surface-subtle/50'
           }`}
         >
           {option.icon}

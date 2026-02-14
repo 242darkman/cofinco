@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useBranding } from '../contexts/BrandingContext';
 import { addPdfLogoHeader } from '../lib/pdf-logo';
 // P4.1: Lazy-load heavy export libraries
 import { loadPDFLibraries } from '../lib/lazy-export';
@@ -16,6 +17,7 @@ export interface DataChange {
 }
 
 export function useDataChanges() {
+  const { branding } = useBranding();
   const [changes, setChanges] = useState<DataChange[]>([]);
   const [loading, setLoading] = useState(false);
   const [filterTable, setFilterTable] = useState('all');
@@ -94,7 +96,7 @@ export function useDataChanges() {
     const separator = ';';
     
     let csvContent = BOM;
-    csvContent += `JOURNAL DES MODIFICATIONS DE DONNÉES - COFIN${separator}${separator}${separator}${separator}\n`;
+    csvContent += `JOURNAL DES MODIFICATIONS DE DONNÉES - ${branding.appName}${separator}${separator}${separator}${separator}\n`;
     csvContent += `Date d'export: ${dateExport}${separator}${separator}${separator}${separator}\n`;
     csvContent += `Total modifications: ${filteredChanges.length}${separator}${separator}${separator}${separator}\n`;
     csvContent += `${separator}${separator}${separator}${separator}\n`;
@@ -108,7 +110,7 @@ export function useDataChanges() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `COFIN_Modifications_Donnees_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `${branding.appName}_Modifications_Donnees_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -123,6 +125,7 @@ export function useDataChanges() {
       title: 'JOURNAL DES MODIFICATIONS',
       subtitle: `Total: ${filteredChanges.length} modifications`,
       dateRight: `Export: ${dateExport}`,
+      appName: branding.appName,
     });
 
     const tableData = filteredChanges.slice(0, 50).map((ch, idx) => [
@@ -143,12 +146,12 @@ export function useDataChanges() {
       alternateRowStyles: { fillColor: [240, 240, 240] }
     });
 
-    doc.save(`COFIN_Modifications_Donnees_${new Date().toISOString().split('T')[0]}.pdf`);
+    doc.save(`${branding.appName}_Modifications_Donnees_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
   const exportToJSON = () => {
     const exportData = {
-      titre: "Journal des Modifications de Données COFIN",
+      titre: `Journal des Modifications de Données ${branding.appName}`,
       dateExport: new Date().toISOString(),
       totalModifications: filteredChanges.length,
       modifications: filteredChanges.map(ch => ({
@@ -165,7 +168,7 @@ export function useDataChanges() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `COFIN_Modifications_Donnees_${new Date().toISOString().split('T')[0]}.json`;
+    link.download = `${branding.appName}_Modifications_Donnees_${new Date().toISOString().split('T')[0]}.json`;
     link.click();
     URL.revokeObjectURL(url);
   };

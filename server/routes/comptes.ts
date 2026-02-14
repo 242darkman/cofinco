@@ -55,6 +55,7 @@ import { comptes, produitsCompte, clients, users, virementsProgrammes } from "@s
 import { getWsInstance } from "../ws-server";
 import { StatutCompte, TypeCompte, MethodePaiement, MotifBlocage, SuspensionReason } from "@shared/enum/status-constants";
 import { dispatchDomainEvent } from "../services/notifications/domain-events/event-registry";
+import { currencySymbol } from "@shared/config/currency";
 
 // Validation schemas
 const createCompteSchema = z.object({
@@ -1749,7 +1750,7 @@ export function registerComptesRoutes(app: Express) {
           wsInstance.broadcastToAgency(user.agence, {
             type: "LIVE_ACTIVITY",
             payload: {
-              action: `Dépôt: ${parsed.montant.toLocaleString()} FCFA`,
+              action: `Dépôt: ${parsed.montant.toLocaleString()} ${currencySymbol()}`,
               user: user.nom || "Système",
               type: "savings",
               timestamp: new Date().toISOString(),
@@ -2098,14 +2099,14 @@ export function registerComptesRoutes(app: Express) {
           wsInstance.broadcastToAgency(user.agence, {
             type: "NOTIFICATION",
             payload: {
-              message: `Retrait de ${parsed.montant.toLocaleString()} FCFA effectué`,
+              message: `Retrait de ${parsed.montant.toLocaleString()} ${currencySymbol()} effectué`,
               targetRole: "admin",
             },
           });
           wsInstance.broadcastToAgency(user.agence, {
             type: "LIVE_ACTIVITY",
             payload: {
-              action: `Retrait: ${parsed.montant.toLocaleString()} FCFA`,
+              action: `Retrait: ${parsed.montant.toLocaleString()} ${currencySymbol()}`,
               user: user.nom || "Système",
               type: "payment",
               timestamp: new Date().toISOString(),
@@ -2552,7 +2553,7 @@ export function registerComptesRoutes(app: Express) {
           wsInstance.broadcastToAgency(user.agence, {
             type: "LIVE_ACTIVITY",
             payload: {
-              action: `Intérêts crédités: ${parsed.montant.toLocaleString()} FCFA`,
+              action: `Intérêts crédités: ${parsed.montant.toLocaleString()} ${currencySymbol()}`,
               user: user.nom || "Système",
               type: "savings",
               timestamp: new Date().toISOString(),

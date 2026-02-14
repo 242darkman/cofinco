@@ -106,8 +106,8 @@ export default function EcartApprovalPanel({ agenceId, onApprovalComplete }: Eca
     return (
       <Card className="p-3">
         <div className="flex items-center justify-center gap-2">
-          <RefreshCw className="w-4 h-4 animate-spin text-blue-500" />
-          <span className="text-sm text-slate-400">Chargement...</span>
+          <RefreshCw className="w-4 h-4 animate-spin text-status-info" />
+          <span className="text-sm text-content-muted">Chargement...</span>
         </div>
       </Card>
     );
@@ -117,8 +117,8 @@ export default function EcartApprovalPanel({ agenceId, onApprovalComplete }: Eca
     return (
       <Card className="p-3">
         <div className="flex items-center justify-center gap-2 py-3">
-          <CheckCircle className="w-5 h-5 text-emerald-500/50" />
-          <p className="text-sm text-slate-400">
+          <CheckCircle className="w-5 h-5 text-status-success/50" />
+          <p className="text-sm text-content-muted">
             Aucune demande d'approbation en attente
           </p>
         </div>
@@ -129,28 +129,28 @@ export default function EcartApprovalPanel({ agenceId, onApprovalComplete }: Eca
   return (
     <>
       <Card className="overflow-hidden">
-        <div className="px-3 py-2 bg-amber-500/10 border-b border-amber-500/20 flex items-center justify-between">
+        <div className="px-3 py-2 bg-status-warning-bg border-b border-status-warning/20 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-lg bg-amber-500/20 flex items-center justify-center">
-              <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+            <div className="w-6 h-6 rounded-lg bg-status-warning-bg flex items-center justify-center">
+              <AlertTriangle className="w-3.5 h-3.5 text-status-warning" />
             </div>
-            <h3 className="text-sm font-semibold text-white">
+            <h3 className="text-sm font-semibold text-content-primary">
               Écarts en attente
             </h3>
-            <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-[10px] font-medium">
+            <span className="px-1.5 py-0.5 rounded-full bg-status-warning-bg text-status-warning text-[10px] font-medium">
               {requests.length}
             </span>
           </div>
           <button
             onClick={() => refetch()}
-            className="flex items-center gap-1.5 text-[11px] text-slate-400 hover:text-white transition-colors"
+            className="flex items-center gap-1.5 text-[11px] text-content-muted hover:text-content-primary transition-colors"
           >
             <RefreshCw className="w-3.5 h-3.5" />
             Actualiser
           </button>
         </div>
 
-        <div className="divide-y divide-slate-700/50 max-h-64 overflow-y-auto">
+        <div className="divide-y divide-edge/50 max-h-64 overflow-y-auto">
           {requests.map((request) => {
             const ecart = Number(request.ecart);
             const isDeficit = request.typeEcart === 'DEFICIT';
@@ -160,24 +160,24 @@ export default function EcartApprovalPanel({ agenceId, onApprovalComplete }: Eca
                 key={request.id}
                 initial={{ opacity: 0, y: 5 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="p-2.5 hover:bg-slate-800/50 transition-colors"
+                className="p-2.5 hover:bg-surface/50 transition-colors"
               >
                 {/* En-tête avec caissier, niveau et date */}
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center shrink-0">
-                    <User className="w-3 h-3 text-slate-400" />
+                  <div className="w-6 h-6 rounded-full bg-surface-elevated flex items-center justify-center shrink-0">
+                    <User className="w-3 h-3 text-content-muted" />
                   </div>
-                  <p className="text-xs font-medium text-white truncate">
+                  <p className="text-xs font-medium text-content-primary truncate">
                     {request.caissierPrenom} {request.caissierNom}
                   </p>
                   <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
                     request.niveauRequis === 'N2'
-                      ? 'bg-red-500/20 text-red-400'
-                      : 'bg-amber-500/20 text-amber-400'
+                      ? 'bg-status-danger-bg text-status-danger'
+                      : 'bg-status-warning-bg text-status-warning'
                   }`}>
                     {request.niveauRequis}
                   </span>
-                  <span className="ml-auto text-[10px] text-slate-500">
+                  <span className="ml-auto text-[10px] text-content-muted">
                     {new Date(request.createdAt).toLocaleString('fr-FR', {
                       day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
                     })}
@@ -186,28 +186,28 @@ export default function EcartApprovalPanel({ agenceId, onApprovalComplete }: Eca
 
                 {/* Montants en ligne */}
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="flex-1 bg-slate-800/50 rounded px-2 py-1">
-                    <span className="text-[10px] text-slate-500">Théo.</span>
-                    <span className="ml-1 text-xs font-medium text-white">
+                  <div className="flex-1 bg-surface/50 rounded px-2 py-1">
+                    <span className="text-[10px] text-content-muted">Théo.</span>
+                    <span className="ml-1 text-xs font-medium text-content-primary">
                       {formatMoney(Number(request.soldeTheorique))}
                     </span>
                   </div>
-                  <div className="flex-1 bg-slate-800/50 rounded px-2 py-1">
-                    <span className="text-[10px] text-slate-500">Phys.</span>
-                    <span className="ml-1 text-xs font-medium text-white">
+                  <div className="flex-1 bg-surface/50 rounded px-2 py-1">
+                    <span className="text-[10px] text-content-muted">Phys.</span>
+                    <span className="ml-1 text-xs font-medium text-content-primary">
                       {formatMoney(Number(request.montantPhysique))}
                     </span>
                   </div>
                   <div className={`flex-1 rounded px-2 py-1 flex items-center gap-1 ${
-                    isDeficit ? 'bg-red-500/10' : 'bg-emerald-500/10'
+                    isDeficit ? 'bg-status-danger-bg' : 'bg-status-success-bg'
                   }`}>
                     {isDeficit ? (
-                      <TrendingDown className="w-3 h-3 text-red-400" />
+                      <TrendingDown className="w-3 h-3 text-status-danger" />
                     ) : (
-                      <TrendingUp className="w-3 h-3 text-emerald-400" />
+                      <TrendingUp className="w-3 h-3 text-status-success" />
                     )}
                     <span className={`text-xs font-bold ${
-                      isDeficit ? 'text-red-400' : 'text-emerald-400'
+                      isDeficit ? 'text-status-danger' : 'text-status-success'
                     }`}>
                       {isDeficit ? '-' : '+'}{formatMoney(Math.abs(ecart))}
                     </span>
@@ -215,8 +215,8 @@ export default function EcartApprovalPanel({ agenceId, onApprovalComplete }: Eca
                 </div>
 
                 {/* Justification compacte */}
-                <div className="bg-slate-800/30 rounded px-2 py-1.5 mb-2">
-                  <p className="text-[10px] text-slate-500 flex items-center gap-1">
+                <div className="bg-surface/30 rounded px-2 py-1.5 mb-2">
+                  <p className="text-[10px] text-content-muted flex items-center gap-1">
                     <MessageSquare className="w-2.5 h-2.5" />
                     {request.justification}
                   </p>
@@ -227,7 +227,7 @@ export default function EcartApprovalPanel({ agenceId, onApprovalComplete }: Eca
                   <button
                     onClick={() => handleDecision(request, 'APPROVED')}
                     disabled={decisionMutation.isPending}
-                    className="flex-1 flex items-center justify-center gap-1 px-2 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded text-[11px] font-medium transition-colors disabled:opacity-50"
+                    className="flex-1 flex items-center justify-center gap-1 px-2 py-1 bg-status-success-bg hover:bg-status-success/30 text-status-success rounded text-[11px] font-medium transition-colors disabled:opacity-50"
                   >
                     <CheckCircle className="w-3 h-3" />
                     Approuver
@@ -235,7 +235,7 @@ export default function EcartApprovalPanel({ agenceId, onApprovalComplete }: Eca
                   <button
                     onClick={() => handleDecision(request, 'REJECTED')}
                     disabled={decisionMutation.isPending}
-                    className="flex-1 flex items-center justify-center gap-1 px-2 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded text-[11px] font-medium transition-colors disabled:opacity-50"
+                    className="flex-1 flex items-center justify-center gap-1 px-2 py-1 bg-status-danger-bg hover:bg-status-danger/30 text-status-danger rounded text-[11px] font-medium transition-colors disabled:opacity-50"
                   >
                     <XCircle className="w-3 h-3" />
                     Rejeter
@@ -264,20 +264,20 @@ export default function EcartApprovalPanel({ agenceId, onApprovalComplete }: Eca
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="relative w-full max-w-md bg-slate-800 rounded-xl shadow-xl border border-slate-700 overflow-hidden"
+              className="relative w-full max-w-md bg-surface rounded-xl shadow-xl border border-edge overflow-hidden"
             >
-              <div className={`px-4 py-3 border-b border-slate-700 ${
-                pendingDecision === 'APPROVED' ? 'bg-emerald-500/10' : 'bg-red-500/10'
+              <div className={`px-4 py-3 border-b border-edge ${
+                pendingDecision === 'APPROVED' ? 'bg-status-success-bg' : 'bg-status-danger-bg'
               }`}>
-                <h3 className="font-semibold text-white flex items-center gap-2">
+                <h3 className="font-semibold text-content-primary flex items-center gap-2">
                   {pendingDecision === 'APPROVED' ? (
                     <>
-                      <CheckCircle className="w-5 h-5 text-emerald-500" />
+                      <CheckCircle className="w-5 h-5 text-status-success" />
                       Confirmer l'approbation
                     </>
                   ) : (
                     <>
-                      <XCircle className="w-5 h-5 text-red-500" />
+                      <XCircle className="w-5 h-5 text-status-danger" />
                       Confirmer le rejet
                     </>
                   )}
@@ -285,7 +285,7 @@ export default function EcartApprovalPanel({ agenceId, onApprovalComplete }: Eca
               </div>
 
               <div className="p-4">
-                <p className="text-slate-300 mb-4">
+                <p className="text-content-secondary mb-4">
                   {pendingDecision === 'APPROVED'
                     ? `Vous allez approuver l'écart de ${formatMoney(Math.abs(Number(selectedRequest.ecart)))} XOF.`
                     : `Vous allez rejeter l'écart. Le caissier devra recompter.`
@@ -293,7 +293,7 @@ export default function EcartApprovalPanel({ agenceId, onApprovalComplete }: Eca
                 </p>
 
                 <div className="mb-4">
-                  <label className="block text-sm text-slate-400 mb-1">
+                  <label className="block text-sm text-content-muted mb-1">
                     Commentaire {pendingDecision === 'REJECTED' && '(obligatoire)'}
                   </label>
                   <textarea
@@ -301,7 +301,7 @@ export default function EcartApprovalPanel({ agenceId, onApprovalComplete }: Eca
                     onChange={(e) => setComment(e.target.value)}
                     placeholder="Ajouter un commentaire..."
                     rows={3}
-                    className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30"
+                    className="w-full px-3 py-2 bg-surface-elevated/50 border border-edge-strong rounded-lg text-content-primary placeholder-content-muted focus:border-status-info focus:ring-1 focus:ring-status-info/30"
                   />
                 </div>
 

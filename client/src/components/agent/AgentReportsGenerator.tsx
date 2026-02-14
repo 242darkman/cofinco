@@ -178,13 +178,13 @@ export default function AgentReportsGenerator() {
       {/* Header Compact */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg sm:text-xl font-bold text-slate-800 dark:text-white">Générateur de Rapports</h2>
-          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-0.5">Créez des rapports détaillés de votre activité</p>
+          <h2 className="text-lg sm:text-xl font-bold text-content-primary">Générateur de Rapports</h2>
+          <p className="text-xs sm:text-sm text-content-muted mt-0.5">Créez des rapports détaillés de votre activité</p>
         </div>
         {reportData && (
           <button
             onClick={downloadReport}
-            className="flex items-center justify-center gap-2 px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 font-medium text-sm transition-colors w-full sm:w-auto"
+            className="flex items-center justify-center gap-2 px-3 py-2 bg-status-success text-white rounded-lg hover:bg-status-success font-medium text-sm transition-colors w-full sm:w-auto"
           >
             <Download size={16} />
             Télécharger
@@ -193,9 +193,9 @@ export default function AgentReportsGenerator() {
       </div>
 
       {/* Configuration Section - Compact */}
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700/50 p-3 sm:p-4">
-        <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-3 flex items-center gap-2">
-            <Filter size={16} className="text-cyan-500" />
+      <div className="bg-surface rounded-lg shadow-sm border border-edge-subtle p-3 sm:p-4">
+        <h3 className="text-sm font-bold text-content-primary mb-3 flex items-center gap-2">
+            <Filter size={16} className="text-accent" />
             Configuration du Rapport
         </h3>
 
@@ -206,18 +206,18 @@ export default function AgentReportsGenerator() {
               onClick={() => setReportType(type)}
               className={`p-2.5 rounded-lg border transition-all text-left group relative overflow-hidden ${
                 reportType === type
-                  ? 'border-cyan-500 bg-cyan-50 dark:bg-cyan-900/20 ring-1 ring-cyan-500/20'
-                  : 'border-slate-200 dark:border-slate-700 hover:border-cyan-400 dark:hover:border-cyan-500/50'
+                  ? 'border-accent bg-accent/10 ring-1 ring-accent/20'
+                  : 'border-edge hover:border-accent/50'
               }`}
             >
               <div className="flex flex-col gap-1">
                 <div className="flex items-center gap-1.5">
-                    <Calendar size={14} className={reportType === type ? 'text-cyan-600' : 'text-slate-400 group-hover:text-cyan-500'} />
-                    <span className={`text-xs font-semibold ${reportType === type ? 'text-cyan-700 dark:text-cyan-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                    <Calendar size={14} className={reportType === type ? 'text-accent' : 'text-content-muted group-hover:text-accent'} />
+                    <span className={`text-xs font-semibold ${reportType === type ? 'text-accent' : 'text-content-secondary'}`}>
                     {type === 'daily' ? 'Quotidien' : type === 'weekly' ? 'Hebdo' : type === 'monthly' ? 'Mensuel' : 'Perso'}
                     </span>
                 </div>
-                <p className="text-[10px] text-slate-500 dark:text-slate-400 pl-5">
+                <p className="text-[10px] text-content-muted pl-5">
                     {type === 'daily' ? "Aujourd'hui" : type === 'weekly' ? "7 derniers jours" : type === 'monthly' ? "30 derniers jours" : "Au choix"}
                 </p>
               </div>
@@ -228,21 +228,21 @@ export default function AgentReportsGenerator() {
         {reportType === 'custom' && (
           <div className="grid grid-cols-2 gap-3 mb-4 animate-in slide-in-from-top-2 duration-200">
             <div>
-              <label className="block text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 mb-1">Début</label>
+              <label className="block text-[10px] uppercase font-bold text-content-muted mb-1">Début</label>
               <input
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="w-full px-2 py-1.5 rounded text-xs border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-white focus:outline-none focus:border-cyan-500 transition-colors"
+                className="w-full px-2 py-1.5 rounded text-xs border border-edge-strong bg-surface text-content-primary focus:outline-none focus:border-accent transition-colors"
               />
             </div>
             <div>
-              <label className="block text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 mb-1">Fin</label>
+              <label className="block text-[10px] uppercase font-bold text-content-muted mb-1">Fin</label>
               <input
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="w-full px-2 py-1.5 rounded text-xs border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-white focus:outline-none focus:border-cyan-500 transition-colors"
+                className="w-full px-2 py-1.5 rounded text-xs border border-edge-strong bg-surface text-content-primary focus:outline-none focus:border-accent transition-colors"
               />
             </div>
           </div>
@@ -251,7 +251,7 @@ export default function AgentReportsGenerator() {
         <button
           onClick={generateReport}
           disabled={loading}
-          className="w-full sm:w-auto px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-500 font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm shadow-cyan-900/10 active:scale-[0.98]"
+          className="w-full sm:w-auto px-4 py-2 bg-accent-secondary text-content-primary rounded-lg hover:bg-accent-secondary font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-sm shadow-accent/10 active:scale-[0.98]"
         >
           {loading ? (
             <>
@@ -279,13 +279,13 @@ export default function AgentReportsGenerator() {
       )}
 
       {reportData && (
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700/50 p-3 sm:p-4">
-          <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-2 flex items-center gap-2">
-            <FileText size={16} className="text-slate-400" />
+        <div className="bg-surface rounded-lg shadow-sm border border-edge-subtle p-3 sm:p-4">
+          <h3 className="text-sm font-bold text-content-primary mb-2 flex items-center gap-2">
+            <FileText size={16} className="text-content-muted" />
             Aperçu
           </h3>
-          <div className="bg-slate-50 dark:bg-slate-950 rounded border border-slate-100 dark:border-slate-800 p-3 overflow-x-auto max-h-[400px] scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700">
-            <pre className="whitespace-pre-wrap text-[10px] sm:text-xs font-mono text-slate-700 dark:text-slate-300 leading-relaxed">
+          <div className="bg-surface-muted rounded border border-edge-subtle p-3 overflow-x-auto max-h-[400px] scrollbar-thin scrollbar-thumb-edge">
+            <pre className="whitespace-pre-wrap text-[10px] sm:text-xs font-mono text-content-secondary leading-relaxed">
               {generateReportContent()}
             </pre>
           </div>
@@ -297,23 +297,23 @@ export default function AgentReportsGenerator() {
 
 function StatCard({ icon: Icon, label, value, color }: { icon: any, label: string, value: string | number, color: string }) {
     const colorClasses: Record<string, string> = {
-        blue: 'text-blue-500 bg-blue-500/10',
-        green: 'text-green-500 bg-green-500/10',
-        cyan: 'text-cyan-500 bg-cyan-500/10',
-        emerald: 'text-emerald-500 bg-emerald-500/10',
-        purple: 'text-purple-500 bg-purple-500/10',
-        indigo: 'text-indigo-500 bg-indigo-500/10',
+        blue: 'text-status-info bg-status-info-bg',
+        green: 'text-status-success bg-status-success-bg',
+        cyan: 'text-accent bg-accent/10',
+        emerald: 'text-status-success bg-status-success-bg',
+        purple: 'text-status-info bg-status-info-bg',
+        indigo: 'text-accent bg-accent/10',
     };
 
     return (
-        <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700/50 p-2.5 sm:p-3 flex flex-col gap-1 shadow-sm">
+        <div className="bg-surface rounded-lg border border-edge-subtle-subtle p-2.5 sm:p-3 flex flex-col gap-1 shadow-sm">
             <div className="flex items-center gap-1.5">
                 <div className={`p-1 rounded ${colorClasses[color]}`}>
                     <Icon size={12} />
                 </div>
-                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{label}</span>
+                <span className="text-[10px] font-bold text-content-muted uppercase tracking-wide">{label}</span>
             </div>
-            <div className="text-lg font-bold text-slate-800 dark:text-white pl-0.5">{value}</div>
+            <div className="text-lg font-bold text-content-primary pl-0.5">{value}</div>
         </div>
     );
 }

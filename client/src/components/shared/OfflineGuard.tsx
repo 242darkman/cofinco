@@ -107,20 +107,20 @@ export default function OfflineGuard({
         <div
           className="
             absolute inset-0 z-10
-            bg-slate-900/70 backdrop-blur-sm
+            bg-surface-base/70 backdrop-blur-sm
             flex flex-col items-center justify-center
             rounded-lg p-4
           "
         >
-          <Icon className="w-8 h-8 text-slate-400 mb-2" />
-          <p className="text-sm text-slate-300 text-center">{offlineMessage}</p>
+          <Icon className="w-8 h-8 text-content-muted mb-2" />
+          <p className="text-sm text-content-secondary text-center">{offlineMessage}</p>
           <button
             onClick={() => forceRetry()}
             disabled={isChecking}
             className="
               mt-3 px-3 py-1.5 text-xs font-medium
-              bg-slate-800 hover:bg-slate-700
-              rounded-lg text-slate-300
+              bg-surface hover:bg-surface-elevated
+              rounded-lg text-content-secondary
               disabled:opacity-50
             "
           >
@@ -194,12 +194,12 @@ function OfflineDialog({
     <Modal isOpen={isOpen} onClose={onClose} title={title} variant="warning">
       <div className="p-6">
         <div className="flex items-start gap-4 mb-6">
-          <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-amber-500/20">
-            <Icon className="w-6 h-6 text-amber-400" />
+          <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-status-warning-bg">
+            <Icon className="w-6 h-6 text-status-warning" />
           </div>
           <div className="flex-1">
-            <p className="text-slate-300">{message}</p>
-            <p className="text-sm text-slate-400 mt-2">
+            <p className="text-content-secondary">{message}</p>
+            <p className="text-sm text-content-muted mt-2">
               {status === 'offline'
                 ? 'Vérifiez votre connexion internet et réessayez.'
                 : 'Le serveur est temporairement indisponible. Réessayez dans quelques instants.'}
@@ -225,7 +225,7 @@ function OfflineDialog({
             <Button
               variant="ghost"
               onClick={onClose}
-              className="text-xs text-slate-500"
+              className="text-xs text-content-muted"
             >
               Continuer quand même (risqué)
             </Button>

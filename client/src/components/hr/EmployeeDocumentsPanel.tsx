@@ -206,11 +206,11 @@ export default function EmployeeDocumentsPanel({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-bold text-white flex items-center gap-2">
-            <FileText size={16} className="text-blue-400" />
+          <h3 className="text-sm font-bold text-content-primary flex items-center gap-2">
+            <FileText size={16} className="text-status-info" />
             Documents {employeNom && `- ${employeNom}`}
           </h3>
-          <p className="text-xs text-slate-500">{documents.length} document(s)</p>
+          <p className="text-xs text-content-muted">{documents.length} document(s)</p>
         </div>
         {!readOnly && canManage && (
           <Button
@@ -227,12 +227,12 @@ export default function EmployeeDocumentsPanel({
       {/* Documents list */}
       {isLoading ? (
         <div className="flex items-center justify-center py-8">
-          <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <div className="w-6 h-6 border-2 border-status-info border-t-transparent rounded-full animate-spin" />
         </div>
       ) : documents.length === 0 ? (
-        <div className="text-center py-8 bg-slate-900/50 rounded-lg border border-slate-800">
-          <FileText size={32} className="mx-auto text-slate-600 mb-2" />
-          <p className="text-sm text-slate-500">Aucun document</p>
+        <div className="text-center py-8 bg-surface-base/50 rounded-lg border border-edge">
+          <FileText size={32} className="mx-auto text-content-muted mb-2" />
+          <p className="text-sm text-content-muted">Aucun document</p>
           {!readOnly && canManage && (
             <Button
               variant="ghost"
@@ -248,13 +248,13 @@ export default function EmployeeDocumentsPanel({
       ) : (
         <div className="space-y-4">
           {Object.entries(groupedDocs).map(([category, docs]) => (
-            <div key={category} className="bg-slate-900/50 rounded-lg border border-slate-800 overflow-hidden">
-              <div className="px-3 py-2 bg-slate-800/50 border-b border-slate-700">
-                <h4 className="text-xs font-semibold text-slate-400 uppercase">
+            <div key={category} className="bg-surface-base/50 rounded-lg border border-edge overflow-hidden">
+              <div className="px-3 py-2 bg-surface/50 border-b border-edge">
+                <h4 className="text-xs font-semibold text-content-muted uppercase">
                   {DOCUMENT_CATEGORIES.find(c => c.value === category)?.label || category}
                 </h4>
               </div>
-              <div className="divide-y divide-slate-800">
+              <div className="divide-y divide-edge">
                 {docs.map((doc) => {
                   const status = STATUS_CONFIG[doc.statut] || STATUS_CONFIG.PENDING;
                   const StatusIcon = status.icon;
@@ -265,26 +265,26 @@ export default function EmployeeDocumentsPanel({
                   return (
                     <div
                       key={doc.id}
-                      className={`p-3 hover:bg-slate-800/30 transition ${
-                        expired ? 'bg-red-500/5' : expiringSoon ? 'bg-amber-500/5' : ''
+                      className={`p-3 hover:bg-surface/30 transition ${
+                        expired ? 'bg-status-danger/5' : expiringSoon ? 'bg-status-warning/5' : ''
                       }`}
                     >
                       <div className="flex items-start gap-3">
                         <div className={`p-2 rounded-lg ${
-                          doc.statut === 'VERIFIED' ? 'bg-green-500/10' :
-                          doc.statut === 'REJECTED' ? 'bg-red-500/10' :
-                          'bg-slate-800'
+                          doc.statut === 'VERIFIED' ? 'bg-status-success-bg' :
+                          doc.statut === 'REJECTED' ? 'bg-status-danger-bg' :
+                          'bg-surface'
                         }`}>
                           <FileIcon size={20} className={
-                            doc.statut === 'VERIFIED' ? 'text-green-400' :
-                            doc.statut === 'REJECTED' ? 'text-red-400' :
-                            'text-slate-400'
+                            doc.statut === 'VERIFIED' ? 'text-status-success' :
+                            doc.statut === 'REJECTED' ? 'text-status-danger' :
+                            'text-content-muted'
                           } />
                         </div>
 
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="text-sm font-medium text-white truncate">{doc.nom}</span>
+                            <span className="text-sm font-medium text-content-primary truncate">{doc.nom}</span>
                             <Badge
                               variant={status.color as any}
                               value={status.label}
@@ -298,14 +298,14 @@ export default function EmployeeDocumentsPanel({
                             )}
                           </div>
 
-                          <div className="flex flex-wrap items-center gap-3 text-[10px] text-slate-500">
+                          <div className="flex flex-wrap items-center gap-3 text-[10px] text-content-muted">
                             <span className="flex items-center gap-1">
                               <FileText size={10} />
                               {DOCUMENT_TYPES.find(t => t.value === doc.typeDocument)?.label || doc.typeDocument}
                             </span>
                             <span>{formatFileSize(doc.fileSize)}</span>
                             {doc.dateExpiration && (
-                              <span className={`flex items-center gap-1 ${expired ? 'text-red-400' : expiringSoon ? 'text-amber-400' : ''}`}>
+                              <span className={`flex items-center gap-1 ${expired ? 'text-status-danger' : expiringSoon ? 'text-status-warning' : ''}`}>
                                 <Calendar size={10} />
                                 Expire: {new Date(doc.dateExpiration).toLocaleDateString('fr-FR')}
                               </span>
@@ -316,11 +316,11 @@ export default function EmployeeDocumentsPanel({
                           </div>
 
                           {doc.description && (
-                            <p className="text-xs text-slate-400 mt-1 line-clamp-1">{doc.description}</p>
+                            <p className="text-xs text-content-muted mt-1 line-clamp-1">{doc.description}</p>
                           )}
 
                           {doc.motifRejet && (
-                            <p className="text-xs text-red-400 mt-1 flex items-center gap-1">
+                            <p className="text-xs text-status-danger mt-1 flex items-center gap-1">
                               <XCircle size={10} />
                               {doc.motifRejet}
                             </p>
@@ -333,7 +333,7 @@ export default function EmployeeDocumentsPanel({
                               href={doc.url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition"
+                              className="p-1.5 text-content-muted hover:text-content-primary hover:bg-surface-elevated rounded transition"
                               title="Voir"
                             >
                               <Eye size={14} />
@@ -343,7 +343,7 @@ export default function EmployeeDocumentsPanel({
                             <a
                               href={doc.url}
                               download={doc.fileName}
-                              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition"
+                              className="p-1.5 text-content-muted hover:text-content-primary hover:bg-surface-elevated rounded transition"
                               title="Télécharger"
                             >
                               <Download size={14} />
@@ -352,7 +352,7 @@ export default function EmployeeDocumentsPanel({
                           {!readOnly && canVerify && doc.statut === 'PENDING' && (
                             <button
                               onClick={() => setShowVerifyModal(doc)}
-                              className="p-1.5 text-blue-400 hover:bg-blue-500/10 rounded transition"
+                              className="p-1.5 text-status-info hover:bg-status-info-bg rounded transition"
                               title="Vérifier"
                             >
                               <Shield size={14} />
@@ -361,7 +361,7 @@ export default function EmployeeDocumentsPanel({
                           {!readOnly && canManage && (
                             <button
                               onClick={() => handleDelete(doc.id)}
-                              className="p-1.5 text-red-400 hover:bg-red-500/10 rounded transition"
+                              className="p-1.5 text-status-danger hover:bg-status-danger-bg rounded transition"
                               title="Supprimer"
                             >
                               <Trash2 size={14} />
@@ -388,9 +388,9 @@ export default function EmployeeDocumentsPanel({
         <div className="space-y-4">
           {/* File input */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">Fichier</label>
+            <label className="block text-sm font-medium text-content-secondary mb-2">Fichier</label>
             <div className={`border-2 border-dashed rounded-lg p-4 text-center transition ${
-              uploadFile ? 'border-green-500/50 bg-green-500/5' : 'border-slate-700 hover:border-slate-600'
+              uploadFile ? 'border-status-success/50 bg-status-success/5' : 'border-edge hover:border-edge-strong'
             }`}>
               <input
                 type="file"
@@ -401,15 +401,15 @@ export default function EmployeeDocumentsPanel({
               />
               <label htmlFor="doc-upload" className="cursor-pointer">
                 {uploadFile ? (
-                  <div className="flex items-center justify-center gap-2 text-green-400">
+                  <div className="flex items-center justify-center gap-2 text-status-success">
                     <CheckCircle size={20} />
                     <span className="text-sm">{uploadFile.name}</span>
                   </div>
                 ) : (
-                  <div className="text-slate-400">
+                  <div className="text-content-muted">
                     <Upload size={24} className="mx-auto mb-2" />
                     <p className="text-sm">Cliquez pour sélectionner un fichier</p>
-                    <p className="text-xs text-slate-500 mt-1">PDF, Images, Documents Word</p>
+                    <p className="text-xs text-content-muted mt-1">PDF, Images, Documents Word</p>
                   </div>
                 )}
               </label>
@@ -467,7 +467,7 @@ export default function EmployeeDocumentsPanel({
             />
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
+          <div className="flex justify-end gap-3 pt-4 border-t border-edge">
             <Button variant="secondary" onClick={() => setShowUploadModal(false)}>
               Annuler
             </Button>
@@ -491,20 +491,20 @@ export default function EmployeeDocumentsPanel({
       >
         {showVerifyModal && (
           <div className="space-y-4">
-            <div className="bg-slate-800/50 rounded-lg p-3">
-              <p className="text-sm text-white font-medium">{showVerifyModal.nom}</p>
-              <p className="text-xs text-slate-400">{showVerifyModal.fileName}</p>
+            <div className="bg-surface/50 rounded-lg p-3">
+              <p className="text-sm text-content-primary font-medium">{showVerifyModal.nom}</p>
+              <p className="text-xs text-content-muted">{showVerifyModal.fileName}</p>
             </div>
 
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-slate-300">Décision</label>
+              <label className="block text-sm font-medium text-content-secondary">Décision</label>
               <div className="flex gap-2">
                 <button
                   onClick={() => setVerifyDecision('VERIFIED')}
                   className={`flex-1 p-3 rounded-lg border transition flex items-center justify-center gap-2 ${
                     verifyDecision === 'VERIFIED'
-                      ? 'bg-green-500/20 border-green-500 text-green-400'
-                      : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'
+                      ? 'bg-status-success-bg border-status-success text-status-success'
+                      : 'bg-surface border-edge text-content-muted hover:border-edge-strong'
                   }`}
                 >
                   <CheckCircle size={16} />
@@ -514,8 +514,8 @@ export default function EmployeeDocumentsPanel({
                   onClick={() => setVerifyDecision('REJECTED')}
                   className={`flex-1 p-3 rounded-lg border transition flex items-center justify-center gap-2 ${
                     verifyDecision === 'REJECTED'
-                      ? 'bg-red-500/20 border-red-500 text-red-400'
-                      : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600'
+                      ? 'bg-status-danger-bg border-status-danger text-status-danger'
+                      : 'bg-surface border-edge text-content-muted hover:border-edge-strong'
                   }`}
                 >
                   <XCircle size={16} />
@@ -535,7 +535,7 @@ export default function EmployeeDocumentsPanel({
               />
             )}
 
-            <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
+            <div className="flex justify-end gap-3 pt-4 border-t border-edge">
               <Button variant="secondary" onClick={() => setShowVerifyModal(null)}>
                 Annuler
               </Button>

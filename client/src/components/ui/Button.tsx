@@ -53,13 +53,11 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     const variantClasses = {
       // Primary: Solid accent color, highly visible
       primary: `
-        bg-accent text-content-inverted
+        bg-accent text-white
         hover:bg-accent-primary-hover
         border border-accent/50
         shadow-lg shadow-accent/30 hover:shadow-xl hover:shadow-accent/40
         focus:ring-accent
-        dark:bg-cyan-500 dark:hover:bg-cyan-400 dark:border-cyan-400/60
-        dark:shadow-cyan-500/40 dark:hover:shadow-cyan-400/50
       `,
 
       // Secondary: More visible with stronger background
@@ -67,38 +65,33 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         bg-accent/15 hover:bg-accent/25
         text-accent border border-accent/40 hover:border-accent/60
         focus:ring-accent
-        dark:bg-cyan-500/20 dark:hover:bg-cyan-500/30 dark:text-cyan-300
-        dark:border-cyan-500/50 dark:hover:border-cyan-400/70
       `,
 
-      // Success: Vibrant green
+      // Success: Fixed green (same in light & dark)
       success: `
-        bg-status-success text-content-inverted
-        hover:brightness-110
-        border border-status-success/50
-        shadow-lg shadow-status-success/30 hover:shadow-xl hover:shadow-status-success/40
-        focus:ring-status-success
-        dark:bg-emerald-500 dark:hover:bg-emerald-400 dark:border-emerald-400/60
+        bg-btn-success text-white
+        hover:bg-btn-success-hover
+        border border-btn-success/50
+        shadow-lg shadow-btn-success/30 hover:shadow-xl hover:shadow-btn-success/40
+        focus:ring-btn-success
       `,
 
-      // Danger: Vibrant red
+      // Danger: Fixed red (same in light & dark)
       danger: `
-        bg-status-danger text-content-inverted
-        hover:brightness-110
-        border border-status-danger/50
-        shadow-lg shadow-status-danger/30 hover:shadow-xl hover:shadow-status-danger/40
-        focus:ring-status-danger
-        dark:bg-red-500 dark:hover:bg-red-400 dark:border-red-400/60
+        bg-btn-danger text-white
+        hover:bg-btn-danger-hover
+        border border-btn-danger/50
+        shadow-lg shadow-btn-danger/30 hover:shadow-xl hover:shadow-btn-danger/40
+        focus:ring-btn-danger
       `,
 
-      // Warning: Vibrant amber/orange
+      // Warning: Fixed amber (same in light & dark)
       warning: `
-        bg-amber-500 text-white
-        hover:bg-amber-600
-        border border-amber-600/50
-        shadow-lg shadow-amber-500/30 hover:shadow-xl hover:shadow-amber-500/40
-        focus:ring-amber-500
-        dark:bg-amber-600 dark:hover:bg-amber-500 dark:border-amber-500/60
+        bg-btn-warning text-white
+        hover:bg-btn-warning-hover
+        border border-btn-warning/50
+        shadow-lg shadow-btn-warning/30 hover:shadow-xl hover:shadow-btn-warning/40
+        focus:ring-btn-warning
       `,
 
       // Ghost: More visible hover state
@@ -108,7 +101,6 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         hover:bg-surface-muted
         border border-transparent hover:border-edge/50
         focus:ring-edge
-        dark:hover:bg-slate-700/60 dark:hover:border-slate-600
       `,
 
       // Outline: Stronger border visibility
@@ -117,8 +109,6 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         text-content-secondary hover:text-content-primary
         hover:border-accent hover:bg-surface-muted
         focus:ring-edge
-        dark:border-slate-500 dark:hover:border-cyan-400 dark:hover:bg-slate-800/60
-        dark:text-slate-300 dark:hover:text-white
       `,
     };
 

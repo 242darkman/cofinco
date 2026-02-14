@@ -11,6 +11,7 @@
 import { pool } from "../db";
 import { logger } from "../lib/logger";
 import { v4 as uuidv4 } from "uuid";
+import { currencySymbol } from "@shared/config/currency";
 
 const AUTO_FIX_THRESHOLD = 10_000; // 10k FCFA
 const ALERT_THRESHOLD = 100_000; // 100k FCFA
@@ -56,7 +57,7 @@ export async function attemptAutoFixGlDiscrepancy(): Promise<AutoFixResult> {
       return {
         action: 'SKIPPED',
         discrepancy,
-        details: 'Écart acceptable (< 500 FCFA)',
+        details: `Écart acceptable (< 500 ${currencySymbol()})`,
       };
     }
 
@@ -71,7 +72,7 @@ export async function attemptAutoFixGlDiscrepancy(): Promise<AutoFixResult> {
       return {
         action: 'ALERTED',
         discrepancy,
-        details: `Écart critique de ${discrepancy.toLocaleString()} FCFA - Équipe alertée`,
+        details: `Écart critique de ${discrepancy.toLocaleString()} ${currencySymbol()} - Équipe alertée`,
       };
     }
 
@@ -85,7 +86,7 @@ export async function attemptAutoFixGlDiscrepancy(): Promise<AutoFixResult> {
       return {
         action: 'ALERTED',
         discrepancy,
-        details: `Écart de ${discrepancy.toLocaleString()} FCFA - Investigation requise`,
+        details: `Écart de ${discrepancy.toLocaleString()} ${currencySymbol()} - Investigation requise`,
       };
     }
 
@@ -162,7 +163,7 @@ export async function attemptAutoFixGlDiscrepancy(): Promise<AutoFixResult> {
         journal.id,
         dateJour,
         reference,
-        `Régularisation automatique écart ${discrepancy.toLocaleString()} FCFA`,
+        `Régularisation automatique écart ${discrepancy.toLocaleString()} ${currencySymbol()}`,
         agence.id,
       ]
     );
@@ -200,7 +201,7 @@ export async function attemptAutoFixGlDiscrepancy(): Promise<AutoFixResult> {
     return {
       action: 'FIXED',
       discrepancy,
-      details: `Écart de ${discrepancy.toLocaleString()} FCFA corrigé automatiquement (${reference})`,
+      details: `Écart de ${discrepancy.toLocaleString()} ${currencySymbol()} corrigé automatiquement (${reference})`,
     };
   } catch (error) {
     await client.query('ROLLBACK');

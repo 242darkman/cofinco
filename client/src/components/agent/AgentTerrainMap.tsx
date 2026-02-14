@@ -127,7 +127,7 @@ export default function AgentTerrainMap() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="p-2.5 bg-brand-primary rounded-xl shadow-lg shadow-brand-primary/20 shrink-0">
-                <Navigation className="w-6 h-6 text-white" />
+                <Navigation className="w-6 h-6 text-content-primary" />
               </div>
               <div>
                 <h2 className="text-lg font-bold text-content-primary leading-tight">Carte Satellite GPS</h2>
@@ -178,7 +178,7 @@ export default function AgentTerrainMap() {
                 type="checkbox"
                 checked={showAgents}
                 onChange={(e) => setShowAgents(e.target.checked)}
-                className="w-3.5 h-3.5 rounded border-slate-500 bg-slate-700 text-status-success focus:ring-status-success focus:ring-offset-0"
+                className="w-3.5 h-3.5 rounded border-edge-strong bg-surface-elevated text-status-success focus:ring-status-success focus:ring-offset-0"
               />
               <span className="w-2 h-2 rounded-full bg-status-success shadow-[0_0_8px_rgba(34,197,94,0.4)]"></span>
               <span className="text-xs font-medium text-content-secondary">Agents ({agents.length})</span>
@@ -189,7 +189,7 @@ export default function AgentTerrainMap() {
                 type="checkbox"
                 checked={showClients}
                 onChange={(e) => setShowClients(e.target.checked)}
-                className="w-3.5 h-3.5 rounded border-slate-500 bg-slate-700 text-brand-primary focus:ring-brand-primary focus:ring-offset-0"
+                className="w-3.5 h-3.5 rounded border-edge-strong bg-surface-elevated text-brand-primary focus:ring-brand-primary focus:ring-offset-0"
               />
               <span className="w-2 h-2 rounded-full bg-brand-primary shadow-[0_0_8px_rgba(59,130,246,0.4)]"></span>
               <span className="text-xs font-medium text-content-secondary">Clients ({clients.length})</span>
@@ -200,7 +200,7 @@ export default function AgentTerrainMap() {
                 type="checkbox"
                 checked={showVisits}
                 onChange={(e) => setShowVisits(e.target.checked)}
-                className="w-3.5 h-3.5 rounded border-slate-500 bg-slate-700 text-brand-secondary focus:ring-brand-secondary focus:ring-offset-0"
+                className="w-3.5 h-3.5 rounded border-edge-strong bg-surface-elevated text-brand-secondary focus:ring-brand-secondary focus:ring-offset-0"
               />
               <span className="w-2 h-2 rounded-full bg-brand-secondary shadow-[0_0_8px_rgba(249,115,22,0.4)]"></span>
               <span className="text-xs font-medium text-content-secondary">Visites ({visits.length})</span>
@@ -209,7 +209,7 @@ export default function AgentTerrainMap() {
         </div>
 
         {/* Map Container */}
-        <div className="flex-1 relative bg-slate-900 overflow-hidden">
+        <div className="flex-1 relative bg-surface-base overflow-hidden">
           <SatelliteMap
             agents={showAgents ? agents : []}
             clients={showClients ? clients : []}
@@ -221,8 +221,8 @@ export default function AgentTerrainMap() {
           />
 
           {/* Info Overlay / Legend (Mobile Compact) */}
-          <div className="absolute top-4 right-4 bg-surface-base/90 backdrop-blur-md p-2 rounded-lg border border-cyan-500/30 shadow-lg z-[500] hidden sm:block">
-             <div className="flex items-center gap-2 text-xs font-medium text-cyan-400">
+          <div className="absolute top-4 right-4 bg-surface-base/90 backdrop-blur-md p-2 rounded-lg border border-accent/30 shadow-lg z-[500] hidden sm:block">
+             <div className="flex items-center gap-2 text-xs font-medium text-accent">
                 <Layers size={14} />
                 <span>Mode Satellite</span>
              </div>
@@ -234,8 +234,8 @@ export default function AgentTerrainMap() {
               <Card padding="sm" className="bg-surface-base/95 backdrop-blur-md border-card-border shadow-xl">
                  <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-gradient-to-br from-brand-primary to-cyan-600 rounded-full flex items-center justify-center shadow-lg shadow-brand-primary/20">
-                      <Users className="w-5 h-5 text-white" />
+                    <div className="w-10 h-10 bg-gradient-to-br from-brand-primary to-accent rounded-full flex items-center justify-center shadow-lg shadow-brand-primary/20">
+                      <Users className="w-5 h-5 text-content-primary" />
                     </div>
                     <div>
                       <h4 className="font-bold text-content-primary">

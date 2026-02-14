@@ -134,18 +134,18 @@ function ConflictItem({ conflict, onResolve, isResolving }: ConflictItemProps) {
   };
 
   return (
-    <Card className="mb-4 border-l-4 border-l-orange-500 bg-slate-800/50">
+    <Card className="mb-4 border-l-4 border-l-orange-500 bg-surface/50">
       <div className="flex items-start justify-between">
         <div className="flex items-start gap-3">
-          <div className="p-2 bg-orange-500/20 rounded-full">
-            <AlertTriangle className="h-5 w-5 text-orange-400" />
+          <div className="p-2 bg-status-warning-bg rounded-full">
+            <AlertTriangle className="h-5 w-5 text-status-warning" />
           </div>
           <div>
-            <h4 className="font-semibold text-white">{getEntityTypeLabel(conflict.entityType)}</h4>
-            <p className="text-sm text-slate-400">
+            <h4 className="font-semibold text-content-primary">{getEntityTypeLabel(conflict.entityType)}</h4>
+            <p className="text-sm text-content-muted">
               ID: {conflict.entityId.slice(0, 8)}... • {conflict.differences.length} différence(s)
             </p>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs text-content-muted mt-1">
               <Clock className="inline h-3 w-3 mr-1" />
               {new Date(conflict.createdAt).toLocaleString('fr-FR')}
             </p>
@@ -167,35 +167,35 @@ function ConflictItem({ conflict, onResolve, isResolving }: ConflictItemProps) {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-700">
-                  <th className="text-left py-2 px-3 text-slate-400 font-medium">Champ</th>
-                  <th className="text-left py-2 px-3 text-slate-400 font-medium">
+                <tr className="border-b border-edge">
+                  <th className="text-left py-2 px-3 text-content-muted font-medium">Champ</th>
+                  <th className="text-left py-2 px-3 text-content-muted font-medium">
                     <div className="flex items-center gap-2">
-                      <Smartphone className="h-4 w-4 text-blue-400" />
+                      <Smartphone className="h-4 w-4 text-status-info" />
                       Local
                     </div>
                   </th>
-                  <th className="text-left py-2 px-3 text-slate-400 font-medium">
+                  <th className="text-left py-2 px-3 text-content-muted font-medium">
                     <div className="flex items-center gap-2">
-                      <Cloud className="h-4 w-4 text-green-400" />
+                      <Cloud className="h-4 w-4 text-status-success" />
                       Serveur
                     </div>
                   </th>
-                  <th className="text-center py-2 px-3 text-slate-400 font-medium">Fusionner</th>
+                  <th className="text-center py-2 px-3 text-content-muted font-medium">Fusionner</th>
                 </tr>
               </thead>
               <tbody>
                 {conflict.differences.map((diff, idx) => (
-                  <tr key={idx} className="border-b border-slate-700/50 hover:bg-slate-700/30">
-                    <td className="py-2 px-3 font-medium text-white">
+                  <tr key={idx} className="border-b border-edge-subtle hover:bg-surface-elevated/30">
+                    <td className="py-2 px-3 font-medium text-content-primary">
                       {diff.field}
                       {diff.type === 'added' && (
-                        <span className="ml-2 text-xs bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded">
+                        <span className="ml-2 text-xs bg-status-success-bg text-status-success px-1.5 py-0.5 rounded">
                           Nouveau
                         </span>
                       )}
                       {diff.type === 'removed' && (
-                        <span className="ml-2 text-xs bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded">
+                        <span className="ml-2 text-xs bg-status-danger-bg text-status-danger px-1.5 py-0.5 rounded">
                           Supprimé
                         </span>
                       )}
@@ -204,8 +204,8 @@ function ConflictItem({ conflict, onResolve, isResolving }: ConflictItemProps) {
                       <code
                         className={`text-xs p-1 rounded ${
                           mergedData[diff.field] === diff.localValue
-                            ? 'bg-blue-500/20 text-blue-300 ring-1 ring-blue-500'
-                            : 'bg-slate-700 text-slate-300'
+                            ? 'bg-status-info-bg text-status-info ring-1 ring-status-info'
+                            : 'bg-surface-elevated text-content-secondary'
                         }`}
                       >
                         {formatValue(diff.localValue)}
@@ -215,8 +215,8 @@ function ConflictItem({ conflict, onResolve, isResolving }: ConflictItemProps) {
                       <code
                         className={`text-xs p-1 rounded ${
                           mergedData[diff.field] === diff.serverValue
-                            ? 'bg-green-500/20 text-green-300 ring-1 ring-green-500'
-                            : 'bg-slate-700 text-slate-300'
+                            ? 'bg-status-success-bg text-status-success ring-1 ring-status-success'
+                            : 'bg-surface-elevated text-content-secondary'
                         }`}
                       >
                         {formatValue(diff.serverValue)}
@@ -228,8 +228,8 @@ function ConflictItem({ conflict, onResolve, isResolving }: ConflictItemProps) {
                           onClick={() => toggleFieldInMerge(diff.field, true)}
                           className={`p-1 rounded ${
                             mergedData[diff.field] === diff.localValue
-                              ? 'bg-blue-500 text-white'
-                              : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                              ? 'bg-status-info text-white'
+                              : 'bg-surface-elevated text-content-muted hover:bg-surface-subtle'
                           }`}
                           title="Utiliser valeur locale"
                         >
@@ -239,8 +239,8 @@ function ConflictItem({ conflict, onResolve, isResolving }: ConflictItemProps) {
                           onClick={() => toggleFieldInMerge(diff.field, false)}
                           className={`p-1 rounded ${
                             mergedData[diff.field] === diff.serverValue
-                              ? 'bg-green-500 text-white'
-                              : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                              ? 'bg-status-success text-white'
+                              : 'bg-surface-elevated text-content-muted hover:bg-surface-subtle'
                           }`}
                           title="Utiliser valeur serveur"
                         >
@@ -255,14 +255,14 @@ function ConflictItem({ conflict, onResolve, isResolving }: ConflictItemProps) {
           </div>
 
           {/* Resolution Buttons */}
-          <div className="flex flex-wrap gap-2 pt-4 border-t border-slate-700">
+          <div className="flex flex-wrap gap-2 pt-4 border-t border-edge">
             <Button
               variant="outline"
               size="sm"
               onClick={() => handleResolve('local')}
               disabled={isResolving}
               icon={Smartphone}
-              className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
+              className="border-status-info/50 text-status-info hover:bg-status-info-bg"
             >
               Garder local
             </Button>
@@ -272,7 +272,7 @@ function ConflictItem({ conflict, onResolve, isResolving }: ConflictItemProps) {
               onClick={() => handleResolve('server')}
               disabled={isResolving}
               icon={Cloud}
-              className="border-green-500/50 text-green-400 hover:bg-green-500/10"
+              className="border-status-success/50 text-status-success hover:bg-status-success-bg"
             >
               Garder serveur
             </Button>
@@ -288,12 +288,12 @@ function ConflictItem({ conflict, onResolve, isResolving }: ConflictItemProps) {
           </div>
 
           {/* Info */}
-          <div className="flex items-start gap-2 p-3 bg-slate-900/50 rounded-lg text-xs text-slate-400">
+          <div className="flex items-start gap-2 p-3 bg-surface-base/50 rounded-lg text-xs text-content-muted">
             <Info className="h-4 w-4 flex-shrink-0 mt-0.5" />
             <p>
-              <strong className="text-slate-300">Garder local</strong> : utilise vos modifications hors ligne.{' '}
-              <strong className="text-slate-300">Garder serveur</strong> : utilise les données actuelles du serveur.{' '}
-              <strong className="text-slate-300">Fusionner</strong> : combine les deux selon votre sélection ci-dessus.
+              <strong className="text-content-secondary">Garder local</strong> : utilise vos modifications hors ligne.{' '}
+              <strong className="text-content-secondary">Garder serveur</strong> : utilise les données actuelles du serveur.{' '}
+              <strong className="text-content-secondary">Fusionner</strong> : combine les deux selon votre sélection ci-dessus.
             </p>
           </div>
         </div>
@@ -395,8 +395,8 @@ export function ConflictResolutionPanel() {
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
-        <RefreshCw className="h-6 w-6 animate-spin text-cyan-400" />
-        <span className="ml-2 text-slate-400">Chargement des conflits...</span>
+        <RefreshCw className="h-6 w-6 animate-spin text-accent" />
+        <span className="ml-2 text-content-muted">Chargement des conflits...</span>
       </div>
     );
   }
@@ -404,9 +404,9 @@ export function ConflictResolutionPanel() {
   if (conflicts.length === 0) {
     return (
       <Card className="text-center py-8">
-        <CheckCircle className="h-12 w-12 mx-auto text-green-400 mb-3" />
-        <h3 className="text-lg font-semibold text-white mb-1">Aucun conflit</h3>
-        <p className="text-slate-400">Toutes vos données sont synchronisées.</p>
+        <CheckCircle className="h-12 w-12 mx-auto text-status-success mb-3" />
+        <h3 className="text-lg font-semibold text-content-primary mb-1">Aucun conflit</h3>
+        <p className="text-content-muted">Toutes vos données sont synchronisées.</p>
       </Card>
     );
   }
@@ -416,12 +416,12 @@ export function ConflictResolutionPanel() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-orange-500/20 rounded-full">
-            <AlertTriangle className="h-6 w-6 text-orange-400" />
+          <div className="p-2 bg-status-warning-bg rounded-full">
+            <AlertTriangle className="h-6 w-6 text-status-warning" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-white">Conflits de synchronisation</h2>
-            <p className="text-sm text-slate-400">{conflicts.length} conflit(s) à résoudre</p>
+            <h2 className="text-lg font-semibold text-content-primary">Conflits de synchronisation</h2>
+            <p className="text-sm text-content-muted">{conflicts.length} conflit(s) à résoudre</p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -436,9 +436,9 @@ export function ConflictResolutionPanel() {
 
       {/* Recent conflict notification */}
       {recentConflict && (
-        <div className="flex items-center gap-3 p-3 bg-orange-500/10 border border-orange-500/30 rounded-lg animate-pulse">
-          <AlertTriangle className="h-5 w-5 text-orange-400" />
-          <p className="text-sm text-orange-200">
+        <div className="flex items-center gap-3 p-3 bg-status-warning-bg border border-status-warning/30 rounded-lg animate-pulse">
+          <AlertTriangle className="h-5 w-5 text-status-warning" />
+          <p className="text-sm text-status-warning-text">
             Nouveau conflit détecté : {getEntityTypeLabel(recentConflict.entityType)}
           </p>
           <Button
@@ -464,14 +464,14 @@ export function ConflictResolutionPanel() {
       </div>
 
       {/* Help Text */}
-      <Card className="bg-slate-900/50 border-slate-700">
+      <Card className="bg-surface-base/50 border-edge">
         <div className="flex items-start gap-3">
-          <Database className="h-5 w-5 text-cyan-400 flex-shrink-0 mt-0.5" />
+          <Database className="h-5 w-5 text-accent flex-shrink-0 mt-0.5" />
           <div className="text-sm">
-            <p className="text-slate-300 mb-2">
+            <p className="text-content-secondary mb-2">
               <strong>Pourquoi ces conflits ?</strong>
             </p>
-            <p className="text-slate-400">
+            <p className="text-content-muted">
               Des conflits surviennent lorsque vous modifiez des données en mode hors ligne qui ont également été
               modifiées sur le serveur. Vous devez décider quelle version conserver ou fusionner les deux.
             </p>

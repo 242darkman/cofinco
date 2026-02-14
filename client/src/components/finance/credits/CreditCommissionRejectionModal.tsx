@@ -69,12 +69,12 @@ export default function CreditCommissionRejectionModal({
       onClose={onClose}
       title={
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center">
-            <XCircle className="text-red-400" size={24} />
+          <div className="w-12 h-12 rounded-full bg-status-danger-bg flex items-center justify-center">
+            <XCircle className="text-status-danger" size={24} />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-white">Rejeter la Demande</h2>
-            <p className="text-sm text-slate-400 mt-0.5">Commission Crédit</p>
+            <h2 className="text-xl font-bold text-content-primary">Rejeter la Demande</h2>
+            <p className="text-sm text-content-muted mt-0.5">Commission Crédit</p>
           </div>
         </div>
       }
@@ -82,11 +82,11 @@ export default function CreditCommissionRejectionModal({
     >
       <div className="space-y-6">
         {/* Warning Banner */}
-        <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg flex items-start gap-3">
-          <AlertTriangle className="text-yellow-400 flex-shrink-0 mt-0.5" size={20} />
-          <div className="text-sm text-yellow-200">
+        <div className="p-4 bg-status-warning-bg border border-status-warning/30 rounded-lg flex items-start gap-3">
+          <AlertTriangle className="text-status-warning flex-shrink-0 mt-0.5" size={20} />
+          <div className="text-sm text-status-warning-text">
             <p className="font-semibold mb-1">Attention</p>
-            <p className="text-yellow-300/90">
+            <p className="text-status-warning/90">
               Cette demande a déjà été approuvée. Le rejet à cette étape annulera l'approbation initiale.
               Le client pourra demander une réévaluation immédiatement.
             </p>
@@ -94,24 +94,24 @@ export default function CreditCommissionRejectionModal({
         </div>
 
         {/* Demande Info */}
-        <div className="bg-slate-700/50 rounded-lg p-4 space-y-2">
+        <div className="bg-surface-elevated/50 rounded-lg p-4 space-y-2">
           <div className="flex justify-between text-sm">
-            <span className="text-slate-400">Numéro de demande</span>
-            <span className="text-white font-mono font-bold">{demande.numeroDemande}</span>
+            <span className="text-content-muted">Numéro de demande</span>
+            <span className="text-content-primary font-mono font-bold">{demande.numeroDemande}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-slate-400">Client</span>
-            <span className="text-white font-semibold">{clientName}</span>
+            <span className="text-content-muted">Client</span>
+            <span className="text-content-primary font-semibold">{clientName}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-slate-400">Montant demandé</span>
-            <span className="text-emerald-400 font-bold">
+            <span className="text-content-muted">Montant demandé</span>
+            <span className="text-status-success font-bold">
               {(demande.montantDemande || 0).toLocaleString('fr-FR')} FCFA
             </span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-slate-400">Statut actuel</span>
-            <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded text-xs font-semibold">
+            <span className="text-content-muted">Statut actuel</span>
+            <span className="px-2 py-0.5 bg-status-success-bg text-status-success rounded text-xs font-semibold">
               {STATUT_DEMANDE_LABELS[demande.statut as StatutDemandeType] || demande.statut}
             </span>
           </div>
@@ -119,8 +119,8 @@ export default function CreditCommissionRejectionModal({
 
         {/* Motif de Rejet */}
         <div>
-          <label className="block text-sm font-medium text-slate-300 mb-2">
-            Motif du rejet <span className="text-red-400">*</span>
+          <label className="block text-sm font-medium text-content-secondary mb-2">
+            Motif du rejet <span className="text-status-danger">*</span>
           </label>
           <textarea
             value={motifRejet}
@@ -130,16 +130,16 @@ export default function CreditCommissionRejectionModal({
             }}
             placeholder="Expliquez les raisons du rejet (minimum 10 caractères)..."
             rows={5}
-            className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500 transition resize-none"
+            className="w-full px-4 py-3 bg-surface-elevated border border-edge-strong rounded-lg text-content-primary placeholder-content-muted focus:outline-none focus:ring-2 focus:ring-status-danger/50 focus:border-status-danger transition resize-none"
             disabled={loading}
           ></textarea>
           <div className="flex justify-between mt-1">
             <span className={`text-xs ${
               motifRejet.length < 10 
-                ? 'text-red-400' 
+                ? 'text-status-danger' 
                 : motifRejet.length > 500 
-                ? 'text-orange-400' 
-                : 'text-emerald-400'
+                ? 'text-status-warning' 
+                : 'text-status-success'
             }`}>
               {motifRejet.length < 10 
                 ? `Minimum 10 caractères (${10 - motifRejet.length} restants)` 
@@ -153,8 +153,8 @@ export default function CreditCommissionRejectionModal({
 
         {/* Error Message */}
         {error && (
-          <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
-            <p className="text-sm text-red-400">{error}</p>
+          <div className="p-3 bg-status-danger-bg border border-status-danger/30 rounded-lg">
+            <p className="text-sm text-status-danger">{error}</p>
           </div>
         )}
 

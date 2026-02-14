@@ -72,11 +72,11 @@ interface CaissierOption {
 }
 
 const statusLabels: Record<string, { label: string; color: string; icon: React.ElementType }> = {
-  PENDING: { label: 'En attente', color: 'text-amber-400 bg-amber-500/10', icon: Clock },
-  COUNTING: { label: 'Comptage en cours', color: 'text-blue-400 bg-blue-500/10', icon: Calculator },
-  CONFIRMED: { label: 'Confirmé', color: 'text-emerald-400 bg-emerald-500/10', icon: Check },
-  CANCELLED: { label: 'Annulé', color: 'text-red-400 bg-red-500/10', icon: X },
-  DISPUTED: { label: 'En attente approbation', color: 'text-orange-400 bg-orange-500/10', icon: AlertTriangle },
+  PENDING: { label: 'En attente', color: 'text-status-warning bg-status-warning-bg', icon: Clock },
+  COUNTING: { label: 'Comptage en cours', color: 'text-status-info bg-status-info-bg', icon: Calculator },
+  CONFIRMED: { label: 'Confirmé', color: 'text-status-success bg-status-success-bg', icon: Check },
+  CANCELLED: { label: 'Annulé', color: 'text-status-danger bg-status-danger-bg', icon: X },
+  DISPUTED: { label: 'En attente approbation', color: 'text-status-warning bg-status-warning-bg', icon: AlertTriangle },
 };
 
 export default function CaisseHandoverPanel({
@@ -238,14 +238,14 @@ export default function CaisseHandoverPanel({
   return (
     <>
       <Card className="overflow-hidden">
-        <div className="px-4 py-3 bg-purple-500/10 border-b border-purple-500/20 flex items-center justify-between">
+        <div className="px-4 py-3 bg-status-info-bg border-b border-status-info/20 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
-              <ArrowRightLeft className="w-5 h-5 text-purple-400" />
+            <div className="w-10 h-10 rounded-xl bg-status-info-bg flex items-center justify-center">
+              <ArrowRightLeft className="w-5 h-5 text-status-info" />
             </div>
             <div>
-              <h3 className="font-semibold text-white">Transfert de garde</h3>
-              <p className="text-xs text-slate-400">Changement de caissier</p>
+              <h3 className="font-semibold text-content-primary">Transfert de garde</h3>
+              <p className="text-xs text-content-muted">Changement de caissier</p>
             </div>
           </div>
           <Button
@@ -262,10 +262,10 @@ export default function CaisseHandoverPanel({
         <div className="p-4">
           {isLoading ? (
             <div className="flex items-center justify-center py-6">
-              <RefreshCw className="w-5 h-5 animate-spin text-slate-400" />
+              <RefreshCw className="w-5 h-5 animate-spin text-content-muted" />
             </div>
           ) : !hasActiveHandover ? (
-            <div className="text-center py-6 text-slate-400">
+            <div className="text-center py-6 text-content-muted">
               <ArrowRightLeft className="w-10 h-10 mx-auto mb-2 opacity-30" />
               <p className="text-sm">Aucun transfert en cours</p>
               <p className="text-xs mt-1">Cliquez sur "Transférer" pour passer la main</p>
@@ -282,16 +282,16 @@ export default function CaisseHandoverPanel({
                     key={handover.id}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="bg-slate-800/50 rounded-lg p-4"
+                    className="bg-surface/50 rounded-lg p-4"
                   >
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
                         {isIncoming ? (
-                          <UserPlus className="w-4 h-4 text-emerald-400" />
+                          <UserPlus className="w-4 h-4 text-status-success" />
                         ) : (
-                          <UserMinus className="w-4 h-4 text-amber-400" />
+                          <UserMinus className="w-4 h-4 text-status-warning" />
                         )}
-                        <span className="text-sm text-white">
+                        <span className="text-sm text-content-primary">
                           {isIncoming ? 'Transfert entrant' : 'Transfert sortant'}
                         </span>
                         <span className={`px-2 py-0.5 rounded text-xs font-medium ${status.color}`}>
@@ -299,23 +299,23 @@ export default function CaisseHandoverPanel({
                           {status.label}
                         </span>
                       </div>
-                      <span className="text-xs text-slate-500">
+                      <span className="text-xs text-content-muted">
                         {new Date(handover.initiatedAt).toLocaleTimeString('fr-FR')}
                       </span>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3 text-sm mb-3">
                       <div>
-                        <span className="text-slate-500">De:</span>
-                        <span className="text-white ml-2">{handover.fromCaissierNom}</span>
+                        <span className="text-content-muted">De:</span>
+                        <span className="text-content-primary ml-2">{handover.fromCaissierNom}</span>
                       </div>
                       <div>
-                        <span className="text-slate-500">À:</span>
-                        <span className="text-white ml-2">{handover.toCaissierNom}</span>
+                        <span className="text-content-muted">À:</span>
+                        <span className="text-content-primary ml-2">{handover.toCaissierNom}</span>
                       </div>
                       <div className="col-span-2">
-                        <span className="text-slate-500">Montant:</span>
-                        <span className="text-white ml-2 font-medium">
+                        <span className="text-content-muted">Montant:</span>
+                        <span className="text-content-primary ml-2 font-medium">
                           {formatMoney(handover.montantTheorique)} XOF
                         </span>
                       </div>
@@ -383,24 +383,24 @@ export default function CaisseHandoverPanel({
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="relative w-full max-w-md bg-slate-800 rounded-xl shadow-xl border border-slate-700 overflow-hidden"
+              className="relative w-full max-w-md bg-surface rounded-xl shadow-xl border border-edge overflow-hidden"
             >
-              <div className="px-4 py-3 bg-purple-500/10 border-b border-slate-700">
-                <h3 className="font-semibold text-white flex items-center gap-2">
-                  <UserPlus className="w-5 h-5 text-purple-400" />
+              <div className="px-4 py-3 bg-status-info-bg border-b border-edge">
+                <h3 className="font-semibold text-content-primary flex items-center gap-2">
+                  <UserPlus className="w-5 h-5 text-status-info" />
                   Initier un transfert de garde
                 </h3>
               </div>
 
               <div className="p-4 space-y-4">
                 <div>
-                  <label className="block text-sm text-slate-400 mb-1">
+                  <label className="block text-sm text-content-muted mb-1">
                     Caissier entrant
                   </label>
                   <select
                     value={selectedCaissier}
                     onChange={(e) => setSelectedCaissier(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white"
+                    className="w-full px-3 py-2 bg-surface-elevated/50 border border-edge-strong rounded-lg text-content-primary"
                   >
                     <option value="">Sélectionner un caissier</option>
                     {availableCaissiers?.map((c) => (
@@ -412,22 +412,22 @@ export default function CaisseHandoverPanel({
                 </div>
 
                 <div>
-                  <label className="block text-sm text-slate-400 mb-1">
+                  <label className="block text-sm text-content-muted mb-1">
                     Montant compté (XOF)
                   </label>
                   <input
                     type="number"
                     value={declaredAmount}
                     onChange={(e) => setDeclaredAmount(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white"
+                    className="w-full px-3 py-2 bg-surface-elevated/50 border border-edge-strong rounded-lg text-content-primary"
                   />
-                  <p className="text-xs text-slate-500 mt-1">
+                  <p className="text-xs text-content-muted mt-1">
                     Solde théorique: {formatMoney(currentSolde)} XOF
                   </p>
                 </div>
 
                 <div>
-                  <label className="block text-sm text-slate-400 mb-1">
+                  <label className="block text-sm text-content-muted mb-1">
                     Motif (optionnel)
                   </label>
                   <input
@@ -435,12 +435,12 @@ export default function CaisseHandoverPanel({
                     value={initiateMotif}
                     onChange={(e) => setInitiateMotif(e.target.value)}
                     placeholder="Ex: Pause déjeuner, fin de service..."
-                    className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500"
+                    className="w-full px-3 py-2 bg-surface-elevated/50 border border-edge-strong rounded-lg text-content-primary placeholder-content-muted"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm text-slate-400 mb-1">
+                  <label className="block text-sm text-content-muted mb-1">
                     Observations (optionnel)
                   </label>
                   <textarea
@@ -448,11 +448,11 @@ export default function CaisseHandoverPanel({
                     onChange={(e) => setInitiateObservations(e.target.value)}
                     placeholder="Notes pour le caissier entrant..."
                     rows={2}
-                    className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500"
+                    className="w-full px-3 py-2 bg-surface-elevated/50 border border-edge-strong rounded-lg text-content-primary placeholder-content-muted"
                   />
                 </div>
 
-                <div className="flex justify-end gap-2 pt-4 border-t border-slate-700">
+                <div className="flex justify-end gap-2 pt-4 border-t border-edge">
                   <Button variant="ghost" onClick={() => setShowInitiateModal(false)}>
                     Annuler
                   </Button>
@@ -489,44 +489,44 @@ export default function CaisseHandoverPanel({
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="relative w-full max-w-md bg-slate-800 rounded-xl shadow-xl border border-slate-700 overflow-hidden"
+              className="relative w-full max-w-md bg-surface rounded-xl shadow-xl border border-edge overflow-hidden"
             >
-              <div className="px-4 py-3 bg-emerald-500/10 border-b border-slate-700">
-                <h3 className="font-semibold text-white flex items-center gap-2">
-                  <Check className="w-5 h-5 text-emerald-400" />
+              <div className="px-4 py-3 bg-status-success-bg border-b border-edge">
+                <h3 className="font-semibold text-content-primary flex items-center gap-2">
+                  <Check className="w-5 h-5 text-status-success" />
                   Confirmer le transfert
                 </h3>
               </div>
 
               <div className="p-4 space-y-4">
-                <div className="bg-slate-700/30 rounded-lg p-3 text-sm">
+                <div className="bg-surface-elevated/30 rounded-lg p-3 text-sm">
                   <div className="flex justify-between mb-1">
-                    <span className="text-slate-400">Montant déclaré:</span>
-                    <span className="text-white font-medium">
+                    <span className="text-content-muted">Montant déclaré:</span>
+                    <span className="text-content-primary font-medium">
                       {formatMoney(showConfirmModal.montantTheorique)} XOF
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">De:</span>
-                    <span className="text-white">{showConfirmModal.fromCaissierNom}</span>
+                    <span className="text-content-muted">De:</span>
+                    <span className="text-content-primary">{showConfirmModal.fromCaissierNom}</span>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm text-slate-400 mb-1">
+                  <label className="block text-sm text-content-muted mb-1">
                     Montant vérifié (XOF)
                   </label>
                   <input
                     type="number"
                     value={verifiedAmount}
                     onChange={(e) => setVerifiedAmount(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white"
+                    className="w-full px-3 py-2 bg-surface-elevated/50 border border-edge-strong rounded-lg text-content-primary"
                   />
                   {verifiedAmount !== showConfirmModal.montantTheorique && (
                     <p className={`text-xs mt-1 ${
                       Math.abs(verifiedAmount - showConfirmModal.montantTheorique) > 5000
-                        ? 'text-red-400'
-                        : 'text-amber-400'
+                        ? 'text-status-danger'
+                        : 'text-status-warning'
                     }`}>
                       Écart: {formatMoney(verifiedAmount - showConfirmModal.montantTheorique)} XOF
                     </p>
@@ -535,7 +535,7 @@ export default function CaisseHandoverPanel({
 
                 {verifiedAmount !== showConfirmModal.montantTheorique && (
                   <div>
-                    <label className="block text-sm text-slate-400 mb-1">
+                    <label className="block text-sm text-content-muted mb-1">
                       Justification de l'écart
                     </label>
                     <textarea
@@ -543,13 +543,13 @@ export default function CaisseHandoverPanel({
                       onChange={(e) => setEcartJustification(e.target.value)}
                       placeholder="Expliquez la raison de l'écart..."
                       rows={2}
-                      className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500"
+                      className="w-full px-3 py-2 bg-surface-elevated/50 border border-edge-strong rounded-lg text-content-primary placeholder-content-muted"
                     />
                   </div>
                 )}
 
                 <div>
-                  <label className="block text-sm text-slate-400 mb-1">
+                  <label className="block text-sm text-content-muted mb-1">
                     Observations (optionnel)
                   </label>
                   <textarea
@@ -557,11 +557,11 @@ export default function CaisseHandoverPanel({
                     onChange={(e) => setConfirmObservations(e.target.value)}
                     placeholder="Notes supplémentaires..."
                     rows={2}
-                    className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500"
+                    className="w-full px-3 py-2 bg-surface-elevated/50 border border-edge-strong rounded-lg text-content-primary placeholder-content-muted"
                   />
                 </div>
 
-                <div className="flex justify-end gap-2 pt-4 border-t border-slate-700">
+                <div className="flex justify-end gap-2 pt-4 border-t border-edge">
                   <Button variant="ghost" onClick={() => setShowConfirmModal(null)}>
                     Annuler
                   </Button>
@@ -598,22 +598,22 @@ export default function CaisseHandoverPanel({
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="relative w-full max-w-sm bg-slate-800 rounded-xl shadow-xl border border-slate-700 overflow-hidden"
+              className="relative w-full max-w-sm bg-surface rounded-xl shadow-xl border border-edge overflow-hidden"
             >
-              <div className="px-4 py-3 bg-red-500/10 border-b border-slate-700">
-                <h3 className="font-semibold text-white flex items-center gap-2">
-                  <X className="w-5 h-5 text-red-400" />
+              <div className="px-4 py-3 bg-status-danger-bg border-b border-edge">
+                <h3 className="font-semibold text-content-primary flex items-center gap-2">
+                  <X className="w-5 h-5 text-status-danger" />
                   Annuler le transfert
                 </h3>
               </div>
 
               <div className="p-4">
-                <p className="text-slate-300 text-sm mb-4">
+                <p className="text-content-secondary text-sm mb-4">
                   Êtes-vous sûr de vouloir annuler ce transfert ? Cette action ne peut pas être annulée.
                 </p>
 
                 <div className="mb-4">
-                  <label className="block text-sm text-slate-400 mb-1">
+                  <label className="block text-sm text-content-muted mb-1">
                     Raison de l'annulation
                   </label>
                   <textarea
@@ -621,7 +621,7 @@ export default function CaisseHandoverPanel({
                     onChange={(e) => setCancelReason(e.target.value)}
                     placeholder="Indiquez la raison..."
                     rows={2}
-                    className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500"
+                    className="w-full px-3 py-2 bg-surface-elevated/50 border border-edge-strong rounded-lg text-content-primary placeholder-content-muted"
                   />
                 </div>
 

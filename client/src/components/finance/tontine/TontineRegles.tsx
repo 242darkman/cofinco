@@ -168,11 +168,11 @@ export default function TontineRegles({ tontineId }: TontineReglesProps) {
 
   const getTypeColor = (type: string): string => {
     switch (type as TypeRegleTontineType) {
-      case TypeRegleTontine.LATE_PENALTY: return 'bg-orange-500/10 text-orange-400';
-      case TypeRegleTontine.MEMBERSHIP_FEE: return 'bg-blue-500/10 text-blue-400';
-      case TypeRegleTontine.EXIT_FEE: return 'bg-purple-500/10 text-purple-400';
-      case TypeRegleTontine.FINE: return 'bg-red-500/10 text-red-400';
-      default: return 'bg-slate-500/10 text-slate-400';
+      case TypeRegleTontine.LATE_PENALTY: return 'bg-status-warning-bg text-status-warning';
+      case TypeRegleTontine.MEMBERSHIP_FEE: return 'bg-status-info-bg text-status-info';
+      case TypeRegleTontine.EXIT_FEE: return 'bg-status-info-bg text-status-info';
+      case TypeRegleTontine.FINE: return 'bg-status-danger-bg text-status-danger';
+      default: return 'bg-surface-subtle/30 text-content-muted';
     }
   };
 
@@ -182,10 +182,10 @@ export default function TontineRegles({ tontineId }: TontineReglesProps) {
 
   const getStatutPenaliteColor = (statut: string): string => {
     switch (statut as StatutPenaliteTontineType) {
-      case StatutPenaliteTontine.PAID: return 'text-green-400';
+      case StatutPenaliteTontine.PAID: return 'text-status-success';
       case StatutPenaliteTontine.CANCELLED:
-      case StatutPenaliteTontine.WAIVED: return 'text-slate-400';
-      default: return 'text-red-400';
+      case StatutPenaliteTontine.WAIVED: return 'text-content-muted';
+      default: return 'text-status-danger';
     }
   };
 
@@ -207,18 +207,18 @@ export default function TontineRegles({ tontineId }: TontineReglesProps) {
         <div className="lg:col-span-8 space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                   <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                       <Scale className="text-cyan-400" size={24} />
+                   <h3 className="text-xl font-bold text-content-primary flex items-center gap-2">
+                       <Scale className="text-accent" size={24} />
                        Règles et Frais
                    </h3>
-                   <p className="text-slate-400 text-sm mt-1">Gérez les pénalités et frais de cette tontine</p>
+                   <p className="text-content-muted text-sm mt-1">Gérez les pénalités et frais de cette tontine</p>
                 </div>
                 <Button
                     size="sm"
                     icon={Plus}
                     onClick={() => setShowAddForm(true)}
                     variant="primary"
-                    className="shadow-lg shadow-cyan-500/20"
+                    className="shadow-lg shadow-accent/20"
                 >
                     Nouvelle Règle
                 </Button>
@@ -241,14 +241,14 @@ export default function TontineRegles({ tontineId }: TontineReglesProps) {
                             key={regle.id}
                             className={`relative overflow-hidden transition-all duration-300 group hover:-translate-y-1 hover:shadow-xl ${
                                 regle.actif
-                                ? 'border-cyan-500/30 bg-slate-800/80 hover:border-cyan-500/50'
-                                : 'border-slate-700 bg-slate-800/40 opacity-75 grayscale-[0.5]'
+                                ? 'border-accent/30 bg-surface/80 hover:border-accent/50'
+                                : 'border-edge bg-surface/40 opacity-75 grayscale-[0.5]'
                             }`}
                         >
                             {/* Status Indicator */}
                             <div className={`absolute top-0 right-0 w-16 h-16 pointer-events-none overflow-hidden`}>
-                                <div className={`absolute top-[10px] right-[-25px] rotate-45 text-[10px] font-bold py-1 px-8 text-center text-white shadow-sm
-                                    ${regle.actif ? 'bg-cyan-500 shadow-cyan-500/20' : 'bg-slate-600'}
+                                <div className={`absolute top-[10px] right-[-25px] rotate-45 text-[10px] font-bold py-1 px-8 text-center text-content-primary shadow-sm
+                                    ${regle.actif ? 'bg-accent shadow-accent/20' : 'bg-surface-subtle'}
                                 `}>
                                     {regle.actif ? 'ON' : 'OFF'}
                                 </div>
@@ -268,8 +268,8 @@ export default function TontineRegles({ tontineId }: TontineReglesProps) {
                                             onClick={() => handleToggleRegle(regle)}
                                             className={`rounded-full w-8 h-8 ${
                                                 regle.actif
-                                                ? 'hover:bg-amber-500/20 hover:text-amber-400 text-slate-400'
-                                                : 'bg-green-500/10 text-green-400 hover:bg-green-500/20'
+                                                ? 'hover:bg-status-warning-bg hover:text-status-warning text-content-muted'
+                                                : 'bg-status-success-bg text-status-success hover:bg-status-success-bg/80'
                                             }`}
                                             title={regle.actif ? "Désactiver" : "Activer"}
                                             aria-label={regle.actif ? "Désactiver" : "Activer"}
@@ -279,7 +279,7 @@ export default function TontineRegles({ tontineId }: TontineReglesProps) {
                                             variant="ghost"
                                             icon={Trash2}
                                             onClick={() => handleDeleteRegle(regle)}
-                                            className="rounded-full w-8 h-8 hover:bg-red-500/20 hover:text-red-400 text-slate-400"
+                                            className="rounded-full w-8 h-8 hover:bg-status-danger-bg hover:text-status-danger text-content-muted"
                                             title="Supprimer"
                                             aria-label="Supprimer"
                                         />
@@ -288,19 +288,19 @@ export default function TontineRegles({ tontineId }: TontineReglesProps) {
 
                                 {/* Content */}
                                 <div>
-                                    <h4 className="font-semibold text-slate-200 text-lg mb-1 leading-tight">{getTypeLabel(regle.typeRegle)}</h4>
+                                    <h4 className="font-semibold text-content-secondary text-lg mb-1 leading-tight">{getTypeLabel(regle.typeRegle)}</h4>
                                     <div className="flex items-baseline gap-1.5">
-                                        <span className={`text-2xl font-bold tracking-tight ${regle.actif ? 'text-white' : 'text-slate-400'}`}>
+                                        <span className={`text-2xl font-bold tracking-tight ${regle.actif ? 'text-content-primary' : 'text-content-muted'}`}>
                                             {Number(regle.montantPenalite).toLocaleString()}
                                         </span>
-                                        <span className="text-xs font-medium text-slate-500 uppercase">FCFA</span>
+                                        <span className="text-xs font-medium text-content-muted uppercase">FCFA</span>
                                     </div>
                                 </div>
 
                                 {/* Description */}
                                 {regle.description && (
-                                    <div className="pt-3 border-t border-slate-700/50">
-                                        <p className="text-sm text-slate-400 line-clamp-2 leading-relaxed">
+                                    <div className="pt-3 border-t border-edge-subtle">
+                                        <p className="text-sm text-content-muted line-clamp-2 leading-relaxed">
                                             {regle.description}
                                         </p>
                                     </div>
@@ -315,22 +315,22 @@ export default function TontineRegles({ tontineId }: TontineReglesProps) {
         {/* Section Pénalités (Sidebar) */}
         <div className="lg:col-span-4 space-y-6">
              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                    <AlertCircle className="text-red-400" size={20} />
+                <h3 className="text-lg font-bold text-content-primary flex items-center gap-2">
+                    <AlertCircle className="text-status-danger" size={20} />
                     Pénalités
                 </h3>
             </div>
 
             {totalPenalitesEnAttente > 0 && (
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-red-600 to-orange-600 p-5 shadow-lg shadow-red-900/20 text-white">
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-status-danger to-status-warning p-5 shadow-lg shadow-status-danger/20 text-white">
                     <div className="relative z-10 flex items-center gap-4">
                         <div className="p-3 bg-white/10 rounded-xl backdrop-blur-sm">
-                            <AlertTriangle size={24} className="text-white" />
+                            <AlertTriangle size={24} className="text-content-primary" />
                         </div>
                         <div>
-                            <div className="text-red-100 text-xs font-semibold uppercase tracking-wider">Total Impayé</div>
+                            <div className="text-status-danger-text text-xs font-semibold uppercase tracking-wider">Total Impayé</div>
                             <div className="text-2xl font-bold">
-                                {totalPenalitesEnAttente.toLocaleString()} <span className="text-sm font-normal text-red-100">FCFA</span>
+                                {totalPenalitesEnAttente.toLocaleString()} <span className="text-sm font-normal text-status-danger-text">FCFA</span>
                             </div>
                         </div>
                     </div>
@@ -340,21 +340,21 @@ export default function TontineRegles({ tontineId }: TontineReglesProps) {
             <div className="space-y-3">
                 {loading && penalites.length === 0 ? (
                     <div className="flex justify-center py-8">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500"></div>
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div>
                     </div>
                 ) : penalites.length === 0 ? (
-                    <div className="text-center py-8 px-4 rounded-xl border border-slate-800 bg-slate-900/50">
-                        <div className="mx-auto w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center text-slate-500 mb-3">
+                    <div className="text-center py-8 px-4 rounded-xl border border-edge bg-surface-base/50">
+                        <div className="mx-auto w-12 h-12 rounded-full bg-surface flex items-center justify-center text-content-muted mb-3">
                             <Check size={20} />
                         </div>
-                        <p className="text-slate-400 text-sm">Aucune pénalité en cours.</p>
+                        <p className="text-content-muted text-sm">Aucune pénalité en cours.</p>
                     </div>
                 ) : (
-                    <div className="bg-slate-900/50 rounded-xl border border-slate-800 divide-y divide-slate-800 overflow-hidden">
+                    <div className="bg-surface-base/50 rounded-xl border border-edge divide-y divide-edge overflow-hidden">
                         {penalites.map((penalite) => (
-                            <div key={penalite.id} className="p-4 hover:bg-slate-800/50 transition-colors">
+                            <div key={penalite.id} className="p-4 hover:bg-surface/50 transition-colors">
                                 <div className="flex justify-between items-start gap-3 mb-2">
-                                    <div className="font-medium text-white text-sm">{penalite.tontine_membres.clients.nom}</div>
+                                    <div className="font-medium text-content-primary text-sm">{penalite.tontine_membres.clients.nom}</div>
                                     <div className="text-right">
                                          <span className={`text-sm font-bold ${getStatutPenaliteColor(penalite.statut)}`}>
                                             {Number(penalite.montant).toLocaleString()} F
@@ -363,8 +363,8 @@ export default function TontineRegles({ tontineId }: TontineReglesProps) {
                                 </div>
 
                                 <div className="flex items-center justify-between text-xs">
-                                     <div className="text-slate-500">{penalite.motif}</div>
-                                     <div className="text-slate-600">
+                                     <div className="text-content-muted">{penalite.motif}</div>
+                                     <div className="text-content-muted">
                                         {new Date(penalite.dateFaute).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
                                      </div>
                                 </div>
@@ -374,7 +374,7 @@ export default function TontineRegles({ tontineId }: TontineReglesProps) {
                                         <Button
                                             size="sm"
                                             variant="ghost"
-                                            className="h-7 text-xs bg-green-500/10 text-green-400 hover:bg-green-500/20 px-2.5"
+                                            className="h-7 text-xs bg-status-success-bg text-status-success hover:bg-status-success-bg/80 px-2.5"
                                             onClick={() => handleMarquerPenalitePaye(penalite.id)}
                                         >
                                             Marquer payée

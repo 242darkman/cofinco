@@ -7,6 +7,7 @@ import Button from '../../ui/Button';
 import Card from '../../ui/Card';
 import { toast, handleApiError } from '../../../lib/toast';
 import { addPdfLogoHeader } from '../../../lib/pdf-logo';
+import { useBranding } from '../../../contexts/BrandingContext';
 import { useChartOfAccounts, useGrandLivre, useAccountingWebSocket } from '../../../hooks/accounting/useAccounting';
 // P4.1: Lazy-load heavy export libraries
 import { loadExportLibraries } from '../../../lib/lazy-export';
@@ -49,6 +50,7 @@ interface GrandLivreData {
 }
 
 export default function GrandLivre() {
+  const { branding } = useBranding();
   const [compteSelectionne, setCompteSelectionne] = useState('');
   const [dateDebut, setDateDebut] = useState(new Date().getFullYear() + '-01-01');
   const [dateFin, setDateFin] = useState(new Date().toISOString().split('T')[0]);
@@ -147,6 +149,7 @@ export default function GrandLivre() {
         title: 'GRAND LIVRE',
         subtitle: `Compte: ${grandLivreData.numeroCompte} - ${grandLivreData.intitule}`,
         dateRight: `Période: ${dateDebut} au ${dateFin}`,
+        appName: branding.appName,
       });
 
       // Solde d'ouverture
@@ -217,9 +220,9 @@ export default function GrandLivre() {
       primary: true,
       format: (val: string, row: GrandLivreEntry) => (
         <div>
-          <span className="text-white font-medium line-clamp-2 text-xs sm:text-sm">{val || row.ligneLibelle}</span>
+          <span className="text-content-primary font-medium line-clamp-2 text-xs sm:text-sm">{val || row.ligneLibelle}</span>
           {row.sourceType && (
-            <span className="text-[10px] text-cyan-400/70 flex items-center gap-1 mt-0.5">
+            <span className="text-[10px] text-accent/70 flex items-center gap-1 mt-0.5">
               <ExternalLink size={10} />
               {row.sourceType}
             </span>
@@ -231,7 +234,7 @@ export default function GrandLivre() {
       label: 'Date',
       key: 'dateEcriture',
       format: (val: string) => (
-        <span className="flex items-center gap-1 text-slate-400 text-xs text-[10px] sm:text-xs">
+        <span className="flex items-center gap-1 text-content-muted text-xs text-[10px] sm:text-xs">
           <CalendarIcon size={12} />
           {new Date(val).toLocaleDateString('fr-FR')}
         </span>
@@ -243,9 +246,9 @@ export default function GrandLivre() {
       hideOnMobile: true,
       format: (val: string, row: GrandLivreEntry) => (
         <div>
-          <span className="font-mono text-cyan-400 text-[10px] sm:text-xs">{val}</span>
+          <span className="font-mono text-accent text-[10px] sm:text-xs">{val}</span>
           {row.journalCode && (
-            <span className="block text-[9px] text-slate-500">{row.journalCode}</span>
+            <span className="block text-[9px] text-content-muted">{row.journalCode}</span>
           )}
         </div>
       )
@@ -253,18 +256,18 @@ export default function GrandLivre() {
     {
       label: 'Debit',
       key: 'debit',
-      format: (val: number) => val > 0 ? <span className="text-amber-400 font-mono text-xs font-medium">{val.toLocaleString()}</span> : <span className="text-slate-600 text-xs">-</span>
+      format: (val: number) => val > 0 ? <span className="text-status-warning font-mono text-xs font-medium">{val.toLocaleString()}</span> : <span className="text-content-muted text-xs">-</span>
     },
     {
       label: 'Credit',
       key: 'credit',
-      format: (val: number) => val > 0 ? <span className="text-emerald-400 font-mono text-xs font-medium">{val.toLocaleString()}</span> : <span className="text-slate-600 text-xs">-</span>
+      format: (val: number) => val > 0 ? <span className="text-status-success font-mono text-xs font-medium">{val.toLocaleString()}</span> : <span className="text-content-muted text-xs">-</span>
     },
     {
       label: 'Solde',
       key: 'soldeProgressif',
       format: (val: number) => (
-        <span className={`font-mono font-bold text-xs ${val >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+        <span className={`font-mono font-bold text-xs ${val >= 0 ? 'text-status-success' : 'text-status-danger'}`}>
           {val.toLocaleString()}
         </span>
       )
@@ -274,18 +277,18 @@ export default function GrandLivre() {
   return (
     <div className="space-y-4">
       {/* Filters & Actions Card */}
-      <Card padding="sm" className="bg-slate-800/80">
+      <Card padding="sm" className="bg-surface/80">
         <div className="flex flex-col gap-3">
             {/* Top Row: Account & Actions */}
             <div className="flex flex-col sm:flex-row justify-between gap-3">
                  <div className="flex-1">
-                     <label className="text-[10px] uppercase text-slate-500 font-bold mb-1.5 flex items-center gap-1">
+                     <label className="text-[10px] uppercase text-content-muted font-bold mb-1.5 flex items-center gap-1">
                         <BookOpen size={10} /> Compte
                      </label>
                      <select
                         value={compteSelectionne}
                         onChange={(e) => handleCompteChange(e.target.value)}
-                        className="w-full bg-slate-900/50 text-white text-xs sm:text-sm px-3 py-2 rounded-lg border border-slate-700 focus:outline-none focus:border-cyan-500 transition-colors"
+                        className="w-full bg-surface-base/50 text-content-primary text-xs sm:text-sm px-3 py-2 rounded-lg border border-edge focus:outline-none focus:border-accent transition-colors"
                       >
                         <option value="">Selectionner un compte...</option>
                         {comptes.map(c => (
@@ -303,7 +306,7 @@ export default function GrandLivre() {
                         icon={RefreshCw}
                         onClick={() => fetchGrandLivre()}
                         disabled={!compteSelectionne || loading}
-                        className={`bg-slate-900/50 border-slate-700 hover:bg-slate-800 ${loading ? 'animate-spin' : ''}`}
+                        className={`bg-surface-base/50 border-edge hover:bg-surface ${loading ? 'animate-spin' : ''}`}
                         title="Rafraichir"
                     />
                     <Button
@@ -312,7 +315,7 @@ export default function GrandLivre() {
                         icon={Download}
                         onClick={handleExportExcel}
                         disabled={!compteSelectionne || entries.length === 0}
-                        className="bg-slate-900/50 border-slate-700 hover:bg-slate-800"
+                        className="bg-surface-base/50 border-edge hover:bg-surface"
                     >
                         <span className="hidden sm:inline">Excel</span>
                     </Button>
@@ -322,7 +325,7 @@ export default function GrandLivre() {
                         icon={Printer}
                         onClick={handleExportPDF}
                         disabled={!compteSelectionne || entries.length === 0}
-                        className="bg-slate-900/50 border-slate-700 hover:bg-slate-800"
+                        className="bg-surface-base/50 border-edge hover:bg-surface"
                     >
                         <span className="hidden sm:inline">PDF</span>
                     </Button>
@@ -330,29 +333,29 @@ export default function GrandLivre() {
             </div>
 
             {/* Bottom Row: Dates */}
-            <div className="flex gap-3 pt-2 border-t border-slate-700/50">
+            <div className="flex gap-3 pt-2 border-t border-edge-subtle">
                  <div className="flex-1">
-                   <label className="text-[10px] uppercase text-slate-500 font-bold mb-1.5">Debut</label>
+                   <label className="text-[10px] uppercase text-content-muted font-bold mb-1.5">Debut</label>
                    <div className="relative">
                        <input
                         type="date"
                         value={dateDebut}
                         onChange={(e) => setDateDebut(e.target.value)}
-                        className="w-full bg-slate-900/50 text-white text-xs sm:text-sm pl-8 pr-2 py-1.5 rounded-lg border border-slate-700 focus:outline-none focus:border-cyan-500"
+                        className="w-full bg-surface-base/50 text-content-primary text-xs sm:text-sm pl-8 pr-2 py-1.5 rounded-lg border border-edge focus:outline-none focus:border-accent"
                       />
-                      <CalendarIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 w-3.5 h-3.5" />
+                      <CalendarIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 text-content-muted w-3.5 h-3.5" />
                    </div>
                  </div>
                  <div className="flex-1">
-                   <label className="text-[10px] uppercase text-slate-500 font-bold mb-1.5">Fin</label>
+                   <label className="text-[10px] uppercase text-content-muted font-bold mb-1.5">Fin</label>
                    <div className="relative">
                        <input
                         type="date"
                         value={dateFin}
                         onChange={(e) => setDateFin(e.target.value)}
-                        className="w-full bg-slate-900/50 text-white text-xs sm:text-sm pl-8 pr-2 py-1.5 rounded-lg border border-slate-700 focus:outline-none focus:border-cyan-500"
+                        className="w-full bg-surface-base/50 text-content-primary text-xs sm:text-sm pl-8 pr-2 py-1.5 rounded-lg border border-edge focus:outline-none focus:border-accent"
                       />
-                      <CalendarIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 w-3.5 h-3.5" />
+                      <CalendarIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 text-content-muted w-3.5 h-3.5" />
                    </div>
                  </div>
             </div>
@@ -364,11 +367,11 @@ export default function GrandLivre() {
           {/* Account Info */}
           {grandLivreData && (
             <div className="flex items-center gap-2 px-2">
-              <FileText size={14} className="text-cyan-400" />
-              <span className="text-sm text-white font-medium">{grandLivreData.numeroCompte}</span>
-              <span className="text-sm text-slate-400">-</span>
-              <span className="text-sm text-slate-300">{grandLivreData.intitule}</span>
-              <span className="text-xs text-slate-500 ml-auto">
+              <FileText size={14} className="text-accent" />
+              <span className="text-sm text-content-primary font-medium">{grandLivreData.numeroCompte}</span>
+              <span className="text-sm text-content-muted">-</span>
+              <span className="text-sm text-content-secondary">{grandLivreData.intitule}</span>
+              <span className="text-xs text-content-muted ml-auto">
                 Classe {grandLivreData.classe} | {grandLivreData.typeCompte}
               </span>
             </div>
@@ -383,7 +386,7 @@ export default function GrandLivre() {
                  icon={Info}
                  color="neutral"
                  subtitle="Report a nouveau"
-                 className="bg-slate-800/50 border-slate-700/50"
+                 className="bg-surface/50 border-edge-subtle"
                />
              )}
              <StatCard
@@ -392,7 +395,7 @@ export default function GrandLivre() {
                icon={ArrowDownRight}
                color="warning"
                subtitle={`${entries.length} mouvements`}
-               className="bg-slate-800/50 border-slate-700/50"
+               className="bg-surface/50 border-edge-subtle"
              />
              <StatCard
                title="Total Credits"
@@ -400,7 +403,7 @@ export default function GrandLivre() {
                icon={ArrowUpRight}
                color="success"
                subtitle="Cumul credit"
-               className="bg-slate-800/50 border-slate-700/50"
+               className="bg-surface/50 border-edge-subtle"
              />
              <StatCard
                title="Solde Final"
@@ -408,12 +411,12 @@ export default function GrandLivre() {
                icon={DollarSign}
                color={soldeFinal >= 0 ? 'success' : 'primary'}
                subtitle={grandLivreData?.sensNormal || ''}
-               className="bg-slate-800/50 border-slate-700/50 shadow-lg shadow-blue-500/5"
+               className="bg-surface/50 border-edge-subtle shadow-lg shadow-status-info/5"
              />
           </div>
 
           {/* Table */}
-          <div className="bg-slate-900/50 rounded-xl overflow-hidden">
+          <div className="bg-surface-base/50 rounded-xl overflow-hidden">
               <ResponsiveTable
                 data={entries}
                 columns={columns}
@@ -426,7 +429,7 @@ export default function GrandLivre() {
           {/* Pagination */}
           {pagination && pagination.totalPages > 1 && (
             <div className="flex items-center justify-between px-2">
-              <span className="text-xs text-slate-400">
+              <span className="text-xs text-content-muted">
                 Page {pagination.page} sur {pagination.totalPages} ({pagination.total} lignes)
               </span>
               <div className="flex gap-2">
@@ -436,7 +439,7 @@ export default function GrandLivre() {
                   icon={ChevronLeft}
                   onClick={() => setPage(p => Math.max(1, p - 1))}
                   disabled={page === 1 || loading}
-                  className="bg-slate-800/50"
+                  className="bg-surface/50"
                 >
                   Prec.
                 </Button>
@@ -446,7 +449,7 @@ export default function GrandLivre() {
                   icon={ChevronRight}
                   onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))}
                   disabled={page === pagination.totalPages || loading}
-                  className="bg-slate-800/50"
+                  className="bg-surface/50"
                 >
                   Suiv.
                 </Button>
@@ -456,11 +459,11 @@ export default function GrandLivre() {
         </>
       ) : (
         <div className="flex flex-col items-center justify-center py-12 text-center opacity-50">
-           <div className="bg-slate-800 p-4 rounded-full mb-4">
-             <BookOpen className="w-8 h-8 text-blue-400" />
+           <div className="bg-surface p-4 rounded-full mb-4">
+             <BookOpen className="w-8 h-8 text-status-info" />
            </div>
-           <p className="text-sm font-medium text-white">Selectionnez un compte</p>
-           <p className="text-xs text-slate-400 max-w-[200px] mt-1">Choisissez un compte ci-dessus pour afficher le grand livre.</p>
+           <p className="text-sm font-medium text-content-primary">Selectionnez un compte</p>
+           <p className="text-xs text-content-muted max-w-[200px] mt-1">Choisissez un compte ci-dessus pour afficher le grand livre.</p>
         </div>
       )}
     </div>

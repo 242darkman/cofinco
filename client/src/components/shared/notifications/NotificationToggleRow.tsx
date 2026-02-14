@@ -19,8 +19,8 @@ export default function NotificationToggleRow({
   return (
     <div className="flex items-center justify-between">
       <div className="flex-1 pr-4">
-        <p className="font-medium text-slate-200">{label}</p>
-        <p className="text-sm text-slate-400">{description}</p>
+        <p className="font-medium text-content-secondary">{label}</p>
+        <p className="text-sm text-content-muted">{description}</p>
       </div>
       <Switch
         checked={checked}

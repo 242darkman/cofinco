@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Users, Wallet, PiggyBank, UsersRound, LucideIcon } from 'lucide-react';
+import { useBranding } from '../contexts/BrandingContext';
 import { requestListAll } from '../lib/api-client';
 import { addPdfLogoHeader, addPdfLogoFooter } from '../lib/pdf-logo';
 // P4.1: Lazy-load heavy export libraries (saves ~650KB on initial bundle)
@@ -40,8 +41,7 @@ export const reportTypes: ReportType[] = [
   { id: 'tontines', label: 'Rapport Tontines', icon: UsersRound, description: 'Activité des groupes de tontine' },
 ];
 
-// Constants for HTML print template
-const COMPANY_NAME = 'COFIN&CO-M';
+// Constant for HTML print template
 const COMPANY_SUBTITLE = 'Établissement de Microfinance';
 
 // ============================================================================
@@ -207,6 +207,8 @@ function buildConfigs(): Record<string, ReportConfig> {
 // ============================================================================
 
 export function useReportGenerator() {
+  const { branding } = useBranding();
+  const COMPANY_NAME = branding.appName;
   const [reportType, setReportType] = useState('clients');
   const [format, setFormat] = useState<'pdf' | 'excel' | 'csv'>('pdf');
   const [dateRange, setDateRange] = useState({
@@ -313,6 +315,7 @@ export function useReportGenerator() {
         title: config.title,
         subtitle: `Période: ${fmtDateRange(dateRange.start)} — ${fmtDateRange(dateRange.end)} | ${data.length} enregistrement${data.length !== 1 ? 's' : ''}`,
         dateRight: `Généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}`,
+        appName: COMPANY_NAME,
       });
 
       // ── Table ──
@@ -356,7 +359,7 @@ export function useReportGenerator() {
       }
 
       // ── Footer ──
-      addPdfLogoFooter(doc, config.title);
+      addPdfLogoFooter(doc, config.title, COMPANY_NAME);
 
       doc.save(`rapport_${reportType}_${dateRange.start}_${dateRange.end}.pdf`);
     } finally { setLoading(false); }

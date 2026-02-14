@@ -23,8 +23,8 @@ import mtnLogo from '@/assets/logos/mtn-logo.png';
 import airtelLogo from '@/assets/logos/airtel-logo.png';
 
 const MOBILE_OPERATORS = [
-  { id: 'mtn', name: 'MTN Mobile Money', color: 'bg-yellow-500', prefix: '+242 05/06', logo: mtnLogo },
-  { id: 'airtel', name: 'Airtel Money', color: 'bg-red-500', prefix: '+242 04', logo: airtelLogo }
+  { id: 'mtn', name: 'MTN Mobile Money', color: 'bg-status-warning-bg0', prefix: '+242 05/06', logo: mtnLogo },
+  { id: 'airtel', name: 'Airtel Money', color: 'bg-status-danger', prefix: '+242 04', logo: airtelLogo }
 ] as const;
 
 const PAYMENT_MODES = [
@@ -496,7 +496,7 @@ export default function CreditRemboursement() {
 
       {/* Offline Indicator */}
       {isOffline && (
-        <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-400 text-sm">
+        <div className="flex items-center gap-2 px-4 py-2 bg-status-warning-bg border border-status-warning/30 rounded-lg text-status-warning text-sm">
           <WifiOff size={16} />
           <span>Mode hors ligne — Seuls les paiements en espèces sont disponibles. Les données seront synchronisées au retour du réseau.</span>
         </div>
@@ -537,13 +537,13 @@ export default function CreditRemboursement() {
       {/* Success Modal */}
       {showSuccessModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-md w-full p-6 text-center">
-            <div className="w-16 h-16 bg-green-500/20 text-green-400 rounded-full flex items-center justify-center mx-auto mb-4 ring-4 ring-green-500/10">
+          <div className="bg-surface-base border border-edge rounded-2xl shadow-2xl max-w-md w-full p-6 text-center">
+            <div className="w-16 h-16 bg-status-success-bg text-status-success rounded-full flex items-center justify-center mx-auto mb-4 ring-4 ring-status-success/10">
               <Check size={32} />
             </div>
-            <h3 className="text-xl font-bold text-white mb-2">Remboursement Enregistré !</h3>
-            <p className="text-slate-400 mb-6">
-              Le remboursement de <strong className="text-white">{formatMoney(lastPaymentAmount)}</strong> a été validé avec succès.
+            <h3 className="text-xl font-bold text-content-primary mb-2">Remboursement Enregistré !</h3>
+            <p className="text-content-muted mb-6">
+              Le remboursement de <strong className="text-content-primary">{formatMoney(lastPaymentAmount)}</strong> a été validé avec succès.
             </p>
             
             <div className="space-y-3">
@@ -577,16 +577,16 @@ export default function CreditRemboursement() {
       )}
 
       {/* Search Section */}
-      <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
-        <h3 className="text-lg font-bold text-white mb-4">Rechercher un Crédit</h3>
+      <div className="bg-surface/50 border border-edge rounded-lg p-6">
+        <h3 className="text-lg font-bold text-content-primary mb-4">Rechercher un Crédit</h3>
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={20} aria-hidden="true" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-content-muted" size={20} aria-hidden="true" />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Numéro de crédit ou nom du client..."
-            className="w-full bg-slate-700 border border-slate-600 rounded-lg pl-10 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            className="w-full bg-surface-elevated border border-edge-strong rounded-lg pl-10 pr-4 py-3 text-content-primary focus:outline-none focus:ring-2 focus:ring-accent"
             aria-label="Rechercher un crédit"
           />
         </div>
@@ -595,8 +595,8 @@ export default function CreditRemboursement() {
           <div className="mt-4 max-h-60 overflow-y-auto space-y-2" role="listbox" aria-label="Résultats de recherche">
             {loadingCredits ? (
               <div className="flex items-center justify-center py-4">
-                <Loader2 className="animate-spin text-cyan-400" size={24} />
-                <span className="ml-2 text-slate-400">Chargement...</span>
+                <Loader2 className="animate-spin text-accent" size={24} />
+                <span className="ml-2 text-content-muted">Chargement...</span>
               </div>
             ) : filteredCredits.length > 0 ? (
               filteredCredits.map(credit => (
@@ -606,26 +606,26 @@ export default function CreditRemboursement() {
                   role="option"
                   aria-selected={selectedCredit?.id === credit.id}
                   onClick={() => handleSelectCredit(credit)}
-                  className={`w-full p-3 rounded-lg cursor-pointer transition text-left focus:outline-none focus:ring-2 focus:ring-cyan-500 ${
+                  className={`w-full p-3 rounded-lg cursor-pointer transition text-left focus:outline-none focus:ring-2 focus:ring-accent ${
                     selectedCredit?.id === credit.id
-                      ? 'bg-cyan-600/20 border border-cyan-500'
-                      : 'bg-slate-700 hover:bg-slate-600'
+                      ? 'bg-accent-secondary/20 border border-accent'
+                      : 'bg-surface-elevated hover:bg-surface-subtle'
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <div className="text-cyan-400 font-mono font-bold">{credit.numeroCredit}</div>
-                      <div className="text-white text-sm">{formatClientName(credit.clients?.nom || '', credit.clients?.prenom)}</div>
+                      <div className="text-accent font-mono font-bold">{credit.numeroCredit}</div>
+                      <div className="text-content-primary text-sm">{formatClientName(credit.clients?.nom || '', credit.clients?.prenom)}</div>
                     </div>
                     <div className="text-right">
-                      <div className="text-white font-bold">{formatMoney(credit.soldeRestant)}</div>
-                      <div className="text-xs text-slate-400">Solde restant</div>
+                      <div className="text-content-primary font-bold">{formatMoney(credit.soldeRestant)}</div>
+                      <div className="text-xs text-content-muted">Solde restant</div>
                     </div>
                   </div>
                 </button>
               ))
             ) : (
-              <div className="text-center py-4 text-slate-400">Aucun crédit trouvé</div>
+              <div className="text-center py-4 text-content-muted">Aucun crédit trouvé</div>
             )}
           </div>
         )}
@@ -634,17 +634,17 @@ export default function CreditRemboursement() {
       {/* Selected Credit Details */}
       {selectedCredit && (
         <>
-          <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-6">
+          <div className="bg-surface/50 border border-edge rounded-lg p-6">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h3 className="text-2xl font-bold text-white">{selectedCredit.numeroCredit}</h3>
-                <p className="text-slate-400 mt-1">{formatClientName(selectedCredit.clients?.nom || '', selectedCredit.clients?.prenom)}</p>
+                <h3 className="text-2xl font-bold text-content-primary">{selectedCredit.numeroCredit}</h3>
+                <p className="text-content-muted mt-1">{formatClientName(selectedCredit.clients?.nom || '', selectedCredit.clients?.prenom)}</p>
               </div>
               {canCreatePayments && (
                 <button
                   onClick={() => setShowPaymentForm(!showPaymentForm)}
                   disabled={loading}
-                  className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="px-6 py-3 bg-status-success hover:bg-status-success text-white rounded-lg font-semibold transition disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-status-success"
                 >
                   {showPaymentForm ? 'Annuler' : 'Encaisser Échéance'}
                 </button>
@@ -653,30 +653,30 @@ export default function CreditRemboursement() {
 
             {/* Stats Grid */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4" role="region" aria-label="Statistiques du crédit">
-              <div className="bg-slate-700/50 rounded-lg p-4">
-                <div className="text-slate-400 text-sm mb-1">Solde Restant</div>
-                <div className="text-xl md:text-2xl font-bold text-white break-words">
+              <div className="bg-surface-elevated/50 rounded-lg p-4">
+                <div className="text-content-muted text-sm mb-1">Solde Restant</div>
+                <div className="text-xl md:text-2xl font-bold text-content-primary break-words">
                   {formatMoney(selectedCredit.soldeRestant)}
                 </div>
               </div>
 
-              <div className="bg-slate-700/50 rounded-lg p-4">
-                <div className="text-slate-400 text-sm mb-1">Mensualité</div>
-                <div className="text-xl md:text-2xl font-bold text-green-400 break-words">
+              <div className="bg-surface-elevated/50 rounded-lg p-4">
+                <div className="text-content-muted text-sm mb-1">Mensualité</div>
+                <div className="text-xl md:text-2xl font-bold text-status-success break-words">
                   {formatMoney(selectedCredit.montantEcheance)}
                 </div>
               </div>
 
-              <div className="bg-slate-700/50 rounded-lg p-4">
-                <div className="text-slate-400 text-sm mb-1">Échéances</div>
-                <div className="text-2xl font-bold text-cyan-400">
+              <div className="bg-surface-elevated/50 rounded-lg p-4">
+                <div className="text-content-muted text-sm mb-1">Échéances</div>
+                <div className="text-2xl font-bold text-accent">
                   {selectedCredit.nombreEcheancesPayees}/{selectedCredit.nombreEcheancesTotal}
                 </div>
               </div>
 
-              <div className="bg-slate-700/50 rounded-lg p-4">
-                <div className="text-slate-400 text-sm mb-1">Pénalités</div>
-                <div className="text-xl md:text-2xl font-bold text-amber-400 break-words">
+              <div className="bg-surface-elevated/50 rounded-lg p-4">
+                <div className="text-content-muted text-sm mb-1">Pénalités</div>
+                <div className="text-xl md:text-2xl font-bold text-status-warning break-words">
                   {formatMoney(selectedCredit.penalitesRetard || 0)}
                 </div>
               </div>
@@ -687,15 +687,15 @@ export default function CreditRemboursement() {
           {showPaymentForm && (
             <form
               onSubmit={handlePayment}
-              className="bg-gradient-to-br from-green-500/10 to-green-600/10 border border-green-500/50 rounded-lg p-6"
+              className="bg-gradient-to-br from-status-success/10 to-status-success/10 border border-status-success/50 rounded-lg p-6"
             >
-              <h3 className="text-lg font-bold text-white mb-4">Nouveau Paiement</h3>
+              <h3 className="text-lg font-bold text-content-primary mb-4">Nouveau Paiement</h3>
 
               <div className="grid md:grid-cols-2 gap-4 mb-4">
                 {/* Amount */}
                 <div>
-                  <label htmlFor="montant" className="block text-sm font-semibold text-slate-300 mb-2">
-                    Montant (FCFA) <span className="text-red-400">*</span>
+                  <label htmlFor="montant" className="block text-sm font-semibold text-content-secondary mb-2">
+                    Montant (FCFA) <span className="text-status-danger">*</span>
                   </label>
                   <input
                     id="montant"
@@ -705,16 +705,16 @@ export default function CreditRemboursement() {
                     max={selectedCredit.soldeRestant}
                     value={paymentData.montant}
                     onChange={(e) => handleInputChange('montant', e.target.value)}
-                    className={`w-full bg-slate-700 border ${errors.montant ? 'border-red-500' : 'border-slate-600'} rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-500`}
+                    className={`w-full bg-surface-elevated border ${errors.montant ? 'border-status-danger' : 'border-edge-strong'} rounded-lg px-4 py-2 text-content-primary focus:outline-none focus:ring-2 focus:ring-status-success`}
                     placeholder={`Montant prévu: ${formatMoney(montantPrevu)}`}
                     disabled={loading}
                     aria-invalid={!!errors.montant}
                     aria-describedby={errors.montant ? 'montant-error' : 'montant-help'}
                   />
                   {errors.montant ? (
-                    <p id="montant-error" className="text-red-400 text-xs mt-1" role="alert">{errors.montant}</p>
+                    <p id="montant-error" className="text-status-danger text-xs mt-1" role="alert">{errors.montant}</p>
                   ) : (
-                    <p id="montant-help" className="text-xs text-slate-400 mt-1">
+                    <p id="montant-help" className="text-xs text-content-muted mt-1">
                       Maximum: {formatMoney(selectedCredit.soldeRestant)}
                     </p>
                   )}
@@ -722,8 +722,8 @@ export default function CreditRemboursement() {
 
                 {/* Payment Mode */}
                 <fieldset>
-                  <legend className="block text-sm font-semibold text-slate-300 mb-2">
-                    Mode de Paiement <span className="text-red-400">*</span>
+                  <legend className="block text-sm font-semibold text-content-secondary mb-2">
+                    Mode de Paiement <span className="text-status-danger">*</span>
                   </legend>
                   <div className="grid grid-cols-3 gap-2" role="radiogroup">
                     {PAYMENT_MODES.map(({ id, icon: Icon, label, disabled }) => {
@@ -739,24 +739,24 @@ export default function CreditRemboursement() {
                             aria-disabled={isDisabled}
                             onClick={() => !isDisabled && handleModeChange(id)}
                             disabled={isDisabled || loading}
-                            className={`flex flex-col items-center justify-center p-2 rounded-lg border transition w-full focus:outline-none focus:ring-2 focus:ring-green-500 ${
+                            className={`flex flex-col items-center justify-center p-2 rounded-lg border transition w-full focus:outline-none focus:ring-2 focus:ring-status-success ${
                               isDisabled
-                                ? 'opacity-50 cursor-not-allowed bg-slate-700 border-slate-600 text-slate-500'
+                                ? 'opacity-50 cursor-not-allowed bg-surface-elevated border-edge-strong text-content-muted'
                                 : isSelected
-                                ? 'bg-green-600 border-green-500 text-white'
-                                : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'
+                                ? 'bg-status-success border-status-success text-white'
+                                : 'bg-surface-elevated border-edge-strong text-content-secondary hover:bg-surface-subtle'
                             }`}
                           >
                             <Icon size={18} className="mb-1" aria-hidden="true" />
                             <span className="text-xs">{label}</span>
                             {id === 'Mobile Money' && !mobileMoneyEnabled && (
-                              <span className="absolute -top-1 -right-1 px-1 py-0.5 bg-amber-500/20 text-amber-400 text-[8px] rounded border border-amber-500/30">
+                              <span className="absolute -top-1 -right-1 px-1 py-0.5 bg-status-warning-bg text-status-warning text-[8px] rounded border border-status-warning/30">
                                 Bientôt
                               </span>
                             )}
                           </button>
                           {id === 'Mobile Money' && !mobileMoneyEnabled && (
-                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-slate-900 text-amber-400 text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 border border-amber-500/30 pointer-events-none">
+                            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-surface-base text-status-warning text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 border border-status-warning/30 pointer-events-none">
                               {mobileMoneyMessage}
                             </div>
                           )}
@@ -769,9 +769,9 @@ export default function CreditRemboursement() {
                 {/* Mobile Operator Selection */}
                 {paymentData.mode_paiement === 'Mobile Money' && (
                   <fieldset className="md:col-span-2">
-                    <legend className="block text-sm font-semibold text-slate-300 mb-2">
+                    <legend className="block text-sm font-semibold text-content-secondary mb-2">
                       <Smartphone size={16} className="inline mr-2" aria-hidden="true" />
-                      Opérateur <span className="text-red-400">*</span>
+                      Opérateur <span className="text-status-danger">*</span>
                     </legend>
                     <div className="grid grid-cols-2 gap-2" role="radiogroup">
                       {MOBILE_OPERATORS.map(op => (
@@ -785,10 +785,10 @@ export default function CreditRemboursement() {
                             if (errors.operateur) setErrors(prev => ({ ...prev, operateur: '' }));
                           }}
                           disabled={loading}
-                          className={`flex items-center gap-2 p-3 rounded-lg border-2 transition focus:outline-none focus:ring-2 focus:ring-green-500 ${
+                          className={`flex items-center gap-2 p-3 rounded-lg border-2 transition focus:outline-none focus:ring-2 focus:ring-status-success ${
                             selectedOperator === op.id
-                              ? `${op.color} border-white text-white`
-                              : 'bg-slate-700 border-slate-600 text-slate-300 hover:border-slate-500'
+                              ? `${op.color} border-white text-content-primary`
+                              : 'bg-surface-elevated border-edge-strong text-content-secondary hover:border-edge-strong'
                           } disabled:opacity-50`}
                         >
                           <img src={op.logo} alt={op.name} className="w-8 h-8 rounded-full object-contain bg-white/10" />
@@ -800,14 +800,14 @@ export default function CreditRemboursement() {
                       ))}
                     </div>
                     {errors.operateur && (
-                      <p className="text-red-400 text-xs mt-1" role="alert">{errors.operateur}</p>
+                      <p className="text-status-danger text-xs mt-1" role="alert">{errors.operateur}</p>
                     )}
                   </fieldset>
                 )}
 
                 {/* Reference */}
                 <div>
-                  <label htmlFor="reference" className="block text-sm font-semibold text-slate-300 mb-2">
+                  <label htmlFor="reference" className="block text-sm font-semibold text-content-secondary mb-2">
                     Référence Paiement
                   </label>
                   <input
@@ -815,7 +815,7 @@ export default function CreditRemboursement() {
                     type="text"
                     value={paymentData.reference_paiement}
                     onChange={(e) => handleInputChange('reference_paiement', e.target.value)}
-                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full bg-surface-elevated border border-edge-strong rounded-lg px-4 py-2 text-content-primary focus:outline-none focus:ring-2 focus:ring-status-success"
                     placeholder="N° transaction, chèque..."
                     maxLength={100}
                     disabled={loading}
@@ -824,7 +824,7 @@ export default function CreditRemboursement() {
 
                 {/* Notes */}
                 <div>
-                  <label htmlFor="notes" className="block text-sm font-semibold text-slate-300 mb-2">
+                  <label htmlFor="notes" className="block text-sm font-semibold text-content-secondary mb-2">
                     Notes
                   </label>
                   <input
@@ -832,7 +832,7 @@ export default function CreditRemboursement() {
                     type="text"
                     value={paymentData.notes}
                     onChange={(e) => handleInputChange('notes', e.target.value)}
-                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full bg-surface-elevated border border-edge-strong rounded-lg px-4 py-2 text-content-primary focus:outline-none focus:ring-2 focus:ring-status-success"
                     placeholder="Informations additionnelles..."
                     maxLength={500}
                     disabled={loading}
@@ -843,7 +843,7 @@ export default function CreditRemboursement() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-green-500 flex items-center justify-center gap-2"
+                className="w-full px-6 py-3 bg-status-success hover:bg-status-success text-white rounded-lg font-semibold transition disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-status-success flex items-center justify-center gap-2"
               >
                 {loading ? (
                   <>
@@ -858,12 +858,12 @@ export default function CreditRemboursement() {
           )}
 
           {/* Echeancier */}
-          <div className="bg-slate-800/50 border border-slate-700 rounded-lg">
-            <div className="p-6 border-b border-slate-700">
-              <h3 className="text-lg font-bold text-white">Échéancier</h3>
+          <div className="bg-surface/50 border border-edge rounded-lg">
+            <div className="p-6 border-b border-edge">
+              <h3 className="text-lg font-bold text-content-primary">Échéancier</h3>
             </div>
 
-            <div className="divide-y divide-slate-700" role="list" aria-label="Liste des échéances">
+            <div className="divide-y divide-edge" role="list" aria-label="Liste des échéances">
               {loadingEcheances ? (
                 <div className="p-4 space-y-3">
                   {[1, 2, 3].map(i => (
@@ -877,15 +877,15 @@ export default function CreditRemboursement() {
                   <div
                     key={echeance.id}
                     role="listitem"
-                    className="p-4 hover:bg-slate-700/30 transition"
+                    className="p-4 hover:bg-surface-elevated/30 transition"
                   >
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div className="flex items-center gap-4">
                         <div
                           className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
-                            echeance.statut === StatutEcheanceCredit.PAID ? 'bg-green-500/20 text-green-400' :
-                            echeance.statut === StatutEcheanceCredit.LATE ? 'bg-red-500/20 text-red-400' :
-                            'bg-cyan-500/20 text-cyan-400'
+                            echeance.statut === StatutEcheanceCredit.PAID ? 'bg-status-success-bg text-status-success' :
+                            echeance.statut === StatutEcheanceCredit.LATE ? 'bg-status-danger-bg text-status-danger' :
+                            'bg-accent/10 text-accent'
                           }`}
                           aria-hidden="true"
                         >
@@ -893,44 +893,44 @@ export default function CreditRemboursement() {
                         </div>
 
                         <div>
-                          <div className="text-white font-semibold">Échéance #{echeance.numeroEcheance}</div>
-                          <div className="text-sm text-slate-400">
+                          <div className="text-content-primary font-semibold">Échéance #{echeance.numeroEcheance}</div>
+                          <div className="text-sm text-content-muted">
                             {new Date(echeance.dateEcheance).toLocaleDateString('fr-FR')}
                           </div>
-                          <div className="text-xs text-cyan-400 mt-0.5">Remboursement Crédit</div>
+                          <div className="text-xs text-accent mt-0.5">Remboursement Crédit</div>
                         </div>
                       </div>
 
                       <div className="flex flex-wrap items-center gap-4 sm:gap-6 ml-14 sm:ml-0">
                         {/* Montant Payé */}
                         <div className="text-center min-w-[80px]">
-                          <div className="text-xs text-slate-500 mb-0.5">Payé</div>
-                          <div className={`font-semibold ${echeance.montantPaye > 0 ? 'text-green-400' : 'text-slate-500'}`}>
+                          <div className="text-xs text-content-muted mb-0.5">Payé</div>
+                          <div className={`font-semibold ${echeance.montantPaye > 0 ? 'text-status-success' : 'text-content-muted'}`}>
                             {formatMoney(echeance.montantPaye)}
                           </div>
                         </div>
 
                         {/* Reste à payer */}
                         <div className="text-center min-w-[80px]">
-                          <div className="text-xs text-slate-500 mb-0.5">Reste</div>
-                          <div className={`font-semibold ${resteAPayer > 0 ? 'text-amber-400' : 'text-green-400'}`}>
+                          <div className="text-xs text-content-muted mb-0.5">Reste</div>
+                          <div className={`font-semibold ${resteAPayer > 0 ? 'text-status-warning' : 'text-status-success'}`}>
                             {formatMoney(Math.max(0, resteAPayer))}
                           </div>
                         </div>
 
                         {echeance.joursRetard > 0 && (
-                          <div className="flex items-center gap-1 text-red-400 text-sm">
+                          <div className="flex items-center gap-1 text-status-danger text-sm">
                             <AlertTriangle size={14} aria-hidden="true" />
                             <span>{echeance.joursRetard}j · +{formatMoney(echeance.penalite)}</span>
                           </div>
                         )}
 
                         <div className="text-right min-w-[100px]">
-                          <div className="text-white font-bold">{formatMoney(echeance.montantTotal)}</div>
+                          <div className="text-content-primary font-bold">{formatMoney(echeance.montantTotal)}</div>
                           <div className={`text-xs ${
-                            echeance.statut === StatutEcheanceCredit.PAID ? 'text-green-400' :
-                            echeance.statut === StatutEcheanceCredit.LATE ? 'text-red-400' :
-                            'text-slate-400'
+                            echeance.statut === StatutEcheanceCredit.PAID ? 'text-status-success' :
+                            echeance.statut === StatutEcheanceCredit.LATE ? 'text-status-danger' :
+                            'text-content-muted'
                           }`}>
                             {STATUT_ECHEANCE_CREDIT_LABELS[echeance.statut as keyof typeof STATUT_ECHEANCE_CREDIT_LABELS] || echeance.statut}
                           </div>
@@ -941,7 +941,7 @@ export default function CreditRemboursement() {
                   );
                 })
               ) : (
-                <div className="p-8 text-center text-slate-400">
+                <div className="p-8 text-center text-content-muted">
                   Aucune échéance disponible
                 </div>
               )}

@@ -83,7 +83,7 @@ export const ClosingReportViewer: React.FC<ClosingReportViewerProps> = ({
           <Button
             onClick={handleDownload}
             disabled={isDownloading}
-            className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+            className="flex-1 bg-status-success hover:bg-status-success text-white"
             icon={isDownloading ? Loader2 : Download}
           >
             {isDownloading ? 'Generation...' : 'Telecharger PDF'}
@@ -112,7 +112,7 @@ export const ClosingReportViewer: React.FC<ClosingReportViewerProps> = ({
       </div>
 
       {/* On-screen preview with scale-to-fit */}
-      <div className="no-print overflow-auto bg-slate-100 rounded-lg p-4 flex justify-center">
+      <div className="no-print overflow-auto bg-surface-muted rounded-lg p-4 flex justify-center">
         <div
           style={{
             transform: `scale(${scale})`,

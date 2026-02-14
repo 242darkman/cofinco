@@ -71,7 +71,7 @@ export default function AccountStatsChart({ compteId, filter = 'ALL' }: AccountS
       case 'CREDIT':
         return { 
           title: 'Volume des Dépôts', 
-          color: '#10b981', 
+          color: 'var(--color-success)',
           dataKey: 'credit',
           Type: BarChart,
           Element: Bar
@@ -79,7 +79,7 @@ export default function AccountStatsChart({ compteId, filter = 'ALL' }: AccountS
       case 'DEBIT':
         return { 
           title: 'Volume des Retraits', 
-          color: '#ef4444', 
+          color: 'var(--color-danger)',
           dataKey: 'debit',
           Type: BarChart,
           Element: Bar
@@ -87,7 +87,7 @@ export default function AccountStatsChart({ compteId, filter = 'ALL' }: AccountS
       default:
         return { 
           title: 'Évolution du solde', 
-          color: data?.trend === 'negative' ? '#ef4444' : '#10b981', 
+          color: data?.trend === 'negative' ? 'var(--color-danger)' : 'var(--color-success)',
           dataKey: 'balance',
           Type: AreaChart,
           Element: Area
@@ -104,8 +104,8 @@ export default function AccountStatsChart({ compteId, filter = 'ALL' }: AccountS
       // Actually usually volume is positive number, visual context implies outflow.
       
       return (
-        <div className="bg-slate-900 border border-slate-700 p-3 rounded-lg shadow-xl text-xs z-50">
-          <p className="text-slate-400 mb-1">{format(new Date(label), 'd MMMM yyyy', { locale: fr })}</p>
+        <div className="bg-surface-base border border-edge p-3 rounded-lg shadow-xl text-xs z-50">
+          <p className="text-content-muted mb-1">{format(new Date(label), 'd MMMM yyyy', { locale: fr })}</p>
           <p className={`font-bold text-base`} style={{ color: config.color }}>
             {formatCurrency(payload[0].value)}
           </p>
@@ -117,7 +117,7 @@ export default function AccountStatsChart({ compteId, filter = 'ALL' }: AccountS
 
   if (error) {
     return (
-      <div className="h-[250px] w-full flex flex-col items-center justify-center text-slate-500 bg-slate-900/30 rounded-xl border border-dashed border-slate-700">
+      <div className="h-[250px] w-full flex flex-col items-center justify-center text-content-muted bg-surface-base/30 rounded-xl border border-dashed border-edge">
         <AlertCircle className="mb-2" />
         <span className="text-sm">{error}</span>
       </div>
@@ -150,16 +150,16 @@ export default function AccountStatsChart({ compteId, filter = 'ALL' }: AccountS
   return (
     <div className="w-full space-y-4">
       <div className="flex items-center justify-between px-2">
-        <h3 className="text-sm font-medium text-slate-300">{config.title}</h3>
-        <div className="flex bg-slate-900 rounded-lg p-1 border border-slate-700">
+        <h3 className="text-sm font-medium text-content-secondary">{config.title}</h3>
+        <div className="flex bg-surface-base rounded-lg p-1 border border-edge">
           {PERIODS.map((p) => (
             <button
               key={p.value}
               onClick={() => setPeriod(p.value)}
               className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all ${
                 period === p.value
-                  ? 'bg-cyan-500/20 text-cyan-400 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-300'
+                  ? 'bg-accent/10 text-accent shadow-sm'
+                  : 'text-content-muted hover:text-content-secondary'
               }`}
             >
               {p.label}
@@ -170,8 +170,8 @@ export default function AccountStatsChart({ compteId, filter = 'ALL' }: AccountS
 
       <div className="h-[220px] w-full relative group">
         {loading && (
-          <div className="absolute inset-0 z-10 bg-slate-900/50 backdrop-blur-[1px] flex items-center justify-center rounded-xl">
-            <Loader2 className="animate-spin text-cyan-500" />
+          <div className="absolute inset-0 z-10 bg-surface-base/50 backdrop-blur-[1px] flex items-center justify-center rounded-xl">
+            <Loader2 className="animate-spin text-accent" />
           </div>
         )}
         
@@ -185,26 +185,26 @@ export default function AccountStatsChart({ compteId, filter = 'ALL' }: AccountS
                   </linearGradient>
                 </defs>
              )}
-            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" vertical={false} />
             <XAxis 
               dataKey="date" 
-              tick={{ fontSize: 10, fill: '#64748b' }} 
+              tick={{ fontSize: 10, fill: 'var(--text-muted)' }}
               tickFormatter={(val) => {
                  try { return format(new Date(val), 'dd/MM'); } catch { return ''; }
-              }} 
+              }}
               minTickGap={30}
               axisLine={false}
               tickLine={false}
               dy={10}
             />
-            <YAxis 
-              tick={{ fontSize: 10, fill: '#64748b' }} 
+            <YAxis
+              tick={{ fontSize: 10, fill: 'var(--text-muted)' }} 
               tickFormatter={(val) => val >= 1000 ? `${(val/1000).toFixed(0)}k` : val}
               axisLine={false}
               tickLine={false}
               domain={domain}
             />
-            <Tooltip content={<CustomTooltip />} cursor={{ fill: '#334155', opacity: 0.2 }} />
+            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'var(--bg-elevated)', opacity: 0.2 }} />
             
             <GraphicElement
               type="monotone"

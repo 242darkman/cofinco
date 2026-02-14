@@ -94,14 +94,14 @@ export default function SuspendAccountModal({
           <button
             onClick={handleClose}
             disabled={loading}
-            className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition text-sm font-medium"
+            className="px-4 py-2.5 bg-surface hover:bg-surface-elevated text-content-secondary rounded-lg transition text-sm font-medium"
           >
             Annuler
           </button>
           <button
             onClick={handleSubmit}
             disabled={!canSubmit || loading}
-            className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition flex items-center gap-2 text-sm font-bold"
+            className="px-4 py-2.5 bg-status-warning hover:bg-status-warning disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition flex items-center gap-2 text-sm font-bold"
           >
             {loading ? (
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
@@ -115,9 +115,9 @@ export default function SuspendAccountModal({
     >
       <div className="space-y-5">
         {/* Warning banner */}
-        <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-start gap-3">
-          <ShieldAlert size={18} className="text-amber-400 shrink-0 mt-0.5" />
-          <p className="text-sm text-amber-300">
+        <div className="p-3 bg-status-warning-bg border border-status-warning/30 rounded-lg flex items-start gap-3">
+          <ShieldAlert size={18} className="text-status-warning shrink-0 mt-0.5" />
+          <p className="text-sm text-status-warning">
             Le compte sera bloqué pour toutes les opérations (dépôts et retraits).
             Cette action est réversible.
           </p>
@@ -125,13 +125,13 @@ export default function SuspendAccountModal({
 
         {/* Reason code */}
         <div>
-          <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">
+          <label className="block text-xs font-semibold text-content-muted mb-1.5 uppercase">
             Motif de suspension *
           </label>
           <select
             value={reasonCode}
             onChange={(e) => setReasonCode(e.target.value as SuspensionReasonType)}
-            className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:ring-1 focus:ring-amber-500 outline-none transition appearance-none"
+            className="w-full bg-surface-base border border-edge rounded-lg px-3 py-2.5 text-content-primary text-sm focus:ring-1 focus:ring-status-warning outline-none transition appearance-none"
           >
             {REASON_OPTIONS.map(([code, label]) => (
               <option key={code} value={code}>
@@ -143,7 +143,7 @@ export default function SuspendAccountModal({
 
         {/* Reason text */}
         <div>
-          <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">
+          <label className="block text-xs font-semibold text-content-muted mb-1.5 uppercase">
             Description (optionnel)
           </label>
           <textarea
@@ -151,7 +151,7 @@ export default function SuspendAccountModal({
             onChange={(e) => setReasonText(e.target.value)}
             placeholder="Détails supplémentaires sur la raison de la suspension..."
             rows={2}
-            className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:ring-1 focus:ring-amber-500 outline-none transition resize-none"
+            className="w-full bg-surface-base border border-edge rounded-lg px-3 py-2.5 text-content-primary text-sm focus:ring-1 focus:ring-status-warning outline-none transition resize-none"
           />
         </div>
 
@@ -165,12 +165,12 @@ export default function SuspendAccountModal({
                 onChange={(e) => setAutoLift(e.target.checked)}
                 className="sr-only peer"
               />
-              <div className="w-10 h-5 bg-slate-700 rounded-full peer-checked:bg-amber-500 transition" />
-              <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full peer-checked:translate-x-5 transition" />
+              <div className="w-10 h-5 bg-edge-strong rounded-full peer-checked:bg-status-warning transition" />
+              <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow-md peer-checked:translate-x-5 transition" />
             </div>
             <div className="flex items-center gap-2">
-              <Calendar size={14} className="text-slate-400" />
-              <span className="text-sm text-slate-300 group-hover:text-white transition">
+              <Calendar size={14} className="text-content-muted" />
+              <span className="text-sm text-content-secondary group-hover:text-content-primary transition">
                 Levée automatique à une date précise
               </span>
             </div>
@@ -178,7 +178,7 @@ export default function SuspendAccountModal({
 
           {autoLift && (
             <div className="animate-in slide-in-from-top-2 duration-200 ml-[52px]">
-              <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">
+              <label className="block text-xs font-semibold text-content-muted mb-1.5 uppercase">
                 Date de fin de suspension *
               </label>
               <input
@@ -186,7 +186,7 @@ export default function SuspendAccountModal({
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
                 min={new Date().toISOString().slice(0, 16)}
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:ring-1 focus:ring-amber-500 outline-none transition"
+                className="w-full bg-surface-base border border-edge rounded-lg px-3 py-2.5 text-content-primary text-sm focus:ring-1 focus:ring-status-warning outline-none transition"
               />
             </div>
           )}
@@ -201,10 +201,10 @@ export default function SuspendAccountModal({
               onChange={(e) => setReviewRequired(e.target.checked)}
               className="sr-only peer"
             />
-            <div className="w-10 h-5 bg-slate-700 rounded-full peer-checked:bg-amber-500 transition" />
-            <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full peer-checked:translate-x-5 transition" />
+            <div className="w-10 h-5 bg-edge-strong rounded-full peer-checked:bg-status-warning transition" />
+            <div className="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow-md peer-checked:translate-x-5 transition" />
           </div>
-          <span className="text-sm text-slate-300 group-hover:text-white transition">
+          <span className="text-sm text-content-secondary group-hover:text-content-primary transition">
             Exiger une revue manuelle avant levée
           </span>
         </label>

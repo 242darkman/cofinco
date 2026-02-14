@@ -180,7 +180,7 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
         <StatCard icon={<Target size={14} />} label={canManage ? "Total Objectifs" : "Mes Objectifs"} value={objectifs.length.toString()} color="blue" />
         <StatCard icon={<Check size={14} />} label="Atteints" value={objectifsAtteints.toString()} color="green" />
-        <StatCard icon={<DollarSign size={14} />} label={canManage ? "Primes" : "Mes Primes"} value={`${(totalRecompenses / 1000).toFixed(0)}k FCFA`} color="emerald" />
+        <StatCard icon={<DollarSign size={14} />} label={canManage ? "Primes" : "Mes Primes"} value={`${(totalRecompenses / 1000).toFixed(0)}k ${currencySymbol()}`} color="emerald" />
         <StatCard icon={<TrendingUp size={14} />} label="Réussite" value={`${tauxReussite.toFixed(0)}%`} color="cyan" />
       </div>
 
@@ -189,7 +189,7 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
         {canManage && (
           <button
             onClick={() => setShowForm(!showForm)}
-            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg flex items-center gap-1.5 text-xs font-bold transition"
+            className="px-3 py-1.5 bg-status-info hover:bg-status-info text-white rounded-lg flex items-center gap-1.5 text-xs font-bold transition"
           >
             {showForm ? <X size={14} /> : <Plus size={14} />}
             {showForm ? 'Fermer' : 'Définir Objectif'}
@@ -201,7 +201,7 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
           <button
             onClick={recalculateAll}
             disabled={recalculating !== null}
-            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg flex items-center gap-1.5 text-xs font-bold transition"
+            className="px-3 py-1.5 bg-accent hover:bg-accent-primary-hover disabled:opacity-50 text-white rounded-lg flex items-center gap-1.5 text-xs font-bold transition"
           >
             {recalculating === 'all' ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
             Actualiser
@@ -209,40 +209,40 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
         )}
         
         <div className="ml-auto flex items-center gap-2">
-           {!canManage && <span className="text-[10px] text-slate-500 uppercase font-bold">Période:</span>}
+           {!canManage && <span className="text-[10px] text-content-muted uppercase font-bold">Période:</span>}
            <div className="relative">
-            <input type="month" value={selectedPeriode} onChange={(e) => setSelectedPeriode(e.target.value)} className="pl-8 pr-2 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs font-bold w-32" />
-            <Calendar size={14} className="absolute left-2.5 top-2 text-slate-400" />
+            <input type="month" value={selectedPeriode} onChange={(e) => setSelectedPeriode(e.target.value)} className="pl-8 pr-2 py-1.5 bg-surface border border-edge rounded-lg text-content-primary text-xs font-bold w-32" />
+            <Calendar size={14} className="absolute left-2.5 top-2 text-content-muted" />
           </div>
         </div>
       </div>
 
       {/* Form Compact (Admin/Supervisor Only) */}
       {canManage && showForm && (
-        <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-800">
+        <div className="bg-surface-base/50 rounded-xl p-4 border border-edge">
           <form onSubmit={handleSubmit} className="space-y-2">
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
               <FormField label="Période">
-                <input type="month" value={formData.periode} onChange={(e) => setFormData({ ...formData, periode: e.target.value })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs" required />
+                <input type="month" value={formData.periode} onChange={(e) => setFormData({ ...formData, periode: e.target.value })} className="w-full px-2 py-1.5 bg-surface border border-edge rounded-lg text-content-primary text-xs" required />
               </FormField>
               <FormField label="Type">
-                <select value={formData.type_objectif} onChange={(e) => setFormData({ ...formData, type_objectif: e.target.value })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs">
+                <select value={formData.type_objectif} onChange={(e) => setFormData({ ...formData, type_objectif: e.target.value })} className="w-full px-2 py-1.5 bg-surface border border-edge rounded-lg text-content-primary text-xs">
                   <option value="Collecte">Collecte</option><option value="Clients">Nouveaux Clients</option><option value="Visites">Visites</option><option value="Performance">Performance</option><option value="Prospection">Prospection</option>
                 </select>
               </FormField>
               <FormField label="Cible">
-                <input type="number" value={formData.valeur_objectif} onChange={(e) => setFormData({ ...formData, valeur_objectif: Number(e.target.value) })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs" required />
+                <input type="number" value={formData.valeur_objectif} onChange={(e) => setFormData({ ...formData, valeur_objectif: Number(e.target.value) })} className="w-full px-2 py-1.5 bg-surface border border-edge rounded-lg text-content-primary text-xs" required />
               </FormField>
               <FormField label="Unité">
-                <select value={formData.unite} onChange={(e) => setFormData({ ...formData, unite: e.target.value })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs">
+                <select value={formData.unite} onChange={(e) => setFormData({ ...formData, unite: e.target.value })} className="w-full px-2 py-1.5 bg-surface border border-edge rounded-lg text-content-primary text-xs">
                   <option value={currencySymbol()}>{currencySymbol()}</option><option value="Clients">Clients</option><option value="Visites">Visites</option><option value="%">%</option><option value="Points">Points</option>
                 </select>
               </FormField>
               <FormField label={`Prime (${currencySymbol()})`}>
-                <input type="number" value={formData.recompense} onChange={(e) => setFormData({ ...formData, recompense: Number(e.target.value) })} className="w-full px-2 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs" />
+                <input type="number" value={formData.recompense} onChange={(e) => setFormData({ ...formData, recompense: Number(e.target.value) })} className="w-full px-2 py-1.5 bg-surface border border-edge rounded-lg text-content-primary text-xs" />
               </FormField>
             </div>
-            <button type="submit" disabled={loading} className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold text-xs mt-2 flex items-center justify-center gap-2">
+            <button type="submit" disabled={loading} className="w-full py-2 bg-status-info hover:bg-status-info text-white rounded-lg font-bold text-xs mt-2 flex items-center justify-center gap-2">
               <UserCheck size={14} /> Assigner l'Objectif
             </button>
           </form>
@@ -252,12 +252,12 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
       {/* Objectives List - Compact Cards */}
       <div className="grid sm:grid-cols-2 gap-3">
         {loading ? (
-             Array(4).fill(0).map((_, i) => <div key={i} className="h-32 bg-slate-800/50 rounded-xl animate-pulse" />)
+             Array(4).fill(0).map((_, i) => <div key={i} className="h-32 bg-surface/50 rounded-xl animate-pulse" />)
         ) : objectifs.length === 0 ? (
-          <div className="col-span-full py-12 text-center text-slate-500 bg-slate-800/30 rounded-xl border border-dashed border-slate-700">
+          <div className="col-span-full py-12 text-center text-content-muted bg-surface/30 rounded-xl border border-dashed border-edge">
             <Target size={32} className="mx-auto mb-2 opacity-50" />
             <p className="text-sm">Aucun objectif pour {new Date(selectedPeriode).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}</p>
-            {!canManage && <p className="text-xs mt-1 text-slate-600">Contactez votre superviseur pour définir vos objectifs.</p>}
+            {!canManage && <p className="text-xs mt-1 text-content-muted">Contactez votre superviseur pour définir vos objectifs.</p>}
           </div>
         ) : (
           paginatedObjectifs.map((obj) => {
@@ -268,44 +268,44 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
               <div 
                 key={obj.id} 
                 onClick={() => { setSelectedObjectif(obj); setUpdateValue(''); }}
-                className={`bg-slate-800 rounded-xl p-4 border transition hover:border-blue-500/50 cursor-pointer group relative overflow-hidden ${
-                  obj.statut === 'Atteint' || obj.statut === 'Depasse' ? 'border-green-500/30' : 'border-slate-700'
+                className={`bg-surface rounded-xl p-4 border transition hover:border-status-info/50 cursor-pointer group relative overflow-hidden ${
+                  obj.statut === 'Atteint' || obj.statut === 'Depasse' ? 'border-status-success/30' : 'border-edge'
                 }`}
               >
                 {/* Progress Bar Background */}
-                <div className="absolute bottom-0 left-0 h-1 bg-slate-700 w-full">
+                <div className="absolute bottom-0 left-0 h-1 bg-surface-elevated w-full">
                    <div className={`h-full transition-all duration-1000 ${
-                     pct >= 100 ? 'bg-green-500' : pct >= 80 ? 'bg-cyan-500' : 'bg-blue-500'
+                     pct >= 100 ? 'bg-status-success' : pct >= 80 ? 'bg-accent-secondary' : 'bg-status-info'
                    }`} style={{ width: `${Math.min(pct, 100)}%` }} />
                 </div>
 
                 <div className="flex justify-between items-start mb-2">
                    <div className="flex items-center gap-2">
                       <div className={`p-1.5 rounded-lg ${
-                        obj.statut === 'Atteint' || obj.statut === 'Depasse' ? 'bg-green-500/20 text-green-400' : 'bg-blue-500/20 text-blue-400'
+                        obj.statut === 'Atteint' || obj.statut === 'Depasse' ? 'bg-status-success-bg text-status-success' : 'bg-status-info-bg text-status-info'
                       }`}>
                         <Target size={14} />
                       </div>
                       <div>
-                        <h4 className="text-sm font-bold text-white">{obj.typeObjectif}</h4>
-                        <span className="text-[10px] text-slate-400 font-medium">{ALL_STATUS_LABELS[obj.statut] || obj.statut}</span>
+                        <h4 className="text-sm font-bold text-content-primary">{obj.typeObjectif}</h4>
+                        <span className="text-[10px] text-content-muted font-medium">{ALL_STATUS_LABELS[obj.statut] || obj.statut}</span>
                       </div>
                    </div>
                    <div className="text-right">
                       <div className={`text-lg font-bold ${
-                        pct >= 100 ? 'text-green-400' : 'text-white'
+                        pct >= 100 ? 'text-status-success' : 'text-content-primary'
                       }`}>{pct.toFixed(0)}%</div>
                    </div>
                 </div>
 
                 <div className="flex justify-between items-end text-xs">
-                   <div className="text-slate-400">
-                      <span className="text-white font-bold">{Number(obj.valeurRealisee).toLocaleString()}</span>
+                   <div className="text-content-muted">
+                      <span className="text-content-primary font-bold">{Number(obj.valeurRealisee).toLocaleString()}</span>
                       <span className="mx-1">/</span>
                       <span>{Number(obj.valeurObjectif).toLocaleString()} {obj.unite}</span>
                    </div>
                    {Number(obj.recompense) > 0 && (
-                     <div className="flex items-center gap-1 text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded">
+                     <div className="flex items-center gap-1 text-status-success font-bold bg-status-success-bg px-2 py-0.5 rounded">
                        <DollarSign size={10} /> {Number(obj.recompense / 1000).toFixed(0)}k
                      </div>
                    )}
@@ -318,26 +318,26 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
 
       {/* Pagination Footer */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between px-3 py-2 bg-slate-800/50 rounded-lg border border-slate-700/50">
-          <span className="text-[10px] text-slate-500">Page {currentPage} sur {totalPages}</span>
+        <div className="flex items-center justify-between px-3 py-2 bg-surface/50 rounded-lg border border-edge-subtle">
+          <span className="text-[10px] text-content-muted">Page {currentPage} sur {totalPages}</span>
           <div className="flex gap-1">
-            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-1 rounded bg-slate-800 border border-slate-700 text-slate-400 hover:text-white disabled:opacity-30 transition"><ChevronLeft size={12} /></button>
-            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="p-1 rounded bg-slate-800 border border-slate-700 text-slate-400 hover:text-white disabled:opacity-30 transition"><ChevronRight size={12} /></button>
+            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-1 rounded bg-surface border border-edge text-content-muted hover:text-content-primary disabled:opacity-30 transition"><ChevronLeft size={12} /></button>
+            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="p-1 rounded bg-surface border border-edge text-content-muted hover:text-content-primary disabled:opacity-30 transition"><ChevronRight size={12} /></button>
           </div>
         </div>
       )}
 
       {/* Detail Sheet */}
       <Sheet open={!!selectedObjectif} onOpenChange={(open) => !open && setSelectedObjectif(null)}>
-        <SheetContent className="w-full sm:max-w-md bg-slate-950 border-l-slate-800 p-0 overflow-y-auto">
+        <SheetContent className="w-full sm:max-w-md bg-surface-base border-l-edge p-0 overflow-y-auto">
           {selectedObjectif && (
             <>
-              <SheetHeader className="px-6 py-4 border-b border-slate-800 bg-slate-950/50 backdrop-blur sticky top-0 z-10">
-                <SheetTitle className="text-white flex items-center gap-2">
-                  <Target size={16} className="text-blue-400" />
+              <SheetHeader className="px-6 py-4 border-b border-edge bg-surface-base/50 backdrop-blur sticky top-0 z-10">
+                <SheetTitle className="text-content-primary flex items-center gap-2">
+                  <Target size={16} className="text-status-info" />
                   Objectif {selectedObjectif.typeObjectif}
                 </SheetTitle>
-                <SheetDescription className="text-slate-400">
+                <SheetDescription className="text-content-muted">
                   Période: {new Date(selectedObjectif.periode).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
                 </SheetDescription>
               </SheetHeader>
@@ -347,14 +347,14 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
                 <div className="flex justify-center py-4">
                   <div className="relative w-32 h-32 flex items-center justify-center">
                     <svg className="w-full h-full transform -rotate-90">
-                      <circle cx="64" cy="64" r="56" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-slate-800" />
+                      <circle cx="64" cy="64" r="56" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-content-primary" />
                       <circle cx="64" cy="64" r="56" stroke="currentColor" strokeWidth="8" fill="transparent" strokeDasharray={351.86} strokeDashoffset={351.86 - (351.86 * Math.min((selectedObjectif.valeurRealisee / selectedObjectif.valeurObjectif), 1))} className={
-                        (selectedObjectif.valeurRealisee / selectedObjectif.valeurObjectif) >= 1 ? 'text-green-500' : 'text-blue-500'
+                        (selectedObjectif.valeurRealisee / selectedObjectif.valeurObjectif) >= 1 ? 'text-status-success' : 'text-status-info'
                       } />
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-2xl font-bold text-white">{((selectedObjectif.valeurRealisee / selectedObjectif.valeurObjectif) * 100).toFixed(0)}%</span>
-                      <span className="text-[10px] text-slate-400 uppercase font-bold">{ALL_STATUS_LABELS[selectedObjectif.statut] || selectedObjectif.statut}</span>
+                      <span className="text-2xl font-bold text-content-primary">{((selectedObjectif.valeurRealisee / selectedObjectif.valeurObjectif) * 100).toFixed(0)}%</span>
+                      <span className="text-[10px] text-content-muted uppercase font-bold">{ALL_STATUS_LABELS[selectedObjectif.statut] || selectedObjectif.statut}</span>
                     </div>
                   </div>
                 </div>
@@ -363,18 +363,18 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
                 <div className="grid grid-cols-2 gap-3">
                   <InfoItem label="Objectif" value={`${selectedObjectif.valeurObjectif.toLocaleString()} ${selectedObjectif.unite}`} />
                   <InfoItem label="Réalisé" value={`${selectedObjectif.valeurRealisee.toLocaleString()} ${selectedObjectif.unite}`} />
-                  <InfoItem label="Récompense" value={`${selectedObjectif.recompense.toLocaleString()} FCFA`} />
+                  <InfoItem label="Récompense" value={`${selectedObjectif.recompense.toLocaleString()} ${currencySymbol()}`} />
                   <InfoItem label="Reste à faire" value={`${Math.max(0, selectedObjectif.valeurObjectif - selectedObjectif.valeurRealisee).toLocaleString()} ${selectedObjectif.unite}`} />
                 </div>
 
                 {/* Update Actions */}
-                <div className="pt-4 border-t border-slate-800 space-y-4">
+                <div className="pt-4 border-t border-edge space-y-4">
                   <div className="flex items-center justify-between">
-                     <h4 className="text-xs font-bold text-slate-500 uppercase">Mise à jour</h4>
+                     <h4 className="text-xs font-bold text-content-muted uppercase">Mise à jour</h4>
                      <button
                        onClick={() => recalculateOne(selectedObjectif.id)}
                        disabled={recalculating !== null}
-                       className="text-xs font-bold text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
+                       className="text-xs font-bold text-accent hover:text-accent flex items-center gap-1"
                      >
                        {recalculating === selectedObjectif.id ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
                        Recalculer auto
@@ -391,12 +391,12 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
                          value={updateValue}
                          onChange={(e) => setUpdateValue(e.target.value)}
                          placeholder="Nouvelle valeur..."
-                         className="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white text-sm"
+                         className="flex-1 px-3 py-2 bg-surface-base border border-edge rounded-lg text-content-primary text-sm"
                        />
                        <button
                          onClick={updateRealisation}
                          disabled={!updateValue}
-                         className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-lg font-bold text-xs"
+                         className="px-4 py-2 bg-status-info hover:bg-status-info disabled:opacity-50 text-white rounded-lg font-bold text-xs"
                        >
                          Mettre à jour
                        </button>
@@ -418,15 +418,15 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
 
 function StatCard({ icon, label, value, color }: { icon: React.ReactNode, label: string, value: string, color: string }) {
   const colorClasses: Record<string, string> = {
-    blue: 'from-blue-500/20 to-blue-600/5 border-blue-500/20 text-blue-400',
-    green: 'from-green-500/20 to-green-600/5 border-green-500/20 text-green-400',
-    cyan: 'from-cyan-500/20 to-cyan-600/5 border-cyan-500/20 text-cyan-400',
-    emerald: 'from-emerald-500/20 to-emerald-600/5 border-emerald-500/20 text-emerald-400',
+    blue: 'from-status-info/20 to-status-info/5 border-status-info/20 text-status-info',
+    green: 'from-status-success/20 to-status-success/5 border-status-success/20 text-status-success',
+    cyan: 'from-accent/20 to-accent/5 border-accent/20 text-accent',
+    emerald: 'from-status-success/20 to-status-success/5 border-status-success/20 text-status-success',
   };
   return (
     <div className={`rounded-xl p-3 border bg-gradient-to-br ${colorClasses[color] || colorClasses.blue}`}>
       <div className="flex justify-between items-start mb-1"><div className="p-1.5 rounded-lg bg-white/5">{icon}</div></div>
-      <div className="text-lg font-bold text-white truncate">{value}</div>
+      <div className="text-lg font-bold text-content-primary truncate">{value}</div>
       <div className="text-[10px] uppercase font-bold opacity-70 tracking-wide">{label}</div>
     </div>
   );
@@ -435,7 +435,7 @@ function StatCard({ icon, label, value, color }: { icon: React.ReactNode, label:
 function FormField({ label, children }: { label: string, children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">{label}</label>
+      <label className="block text-[10px] uppercase font-bold text-content-muted mb-1">{label}</label>
       {children}
     </div>
   );
@@ -443,9 +443,9 @@ function FormField({ label, children }: { label: string, children: React.ReactNo
 
 function InfoItem({ label, value }: { label: string, value: string }) {
   return (
-    <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800">
-      <div className="text-[10px] uppercase font-bold text-slate-500 mb-0.5">{label}</div>
-      <div className="text-sm font-medium text-slate-200 truncate">{value}</div>
+    <div className="p-2.5 bg-surface-base rounded-lg border border-edge">
+      <div className="text-[10px] uppercase font-bold text-content-muted mb-0.5">{label}</div>
+      <div className="text-sm font-medium text-content-secondary truncate">{value}</div>
     </div>
   );
 }

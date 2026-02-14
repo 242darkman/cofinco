@@ -24,6 +24,7 @@ import { registerDepartmentsRoutes } from "./routes/departments";
 import loyaltyRouter from "./routes/loyalty";
 import { registerOtpRoutes } from "./routes/otp";
 import { registerConfigRoutes, registerSecurityConfigRoutes } from "./routes/config";
+import { registerBrandingRoutes } from "./routes/branding";
 import { registerComptesRoutes } from "./routes/comptes";
 import { registerReevaluationRoutes } from "./routes/reevaluations";
 import { registerNotificationsRoutes } from "./routes/notifications";
@@ -128,6 +129,9 @@ export function registerRoutes(app: Express): Server {
 
   // Security Config Module (OTP bypass, presence verification)
   registerSecurityConfigRoutes(app);
+
+  // Branding Module (app name, logo, theme colors)
+  registerBrandingRoutes(app);
 
   // Reevaluation Module (Credit reevaluation workflow)
   registerReevaluationRoutes(app);

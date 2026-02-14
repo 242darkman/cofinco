@@ -52,14 +52,14 @@ export default function PlatformHeader({
         </div>
         <div className="flex items-center gap-4 border-l border-edge pl-4">
           <div>
-            <h2 className="text-2xl font-black tracking-tight bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">
+            <h2 className="text-2xl font-black tracking-tight bg-gradient-to-r from-accent via-blue-500 to-status-info bg-clip-text text-transparent">
               {t('cofinPlatform')}
             </h2>
             <div className="flex items-center gap-2">
               <span className="text-[10px] uppercase font-bold tracking-[0.15em] text-content-muted/80">
                 {t('platformeMicrofinance')}
               </span>
-              <div className="h-px flex-1 bg-gradient-to-r from-cyan-500/20 to-transparent"></div>
+              <div className="h-px flex-1 bg-gradient-to-r from-accent/20 to-transparent"></div>
             </div>
           </div>
         </div>
@@ -105,7 +105,7 @@ export default function PlatformHeader({
               aria-label="Messages"
             />
             {totalUnread > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center pointer-events-none animate-in zoom-in duration-200 ring-2 ring-surface-elevated">
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-status-danger text-white text-[10px] font-bold rounded-full flex items-center justify-center pointer-events-none animate-in zoom-in duration-200 ring-2 ring-surface-elevated">
                 {totalUnread > 99 ? '99+' : totalUnread}
               </span>
             )}

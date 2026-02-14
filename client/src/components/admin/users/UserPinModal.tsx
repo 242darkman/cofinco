@@ -92,19 +92,19 @@ function AnimatedCheckmark() {
       transition={{ type: 'spring', stiffness: 200, damping: 15 }}
     >
       <motion.div
-        className="absolute w-24 h-24 rounded-full bg-emerald-500/20"
+        className="absolute w-24 h-24 rounded-full bg-status-success-bg"
         initial={{ scale: 0 }}
         animate={{ scale: [0, 1.5, 1] }}
         transition={{ duration: 0.6 }}
       />
       <motion.div
-        className="absolute w-20 h-20 rounded-full bg-emerald-500/30"
+        className="absolute w-20 h-20 rounded-full bg-status-success/30"
         initial={{ scale: 0 }}
         animate={{ scale: [0, 1.3, 1] }}
         transition={{ duration: 0.5, delay: 0.1 }}
       />
       <motion.div
-        className="w-16 h-16 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/50"
+        className="w-16 h-16 rounded-full bg-gradient-to-br from-status-success to-status-success flex items-center justify-center shadow-lg shadow-status-success/50"
         initial={{ scale: 0, rotate: -180 }}
         animate={{ scale: 1, rotate: 0 }}
         transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.2 }}
@@ -114,7 +114,7 @@ function AnimatedCheckmark() {
           animate={{ pathLength: 1 }}
           transition={{ duration: 0.4, delay: 0.4 }}
         >
-          <Check className="w-8 h-8 text-white" strokeWidth={3} />
+          <Check className="w-8 h-8 text-content-primary" strokeWidth={3} />
         </motion.div>
       </motion.div>
     </motion.div>
@@ -129,10 +129,10 @@ function PinDigit({ value, isFilled, isActive, showDigit }: { value: string; isF
         w-10 h-12 rounded-lg border-2 flex items-center justify-center text-xl font-bold
         transition-all duration-200
         ${isFilled
-          ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400'
+          ? 'border-status-success bg-status-success-bg text-status-success'
           : isActive
             ? 'border-primary bg-primary/10'
-            : 'border-slate-600 bg-slate-800/50'
+            : 'border-edge-strong bg-surface/50'
         }
       `}
       animate={isFilled ? { scale: [1, 1.1, 1] } : {}}
@@ -238,7 +238,7 @@ export default function UserPinModal({ isOpen, onClose, userId, userName }: User
             <SuccessParticles />
             <AnimatedCheckmark />
             <motion.p
-              className="mt-6 text-lg font-medium text-emerald-400"
+              className="mt-6 text-lg font-medium text-status-success"
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.5 }}
@@ -246,7 +246,7 @@ export default function UserPinModal({ isOpen, onClose, userId, userName }: User
               PIN configuré !
             </motion.p>
             <motion.p
-              className="mt-1 text-sm text-slate-400"
+              className="mt-1 text-sm text-content-muted"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.7 }}
@@ -264,9 +264,9 @@ export default function UserPinModal({ isOpen, onClose, userId, userName }: User
             exit={{ opacity: 0 }}
           >
             {/* Info banner */}
-            <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-lg flex items-start gap-3">
-              <Shield className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
-              <p className="text-sm text-blue-200">
+            <div className="bg-status-info-bg border border-status-info/20 p-3 rounded-lg flex items-start gap-3">
+              <Shield className="w-5 h-5 text-status-info mt-0.5 flex-shrink-0" />
+              <p className="text-sm text-status-info-text">
                 Vous définissez le code PIN pour cet utilisateur. Ce code sera requis pour autoriser les opérations sensibles en caisse.
               </p>
             </div>
@@ -278,7 +278,7 @@ export default function UserPinModal({ isOpen, onClose, userId, userName }: User
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
-                  className="bg-red-500/10 border border-red-500/20 p-3 rounded-lg flex items-center gap-2 text-sm text-red-400"
+                  className="bg-status-danger-bg border border-status-danger/20 p-3 rounded-lg flex items-center gap-2 text-sm text-status-danger"
                 >
                   <X className="w-4 h-4 flex-shrink-0" />
                   {error}
@@ -290,13 +290,13 @@ export default function UserPinModal({ isOpen, onClose, userId, userName }: User
             <div className="space-y-4">
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="text-sm font-medium text-slate-300">
+                  <label className="text-sm font-medium text-content-secondary">
                     Nouveau PIN (6 chiffres)
                   </label>
                   <button
                     type="button"
                     onClick={() => setShowPin(!showPin)}
-                    className="flex items-center gap-1 text-xs text-slate-400 hover:text-white transition-colors"
+                    className="flex items-center gap-1 text-xs text-content-muted hover:text-content-primary transition-colors"
                   >
                     {showPin ? <EyeOff size={14} /> : <Eye size={14} />}
                     <span>{showPin ? 'Masquer' : 'Afficher'}</span>
@@ -333,7 +333,7 @@ export default function UserPinModal({ isOpen, onClose, userId, userName }: User
                     input?.focus();
                   }}
                 >
-                  <span className="text-xs text-slate-500 cursor-pointer hover:text-slate-400">
+                  <span className="text-xs text-content-muted cursor-pointer hover:text-content-muted">
                     Cliquez pour saisir
                   </span>
                 </div>
@@ -345,7 +345,7 @@ export default function UserPinModal({ isOpen, onClose, userId, userName }: User
                       initial={{ opacity: 0, y: -5 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -5 }}
-                      className="mt-2 flex items-center gap-2 text-amber-400 text-xs"
+                      className="mt-2 flex items-center gap-2 text-status-warning text-xs"
                     >
                       <AlertTriangle className="w-3.5 h-3.5" />
                       {pinSecurity.reason}
@@ -356,7 +356,7 @@ export default function UserPinModal({ isOpen, onClose, userId, userName }: User
 
               {/* Confirm PIN */}
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-content-secondary mb-2">
                   Confirmer le PIN
                 </label>
                 <div className="flex justify-center gap-2 mb-2">
@@ -368,13 +368,13 @@ export default function UserPinModal({ isOpen, onClose, userId, userName }: User
                         transition-all duration-200
                         ${i < confirmPin.length
                           ? pinsMatch
-                            ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400'
+                            ? 'border-status-success bg-status-success-bg text-status-success'
                             : pinsMismatch
-                              ? 'border-red-500 bg-red-500/10 text-red-400'
+                              ? 'border-status-danger bg-status-danger-bg text-status-danger'
                               : 'border-primary bg-primary/10 text-primary'
                           : activeField === 'confirm' && i === confirmPin.length
                             ? 'border-primary bg-primary/10'
-                            : 'border-slate-600 bg-slate-800/50'
+                            : 'border-edge-strong bg-surface/50'
                         }
                       `}
                       animate={i < confirmPin.length ? { scale: [1, 1.1, 1] } : {}}
@@ -402,7 +402,7 @@ export default function UserPinModal({ isOpen, onClose, userId, userName }: User
                     input?.focus();
                   }}
                 >
-                  <span className="text-xs text-slate-500 cursor-pointer hover:text-slate-400">
+                  <span className="text-xs text-content-muted cursor-pointer hover:text-content-muted">
                     Cliquez pour saisir
                   </span>
                 </div>
@@ -414,7 +414,7 @@ export default function UserPinModal({ isOpen, onClose, userId, userName }: User
                       initial={{ opacity: 0, y: -5 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -5 }}
-                      className="mt-2 flex items-center justify-center gap-2 text-emerald-400 text-xs"
+                      className="mt-2 flex items-center justify-center gap-2 text-status-success text-xs"
                     >
                       <Check className="w-3.5 h-3.5" />
                       Les PIN correspondent
@@ -425,7 +425,7 @@ export default function UserPinModal({ isOpen, onClose, userId, userName }: User
                       initial={{ opacity: 0, y: -5 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -5 }}
-                      className="mt-2 flex items-center justify-center gap-2 text-red-400 text-xs"
+                      className="mt-2 flex items-center justify-center gap-2 text-status-danger text-xs"
                     >
                       <X className="w-3.5 h-3.5" />
                       Les PIN ne correspondent pas
@@ -435,7 +435,7 @@ export default function UserPinModal({ isOpen, onClose, userId, userName }: User
               </div>
             </div>
 
-            <p className="text-xs text-slate-500 text-center">6 chiffres minimum requis</p>
+            <p className="text-xs text-content-muted text-center">6 chiffres minimum requis</p>
 
             {/* Actions */}
             <div className="flex justify-end gap-3 pt-2">
@@ -448,7 +448,7 @@ export default function UserPinModal({ isOpen, onClose, userId, userName }: User
                 disabled={loading || pin.length !== 6 || confirmPin.length !== 6 || !pinsMatch || pinSecurity.isWeak}
                 isLoading={loading}
                 icon={pinsMatch && !pinSecurity.isWeak ? Sparkles : KeyRound}
-                className={pinsMatch && !pinSecurity.isWeak ? 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600' : ''}
+                className={pinsMatch && !pinSecurity.isWeak ? 'bg-gradient-to-r from-status-success to-accent hover:from-status-success hover:to-accent' : ''}
               >
                 Définir le PIN
               </Button>

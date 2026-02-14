@@ -50,6 +50,8 @@ export interface TransactionsListProps {
   maxItems?: number;
   className?: string;
   compactMode?: boolean;
+  /** When provided, overrides the default 600px VirtualList height cap */
+  listHeight?: number;
 }
 
 // --- Helper Functions ---
@@ -84,26 +86,26 @@ const getStatusConfig = (status: string) => {
   const configs: Record<OperationStatus, { icon: typeof CheckCircle; color: string; bg: string; badgeVariant: 'success' | 'danger' | 'warning' | 'neutral' }> = {
     SUCCESS: {
       icon: CheckCircle,
-      color: 'text-emerald-400',
-      bg: 'bg-emerald-500/10',
+      color: 'text-status-success',
+      bg: 'bg-status-success-bg',
       badgeVariant: 'success'
     },
     FAILED: {
       icon: XCircle,
-      color: 'text-red-400',
-      bg: 'bg-red-500/10',
+      color: 'text-status-danger',
+      bg: 'bg-status-danger-bg',
       badgeVariant: 'danger'
     },
     PENDING: {
       icon: Hourglass,
-      color: 'text-amber-400',
-      bg: 'bg-amber-500/10',
+      color: 'text-status-warning',
+      bg: 'bg-status-warning-bg',
       badgeVariant: 'warning'
     },
     CANCELLED: {
       icon: XCircle,
-      color: 'text-slate-400',
-      bg: 'bg-slate-500/10',
+      color: 'text-content-muted',
+      bg: 'bg-surface-subtle/30',
       badgeVariant: 'neutral'
     }
   };
@@ -154,7 +156,7 @@ function MobileTransactionRow({
     <div
       style={style}
       onClick={handleClick}
-      className={`${paddingClass} active:bg-slate-800/50 transition-colors cursor-pointer border-b border-edge`}
+      className={`${paddingClass} active:bg-surface/50 transition-colors cursor-pointer border-b border-edge`}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => e.key === 'Enter' && handleClick()}
@@ -162,24 +164,24 @@ function MobileTransactionRow({
       <div className="flex items-start gap-3">
         <div className={`
           ${iconSizeClass} rounded-full flex items-center justify-center shrink-0
-          ${isCredit ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}
+          ${isCredit ? 'bg-status-success-bg text-status-success' : 'bg-status-danger-bg text-status-danger'}
         `}>
           {isCredit ? <ArrowDownLeft size={iconInnerSize} /> : <ArrowUpRight size={iconInnerSize} />}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-white truncate">
+              <p className="text-sm font-semibold text-content-primary truncate">
                 {formatDescription(tx.description || tx.typeOperation || tx.type)}
               </p>
               <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-xs text-slate-500">{timeStr}</span>
-                <span className="text-slate-600">·</span>
-                <span className="text-xs text-slate-500">{dateStr}</span>
+                <span className="text-xs text-content-muted">{timeStr}</span>
+                <span className="text-content-muted">·</span>
+                <span className="text-xs text-content-muted">{dateStr}</span>
               </div>
             </div>
             <div className="text-right shrink-0">
-              <p className={`text-base font-bold font-mono ${isCredit ? 'text-emerald-400' : 'text-red-400'}`}>
+              <p className={`text-base font-bold font-mono ${isCredit ? 'text-status-success' : 'text-status-danger'}`}>
                 {isCredit ? '+' : '-'}{formatMoney(tx.amount, { showCurrency: false })}
               </p>
               {normalizeStatus(tx.status) !== 'SUCCESS' && (
@@ -208,7 +210,8 @@ export default function TransactionsList({
   onViewAll,
   maxItems,
   className = '',
-  compactMode = false
+  compactMode = false,
+  listHeight
 }: TransactionsListProps) {
   const displayedTransactions = maxItems ? transactions.slice(0, maxItems) : transactions;
 
@@ -226,8 +229,8 @@ export default function TransactionsList({
         {showHeader && (
           <div className="p-4 border-b border-edge flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Clock size={16} className="text-cyan-400" />
-              <span className="text-sm font-bold text-white">{headerTitle}</span>
+              <Clock size={16} className="text-accent" />
+              <span className="text-sm font-bold text-content-primary">{headerTitle}</span>
             </div>
           </div>
         )}
@@ -235,12 +238,12 @@ export default function TransactionsList({
           {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="p-4 animate-pulse">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-slate-700" />
+                <div className="w-10 h-10 rounded-full bg-surface-elevated" />
                 <div className="flex-1 space-y-2">
-                  <div className="h-4 bg-slate-700 rounded w-3/4" />
-                  <div className="h-3 bg-slate-700/50 rounded w-1/2" />
+                  <div className="h-4 bg-surface-elevated rounded w-3/4" />
+                  <div className="h-3 bg-surface-elevated/50 rounded w-1/2" />
                 </div>
-                <div className="h-5 bg-slate-700 rounded w-20" />
+                <div className="h-5 bg-surface-elevated rounded w-20" />
               </div>
             </div>
           ))}
@@ -256,16 +259,16 @@ export default function TransactionsList({
         {showHeader && (
           <div className="p-4 border-b border-edge flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Clock size={16} className="text-cyan-400" />
-              <span className="text-sm font-bold text-white">{headerTitle}</span>
+              <Clock size={16} className="text-accent" />
+              <span className="text-sm font-bold text-content-primary">{headerTitle}</span>
             </div>
           </div>
         )}
         <div className="p-8 text-center">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-slate-800/50 flex items-center justify-center">
-            <FileText size={28} className="text-slate-500" />
+          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-surface/50 flex items-center justify-center">
+            <FileText size={28} className="text-content-muted" />
           </div>
-          <p className="text-slate-400 text-sm">{emptyMessage}</p>
+          <p className="text-content-muted text-sm">{emptyMessage}</p>
         </div>
       </div>
     );
@@ -277,13 +280,13 @@ export default function TransactionsList({
       {showHeader && (
         <div className="px-3 py-2 border-b border-edge flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Clock size={14} className="text-cyan-400" />
-            <h3 className="text-xs font-bold text-white">{headerTitle}</h3>
+            <Clock size={14} className="text-accent" />
+            <h3 className="text-xs font-bold text-content-primary">{headerTitle}</h3>
           </div>
           {onViewAll && (
             <button
               onClick={onViewAll}
-              className="text-[10px] font-medium text-cyan-400 hover:text-cyan-300 transition-colors flex items-center gap-1"
+              className="text-[10px] font-medium text-accent hover:text-accent transition-colors flex items-center gap-1"
             >
               Voir tout
               <ChevronRight size={12} />
@@ -296,7 +299,7 @@ export default function TransactionsList({
       <div className="md:hidden">
         {useVirtualization ? (
           <VirtualList<TransactionRowProps>
-            style={{ height: Math.min(displayedTransactions.length * (compactMode ? 64 : 88), 600), width: '100%' }}
+            style={{ height: listHeight ?? Math.min(displayedTransactions.length * (compactMode ? 64 : 88), 600), width: '100%' }}
             rowCount={displayedTransactions.length}
             rowHeight={compactMode ? 64 : 88}
             className="divide-y divide-edge"
@@ -325,7 +328,7 @@ export default function TransactionsList({
                 <div
                   key={tx.id}
                   onClick={() => handleClick(tx)}
-                  className={`${paddingClass} active:bg-slate-800/50 transition-colors cursor-pointer`}
+                  className={`${paddingClass} active:bg-surface/50 transition-colors cursor-pointer`}
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => e.key === 'Enter' && handleClick(tx)}
@@ -333,24 +336,24 @@ export default function TransactionsList({
                   <div className="flex items-start gap-3">
                     <div className={`
                       ${iconSizeClass} rounded-full flex items-center justify-center shrink-0
-                      ${isCredit ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}
+                      ${isCredit ? 'bg-status-success-bg text-status-success' : 'bg-status-danger-bg text-status-danger'}
                     `}>
                       {isCredit ? <ArrowDownLeft size={iconInnerSize} /> : <ArrowUpRight size={iconInnerSize} />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="text-sm font-semibold text-white truncate">
+                          <p className="text-sm font-semibold text-content-primary truncate">
                             {formatDescription(tx.description || tx.typeOperation || tx.type)}
                           </p>
                           <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-xs text-slate-500">{timeStr}</span>
-                            <span className="text-slate-600">·</span>
-                            <span className="text-xs text-slate-500">{dateStr}</span>
+                            <span className="text-xs text-content-muted">{timeStr}</span>
+                            <span className="text-content-muted">·</span>
+                            <span className="text-xs text-content-muted">{dateStr}</span>
                           </div>
                         </div>
                         <div className="text-right shrink-0">
-                          <p className={`text-base font-bold font-mono ${isCredit ? 'text-emerald-400' : 'text-red-400'}`}>
+                          <p className={`text-base font-bold font-mono ${isCredit ? 'text-status-success' : 'text-status-danger'}`}>
                             {isCredit ? '+' : '-'}{formatMoney(tx.amount, { showCurrency: false })}
                           </p>
                           {normalizeStatus(tx.status) !== 'SUCCESS' && (
@@ -373,12 +376,12 @@ export default function TransactionsList({
       <div className="hidden md:block">
         <table className="w-full">
           <thead>
-            <tr className="bg-slate-800/30 border-b border-edge">
-              <th className={`text-left ${compactMode ? 'py-1' : 'py-2'} px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider`}>Date</th>
-              <th className={`text-left ${compactMode ? 'py-1' : 'py-2'} px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider`}>Type</th>
-              <th className={`text-left ${compactMode ? 'py-1' : 'py-2'} px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider`}>Référence</th>
-              <th className={`text-right ${compactMode ? 'py-1' : 'py-2'} px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider`}>Montant</th>
-              <th className={`text-center ${compactMode ? 'py-1' : 'py-2'} px-3 text-[10px] font-bold text-slate-500 uppercase tracking-wider`}>Statut</th>
+            <tr className="bg-surface/30 border-b border-edge">
+              <th className={`text-left ${compactMode ? 'py-1' : 'py-2'} px-3 text-[10px] font-bold text-content-muted uppercase tracking-wider`}>Date</th>
+              <th className={`text-left ${compactMode ? 'py-1' : 'py-2'} px-3 text-[10px] font-bold text-content-muted uppercase tracking-wider`}>Type</th>
+              <th className={`text-left ${compactMode ? 'py-1' : 'py-2'} px-3 text-[10px] font-bold text-content-muted uppercase tracking-wider`}>Référence</th>
+              <th className={`text-right ${compactMode ? 'py-1' : 'py-2'} px-3 text-[10px] font-bold text-content-muted uppercase tracking-wider`}>Montant</th>
+              <th className={`text-center ${compactMode ? 'py-1' : 'py-2'} px-3 text-[10px] font-bold text-content-muted uppercase tracking-wider`}>Statut</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-edge">
@@ -391,17 +394,17 @@ export default function TransactionsList({
                 <tr
                   key={tx.id}
                   onClick={() => handleClick(tx)}
-                  className="hover:bg-slate-800/30 transition-colors cursor-pointer group"
+                  className="hover:bg-surface/30 transition-colors cursor-pointer group"
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => e.key === 'Enter' && handleClick(tx)}
                 >
                   <td className={`${compactMode ? 'py-1' : 'py-2'} px-3`}>
                     <div className="flex items-center gap-2">
-                       <span className="text-xs text-white">
+                       <span className="text-xs text-content-primary">
                         {dateObj.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                       </span>
-                      <span className="text-[10px] text-slate-500 text-nowrap">
+                      <span className="text-[10px] text-content-muted text-nowrap">
                         {dateObj.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}
                       </span>
                     </div>
@@ -410,22 +413,22 @@ export default function TransactionsList({
                     <div className="flex items-center gap-2">
                       <div className={`
                         ${compactMode ? 'w-5 h-5' : 'w-6 h-6'} rounded-full flex items-center justify-center shrink-0
-                        ${isCredit ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}
+                        ${isCredit ? 'bg-status-success-bg text-status-success' : 'bg-status-danger-bg text-status-danger'}
                       `}>
                         {isCredit ? <ArrowDownLeft size={compactMode ? 10 : 12} /> : <ArrowUpRight size={compactMode ? 10 : 12} />}
                       </div>
-                      <span className="text-xs font-medium text-white group-hover:text-cyan-400 transition-colors truncate max-w-[150px] block">
+                      <span className="text-xs font-medium text-content-primary group-hover:text-accent transition-colors truncate max-w-[150px] block">
                         {formatDescription(tx.description || tx.typeOperation || tx.type)}
                       </span>
                     </div>
                   </td>
                   <td className={`${compactMode ? 'py-1' : 'py-2'} px-3`}>
-                    <span className="text-[10px] font-mono text-slate-500 group-hover:text-slate-400 transition-colors truncate max-w-[120px] block">
+                    <span className="text-[10px] font-mono text-content-muted group-hover:text-content-muted transition-colors truncate max-w-[120px] block">
                       {tx.reference}
                     </span>
                   </td>
                   <td className={`${compactMode ? 'py-1' : 'py-2'} px-3 text-right`}>
-                    <span className={`text-xs font-bold font-mono ${isCredit ? 'text-emerald-400' : 'text-red-400'}`}>
+                    <span className={`text-xs font-bold font-mono ${isCredit ? 'text-status-success' : 'text-status-danger'}`}>
                       {isCredit ? '+' : '-'}{formatMoney(tx.amount, { showCurrency: false })}
                     </span>
                   </td>

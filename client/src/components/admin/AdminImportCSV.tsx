@@ -375,17 +375,17 @@ export default function AdminImportCSV({ onClose, onSuccess }: AdminImportCSVPro
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-800 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-slate-800 border-b border-slate-700 p-6 flex items-center justify-between z-10">
+      <div className="bg-surface rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-surface border-b border-edge p-6 flex items-center justify-between z-10">
           <div className="flex items-center gap-3">
-            <Upload className="text-blue-400" size={24} />
-            <h3 className="text-2xl font-bold text-white">
+            <Upload className="text-status-info" size={24} />
+            <h3 className="text-2xl font-bold text-content-primary">
               Importer Utilisateurs (CSV)
             </h3>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-white transition"
+            className="text-content-muted hover:text-content-primary transition"
           >
             <X size={24} />
           </button>
@@ -394,10 +394,10 @@ export default function AdminImportCSV({ onClose, onSuccess }: AdminImportCSVPro
         <div className="p-6 space-y-6">
           {!result && (
             <>
-              <div className="bg-blue-500/20 border border-blue-500 rounded-lg p-4">
+              <div className="bg-status-info-bg border border-status-info rounded-lg p-4">
                 <div className="flex items-start gap-3">
-                  <AlertCircle className="text-blue-400 flex-shrink-0 mt-1" size={20} />
-                  <div className="text-sm text-blue-300 space-y-2">
+                  <AlertCircle className="text-status-info flex-shrink-0 mt-1" size={20} />
+                  <div className="text-sm text-status-info space-y-2">
                     <div className="font-semibold">Format requis :</div>
                     <ul className="list-disc list-inside space-y-1">
                       <li>Fichier CSV avec colonnes : email, prenom, nom, telephone, role, statut</li>
@@ -412,7 +412,7 @@ export default function AdminImportCSV({ onClose, onSuccess }: AdminImportCSVPro
 
               <button
                 onClick={downloadTemplate}
-                className="w-full px-4 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition flex items-center justify-center gap-2"
+                className="w-full px-4 py-3 bg-surface-elevated hover:bg-surface-subtle text-content-primary rounded-lg transition flex items-center justify-center gap-2"
               >
                 <Download size={20} />
                 Télécharger modèle CSV
@@ -428,7 +428,7 @@ export default function AdminImportCSV({ onClose, onSuccess }: AdminImportCSVPro
                 />
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="w-full px-6 py-4 border-2 border-dashed border-slate-600 hover:border-blue-500 rounded-lg transition flex flex-col items-center gap-2 text-slate-400 hover:text-white"
+                  className="w-full px-6 py-4 border-2 border-dashed border-edge-strong hover:border-status-info rounded-lg transition flex flex-col items-center gap-2 text-content-muted hover:text-content-primary"
                 >
                   <FileText size={32} />
                   <span className="font-semibold">
@@ -443,7 +443,7 @@ export default function AdminImportCSV({ onClose, onSuccess }: AdminImportCSVPro
               </div>
 
               {error && (
-                <div className="bg-red-500/20 border border-red-500 rounded-lg p-4 flex items-center gap-3 text-red-400">
+                <div className="bg-status-danger-bg border border-status-danger rounded-lg p-4 flex items-center gap-3 text-status-danger">
                   <AlertCircle size={20} />
                   <span>{error}</span>
                 </div>
@@ -451,14 +451,14 @@ export default function AdminImportCSV({ onClose, onSuccess }: AdminImportCSVPro
 
               {/* Duplicate Warnings */}
               {duplicates.length > 0 && (
-                <div className="bg-amber-500/20 border border-amber-500 rounded-lg p-4">
+                <div className="bg-status-warning-bg border border-status-warning rounded-lg p-4">
                   <div className="flex items-start gap-3">
-                    <AlertTriangle className="text-amber-400 flex-shrink-0 mt-0.5" size={20} />
+                    <AlertTriangle className="text-status-warning flex-shrink-0 mt-0.5" size={20} />
                     <div className="flex-1">
-                      <div className="font-semibold text-amber-400 mb-2">
+                      <div className="font-semibold text-status-warning mb-2">
                         {duplicates.length} doublon(s) détecté(s) dans le fichier
                       </div>
-                      <div className="space-y-1 text-sm text-amber-300">
+                      <div className="space-y-1 text-sm text-status-warning">
                         {(showAllDuplicates ? duplicates : duplicates.slice(0, 3)).map((dup, idx) => (
                           <div key={idx}>
                             <strong>{dup.field}:</strong> "{dup.value}" - lignes {dup.lines.join(', ')}
@@ -468,7 +468,7 @@ export default function AdminImportCSV({ onClose, onSuccess }: AdminImportCSVPro
                       {duplicates.length > 3 && (
                         <button
                           onClick={() => setShowAllDuplicates(!showAllDuplicates)}
-                          className="mt-2 text-xs text-amber-400 hover:text-amber-300 flex items-center gap-1"
+                          className="mt-2 text-xs text-status-warning hover:text-status-warning flex items-center gap-1"
                         >
                           {showAllDuplicates ? (
                             <>
@@ -489,26 +489,26 @@ export default function AdminImportCSV({ onClose, onSuccess }: AdminImportCSVPro
               {preview.length > 0 && (
                 <div>
                   <div className="flex items-center justify-between mb-3">
-                    <div className="text-sm font-semibold text-white">
+                    <div className="text-sm font-semibold text-content-primary">
                       Aperçu ({Math.min(preview.length, PREVIEW_LIMIT)} sur {totalLines} lignes)
                     </div>
                     {totalLines > PREVIEW_LIMIT && (
-                      <span className="text-xs text-slate-400">
+                      <span className="text-xs text-content-muted">
                         +{totalLines - PREVIEW_LIMIT} lignes non affichées
                       </span>
                     )}
                   </div>
-                  <div className="overflow-x-auto max-h-[300px] overflow-y-auto border border-slate-700 rounded-lg">
+                  <div className="overflow-x-auto max-h-[300px] overflow-y-auto border border-edge rounded-lg">
                     <table className="w-full text-sm">
-                      <thead className="bg-slate-700 sticky top-0">
+                      <thead className="bg-surface-elevated sticky top-0">
                         <tr>
-                          <th className="px-3 py-2 text-left text-slate-300 text-xs">#</th>
-                          <th className="px-3 py-2 text-left text-slate-300 text-xs">Email</th>
-                          <th className="px-3 py-2 text-left text-slate-300 text-xs">Prénom</th>
-                          <th className="px-3 py-2 text-left text-slate-300 text-xs">Nom</th>
-                          <th className="px-3 py-2 text-left text-slate-300 text-xs">Téléphone</th>
-                          <th className="px-3 py-2 text-left text-slate-300 text-xs">Rôle</th>
-                          <th className="px-3 py-2 text-left text-slate-300 text-xs">Statut</th>
+                          <th className="px-3 py-2 text-left text-content-secondary text-xs">#</th>
+                          <th className="px-3 py-2 text-left text-content-secondary text-xs">Email</th>
+                          <th className="px-3 py-2 text-left text-content-secondary text-xs">Prénom</th>
+                          <th className="px-3 py-2 text-left text-content-secondary text-xs">Nom</th>
+                          <th className="px-3 py-2 text-left text-content-secondary text-xs">Téléphone</th>
+                          <th className="px-3 py-2 text-left text-content-secondary text-xs">Rôle</th>
+                          <th className="px-3 py-2 text-left text-content-secondary text-xs">Statut</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -521,15 +521,15 @@ export default function AdminImportCSV({ onClose, onSuccess }: AdminImportCSVPro
                           return (
                             <tr
                               key={index}
-                              className={`border-b border-slate-700 ${hasDuplicate ? 'bg-amber-500/10' : ''}`}
+                              className={`border-b border-edge ${hasDuplicate ? 'bg-status-warning-bg' : ''}`}
                             >
-                              <td className="px-3 py-2 text-slate-500 text-xs">{row.lineNumber || index + 2}</td>
-                              <td className="px-3 py-2 text-white text-xs">{row.email}</td>
-                              <td className="px-3 py-2 text-slate-300 text-xs">{row.prenom || '-'}</td>
-                              <td className="px-3 py-2 text-slate-300 text-xs">{row.nom || '-'}</td>
-                              <td className="px-3 py-2 text-slate-300 text-xs">{row.telephone || '-'}</td>
-                              <td className="px-3 py-2 text-slate-300 text-xs">{row.role}</td>
-                              <td className="px-3 py-2 text-slate-300 text-xs">{ALL_STATUS_LABELS[row.statut] || row.statut}</td>
+                              <td className="px-3 py-2 text-content-muted text-xs">{row.lineNumber || index + 2}</td>
+                              <td className="px-3 py-2 text-content-primary text-xs">{row.email}</td>
+                              <td className="px-3 py-2 text-content-secondary text-xs">{row.prenom || '-'}</td>
+                              <td className="px-3 py-2 text-content-secondary text-xs">{row.nom || '-'}</td>
+                              <td className="px-3 py-2 text-content-secondary text-xs">{row.telephone || '-'}</td>
+                              <td className="px-3 py-2 text-content-secondary text-xs">{row.role}</td>
+                              <td className="px-3 py-2 text-content-secondary text-xs">{ALL_STATUS_LABELS[row.statut] || row.statut}</td>
                             </tr>
                           );
                         })}
@@ -542,7 +542,7 @@ export default function AdminImportCSV({ onClose, onSuccess }: AdminImportCSVPro
               <div className="flex gap-3 pt-4">
                 <button
                   onClick={onClose}
-                  className="flex-1 px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-bold transition"
+                  className="flex-1 px-6 py-3 bg-surface-elevated hover:bg-surface-subtle text-content-primary rounded-xl font-bold transition"
                 >
                   Annuler
                 </button>
@@ -550,7 +550,7 @@ export default function AdminImportCSV({ onClose, onSuccess }: AdminImportCSVPro
                   <button
                     onClick={handleImport}
                     disabled={!file || preview.length === 0 || importing}
-                    className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white rounded-xl font-bold transition disabled:opacity-50 flex items-center justify-center gap-2"
+                    className="flex-1 px-6 py-3 bg-gradient-to-r from-status-info to-accent hover:from-status-info hover:to-accent text-white rounded-xl font-bold transition disabled:opacity-50 flex items-center justify-center gap-2"
                   >
                     {importing ? (
                       <>
@@ -565,7 +565,7 @@ export default function AdminImportCSV({ onClose, onSuccess }: AdminImportCSVPro
                     )}
                   </button>
                 ) : (
-                  <div className="flex-1 px-6 py-3 bg-amber-500/20 text-amber-400 rounded-xl font-bold flex items-center justify-center gap-2">
+                  <div className="flex-1 px-6 py-3 bg-status-warning-bg text-status-warning rounded-xl font-bold flex items-center justify-center gap-2">
                     <AlertTriangle size={20} />
                     Permission requise
                   </div>
@@ -578,57 +578,57 @@ export default function AdminImportCSV({ onClose, onSuccess }: AdminImportCSVPro
             <div className="space-y-4">
               <div className={`rounded-lg p-6 ${
                 result.rolledBack
-                  ? 'bg-slate-500/20 border border-slate-500'
+                  ? 'bg-surface-subtle/40 border border-edge-strong'
                   : result.failed === 0
-                  ? 'bg-green-500/20 border border-green-500'
-                  : 'bg-cyan-500/20 border border-cyan-500'
+                  ? 'bg-status-success-bg border border-status-success'
+                  : 'bg-accent/10 border border-accent'
               }`}>
                 <div className="flex items-center gap-3 mb-4">
                   {result.rolledBack ? (
-                    <RotateCcw size={24} className="text-slate-400" />
+                    <RotateCcw size={24} className="text-content-muted" />
                   ) : result.failed === 0 ? (
-                    <Check size={24} className="text-green-400" />
+                    <Check size={24} className="text-status-success" />
                   ) : (
-                    <AlertCircle size={24} className="text-cyan-400" />
+                    <AlertCircle size={24} className="text-accent" />
                   )}
                   <span className={`text-xl font-bold ${
                     result.rolledBack
-                      ? 'text-slate-400'
+                      ? 'text-content-muted'
                       : result.failed === 0
-                      ? 'text-green-400'
-                      : 'text-cyan-400'
+                      ? 'text-status-success'
+                      : 'text-accent'
                   }`}>
                     {result.rolledBack ? 'Import annulé' : 'Import terminé'}
                   </span>
                 </div>
 
                 <div className="grid grid-cols-3 gap-4">
-                  <div className="bg-slate-700 rounded-lg p-4">
-                    <div className="text-2xl font-bold text-white">{result.total}</div>
-                    <div className="text-sm text-slate-400">Total lignes</div>
+                  <div className="bg-surface-elevated rounded-lg p-4">
+                    <div className="text-2xl font-bold text-content-primary">{result.total}</div>
+                    <div className="text-sm text-content-muted">Total lignes</div>
                   </div>
-                  <div className={`rounded-lg p-4 ${result.rolledBack ? 'bg-slate-600/50' : 'bg-green-500/20'}`}>
-                    <div className={`text-2xl font-bold ${result.rolledBack ? 'text-slate-400 line-through' : 'text-green-400'}`}>
+                  <div className={`rounded-lg p-4 ${result.rolledBack ? 'bg-surface-subtle/50' : 'bg-status-success-bg'}`}>
+                    <div className={`text-2xl font-bold ${result.rolledBack ? 'text-content-muted line-through' : 'text-status-success'}`}>
                       {result.success}
                     </div>
-                    <div className="text-sm text-slate-400">Créés</div>
+                    <div className="text-sm text-content-muted">Créés</div>
                   </div>
-                  <div className="bg-red-500/20 rounded-lg p-4">
-                    <div className="text-2xl font-bold text-red-400">{result.failed}</div>
-                    <div className="text-sm text-slate-400">Échoués</div>
+                  <div className="bg-status-danger-bg rounded-lg p-4">
+                    <div className="text-2xl font-bold text-status-danger">{result.failed}</div>
+                    <div className="text-sm text-content-muted">Échoués</div>
                   </div>
                 </div>
 
                 {/* Batch ID for tracking */}
                 {batchId && !result.rolledBack && (
-                  <div className="mt-4 p-3 bg-slate-700/50 rounded-lg flex items-center justify-between">
+                  <div className="mt-4 p-3 bg-surface-elevated/50 rounded-lg flex items-center justify-between">
                     <div>
-                      <div className="text-xs text-slate-400">ID du lot d'import</div>
-                      <div className="text-sm text-white font-mono">{batchId.slice(0, 8)}...</div>
+                      <div className="text-xs text-content-muted">ID du lot d'import</div>
+                      <div className="text-sm text-content-primary font-mono">{batchId.slice(0, 8)}...</div>
                     </div>
                     <button
                       onClick={copyBatchId}
-                      className="p-2 text-slate-400 hover:text-white transition"
+                      className="p-2 text-content-muted hover:text-content-primary transition"
                       title="Copier l'ID"
                     >
                       <Copy size={16} />
@@ -637,8 +637,8 @@ export default function AdminImportCSV({ onClose, onSuccess }: AdminImportCSVPro
                 )}
 
                 {result.rolledBack && (
-                  <div className="mt-4 p-3 bg-slate-600/30 rounded-lg text-center">
-                    <div className="text-slate-400">
+                  <div className="mt-4 p-3 bg-surface-subtle/30 rounded-lg text-center">
+                    <div className="text-content-muted">
                       {result.rollbackCount} enregistrement(s) supprimé(s)
                     </div>
                   </div>
@@ -646,14 +646,14 @@ export default function AdminImportCSV({ onClose, onSuccess }: AdminImportCSVPro
               </div>
 
               {result.errors && result.errors.length > 0 && (
-                <div className="bg-red-500/20 border border-red-500 rounded-lg p-4">
-                  <div className="font-semibold text-red-400 mb-3">
+                <div className="bg-status-danger-bg border border-status-danger rounded-lg p-4">
+                  <div className="font-semibold text-status-danger mb-3">
                     Erreurs ({result.errors.length}{result.errors.length >= 20 ? '+' : ''}) :
                   </div>
                   <div className="space-y-2 text-sm max-h-[200px] overflow-y-auto">
                     {result.errors.map((err: any, index: number) => (
-                      <div key={index} className="flex items-start gap-2 text-red-300">
-                        <span className="font-mono text-xs bg-red-500/30 px-1 rounded">L{err.line}</span>
+                      <div key={index} className="flex items-start gap-2 text-status-danger">
+                        <span className="font-mono text-xs bg-status-danger/30 px-1 rounded">L{err.line}</span>
                         <span className="truncate">{err.email} - {err.error}</span>
                       </div>
                     ))}
@@ -667,7 +667,7 @@ export default function AdminImportCSV({ onClose, onSuccess }: AdminImportCSVPro
                   <button
                     onClick={handleRollback}
                     disabled={rollingBack}
-                    className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold transition disabled:opacity-50 flex items-center justify-center gap-2"
+                    className="px-6 py-3 bg-status-danger hover:bg-status-danger text-white rounded-xl font-bold transition disabled:opacity-50 flex items-center justify-center gap-2"
                   >
                     {rollingBack ? (
                       <Loader2 size={20} className="animate-spin" />
@@ -683,7 +683,7 @@ export default function AdminImportCSV({ onClose, onSuccess }: AdminImportCSVPro
                     onSuccess();
                     onClose();
                   }}
-                  className="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold transition"
+                  className="flex-1 px-6 py-3 bg-status-success hover:bg-status-success text-white rounded-xl font-bold transition"
                 >
                   Terminé
                 </button>

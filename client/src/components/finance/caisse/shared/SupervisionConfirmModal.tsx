@@ -91,36 +91,36 @@ export default function SupervisionConfirmModal({
         size="md"
       >
         <div className="space-y-4">
-          <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+          <div className="p-4 bg-status-warning-bg border border-status-warning/20 rounded-xl">
             <div className="flex items-start gap-3">
-              <AlertTriangle className="text-amber-500 shrink-0 mt-0.5" size={20} />
+              <AlertTriangle className="text-status-warning shrink-0 mt-0.5" size={20} />
               <div>
-                <p className="font-semibold text-amber-400">Vous supervisez déjà une caisse</p>
-                <p className="text-sm text-amber-300/80 mt-1">
+                <p className="font-semibold text-status-warning">Vous supervisez déjà une caisse</p>
+                <p className="text-sm text-status-warning/80 mt-1">
                   Vous ne pouvez superviser qu'une seule caisse à la fois. Veuillez d'abord quitter la supervision en cours.
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="p-4 bg-slate-800/50 rounded-xl space-y-3">
+          <div className="p-4 bg-surface/50 rounded-xl space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-400">Caisse supervisée</span>
-              <span className="font-medium text-white">{existingSupervision.targetCaisseName}</span>
+              <span className="text-sm text-content-muted">Caisse supervisée</span>
+              <span className="font-medium text-content-primary">{existingSupervision.targetCaisseName}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-400">Caissier</span>
-              <span className="font-medium text-white">{existingSupervision.targetCaissierName}</span>
+              <span className="text-sm text-content-muted">Caissier</span>
+              <span className="font-medium text-content-primary">{existingSupervision.targetCaissierName}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-400">Depuis</span>
-              <span className="font-medium text-emerald-400">
+              <span className="text-sm text-content-muted">Depuis</span>
+              <span className="font-medium text-status-success">
                 {new Date(existingSupervision.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-400">Motif</span>
-              <span className="font-medium text-cyan-400">{existingSupervision.reason}</span>
+              <span className="text-sm text-content-muted">Motif</span>
+              <span className="font-medium text-accent">{existingSupervision.reason}</span>
             </div>
           </div>
 
@@ -144,38 +144,38 @@ export default function SupervisionConfirmModal({
     >
       <div className="space-y-5 -mx-2 sm:mx-0">
         {/* Target Session Info */}
-        <div className="p-4 bg-gradient-to-r from-slate-800/60 to-slate-800/30 rounded-xl border border-slate-700/50">
+        <div className="p-4 bg-gradient-to-r from-surface/60 to-surface/30 rounded-xl border border-edge-subtle">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-full bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center text-cyan-400 font-bold text-lg shrink-0">
+            <div className="w-12 h-12 rounded-full bg-accent/10 border border-accent/30 flex items-center justify-center text-accent font-bold text-lg shrink-0">
               {session.caissierNom?.[0] || 'C'}
             </div>
             <div className="flex-1 min-w-0">
-              <h4 className="font-semibold text-white text-base">
+              <h4 className="font-semibold text-content-primary text-base">
                 {session.caissierNom || 'Caissier inconnu'}
               </h4>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-sm">
-                <span className="text-slate-400 flex items-center gap-1">
+                <span className="text-content-muted flex items-center gap-1">
                   <Wallet size={12} />
                   {session.caisseNom || 'Caisse'}
                 </span>
                 {session.agenceNom && (
-                  <span className="text-slate-500">• {session.agenceNom}</span>
+                  <span className="text-content-muted">• {session.agenceNom}</span>
                 )}
               </div>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3 mt-4">
-            <div className="p-3 rounded-lg bg-slate-900/50 border border-slate-700/30">
-              <div className="text-[10px] text-slate-500 uppercase font-semibold mb-1">Solde actuel</div>
-              <div className="text-lg font-bold text-emerald-400 font-mono">
-                {formatMoney(Number(session.soldeTheorique))} <span className="text-xs text-slate-500">F</span>
+            <div className="p-3 rounded-lg bg-surface-base/50 border border-edge-subtle">
+              <div className="text-[10px] text-content-muted uppercase font-semibold mb-1">Solde actuel</div>
+              <div className="text-lg font-bold text-status-success font-mono">
+                {formatMoney(Number(session.soldeTheorique))} <span className="text-xs text-content-muted">F</span>
               </div>
             </div>
-            <div className="p-3 rounded-lg bg-slate-900/50 border border-slate-700/30">
-              <div className="text-[10px] text-slate-500 uppercase font-semibold mb-1">Session ouverte</div>
-              <div className="text-base font-medium text-white flex items-center gap-1.5">
-                <Clock size={14} className="text-cyan-400" />
+            <div className="p-3 rounded-lg bg-surface-base/50 border border-edge-subtle">
+              <div className="text-[10px] text-content-muted uppercase font-semibold mb-1">Session ouverte</div>
+              <div className="text-base font-medium text-content-primary flex items-center gap-1.5">
+                <Clock size={14} className="text-accent" />
                 {formatTimeAgo(session.openedAt || '')}
               </div>
             </div>
@@ -184,8 +184,8 @@ export default function SupervisionConfirmModal({
 
         {/* Reason Selection */}
         <div className="space-y-3">
-          <label className="block text-sm font-semibold text-slate-300">
-            Motif de la supervision <span className="text-red-400">*</span>
+          <label className="block text-sm font-semibold text-content-secondary">
+            Motif de la supervision <span className="text-status-danger">*</span>
           </label>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {SUPERVISION_REASONS.map((reason) => (
@@ -196,21 +196,21 @@ export default function SupervisionConfirmModal({
                 className={`
                   p-3 rounded-xl border text-left transition-all
                   ${selectedReason === reason.id
-                    ? 'border-cyan-500 bg-cyan-500/10 ring-1 ring-cyan-500/50'
-                    : 'border-slate-700/50 bg-slate-800/30 hover:border-slate-600 hover:bg-slate-800/50'
+                    ? 'border-accent bg-accent/10 ring-1 ring-accent/50'
+                    : 'border-edge-subtle bg-surface/30 hover:border-edge-strong hover:bg-surface/50'
                   }
                 `}
               >
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-base">{reason.icon}</span>
-                  <span className={`text-sm font-medium ${selectedReason === reason.id ? 'text-cyan-400' : 'text-white'}`}>
+                  <span className={`text-sm font-medium ${selectedReason === reason.id ? 'text-accent' : 'text-content-primary'}`}>
                     {reason.label}
                   </span>
                   {selectedReason === reason.id && (
-                    <CheckCircle2 size={14} className="text-cyan-400 ml-auto" />
+                    <CheckCircle2 size={14} className="text-accent ml-auto" />
                   )}
                 </div>
-                <p className="text-[11px] text-slate-500 pl-6">{reason.description}</p>
+                <p className="text-[11px] text-content-muted pl-6">{reason.description}</p>
               </button>
             ))}
           </div>
@@ -219,15 +219,15 @@ export default function SupervisionConfirmModal({
         {/* Detail field for "Other" reason */}
         {selectedReason === 'other' && (
           <div className="space-y-2 animate-in slide-in-from-top-2 duration-200">
-            <label className="block text-sm font-semibold text-slate-300">
-              Précisez le motif <span className="text-red-400">*</span>
+            <label className="block text-sm font-semibold text-content-secondary">
+              Précisez le motif <span className="text-status-danger">*</span>
             </label>
             <textarea
               value={reasonDetail}
               onChange={(e) => setReasonDetail(e.target.value)}
               placeholder="Décrivez la raison de cette supervision..."
-              className="w-full px-3 py-2.5 bg-slate-800/60 border border-slate-700/50 rounded-xl text-white text-sm
-                       placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50
+              className="w-full px-3 py-2.5 bg-surface/60 border border-edge-subtle rounded-xl text-content-primary text-sm
+                       placeholder-content-muted focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/50
                        resize-none transition-all"
               rows={3}
             />
@@ -235,12 +235,12 @@ export default function SupervisionConfirmModal({
         )}
 
         {/* Warning Notice */}
-        <div className="p-3 bg-amber-500/5 border border-amber-500/20 rounded-xl">
+        <div className="p-3 bg-status-warning/5 border border-status-warning/20 rounded-xl">
           <div className="flex items-start gap-2">
-            <Shield size={16} className="text-amber-500 shrink-0 mt-0.5" />
+            <Shield size={16} className="text-status-warning shrink-0 mt-0.5" />
             <div>
-              <p className="text-xs text-amber-400 font-medium">Traçabilité des actions</p>
-              <p className="text-[11px] text-amber-300/70 mt-0.5">
+              <p className="text-xs text-status-warning font-medium">Traçabilité des actions</p>
+              <p className="text-[11px] text-status-warning/70 mt-0.5">
                 Cette supervision sera enregistrée dans l'historique avec votre identité, le motif sélectionné,
                 et l'horodatage. Toutes les opérations effectuées pendant la supervision seront tracées.
               </p>
@@ -249,13 +249,13 @@ export default function SupervisionConfirmModal({
         </div>
 
         {/* Duration Info */}
-        <div className="flex items-center gap-2 text-xs text-slate-500">
+        <div className="flex items-center gap-2 text-xs text-content-muted">
           <Clock size={12} />
           <span>Durée par défaut : 30 minutes (prolongeable si nécessaire)</span>
         </div>
 
         {/* Actions */}
-        <div className="flex justify-end gap-3 pt-2 border-t border-slate-800/50">
+        <div className="flex justify-end gap-3 pt-2 border-t border-edge/50">
           <Button variant="ghost" onClick={handleClose} disabled={isLoading}>
             Annuler
           </Button>

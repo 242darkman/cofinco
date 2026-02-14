@@ -54,7 +54,7 @@ const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
     // Variant classes - Theme-aware
     const variantClasses = {
       primary: `
-        bg-accent text-content-inverted
+        bg-accent text-white
         hover:bg-accent-primary-hover
         shadow-md hover:shadow-lg
         focus:ring-accent

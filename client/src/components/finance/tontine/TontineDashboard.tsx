@@ -128,7 +128,7 @@ export default function TontineDashboard({
     return (
       <div className="animate-pulse space-y-4">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {[1, 2, 3, 4].map(i => <div key={i} className="h-20 bg-slate-800/50 rounded-lg" />)}
+          {[1, 2, 3, 4].map(i => <div key={i} className="h-20 bg-surface/50 rounded-lg" />)}
         </div>
       </div>
     );
@@ -138,49 +138,49 @@ export default function TontineDashboard({
     <div className="space-y-4">
       {/* Stats principales */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Card className="bg-gradient-to-br from-green-500/10 to-green-600/5 border-green-500/20 p-3">
+        <Card className="bg-gradient-to-br from-status-success/10 to-status-success/5 border-status-success/20 p-3">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-green-400 text-xs font-semibold">Pot Collecté</span>
-            <TrendingUp className="text-green-400" size={16} />
+            <span className="text-status-success text-xs font-semibold">Pot Collecté</span>
+            <TrendingUp className="text-status-success" size={16} />
           </div>
-          <div className="text-xl font-bold text-white truncate">
+          <div className="text-xl font-bold text-content-primary truncate">
             {potCollecte.toLocaleString()}
-            <span className="text-xs font-normal text-slate-400 ml-1">FCFA</span>
+            <span className="text-xs font-normal text-content-muted ml-1">FCFA</span>
           </div>
         </Card>
 
-        <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 border-emerald-500/20 p-3">
+        <Card className="bg-gradient-to-br from-status-success/10 to-status-success/5 border-status-success/20 p-3">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-emerald-400 text-xs font-semibold">Distribué</span>
-            <DollarSign className="text-emerald-400" size={16} />
+            <span className="text-status-success text-xs font-semibold">Distribué</span>
+            <DollarSign className="text-status-success" size={16} />
           </div>
-          <div className="text-xl font-bold text-white truncate">
+          <div className="text-xl font-bold text-content-primary truncate">
             {potDistribue.toLocaleString()}
-            <span className="text-xs font-normal text-slate-400 ml-1">FCFA</span>
+            <span className="text-xs font-normal text-content-muted ml-1">FCFA</span>
           </div>
-          <div className="text-[10px] text-emerald-400/80 mt-1">
+          <div className="text-[10px] text-status-success/80 mt-1">
             Solde: {soldeNet.toLocaleString()} FCFA
           </div>
         </Card>
 
-        <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border-blue-500/20 p-3">
+        <Card className="bg-gradient-to-br from-status-info/10 to-status-info/5 border-status-info/20 p-3">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-blue-400 text-xs font-semibold">Membres</span>
-            <Users className="text-blue-400" size={16} />
+            <span className="text-status-info text-xs font-semibold">Membres</span>
+            <Users className="text-status-info" size={16} />
           </div>
-          <div className="text-xl font-bold text-white">
-            {membresActifs}<span className="text-slate-500 text-sm">/{totalMembres}</span>
+          <div className="text-xl font-bold text-content-primary">
+            {membresActifs}<span className="text-content-muted text-sm">/{totalMembres}</span>
           </div>
         </Card>
 
-        <Card className="bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-500/20 p-3">
+        <Card className="bg-gradient-to-br from-status-info/10 to-status-info/5 border-status-info/20 p-3">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-purple-400 text-xs font-semibold">Cycle</span>
-            <Calendar className="text-purple-400" size={16} />
+            <span className="text-status-info text-xs font-semibold">Cycle</span>
+            <Calendar className="text-status-info" size={16} />
           </div>
           {currentCycle ? (
             <div className="flex items-center gap-2">
-              <span className="text-xl font-bold text-white">#{currentCycle.cycleNumber}</span>
+              <span className="text-xl font-bold text-content-primary">#{currentCycle.cycleNumber}</span>
               <Badge variant="success" className="text-[10px]" value="Actif" />
             </div>
           ) : (
@@ -203,28 +203,28 @@ export default function TontineDashboard({
         <div className="grid md:grid-cols-2 gap-3">
           {/* Prochain tour */}
           {nextTurn && (
-            <Card className="p-3 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border-cyan-500/30">
+            <Card className="p-3 bg-gradient-to-r from-accent/10 to-accent-secondary/10 border-accent/30">
               <div className="flex items-start justify-between">
                 <div>
-                  <div className="text-cyan-400 text-xs font-semibold uppercase tracking-wider mb-1">
+                  <div className="text-accent text-xs font-semibold uppercase tracking-wider mb-1">
                     Prochain Bénéficiaire
                   </div>
-                  <div className="text-white font-bold flex items-center gap-2">
-                    <Gift size={16} className="text-emerald-400" />
+                  <div className="text-content-primary font-bold flex items-center gap-2">
+                    <Gift size={16} className="text-status-success" />
                     Tour #{nextTurn.turnNumber}
                   </div>
-                  <div className="text-slate-400 text-xs mt-0.5">
+                  <div className="text-content-muted text-xs mt-0.5">
                     {nextTurn.dueDate ? new Date(nextTurn.dueDate).toLocaleDateString('fr-FR', {
                       day: 'numeric', month: 'short'
                     }) : '-'}
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-white font-bold">
+                  <div className="text-content-primary font-bold">
                     {Number(nextTurn.amountExpected || 0).toLocaleString()} FCFA
                   </div>
                   {(nextTurn.isLocked) && (
-                    <div className="flex items-center gap-1 text-amber-400 text-[10px] mt-1 justify-end">
+                    <div className="flex items-center gap-1 text-status-warning text-[10px] mt-1 justify-end">
                       <Lock size={10} />
                       <span>Verrouillé</span>
                     </div>
@@ -237,8 +237,8 @@ export default function TontineDashboard({
           {/* Progression */}
           <Card className="p-3">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider">Progression</span>
-              <span className="text-white text-sm font-medium">{completedTurns}/{totalTurns}</span>
+              <span className="text-content-muted text-xs font-semibold uppercase tracking-wider">Progression</span>
+              <span className="text-content-primary text-sm font-medium">{completedTurns}/{totalTurns}</span>
             </div>
             <ProgressBar
               value={progressPercent}
@@ -246,7 +246,7 @@ export default function TontineDashboard({
               size="md"
               animate
             />
-            <div className="flex justify-between mt-2 text-[10px] text-slate-500">
+            <div className="flex justify-between mt-2 text-[10px] text-content-muted">
               <span>{Math.round(progressPercent)}% complété</span>
               <span>{totalTurns - completedTurns} restants</span>
             </div>
@@ -257,9 +257,9 @@ export default function TontineDashboard({
       {/* Liste des tours (compact) */}
       {turns.length > 0 && (
         <Card className="overflow-hidden">
-          <div className="p-3 border-b border-slate-700/50 flex items-center justify-between">
-            <h3 className="text-white font-semibold text-sm flex items-center gap-2">
-              <Calendar size={14} className="text-cyan-400" />
+          <div className="p-3 border-b border-edge-subtle flex items-center justify-between">
+            <h3 className="text-content-primary font-semibold text-sm flex items-center gap-2">
+              <Calendar size={14} className="text-accent" />
               Calendrier des Tours
             </h3>
             {turns.length > 5 && (
@@ -273,7 +273,7 @@ export default function TontineDashboard({
               </Button>
             )}
           </div>
-          <div className="divide-y divide-slate-700/30 max-h-[250px] overflow-y-auto">
+          <div className="divide-y divide-edge/30 max-h-[250px] overflow-y-auto">
             {visibleTurns.map((turn: any, idx: number) => {
               const status = turn.status || 'SCHEDULED';
               const statusCfg = turnStatusConfig[status] || turnStatusConfig.SCHEDULED;
@@ -287,32 +287,32 @@ export default function TontineDashboard({
                 <div
                   key={turn.id || idx}
                   className={cn(
-                    'flex items-center justify-between px-3 py-2 hover:bg-slate-800/30 transition',
-                    isNext && 'bg-cyan-500/5 border-l-2 border-cyan-500'
+                    'flex items-center justify-between px-3 py-2 hover:bg-surface/30 transition',
+                    isNext && 'bg-accent/5 border-l-2 border-accent'
                   )}
                 >
                   <div className="flex items-center gap-2">
                     <div className={cn(
                       'w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold',
-                      status === 'PAID_OUT' ? 'bg-green-500/20 text-green-400' :
-                      status === 'READY' ? 'bg-amber-500/20 text-amber-400' :
-                      'bg-slate-700/50 text-slate-400'
+                      status === 'PAID_OUT' ? 'bg-status-success-bg text-status-success' :
+                      status === 'READY' ? 'bg-status-warning-bg text-status-warning' :
+                      'bg-surface-elevated/50 text-content-muted'
                     )}>
                       {turnNum}
                     </div>
                     <div>
-                      <div className="text-white text-xs font-medium">
+                      <div className="text-content-primary text-xs font-medium">
                         {turn.beneficiaryMemberName || `Tour ${turnNum}`}
                       </div>
-                      <div className="text-slate-500 text-[10px]">
+                      <div className="text-content-muted text-[10px]">
                         {dueDate ? new Date(dueDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : '-'}
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {isLocked && <Lock size={10} className="text-slate-500" />}
+                    {isLocked && <Lock size={10} className="text-content-muted" />}
                     <Badge variant={statusCfg.variant} className="text-[9px] px-1.5" value={statusCfg.label} />
-                    <span className="text-slate-400 text-[10px] font-medium min-w-[60px] text-right">
+                    <span className="text-content-muted text-[10px] font-medium min-w-[60px] text-right">
                       {amountExpected.toLocaleString()}
                     </span>
                   </div>
@@ -325,33 +325,33 @@ export default function TontineDashboard({
 
       {/* Activité récente (compact) */}
       <Card>
-        <div className="p-3 border-b border-slate-700/50">
-          <h3 className="text-white font-semibold text-sm flex items-center gap-2">
-            <Activity size={14} className="text-cyan-400" />
+        <div className="p-3 border-b border-edge-subtle">
+          <h3 className="text-content-primary font-semibold text-sm flex items-center gap-2">
+            <Activity size={14} className="text-accent" />
             Activité Récente
           </h3>
         </div>
-        <div className="divide-y divide-slate-700/30 max-h-[200px] overflow-y-auto">
+        <div className="divide-y divide-edge/30 max-h-[200px] overflow-y-auto">
           {recentActivity.length === 0 ? (
-            <div className="text-center py-6 text-slate-500 text-xs">Aucune activité</div>
+            <div className="text-center py-6 text-content-muted text-xs">Aucune activité</div>
           ) : (
             recentActivity.map((activity, index) => (
-              <div key={index} className="flex items-center justify-between px-3 py-2 hover:bg-slate-800/30 transition">
+              <div key={index} className="flex items-center justify-between px-3 py-2 hover:bg-surface/30 transition">
                 <div className="flex items-center gap-2">
                   <div className={`p-1 rounded ${
-                    activity.type === 'contribution' ? 'bg-green-500/10 text-green-400' : 'bg-emerald-500/10 text-emerald-400'
+                    activity.type === 'contribution' ? 'bg-status-success-bg text-status-success' : 'bg-status-success-bg text-status-success'
                   }`}>
                     {activity.type === 'contribution' ? <TrendingUp size={12} /> : <ArrowRight size={12} />}
                   </div>
-                  <span className="text-white text-xs truncate max-w-[120px]">{activity.nom}</span>
+                  <span className="text-content-primary text-xs truncate max-w-[120px]">{activity.nom}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className={`text-xs font-bold ${
-                    activity.type === 'contribution' ? 'text-green-400' : 'text-emerald-400'
+                    activity.type === 'contribution' ? 'text-status-success' : 'text-status-success'
                   }`}>
                     {activity.montant.toLocaleString()}
                   </span>
-                  <span className="text-slate-500 text-[10px]">
+                  <span className="text-content-muted text-[10px]">
                     {new Date(activity.date).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
                   </span>
                 </div>
@@ -364,9 +364,9 @@ export default function TontineDashboard({
       {/* Action: générer cycle si pas de cycle */}
       {!currentCycle && !loading && (
         <Card className="p-4 text-center">
-          <Calendar className="mx-auto text-slate-500 mb-3" size={32} />
-          <h3 className="text-white font-semibold mb-1">Aucun cycle actif</h3>
-          <p className="text-slate-400 text-xs mb-3">
+          <Calendar className="mx-auto text-content-muted mb-3" size={32} />
+          <h3 className="text-content-primary font-semibold mb-1">Aucun cycle actif</h3>
+          <p className="text-content-muted text-xs mb-3">
             Générez un cycle pour planifier les tours de distribution
           </p>
           <Button

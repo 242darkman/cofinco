@@ -299,9 +299,9 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
     }
 
     // Determine Color & Verbal Dictum
-    let color = 'text-red-500';
-    if (score >= 70) color = 'text-emerald-500';
-    else if (score >= 40) color = 'text-amber-500';
+    let color = 'text-status-danger';
+    if (score >= 70) color = 'text-status-success';
+    else if (score >= 40) color = 'text-status-warning';
 
     return {
         solvencyScore: score,
@@ -521,9 +521,9 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
   }, [demande.id, demande.montantFraisEngagement, demande.motifRejet, refundAmount, onSuccess]);
 
   const getEndettementColor = useCallback((taux: number) => {
-    if (taux > 50) return 'text-red-400';
-    if (taux > 40) return 'text-amber-400';
-    return 'text-emerald-400';
+    if (taux > 50) return 'text-status-danger';
+    if (taux > 40) return 'text-status-warning';
+    return 'text-status-success';
   }, []);
 
   return (
@@ -532,23 +532,23 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
       role="dialog"
       aria-modal="true"
     >
-      <div className="bg-slate-900 rounded-xl border border-slate-700 w-full max-w-5xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+      <div className="bg-surface-base rounded-xl border border-edge w-full max-w-5xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
                         {/* === HEADER COMPACT === */}
         {/* === HEADER COMPACT === */}
-        <div className="bg-slate-800/80 border-b border-slate-700 p-4 flex justify-between items-center shrink-0">
+        <div className="bg-surface/80 border-b border-edge p-4 flex justify-between items-center shrink-0">
             <div className="flex items-center gap-3">
                 <div className="flex flex-col">
-                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                    <h2 className="text-xl font-bold text-content-primary flex items-center gap-2">
                         Analyse Crédit
                         <Badge value={demande.statut} size="sm" />
                     </h2>
-                    <span className="text-slate-400 text-xs font-mono">{demande.numeroDemande}</span>
+                    <span className="text-content-muted text-xs font-mono">{demande.numeroDemande}</span>
                 </div>
                 {/* Status Fees - Compact Pill */}
                 <div className={`hidden sm:flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold border ${
                     demande.fraisEngagementPayes
-                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                    : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                    ? 'bg-status-success-bg border-status-success/30 text-status-success'
+                    : 'bg-status-warning-bg border-status-warning/30 text-status-warning'
                 }`}>
                     {demande.fraisEngagementPayes ? (
                         <><CheckCircle size={12} /> Frais Payés: {formatMoney(demande.montantFraisEngagement || 0)}</>
@@ -560,8 +560,8 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                 {existingRefund && (
                     <div className={`hidden sm:flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold border ${
                         existingRefund.statut === 'PAID'
-                            ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400'
-                            : 'bg-purple-500/10 border-purple-500/30 text-purple-400'
+                            ? 'bg-accent/10 border-accent/30 text-accent'
+                            : 'bg-status-info-bg border-status-info/30 text-status-info'
                     }`}>
                         {existingRefund.statut === 'PAID' ? (
                             <><Wallet size={12} /> Remboursé: {formatMoney(existingRefund.montantRemboursable)}</>
@@ -580,7 +580,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                  />
                 <button
                 onClick={onClose}
-                className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-700 transition"
+                className="text-content-muted hover:text-content-primary p-2 rounded-lg hover:bg-surface-elevated transition"
                 disabled={loading}
                 >
                 <X size={20} />
@@ -593,38 +593,38 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
             
             {/* 1. TOP STATS ROW (KPIs) */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="bg-slate-800 rounded-lg p-3 border border-slate-700 hover:border-blue-500/50 transition-colors">
-                    <div className="flex items-center gap-2 text-slate-400 text-xs mb-1">
-                        <DollarSign size={14} className="text-blue-400" /> Montant Demandé
+                <div className="bg-surface rounded-lg p-3 border border-edge hover:border-status-info/50 transition-colors">
+                    <div className="flex items-center gap-2 text-content-muted text-xs mb-1">
+                        <DollarSign size={14} className="text-status-info" /> Montant Demandé
                     </div>
-                    <div className="text-lg md:text-xl font-bold text-white">{formatMoney(demande.montantDemande)}</div>
+                    <div className="text-lg md:text-xl font-bold text-content-primary">{formatMoney(demande.montantDemande)}</div>
                 </div>
-                <div className="bg-slate-800 rounded-lg p-3 border border-slate-700 hover:border-purple-500/50 transition-colors">
-                    <div className="flex items-center gap-2 text-slate-400 text-xs mb-1">
-                        <Wallet size={14} className="text-purple-400" />
+                <div className="bg-surface rounded-lg p-3 border border-edge hover:border-status-info/50 transition-colors">
+                    <div className="flex items-center gap-2 text-content-muted text-xs mb-1">
+                        <Wallet size={14} className="text-status-info" />
                         {['Journalier', 'DAILY'].includes(demande.frequenceRemboursement) ? 'Échéance Journalière' :
                          ['Hebdomadaire', 'WEEKLY'].includes(demande.frequenceRemboursement) ? 'Échéance Hebdo' :
                          ['Bimensuel', 'BIMONTHLY'].includes(demande.frequenceRemboursement) ? 'Échéance Bimensuelle' :
                          ['Trimestriel', 'QUARTERLY'].includes(demande.frequenceRemboursement) ? 'Échéance Trimestrielle' :
                          'Mensualité Est'}
                     </div>
-                    <div className="text-lg md:text-xl font-bold text-white">{formatMoney(mensualite)}</div>
+                    <div className="text-lg md:text-xl font-bold text-content-primary">{formatMoney(mensualite)}</div>
                 </div>
-                <div className="bg-slate-800 rounded-lg p-3 border border-slate-700 hover:border-emerald-500/50 transition-colors">
-                    <div className="flex items-center gap-2 text-slate-400 text-xs mb-1">
-                        <PiggyBank size={14} className="text-emerald-400" /> Revenus Net
+                <div className="bg-surface rounded-lg p-3 border border-edge hover:border-status-success/50 transition-colors">
+                    <div className="flex items-center gap-2 text-content-muted text-xs mb-1">
+                        <PiggyBank size={14} className="text-status-success" /> Revenus Net
                     </div>
-                    <div className="text-lg md:text-xl font-bold text-white">{formatMoney(demande.revenusMensuels ?? 0)}</div>
-                    <div className="text-[10px] text-slate-500">Charges: {formatMoney(Number(demande.chargesMensuelles) || 0)}</div>
+                    <div className="text-lg md:text-xl font-bold text-content-primary">{formatMoney(demande.revenusMensuels ?? 0)}</div>
+                    <div className="text-[10px] text-content-muted">Charges: {formatMoney(Number(demande.chargesMensuelles) || 0)}</div>
                 </div>
-                <div className="bg-slate-800 rounded-lg p-3 border border-slate-700 hover:border-amber-500/50 transition-colors">
-                    <div className="flex items-center gap-2 text-slate-400 text-xs mb-1">
-                        <Percent size={14} className="text-amber-400" /> Endettement
+                <div className="bg-surface rounded-lg p-3 border border-edge hover:border-status-warning/50 transition-colors">
+                    <div className="flex items-center gap-2 text-content-muted text-xs mb-1">
+                        <Percent size={14} className="text-status-warning" /> Endettement
                     </div>
                     <div className={`text-lg md:text-xl font-bold ${getEndettementColor(tauxEndettement)}`}>
                         {tauxEndettement.toFixed(1)}%
                     </div>
-                    {tauxEndettement > 40 && <div className="text-[10px] text-amber-500 font-medium">Attention</div>}
+                    {tauxEndettement > 40 && <div className="text-[10px] text-status-warning font-medium">Attention</div>}
                 </div>
             </div>
 
@@ -632,9 +632,9 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
             <div className="grid md:grid-cols-3 gap-5">
                 {/* LEFT: Client Profile */}
                 <div className="md:col-span-1 space-y-3">
-                    <div className="bg-slate-800 rounded-xl overflow-hidden border border-slate-700">
-                        <div className="h-20 bg-gradient-to-r from-blue-900 to-slate-900 relative">
-                             <div className="absolute -bottom-8 left-4 w-16 h-16 rounded-full bg-slate-800 border-4 border-slate-800 flex items-center justify-center overflow-hidden">
+                    <div className="bg-surface rounded-xl overflow-hidden border border-edge">
+                        <div className="h-20 bg-gradient-to-r from-status-info to-surface-base relative">
+                             <div className="absolute -bottom-8 left-4 w-16 h-16 rounded-full bg-surface border-4 border-edge flex items-center justify-center overflow-hidden">
                                 {clientAvatarUrl ? (
                                     <img
                                       src={clientAvatarUrl}
@@ -647,63 +647,63 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                                       }}
                                     />
                                 ) : (
-                                    <User size={30} className="text-slate-500" />
+                                    <User size={30} className="text-content-muted" />
                                 )}
                              </div>
                         </div>
                         <div className="pt-10 px-4 pb-4">
-                            <h3 className="font-bold text-white text-lg leading-tight">{safeClientName}</h3>
-                            <div className="flex items-center gap-2 text-xs text-slate-400 mt-1">
+                            <h3 className="font-bold text-content-primary text-lg leading-tight">{safeClientName}</h3>
+                            <div className="flex items-center gap-2 text-xs text-content-muted mt-1">
                                 <Mail size={12} /> {demande.clients.email || 'Pas d\'email'}
                             </div>
-                            <div className="flex items-center gap-2 text-xs text-slate-400 mt-1">
+                            <div className="flex items-center gap-2 text-xs text-content-muted mt-1">
                                 <Phone size={12} /> {demande.clients.phone || 'Pas de téléphone'}
                             </div>
                             
-                            <div className="mt-4 pt-4 border-t border-slate-700 grid grid-cols-2 gap-2 text-center">
+                            <div className="mt-4 pt-4 border-t border-edge grid grid-cols-2 gap-2 text-center">
                                 <div>
-                                    <div className="text-[10px] text-slate-500 uppercase tracking-wider">Score Remb.</div>
-                                    <div className="text-emerald-400 font-bold">{demande.clients.tauxRemboursement ?? 0}%</div>
+                                    <div className="text-[10px] text-content-muted uppercase tracking-wider">Score Remb.</div>
+                                    <div className="text-status-success font-bold">{demande.clients.tauxRemboursement ?? 0}%</div>
                                 </div>
                                 <div>
-                                    <div className="text-[10px] text-slate-500 uppercase tracking-wider">En cours</div>
-                                    <div className="text-white font-bold text-xs">{formatMoney(demande.clients.creditTotal ?? 0)}</div>
+                                    <div className="text-[10px] text-content-muted uppercase tracking-wider">En cours</div>
+                                    <div className="text-content-primary font-bold text-xs">{formatMoney(demande.clients.creditTotal ?? 0)}</div>
                                 </div>
                             </div>
                         </div>
                     </div>
                     
                     {/* Objet Credit Card */}
-                    <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
-                         <div className="flex items-center gap-2 mb-2 text-amber-400 font-semibold text-sm">
+                    <div className="bg-surface rounded-xl p-4 border border-edge">
+                         <div className="flex items-center gap-2 mb-2 text-status-warning font-semibold text-sm">
                              <Briefcase size={14} /> Objet du crédit
                          </div>
-                         <p className="text-slate-300 text-sm leading-relaxed italic">
+                         <p className="text-content-secondary text-sm leading-relaxed italic">
                              "{escapeHtml(demande.objetCredit)}"
                          </p>
                     </div>
 
                     {/* Solvency Analysis Card (Dynamic) */}
-                    <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
+                    <div className="bg-surface rounded-xl p-4 border border-edge">
                         <div className="flex items-center justify-between mb-3">
-                             <div className="flex items-center gap-2 text-slate-300 font-semibold text-sm">
+                             <div className="flex items-center gap-2 text-content-secondary font-semibold text-sm">
                                  <TrendingUp size={14} className={solvencyColor} /> Score Solvabilité
                              </div>
                              <span className={`text-xl font-bold ${solvencyColor}`}>{solvencyScore}/100</span>
                         </div>
                         
                         {/* Progress Bar */}
-                        <div className="w-full bg-slate-700/50 rounded-full h-2 mb-3">
+                        <div className="w-full bg-surface-elevated/50 rounded-full h-2 mb-3">
                             <div 
                                 className={`h-2 rounded-full transition-all duration-1000 ${
-                                    solvencyScore >= 70 ? 'bg-emerald-500' : 
-                                    solvencyScore >= 40 ? 'bg-amber-500' : 'bg-red-500'
+                                    solvencyScore >= 70 ? 'bg-status-success' : 
+                                    solvencyScore >= 40 ? 'bg-status-warning' : 'bg-status-danger'
                                 }`} 
                                 style={{ width: `${solvencyScore}%` }}
                             ></div>
                         </div>
 
-                        <p className="text-xs text-slate-400 leading-relaxed">
+                        <p className="text-xs text-content-muted leading-relaxed">
                             {solvencyAnalysis || "Analyse en cours..."}
                         </p>
                     </div>
@@ -712,22 +712,22 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                 {/* RIGHT: Request Details & Verification */}
                 <div className="md:col-span-2 space-y-4">
                      {/* Details Grid */}
-                     <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
-                        <h4 className="text-sm font-semibold text-slate-300 mb-3 uppercase tracking-wide flex items-center gap-2">
+                     <div className="bg-surface/50 rounded-xl p-4 border border-edge">
+                        <h4 className="text-sm font-semibold text-content-secondary mb-3 uppercase tracking-wide flex items-center gap-2">
                              <LayoutDashboard size={14} /> Caractéristiques
                         </h4>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-4 gap-x-2">
                             <div>
-                                <div className="text-xs text-slate-500 mb-1">Date Demande</div>
-                                <div className="text-sm text-white font-medium flex items-center gap-1">
-                                    <Calendar size={12} className="text-slate-600" />
+                                <div className="text-xs text-content-muted mb-1">Date Demande</div>
+                                <div className="text-sm text-content-primary font-medium flex items-center gap-1">
+                                    <Calendar size={12} className="text-content-muted" />
                                     {new Date(demande.createdAt || demande.dateDemande).toLocaleDateString('fr-FR')}
                                 </div>
                             </div>
                             <div>
-                                <div className="text-xs text-slate-500 mb-1">Durée</div>
-                                <div className="text-sm text-white font-medium">
-                                    {demande.dureeValeur} <span className="text-slate-400 lowercase">
+                                <div className="text-xs text-content-muted mb-1">Durée</div>
+                                <div className="text-sm text-content-primary font-medium">
+                                    {demande.dureeValeur} <span className="text-content-muted lowercase">
                                         {['Jour', 'day', 'Day', 'JOUR', 'DAY'].includes(demande.dureeUnite)
                                             ? (demande.dureeValeur === 1 ? 'jour' : 'jours') :
                                          ['Semaine', 'week', 'Week', 'SEMAINE', 'WEEK'].includes(demande.dureeUnite)
@@ -738,9 +738,9 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                                 </div>
                             </div>
                              <div>
-                                <div className="text-xs text-slate-500 mb-1">Nb Échéances</div>
-                                <div className="text-sm text-white font-medium">
-                                    {nombreEcheancesCalc} <span className="text-slate-400 text-xs">
+                                <div className="text-xs text-content-muted mb-1">Nb Échéances</div>
+                                <div className="text-sm text-content-primary font-medium">
+                                    {nombreEcheancesCalc} <span className="text-content-muted text-xs">
                                         ({demande.frequenceRemboursement === 'DAILY' ? 'Journalier' : 
                                           demande.frequenceRemboursement === 'WEEKLY' ? 'Hebdomadaire' : 
                                           demande.frequenceRemboursement === 'MONTHLY' ? 'Mensuel' : 
@@ -749,12 +749,12 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                                 </div>
                             </div>
                             <div>
-                                <div className="text-xs text-slate-500 mb-1">Taux Intérêt</div>
-                                <div className="text-sm text-white font-medium">{demande.tauxInteret}%</div>
+                                <div className="text-xs text-content-muted mb-1">Taux Intérêt</div>
+                                <div className="text-sm text-content-primary font-medium">{demande.tauxInteret}%</div>
                             </div>
                             <div>
-                                <div className="text-xs text-slate-500 mb-1">Type Crédit</div>
-                                <div className="text-sm text-white font-medium truncate">
+                                <div className="text-xs text-content-muted mb-1">Type Crédit</div>
+                                <div className="text-sm text-content-primary font-medium truncate">
                                     {demande.typeCredit === 'PERSONAL' ? 'Personnel' : 
                                      demande.typeCredit === 'BUSINESS' ? 'Business' : 
                                      (demande.typeCredit || 'Standard')}
@@ -765,56 +765,56 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
 
                      {/* Enquêtes Section (Compact) */}
                      {enquetes.length > 0 && (
-                         <div className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
-                             <div className="p-3 bg-slate-800/80 border-b border-slate-700 flex justify-between items-center">
-                                 <h4 className="text-sm font-semibold text-purple-400 flex items-center gap-2">
+                         <div className="bg-surface/50 rounded-xl border border-edge overflow-hidden">
+                             <div className="p-3 bg-surface/80 border-b border-edge flex justify-between items-center">
+                                 <h4 className="text-sm font-semibold text-status-info flex items-center gap-2">
                                      <Shield size={14} /> Vérification Terrain ({enquetes.length})
                                  </h4>
                              </div>
                              
-                             <div className="divide-y divide-slate-700/50">
+                             <div className="divide-y divide-edge/50">
                                  {enquetes.map((enquete, idx) => (
-                                     <div key={enquete.id || idx} className="p-3 hover:bg-slate-700/30 transition-colors">
+                                     <div key={enquete.id || idx} className="p-3 hover:bg-surface-elevated/30 transition-colors">
                                          <div 
                                             className="flex items-center justify-between cursor-pointer"
                                             onClick={() => setExpandedEnquete(expandedEnquete === (enquete.id || idx) ? null : (enquete.id || idx))}
                                          >
                                              <div className="flex items-center gap-3">
                                                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                                                     (enquete.statut || '').toLowerCase().includes('appro') ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-600/20 text-slate-400'
+                                                     (enquete.statut || '').toLowerCase().includes('appro') ? 'bg-status-success-bg text-status-success' : 'bg-surface-subtle/20 text-content-muted'
                                                  }`}>
                                                      <Shield size={14} />
                                                  </div>
                                                  <div>
-                                                     <div className="text-sm text-white font-medium">Enquête #{enquetes.length - idx}</div>
-                                                     <div className="text-[10px] text-slate-400">
+                                                     <div className="text-sm text-content-primary font-medium">Enquête #{enquetes.length - idx}</div>
+                                                     <div className="text-[10px] text-content-muted">
                                                          {new Date(enquete.createdAt).toLocaleDateString()} - Agent {enquete.createdByName || 'Terrain'}
                                                      </div>
                                                  </div>
                                              </div>
-                                             {expandedEnquete === (enquete.id || idx) ? <ChevronUp size={16} className="text-slate-500" /> : <ChevronDown size={16} className="text-slate-500" />}
+                                             {expandedEnquete === (enquete.id || idx) ? <ChevronUp size={16} className="text-content-muted" /> : <ChevronDown size={16} className="text-content-muted" />}
                                          </div>
                                          
                                          {/* Enhanced Expanded View - RESTORED FULL DETAILS */}
                                          {expandedEnquete === (enquete.id || idx) && (
-                                             <div className="mt-3 pl-11 pr-2 pb-1 text-sm space-y-3 animation-fade-in border-t border-slate-700/50 pt-3">
+                                             <div className="mt-3 pl-11 pr-2 pb-1 text-sm space-y-3 animation-fade-in border-t border-edge-subtle pt-3">
                                                  {/* Financial Grid */}
                                                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                                     <div className="bg-slate-900/50 p-2 rounded border border-slate-700/50 text-center">
-                                                         <div className="text-xs text-slate-500">Revenus Estimés</div>
-                                                         <div className="text-emerald-400 font-bold">
+                                                     <div className="bg-surface-base/50 p-2 rounded border border-edge-subtle text-center">
+                                                         <div className="text-xs text-content-muted">Revenus Estimés</div>
+                                                         <div className="text-status-success font-bold">
                                                             {formatMoney(enquete.revenuMensuel || 0)}
                                                          </div>
                                                      </div>
-                                                     <div className="bg-slate-900/50 p-2 rounded border border-slate-700/50 text-center">
-                                                         <div className="text-xs text-slate-500">Charges</div>
-                                                         <div className="text-white font-bold">
+                                                     <div className="bg-surface-base/50 p-2 rounded border border-edge-subtle text-center">
+                                                         <div className="text-xs text-content-muted">Charges</div>
+                                                         <div className="text-content-primary font-bold">
                                                              {formatMoney(enquete.chargesMensuelles || 0)}
                                                          </div>
                                                      </div>
-                                                     <div className="bg-slate-900/50 p-2 rounded border border-slate-700/50 text-center">
-                                                         <div className="text-xs text-slate-500">Capacité Remb.</div>
-                                                         <div className="text-purple-400 font-bold">
+                                                     <div className="bg-surface-base/50 p-2 rounded border border-edge-subtle text-center">
+                                                         <div className="text-xs text-content-muted">Capacité Remb.</div>
+                                                         <div className="text-status-info font-bold">
                                                              {formatMoney(
                                                                  (enquete.capaciteRemboursement) 
                                                                  ?? Math.max(0, (enquete.revenuMensuel || 0) - (enquete.chargesMensuelles || 0))
@@ -827,30 +827,30 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                                                  <div className="grid md:grid-cols-2 gap-4 text-xs">
                                                      <div className="space-y-2">
                                                          <div>
-                                                             <span className="text-slate-500">Activité:</span>{' '}
-                                                             <span className="text-white">{enquete.typeActivite || 'N/A'}</span>
+                                                             <span className="text-content-muted">Activité:</span>{' '}
+                                                             <span className="text-content-primary">{enquete.typeActivite || 'N/A'}</span>
                                                          </div>
                                                          <div>
-                                                             <span className="text-slate-500">Catégorie:</span>{' '}
-                                                             <span className="text-amber-400">{enquete.categorieActivite || 'N/A'}</span>
+                                                             <span className="text-content-muted">Catégorie:</span>{' '}
+                                                             <span className="text-status-warning">{enquete.categorieActivite || 'N/A'}</span>
                                                          </div>
                                                           <div>
-                                                             <span className="text-slate-500">Ancienneté:</span>{' '}
-                                                             <span className="text-white">{enquete.ancienneteActivite} mois</span>
+                                                             <span className="text-content-muted">Ancienneté:</span>{' '}
+                                                             <span className="text-content-primary">{enquete.ancienneteActivite} mois</span>
                                                          </div>
                                                      </div>
                                                      <div className="space-y-2">
                                                           <div>
-                                                             <span className="text-slate-500">Habitation:</span>{' '}
-                                                             <span className="text-white">{enquete.typeHabitation || 'N/A'}</span>
+                                                             <span className="text-content-muted">Habitation:</span>{' '}
+                                                             <span className="text-content-primary">{enquete.typeHabitation || 'N/A'}</span>
                                                          </div>
                                                          <div>
-                                                             <span className="text-slate-500">Pers. à charge:</span>{' '}
-                                                             <span className="text-white">{enquete.personnesCharge ?? 0}</span>
+                                                             <span className="text-content-muted">Pers. à charge:</span>{' '}
+                                                             <span className="text-content-primary">{enquete.personnesCharge ?? 0}</span>
                                                          </div>
                                                          <div>
-                                                             <span className="text-slate-500">Autres prêts:</span>{' '}
-                                                             <span className="text-white">{formatMoney(enquete.autrePrets || 0)}</span>
+                                                             <span className="text-content-muted">Autres prêts:</span>{' '}
+                                                             <span className="text-content-primary">{formatMoney(enquete.autrePrets || 0)}</span>
                                                          </div>
                                                      </div>
                                                  </div>
@@ -858,21 +858,21 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                                                  {/* Analysis & Comments - RESTORED EVALUATION */}
                                                  <div className="space-y-2">
                                                      {enquete.evaluationActivite && (
-                                                         <div className="bg-slate-900/50 p-3 rounded border border-slate-700/50">
-                                                             <span className="text-slate-500 block mb-1 text-xs uppercase font-semibold flex items-center gap-2">
-                                                                <Briefcase size={12} className="text-amber-400" /> Analyse de l'Activité
+                                                         <div className="bg-surface-base/50 p-3 rounded border border-edge-subtle">
+                                                             <span className="text-content-muted block mb-1 text-xs uppercase font-semibold flex items-center gap-2">
+                                                                <Briefcase size={12} className="text-status-warning" /> Analyse de l'Activité
                                                              </span>
-                                                             <p className="text-slate-300 text-sm leading-relaxed">
+                                                             <p className="text-content-secondary text-sm leading-relaxed">
                                                                  {enquete.evaluationActivite}
                                                              </p>
                                                          </div>
                                                      )}
                                                      
-                                                     <div className="bg-slate-900/50 p-3 rounded border border-slate-700/50">
-                                                         <span className="text-slate-500 block mb-1 text-xs uppercase font-semibold flex items-center gap-2">
-                                                            <MessageSquare size={12} className="text-purple-400" /> Avis / Recommandation
+                                                     <div className="bg-surface-base/50 p-3 rounded border border-edge-subtle">
+                                                         <span className="text-content-muted block mb-1 text-xs uppercase font-semibold flex items-center gap-2">
+                                                            <MessageSquare size={12} className="text-status-info" /> Avis / Recommandation
                                                          </span>
-                                                         <p className="text-white italic text-sm">
+                                                         <p className="text-content-primary italic text-sm">
                                                              "{enquete.recommandation || enquete.observations || 'Aucune observation'}"
                                                          </p>
                                                      </div>
@@ -880,7 +880,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                                                  
                                                  {/* Agent */}
                                                  {enquete.createdBy && (
-                                                     <div className="flex items-center gap-2 justify-end text-xs text-slate-500">
+                                                     <div className="flex items-center gap-2 justify-end text-xs text-content-muted">
                                                          <UserCheck size={12} />
                                                          Vérifié par {enquete.createdByName || 'Agent Terrain'}
                                                      </div>
@@ -895,9 +895,9 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
 
                      {/* Workflow Timeline (Collapsed by default logic if needed, but keeping it visible as requested) */}
                      {/* We can make it compact */}
-                     <div className="bg-slate-800/30 rounded-xl p-4 border border-slate-700">
-                         <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-slate-300">
-                             <Clock size={14} className="text-amber-400" /> Historique
+                     <div className="bg-surface/30 rounded-xl p-4 border border-edge">
+                         <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-content-secondary">
+                             <Clock size={14} className="text-status-warning" /> Historique
                          </div>
                          <CreditTimeline demandeId={demande.id} compact />
                      </div>
@@ -906,37 +906,37 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
 
             {/* ACTION AREA - Contextual Forms */}
             {showActions && action && (
-                <div className="bg-slate-800 rounded-xl p-4 border border-slate-600 shadow-lg animate-in fade-in slide-in-from-bottom-4">
+                <div className="bg-surface rounded-xl p-4 border border-edge-strong shadow-lg animate-in fade-in slide-in-from-bottom-4">
                     {action === 'approve' ? (
                         <div className="space-y-4">
-                            <h3 className="font-bold text-green-400 flex items-center gap-2">
+                            <h3 className="font-bold text-status-success flex items-center gap-2">
                                 <CheckCircle size={18} /> Finaliser l'approbation
                             </h3>
                             
                             <textarea
                                 value={commentaire}
                                 onChange={(e) => setCommentaire(e.target.value)}
-                                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white text-sm focus:ring-2 focus:ring-green-500 outline-none"
+                                className="w-full bg-surface-base border border-edge rounded-lg p-3 text-content-primary text-sm focus:ring-2 focus:ring-status-success outline-none"
                                 rows={2}
                                 placeholder="Ajouter une note d'approbation (optionnel)..."
                             />
 
-                            <div className="flex gap-4 items-start bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">
+                            <div className="flex gap-4 items-start bg-surface-base/50 p-3 rounded-lg border border-edge-subtle">
                                 <input
                                   type="checkbox"
                                   checked={scheduledDisbursement}
                                   onChange={(e) => setScheduledDisbursement(e.target.checked)}
-                                  className="mt-1 w-4 h-4 rounded border-slate-600 bg-slate-800 text-green-600 focus:ring-green-500"
+                                  className="mt-1 w-4 h-4 rounded border-edge-strong bg-surface text-status-success focus:ring-status-success"
                                 />
                                 <div className="flex-1">
-                                    <span className="text-sm font-medium text-white block">Programmer le décaissement automatique</span>
+                                    <span className="text-sm font-medium text-content-primary block">Programmer le décaissement automatique</span>
                                     {scheduledDisbursement && (
                                         <input
                                             type="date"
                                             value={disbursementDate}
                                             onChange={(e) => setDisbursementDate(e.target.value)}
                                             min={new Date(Date.now() + 86400000).toISOString().split('T')[0]}
-                                            className="mt-2 bg-slate-800 border border-slate-600 rounded px-2 py-1 text-white text-sm w-full sm:w-auto"
+                                            className="mt-2 bg-surface border border-edge-strong rounded px-2 py-1 text-content-primary text-sm w-full sm:w-auto"
                                             required
                                         />
                                     )}
@@ -945,24 +945,24 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                         </div>
                     ) : (
                         <div className="space-y-4">
-                            <h3 className="font-bold text-red-400 flex items-center gap-2">
+                            <h3 className="font-bold text-status-danger flex items-center gap-2">
                                 <XCircle size={18} /> Motiver le rejet
                             </h3>
                             <textarea
                                 value={commentaire}
                                 onChange={(e) => setCommentaire(e.target.value)}
-                                className="w-full bg-slate-900 border border-red-900/50 rounded-lg p-3 text-white text-sm focus:ring-2 focus:ring-red-500 outline-none"
+                                className="w-full bg-surface-base border border-status-danger/30 rounded-lg p-3 text-content-primary text-sm focus:ring-2 focus:ring-status-danger outline-none"
                                 rows={2}
                                 placeholder="Raison du rejet (Obligatoire)..."
                             />
                             {/* Refund option if fees paid */}
                             {demande.fraisEngagementPayes && demande.montantFraisEngagement && demande.montantFraisEngagement > 0 && (
-                                <div className="bg-amber-900/10 p-3 rounded-lg border border-amber-500/30 space-y-3">
+                                <div className="bg-status-warning-bg p-3 rounded-lg border border-status-warning/30 space-y-3">
                                     <div className="flex items-center justify-between">
-                                        <label className="text-sm font-medium text-amber-400 flex items-center gap-2">
+                                        <label className="text-sm font-medium text-status-warning flex items-center gap-2">
                                             <Wallet size={16} /> Remboursement des frais
                                         </label>
-                                        <span className="text-xs text-slate-400">
+                                        <span className="text-xs text-content-muted">
                                             Payés: {formatMoney(demande.montantFraisEngagement)}
                                         </span>
                                     </div>
@@ -974,8 +974,8 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                                             onClick={() => setReimbursementAmount('')}
                                             className={`px-2 py-2 rounded-lg text-xs font-medium border transition ${
                                                 reimbursementAmount === ''
-                                                    ? 'bg-slate-700 border-slate-500 text-white'
-                                                    : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:bg-slate-700'
+                                                    ? 'bg-surface-elevated border-edge-strong text-content-primary'
+                                                    : 'bg-surface/50 border-edge text-content-muted hover:bg-surface-elevated'
                                             }`}
                                         >
                                             Aucun
@@ -985,8 +985,8 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                                             onClick={() => setReimbursementAmount(String(Math.round(demande.montantFraisEngagement! * 0.5)))}
                                             className={`px-2 py-2 rounded-lg text-xs font-medium border transition ${
                                                 reimbursementAmount === String(Math.round(demande.montantFraisEngagement! * 0.5))
-                                                    ? 'bg-amber-500/20 border-amber-500 text-amber-400'
-                                                    : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:bg-slate-700'
+                                                    ? 'bg-status-warning-bg border-status-warning text-status-warning'
+                                                    : 'bg-surface/50 border-edge text-content-muted hover:bg-surface-elevated'
                                             }`}
                                         >
                                             50%
@@ -996,8 +996,8 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                                             onClick={() => setReimbursementAmount(String(demande.montantFraisEngagement))}
                                             className={`px-2 py-2 rounded-lg text-xs font-medium border transition ${
                                                 reimbursementAmount === String(demande.montantFraisEngagement)
-                                                    ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
-                                                    : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:bg-slate-700'
+                                                    ? 'bg-status-success-bg border-status-success text-status-success'
+                                                    : 'bg-surface/50 border-edge text-content-muted hover:bg-surface-elevated'
                                             }`}
                                         >
                                             100%
@@ -1006,7 +1006,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                                             type="number"
                                             value={reimbursementAmount}
                                             onChange={(e) => setReimbursementAmount(e.target.value)}
-                                            className="w-full bg-slate-900 border border-slate-600 rounded-lg px-2 py-2 text-white text-xs text-center focus:ring-1 focus:ring-amber-500 focus:border-amber-500 outline-none"
+                                            className="w-full bg-surface-base border border-edge-strong rounded-lg px-2 py-2 text-content-primary text-xs text-center focus:ring-1 focus:ring-status-warning focus:border-status-warning outline-none"
                                             placeholder="Autre"
                                             max={demande.montantFraisEngagement}
                                         />
@@ -1014,14 +1014,14 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
 
                                     {/* Summary */}
                                     {reimbursementAmount && Number(reimbursementAmount) > 0 && (
-                                        <div className="flex items-center justify-between text-xs bg-slate-800/50 rounded p-2">
-                                            <span className="text-slate-400">À rembourser:</span>
-                                            <span className="text-emerald-400 font-bold">{formatMoney(Number(reimbursementAmount))}</span>
+                                        <div className="flex items-center justify-between text-xs bg-surface/50 rounded p-2">
+                                            <span className="text-content-muted">À rembourser:</span>
+                                            <span className="text-status-success font-bold">{formatMoney(Number(reimbursementAmount))}</span>
                                         </div>
                                     )}
 
                                     {errors.reimbursement && (
-                                        <p className="text-xs text-red-400">{errors.reimbursement}</p>
+                                        <p className="text-xs text-status-danger">{errors.reimbursement}</p>
                                     )}
                                 </div>
                             )}
@@ -1032,7 +1032,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
         </div>
 
         {/* === FOOTER ACTIONS === */}
-        <div className="bg-slate-800 border-t border-slate-700 p-4 flex flex-col sm:flex-row gap-3 shrink-0">
+        <div className="bg-surface border-t border-edge p-4 flex flex-col sm:flex-row gap-3 shrink-0">
              {showActions ? (
                 !action ? (
                     canApproveCredits ? (
@@ -1040,20 +1040,20 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                             <button
                                 onClick={() => setAction('reject')}
                                 disabled={loading}
-                                className="flex-1 px-4 py-2.5 bg-slate-700 hover:bg-red-600/90 text-white rounded-lg font-semibold transition flex items-center justify-center gap-2"
+                                className="flex-1 px-4 py-2.5 bg-surface-elevated hover:bg-status-danger/90 text-white rounded-lg font-semibold transition flex items-center justify-center gap-2"
                             >
                                 <XCircle size={18} /> Rejeter
                             </button>
                             <button
                                 onClick={() => setAction('approve')}
                                 disabled={loading}
-                                className="flex-1 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-semibold transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20"
+                                className="flex-1 px-4 py-2.5 bg-status-success hover:bg-status-success text-white rounded-lg font-semibold transition flex items-center justify-center gap-2 shadow-lg shadow-status-success/20"
                             >
                                 <CheckCircle size={18} /> Approuver le crédit
                             </button>
                         </>
                     ) : (
-                         <div className="w-full text-center text-slate-500 text-sm py-2">
+                         <div className="w-full text-center text-content-muted text-sm py-2">
                              Modération uniquement (Permissions insuffisantes)
                          </div>
                     )
@@ -1061,7 +1061,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                     <>
                         <button
                             onClick={handleCancel}
-                            className="px-6 py-2.5 bg-slate-700 text-white rounded-lg font-medium hover:bg-slate-600 transition"
+                            className="px-6 py-2.5 bg-surface-elevated text-content-primary rounded-lg font-medium hover:bg-surface-subtle transition"
                         >
                             Annuler
                         </button>
@@ -1069,8 +1069,8 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                             onClick={handleSubmitAction}
                             disabled={loading}
                             className={`flex-1 px-4 py-2.5 ${
-                                action === 'approve' ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-red-600 hover:bg-red-500'
-                            } text-white rounded-lg font-bold transition flex items-center justify-center gap-2`}
+                                action === 'approve' ? 'bg-status-success hover:bg-status-success' : 'bg-status-danger hover:bg-status-danger'
+                            } text-content-primary rounded-lg font-bold transition flex items-center justify-center gap-2`}
                         >
                             {loading && <Loader2 size={16} className="animate-spin" />}
                             Confirmer {action === 'approve' ? 'Approbation' : 'Rejet'}
@@ -1081,8 +1081,8 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                 <div className="flex flex-col gap-2 w-full">
                     {/* Warning: fees need to be repaid before reevaluation */}
                     {feesNeedRepayment && isRejected && !isDefinitivelyRejected && (
-                        <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-2 text-center">
-                            <p className="text-xs text-amber-400 flex items-center justify-center gap-2">
+                        <div className="bg-status-warning-bg border border-status-warning/30 rounded-lg p-2 text-center">
+                            <p className="text-xs text-status-warning flex items-center justify-center gap-2">
                                 <AlertCircle size={14} />
                                 Les frais ont été remboursés. Pour demander une réévaluation, le client doit d'abord repayer les frais.
                             </p>
@@ -1090,8 +1090,8 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                     )}
                     {/* Info: refund already in progress */}
                     {hasRefundInProgress && (
-                        <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-2 text-center">
-                            <p className="text-xs text-purple-400 flex items-center justify-center gap-2">
+                        <div className="bg-status-info-bg border border-status-info/30 rounded-lg p-2 text-center">
+                            <p className="text-xs text-status-info flex items-center justify-center gap-2">
                                 <Wallet size={14} />
                                 Remboursement de {formatMoney(existingRefund?.montantRemboursable || 0)} en cours de traitement
                             </p>
@@ -1101,7 +1101,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                         {canInitiateRefund && (
                             <button
                                 onClick={() => setShowRefundModal(true)}
-                                className="flex-1 px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg font-bold transition flex items-center justify-center gap-2"
+                                className="flex-1 px-4 py-2.5 bg-status-warning hover:bg-status-warning text-white rounded-lg font-bold transition flex items-center justify-center gap-2"
                             >
                                 <Wallet size={18} /> Rembourser les frais
                             </button>
@@ -1109,14 +1109,14 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                         {canRequestReevaluation && (
                             <button
                                 onClick={() => setShowReevaluationModal(true)}
-                                className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold transition flex items-center justify-center gap-2"
+                                className="flex-1 px-4 py-2.5 bg-status-info hover:bg-status-info text-white rounded-lg font-bold transition flex items-center justify-center gap-2"
                             >
                                 <RefreshCw size={18} /> Réévaluation
                             </button>
                         )}
                         <button
                             onClick={onClose}
-                            className={`${canRequestReevaluation || canInitiateRefund ? 'px-6' : 'flex-1'} py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition`}
+                            className={`${canRequestReevaluation || canInitiateRefund ? 'px-6' : 'flex-1'} py-2.5 bg-surface-elevated hover:bg-surface-subtle text-content-primary rounded-lg font-medium transition`}
                         >
                             {canRequestReevaluation || canInitiateRefund ? 'Fermer' : 'Fermer le dossier'}
                         </button>
@@ -1173,30 +1173,30 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
       {/* Refund Modal for already rejected demandes */}
       {showRefundModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[60] p-4">
-          <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-md shadow-2xl">
+          <div className="bg-surface rounded-xl border border-edge w-full max-w-md shadow-2xl">
             {/* Header */}
-            <div className="p-4 border-b border-slate-700 flex justify-between items-center">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <Wallet className="text-amber-400" size={20} />
+            <div className="p-4 border-b border-edge flex justify-between items-center">
+              <h3 className="text-lg font-bold text-content-primary flex items-center gap-2">
+                <Wallet className="text-status-warning" size={20} />
                 Rembourser les frais
               </h3>
               <button
                 onClick={() => { setShowRefundModal(false); setRefundAmount(''); }}
-                className="p-1.5 hover:bg-slate-700 rounded-lg transition"
+                className="p-1.5 hover:bg-surface-elevated rounded-lg transition"
               >
-                <X className="text-slate-400" size={18} />
+                <X className="text-content-muted" size={18} />
               </button>
             </div>
 
             {/* Content */}
             <div className="p-4 space-y-4">
               {/* Info */}
-              <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
+              <div className="bg-status-warning-bg border border-status-warning/30 rounded-lg p-3">
                 <div className="flex items-start gap-2">
-                  <AlertCircle className="text-amber-400 flex-shrink-0 mt-0.5" size={16} />
+                  <AlertCircle className="text-status-warning flex-shrink-0 mt-0.5" size={16} />
                   <div className="text-sm">
-                    <p className="text-amber-400 font-medium">Demande rejetée</p>
-                    <p className="text-slate-300 text-xs mt-1">
+                    <p className="text-status-warning font-medium">Demande rejetée</p>
+                    <p className="text-content-secondary text-xs mt-1">
                       Le client peut être remboursé intégralement ou partiellement.
                       Le paiement pourra se faire en espèces, Mobile Money ou virement.
                     </p>
@@ -1205,22 +1205,22 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
               </div>
 
               {/* Amount info */}
-              <div className="bg-slate-700/50 rounded-lg p-3 flex justify-between items-center">
-                <span className="text-slate-400 text-sm">Frais payés</span>
-                <span className="text-white font-bold">{formatMoney(demande.montantFraisEngagement || 0)}</span>
+              <div className="bg-surface-elevated/50 rounded-lg p-3 flex justify-between items-center">
+                <span className="text-content-muted text-sm">Frais payés</span>
+                <span className="text-content-primary font-bold">{formatMoney(demande.montantFraisEngagement || 0)}</span>
               </div>
 
               {/* Quick selection buttons */}
               <div className="space-y-2">
-                <label className="text-xs text-slate-400">Montant à rembourser</label>
+                <label className="text-xs text-content-muted">Montant à rembourser</label>
                 <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
                     onClick={() => setRefundAmount(String(Math.round((demande.montantFraisEngagement || 0) * 0.5)))}
                     className={`px-3 py-2.5 rounded-lg text-sm font-medium border transition ${
                       refundAmount === String(Math.round((demande.montantFraisEngagement || 0) * 0.5))
-                        ? 'bg-amber-500/20 border-amber-500 text-amber-400'
-                        : 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700'
+                        ? 'bg-status-warning-bg border-status-warning text-status-warning'
+                        : 'bg-surface border-edge-strong text-content-secondary hover:bg-surface-elevated'
                     }`}
                   >
                     50%
@@ -1230,8 +1230,8 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                     onClick={() => setRefundAmount(String(demande.montantFraisEngagement || 0))}
                     className={`px-3 py-2.5 rounded-lg text-sm font-medium border transition ${
                       refundAmount === String(demande.montantFraisEngagement || 0)
-                        ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
-                        : 'bg-slate-800 border-slate-600 text-slate-300 hover:bg-slate-700'
+                        ? 'bg-status-success-bg border-status-success text-status-success'
+                        : 'bg-surface border-edge-strong text-content-secondary hover:bg-surface-elevated'
                     }`}
                   >
                     100%
@@ -1240,7 +1240,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                     type="number"
                     value={refundAmount}
                     onChange={(e) => setRefundAmount(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2.5 text-white text-sm text-center focus:ring-1 focus:ring-amber-500 focus:border-amber-500 outline-none"
+                    className="w-full bg-surface-base border border-edge-strong rounded-lg px-3 py-2.5 text-content-primary text-sm text-center focus:ring-1 focus:ring-status-warning focus:border-status-warning outline-none"
                     placeholder="Autre"
                     max={demande.montantFraisEngagement || 0}
                   />
@@ -1249,18 +1249,18 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
 
               {/* Summary */}
               {refundAmount && Number(refundAmount) > 0 && (
-                <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3 flex justify-between items-center">
-                  <span className="text-slate-300 text-sm">À rembourser</span>
-                  <span className="text-emerald-400 font-bold text-lg">{formatMoney(Number(refundAmount))}</span>
+                <div className="bg-status-success-bg border border-status-success/30 rounded-lg p-3 flex justify-between items-center">
+                  <span className="text-content-secondary text-sm">À rembourser</span>
+                  <span className="text-status-success font-bold text-lg">{formatMoney(Number(refundAmount))}</span>
                 </div>
               )}
             </div>
 
             {/* Footer */}
-            <div className="p-4 border-t border-slate-700 flex gap-3 justify-end">
+            <div className="p-4 border-t border-edge flex gap-3 justify-end">
               <button
                 onClick={() => { setShowRefundModal(false); setRefundAmount(''); }}
-                className="px-4 py-2 text-slate-300 hover:bg-slate-700 rounded-lg transition"
+                className="px-4 py-2 text-content-secondary hover:bg-surface-elevated rounded-lg transition"
                 disabled={refundLoading}
               >
                 Annuler
@@ -1268,7 +1268,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
               <button
                 onClick={handleInitiateRefund}
                 disabled={refundLoading || !refundAmount || Number(refundAmount) <= 0}
-                className="px-6 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-medium rounded-lg transition flex items-center gap-2"
+                className="px-6 py-2 bg-status-warning hover:bg-status-warning disabled:bg-surface-elevated disabled:text-content-muted text-white font-medium rounded-lg transition flex items-center gap-2"
               >
                 {refundLoading ? <Loader2 className="animate-spin" size={16} /> : <DollarSign size={16} />}
                 Créer la demande

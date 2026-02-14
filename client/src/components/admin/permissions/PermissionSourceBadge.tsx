@@ -37,35 +37,35 @@ const SOURCE_CONFIG: Record<PermissionSource, {
     label: 'Hérité du rôle',
     shortLabel: 'Rôle',
     icon: Shield,
-    baseClasses: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+    baseClasses: 'bg-status-info-bg text-status-info border-status-info/20',
   },
   TEMPORARY: {
     label: 'Permission temporaire',
     shortLabel: 'Temp.',
     icon: Clock,
-    baseClasses: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+    baseClasses: 'bg-status-warning-bg text-status-warning border-status-warning/20',
   },
   OVERRIDE_GLOBAL: {
     label: 'Override global',
     shortLabel: 'Override',
     icon: Globe,
-    baseClasses: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
-    grantedClasses: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-    deniedClasses: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
+    baseClasses: 'bg-accent/10 text-accent border-accent/20',
+    grantedClasses: 'bg-status-success-bg text-status-success border-status-success/20',
+    deniedClasses: 'bg-status-danger/10 text-status-danger border-status-danger/20',
   },
   OVERRIDE_AGENCE: {
     label: 'Override agence',
     shortLabel: 'Agence',
     icon: Building2,
-    baseClasses: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
-    grantedClasses: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-    deniedClasses: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
+    baseClasses: 'bg-status-info-bg text-status-info border-status-info/20',
+    grantedClasses: 'bg-status-success-bg text-status-success border-status-success/20',
+    deniedClasses: 'bg-status-danger/10 text-status-danger border-status-danger/20',
   },
   NONE: {
     label: 'Non accordé',
     shortLabel: 'Aucun',
     icon: AlertCircle,
-    baseClasses: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
+    baseClasses: 'bg-surface-subtle/30 text-content-muted border-edge-strong/20',
   },
 };
 
@@ -150,9 +150,9 @@ export const PERMISSION_SOURCE_LABELS: Record<PermissionSource, string> = {
 };
 
 export const PERMISSION_SOURCE_COLORS: Record<PermissionSource, string> = {
-  ROLE: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-  TEMPORARY: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-  OVERRIDE_GLOBAL: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
-  OVERRIDE_AGENCE: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
-  NONE: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
+  ROLE: 'bg-status-info-bg text-status-info border-status-info/20',
+  TEMPORARY: 'bg-status-warning-bg text-status-warning border-status-warning/20',
+  OVERRIDE_GLOBAL: 'bg-accent/10 text-accent border-accent/20',
+  OVERRIDE_AGENCE: 'bg-status-info-bg text-status-info border-status-info/20',
+  NONE: 'bg-surface-subtle/30 text-content-muted border-edge-strong/20',
 };

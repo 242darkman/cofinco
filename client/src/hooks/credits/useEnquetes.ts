@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { StatutEnquete, StatutEnqueteType } from '@shared/enum/status-constants';
 import { creditKeys } from '../../lib/query-keys';
+import { currencySymbol } from '@shared/config/currency';
 
 // Labels for enquête status
 const STATUT_ENQUETE_LABELS: Record<StatutEnqueteType, string> = {
@@ -165,7 +166,7 @@ export function useEnquetes() {
       const messages: Record<string, { title: string; description: string }> = {
         APPROVED: { title: 'Demande approuvée', description: 'Le crédit est prêt pour décaissement' },
         REJECTED: { title: 'Demande rejetée', description: 'Le client sera notifié du rejet' },
-        REDUCED: { title: 'Montant réduit', description: `Nouveau montant: ${montantApprouve?.toLocaleString()} FCFA` },
+        REDUCED: { title: 'Montant réduit', description: `Nouveau montant: ${montantApprouve?.toLocaleString()} ${currencySymbol()}` },
       };
       const msg = messages[decision] || { title: 'Validation effectuée', description: '' };
       toast.success(msg.title, { description: msg.description });
@@ -233,11 +234,11 @@ export function useEnquetes() {
   const getStatutColor = (statut?: string) => {
     const normalized = normalizeStatut(statut);
     const colors: Record<StatutEnqueteType, string> = {
-      [StatutEnquete.PENDING]: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-      [StatutEnquete.IN_PROGRESS]: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-      [StatutEnquete.APPROVED]: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-      [StatutEnquete.REJECTED]: 'bg-red-500/20 text-red-400 border-red-500/30',
-      [StatutEnquete.REDUCED]: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+      [StatutEnquete.PENDING]: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+      [StatutEnquete.IN_PROGRESS]: 'bg-status-info-bg text-status-info border-status-info/30',
+      [StatutEnquete.APPROVED]: 'bg-status-success-bg text-status-success border-status-success/30',
+      [StatutEnquete.REJECTED]: 'bg-status-danger-bg text-status-danger border-status-danger/30',
+      [StatutEnquete.REDUCED]: 'bg-status-info-bg text-status-info border-status-info/30',
     };
     return colors[normalized];
   };

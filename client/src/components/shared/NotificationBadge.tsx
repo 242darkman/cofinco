@@ -97,16 +97,16 @@ export default function NotificationBadge() {
         variant="ghost"
         size="sm"
         onClick={() => setShowCenter(!showCenter)}
-        className={`relative transition-colors ${showCenter ? 'bg-slate-800 text-white' : ''}`}
+        className={`relative transition-colors ${showCenter ? 'bg-surface text-content-primary' : ''}`}
         title="Notifications"
         data-testid="button-notifications"
       >
-        <Bell size={20} className={showCenter ? 'text-white' : 'text-slate-300'} />
+        <Bell size={20} className={showCenter ? 'text-content-primary' : 'text-content-secondary'} />
         {unreadCount > 0 && (
           <div className="absolute -top-1 -right-1">
             <Badge
               variant="primary"
-              className="w-5 h-5 flex items-center justify-center p-0 text-xs animate-pulse bg-blue-600 hover:bg-blue-700 border-none text-white shadow-lg shadow-blue-500/20"
+              className="w-5 h-5 flex items-center justify-center p-0 text-xs animate-pulse bg-status-info hover:bg-status-info border-none text-white shadow-lg shadow-status-info/20"
               data-testid="badge-notification-count"
               value={unreadCount > 9 ? '9+' : unreadCount.toString()}
             />

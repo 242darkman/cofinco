@@ -111,57 +111,57 @@ const CATEGORY_CONFIG: Record<CategoryKey, {
   ENGAGEMENT_FEE: {
     label: 'Frais de dossier',
     icon: FileText,
-    bgActive: 'bg-emerald-500',
-    shadowActive: 'shadow-emerald-500/20',
-    bgBadge: 'bg-emerald-500/20',
-    textBadge: 'text-emerald-400',
-    tagBg: 'bg-emerald-500/15',
-    tagText: 'text-emerald-400',
-    tagBorder: 'border-emerald-500/20',
+    bgActive: 'bg-status-success',
+    shadowActive: 'shadow-status-success/20',
+    bgBadge: 'bg-status-success-bg',
+    textBadge: 'text-status-success',
+    tagBg: 'bg-status-success-bg',
+    tagText: 'text-status-success',
+    tagBorder: 'border-status-success/20',
   },
   FEE_REFUND: {
     label: 'Restitution de frais',
     icon: ArrowDownRight,
-    bgActive: 'bg-red-500',
-    shadowActive: 'shadow-red-500/20',
-    bgBadge: 'bg-red-500/20',
-    textBadge: 'text-red-400',
-    tagBg: 'bg-red-500/15',
-    tagText: 'text-red-400',
-    tagBorder: 'border-red-500/20',
+    bgActive: 'bg-status-danger',
+    shadowActive: 'shadow-status-danger/20',
+    bgBadge: 'bg-status-danger-bg',
+    textBadge: 'text-status-danger',
+    tagBg: 'bg-status-danger-bg',
+    tagText: 'text-status-danger',
+    tagBorder: 'border-status-danger/20',
   },
   LOAN_DISBURSEMENT: {
     label: 'Décaissement prêts',
     icon: Wallet,
-    bgActive: 'bg-orange-500',
-    shadowActive: 'shadow-orange-500/20',
-    bgBadge: 'bg-orange-500/20',
-    textBadge: 'text-orange-400',
-    tagBg: 'bg-orange-500/15',
-    tagText: 'text-orange-400',
-    tagBorder: 'border-orange-500/20',
+    bgActive: 'bg-status-warning',
+    shadowActive: 'shadow-status-warning/20',
+    bgBadge: 'bg-status-warning-bg',
+    textBadge: 'text-status-warning',
+    tagBg: 'bg-status-warning-bg',
+    tagText: 'text-status-warning',
+    tagBorder: 'border-status-warning/20',
   },
   SALARY_PAYMENT: {
     label: 'Paiement salaires',
     icon: Users,
-    bgActive: 'bg-blue-500',
-    shadowActive: 'shadow-blue-500/20',
-    bgBadge: 'bg-blue-500/20',
-    textBadge: 'text-blue-400',
-    tagBg: 'bg-blue-500/15',
-    tagText: 'text-blue-400',
-    tagBorder: 'border-blue-500/20',
+    bgActive: 'bg-status-info',
+    shadowActive: 'shadow-status-info/20',
+    bgBadge: 'bg-status-info-bg',
+    textBadge: 'text-status-info',
+    tagBg: 'bg-status-info-bg',
+    tagText: 'text-status-info',
+    tagBorder: 'border-status-info/20',
   },
   ACCOUNT_ACTIVATION: {
     label: 'Activation comptes',
     icon: CreditCard,
-    bgActive: 'bg-purple-500',
-    shadowActive: 'shadow-purple-500/20',
-    bgBadge: 'bg-purple-500/20',
-    textBadge: 'text-purple-400',
-    tagBg: 'bg-purple-500/15',
-    tagText: 'text-purple-400',
-    tagBorder: 'border-purple-500/20',
+    bgActive: 'bg-status-info',
+    shadowActive: 'shadow-status-info/20',
+    bgBadge: 'bg-status-info-bg',
+    textBadge: 'text-status-info',
+    tagBg: 'bg-status-info/15',
+    tagText: 'text-status-info',
+    tagBorder: 'border-status-info/20',
   },
 };
 
@@ -473,10 +473,10 @@ export default function CaisseDemandesTab({
       {/* ── Header ─────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <ClipboardList size={20} className="text-cyan-400 shrink-0" />
-          <h2 className="text-base sm:text-lg font-bold text-white">Demandes de Paiement</h2>
+          <ClipboardList size={20} className="text-accent shrink-0" />
+          <h2 className="text-base sm:text-lg font-bold text-content-primary">Demandes de Paiement</h2>
           {allItems.length > 0 && (
-            <span className="bg-cyan-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+            <span className="bg-accent-secondary text-white text-xs font-bold px-2 py-0.5 rounded-full">
               {allItems.length}
             </span>
           )}
@@ -486,19 +486,19 @@ export default function CaisseDemandesTab({
           {selectedLoanIds.size > 0 && (
             <button
               onClick={() => setShowBatchConfirm(true)}
-              className="px-3 py-1.5 text-xs font-bold bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition flex items-center gap-1.5"
+              className="px-3 py-1.5 text-xs font-bold bg-status-warning text-white rounded-lg hover:bg-status-warning transition flex items-center gap-1.5"
             >
               <CheckCircle size={14} />
               Décaisser ({selectedLoanIds.size})
             </button>
           )}
           {activeCategory === 'LOAN_DISBURSEMENT' && pendingCredits.length > 1 && (
-            <label className="flex items-center gap-1.5 cursor-pointer text-xs text-slate-400 px-2 py-1 rounded hover:bg-slate-800">
+            <label className="flex items-center gap-1.5 cursor-pointer text-xs text-content-muted px-2 py-1 rounded hover:bg-surface">
               <input
                 type="checkbox"
                 checked={selectedLoanIds.size === pendingCredits.length && pendingCredits.length > 0}
                 onChange={toggleSelectAllLoans}
-                className="w-3.5 h-3.5 rounded border-slate-600 text-orange-500 focus:ring-0"
+                className="w-3.5 h-3.5 rounded border-edge-strong text-status-warning focus:ring-0"
               />
               Tout
             </label>
@@ -506,7 +506,7 @@ export default function CaisseDemandesTab({
           <button
             onClick={() => fetchAll()}
             disabled={loading}
-            className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 transition"
+            className="p-2 rounded-lg hover:bg-surface text-content-muted transition"
             title="Rafraîchir"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -520,14 +520,14 @@ export default function CaisseDemandesTab({
           onClick={() => setActiveCategory('ALL')}
           className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
             activeCategory === 'ALL'
-              ? 'bg-cyan-500 text-white shadow-lg shadow-cyan-500/20'
-              : 'bg-slate-800 text-slate-400 hover:text-white border border-slate-700'
+              ? 'bg-accent-secondary text-white shadow-lg shadow-accent/20'
+              : 'bg-surface text-content-muted hover:text-content-primary border border-edge'
           }`}
         >
           Toutes
           {categoryCounts.ALL > 0 && (
             <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-              activeCategory === 'ALL' ? 'bg-white/20' : 'bg-cyan-500/20 text-cyan-400'
+              activeCategory === 'ALL' ? 'bg-white/20 text-white' : 'bg-accent/10 text-accent'
             }`}>
               {categoryCounts.ALL}
             </span>
@@ -545,17 +545,17 @@ export default function CaisseDemandesTab({
               className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap ${
                 activeCategory === key
                   ? `${cfg.bgActive} text-white shadow-lg ${cfg.shadowActive}`
-                  : 'bg-slate-800 text-slate-400 hover:text-white border border-slate-700'
+                  : 'bg-surface text-content-muted hover:text-content-primary border border-edge'
               }`}
             >
               <Icon size={13} />
               {cfg.label}
               <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
                 activeCategory === key
-                  ? 'bg-white/20'
+                  ? 'bg-white/20 text-white'
                   : count > 0
                   ? `${cfg.bgBadge} ${cfg.textBadge}`
-                  : 'bg-slate-700/50 text-slate-500'
+                  : 'bg-surface-elevated/50 text-content-muted'
               }`}>
                 {count}
               </span>
@@ -566,27 +566,27 @@ export default function CaisseDemandesTab({
 
       {/* ── Search ─────────────────────────────────────── */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" size={16} />
         <input
           type="text"
           placeholder="Rechercher par nom, description..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:border-cyan-500 outline-none transition-all"
+          className="w-full bg-surface-base border border-edge rounded-lg pl-10 pr-4 py-2.5 text-sm text-content-primary placeholder-content-muted focus:border-accent outline-none transition-all"
         />
       </div>
 
       {/* ── List ───────────────────────────────────────── */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 size={24} className="animate-spin text-cyan-500" />
+          <Loader2 size={24} className="animate-spin text-accent" />
         </div>
       ) : paged.length === 0 ? (
         <div className="text-center py-12">
-          <div className="w-14 h-14 rounded-full bg-slate-800 flex items-center justify-center mx-auto mb-3">
-            <ClipboardList size={24} className="text-slate-600" />
+          <div className="w-14 h-14 rounded-full bg-surface flex items-center justify-center mx-auto mb-3">
+            <ClipboardList size={24} className="text-content-muted" />
           </div>
-          <p className="text-sm text-slate-500 font-medium">
+          <p className="text-sm text-content-muted font-medium">
             {allItems.length === 0
               ? 'Aucune demande en attente'
               : 'Aucun résultat pour cette recherche'}
@@ -606,12 +606,12 @@ export default function CaisseDemandesTab({
                 key={item.id}
                 className={`group rounded-xl border transition-all ${
                   isExpanded
-                    ? 'bg-slate-800/80 border-orange-500/40 shadow-lg'
+                    ? 'bg-surface/80 border-status-warning/40 shadow-lg'
                     : isLoanSelected
-                    ? 'bg-orange-950/20 border-orange-500/20'
+                    ? 'bg-status-warning-bg border-status-warning/20'
                     : isIn
-                    ? 'bg-emerald-500/5 border-emerald-500/10 hover:border-emerald-500/30'
-                    : 'bg-red-500/5 border-red-500/10 hover:border-red-500/30'
+                    ? 'bg-status-success/5 border-status-success/10 hover:border-status-success/30'
+                    : 'bg-status-danger/5 border-status-danger/10 hover:border-status-danger/30'
                 }`}
               >
                 <div
@@ -628,22 +628,22 @@ export default function CaisseDemandesTab({
                         checked={!!isLoanSelected}
                         onClick={(e) => { e.stopPropagation(); toggleLoanSelect(item.creditData!.id); }}
                         onChange={() => {}}
-                        className="w-3.5 h-3.5 rounded border-slate-600 text-orange-500 focus:ring-0 shrink-0 mt-1"
+                        className="w-3.5 h-3.5 rounded border-edge-strong text-status-warning focus:ring-0 shrink-0 mt-1"
                       />
                     )}
 
                     {/* Icon / Photo */}
                     {item.photoUrl ? (
-                      <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-slate-800 border border-slate-700 overflow-hidden shrink-0">
+                      <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-surface border border-edge overflow-hidden shrink-0">
                         <img src={resolveStorageUrl(item.photoUrl)} className="w-full h-full object-cover" alt="" />
                       </div>
                     ) : (
                       <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center shrink-0 ${
-                        isIn ? 'bg-emerald-500/15' : 'bg-red-500/15'
+                        isIn ? 'bg-status-success-bg' : 'bg-status-danger-bg'
                       }`}>
                         {isIn
-                          ? <ArrowUpRight size={16} className="text-emerald-400 sm:w-[18px] sm:h-[18px]" />
-                          : <ArrowDownRight size={16} className="text-red-400 sm:w-[18px] sm:h-[18px]" />
+                          ? <ArrowUpRight size={16} className="text-status-success sm:w-[18px] sm:h-[18px]" />
+                          : <ArrowDownRight size={16} className="text-status-danger sm:w-[18px] sm:h-[18px]" />
                         }
                       </div>
                     )}
@@ -653,24 +653,24 @@ export default function CaisseDemandesTab({
                       {/* Top: label + amount */}
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="text-xs sm:text-sm font-semibold text-white truncate">{item.label}</p>
+                          <p className="text-xs sm:text-sm font-semibold text-content-primary truncate">{item.label}</p>
                           {item.displayName && (
-                            <p className="text-[11px] sm:text-xs text-slate-400 flex items-center gap-1 mt-0.5">
+                            <p className="text-[11px] sm:text-xs text-content-muted flex items-center gap-1 mt-0.5">
                               <User size={10} className="shrink-0" />
                               <span className="truncate">{item.displayName}</span>
                             </p>
                           )}
                         </div>
                         <div className="text-right shrink-0">
-                          <p className={`text-sm sm:text-base font-bold tabular-nums ${isIn ? 'text-emerald-400' : 'text-red-400'}`}>
+                          <p className={`text-sm sm:text-base font-bold tabular-nums ${isIn ? 'text-status-success' : 'text-status-danger'}`}>
                             {isIn ? '+' : '-'}{formatMoney(item.montant)}
                           </p>
-                          <p className="text-[10px] text-slate-500 mt-0.5">{timeSince(item.createdAt)}</p>
+                          <p className="text-[10px] text-content-muted mt-0.5">{timeSince(item.createdAt)}</p>
                         </div>
                       </div>
 
                       {item.description && (
-                        <p className="text-[10px] sm:text-[11px] text-slate-500 mt-1 truncate">{item.description}</p>
+                        <p className="text-[10px] sm:text-[11px] text-content-muted mt-1 truncate">{item.description}</p>
                       )}
 
                       {/* Tags + Actions */}
@@ -682,7 +682,7 @@ export default function CaisseDemandesTab({
                             <span className="xs:hidden">{cfg.label.split(' ')[0]}</span>
                           </span>
                           <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
-                            isIn ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
+                            isIn ? 'bg-status-success-bg text-status-success' : 'bg-status-danger-bg text-status-danger'
                           }`}>
                             {isIn ? 'Encaissement' : 'Décaissement'}
                           </span>
@@ -694,7 +694,7 @@ export default function CaisseDemandesTab({
                             <button
                               onClick={(e) => { e.stopPropagation(); setCancelTarget(item); }}
                               disabled={!!actionLoading}
-                              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-all"
+                              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-surface hover:bg-status-danger-bg text-content-muted hover:text-status-danger transition-all"
                               title="Rejeter la demande"
                             >
                               <XCircle size={14} className="inline mr-1" />Rejeter
@@ -704,8 +704,8 @@ export default function CaisseDemandesTab({
                               disabled={!!actionLoading}
                               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                                 isIn
-                                  ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                                  : 'bg-red-600 hover:bg-red-500 text-white'
+                                  ? 'bg-status-success hover:bg-status-success text-white'
+                                  : 'bg-status-danger hover:bg-status-danger text-white'
                               }`}
                             >
                               {actionLoading === item.id ? (
@@ -719,7 +719,7 @@ export default function CaisseDemandesTab({
 
                         {/* Loan expand indicator */}
                         {isLoan && !isExpanded && (
-                          <ChevronDown size={14} className="text-slate-500 shrink-0 hidden sm:block" />
+                          <ChevronDown size={14} className="text-content-muted shrink-0 hidden sm:block" />
                         )}
                       </div>
                     </div>
@@ -728,26 +728,26 @@ export default function CaisseDemandesTab({
 
                 {/* ── Loan expanded panel ─────────────── */}
                 {isExpanded && item.creditData && (
-                  <div className="px-3 pb-3 pt-1 border-t border-slate-700/50 animate-in slide-in-from-top-1 duration-200">
+                  <div className="px-3 pb-3 pt-1 border-t border-edge-subtle animate-in slide-in-from-top-1 duration-200">
                     {/* Identity verification */}
-                    <div className="flex items-start gap-2 p-2 bg-orange-500/10 border border-orange-500/20 rounded-lg mb-3">
-                      <Shield size={14} className="text-orange-400 shrink-0 mt-0.5" />
-                      <p className="text-[10px] sm:text-xs text-orange-200/80 leading-relaxed">
-                        <span className="font-bold text-orange-200">Vérifiez l'identité</span> du client avant le décaissement.
+                    <div className="flex items-start gap-2 p-2 bg-status-warning-bg border border-status-warning/20 rounded-lg mb-3">
+                      <Shield size={14} className="text-status-warning shrink-0 mt-0.5" />
+                      <p className="text-[10px] sm:text-xs text-status-warning-text/80 leading-relaxed">
+                        <span className="font-bold text-status-warning-text">Vérifiez l'identité</span> du client avant le décaissement.
                       </p>
                     </div>
 
                     {/* Info grid */}
                     <div className="grid grid-cols-2 gap-2 mb-3">
-                      <div className="bg-slate-950/50 rounded-lg p-2 text-center">
-                        <p className="text-[9px] text-slate-500 uppercase tracking-wider">Montant</p>
-                        <p className="text-base sm:text-lg font-black text-white tabular-nums">
+                      <div className="bg-surface-base/50 rounded-lg p-2 text-center">
+                        <p className="text-[9px] text-content-muted uppercase tracking-wider">Montant</p>
+                        <p className="text-base sm:text-lg font-black text-content-primary tabular-nums">
                           {formatMoney(item.montant)}
                         </p>
                       </div>
-                      <div className="bg-slate-950/50 rounded-lg p-2 text-center">
-                        <p className="text-[9px] text-slate-500 uppercase tracking-wider">Crédit</p>
-                        <p className="text-xs font-bold text-slate-300 font-mono mt-1">
+                      <div className="bg-surface-base/50 rounded-lg p-2 text-center">
+                        <p className="text-[9px] text-content-muted uppercase tracking-wider">Crédit</p>
+                        <p className="text-xs font-bold text-content-secondary font-mono mt-1">
                           #{item.creditData.numeroCredit}
                         </p>
                       </div>
@@ -756,13 +756,13 @@ export default function CaisseDemandesTab({
                     {/* Receipt input */}
                     <div className="mb-3">
                       <div className="relative">
-                        <FileText size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                        <FileText size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-content-muted" />
                         <input
                           type="text"
                           value={receiptNumbers[item.creditData.id] || ''}
                           onChange={(e) => setReceiptNumbers(prev => ({ ...prev, [item.creditData!.id]: e.target.value }))}
                           placeholder="Réf. reçu (optionnel)"
-                          className="w-full pl-8 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white placeholder:text-slate-600 focus:border-orange-500 outline-none"
+                          className="w-full pl-8 pr-3 py-2 bg-surface-base border border-edge rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:border-status-warning outline-none"
                           onClick={(e) => e.stopPropagation()}
                         />
                       </div>
@@ -773,7 +773,7 @@ export default function CaisseDemandesTab({
                       <button
                         onClick={(e) => { e.stopPropagation(); setCancelTarget(item); setCancelReason('Client non présenté'); }}
                         disabled={!!actionLoading}
-                        className="flex-1 py-2 px-3 text-xs font-bold text-rose-400 border border-rose-500/30 rounded-lg hover:bg-rose-500/10 transition flex items-center justify-center gap-1"
+                        className="flex-1 py-2 px-3 text-xs font-bold text-status-danger border border-status-danger/30 rounded-lg hover:bg-status-danger/10 transition flex items-center justify-center gap-1"
                       >
                         <XCircle size={14} />
                         Rejeter
@@ -781,7 +781,7 @@ export default function CaisseDemandesTab({
                       <button
                         onClick={(e) => { e.stopPropagation(); setProcessTarget(item); }}
                         disabled={!!actionLoading}
-                        className="flex-[2] py-2.5 px-3 text-xs font-bold text-white bg-gradient-to-r from-orange-600 to-amber-600 rounded-lg hover:from-orange-500 hover:to-amber-500 transition flex items-center justify-center gap-1.5 shadow-lg shadow-orange-900/20"
+                        className="flex-[2] py-2.5 px-3 text-xs font-bold text-white bg-gradient-to-r from-status-warning to-status-warning rounded-lg hover:from-status-warning hover:to-status-warning transition flex items-center justify-center gap-1.5 shadow-lg shadow-status-warning/20"
                       >
                         {actionLoading === item.id ? (
                           <Loader2 size={14} className="animate-spin" />
@@ -801,24 +801,24 @@ export default function CaisseDemandesTab({
       {/* ── Pagination ─────────────────────────────────── */}
       {totalPages > 1 && (
         <div className="flex items-center justify-between pt-2">
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-content-muted">
             {filtered.length} demande{filtered.length > 1 ? 's' : ''}
           </p>
           <div className="flex items-center gap-1">
             <button
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white disabled:opacity-50 transition-all"
+              className="p-1.5 rounded-lg bg-surface text-content-muted hover:text-content-primary disabled:opacity-50 transition-all"
             >
               <ChevronLeft size={14} />
             </button>
-            <span className="text-xs text-slate-400 px-2">
+            <span className="text-xs text-content-muted px-2">
               {currentPage}/{totalPages}
             </span>
             <button
               onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              className="p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white disabled:opacity-50 transition-all"
+              className="p-1.5 rounded-lg bg-surface text-content-muted hover:text-content-primary disabled:opacity-50 transition-all"
             >
               <ChevronRight size={14} />
             </button>
@@ -835,27 +835,27 @@ export default function CaisseDemandesTab({
           title={processTarget.source === 'loan-disbursement' ? 'Confirmer le décaissement' : 'Confirmer le traitement'}
           message={
             <div className="space-y-3">
-              <p className="text-sm text-slate-300">{processTarget.label}</p>
+              <p className="text-sm text-content-secondary">{processTarget.label}</p>
               {processTarget.displayName && (
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-content-muted">
                   {processTarget.source === 'loan-disbursement' ? 'Client' : 'Bénéficiaire'}:{' '}
-                  <span className="text-white font-medium">{processTarget.displayName}</span>
+                  <span className="text-content-primary font-medium">{processTarget.displayName}</span>
                 </p>
               )}
-              <div className="bg-slate-800 rounded-lg p-3 space-y-2">
+              <div className="bg-surface rounded-lg p-3 space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-400">Montant</span>
-                  <span className={`font-bold ${processTarget.direction === 'IN' ? 'text-emerald-400' : 'text-red-400'}`}>
+                  <span className="text-content-muted">Montant</span>
+                  <span className={`font-bold ${processTarget.direction === 'IN' ? 'text-status-success' : 'text-status-danger'}`}>
                     {formatMoney(processTarget.montant)} FCFA
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-400">Type</span>
-                  <span className="text-white">{processCfg.label}</span>
+                  <span className="text-content-muted">Type</span>
+                  <span className="text-content-primary">{processCfg.label}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-400">Direction</span>
-                  <span className={processTarget.direction === 'IN' ? 'text-emerald-400' : 'text-red-400'}>
+                  <span className="text-content-muted">Direction</span>
+                  <span className={processTarget.direction === 'IN' ? 'text-status-success' : 'text-status-danger'}>
                     {processTarget.direction === 'IN' ? 'Encaissement' : 'Décaissement'}
                   </span>
                 </div>
@@ -863,29 +863,29 @@ export default function CaisseDemandesTab({
 
               {processTarget.source === 'loan-disbursement' && processTarget.creditData && (
                 <>
-                  <div className="flex items-start gap-2 p-2 rounded-lg bg-orange-500/10 border border-orange-500/20">
-                    <Shield size={14} className="text-orange-400 mt-0.5 shrink-0" />
-                    <p className="text-xs text-orange-200/80">
-                      <span className="font-bold text-orange-200">Vérifiez l'identité</span> du client avant de procéder.
+                  <div className="flex items-start gap-2 p-2 rounded-lg bg-status-warning-bg border border-status-warning/20">
+                    <Shield size={14} className="text-status-warning mt-0.5 shrink-0" />
+                    <p className="text-xs text-status-warning-text/80">
+                      <span className="font-bold text-status-warning-text">Vérifiez l'identité</span> du client avant de procéder.
                     </p>
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-slate-400 mb-1 block">Référence reçu (optionnel)</label>
+                    <label className="text-xs font-semibold text-content-muted mb-1 block">Référence reçu (optionnel)</label>
                     <input
                       type="text"
                       value={receiptNumbers[processTarget.creditData.id] || ''}
                       onChange={(e) => setReceiptNumbers(prev => ({ ...prev, [processTarget.creditData!.id]: e.target.value }))}
                       placeholder="Numéro de reçu..."
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-orange-500 outline-none"
+                      className="w-full bg-surface-base border border-edge rounded-lg px-3 py-2 text-sm text-content-primary placeholder-content-muted focus:border-status-warning outline-none"
                     />
                   </div>
                 </>
               )}
 
               {processTarget.source !== 'loan-disbursement' && processTarget.direction === 'OUT' && (
-                <div className="flex items-start gap-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                  <AlertCircle size={14} className="text-amber-400 mt-0.5 shrink-0" />
-                  <p className="text-xs text-amber-300">
+                <div className="flex items-start gap-2 p-2 rounded-lg bg-status-warning-bg border border-status-warning/20">
+                  <AlertCircle size={14} className="text-status-warning mt-0.5 shrink-0" />
+                  <p className="text-xs text-status-warning">
                     Ce montant sera retiré de la caisse. Vérifiez les fonds disponibles.
                   </p>
                 </div>
@@ -913,24 +913,24 @@ export default function CaisseDemandesTab({
           title="Annuler la demande"
           message={
             <div className="space-y-3">
-              <p className="text-sm text-slate-300">
-                Annuler: <span className="text-white font-medium">{cancelTarget.label}</span> — {formatMoney(cancelTarget.montant)} FCFA
+              <p className="text-sm text-content-secondary">
+                Annuler: <span className="text-content-primary font-medium">{cancelTarget.label}</span> — {formatMoney(cancelTarget.montant)} FCFA
               </p>
               {cancelTarget.category === 'ENGAGEMENT_FEE' && (
-                <div className="flex items-start gap-2 p-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                  <AlertCircle size={14} className="text-blue-400 mt-0.5 shrink-0" />
-                  <p className="text-[10px] text-blue-300/80">
+                <div className="flex items-start gap-2 p-2 rounded-lg bg-status-info-bg border border-status-info/20">
+                  <AlertCircle size={14} className="text-status-info mt-0.5 shrink-0" />
+                  <p className="text-[10px] text-status-info/80">
                     En annulant, le bouton de paiement réapparaîtra dans le module Crédits. Le client pourra re-payer via Mobile Money ou espèces.
                   </p>
                 </div>
               )}
               <div>
-                <label className="text-xs font-semibold text-slate-400 mb-1 block">Motif d'annulation</label>
+                <label className="text-xs font-semibold text-content-muted mb-1 block">Motif d'annulation</label>
                 <textarea
                   value={cancelReason}
                   onChange={(e) => setCancelReason(e.target.value)}
                   placeholder="Raison de l'annulation..."
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-red-500 outline-none resize-none"
+                  className="w-full bg-surface-base border border-edge rounded-lg px-3 py-2 text-sm text-content-primary placeholder-content-muted focus:border-status-danger outline-none resize-none"
                   rows={2}
                   autoFocus
                 />

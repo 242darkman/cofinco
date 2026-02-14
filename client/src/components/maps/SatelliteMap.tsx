@@ -151,8 +151,8 @@ function LocationMarker({ onLocationUpdate, onAddressFound }: {
 
   const myLocationIcon = new DivIcon({
     html: `<div class="relative">
-      <div class="w-5 h-5 bg-blue-600 rounded-full border-3 border-white shadow-xl animate-pulse"></div>
-      <div class="absolute -inset-3 bg-blue-500/30 rounded-full animate-ping"></div>
+      <div class="w-5 h-5 bg-status-info rounded-full border-3 border-white shadow-xl animate-pulse"></div>
+      <div class="absolute -inset-3 bg-status-info/30 rounded-full animate-ping"></div>
     </div>`,
     className: 'custom-marker',
     iconSize: [24, 24],
@@ -174,13 +174,13 @@ function LocationMarker({ onLocationUpdate, onAddressFound }: {
       <Marker position={[latitude, longitude]} icon={myLocationIcon}>
         <Popup>
           <div className="text-center p-1">
-            <strong className="text-blue-700">Ma position GPS</strong>
+            <strong className="text-status-info">Ma position GPS</strong>
             <br />
-            <span className="text-xs text-gray-600">
+            <span className="text-xs text-content-muted">
               Précision: {accuracy?.toFixed(0)}m
             </span>
             <br />
-            <span className="text-xs text-gray-500">
+            <span className="text-xs text-content-muted">
               {latitude.toFixed(6)}, {longitude.toFixed(6)}
             </span>
           </div>
@@ -202,11 +202,11 @@ function RecenterButton({ position }: { position?: [number, number] }) {
   return (
     <button
       onClick={handleRecenter}
-      className="absolute bottom-4 right-4 z-[1000] bg-white p-3 rounded-full shadow-xl hover:bg-blue-50 transition-colors border-2 border-blue-500"
+      className="absolute bottom-4 right-4 z-[1000] bg-surface p-3 rounded-full shadow-xl hover:bg-status-info-bg transition-colors border-2 border-status-info"
       data-testid="button-recenter-map"
       title="Recentrer sur ma position"
     >
-      <Crosshair className="w-6 h-6 text-blue-600" />
+      <Crosshair className="w-6 h-6 text-status-info" />
     </button>
   );
 }
@@ -216,7 +216,7 @@ function LocateButton({ onClick, isLoading }: { onClick: () => void; isLoading: 
     <button
       onClick={onClick}
       disabled={isLoading}
-      className="absolute bottom-20 right-4 z-[1000] bg-blue-600 p-3 rounded-full shadow-xl hover:bg-blue-700 transition-colors disabled:opacity-50"
+      className="absolute bottom-20 right-4 z-[1000] bg-status-info p-3 rounded-full shadow-xl hover:bg-status-info transition-colors disabled:opacity-50"
       data-testid="button-locate-me"
       title="Me localiser"
     >
@@ -267,8 +267,8 @@ export default function SatelliteMap({
     : locationHistory;
 
   const agentIcon = new DivIcon({
-    html: `<div class="w-8 h-8 bg-green-500 rounded-full border-3 border-white shadow-lg flex items-center justify-center">
-      <svg class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+    html: `<div class="w-8 h-8 bg-status-success rounded-full border-3 border-white shadow-lg flex items-center justify-center">
+      <svg class="w-4 h-4 text-content-primary" fill="currentColor" viewBox="0 0 24 24">
         <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
       </svg>
     </div>`,
@@ -279,8 +279,8 @@ export default function SatelliteMap({
   });
 
   const clientIcon = new DivIcon({
-    html: `<div class="w-6 h-6 bg-blue-600 rounded-full border-2 border-white shadow-lg flex items-center justify-center">
-      <svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24">
+    html: `<div class="w-6 h-6 bg-status-info rounded-full border-2 border-white shadow-lg flex items-center justify-center">
+      <svg class="w-3 h-3 text-content-primary" fill="currentColor" viewBox="0 0 24 24">
         <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
       </svg>
     </div>`,
@@ -291,8 +291,8 @@ export default function SatelliteMap({
   });
 
   const visitIcon = (statut: string) => new DivIcon({
-    html: `<div class="w-6 h-6 ${(statut === 'COMPLETED') ? 'bg-emerald-500' : (statut === 'IN_PROGRESS') ? 'bg-orange-500' : 'bg-slate-400'} rounded-full border-2 border-white shadow-lg flex items-center justify-center">
-      <svg class="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 24 24">
+    html: `<div class="w-6 h-6 ${(statut === 'COMPLETED') ? 'bg-status-success' : (statut === 'IN_PROGRESS') ? 'bg-status-warning' : 'bg-surface-subtle'} rounded-full border-2 border-white shadow-lg flex items-center justify-center">
+      <svg class="w-3 h-3 text-content-primary" fill="currentColor" viewBox="0 0 24 24">
         <path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/>
       </svg>
     </div>`,
@@ -349,18 +349,18 @@ export default function SatelliteMap({
           >
             <Popup>
               <div className="p-2">
-                <div className="font-semibold text-green-700">
+                <div className="font-semibold text-status-success">
                   {agent.prenom} {agent.nom}
                 </div>
-                <div className="text-xs text-gray-500 mt-1">
+                <div className="text-xs text-content-muted mt-1">
                   Agent Terrain
                 </div>
                 {agent.lastSeenAt && (
-                  <div className="text-xs text-gray-400 mt-1">
+                  <div className="text-xs text-content-muted mt-1">
                     Dernière position: {new Date(agent.lastSeenAt).toLocaleString('fr-FR')}
                   </div>
                 )}
-                <div className={`text-xs mt-1 ${(agent.statut === StatutUser.ACTIVE) ? 'text-green-500' : 'text-gray-400'}`}>
+                <div className={`text-xs mt-1 ${(agent.statut === StatutUser.ACTIVE) ? 'text-status-success' : 'text-content-muted'}`}>
                   {ALL_STATUS_LABELS[agent.statut || StatutUser.ACTIVE] || agent.statut || StatutUser.ACTIVE}
                 </div>
               </div>
@@ -379,11 +379,11 @@ export default function SatelliteMap({
           >
             <Popup>
               <div className="p-2">
-                <div className="font-semibold text-blue-700">
+                <div className="font-semibold text-status-info">
                   {formatClientName(client.nom, client.prenom)}
                 </div>
                 {client.telephone && (
-                  <div className="text-xs text-gray-500 mt-1">
+                  <div className="text-xs text-content-muted mt-1">
                     {client.telephone}
                   </div>
                 )}
@@ -401,12 +401,12 @@ export default function SatelliteMap({
             <Popup>
               <div className="p-2">
                 <div className="font-semibold">{visit.clientNom}</div>
-                <div className="text-xs text-gray-500 mt-1">
+                <div className="text-xs text-content-muted mt-1">
                   {new Date(visit.dateVisite).toLocaleDateString('fr-FR')}
                 </div>
                 <div className={`text-xs mt-1 font-medium ${
-                  (visit.statut === 'COMPLETED') ? 'text-emerald-600' :
-                  (visit.statut === 'IN_PROGRESS') ? 'text-orange-600' : 'text-gray-500'
+                  (visit.statut === 'COMPLETED') ? 'text-status-success' :
+                  (visit.statut === 'IN_PROGRESS') ? 'text-status-warning' : 'text-content-muted'
                 }`}>
                   {ALL_STATUS_LABELS[visit.statut] || visit.statut}
                 </div>
@@ -447,46 +447,46 @@ export default function SatelliteMap({
       </MapContainer>
 
       {showPanel ? (
-        <div className="absolute top-4 left-4 z-[1000] bg-slate-900/95 backdrop-blur-sm rounded-xl p-4 shadow-2xl border border-slate-700 max-w-sm">
+        <div className="absolute top-4 left-4 z-[1000] bg-surface-base/95 backdrop-blur-sm rounded-xl p-4 shadow-2xl border border-edge max-w-sm">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2 text-sm">
-              <div className="p-2 bg-blue-600 rounded-lg">
-                <Satellite className="w-4 h-4 text-white" />
+              <div className="p-2 bg-status-info rounded-lg">
+                <Satellite className="w-4 h-4 text-content-primary" />
               </div>
               <div>
-                <span className="font-bold text-white block">Carte Satellite GPS</span>
-                <span className="text-xs text-slate-400">Zoom x16 - Haute résolution</span>
+                <span className="font-bold text-content-primary block">Carte Satellite GPS</span>
+                <span className="text-xs text-content-muted">Zoom x16 - Haute résolution</span>
               </div>
             </div>
             <button
               onClick={() => setShowPanel(false)}
-              className="p-1.5 hover:bg-slate-700 rounded-lg transition-colors"
+              className="p-1.5 hover:bg-surface-elevated rounded-lg transition-colors"
               data-testid="button-close-map-panel"
               title="Fermer le panneau"
             >
-              <X className="w-5 h-5 text-slate-400 hover:text-white" />
+              <X className="w-5 h-5 text-content-muted hover:text-content-primary" />
             </button>
           </div>
           
           {currentAddress && (
-            <div className="bg-slate-800 rounded-lg p-3 mb-3 border border-slate-600">
+            <div className="bg-surface rounded-lg p-3 mb-3 border border-edge-strong">
               <div className="flex items-start gap-2">
-                <MapPin className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
+                <MapPin className="w-4 h-4 text-status-success mt-0.5 flex-shrink-0" />
                 <div className="text-sm flex-1">
-                  <div className="font-semibold text-white">
+                  <div className="font-semibold text-content-primary">
                     {currentAddress.numero && `N° ${currentAddress.numero}, `}
                     {currentAddress.rue || 'Position GPS'}
                   </div>
                   {currentAddress.quartier && (
-                    <div className="text-green-400 font-medium">
+                    <div className="text-status-success font-medium">
                       Quartier {currentAddress.quartier}
                     </div>
                   )}
-                  <div className="text-slate-400 text-xs mt-1">
+                  <div className="text-content-muted text-xs mt-1">
                     {currentAddress.ville}
                   </div>
                   {currentAddress.fullAddress && currentAddress.fullAddress !== currentAddress.rue && (
-                    <div className="text-slate-500 text-xs mt-1 italic">
+                    <div className="text-content-muted text-xs mt-1 italic">
                       {currentAddress.fullAddress.length > 80 
                         ? currentAddress.fullAddress.substring(0, 80) + '...' 
                         : currentAddress.fullAddress}
@@ -498,8 +498,8 @@ export default function SatelliteMap({
           )}
           
           {myPosition && (
-            <div className="bg-blue-900/50 rounded-lg p-2 mb-3 border border-blue-700">
-              <div className="flex items-center gap-2 text-xs text-blue-200">
+            <div className="bg-status-info-bg rounded-lg p-2 mb-3 border border-status-info/30">
+              <div className="flex items-center gap-2 text-xs text-status-info-text">
                 <Navigation className="w-3 h-3" />
                 <span>GPS: {myPosition[0].toFixed(6)}, {myPosition[1].toFixed(6)}</span>
               </div>
@@ -507,32 +507,32 @@ export default function SatelliteMap({
           )}
           
           <div className="flex flex-wrap gap-2 text-xs">
-            <div className="flex items-center gap-1 bg-slate-800 px-2 py-1 rounded-full">
-              <div className="w-2.5 h-2.5 bg-green-500 rounded-full"></div>
-              <span className="text-slate-300">Agents ({agents.length})</span>
+            <div className="flex items-center gap-1 bg-surface px-2 py-1 rounded-full">
+              <div className="w-2.5 h-2.5 bg-status-success rounded-full"></div>
+              <span className="text-content-secondary">Agents ({agents.length})</span>
             </div>
-            <div className="flex items-center gap-1 bg-slate-800 px-2 py-1 rounded-full">
-              <div className="w-2.5 h-2.5 bg-blue-500 rounded-full"></div>
-              <span className="text-slate-300">Clients ({clients.length})</span>
+            <div className="flex items-center gap-1 bg-surface px-2 py-1 rounded-full">
+              <div className="w-2.5 h-2.5 bg-status-info rounded-full"></div>
+              <span className="text-content-secondary">Clients ({clients.length})</span>
             </div>
-            <div className="flex items-center gap-1 bg-slate-800 px-2 py-1 rounded-full">
-              <div className="w-2.5 h-2.5 bg-orange-500 rounded-full"></div>
-              <span className="text-slate-300">Visites ({visits.length})</span>
+            <div className="flex items-center gap-1 bg-surface px-2 py-1 rounded-full">
+              <div className="w-2.5 h-2.5 bg-status-warning rounded-full"></div>
+              <span className="text-content-secondary">Visites ({visits.length})</span>
             </div>
-            <div className="flex items-center gap-1 bg-slate-800 px-2 py-1 rounded-full">
-              <div className="w-4 h-0.5 bg-green-500 rounded"></div>
-              <span className="text-slate-300">Itinéraire</span>
+            <div className="flex items-center gap-1 bg-surface px-2 py-1 rounded-full">
+              <div className="w-4 h-0.5 bg-status-success rounded"></div>
+              <span className="text-content-secondary">Itinéraire</span>
             </div>
           </div>
         </div>
       ) : (
         <button
           onClick={() => setShowPanel(true)}
-          className="absolute top-20 left-4 z-[1000] bg-slate-900/95 backdrop-blur-sm rounded-xl p-3 shadow-2xl border border-slate-700 hover:bg-slate-800 transition-colors"
+          className="absolute top-20 left-4 z-[1000] bg-surface-base/95 backdrop-blur-sm rounded-xl p-3 shadow-2xl border border-edge hover:bg-surface transition-colors"
           data-testid="button-open-map-panel"
           title="Afficher le panneau"
         >
-          <Satellite className="w-5 h-5 text-blue-400" />
+          <Satellite className="w-5 h-5 text-status-info" />
         </button>
       )}
     </div>

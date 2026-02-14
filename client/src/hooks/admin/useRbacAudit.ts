@@ -443,9 +443,9 @@ export const PERMISSION_SOURCE_LABELS: Record<PermissionSource, string> = {
 };
 
 export const PERMISSION_SOURCE_COLORS: Record<PermissionSource, string> = {
-  ROLE: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-  TEMPORARY: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-  OVERRIDE_GLOBAL: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
-  OVERRIDE_AGENCE: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
-  NONE: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
+  ROLE: 'bg-status-info-bg text-status-info border-status-info/20',
+  TEMPORARY: 'bg-status-warning-bg text-status-warning border-status-warning/20',
+  OVERRIDE_GLOBAL: 'bg-accent/10 text-accent border-accent/20',
+  OVERRIDE_AGENCE: 'bg-status-info-bg text-status-info border-status-info/20',
+  NONE: 'bg-surface-subtle/30 text-content-muted border-edge-strong/20',
 };

@@ -520,7 +520,7 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
                  <button 
                    type="button"
                    onClick={() => setShowCamera(true)}
-                   className="text-white hover:text-primary transition-colors p-1"
+                   className="text-content-primary hover:text-primary transition-colors p-1"
                    title="Prendre une photo"
                    disabled={isUploading}
                  >
@@ -529,7 +529,7 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
                  <button 
                    type="button"
                    onClick={() => fileInputRef.current?.click()}
-                   className="text-white hover:text-primary transition-colors p-1"
+                   className="text-content-primary hover:text-primary transition-colors p-1"
                    title="Importer"
                    disabled={isUploading}
                  >
@@ -539,7 +539,7 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
                     <button 
                      type="button"
                      onClick={() => updateField('photoProfile', '')}
-                     className="text-white hover:text-danger transition-colors p-1"
+                     className="text-content-primary hover:text-danger transition-colors p-1"
                      title="Supprimer"
                    >
                      <X size={16} />
@@ -551,7 +551,7 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
                <button
                  type="button"
                  onClick={() => fileInputRef.current?.click()}
-                 className="absolute bottom-0 right-0 bg-primary text-white p-1.5 rounded-full shadow-lg border-2 border-surface-base sm:hidden"
+                 className="absolute bottom-0 right-0 bg-primary text-content-primary p-1.5 rounded-full shadow-lg border-2 border-surface-base sm:hidden"
                >
                  <Camera size={14} />
                </button>
@@ -605,19 +605,19 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
                     placeholder="ex: p.nom"
                   />
                    {usernameValidation.checking && (
-                     <div className="absolute right-2 top-8 text-xs text-slate-400 flex items-center gap-1">
+                     <div className="absolute right-2 top-8 text-xs text-content-muted flex items-center gap-1">
                        <Loader2 size={12} className="animate-spin" />
                        Vérification...
                      </div>
                    )}
                    {!usernameValidation.checking && usernameValidation.available === true && formData.username && (
-                     <div className="absolute right-2 top-8 text-xs text-green-400 flex items-center gap-1">
+                     <div className="absolute right-2 top-8 text-xs text-status-success flex items-center gap-1">
                        <CheckCircle2 size={12} />
                        Disponible
                      </div>
                    )}
                    {!usernameValidation.checking && usernameValidation.available === false && formData.username && (
-                     <div className="absolute right-2 top-8 text-xs text-red-400 flex items-center gap-1">
+                     <div className="absolute right-2 top-8 text-xs text-status-danger flex items-center gap-1">
                        <XCircle size={12} />
                        Déjà utilisé
                      </div>
@@ -664,7 +664,7 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
                     options={roles}
                     required
                     containerClassName="mt-0"
-                    className="bg-slate-800 border-slate-700 text-white focus:border-primary focus:ring-primary/20"
+                    className="bg-surface border-edge text-content-primary focus:border-primary focus:ring-primary/20"
                  />
                  <SelectField
                     label="Statut"
@@ -673,7 +673,7 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
                     onChange={(e) => setFormData({ ...formData, statut: e.target.value })}
                     options={statusOptions}
                     containerClassName="mt-0"
-                    className="bg-slate-800 border-slate-700 text-white focus:border-primary focus:ring-primary/20"
+                    className="bg-surface border-edge text-content-primary focus:border-primary focus:ring-primary/20"
                  />
                </div>
 
@@ -723,7 +723,7 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
 
           {/* Global error message */}
           {submitError && (
-            <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+            <div className="flex items-center gap-2 p-3 bg-status-danger-bg border border-status-danger/30 rounded-lg text-status-danger text-sm">
               <AlertCircle size={16} />
               <span>{submitError}</span>
             </div>

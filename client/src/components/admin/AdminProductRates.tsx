@@ -65,19 +65,19 @@ const TYPE_CONFIG: Record<string, { label: string; badge: string; icon: React.El
     label: 'Épargne',
     badge: 'ÉPARGNE',
     icon: PiggyBank,
-    gradient: 'from-emerald-500/20 to-teal-500/20 border-emerald-500/30',
+    gradient: 'from-status-success/20 to-accent/20 border-status-success/30',
   },
   CURRENT: {
     label: 'Courant',
     badge: 'COURANT',
     icon: Wallet,
-    gradient: 'from-blue-500/20 to-indigo-500/20 border-blue-500/30',
+    gradient: 'from-status-info/20 to-accent/20 border-status-info/30',
   },
   BLOCKED: {
     label: 'Bloqué',
     badge: 'BLOQUÉ',
     icon: Lock,
-    gradient: 'from-amber-500/20 to-orange-500/20 border-amber-500/30',
+    gradient: 'from-status-warning/20 to-status-warning/20 border-status-warning/30',
   },
 };
 
@@ -216,9 +216,9 @@ export default function AdminProductRates() {
     return (
       <div className="h-full flex items-center justify-center">
         <div className="text-center">
-          <Shield size={48} className="mx-auto mb-4 text-red-400 opacity-50" />
-          <h3 className="text-lg font-semibold text-white mb-2">Accès restreint</h3>
-          <p className="text-slate-400 text-sm">Permission requise</p>
+          <Shield size={48} className="mx-auto mb-4 text-status-danger opacity-50" />
+          <h3 className="text-lg font-semibold text-content-primary mb-2">Accès restreint</h3>
+          <p className="text-content-muted text-sm">Permission requise</p>
         </div>
       </div>
     );
@@ -227,38 +227,38 @@ export default function AdminProductRates() {
   return (
     <div className="space-y-4">
       {/* Compact Header with Stats */}
-      <div className="bg-linear-to-r from-teal-600/90 via-cyan-600/90 to-blue-600/90 rounded-xl p-4">
+      <div className="bg-linear-to-r from-accent via-cyan-600/90 to-status-info rounded-xl p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-white/20 rounded-lg">
-              <Percent size={20} className="text-white" />
+              <Percent size={20} className="text-content-primary" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-white">Gestion des Taux</h2>
-              <p className="text-[11px] text-indigo-100/80">Configuration produits</p>
+              <h2 className="text-base font-bold text-content-primary">Gestion des Taux</h2>
+              <p className="text-[11px] text-accent/80">Configuration produits</p>
             </div>
           </div>
 
           {/* Inline Stats */}
           <div className="hidden sm:flex items-center gap-4">
             <div className="text-center px-3">
-              <p className="text-lg font-bold text-white">{stats.total}</p>
-              <p className="text-[9px] text-indigo-100/70 uppercase">Produits</p>
+              <p className="text-lg font-bold text-content-primary">{stats.total}</p>
+              <p className="text-[9px] text-accent/70 uppercase">Produits</p>
             </div>
             <div className="w-px h-8 bg-white/20" />
             <div className="text-center px-3">
-              <p className="text-lg font-bold text-emerald-300">{stats.active}</p>
-              <p className="text-[9px] text-indigo-100/70 uppercase">Actifs</p>
+              <p className="text-lg font-bold text-status-success">{stats.active}</p>
+              <p className="text-[9px] text-accent/70 uppercase">Actifs</p>
             </div>
             <div className="w-px h-8 bg-white/20" />
             <div className="text-center px-3">
-              <p className="text-lg font-bold text-amber-300">{stats.avgRate}%</p>
-              <p className="text-[9px] text-indigo-100/70 uppercase">Taux Moy.</p>
+              <p className="text-lg font-bold text-status-warning">{stats.avgRate}%</p>
+              <p className="text-[9px] text-accent/70 uppercase">Taux Moy.</p>
             </div>
             <div className="w-px h-8 bg-white/20" />
             <div className="text-center px-3">
-              <p className="text-lg font-bold text-cyan-300">{stats.withRates}</p>
-              <p className="text-[9px] text-indigo-100/70 uppercase">Avec Taux</p>
+              <p className="text-lg font-bold text-accent">{stats.withRates}</p>
+              <p className="text-[9px] text-accent/70 uppercase">Avec Taux</p>
             </div>
           </div>
 
@@ -267,7 +267,7 @@ export default function AdminProductRates() {
             disabled={isLoading}
             className="p-2 bg-white/10 hover:bg-white/20 rounded-lg transition"
           >
-            <RefreshCw size={16} className={cn("text-white", isLoading && "animate-spin")} />
+            <RefreshCw size={16} className={cn("text-content-primary", isLoading && "animate-spin")} />
           </button>
         </div>
       </div>
@@ -275,13 +275,13 @@ export default function AdminProductRates() {
       {/* Toolbar: Search + Type Filter */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Rechercher un produit..."
-            className="w-full h-9 pl-9 pr-3 bg-slate-800/50 border border-slate-700 rounded-lg text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500"
+            className="w-full h-9 pl-9 pr-3 bg-surface/50 border border-edge rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-accent"
           />
         </div>
 
@@ -291,8 +291,8 @@ export default function AdminProductRates() {
             className={cn(
               "h-9 px-3 text-[11px] font-medium rounded-lg border transition-colors",
               !filterType
-                ? "bg-indigo-500/20 border-indigo-500/40 text-indigo-400"
-                : "bg-slate-800/50 border-slate-700 text-slate-400 hover:text-white"
+                ? "bg-accent/10 border-accent/40 text-accent"
+                : "bg-surface/50 border-edge text-content-muted hover:text-content-primary"
             )}
           >
             Tous
@@ -305,7 +305,7 @@ export default function AdminProductRates() {
                 "h-9 px-3 text-[11px] font-medium rounded-lg border transition-colors flex items-center gap-1.5",
                 filterType === type
                   ? `bg-linear-to-r ${config.gradient}`
-                  : "bg-slate-800/50 border-slate-700 text-slate-400 hover:text-white"
+                  : "bg-surface/50 border-edge text-content-muted hover:text-content-primary"
               )}
             >
               <config.icon size={12} />
@@ -318,10 +318,10 @@ export default function AdminProductRates() {
       {/* Products Grid */}
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="animate-spin text-indigo-400" size={32} />
+          <Loader2 className="animate-spin text-accent" size={32} />
         </div>
       ) : filteredProducts.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+        <div className="flex flex-col items-center justify-center py-12 text-content-muted">
           <Info size={32} className="mb-2 opacity-50" />
           <p className="text-sm">Aucun produit trouvé</p>
         </div>
@@ -336,38 +336,38 @@ export default function AdminProductRates() {
               <div
                 key={product.id}
                 className={cn(
-                  "bg-slate-900/50 border rounded-xl transition-all",
+                  "bg-surface-base/50 border rounded-xl transition-all",
                   isEditing
-                    ? "border-indigo-500 ring-1 ring-indigo-500/30"
-                    : "border-slate-800 hover:border-slate-700"
+                    ? "border-accent ring-1 ring-accent/30"
+                    : "border-edge hover:border-edge"
                 )}
               >
                 {/* Product Header - Compact */}
-                <div className={cn("p-3 bg-linear-to-r border-b border-slate-800 rounded-t-xl", config.gradient)}>
+                <div className={cn("p-3 bg-linear-to-r border-b border-edge rounded-t-xl", config.gradient)}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5 min-w-0">
                       <div className="p-1.5 bg-white/10 rounded-lg shrink-0">
-                        <TypeIcon size={14} className="text-white" />
+                        <TypeIcon size={14} className="text-content-primary" />
                       </div>
                       <div className="min-w-0 flex items-center gap-2">
-                        <h3 className="text-sm font-semibold text-white truncate">{product.nom}</h3>
+                        <h3 className="text-sm font-semibold text-content-primary truncate">{product.nom}</h3>
                         {!product.actif && (
-                          <span className="px-1.5 py-0.5 text-[8px] bg-red-500/30 text-red-300 rounded">
+                          <span className="px-1.5 py-0.5 text-[8px] bg-status-danger/30 text-status-danger rounded">
                             INACTIF
                           </span>
                         )}
                       </div>
                     </div>
-                    <span className="px-2 py-0.5 text-[9px] font-bold bg-black/20 text-white/80 rounded">
+                    <span className="px-2 py-0.5 text-[9px] font-bold bg-black/20 text-content-primary/80 rounded">
                       {config.badge}
                     </span>
                   </div>
                 </div>
 
                 {/* Rate Display - Prominent */}
-                <div className="px-3 py-2.5 bg-slate-800/30 border-b border-slate-800/50">
+                <div className="px-3 py-2.5 bg-surface/30 border-b border-edge/50">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] text-slate-500 flex items-center gap-1">
+                    <span className="text-[10px] text-content-muted flex items-center gap-1">
                       <Percent size={10} />
                       Taux d'intérêt
                     </span>
@@ -378,16 +378,16 @@ export default function AdminProductRates() {
                           step="0.01"
                           value={editValues.tauxInteret}
                           onChange={(e) => setEditValues({ ...editValues, tauxInteret: e.target.value })}
-                          className="w-16 px-2 py-0.5 text-right text-sm bg-slate-700 border border-slate-600 rounded focus:border-indigo-500 outline-none text-white"
+                          className="w-16 px-2 py-0.5 text-right text-sm bg-surface-elevated border border-edge-strong rounded focus:border-accent outline-none text-content-primary"
                         />
-                        <span className="text-slate-400 text-xs">%</span>
+                        <span className="text-content-muted text-xs">%</span>
                       </div>
                     ) : (
                       <span className={cn(
                         "text-lg font-bold",
                         product.tauxInteret && parseFloat(product.tauxInteret) > 0
-                          ? "text-emerald-400"
-                          : "text-slate-500"
+                          ? "text-status-success"
+                          : "text-content-muted"
                       )}>
                         {product.tauxInteret ? `${parseFloat(product.tauxInteret).toFixed(2)}%` : '0.00%'}
                       </span>
@@ -433,33 +433,33 @@ export default function AdminProductRates() {
                   </div>
 
                   {/* Rules - Inline */}
-                  <div className="mt-2 pt-2 border-t border-slate-800/50 grid grid-cols-2 gap-2">
+                  <div className="mt-2 pt-2 border-t border-edge/50 grid grid-cols-2 gap-2">
                     <div className="text-[10px]">
-                      <span className="text-slate-500 inline-flex items-center">Min:<InfoTooltip field="soldeMinimum" /> </span>
+                      <span className="text-content-muted inline-flex items-center">Min:<InfoTooltip field="soldeMinimum" /> </span>
                       {isEditing ? (
                         <input
                           type="number"
                           value={editValues.soldeMinimum}
                           onChange={(e) => setEditValues({ ...editValues, soldeMinimum: e.target.value })}
-                          className="w-16 px-1 py-0.5 bg-slate-700 border border-slate-600 rounded text-white text-[10px]"
+                          className="w-16 px-1 py-0.5 bg-surface-elevated border border-edge-strong rounded text-content-primary text-[10px]"
                         />
                       ) : (
-                        <span className="text-slate-300">
+                        <span className="text-content-secondary">
                           {product.regles?.soldeMinimum?.toLocaleString() || '-'} F
                         </span>
                       )}
                     </div>
                     <div className="text-[10px]">
-                      <span className="text-slate-500 inline-flex items-center">Plafond:<InfoTooltip field="plafondDepot" /> </span>
+                      <span className="text-content-muted inline-flex items-center">Plafond:<InfoTooltip field="plafondDepot" /> </span>
                       {isEditing ? (
                         <input
                           type="number"
                           value={editValues.plafondDepot}
                           onChange={(e) => setEditValues({ ...editValues, plafondDepot: e.target.value })}
-                          className="w-16 px-1 py-0.5 bg-slate-700 border border-slate-600 rounded text-white text-[10px]"
+                          className="w-16 px-1 py-0.5 bg-surface-elevated border border-edge-strong rounded text-content-primary text-[10px]"
                         />
                       ) : (
-                        <span className="text-slate-300">
+                        <span className="text-content-secondary">
                           {product.regles?.plafondDepot?.toLocaleString() || '∞'}
                         </span>
                       )}
@@ -467,8 +467,8 @@ export default function AdminProductRates() {
                   </div>
 
                   {/* Policy toggles */}
-                  <div className="mt-2 pt-2 border-t border-slate-800/50 space-y-1.5">
-                    <p className="text-[9px] text-slate-500 uppercase tracking-wide">Politique</p>
+                  <div className="mt-2 pt-2 border-t border-edge/50 space-y-1.5">
+                    <p className="text-[9px] text-content-muted uppercase tracking-wide">Politique</p>
                     <PolicyToggle
                       label="Dépôt initial obligatoire"
                       tooltipField="depotInitialObligatoire"
@@ -478,17 +478,17 @@ export default function AdminProductRates() {
                     />
                     {(isEditing ? editValues.depotInitialObligatoire : product.regles?.depotInitialObligatoire) && (
                       <div className="text-[10px] pl-5">
-                        <span className="text-slate-500 inline-flex items-center">Dépôt min: <InfoTooltip field="depotInitialMinimum" /></span>
+                        <span className="text-content-muted inline-flex items-center">Dépôt min: <InfoTooltip field="depotInitialMinimum" /></span>
                         {isEditing ? (
                           <input
                             type="number"
                             value={editValues.depotInitialMinimum}
                             onChange={(e) => setEditValues({ ...editValues, depotInitialMinimum: e.target.value })}
-                            className="w-16 px-1 py-0.5 bg-slate-700 border border-slate-600 rounded text-white text-[10px]"
+                            className="w-16 px-1 py-0.5 bg-surface-elevated border border-edge-strong rounded text-content-primary text-[10px]"
                             placeholder="0"
                           />
                         ) : (
-                          <span className="text-slate-300">
+                          <span className="text-content-secondary">
                             {product.regles?.depotInitialMinimum?.toLocaleString() || '-'} F
                           </span>
                         )}
@@ -512,8 +512,8 @@ export default function AdminProductRates() {
                 </div>
 
                 {/* Actions Footer */}
-                <div className="px-3 py-2 bg-slate-900/50 border-t border-slate-800 rounded-b-xl flex items-center justify-between">
-                  <span className="text-[9px] text-slate-600">
+                <div className="px-3 py-2 bg-surface-base/50 border-t border-edge rounded-b-xl flex items-center justify-between">
+                  <span className="text-[9px] text-content-muted">
                     {format(new Date(product.createdAt), 'dd/MM/yy', { locale: fr })}
                   </span>
 
@@ -521,14 +521,14 @@ export default function AdminProductRates() {
                     <div className="flex items-center gap-1.5">
                       <button
                         onClick={cancelEditing}
-                        className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition"
+                        className="p-1.5 text-content-muted hover:text-content-primary hover:bg-surface-elevated rounded transition"
                       >
                         <X size={14} />
                       </button>
                       <button
                         onClick={() => saveChanges(product)}
                         disabled={updateMutation.isPending}
-                        className="flex items-center gap-1 px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-[11px] font-medium transition disabled:opacity-50"
+                        className="flex items-center gap-1 px-2.5 py-1 bg-accent hover:bg-accent-primary-hover text-white rounded text-[11px] font-medium transition disabled:opacity-50"
                       >
                         {updateMutation.isPending ? (
                           <Loader2 size={12} className="animate-spin" />
@@ -541,7 +541,7 @@ export default function AdminProductRates() {
                   ) : (
                     <button
                       onClick={() => startEditing(product)}
-                      className="flex items-center gap-1 px-2.5 py-1 text-slate-400 hover:text-white hover:bg-slate-700 rounded text-[11px] transition"
+                      className="flex items-center gap-1 px-2.5 py-1 text-content-muted hover:text-content-primary hover:bg-surface-elevated rounded text-[11px] transition"
                     >
                       <Edit2 size={12} />
                       Modifier
@@ -587,7 +587,7 @@ function InfoTooltip({ field }: { field: string }) {
   if (!tip) return null;
   return (
     <Tooltip content={tip} position="top" maxWidth={220}>
-      <HelpCircle size={10} className="ml-1 text-slate-500 hover:text-slate-300 cursor-help" />
+      <HelpCircle size={10} className="ml-1 text-content-muted hover:text-content-secondary cursor-help" />
     </Tooltip>
   );
 }
@@ -614,7 +614,7 @@ function PolicyToggle({
           onClick={() => onChange(!checked)}
           className={cn(
             "relative w-7 h-4 rounded-full transition-colors shrink-0",
-            checked ? "bg-indigo-500" : "bg-slate-600"
+            checked ? "bg-accent" : "bg-surface-subtle"
           )}
         >
           <span
@@ -627,10 +627,10 @@ function PolicyToggle({
       ) : (
         <span className={cn(
           "w-2 h-2 rounded-full shrink-0",
-          checked ? "bg-emerald-400" : "bg-slate-600"
+          checked ? "bg-status-success" : "bg-surface-subtle"
         )} />
       )}
-      <span className="text-[10px] text-slate-400 flex items-center">{label}{tooltipField && <InfoTooltip field={tooltipField} />}</span>
+      <span className="text-[10px] text-content-muted flex items-center">{label}{tooltipField && <InfoTooltip field={tooltipField} />}</span>
     </div>
   );
 }
@@ -652,19 +652,19 @@ function FeeField({
   tooltipField?: string;
 }) {
   return (
-    <div className="bg-slate-800/40 rounded-lg px-2.5 py-2">
-      <p className="text-[9px] text-slate-500 uppercase tracking-wide mb-0.5 flex items-center">{label}{tooltipField && <InfoTooltip field={tooltipField} />}</p>
+    <div className="bg-surface/40 rounded-lg px-2.5 py-2">
+      <p className="text-[9px] text-content-muted uppercase tracking-wide mb-0.5 flex items-center">{label}{tooltipField && <InfoTooltip field={tooltipField} />}</p>
       {isEditing ? (
         <input
           type="number"
           value={editValue}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full px-1.5 py-0.5 text-xs bg-slate-700 border border-slate-600 rounded focus:border-indigo-500 outline-none text-white"
+          className="w-full px-1.5 py-0.5 text-xs bg-surface-elevated border border-edge-strong rounded focus:border-accent outline-none text-content-primary"
           placeholder="0"
         />
       ) : (
-        <p className="text-xs font-medium text-white">
-          {value?.toLocaleString() || '-'} <span className="text-slate-500 text-[10px]">F</span>
+        <p className="text-xs font-medium text-content-primary">
+          {value?.toLocaleString() || '-'} <span className="text-content-muted text-[10px]">F</span>
         </p>
       )}
     </div>

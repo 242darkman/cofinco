@@ -58,10 +58,10 @@ const JOURS_SEMAINE = [
 ];
 
 const STATUS_CONFIG: Record<string, { color: string; icon: React.ElementType; label: string }> = {
-  SCHEDULED: { color: 'bg-blue-500/20 text-blue-400', icon: Clock, label: 'Planifié' },
-  EXECUTED: { color: 'bg-green-500/20 text-green-400', icon: CheckCircle, label: 'Exécuté' },
-  CANCELLED: { color: 'bg-slate-500/20 text-slate-400', icon: XCircle, label: 'Annulé' },
-  FAILED: { color: 'bg-red-500/20 text-red-400', icon: AlertCircle, label: 'Échoué' },
+  SCHEDULED: { color: 'bg-status-info-bg text-status-info', icon: Clock, label: 'Planifié' },
+  EXECUTED: { color: 'bg-status-success-bg text-status-success', icon: CheckCircle, label: 'Exécuté' },
+  CANCELLED: { color: 'bg-surface-subtle/40 text-content-muted', icon: XCircle, label: 'Annulé' },
+  FAILED: { color: 'bg-status-danger-bg text-status-danger', icon: AlertCircle, label: 'Échoué' },
 };
 
 export default function ScheduledCaisseTransfersPanel({
@@ -208,8 +208,8 @@ export default function ScheduledCaisseTransfersPanel({
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-bold text-white flex items-center gap-2">
-          <Calendar size={16} className="text-indigo-400" />
+        <h3 className="text-sm font-bold text-content-primary flex items-center gap-2">
+          <Calendar size={16} className="text-accent" />
           Transferts Planifiés
         </h3>
         <div className="flex items-center gap-2">
@@ -236,10 +236,10 @@ export default function ScheduledCaisseTransfersPanel({
       <div className="space-y-2">
         {loading && transfers.length === 0 ? (
           <div className="flex justify-center py-8">
-            <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
+            <Loader2 className="w-6 h-6 animate-spin text-accent" />
           </div>
         ) : transfers.length === 0 ? (
-          <div className="text-center py-8 text-slate-500">
+          <div className="text-center py-8 text-content-muted">
             <Calendar size={32} className="mx-auto mb-2 opacity-50" />
             <p className="text-sm">Aucun transfert planifié</p>
           </div>
@@ -252,22 +252,22 @@ export default function ScheduledCaisseTransfersPanel({
             return (
               <div
                 key={transfer.id}
-                className="bg-slate-800/50 border border-slate-700 rounded-lg p-4"
+                className="bg-surface/50 border border-edge rounded-lg p-4"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     {/* Source -> Dest */}
                     <div className="flex items-center gap-2 mb-2">
                       <div className="flex items-center gap-1.5 text-sm">
-                        <Building2 size={14} className="text-slate-400" />
-                        <span className="text-white font-medium truncate">
+                        <Building2 size={14} className="text-content-muted" />
+                        <span className="text-content-primary font-medium truncate">
                           {transfer.agenceSourceNom || getAgencyName(transfer.agenceSourceId)}
                         </span>
                       </div>
-                      <ArrowRight size={14} className="text-slate-500 flex-shrink-0" />
+                      <ArrowRight size={14} className="text-content-muted flex-shrink-0" />
                       <div className="flex items-center gap-1.5 text-sm">
-                        <Building2 size={14} className="text-slate-400" />
-                        <span className="text-white font-medium truncate">
+                        <Building2 size={14} className="text-content-muted" />
+                        <span className="text-content-primary font-medium truncate">
                           {transfer.agenceDestNom || getAgencyName(transfer.agenceDestId)}
                         </span>
                       </div>
@@ -275,7 +275,7 @@ export default function ScheduledCaisseTransfersPanel({
 
                     {/* Amount and frequency */}
                     <div className="flex items-center gap-3 mb-2">
-                      <span className="text-lg font-bold text-white">
+                      <span className="text-lg font-bold text-content-primary">
                         {formatMoney(parseFloat(transfer.montant))}
                       </span>
                       <Badge
@@ -284,12 +284,12 @@ export default function ScheduledCaisseTransfersPanel({
                         size="xs"
                       />
                       {isRecurring && (
-                        <Repeat size={12} className="text-indigo-400" />
+                        <Repeat size={12} className="text-accent" />
                       )}
                     </div>
 
                     {/* Details */}
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-400">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-content-muted">
                       <span className="flex items-center gap-1">
                         <Clock size={10} />
                         Prochaine: {transfer.prochaineExecution
@@ -302,7 +302,7 @@ export default function ScheduledCaisseTransfersPanel({
                     </div>
 
                     {transfer.motif && (
-                      <p className="text-xs text-slate-500 mt-1 truncate">{transfer.motif}</p>
+                      <p className="text-xs text-content-muted mt-1 truncate">{transfer.motif}</p>
                     )}
                   </div>
 
@@ -318,7 +318,7 @@ export default function ScheduledCaisseTransfersPanel({
                         <button
                           onClick={() => handleExecuteNow(transfer.id)}
                           disabled={executing === transfer.id}
-                          className="p-1.5 text-green-400 hover:bg-green-500/10 rounded transition disabled:opacity-50"
+                          className="p-1.5 text-status-success hover:bg-status-success-bg rounded transition disabled:opacity-50"
                           title="Exécuter maintenant"
                         >
                           {executing === transfer.id ? (
@@ -329,14 +329,14 @@ export default function ScheduledCaisseTransfersPanel({
                         </button>
                         <button
                           onClick={() => handleEdit(transfer)}
-                          className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition"
+                          className="p-1.5 text-content-muted hover:text-content-primary hover:bg-surface-elevated rounded transition"
                           title="Modifier"
                         >
                           <Edit2 size={14} />
                         </button>
                         <button
                           onClick={() => handleCancel(transfer.id)}
-                          className="p-1.5 text-red-400 hover:bg-red-500/10 rounded transition"
+                          className="p-1.5 text-status-danger hover:bg-status-danger-bg rounded transition"
                           title="Annuler"
                         >
                           <Trash2 size={14} />
@@ -460,7 +460,7 @@ export default function ScheduledCaisseTransfersPanel({
             placeholder="Ex: Approvisionnement hebdomadaire"
           />
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
+          <div className="flex justify-end gap-3 pt-4 border-t border-edge">
             <Button variant="secondary" onClick={() => { setShowForm(false); setEditingTransfer(null); }}>
               Annuler
             </Button>

@@ -140,10 +140,10 @@ export default function AdminSessionsManager() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active': return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
-      case 'idle': return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
-      case 'expired': return 'bg-slate-500/20 text-slate-400 border-slate-500/30';
-      default: return 'bg-slate-500/20 text-slate-400';
+      case 'active': return 'bg-status-success-bg text-status-success border-status-success/30';
+      case 'idle': return 'bg-status-warning-bg text-status-warning border-status-warning/30';
+      case 'expired': return 'bg-surface-subtle/40 text-content-muted border-edge-strong/30';
+      default: return 'bg-surface-subtle/40 text-content-muted';
     }
   };
 
@@ -158,33 +158,33 @@ export default function AdminSessionsManager() {
     <div className="space-y-4">
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="bg-slate-800/80 backdrop-blur-sm border border-slate-700/50 p-3 rounded-xl flex items-center gap-3 shadow-sm">
-          <div className="w-10 h-10 bg-emerald-500/10 rounded-lg flex items-center justify-center border border-emerald-500/20 shrink-0">
-            <CheckCircle className="text-emerald-400" size={20} />
+        <div className="bg-surface/80 backdrop-blur-sm border border-edge-subtle p-3 rounded-xl flex items-center gap-3 shadow-sm">
+          <div className="w-10 h-10 bg-status-success-bg rounded-lg flex items-center justify-center border border-status-success/20 shrink-0">
+            <CheckCircle className="text-status-success" size={20} />
           </div>
           <div>
-            <p className="text-xl font-bold text-white">{sessions.filter(s => s.status === 'active').length}</p>
-            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Sessions Actives</p>
+            <p className="text-xl font-bold text-content-primary">{sessions.filter(s => s.status === 'active').length}</p>
+            <p className="text-[10px] text-content-muted font-medium uppercase tracking-wide">Sessions Actives</p>
           </div>
         </div>
 
-        <div className="bg-slate-800/80 backdrop-blur-sm border border-slate-700/50 p-3 rounded-xl flex items-center gap-3 shadow-sm">
-          <div className="w-10 h-10 bg-amber-500/10 rounded-lg flex items-center justify-center border border-amber-500/20 shrink-0">
-            <Clock className="text-amber-400" size={20} />
+        <div className="bg-surface/80 backdrop-blur-sm border border-edge-subtle p-3 rounded-xl flex items-center gap-3 shadow-sm">
+          <div className="w-10 h-10 bg-status-warning-bg rounded-lg flex items-center justify-center border border-status-warning/20 shrink-0">
+            <Clock className="text-status-warning" size={20} />
           </div>
           <div>
-            <p className="text-xl font-bold text-white">{sessions.filter(s => s.status === 'idle').length}</p>
-            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Inactives</p>
+            <p className="text-xl font-bold text-content-primary">{sessions.filter(s => s.status === 'idle').length}</p>
+            <p className="text-[10px] text-content-muted font-medium uppercase tracking-wide">Inactives</p>
           </div>
         </div>
 
-        <div className="bg-slate-800/80 backdrop-blur-sm border border-slate-700/50 p-3 rounded-xl flex items-center gap-3 shadow-sm">
-          <div className="w-10 h-10 bg-blue-500/10 rounded-lg flex items-center justify-center border border-blue-500/20 shrink-0">
-            <Monitor className="text-blue-400" size={20} />
+        <div className="bg-surface/80 backdrop-blur-sm border border-edge-subtle p-3 rounded-xl flex items-center gap-3 shadow-sm">
+          <div className="w-10 h-10 bg-status-info-bg rounded-lg flex items-center justify-center border border-status-info/20 shrink-0">
+            <Monitor className="text-status-info" size={20} />
           </div>
           <div>
-            <p className="text-xl font-bold text-white">{sessions.length}</p>
-            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Total Sessions</p>
+            <p className="text-xl font-bold text-content-primary">{sessions.length}</p>
+            <p className="text-[10px] text-content-muted font-medium uppercase tracking-wide">Total Sessions</p>
           </div>
         </div>
       </div>
@@ -194,8 +194,8 @@ export default function AdminSessionsManager() {
         <div className="p-2 border-b border-edge bg-surface-muted/30">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-blue-500/10 rounded-lg flex items-center justify-center shrink-0">
-                  <Monitor className="w-4 h-4 text-blue-400" />
+                <div className="w-8 h-8 bg-status-info-bg rounded-lg flex items-center justify-center shrink-0">
+                  <Monitor className="w-4 h-4 text-status-info" />
                 </div>
                 <div>
                   <h2 className="text-base font-bold text-content-primary">Sessions Actives</h2>
@@ -215,7 +215,7 @@ export default function AdminSessionsManager() {
                     className={`
                       px-2 py-1 text-[10px] sm:text-xs font-medium rounded-md transition-all
                       ${filterStatus === tab.id
-                        ? 'bg-primary text-white shadow-sm'
+                        ? 'bg-primary text-content-primary shadow-sm'
                         : 'text-content-muted hover:text-content-primary hover:bg-surface-muted'
                       }
                     `}

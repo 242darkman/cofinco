@@ -187,14 +187,14 @@ function formatTimeSince(seconds: number): string {
  * Get connection state color for UI (simplified)
  */
 export function getConnectionStateColor(state: ConnectionState): string {
-  return state === 'connected' ? 'text-green-400' : 'text-red-400';
+  return state === 'connected' ? 'text-status-success' : 'text-status-danger';
 }
 
 /**
  * Get connection state background color for UI (simplified)
  */
 export function getConnectionStateBgColor(state: ConnectionState): string {
-  return state === 'connected' ? 'bg-green-500' : 'bg-red-500';
+  return state === 'connected' ? 'bg-status-success' : 'bg-status-danger';
 }
 
 /**
@@ -210,13 +210,13 @@ export function getConnectionStateLabel(state: ConnectionState): string {
 export function getLatencyQualityColor(quality: LatencyQuality): string {
   switch (quality) {
     case 'good':
-      return 'text-green-400';
+      return 'text-status-success';
     case 'fair':
-      return 'text-yellow-400';
+      return 'text-status-warning';
     case 'poor':
-      return 'text-orange-400';
+      return 'text-status-warning';
     default:
-      return 'text-slate-400';
+      return 'text-content-muted';
   }
 }
 
@@ -226,13 +226,13 @@ export function getLatencyQualityColor(quality: LatencyQuality): string {
 export function getLatencyQualityBgColor(quality: LatencyQuality): string {
   switch (quality) {
     case 'good':
-      return 'bg-green-500/20';
+      return 'bg-status-success-bg';
     case 'fair':
-      return 'bg-yellow-500/20';
+      return 'bg-status-warning-bg';
     case 'poor':
-      return 'bg-orange-500/20';
+      return 'bg-status-warning-bg';
     default:
-      return 'bg-slate-500/20';
+      return 'bg-surface-subtle/40';
   }
 }
 

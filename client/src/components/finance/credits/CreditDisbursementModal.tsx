@@ -16,8 +16,8 @@ import airtelLogo from '@/assets/logos/airtel-logo.png';
 import { currencyCode } from '@shared/config/currency';
 
 const MOBILE_OPERATORS = [
-  { id: 'MTN', name: 'MTN Mobile Money', color: 'from-yellow-500 to-yellow-600', logo: mtnLogo },
-  { id: 'AIRTEL', name: 'Airtel Money', color: 'from-red-600 to-red-700', logo: airtelLogo },
+  { id: 'MTN', name: 'MTN Mobile Money', color: 'from-status-warning to-status-warning', logo: mtnLogo },
+  { id: 'AIRTEL', name: 'Airtel Money', color: 'from-status-danger to-status-danger', logo: airtelLogo },
 ] as const;
 
 interface Demande {
@@ -291,21 +291,21 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
   if (insufficientFundsError) {
     return (
       <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-        <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-lg animate-in fade-in zoom-in-95 duration-200">
+        <div className="bg-surface rounded-xl border border-edge w-full max-w-lg animate-in fade-in zoom-in-95 duration-200">
           {/* Header */}
-          <div className="p-6 border-b border-slate-700 flex justify-between items-center">
+          <div className="p-6 border-b border-edge flex justify-between items-center">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-amber-500/20 border border-amber-500/30">
-                <AlertTriangle className="text-amber-400" size={24} />
+              <div className="p-2 rounded-xl bg-status-warning-bg border border-status-warning/30">
+                <AlertTriangle className="text-status-warning" size={24} />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-white">Solde Insuffisant</h2>
-                <p className="text-slate-400 text-sm">Action requise pour continuer</p>
+                <h2 className="text-lg font-bold text-content-primary">Solde Insuffisant</h2>
+                <p className="text-content-muted text-sm">Action requise pour continuer</p>
               </div>
             </div>
             <button
               onClick={onClose}
-              className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-700 transition-colors"
+              className="text-content-muted hover:text-content-primary p-2 rounded-lg hover:bg-surface-elevated transition-colors"
             >
               <X size={20} />
             </button>
@@ -314,28 +314,28 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
           {/* Contenu */}
           <div className="p-6 space-y-6">
             {/* Alerte principale */}
-            <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 space-y-3">
+            <div className="bg-status-warning-bg border border-status-warning/30 rounded-xl p-4 space-y-3">
               <div className="flex items-start gap-3">
-                <Vault className="text-amber-400 flex-shrink-0 mt-0.5" size={20} />
+                <Vault className="text-status-warning flex-shrink-0 mt-0.5" size={20} />
                 <div className="space-y-1">
-                  <p className="text-amber-200 font-medium">
+                  <p className="text-status-warning-text font-medium">
                     {insufficientFundsError.code === 'COFFRE_SOLDE_MINIMUM' ? (
-                      <>Le coffre ne contient que <span className="text-amber-400 font-bold">{formatMoney(insufficientFundsError.current)}</span> — le solde minimum requis est de <span className="text-amber-400 font-bold">{formatMoney(insufficientFundsError.soldeMinimum || 0)}</span></>
+                      <>Le coffre ne contient que <span className="text-status-warning font-bold">{formatMoney(insufficientFundsError.current)}</span> — le solde minimum requis est de <span className="text-status-warning font-bold">{formatMoney(insufficientFundsError.soldeMinimum || 0)}</span></>
                     ) : (
-                      <>Le coffre {insufficientFundsError.coffreCode} ne contient que <span className="text-amber-400 font-bold">{formatMoney(insufficientFundsError.current)}</span></>
+                      <>Le coffre {insufficientFundsError.coffreCode} ne contient que <span className="text-status-warning font-bold">{formatMoney(insufficientFundsError.current)}</span></>
                     )}
                   </p>
-                  <p className="text-slate-300 text-sm">
+                  <p className="text-content-secondary text-sm">
                     Il manque{' '}
-                    <span className="text-red-400 font-semibold">
+                    <span className="text-status-danger font-semibold">
                       {formatMoney(insufficientFundsError.deficit)}
                     </span>{' '}
                     pour valider ce décaissement de{' '}
-                    <span className="text-white font-semibold">
+                    <span className="text-content-primary font-semibold">
                       {formatMoney(montantDecaissement)}
                     </span>
                     {insufficientFundsError.code === 'COFFRE_SOLDE_MINIMUM' && (
-                      <span className="text-slate-400"> (le solde après l'opération doit rester au-dessus du minimum)</span>
+                      <span className="text-content-muted"> (le solde après l'opération doit rester au-dessus du minimum)</span>
                     )}
                   </p>
                 </div>
@@ -343,17 +343,17 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
             </div>
 
             {/* Résumé du crédit */}
-            <div className="bg-slate-700/50 rounded-xl p-4 space-y-2">
-              <h4 className="text-sm font-semibold text-slate-400 uppercase">Crédit en attente</h4>
+            <div className="bg-surface-elevated/50 rounded-xl p-4 space-y-2">
+              <h4 className="text-sm font-semibold text-content-muted uppercase">Crédit en attente</h4>
               <div className="flex justify-between items-center">
-                <span className="text-slate-300">Bénéficiaire</span>
-                <span className="text-white font-medium">
+                <span className="text-content-secondary">Bénéficiaire</span>
+                <span className="text-content-primary font-medium">
                   {formatClientName(demande.clients.nom, demande.clients.prenom)}
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-slate-300">Montant à décaisser</span>
-                <span className="text-emerald-400 font-bold">{formatMoney(montantDecaissement)}</span>
+                <span className="text-content-secondary">Montant à décaisser</span>
+                <span className="text-status-success font-bold">{formatMoney(montantDecaissement)}</span>
               </div>
             </div>
 
@@ -363,7 +363,7 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
                 <Button
                   onClick={handleOpenReplenishmentForm}
                   disabled={loadingCoffres}
-                  className="w-full bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-semibold py-3"
+                  className="w-full bg-gradient-to-r from-status-warning to-status-warning hover:from-status-warning hover:to-status-warning text-white font-semibold py-3"
                 >
                   {loadingCoffres ? (
                     <>
@@ -378,12 +378,12 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
                   )}
                 </Button>
               ) : (
-                <div className="bg-slate-700/50 border border-slate-600 rounded-xl p-4">
-                  <div className="flex items-center gap-3 text-slate-300">
-                    <Phone className="text-slate-400" size={20} />
+                <div className="bg-surface-elevated/50 border border-edge-strong rounded-xl p-4">
+                  <div className="flex items-center gap-3 text-content-secondary">
+                    <Phone className="text-content-muted" size={20} />
                     <div>
                       <p className="font-medium">Permission insuffisante</p>
-                      <p className="text-sm text-slate-400">
+                      <p className="text-sm text-content-muted">
                         Contactez votre chef d'agence pour demander un approvisionnement du coffre.
                       </p>
                     </div>
@@ -395,14 +395,14 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
                 <Button
                   variant="outline"
                   onClick={handleBackToDisburse}
-                  className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-700"
+                  className="flex-1 border-edge-strong text-content-secondary hover:bg-surface-elevated"
                 >
                   Retour
                 </Button>
                 <Button
                   variant="outline"
                   onClick={onClose}
-                  className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-700"
+                  className="flex-1 border-edge-strong text-content-secondary hover:bg-surface-elevated"
                 >
                   Fermer
                 </Button>
@@ -425,27 +425,27 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
   return (
     <>
       <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
-        <div className="bg-slate-900 rounded-xl border border-slate-700 w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh]">
+        <div className="bg-surface-base rounded-xl border border-edge w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh]">
           
           {/* === HEADER === */}
-          <div className="bg-slate-800/80 border-b border-slate-700 p-4 flex justify-between items-center shrink-0">
+          <div className="bg-surface/80 border-b border-edge p-4 flex justify-between items-center shrink-0">
             <div>
-              <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                <DollarSign size={18} className="text-emerald-400" /> 
+              <h2 className="text-lg font-bold text-content-primary flex items-center gap-2">
+                <DollarSign size={18} className="text-status-success" /> 
                 Décaissement Crédit
               </h2>
-              <p className="text-slate-400 text-xs">Validation et transfert des fonds</p>
+              <p className="text-content-muted text-xs">Validation et transfert des fonds</p>
             </div>
-            <button onClick={onClose} className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-700 transition">
+            <button onClick={onClose} className="text-content-muted hover:text-content-primary p-1 rounded hover:bg-surface-elevated transition">
                 <X size={20} />
             </button>
           </div>
 
           <div className="p-4 space-y-5 overflow-y-auto custom-scrollbar flex-1">
             {/* 1. BENEFICIARY & AMOUNT (Horizontal Compact Card) */}
-            <div className="bg-slate-800 rounded-xl p-4 border border-slate-700 flex flex-col sm:flex-row justify-between gap-4">
+            <div className="bg-surface rounded-xl p-4 border border-edge flex flex-col sm:flex-row justify-between gap-4">
                 <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-slate-700 flex items-center justify-center text-slate-400 overflow-hidden">
+                    <div className="h-10 w-10 rounded-full bg-surface-elevated flex items-center justify-center text-content-muted overflow-hidden">
                         {clientAvatarUrl ? (
                           <img
                             src={clientAvatarUrl}
@@ -462,17 +462,17 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
                         )}
                     </div>
                     <div>
-                        <div className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Bénéficiaire</div>
-                        <div className="text-white font-bold text-sm sm:text-base">{formatClientName(demande.clients.nom, demande.clients.prenom)}</div>
-                        <div className="text-slate-400 text-xs flex items-center gap-1">
+                        <div className="text-xs text-content-muted uppercase tracking-wider font-semibold">Bénéficiaire</div>
+                        <div className="text-content-primary font-bold text-sm sm:text-base">{formatClientName(demande.clients.nom, demande.clients.prenom)}</div>
+                        <div className="text-content-muted text-xs flex items-center gap-1">
                              <Phone size={10} /> {demande.clients.phone}
                         </div>
                     </div>
                 </div>
-                <div className="text-left sm:text-right border-t sm:border-t-0 sm:border-l border-slate-700 pt-3 sm:pt-0 pl-0 sm:pl-4">
-                     <div className="text-xs text-emerald-500 uppercase tracking-wider font-semibold">Net à Décaisser</div>
-                     <div className="text-2xl font-bold text-white tracking-tight">{formatMoney(montantDecaissement)}</div>
-                     <div className="text-slate-500 text-xs">
+                <div className="text-left sm:text-right border-t sm:border-t-0 sm:border-l border-edge pt-3 sm:pt-0 pl-0 sm:pl-4">
+                     <div className="text-xs text-status-success uppercase tracking-wider font-semibold">Net à Décaisser</div>
+                     <div className="text-2xl font-bold text-content-primary tracking-tight">{formatMoney(montantDecaissement)}</div>
+                     <div className="text-content-muted text-xs">
                          {nombreEcheancesCalc} échéances de {formatMoney(mensualite)}
                      </div>
                 </div>
@@ -480,7 +480,7 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
 
             {/* 2. CHANNEL SELECTOR */}
             <div>
-                <h3 className="text-xs font-bold text-slate-400 uppercase mb-2 flex items-center gap-2">
+                <h3 className="text-xs font-bold text-content-muted uppercase mb-2 flex items-center gap-2">
                     <Wallet size={14} /> Canal de Versement
                 </h3>
                 <div className="grid grid-cols-3 gap-2">
@@ -489,8 +489,8 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
                         onClick={() => setDisbursementChannel(DisbursementChannel.ACCOUNT)}
                         className={`p-3 rounded-lg border flex flex-col items-center gap-2 transition-all ${
                         disbursementChannel === DisbursementChannel.ACCOUNT
-                            ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400 ring-1 ring-emerald-500/50'
-                            : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:border-slate-600'
+                            ? 'bg-status-success-bg border-status-success text-status-success ring-1 ring-status-success/50'
+                            : 'bg-surface border-edge text-content-muted hover:bg-surface-elevated hover:border-edge-strong'
                         }`}
                     >
                         <CreditCard size={20} />
@@ -501,8 +501,8 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
                         onClick={() => setDisbursementChannel(DisbursementChannel.CASH)}
                         className={`p-3 rounded-lg border flex flex-col items-center gap-2 transition-all ${
                         disbursementChannel === DisbursementChannel.CASH
-                            ? 'bg-amber-500/10 border-amber-500 text-amber-400 ring-1 ring-amber-500/50'
-                            : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:border-slate-600'
+                            ? 'bg-status-warning-bg border-status-warning text-status-warning ring-1 ring-status-warning/50'
+                            : 'bg-surface border-edge text-content-muted hover:bg-surface-elevated hover:border-edge-strong'
                         }`}
                     >
                         <Banknote size={20} />
@@ -513,8 +513,8 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
                         onClick={() => setDisbursementChannel(DisbursementChannel.MOBILE_MONEY)}
                         className={`p-3 rounded-lg border flex flex-col items-center gap-2 transition-all ${
                         disbursementChannel === DisbursementChannel.MOBILE_MONEY
-                            ? 'bg-purple-500/10 border-purple-500 text-purple-400 ring-1 ring-purple-500/50'
-                            : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700 hover:border-slate-600'
+                            ? 'bg-status-info-bg border-status-info text-status-info ring-1 ring-status-info/50'
+                            : 'bg-surface border-edge text-content-muted hover:bg-surface-elevated hover:border-edge-strong'
                         }`}
                     >
                         {mobileProvider ? (
@@ -527,20 +527,20 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
                 </div>
 
                 {/* Contextual Info Box */}
-                <div className="mt-2 bg-slate-800/50 border border-slate-700 p-3 rounded-lg text-xs transition-all">
+                <div className="mt-2 bg-surface/50 border border-edge p-3 rounded-lg text-xs transition-all">
                     {disbursementChannel === DisbursementChannel.ACCOUNT && (
-                        <p className="text-slate-300">
-                             Virement automatique sur le <span className="text-emerald-400 font-semibold">Compte Courant</span> du client. Solde disponible immédiatement.
+                        <p className="text-content-secondary">
+                             Virement automatique sur le <span className="text-status-success font-semibold">Compte Courant</span> du client. Solde disponible immédiatement.
                         </p>
                     )}
                     {disbursementChannel === DisbursementChannel.CASH && (
-                        <p className="text-slate-300">
-                            Génère un ordre de retrait <span className="text-amber-400 font-semibold">Caisse</span>. Le client devra présenter sa pièce d'identité au guichet.
+                        <p className="text-content-secondary">
+                            Génère un ordre de retrait <span className="text-status-warning font-semibold">Caisse</span>. Le client devra présenter sa pièce d'identité au guichet.
                         </p>
                     )}
                     {disbursementChannel === DisbursementChannel.MOBILE_MONEY && (
-                         <p className="text-slate-300">
-                             Transfert vers le numéro <span className="text-purple-400 font-semibold">{demande.clients.phone}</span>. Des frais opérateur peuvent s'appliquer.
+                         <p className="text-content-secondary">
+                             Transfert vers le numéro <span className="text-status-info font-semibold">{demande.clients.phone}</span>. Des frais opérateur peuvent s'appliquer.
                          </p>
                     )}
                 </div>
@@ -548,7 +548,7 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
                 {/* Provider selection for Mobile Money */}
                 {disbursementChannel === DisbursementChannel.MOBILE_MONEY && (
                   <div className="mt-3">
-                    <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Opérateur</label>
+                    <label className="block text-xs font-bold text-content-muted uppercase mb-2">Opérateur</label>
                     <div className="grid grid-cols-2 gap-2">
                       {MOBILE_OPERATORS.map(op => (
                         <button
@@ -558,7 +558,7 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
                           className={`flex items-center gap-2.5 p-3 rounded-lg border text-sm font-medium transition-all ${
                             mobileProvider === op.id
                               ? `bg-gradient-to-r ${op.color} border-transparent text-white shadow-lg`
-                              : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700 hover:border-slate-600'
+                              : 'bg-surface border-edge text-content-secondary hover:bg-surface-elevated hover:border-edge-strong'
                           }`}
                         >
                           <img src={op.logo} alt={op.name} className="w-7 h-7 rounded-full object-contain bg-white/10" />
@@ -571,20 +571,20 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
             </div>
 
             {/* 3. SCHEDULING (Compact Segment) */}
-            <div className="bg-slate-800 rounded-xl p-1 border border-slate-700 flex text-xs font-semibold">
+            <div className="bg-surface rounded-xl p-1 border border-edge flex text-xs font-semibold">
                 <button
                     onClick={() => setDecaissementType('immediat')}
                     className={`flex-1 py-1.5 rounded-lg flex items-center justify-center gap-2 transition-all ${
-                        decaissementType === 'immediat' ? 'bg-slate-700 text-white shadow' : 'text-slate-400 hover:text-slate-300'
+                        decaissementType === 'immediat' ? 'bg-surface-elevated text-content-primary shadow' : 'text-content-muted hover:text-content-secondary'
                     }`}
                 >
                     <Clock size={14} /> Immédiat
                 </button>
-                <div className="w-px bg-slate-700 my-1"></div>
+                <div className="w-px bg-surface-elevated my-1"></div>
                 <button
                     onClick={() => setDecaissementType('programme')}
                     className={`flex-1 py-1.5 rounded-lg flex items-center justify-center gap-2 transition-all ${
-                        decaissementType === 'programme' ? 'bg-slate-700 text-blue-400 shadow' : 'text-slate-400 hover:text-slate-300'
+                        decaissementType === 'programme' ? 'bg-surface-elevated text-status-info shadow' : 'text-content-muted hover:text-content-secondary'
                     }`}
                 >
                     <Calendar size={14} /> Programmé
@@ -592,7 +592,7 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
             </div>
 
              {decaissementType === 'programme' && (
-                <div className="animate-in slide-in-from-top-2 fade-in bg-slate-800/50 p-3 rounded-lg border border-slate-700">
+                <div className="animate-in slide-in-from-top-2 fade-in bg-surface/50 p-3 rounded-lg border border-edge">
                     <div className="grid grid-cols-2 gap-3 items-center">
                          <input
                             type="date"
@@ -602,7 +602,7 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
                                 setDelaiJours(0);
                             }}
                             min={new Date().toISOString().split('T')[0]}
-                            className="bg-slate-900 border border-slate-600 rounded px-3 py-1.5 text-white text-sm w-full"
+                            className="bg-surface-base border border-edge-strong rounded px-3 py-1.5 text-content-primary text-sm w-full"
                          />
                          <div className="flex gap-1">
                             {[1, 3, 7].map(j => (
@@ -614,7 +614,7 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
                                         setDateDecaissement(d.toISOString().split('T')[0]);
                                     }}
                                     className={`flex-1 px-3 py-1.5 text-xs rounded border transition-colors ${
-                                        delaiJours === j ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-600 text-slate-400 hover:bg-slate-700'
+                                        delaiJours === j ? 'bg-status-info border-status-info text-white' : 'border-edge-strong text-content-muted hover:bg-surface-elevated'
                                     }`}
                                 >
                                     +{j}j
@@ -626,28 +626,28 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
              )}
 
             {/* 4. SUMMARY FOOTER CARD */}
-            <div className="bg-slate-950/50 border border-slate-800 rounded-lg p-3 text-xs space-y-2">
+            <div className="bg-surface-base/50 border border-edge rounded-lg p-3 text-xs space-y-2">
                  <div className="flex justify-between">
-                     <span className="text-slate-500">Date d'effet</span>
-                     <span className="text-white">{dateEffectiveDecaissement.toLocaleDateString('fr-FR')}</span>
+                     <span className="text-content-muted">Date d'effet</span>
+                     <span className="text-content-primary">{dateEffectiveDecaissement.toLocaleDateString('fr-FR')}</span>
                  </div>
                  <div className="flex justify-between">
-                     <span className="text-slate-500">Première échéance</span>
-                     <span className="text-white">
+                     <span className="text-content-muted">Première échéance</span>
+                     <span className="text-content-primary">
                          {new Date(new Date(dateEffectiveDecaissement).getTime() + 30*24*60*60*1000).toLocaleDateString('fr-FR')} (Est.)
                      </span>
                  </div>
-                 <div className="border-t border-slate-800 pt-2 flex justify-between font-bold">
-                     <span className="text-slate-400">Total à Rembourser</span>
-                     <span className="text-amber-400">{formatMoney(montantTotal)}</span>
+                 <div className="border-t border-edge pt-2 flex justify-between font-bold">
+                     <span className="text-content-muted">Total à Rembourser</span>
+                     <span className="text-status-warning">{formatMoney(montantTotal)}</span>
                  </div>
             </div>
             
           </div>
 
           {/* === ACTIONS === */}
-          <div className="p-4 bg-slate-800 border-t border-slate-700 flex gap-3 shrink-0">
-             <Button variant="outline" onClick={onClose} className="border-slate-600 text-slate-300 hover:bg-slate-700">
+          <div className="p-4 bg-surface border-t border-edge flex gap-3 shrink-0">
+             <Button variant="outline" onClick={onClose} className="border-edge-strong text-content-secondary hover:bg-surface-elevated">
                  Annuler
              </Button>
              {canDisburse ? (
@@ -657,17 +657,17 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
                     disabled={loading || (disbursementChannel === DisbursementChannel.MOBILE_MONEY && !mobileProvider)}
                     className={`flex-1 font-bold shadow-lg ${
                         disbursementChannel === DisbursementChannel.CASH 
-                        ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-amber-900/20' 
+                        ? 'bg-status-warning hover:bg-status-warning text-white shadow-status-warning/20' 
                         : disbursementChannel === DisbursementChannel.MOBILE_MONEY
-                        ? 'bg-purple-600 hover:bg-purple-500 text-white shadow-purple-900/20'
-                        : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/20'
+                        ? 'bg-status-info hover:bg-status-info text-white shadow-status-info/20'
+                        : 'bg-status-success hover:bg-status-success text-white shadow-status-success/20'
                     }`}
                  >
                     {loading ? <Loader2 className="animate-spin" size={18} /> : 
                      decaissementType === 'programme' ? 'Valider la Programmation' : 'Confirmer le Décaissement'}
                  </Button>
              ) : (
-                 <div className="flex-1 px-4 py-2 bg-slate-700 text-slate-500 rounded-lg text-xs text-center flex items-center justify-center gap-2">
+                 <div className="flex-1 px-4 py-2 bg-surface-elevated text-content-muted rounded-lg text-xs text-center flex items-center justify-center gap-2">
                      <AlertCircle size={14} /> Droit insuffisant
                  </div>
              )}
@@ -895,24 +895,24 @@ function TransfertInterCoffresFormWithPrefill({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
-      <div className="bg-slate-900 border border-slate-800 w-full max-w-2xl max-h-[95vh] sm:rounded-2xl rounded-t-3xl shadow-2xl flex flex-col animate-in slide-in-from-bottom-5 duration-300">
+    <div className="fixed inset-0 bg-surface-base/90 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+      <div className="bg-surface-base border border-edge w-full max-w-2xl max-h-[95vh] sm:rounded-2xl rounded-t-3xl shadow-2xl flex flex-col animate-in slide-in-from-bottom-5 duration-300">
         {/* Header */}
-        <header className="p-5 border-b border-slate-800 flex items-center justify-between sticky top-0 bg-slate-900/95 backdrop-blur z-10 rounded-t-3xl sm:rounded-t-2xl">
+        <header className="p-5 border-b border-edge flex items-center justify-between sticky top-0 bg-surface-base/95 backdrop-blur z-10 rounded-t-3xl sm:rounded-t-2xl">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30">
-              <Vault size={20} className="text-amber-400" />
+            <div className="p-2 rounded-xl bg-gradient-to-br from-status-warning/20 to-status-warning/20 border border-status-warning/30">
+              <Vault size={20} className="text-status-warning" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white">Demande d'Approvisionnement</h2>
-              <p className="text-xs text-slate-400">Transfert inter-coffres pour décaissement crédit</p>
+              <h2 className="text-lg font-bold text-content-primary">Demande d'Approvisionnement</h2>
+              <p className="text-xs text-content-muted">Transfert inter-coffres pour décaissement crédit</p>
             </div>
           </div>
           <Button
             variant="ghost"
             size="sm"
             onClick={onClose}
-            className="rounded-full text-slate-400 hover:text-white h-10 w-10 p-0"
+            className="rounded-full text-content-muted hover:text-content-primary h-10 w-10 p-0"
           >
             <X size={20} />
           </Button>
@@ -920,9 +920,9 @@ function TransfertInterCoffresFormWithPrefill({
 
         {/* Info pré-remplissage */}
         <div className="px-5 pt-4">
-          <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-3 flex items-start gap-3">
-            <AlertCircle className="text-blue-400 flex-shrink-0 mt-0.5" size={18} />
-            <p className="text-sm text-blue-200">
+          <div className="bg-status-info-bg border border-status-info/30 rounded-xl p-3 flex items-start gap-3">
+            <AlertCircle className="text-status-info flex-shrink-0 mt-0.5" size={18} />
+            <p className="text-sm text-status-info-text">
               Montant minimum requis pré-rempli. Vous pouvez augmenter ce montant pour anticiper d'autres opérations.
             </p>
           </div>
@@ -932,20 +932,20 @@ function TransfertInterCoffresFormWithPrefill({
         <form onSubmit={(e) => handleSubmit(e, false)} className="flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar">
           {/* Source & Destination */}
           <section className="space-y-4">
-            <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wide flex items-center gap-2">
-              <ArrowRight size={16} className="text-cyan-400" />
+            <h3 className="text-sm font-semibold text-content-secondary uppercase tracking-wide flex items-center gap-2">
+              <ArrowRight size={16} className="text-accent" />
               Coffres Source et Destination
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Source */}
               <div className="space-y-2">
-                <label className="text-xs font-medium text-slate-400 uppercase">Coffre Source *</label>
+                <label className="text-xs font-medium text-content-muted uppercase">Coffre Source *</label>
                 <select
                   value={coffreSourceId}
                   onChange={(e) => setCoffreSourceId(e.target.value)}
-                  className={`w-full px-4 py-3 bg-slate-950 border rounded-xl text-white focus:ring-2 focus:ring-cyan-500/30 outline-none transition-all ${
-                    errors.coffreSource ? 'border-red-500' : 'border-slate-700 focus:border-cyan-500'
+                  className={`w-full px-4 py-3 bg-surface-base border rounded-xl text-content-primary focus:ring-2 focus:ring-accent/30 outline-none transition-all ${
+                    errors.coffreSource ? 'border-status-danger' : 'border-edge focus:border-accent'
                   }`}
                 >
                   <option value="">Sélectionner le coffre source...</option>
@@ -956,21 +956,21 @@ function TransfertInterCoffresFormWithPrefill({
                   ))}
                 </select>
                 {coffreSource && (
-                  <div className="text-xs text-slate-500">
-                    Solde: <span className="text-emerald-400 font-medium">{formatMoney(parseFloat(coffreSource.solde))}</span>
+                  <div className="text-xs text-content-muted">
+                    Solde: <span className="text-status-success font-medium">{formatMoney(parseFloat(coffreSource.solde))}</span>
                   </div>
                 )}
-                {errors.coffreSource && <p className="text-xs text-red-400">{errors.coffreSource}</p>}
+                {errors.coffreSource && <p className="text-xs text-status-danger">{errors.coffreSource}</p>}
               </div>
 
               {/* Destination (pré-sélectionnée) */}
               <div className="space-y-2">
-                <label className="text-xs font-medium text-slate-400 uppercase">Coffre Destination *</label>
+                <label className="text-xs font-medium text-content-muted uppercase">Coffre Destination *</label>
                 <select
                   value={coffreDestinationId}
                   onChange={(e) => setCoffreDestinationId(e.target.value)}
-                  className={`w-full px-4 py-3 bg-slate-950 border rounded-xl text-white focus:ring-2 focus:ring-cyan-500/30 outline-none transition-all ${
-                    errors.coffreDestination ? 'border-red-500' : 'border-slate-700 focus:border-cyan-500'
+                  className={`w-full px-4 py-3 bg-surface-base border rounded-xl text-content-primary focus:ring-2 focus:ring-accent/30 outline-none transition-all ${
+                    errors.coffreDestination ? 'border-status-danger' : 'border-edge focus:border-accent'
                   }`}
                 >
                   <option value="">Sélectionner...</option>
@@ -981,40 +981,40 @@ function TransfertInterCoffresFormWithPrefill({
                   ))}
                 </select>
                 {coffreDestination && (
-                  <div className="text-xs text-slate-500">
-                    Solde actuel: <span className="text-white">{formatMoney(parseFloat(coffreDestination.solde))}</span>
+                  <div className="text-xs text-content-muted">
+                    Solde actuel: <span className="text-content-primary">{formatMoney(parseFloat(coffreDestination.solde))}</span>
                     {prefilledDestinationCoffreId === coffreDestinationId && (
-                      <span className="ml-2 text-amber-400">(Coffre à approvisionner)</span>
+                      <span className="ml-2 text-status-warning">(Coffre à approvisionner)</span>
                     )}
                   </div>
                 )}
-                {errors.coffreDestination && <p className="text-xs text-red-400">{errors.coffreDestination}</p>}
+                {errors.coffreDestination && <p className="text-xs text-status-danger">{errors.coffreDestination}</p>}
               </div>
             </div>
           </section>
 
           {/* Montant */}
           <section className="space-y-2">
-            <label className="text-xs font-medium text-slate-400 uppercase">Montant ({currencyCode()}) *</label>
+            <label className="text-xs font-medium text-content-muted uppercase">Montant ({currencyCode()}) *</label>
             <div className="relative">
               <input
                 type="number"
                 value={montant}
                 onChange={(e) => setMontant(e.target.value)}
                 placeholder="0"
-                className={`w-full pl-4 pr-16 py-4 bg-slate-950 border rounded-xl text-2xl font-bold text-white focus:ring-2 focus:ring-cyan-500/30 outline-none transition-all ${
-                  errors.montant ? 'border-red-500' : 'border-slate-700 focus:border-cyan-500'
+                className={`w-full pl-4 pr-16 py-4 bg-surface-base border rounded-xl text-2xl font-bold text-content-primary focus:ring-2 focus:ring-accent/30 outline-none transition-all ${
+                  errors.montant ? 'border-status-danger' : 'border-edge focus:border-accent'
                 }`}
               />
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-slate-500">{currencyCode()}</span>
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-medium text-content-muted">{currencyCode()}</span>
             </div>
-            {errors.montant && <p className="text-xs text-red-400">{errors.montant}</p>}
+            {errors.montant && <p className="text-xs text-status-danger">{errors.montant}</p>}
 
             {/* Validation messages */}
             {validation.errors.length > 0 && (
-              <div className="mt-2 p-3 bg-red-500/10 border border-red-500/30 rounded-xl space-y-1">
+              <div className="mt-2 p-3 bg-status-danger-bg border border-status-danger/30 rounded-xl space-y-1">
                 {validation.errors.map((err, i) => (
-                  <p key={i} className="text-xs text-red-400 flex items-center gap-2">
+                  <p key={i} className="text-xs text-status-danger flex items-center gap-2">
                     <AlertTriangle size={12} /> {err}
                   </p>
                 ))}
@@ -1024,33 +1024,33 @@ function TransfertInterCoffresFormWithPrefill({
 
           {/* Motif */}
           <section className="space-y-2">
-            <label className="text-xs font-medium text-slate-400 uppercase">Motif du transfert *</label>
+            <label className="text-xs font-medium text-content-muted uppercase">Motif du transfert *</label>
             <textarea
               value={motif}
               onChange={(e) => setMotif(e.target.value)}
               placeholder="Décrivez la raison de ce transfert..."
               rows={2}
-              className={`w-full px-4 py-3 bg-slate-950 border rounded-xl text-white placeholder-slate-600 focus:ring-2 focus:ring-cyan-500/30 outline-none resize-none transition-all ${
-                errors.motif ? 'border-red-500' : 'border-slate-700 focus:border-cyan-500'
+              className={`w-full px-4 py-3 bg-surface-base border rounded-xl text-content-primary placeholder-content-muted focus:ring-2 focus:ring-accent/30 outline-none resize-none transition-all ${
+                errors.motif ? 'border-status-danger' : 'border-edge focus:border-accent'
               }`}
             />
-            {errors.motif && <p className="text-xs text-red-400">{errors.motif}</p>}
+            {errors.motif && <p className="text-xs text-status-danger">{errors.motif}</p>}
           </section>
 
           {/* Date */}
           <section className="space-y-2">
-            <label className="text-xs font-medium text-slate-400 uppercase">Date du transfert *</label>
+            <label className="text-xs font-medium text-content-muted uppercase">Date du transfert *</label>
             <input
               type="date"
               value={dateTransfert}
               onChange={(e) => setDateTransfert(e.target.value)}
-              className="w-full px-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-white focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500 outline-none"
+              className="w-full px-4 py-3 bg-surface-base border border-edge rounded-xl text-content-primary focus:ring-2 focus:ring-accent/30 focus:border-accent outline-none"
             />
           </section>
 
           {/* Conditionnement */}
           <section className="space-y-4">
-            <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wide">Conditionnement</h3>
+            <h3 className="text-sm font-semibold text-content-secondary uppercase tracking-wide">Conditionnement</h3>
             <div className="grid grid-cols-2 gap-2">
               {['Sac scellé', 'Mallette', 'Enveloppe', 'Autre'].map((type) => (
                 <button
@@ -1059,8 +1059,8 @@ function TransfertInterCoffresFormWithPrefill({
                   onClick={() => setTypeConditionnement(type)}
                   className={`px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
                     typeConditionnement === type
-                      ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/50'
-                      : 'bg-slate-800 text-slate-400 border border-slate-700 hover:border-slate-600'
+                      ? 'bg-accent/10 text-accent border border-accent/50'
+                      : 'bg-surface text-content-muted border border-edge hover:border-edge-strong'
                   }`}
                 >
                   {type}
@@ -1070,17 +1070,17 @@ function TransfertInterCoffresFormWithPrefill({
 
             {typeConditionnement === 'Sac scellé' && (
               <div className="space-y-2">
-                <label className="text-xs font-medium text-slate-400 uppercase">Numéro de scellé *</label>
+                <label className="text-xs font-medium text-content-muted uppercase">Numéro de scellé *</label>
                 <input
                   type="text"
                   value={numeroScelle}
                   onChange={(e) => setNumeroScelle(e.target.value)}
                   placeholder="Ex: SC-2026-00123"
-                  className={`w-full px-4 py-3 bg-slate-950 border rounded-xl text-white placeholder-slate-600 focus:ring-2 focus:ring-cyan-500/30 outline-none ${
-                    errors.numeroScelle ? 'border-red-500' : 'border-slate-700 focus:border-cyan-500'
+                  className={`w-full px-4 py-3 bg-surface-base border rounded-xl text-content-primary placeholder-content-muted focus:ring-2 focus:ring-accent/30 outline-none ${
+                    errors.numeroScelle ? 'border-status-danger' : 'border-edge focus:border-accent'
                   }`}
                 />
-                {errors.numeroScelle && <p className="text-xs text-red-400">{errors.numeroScelle}</p>}
+                {errors.numeroScelle && <p className="text-xs text-status-danger">{errors.numeroScelle}</p>}
               </div>
             )}
           </section>
@@ -1088,7 +1088,7 @@ function TransfertInterCoffresFormWithPrefill({
           {/* Agents de Transport */}
           <section className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wide">
+              <h3 className="text-sm font-semibold text-content-secondary uppercase tracking-wide">
                 Agents de Transport (min. 2)
               </h3>
               <Button
@@ -1096,14 +1096,14 @@ function TransfertInterCoffresFormWithPrefill({
                 variant="ghost"
                 size="sm"
                 onClick={addAgent}
-                className="text-cyan-400 hover:bg-cyan-500/10"
+                className="text-accent hover:bg-accent/10"
               >
                 + Ajouter
               </Button>
             </div>
 
             {errors.agentsTransport && (
-              <p className="text-xs text-red-400 flex items-center gap-1">
+              <p className="text-xs text-status-danger flex items-center gap-1">
                 <AlertTriangle size={12} /> {errors.agentsTransport}
               </p>
             )}
@@ -1117,14 +1117,14 @@ function TransfertInterCoffresFormWithPrefill({
                       value={agent.nom}
                       onChange={(e) => updateAgent(index, 'nom', e.target.value)}
                       placeholder="Nom complet"
-                      className="w-full px-3 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500 outline-none"
+                      className="w-full px-3 py-2.5 bg-surface-base border border-edge rounded-xl text-sm text-content-primary placeholder-content-muted focus:ring-2 focus:ring-accent/30 focus:border-accent outline-none"
                     />
                     <input
                       type="text"
                       value={agent.contact}
                       onChange={(e) => updateAgent(index, 'contact', e.target.value)}
                       placeholder="Téléphone"
-                      className="w-full px-3 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-600 focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500 outline-none"
+                      className="w-full px-3 py-2.5 bg-surface-base border border-edge rounded-xl text-sm text-content-primary placeholder-content-muted focus:ring-2 focus:ring-accent/30 focus:border-accent outline-none"
                     />
                   </div>
                   {agentsTransport.length > 2 && (
@@ -1133,7 +1133,7 @@ function TransfertInterCoffresFormWithPrefill({
                       variant="ghost"
                       size="sm"
                       onClick={() => removeAgent(index)}
-                      className="text-red-400 hover:bg-red-500/10 h-10 w-10 p-0 rounded-xl"
+                      className="text-status-danger hover:bg-status-danger-bg h-10 w-10 p-0 rounded-xl"
                     >
                       <X size={16} />
                     </Button>
@@ -1145,13 +1145,13 @@ function TransfertInterCoffresFormWithPrefill({
         </form>
 
         {/* Footer */}
-        <footer className="p-5 border-t border-slate-800 bg-slate-900/95 backdrop-blur sticky bottom-0">
+        <footer className="p-5 border-t border-edge bg-surface-base/95 backdrop-blur sticky bottom-0">
           <div className="flex flex-col sm:flex-row gap-3">
             <Button
               type="button"
               variant="outline"
               onClick={onClose}
-              className="w-full sm:w-auto border-slate-700 text-slate-300 hover:bg-slate-800"
+              className="w-full sm:w-auto border-edge text-content-secondary hover:bg-surface"
               disabled={loading}
             >
               Annuler
@@ -1161,7 +1161,7 @@ function TransfertInterCoffresFormWithPrefill({
                 type="button"
                 onClick={(e) => handleSubmit(e, false)}
                 disabled={loading || !validation.valid}
-                className="flex-1 bg-slate-700 hover:bg-slate-600 text-white"
+                className="flex-1 bg-surface-elevated hover:bg-surface-subtle text-content-primary"
               >
                 Sauvegarder brouillon
               </Button>
@@ -1169,7 +1169,7 @@ function TransfertInterCoffresFormWithPrefill({
                 type="button"
                 onClick={(e) => handleSubmit(e, true)}
                 disabled={loading || !validation.valid}
-                className="flex-1 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white shadow-lg shadow-amber-500/20"
+                className="flex-1 bg-gradient-to-r from-status-warning to-status-warning hover:from-status-warning hover:to-status-warning text-white shadow-lg shadow-status-warning/20"
               >
                 {loading ? 'Traitement...' : 'Soumettre la demande'}
               </Button>

@@ -96,11 +96,11 @@ export default function AuditDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-gradient-to-br from-blue-600 to-emerald-600 rounded-2xl p-6 text-white">
+      <div className="bg-gradient-to-br from-status-info to-status-success rounded-2xl p-6 text-white">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-3xl font-bold mb-2">Tableau de Bord Analytique</h2>
-            <p className="text-blue-100">Vue d'ensemble en temps réel</p>
+            <p className="text-status-info-text">Vue d'ensemble en temps réel</p>
           </div>
           <select
             value={timeRange}
@@ -116,7 +116,7 @@ export default function AuditDashboard() {
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">
-        <div className="bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl p-6 text-white">
+        <div className="bg-gradient-to-br from-status-info to-accent rounded-2xl p-6 text-white">
           <div className="flex items-center justify-between mb-4">
             <div>
               <div className="text-sm opacity-90 mb-1">Total Logs</div>
@@ -130,7 +130,7 @@ export default function AuditDashboard() {
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-green-500 to-emerald-500 rounded-2xl p-6 text-white">
+        <div className="bg-gradient-to-br from-status-success to-status-success rounded-2xl p-6 text-white">
           <div className="flex items-center justify-between mb-4">
             <div>
               <div className="text-sm opacity-90 mb-1">Transactions</div>
@@ -143,7 +143,7 @@ export default function AuditDashboard() {
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-emerald-500 to-cyan-500 rounded-2xl p-6 text-white">
+        <div className="bg-gradient-to-br from-status-success to-accent rounded-2xl p-6 text-white">
           <div className="flex items-center justify-between mb-4">
             <div>
               <div className="text-sm opacity-90 mb-1">Utilisateurs Actifs</div>
@@ -159,50 +159,50 @@ export default function AuditDashboard() {
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
-        <div className="bg-slate-800 rounded-2xl p-6">
+        <div className="bg-surface rounded-2xl p-6">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-bold text-white">Activité par Heure</h3>
-            <Clock className="text-blue-400" size={24} />
+            <h3 className="text-xl font-bold text-content-primary">Activité par Heure</h3>
+            <Clock className="text-status-info" size={24} />
           </div>
           <div className="h-64 flex items-end justify-between gap-2">
             {activityData.map((item, index) => (
               <div key={index} className="flex-1 flex flex-col items-center gap-2">
                 <div className="relative w-full">
                   <div
-                    className="w-full bg-gradient-to-t from-blue-600 to-cyan-500 rounded-t-lg transition-all hover:opacity-80 cursor-pointer"
+                    className="w-full bg-gradient-to-t from-status-info to-accent rounded-t-lg transition-all hover:opacity-80 cursor-pointer"
                     style={{ height: `${(item.value / maxValue) * 200}px` }}
                     title={`${item.hour}: ${item.value} actions`}
                   >
-                    <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 text-xs text-white font-bold opacity-0 hover:opacity-100">
+                    <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 text-xs text-content-primary font-bold opacity-0 hover:opacity-100">
                       {item.value}
                     </div>
                   </div>
                 </div>
-                <span className="text-xs text-slate-400">{item.hour}</span>
+                <span className="text-xs text-content-muted">{item.hour}</span>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="bg-slate-800 rounded-2xl p-6">
+        <div className="bg-surface rounded-2xl p-6">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-bold text-white">Distribution des Actions</h3>
-            <BarChart3 className="text-green-400" size={24} />
+            <h3 className="text-xl font-bold text-content-primary">Distribution des Actions</h3>
+            <BarChart3 className="text-status-success" size={24} />
           </div>
           <div className="space-y-4">
             {[
-              { action: 'CREATE', count: 245, color: 'from-green-500 to-emerald-500', percent: 35 },
-              { action: 'UPDATE', count: 189, color: 'from-blue-500 to-cyan-500', percent: 27 },
-              { action: 'DELETE', count: 98, color: 'from-blue-500 to-cyan-500', percent: 14 },
-              { action: 'VIEW', count: 156, color: 'from-emerald-500 to-cyan-500', percent: 22 },
-              { action: 'LOGIN', count: 12, color: 'from-cyan-500 to-emerald-500', percent: 2 }
+              { action: 'CREATE', count: 245, color: 'from-status-success to-status-success', percent: 35 },
+              { action: 'UPDATE', count: 189, color: 'from-status-info to-accent', percent: 27 },
+              { action: 'DELETE', count: 98, color: 'from-status-info to-accent', percent: 14 },
+              { action: 'VIEW', count: 156, color: 'from-status-success to-accent', percent: 22 },
+              { action: 'LOGIN', count: 12, color: 'from-accent to-status-success', percent: 2 }
             ].map((item, index) => (
               <div key={index}>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-slate-300 font-semibold">{item.action}</span>
-                  <span className="text-white font-bold">{item.count}</span>
+                  <span className="text-content-secondary font-semibold">{item.action}</span>
+                  <span className="text-content-primary font-bold">{item.count}</span>
                 </div>
-                <div className="h-3 bg-slate-700 rounded-full overflow-hidden">
+                <div className="h-3 bg-surface-elevated rounded-full overflow-hidden">
                   <div
                     className={`h-full bg-gradient-to-r ${item.color} transition-all`}
                     style={{ width: `${item.percent}%` }}
@@ -215,100 +215,100 @@ export default function AuditDashboard() {
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">
-        <div className="bg-slate-800 rounded-2xl p-6">
-          <h3 className="text-lg font-bold text-white mb-4">Alertes de Sécurité</h3>
+        <div className="bg-surface rounded-2xl p-6">
+          <h3 className="text-lg font-bold text-content-primary mb-4">Alertes de Sécurité</h3>
           <div className="space-y-3">
-            <div className="flex items-center justify-between p-3 bg-blue-500/10 border border-blue-500/30 rounded-xl">
+            <div className="flex items-center justify-between p-3 bg-status-info-bg border border-status-info/30 rounded-xl">
               <div className="flex items-center gap-2">
-                <AlertTriangle className="text-blue-400" size={20} />
-                <span className="text-slate-300">Critiques</span>
+                <AlertTriangle className="text-status-info" size={20} />
+                <span className="text-content-secondary">Critiques</span>
               </div>
-              <span className="text-2xl font-bold text-blue-400">{stats.criticalAlerts}</span>
+              <span className="text-2xl font-bold text-status-info">{stats.criticalAlerts}</span>
             </div>
-            <div className="flex items-center justify-between p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl">
+            <div className="flex items-center justify-between p-3 bg-status-success-bg border border-status-success/30 rounded-xl">
               <div className="flex items-center gap-2">
-                <AlertTriangle className="text-emerald-400" size={20} />
-                <span className="text-slate-300">Élevées</span>
+                <AlertTriangle className="text-status-success" size={20} />
+                <span className="text-content-secondary">Élevées</span>
               </div>
-              <span className="text-2xl font-bold text-emerald-400">5</span>
+              <span className="text-2xl font-bold text-status-success">5</span>
             </div>
-            <div className="flex items-center justify-between p-3 bg-cyan-500/10 border border-cyan-500/30 rounded-xl">
+            <div className="flex items-center justify-between p-3 bg-accent/10 border border-accent/30 rounded-xl">
               <div className="flex items-center gap-2">
-                <AlertTriangle className="text-cyan-400" size={20} />
-                <span className="text-slate-300">Moyennes</span>
+                <AlertTriangle className="text-accent" size={20} />
+                <span className="text-content-secondary">Moyennes</span>
               </div>
-              <span className="text-2xl font-bold text-cyan-400">12</span>
+              <span className="text-2xl font-bold text-accent">12</span>
             </div>
           </div>
         </div>
 
-        <div className="bg-slate-800 rounded-2xl p-6">
-          <h3 className="text-lg font-bold text-white mb-4">Top Modules</h3>
+        <div className="bg-surface rounded-2xl p-6">
+          <h3 className="text-lg font-bold text-content-primary mb-4">Top Modules</h3>
           <div className="space-y-3">
             {[
-              { name: 'Comptabilité', count: 487, color: 'bg-blue-500' },
-              { name: 'Clients', count: 356, color: 'bg-green-500' },
-              { name: 'Crédits', count: 298, color: 'bg-emerald-500' },
-              { name: 'Épargnes', count: 234, color: 'bg-emerald-500' },
-              { name: 'Tontines', count: 187, color: 'bg-cyan-500' }
+              { name: 'Comptabilité', count: 487, color: 'bg-status-info' },
+              { name: 'Clients', count: 356, color: 'bg-status-success' },
+              { name: 'Crédits', count: 298, color: 'bg-status-success' },
+              { name: 'Épargnes', count: 234, color: 'bg-status-success' },
+              { name: 'Tontines', count: 187, color: 'bg-accent-secondary' }
             ].map((module, index) => (
               <div key={index} className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className={`w-3 h-3 rounded-full ${module.color}`}></div>
-                  <span className="text-slate-300">{module.name}</span>
+                  <span className="text-content-secondary">{module.name}</span>
                 </div>
-                <span className="text-white font-bold">{module.count}</span>
+                <span className="text-content-primary font-bold">{module.count}</span>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="bg-slate-800 rounded-2xl p-6">
-          <h3 className="text-lg font-bold text-white mb-4">Performance Système</h3>
+        <div className="bg-surface rounded-2xl p-6">
+          <h3 className="text-lg font-bold text-content-primary mb-4">Performance Système</h3>
           <div className="space-y-4">
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-slate-300">CPU</span>
-                <span className="text-green-400 font-bold">45%</span>
+                <span className="text-content-secondary">CPU</span>
+                <span className="text-status-success font-bold">45%</span>
               </div>
-              <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-green-500 to-emerald-500" style={{ width: '45%' }}></div>
-              </div>
-            </div>
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-slate-300">Mémoire</span>
-                <span className="text-blue-400 font-bold">62%</span>
-              </div>
-              <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-blue-500 to-cyan-500" style={{ width: '62%' }}></div>
+              <div className="h-2 bg-surface-elevated rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-status-success to-status-success" style={{ width: '45%' }}></div>
               </div>
             </div>
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-slate-300">Base de données</span>
-                <span className="text-emerald-400 font-bold">38%</span>
+                <span className="text-content-secondary">Mémoire</span>
+                <span className="text-status-info font-bold">62%</span>
               </div>
-              <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-emerald-500 to-cyan-500" style={{ width: '38%' }}></div>
+              <div className="h-2 bg-surface-elevated rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-status-info to-accent" style={{ width: '62%' }}></div>
               </div>
             </div>
-            <div className="pt-2 border-t border-slate-700">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-content-secondary">Base de données</span>
+                <span className="text-status-success font-bold">38%</span>
+              </div>
+              <div className="h-2 bg-surface-elevated rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-status-success to-accent" style={{ width: '38%' }}></div>
+              </div>
+            </div>
+            <div className="pt-2 border-t border-edge">
               <div className="flex items-center justify-between">
-                <span className="text-slate-400 text-sm">Temps de réponse moyen</span>
-                <span className="text-green-400 font-bold">124ms</span>
+                <span className="text-content-muted text-sm">Temps de réponse moyen</span>
+                <span className="text-status-success font-bold">124ms</span>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-6 border border-slate-700">
-        <h3 className="text-xl font-bold text-white mb-4">Carte de Chaleur - Activité 7 Derniers Jours</h3>
+      <div className="bg-gradient-to-br from-surface to-surface-base rounded-2xl p-6 border border-edge">
+        <h3 className="text-xl font-bold text-content-primary mb-4">Carte de Chaleur - Activité 7 Derniers Jours</h3>
         <div className="grid grid-cols-7 gap-2">
           {Array.from({ length: 7 }, (_, day) => (
             <div key={day} className="space-y-2">
-              <div className="text-center text-xs text-slate-400">
+              <div className="text-center text-xs text-content-muted">
                 J-{6-day}
               </div>
               {Array.from({ length: 24 }, (_, hour) => {
@@ -317,11 +317,11 @@ export default function AuditDashboard() {
                   <div
                     key={hour}
                     className={`h-3 rounded transition-all hover:scale-110 cursor-pointer ${
-                      intensity > 0.7 ? 'bg-blue-500' :
-                      intensity > 0.5 ? 'bg-emerald-500' :
-                      intensity > 0.3 ? 'bg-cyan-500' :
-                      intensity > 0.1 ? 'bg-green-500' :
-                      'bg-slate-700'
+                      intensity > 0.7 ? 'bg-status-info' :
+                      intensity > 0.5 ? 'bg-status-success' :
+                      intensity > 0.3 ? 'bg-accent-secondary' :
+                      intensity > 0.1 ? 'bg-status-success' :
+                      'bg-surface-elevated'
                     }`}
                     title={`Jour ${day}, ${hour}h: ${Math.round(intensity * 100)} actions`}
                   ></div>
@@ -330,21 +330,21 @@ export default function AuditDashboard() {
             </div>
           ))}
         </div>
-        <div className="flex items-center justify-center gap-4 mt-4 text-xs text-slate-400">
+        <div className="flex items-center justify-center gap-4 mt-4 text-xs text-content-muted">
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-slate-700 rounded"></div>
+            <div className="w-3 h-3 bg-surface-elevated rounded"></div>
             <span>Faible</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-green-500 rounded"></div>
+            <div className="w-3 h-3 bg-status-success rounded"></div>
             <span>Modéré</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-cyan-500 rounded"></div>
+            <div className="w-3 h-3 bg-accent-secondary rounded"></div>
             <span>Élevé</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-blue-500 rounded"></div>
+            <div className="w-3 h-3 bg-status-info rounded"></div>
             <span>Très élevé</span>
           </div>
         </div>

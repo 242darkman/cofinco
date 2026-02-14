@@ -107,15 +107,15 @@ const Badge: React.FC<BadgeProps> = ({
 
   // Variant color classes (mobile-first)
   const variantClasses = {
-    success: 'bg-green-500/20 text-green-400 border-green-500/30',
-    warning: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-    danger: 'bg-red-500/20 text-red-400 border-red-500/30',
-    error: 'bg-red-500/20 text-red-400 border-red-500/30', // alias for danger
-    info: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-    neutral: 'bg-slate-500/20 text-slate-400 border-slate-500/30',
-    default: 'bg-slate-500/20 text-slate-400 border-slate-500/30', // alias for neutral
-    primary: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
-    outline: 'bg-transparent text-slate-600 border-slate-300',
+    success: 'bg-status-success-bg text-status-success border-status-success/30',
+    warning: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+    danger: 'bg-status-danger-bg text-status-danger border-status-danger/30',
+    error: 'bg-status-danger-bg text-status-danger border-status-danger/30',
+    info: 'bg-status-info-bg text-status-info border-status-info/30',
+    neutral: 'bg-surface-subtle/40 text-content-muted border-edge-strong/30',
+    default: 'bg-surface-subtle/40 text-content-muted border-edge-strong/30',
+    primary: 'bg-accent/20 text-accent border-accent/30',
+    outline: 'bg-transparent text-content-muted border-edge',
   };
 
   // Size classes (mobile-first)

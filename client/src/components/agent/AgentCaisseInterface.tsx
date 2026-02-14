@@ -253,15 +253,15 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
               className={`p-4 rounded-xl border transition-all duration-300 relative ${
                 activeTab === tab
                   ? tab === 'offline'
-                    ? 'bg-gradient-to-br from-amber-600 to-orange-600 border-amber-500 shadow-lg shadow-amber-500/30 text-white scale-105'
-                    : 'bg-gradient-to-br from-blue-600 to-cyan-600 border-blue-500 shadow-lg shadow-blue-500/30 text-white scale-105'
-                  : 'bg-slate-800/50 border-slate-700 text-slate-300 hover:bg-slate-800 hover:scale-105'
+                    ? 'bg-gradient-to-br from-status-warning to-status-warning border-status-warning shadow-lg shadow-status-warning/30 text-white scale-105'
+                    : 'bg-gradient-to-br from-status-info to-accent border-status-info shadow-lg shadow-status-info/30 text-white scale-105'
+                  : 'bg-surface/50 border-edge text-content-secondary hover:bg-surface hover:scale-105'
               } ${!canPerformTab(tab) ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <div className="flex items-center justify-between mb-2">
                 {getTabIcon(tab)}
                 {tab === 'offline' && pendingOffline > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
+                  <span className="absolute -top-1 -right-1 bg-status-warning text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
                     {pendingOffline > 99 ? '99+' : pendingOffline}
                   </span>
                 )}
@@ -280,7 +280,7 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
                 agenceId={user.agenceId || ''}
               />
             ) : (
-              <div className="text-center py-12 text-slate-400">Chargement du profil...</div>
+              <div className="text-center py-12 text-content-muted">Chargement du profil...</div>
             )}
           </div>
         )}
@@ -293,9 +293,9 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
               <h2 className="text-xl font-bold mb-4 gradient-text">Nouvelle Transaction</h2>
 
               {!canPerformAction() && (
-                <div className="bg-blue-500/20 border border-blue-500/30 rounded-lg p-4 mb-4 flex items-center gap-3">
-                  <AlertCircle className="text-blue-400" size={20} />
-                  <p className="text-blue-400 text-sm">
+                <div className="bg-status-info-bg border border-status-info/30 rounded-lg p-4 mb-4 flex items-center gap-3">
+                  <AlertCircle className="text-status-info" size={20} />
+                  <p className="text-status-info text-sm">
                     Vous n'avez pas l'autorisation pour effectuer cette action
                   </p>
                 </div>
@@ -303,7 +303,7 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
 
               <div className="space-y-4">
                 <div className="relative">
-                  <label className="block text-sm font-semibold text-slate-300 mb-2">
+                  <label className="block text-sm font-semibold text-content-secondary mb-2">
                     <Search size={16} className="inline mr-1" />
                     Rechercher un client
                   </label>
@@ -314,38 +314,38 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
                     onChange={(e) => handleSearchChange(e.target.value)}
                     onFocus={() => searchResults.length > 0 && setShowSearchResults(true)}
                     onBlur={() => setTimeout(() => setShowSearchResults(false), 200)}
-                    className="w-full bg-slate-700 text-white px-4 py-3 rounded-lg border border-slate-600 input-focus"
+                    className="w-full bg-surface-elevated text-content-primary px-4 py-3 rounded-lg border border-edge-strong input-focus"
                     disabled={!canPerformAction()}
                   />
                   {showSearchResults && searchResults.length > 0 && (
-                    <div className="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-600 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                    <div className="absolute z-50 w-full mt-1 bg-surface border border-edge-strong rounded-lg shadow-xl max-h-60 overflow-y-auto">
                       {searchResults.map((client: any) => (
                         <button
                           key={client.id}
                           type="button"
                           onClick={() => selectClient(client)}
-                          className="w-full text-left px-4 py-3 hover:bg-slate-700 transition border-b border-slate-700 last:border-b-0"
+                          className="w-full text-left px-4 py-3 hover:bg-surface-elevated transition border-b border-edge last:border-b-0"
                         >
-                          <p className="text-white font-semibold text-sm">
+                          <p className="text-content-primary font-semibold text-sm">
                             {client.nomComplet || `${client.nom || ''} ${client.prenom || ''}`.trim()}
                           </p>
-                          <p className="text-slate-400 text-xs">{client.telephone || client.phone || ''}</p>
+                          <p className="text-content-muted text-xs">{client.telephone || client.phone || ''}</p>
                         </button>
                       ))}
                     </div>
                   )}
                   {selectedClient && (
-                    <div className="mt-2 p-3 bg-green-500/20 border border-green-500/30 rounded-lg flex items-center justify-between">
+                    <div className="mt-2 p-3 bg-status-success-bg border border-status-success/30 rounded-lg flex items-center justify-between">
                       <div>
-                        <p className="text-green-400 font-semibold">
+                        <p className="text-status-success font-semibold">
                           {selectedClient.nomComplet || `${selectedClient.nom || ''} ${selectedClient.prenom || ''}`.trim()}
                         </p>
-                        <p className="text-sm text-slate-400">{selectedClient.telephone || selectedClient.phone || ''}</p>
+                        <p className="text-sm text-content-muted">{selectedClient.telephone || selectedClient.phone || ''}</p>
                       </div>
                       <button
                         type="button"
                         onClick={() => { setSelectedClient(null); setSearchClient(''); }}
-                        className="text-slate-400 hover:text-white text-sm"
+                        className="text-content-muted hover:text-content-primary text-sm"
                       >
                         &times;
                       </button>
@@ -354,7 +354,7 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-slate-300 mb-2">
+                  <label className="block text-sm font-semibold text-content-secondary mb-2">
                     <DollarSign size={16} className="inline mr-1" />
                     Montant (FC)
                   </label>
@@ -363,18 +363,18 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
                     placeholder="0.00"
                     value={montant}
                     onChange={(e) => setMontant(e.target.value)}
-                    className="w-full bg-slate-700 text-white px-4 py-3 rounded-lg border border-slate-600 input-focus text-2xl font-bold"
+                    className="w-full bg-surface-elevated text-content-primary px-4 py-3 rounded-lg border border-edge-strong input-focus text-2xl font-bold"
                     disabled={!canPerformAction()}
                   />
                   {agent && (
-                    <p className="text-xs text-slate-500 mt-1">
+                    <p className="text-xs text-content-muted mt-1">
                       Limite: {agent.limite_transaction_max.toLocaleString()} FCFA
                     </p>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-slate-300 mb-2">
+                  <label className="block text-sm font-semibold text-content-secondary mb-2">
                     Référence (optionnelle)
                   </label>
                   <input
@@ -382,7 +382,7 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
                     placeholder="REF-123456"
                     value={reference}
                     onChange={(e) => setReference(e.target.value)}
-                    className="w-full bg-slate-700 text-white px-4 py-3 rounded-lg border border-slate-600 input-focus"
+                    className="w-full bg-surface-elevated text-content-primary px-4 py-3 rounded-lg border border-edge-strong input-focus"
                     disabled={!canPerformAction()}
                   />
                 </div>
@@ -409,19 +409,19 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
             <div className="card-gradient p-6">
               <h3 className="text-lg font-bold mb-4">Mes Informations</h3>
               <div className="space-y-3">
-                <div className="bg-slate-700/30 p-3 rounded-lg">
-                  <p className="text-xs text-slate-400">Caisse assignée</p>
-                  <p className="font-semibold text-white">{agent?.caisse_assignee || 'Non assigné'}</p>
+                <div className="bg-surface-elevated/30 p-3 rounded-lg">
+                  <p className="text-xs text-content-muted">Caisse assignée</p>
+                  <p className="font-semibold text-content-primary">{agent?.caisse_assignee || 'Non assigné'}</p>
                 </div>
-                <div className="bg-slate-700/30 p-3 rounded-lg">
-                  <p className="text-xs text-slate-400">Statut</p>
-                  <span className="inline-block mt-1 px-3 py-1 bg-green-500/20 text-green-400 rounded-full text-xs font-semibold">
+                <div className="bg-surface-elevated/30 p-3 rounded-lg">
+                  <p className="text-xs text-content-muted">Statut</p>
+                  <span className="inline-block mt-1 px-3 py-1 bg-status-success-bg text-status-success rounded-full text-xs font-semibold">
                     {ALL_STATUS_LABELS[agent?.statut || ''] || agent?.statut || 'Actif'}
                   </span>
                 </div>
-                <div className="bg-slate-700/30 p-3 rounded-lg">
-                  <p className="text-xs text-slate-400">Horaires</p>
-                  <p className="font-semibold text-white">
+                <div className="bg-surface-elevated/30 p-3 rounded-lg">
+                  <p className="text-xs text-content-muted">Horaires</p>
+                  <p className="font-semibold text-content-primary">
                     {agent?.horaire_debut} - {agent?.horaire_fin}
                   </p>
                 </div>
@@ -432,16 +432,16 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
               <h3 className="text-lg font-bold mb-4">Transactions Récentes</h3>
               <div className="space-y-2">
                 {transactions.slice(0, 5).map((tx, idx) => (
-                  <div key={idx} className="bg-slate-700/30 p-3 rounded-lg">
+                  <div key={idx} className="bg-surface-elevated/30 p-3 rounded-lg">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-semibold text-white">{tx.type}</span>
-                      <span className="text-sm font-bold text-green-400">{tx.montant} FCFA</span>
+                      <span className="text-sm font-semibold text-content-primary">{tx.type}</span>
+                      <span className="text-sm font-bold text-status-success">{tx.montant} FCFA</span>
                     </div>
-                    <p className="text-xs text-slate-400">{tx.reference}</p>
+                    <p className="text-xs text-content-muted">{tx.reference}</p>
                   </div>
                 ))}
                 {transactions.length === 0 && (
-                  <p className="text-sm text-slate-500 text-center py-4">Aucune transaction</p>
+                  <p className="text-sm text-content-muted text-center py-4">Aucune transaction</p>
                 )}
               </div>
             </div>
@@ -453,8 +453,8 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
       {notification && (
         <div className={`fixed top-4 right-4 z-50 px-6 py-4 rounded-lg shadow-2xl border animate-slide-down ${
           notification.type === 'success'
-            ? 'bg-green-500/90 border-green-400 text-white'
-            : 'bg-blue-500/90 border-blue-400 text-white'
+            ? 'bg-status-success/90 border-status-success text-content-primary'
+            : 'bg-status-info/90 border-status-info text-white'
         }`}>
           <div className="flex items-center gap-3">
             {notification.type === 'success' ? <CheckCircle size={20} /> : <AlertCircle size={20} />}

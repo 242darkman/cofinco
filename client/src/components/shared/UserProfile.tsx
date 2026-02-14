@@ -96,8 +96,8 @@ function EditableField({ label, value, icon: Icon, onSave, editable = true, type
   // --- MODE ÉDITION (Compact) ---
   if (isEditing) {
     return (
-      <div className="animate-in fade-in zoom-in-95 duration-200 bg-slate-900/50 p-1.5 -m-1.5 rounded-lg border border-indigo-500/20">
-        <label className="block text-[10px] font-medium text-indigo-400 mb-1 ml-1">
+      <div className="animate-in fade-in zoom-in-95 duration-200 bg-surface-base/50 p-1.5 -m-1.5 rounded-lg border border-accent/20">
+        <label className="block text-[10px] font-medium text-accent mb-1 ml-1">
           {label}
         </label>
 
@@ -105,10 +105,10 @@ function EditableField({ label, value, icon: Icon, onSave, editable = true, type
           <div className="relative flex-1">
             <input
               type={type}
-              className={`w-full h-8 bg-slate-950 border rounded-md pl-2 pr-2 text-xs text-white focus:outline-none focus:ring-1 transition-all ${
+              className={`w-full h-8 bg-surface-base border rounded-md pl-2 pr-2 text-xs text-content-primary focus:outline-none focus:ring-1 transition-all ${
                 validationError
-                  ? 'border-red-500 focus:ring-red-500/20'
-                  : 'border-indigo-500 focus:ring-indigo-500/20'
+                  ? 'border-status-danger focus:ring-status-danger/20'
+                  : 'border-accent focus:ring-accent/20'
               }`}
               value={tempValue}
               onChange={e => handleChange(e.target.value)}
@@ -120,7 +120,7 @@ function EditableField({ label, value, icon: Icon, onSave, editable = true, type
           <button
             onClick={handleSave}
             disabled={saving || !!validationError}
-            className="h-8 w-8 flex items-center justify-center bg-emerald-500 hover:bg-emerald-400 text-slate-900 rounded-md transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            className="h-8 w-8 flex items-center justify-center bg-status-success hover:bg-status-success text-white rounded-md transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
             title="Valider"
           >
             {saving ? <LoadingSpinner size="sm" /> : <Check size={14} strokeWidth={3} />}
@@ -128,7 +128,7 @@ function EditableField({ label, value, icon: Icon, onSave, editable = true, type
 
           <button
             onClick={handleCancel}
-            className="h-8 w-8 flex items-center justify-center bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-md border border-slate-700 transition-colors"
+            className="h-8 w-8 flex items-center justify-center bg-surface hover:bg-surface-elevated text-content-muted hover:text-content-primary rounded-md border border-edge transition-colors"
             title="Annuler"
           >
             <X size={14} />
@@ -137,7 +137,7 @@ function EditableField({ label, value, icon: Icon, onSave, editable = true, type
 
         {/* Validation error message */}
         {validationError && (
-          <div className="mt-1 flex items-center gap-1 text-[9px] text-red-400">
+          <div className="mt-1 flex items-center gap-1 text-[9px] text-status-danger">
             <AlertCircle size={10} />
             <span>{validationError}</span>
           </div>
@@ -148,21 +148,21 @@ function EditableField({ label, value, icon: Icon, onSave, editable = true, type
 
   // --- MODE LECTURE (Compact) ---
   return (
-    <div className="group flex items-center justify-between p-2 hover:bg-slate-800/50 rounded-lg transition-colors border border-transparent hover:border-slate-800/50 cursor-default -mx-2">
+    <div className="group flex items-center justify-between p-2 hover:bg-surface/50 rounded-lg transition-colors border border-transparent hover:border-edge/50 cursor-default -mx-2">
       <div className="flex items-center gap-3 overflow-hidden">
-        <div className="flex-shrink-0 p-1.5 bg-slate-950 rounded-md text-slate-400 border border-slate-800 group-hover:border-slate-700 group-hover:text-indigo-400 transition-colors">
+        <div className="flex-shrink-0 p-1.5 bg-surface-base rounded-md text-content-muted border border-edge group-hover:border-edge group-hover:text-accent transition-colors">
           <Icon size={14} />
         </div>
         <div className="min-w-0">
-          <div className="text-[10px] text-slate-500 font-medium leading-none mb-0.5">{label}</div>
-          <div className="text-xs font-medium text-slate-200 truncate leading-tight">{value || 'Non renseigné'}</div>
+          <div className="text-[10px] text-content-muted font-medium leading-none mb-0.5">{label}</div>
+          <div className="text-xs font-medium text-content-secondary truncate leading-tight">{value || 'Non renseigné'}</div>
         </div>
       </div>
       
       {editable && (
         <button 
           onClick={() => setIsEditing(true)} 
-          className="opacity-0 group-hover:opacity-100 p-1.5 text-indigo-400 hover:bg-indigo-500/10 hover:text-indigo-300 rounded transition-all transform scale-90 group-hover:scale-100"
+          className="opacity-0 group-hover:opacity-100 p-1.5 text-accent hover:bg-accent/10 hover:text-accent rounded transition-all transform scale-90 group-hover:scale-100"
         >
           <PenLine size={14} />
         </button>
@@ -181,9 +181,9 @@ interface ReadOnlyFieldProps {
 function ReadOnlyField({ label, value, highlight }: ReadOnlyFieldProps) {
   return (
     <div className="flex flex-col">
-      <div className="text-[9px] text-slate-500 uppercase tracking-wider">{label}</div>
-      <div className={`text-xs font-semibold truncate ${highlight ? 'text-emerald-400' : 'text-slate-300'}`}>
-        {value || <span className="text-slate-700">—</span>}
+      <div className="text-[9px] text-content-muted uppercase tracking-wider">{label}</div>
+      <div className={`text-xs font-semibold truncate ${highlight ? 'text-status-success' : 'text-content-secondary'}`}>
+        {value || <span className="text-content-secondary">—</span>}
       </div>
     </div>
   );
@@ -247,7 +247,7 @@ function CaissePinManager({ hasPin, onPinConfigured, canAccessCaisse }: CaissePi
   
   if (!canAccessCaisse) {
        return (
-        <div className="flex items-center gap-2 text-[10px] text-slate-500 bg-slate-900/50 p-2 rounded border border-slate-800">
+        <div className="flex items-center gap-2 text-[10px] text-content-muted bg-surface-base/50 p-2 rounded border border-edge">
           <Info size={12} className="shrink-0" />
           <span>PIN Caisse non requis (aucune permission caisse).</span>
         </div>
@@ -256,7 +256,7 @@ function CaissePinManager({ hasPin, onPinConfigured, canAccessCaisse }: CaissePi
 
   if (showForm) {
       return (
-        <div className="p-2 rounded-lg border bg-slate-950 border-slate-700">
+        <div className="p-2 rounded-lg border bg-surface-base border-edge">
            <PinForm
             formData={formData}
             setFormData={setFormData}
@@ -272,21 +272,21 @@ function CaissePinManager({ hasPin, onPinConfigured, canAccessCaisse }: CaissePi
   }
 
   return (
-    <div className={`flex items-center justify-between p-2 rounded-lg border ${!hasPin ? 'bg-amber-900/10 border-amber-500/20' : 'bg-slate-900 border-slate-800'}`}>
+    <div className={`flex items-center justify-between p-2 rounded-lg border ${!hasPin ? 'bg-status-warning-bg border-status-warning/20' : 'bg-surface-base border-edge'}`}>
        <div className="flex items-center gap-2">
-            <CreditCard size={14} className={hasPin ? "text-emerald-400" : "text-amber-400"} />
+            <CreditCard size={14} className={hasPin ? "text-status-success" : "text-status-warning"} />
             <div className="flex flex-col">
-                 <span className={`text-[10px] font-bold ${hasPin ? "text-emerald-400" : "text-amber-400"}`}>
+                 <span className={`text-[10px] font-bold ${hasPin ? "text-status-success" : "text-status-warning"}`}>
                      {hasPin ? 'PIN Actif' : 'PIN Inactif'}
                  </span>
-                 <span className="text-[9px] text-slate-500 leading-none">Accès caisse</span>
+                 <span className="text-[9px] text-content-muted leading-none">Accès caisse</span>
             </div>
        </div>
        <button
             onClick={() => setShowForm(true)}
             className={`text-[10px] px-2 py-1 rounded border transition-colors ${hasPin 
-                ? 'text-slate-400 border-slate-700 hover:bg-slate-800' 
-                : 'text-amber-900 bg-amber-500 hover:bg-amber-400 border-amber-500 font-bold'}`}
+                ? 'text-content-muted border-edge hover:bg-surface' 
+                : 'text-status-warning bg-status-warning hover:bg-status-warning border-status-warning font-bold'}`}
        >
             {hasPin ? 'Modifier' : 'Créer'}
        </button>
@@ -300,7 +300,7 @@ function PinForm({ formData, setFormData, showPassword, setShowPassword, loading
   return (
     <form onSubmit={onSubmit} className="space-y-2">
       {error && (
-        <div className="text-[9px] text-red-400 bg-red-900/20 p-1 rounded">
+        <div className="text-[9px] text-status-danger bg-status-danger-bg p-1 rounded">
           {error}
         </div>
       )}
@@ -310,14 +310,14 @@ function PinForm({ formData, setFormData, showPassword, setShowPassword, loading
             type={showPassword ? 'text' : 'password'}
             value={formData.currentPassword}
             onChange={(e) => setFormData({ ...formData, currentPassword: e.target.value })}
-            className="w-full px-2 py-1 bg-slate-900 border border-slate-700 rounded text-white text-xs focus:border-indigo-500 outline-none pr-7 h-7"
+            className="w-full px-2 py-1 bg-surface-base border border-edge rounded text-content-primary text-xs focus:border-accent outline-none pr-7 h-7"
             placeholder="Mot de passe actuel"
             required
           />
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-content-muted hover:text-content-primary"
           >
             {showPassword ? <EyeOff size={10} /> : <Eye size={10} />}
           </button>
@@ -329,7 +329,7 @@ function PinForm({ formData, setFormData, showPassword, setShowPassword, loading
             type={showPin ? 'text' : 'password'}
             value={formData.newPin}
             onChange={(e) => setFormData({ ...formData, newPin: e.target.value.replace(/\D/g, '').slice(0, 6) })}
-            className="w-full px-2 py-1 bg-slate-900 border border-slate-700 rounded text-white text-center text-xs font-mono tracking-widest focus:border-indigo-500 outline-none pr-6 h-7"
+            className="w-full px-2 py-1 bg-surface-base border border-edge rounded text-content-primary text-center text-xs font-mono tracking-widest focus:border-accent outline-none pr-6 h-7"
             placeholder="Nouveau"
             maxLength={6}
             inputMode="numeric"
@@ -338,7 +338,7 @@ function PinForm({ formData, setFormData, showPassword, setShowPassword, loading
           <button
             type="button"
             onClick={() => setShowPin(!showPin)}
-            className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 text-content-muted hover:text-content-primary"
           >
             {showPin ? <EyeOff size={10} /> : <Eye size={10} />}
           </button>
@@ -348,7 +348,7 @@ function PinForm({ formData, setFormData, showPassword, setShowPassword, loading
             type={showPin ? 'text' : 'password'}
             value={formData.confirmPin}
             onChange={(e) => setFormData({ ...formData, confirmPin: e.target.value.replace(/\D/g, '').slice(0, 6) })}
-            className="w-full px-2 py-1 bg-slate-900 border border-slate-700 rounded text-white text-center text-xs font-mono tracking-widest focus:border-indigo-500 outline-none pr-6 h-7"
+            className="w-full px-2 py-1 bg-surface-base border border-edge rounded text-content-primary text-center text-xs font-mono tracking-widest focus:border-accent outline-none pr-6 h-7"
             placeholder="Confirmer"
             maxLength={6}
             inputMode="numeric"
@@ -357,20 +357,20 @@ function PinForm({ formData, setFormData, showPassword, setShowPassword, loading
           <button
             type="button"
             onClick={() => setShowPin(!showPin)}
-            className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 text-content-muted hover:text-content-primary"
           >
             {showPin ? <EyeOff size={10} /> : <Eye size={10} />}
           </button>
         </div>
       </div>
 
-      <p className="text-[9px] text-slate-500">6 chiffres minimum requis</p>
+      <p className="text-[9px] text-content-muted">6 chiffres minimum requis</p>
 
       <div className="flex gap-1.5">
         <button
           type="submit"
           disabled={loading}
-          className="flex-1 py-1 bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] font-semibold rounded transition-colors disabled:opacity-50 flex items-center justify-center gap-1 h-6"
+          className="flex-1 py-1 bg-accent hover:bg-accent-primary-hover text-white text-[10px] font-semibold rounded transition-colors disabled:opacity-50 flex items-center justify-center gap-1 h-6"
         >
           {loading ? <LoadingSpinner size="sm" /> : <Check size={10} />}
           OK
@@ -378,7 +378,7 @@ function PinForm({ formData, setFormData, showPassword, setShowPassword, loading
         <button
           type="button"
           onClick={onCancel}
-          className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] rounded transition-colors h-6"
+          className="px-2 py-1 bg-surface hover:bg-surface-elevated text-content-secondary text-[10px] rounded transition-colors h-6"
         >
           <X size={10} />
         </button>
@@ -509,11 +509,11 @@ export default function UserProfile({ onUserUpdate }: UserProfileProps) {
   if (!user) {
     return (
       <div className="text-center py-12">
-        <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
-          <User size={32} className="text-slate-500" />
+        <div className="w-16 h-16 bg-surface rounded-full flex items-center justify-center mx-auto mb-4">
+          <User size={32} className="text-content-muted" />
         </div>
-        <h3 className="font-bold text-white mb-1">Non connecté</h3>
-        <p className="text-slate-400 text-xs text-center px-4">Reconnectez-vous.</p>
+        <h3 className="font-bold text-content-primary mb-1">Non connecté</h3>
+        <p className="text-content-muted text-xs text-center px-4">Reconnectez-vous.</p>
       </div>
     );
   }
@@ -529,7 +529,7 @@ export default function UserProfile({ onUserUpdate }: UserProfileProps) {
   };
 
   return (
-    <div className="text-white p-2 md:p-3 max-w-5xl mx-auto">
+    <div className="text-content-primary p-2 md:p-3 max-w-5xl mx-auto">
       <input
         ref={fileInputRef}
         type="file"
@@ -539,7 +539,7 @@ export default function UserProfile({ onUserUpdate }: UserProfileProps) {
       />
 
       {/* HEADER COMPACT */}
-      <div className="flex items-center gap-3 mb-4 bg-slate-900/50 p-2 rounded-xl border border-slate-800/50">
+      <div className="flex items-center gap-3 mb-4 bg-surface-base/50 p-2 rounded-xl border border-edge/50">
         <div className="relative group shrink-0">
           {/* Photo Preview Mode */}
           {photoPreview ? (
@@ -547,13 +547,13 @@ export default function UserProfile({ onUserUpdate }: UserProfileProps) {
               <img
                 src={photoPreview.url}
                 alt="Aperçu"
-                className="w-10 h-10 rounded-full border-2 border-indigo-500 object-cover ring-2 ring-indigo-500/30"
+                className="w-10 h-10 rounded-full border-2 border-accent object-cover ring-2 ring-accent/30"
               />
               <div className="absolute -bottom-2 -right-2 flex gap-0.5">
                 <button
                   onClick={handleConfirmPhoto}
                   disabled={uploadingPhoto}
-                  className="bg-emerald-500 hover:bg-emerald-400 p-1 rounded-full transition-colors disabled:opacity-50"
+                  className="bg-status-success hover:bg-status-success p-1 rounded-full transition-colors disabled:opacity-50"
                   title="Confirmer"
                 >
                   {uploadingPhoto ? (
@@ -565,10 +565,10 @@ export default function UserProfile({ onUserUpdate }: UserProfileProps) {
                 <button
                   onClick={handleCancelPreview}
                   disabled={uploadingPhoto}
-                  className="bg-slate-700 hover:bg-slate-600 p-1 rounded-full border border-slate-600 transition-colors disabled:opacity-50"
+                  className="bg-surface-elevated hover:bg-surface-subtle p-1 rounded-full border border-edge-strong transition-colors disabled:opacity-50"
                   title="Annuler"
                 >
-                  <X size={10} className="text-slate-300" />
+                  <X size={10} className="text-content-secondary" />
                 </button>
               </div>
             </div>
@@ -578,19 +578,19 @@ export default function UserProfile({ onUserUpdate }: UserProfileProps) {
                 <img
                   src={resolveStorageUrl(user.photoProfile)}
                   alt={getFullName()}
-                  className="w-10 h-10 rounded-full border border-indigo-500 object-cover"
+                  className="w-10 h-10 rounded-full border border-accent object-cover"
                 />
               ) : (
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-sm font-bold border border-indigo-400">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-accent to-status-info flex items-center justify-center text-white text-sm font-bold border border-accent">
                   {getInitials()}
                 </div>
               )}
               <button
                 onClick={handlePhotoClick}
                 disabled={uploadingPhoto}
-                className="absolute -bottom-1 -right-1 bg-slate-800 p-1 rounded-full border border-slate-600 hover:bg-slate-700 transition-colors disabled:opacity-50"
+                className="absolute -bottom-1 -right-1 bg-surface p-1 rounded-full border border-edge-strong hover:bg-surface-elevated transition-colors disabled:opacity-50"
               >
-                <Camera size={8} className="text-slate-300" />
+                <Camera size={8} className="text-content-secondary" />
               </button>
             </>
           )}
@@ -599,13 +599,13 @@ export default function UserProfile({ onUserUpdate }: UserProfileProps) {
           <div className="flex items-center gap-2">
             <h1 className="text-base font-bold truncate leading-tight">{getFullName()}</h1>
             {photoPreview && (
-              <span className="text-[9px] px-1.5 py-0.5 bg-indigo-500/20 text-indigo-400 rounded border border-indigo-500/30">
+              <span className="text-[9px] px-1.5 py-0.5 bg-accent/10 text-accent rounded border border-accent/30">
                 Aperçu photo
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
-             <span className="text-indigo-400 font-medium text-[10px] uppercase">
+          <div className="flex items-center gap-2 text-xs text-content-muted mt-0.5">
+             <span className="text-accent font-medium text-[10px] uppercase">
                {getRoleLabel(user.role)}
              </span>
              {user.agence && <span className="opacity-50">• {user.agence}</span>}
@@ -616,9 +616,9 @@ export default function UserProfile({ onUserUpdate }: UserProfileProps) {
       {/* BENTO GRID - DENSE */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-2">
         {/* 1. CARTE IDENTITÉ */}
-        <div className="bg-slate-900 border border-slate-800 rounded-lg p-3 space-y-2 flex flex-col">
-          <h3 className="text-xs font-semibold flex items-center gap-2 pb-2 border-b border-slate-800 text-slate-300">
-            <User size={14} className="text-indigo-400" />
+        <div className="bg-surface-base border border-edge rounded-lg p-3 space-y-2 flex flex-col">
+          <h3 className="text-xs font-semibold flex items-center gap-2 pb-2 border-b border-edge text-content-secondary">
+            <User size={14} className="text-accent" />
             Identité
           </h3>
 
@@ -650,20 +650,20 @@ export default function UserProfile({ onUserUpdate }: UserProfileProps) {
             />
           </div>
 
-          <div className="flex items-center gap-1.5 pt-2 border-t border-slate-800">
-            <UserCircle size={12} className="text-slate-600" />
-            <span className="text-[10px] text-slate-600">@{user.username}</span>
+          <div className="flex items-center gap-1.5 pt-2 border-t border-edge">
+            <UserCircle size={12} className="text-content-muted" />
+            <span className="text-[10px] text-content-muted">@{user.username}</span>
           </div>
         </div>
 
         {/* 2. CARTE RH */}
-        <div className="bg-slate-900 border border-slate-800 rounded-lg p-3 space-y-3">
-          <div className="flex justify-between items-center pb-2 border-b border-slate-800">
-            <h3 className="text-xs font-semibold flex items-center gap-2 text-slate-300">
-              <Building2 size={14} className="text-emerald-400" />
+        <div className="bg-surface-base border border-edge rounded-lg p-3 space-y-3">
+          <div className="flex justify-between items-center pb-2 border-b border-edge">
+            <h3 className="text-xs font-semibold flex items-center gap-2 text-content-secondary">
+              <Building2 size={14} className="text-status-success" />
               RH & Contrat
             </h3>
-            <div className={user.matricule ? "text-emerald-500" : "text-amber-500"}>
+            <div className={user.matricule ? "text-status-success" : "text-status-warning"}>
                  <div className="w-1.5 h-1.5 rounded-full bg-current" />
             </div>
           </div>
@@ -679,34 +679,34 @@ export default function UserProfile({ onUserUpdate }: UserProfileProps) {
           </div>
 
           {canViewSalary() && user.salaireBase !== undefined && (
-            <div className="pt-2 border-t border-slate-800">
+            <div className="pt-2 border-t border-edge">
               <div className="flex justify-between items-end">
-                   <span className="text-[9px] text-slate-500 uppercase tracking-wider">Salaire Base</span>
-                   <span className="text-sm font-mono font-bold text-emerald-400">{formatMoney(user.salaireBase)}</span>
+                   <span className="text-[9px] text-content-muted uppercase tracking-wider">Salaire Base</span>
+                   <span className="text-sm font-mono font-bold text-status-success">{formatMoney(user.salaireBase)}</span>
               </div>
             </div>
           )}
         </div>
 
         {/* 3. CARTE SÉCURITÉ */}
-        <div className="bg-slate-900 border border-slate-800 rounded-lg p-3 space-y-3">
-          <h3 className="text-xs font-semibold flex items-center gap-2 pb-2 border-b border-slate-800 text-slate-300">
-            <Shield size={14} className="text-rose-400" />
+        <div className="bg-surface-base border border-edge rounded-lg p-3 space-y-3">
+          <h3 className="text-xs font-semibold flex items-center gap-2 pb-2 border-b border-edge text-content-secondary">
+            <Shield size={14} className="text-status-danger" />
             Sécurité
           </h3>
 
           <div className="space-y-3">
             {/* Mot de passe */}
-            <div className="flex justify-between items-center p-2 bg-slate-950 rounded-lg border border-slate-800">
+            <div className="flex justify-between items-center p-2 bg-surface-base rounded-lg border border-edge">
                 <div className="flex items-center gap-2">
-                <Key size={14} className="text-slate-500" />
+                <Key size={14} className="text-content-muted" />
                 <div className="flex flex-col">
-                    <span className="text-[10px] font-medium text-slate-300">Mot de passe</span>
+                    <span className="text-[10px] font-medium text-content-secondary">Mot de passe</span>
                 </div>
                 </div>
                 <button
                 onClick={() => setShowPasswordModal(true)}
-                className="text-[10px] text-indigo-400 hover:text-indigo-300 font-medium px-2 py-1 border border-slate-700 rounded hover:bg-slate-800 transition-colors"
+                className="text-[10px] text-accent hover:text-accent font-medium px-2 py-1 border border-edge rounded hover:bg-surface transition-colors"
                 >
                 Modifier
                 </button>

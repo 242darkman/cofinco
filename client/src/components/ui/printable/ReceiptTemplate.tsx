@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useBranding } from '@/contexts/BrandingContext';
 import { LOGO_BASE64 } from '@/lib/pdf-logo';
 import { currencySymbol } from '@shared/config/currency';
 
@@ -210,7 +211,7 @@ const LogoWithFallback: React.FC<LogoWithFallbackProps> = ({ src, alt, className
   if (!src || hasError) {
     const initials = alt.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
     return (
-      <div className={`${className} bg-black text-white font-bold flex items-center justify-center rounded`}>
+      <div className={`${className} bg-black text-content-primary font-bold flex items-center justify-center rounded`}>
         {initials}
       </div>
     );
@@ -467,7 +468,7 @@ const ReceiptContent: React.FC<{
           )}
           {normalized.internalTransaction.observations && (
             <div className="mt-1">
-              <span className="block text-[11px] text-gray-600">Observations:</span>
+              <span className="block text-[11px] text-content-muted">Observations:</span>
               <span className="text-[11px] italic">{normalized.internalTransaction.observations}</span>
             </div>
           )}
@@ -541,7 +542,7 @@ const ReceiptContent: React.FC<{
     {showQRCode && (
       <div className="mt-3 flex items-center justify-center gap-2">
         <MiniQRCode data={verificationData} size={28} />
-        <span className="text-[9px] text-gray-600">Vérification</span>
+        <span className="text-[9px] text-content-muted">Vérification</span>
       </div>
     )}
 
@@ -557,7 +558,7 @@ const ReceiptContent: React.FC<{
 
     {/* Legal identifiers at bottom */}
     {(normalized.resolvedCompany.nif || normalized.resolvedCompany.rccm) && (
-      <div className="mt-2 text-center text-[9px] text-gray-500">
+      <div className="mt-2 text-center text-[9px] text-content-muted">
         {normalized.resolvedCompany.nif && <span>NIF: {normalized.resolvedCompany.nif}</span>}
         {normalized.resolvedCompany.nif && normalized.resolvedCompany.rccm && <span> | </span>}
         {normalized.resolvedCompany.rccm && <span>RCCM: {normalized.resolvedCompany.rccm}</span>}
@@ -568,7 +569,12 @@ const ReceiptContent: React.FC<{
 
 export const ReceiptTemplate = React.forwardRef<HTMLDivElement, ReceiptTemplateProps>(
   ({ data, companyInfo, copyType = 'original', showQRCode = true }, ref) => {
+    const { branding } = useBranding();
     const normalized = normalizeReceiptData(data, companyInfo);
+    // Override default company name with dynamic branding
+    if (!companyInfo?.name && !companyInfo?.nom && !data.companyInfo?.name) {
+      normalized.resolvedCompany.name = branding.appName;
+    }
     const formattedDate = formatDateTime(normalized.date);
 
     // Generate verification data for QR code
@@ -636,7 +642,7 @@ export const ReceiptTemplate = React.forwardRef<HTMLDivElement, ReceiptTemplateP
             </div>
             {/* Cut line indicator */}
             <div className="border-t-2 border-dashed border-black my-2 relative">
-              <span className="absolute left-1/2 -translate-x-1/2 -top-2 bg-white px-2 text-[8px] text-gray-500">✂ DÉCOUPER ICI</span>
+              <span className="absolute left-1/2 -translate-x-1/2 -top-2 bg-white px-2 text-[8px] text-content-muted">✂ DÉCOUPER ICI</span>
             </div>
             {/* Duplicate */}
             <div className="receipt-copy p-4">

@@ -18,28 +18,28 @@ const icons: Record<ToastType, typeof CheckCircle> = {
 
 const colors: Record<ToastType, { bg: string; border: string; icon: string; text: string }> = {
   success: {
-    bg: 'bg-emerald-500/10',
-    border: 'border-emerald-500/50',
-    icon: 'text-emerald-400',
-    text: 'text-emerald-300',
+    bg: 'bg-status-success-bg',
+    border: 'border-status-success/50',
+    icon: 'text-status-success',
+    text: 'text-status-success-text',
   },
   error: {
-    bg: 'bg-red-500/10',
-    border: 'border-red-500/50',
-    icon: 'text-red-400',
-    text: 'text-red-300',
+    bg: 'bg-status-danger-bg',
+    border: 'border-status-danger/50',
+    icon: 'text-status-danger',
+    text: 'text-status-danger-text',
   },
   warning: {
-    bg: 'bg-amber-500/10',
-    border: 'border-amber-500/50',
-    icon: 'text-amber-400',
-    text: 'text-amber-300',
+    bg: 'bg-status-warning-bg',
+    border: 'border-status-warning/50',
+    icon: 'text-status-warning',
+    text: 'text-status-warning-text',
   },
   info: {
-    bg: 'bg-cyan-500/10',
-    border: 'border-cyan-500/50',
-    icon: 'text-cyan-400',
-    text: 'text-cyan-300',
+    bg: 'bg-status-info-bg',
+    border: 'border-status-info/50',
+    icon: 'text-status-info',
+    text: 'text-status-info-text',
   },
 };
 
@@ -79,7 +79,7 @@ export default function ToastContainer() {
             <p className={`${color.text} text-sm flex-1 font-medium`}>{t.message}</p>
             <button
               onClick={() => toast.remove(t.id)}
-              className="shrink-0 text-slate-400 hover:text-white transition-colors"
+              className="shrink-0 text-content-muted hover:text-content-primary transition-colors"
               aria-label="Fermer la notification"
             >
               <X size={16} />

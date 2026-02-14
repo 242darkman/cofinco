@@ -56,7 +56,7 @@ export default function Loge() {
   }
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
+    <div className="p-4 sm:p-6 space-y-6 min-h-screen bg-surface-base">
       <LogeHeader
         onLock={handleLock}
         onUpload={() => setShowUploadModal(true)}

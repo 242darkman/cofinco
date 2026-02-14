@@ -95,9 +95,9 @@ export function ReportsToolbar({
   ];
 
   return (
-    <Card className="bg-slate-900/80 border-slate-800 backdrop-blur-sm shadow-xl overflow-hidden">
+    <Card className="bg-surface-base/80 border-edge backdrop-blur-sm shadow-xl overflow-hidden">
       {/* Row 1: Report Type Tabs - Full width, always visible */}
-      <div className="border-b border-slate-800/50">
+      <div className="border-b border-edge/50">
         <div className="flex">
           {REPORT_TYPES.map((type) => (
             <button
@@ -105,17 +105,17 @@ export function ReportsToolbar({
               onClick={() => onTypeRapportChange(type.value)}
               className={`flex-1 flex items-center justify-center gap-2 px-3 py-3 text-xs sm:text-sm font-semibold transition-all relative ${
                 typeRapport === type.value
-                  ? 'text-cyan-400 bg-cyan-500/5'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                  ? 'text-accent bg-accent/5'
+                  : 'text-content-muted hover:text-content-primary hover:bg-surface/50'
               }`}
             >
-              <span className={typeRapport === type.value ? 'text-cyan-400' : 'text-slate-500'}>
+              <span className={typeRapport === type.value ? 'text-accent' : 'text-content-muted'}>
                 {type.icon}
               </span>
               <span>{type.label}</span>
               {/* Active indicator */}
               {typeRapport === type.value && (
-                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-cyan-500 to-blue-500" />
+                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-accent to-status-info" />
               )}
             </button>
           ))}
@@ -135,8 +135,8 @@ export function ReportsToolbar({
                   onClick={() => setPeriode(btn.type)}
                   className={`px-2.5 sm:px-3 py-1.5 text-[10px] sm:text-xs font-semibold rounded-lg whitespace-nowrap transition-all ${
                     activePeriod === btn.type
-                      ? 'bg-gradient-to-r from-cyan-500/20 to-blue-500/20 text-cyan-400 ring-1 ring-cyan-500/30'
-                      : 'bg-slate-800/50 text-slate-400 hover:text-white hover:bg-slate-700/50'
+                      ? 'bg-gradient-to-r from-accent/20 to-status-info/20 text-accent ring-1 ring-accent/30'
+                      : 'bg-surface/50 text-content-muted hover:text-content-primary hover:bg-surface-elevated/50'
                   }`}
                 >
                   <span className="sm:hidden">{btn.shortLabel}</span>
@@ -146,20 +146,20 @@ export function ReportsToolbar({
             </div>
 
             {/* Date Pickers */}
-            <div className="flex items-center gap-1.5 bg-slate-800/40 rounded-lg px-2 py-1.5 border border-slate-700/50 focus-within:border-cyan-500/50 transition-colors flex-1 min-w-0">
-              <Calendar size={14} className="text-slate-500 shrink-0" />
+            <div className="flex items-center gap-1.5 bg-surface/40 rounded-lg px-2 py-1.5 border border-edge-subtle focus-within:border-accent/50 transition-colors flex-1 min-w-0">
+              <Calendar size={14} className="text-content-muted shrink-0" />
               <input
                 type="date"
                 value={dateDebut}
                 onChange={(e) => onDateDebutChange(e.target.value)}
-                className="bg-transparent border-none text-[11px] sm:text-xs font-medium text-slate-300 focus:ring-0 focus:outline-none p-0 min-w-0 w-full max-w-[100px] sm:max-w-[110px] [color-scheme:dark]"
+                className="bg-transparent border-none text-[11px] sm:text-xs font-medium text-content-secondary focus:ring-0 focus:outline-none p-0 min-w-0 w-full max-w-[100px] sm:max-w-[110px] [color-scheme:dark]"
               />
-              <span className="text-slate-600 text-[10px] font-bold shrink-0">→</span>
+              <span className="text-content-muted text-[10px] font-bold shrink-0">→</span>
               <input
                 type="date"
                 value={dateFin}
                 onChange={(e) => onDateFinChange(e.target.value)}
-                className="bg-transparent border-none text-[11px] sm:text-xs font-medium text-slate-300 focus:ring-0 focus:outline-none p-0 min-w-0 w-full max-w-[100px] sm:max-w-[110px] [color-scheme:dark]"
+                className="bg-transparent border-none text-[11px] sm:text-xs font-medium text-content-secondary focus:ring-0 focus:outline-none p-0 min-w-0 w-full max-w-[100px] sm:max-w-[110px] [color-scheme:dark]"
               />
             </div>
           </div>
@@ -173,7 +173,7 @@ export function ReportsToolbar({
                 size="sm"
                 onClick={onExportPDF}
                 disabled={loading}
-                className="h-8 px-3 border-slate-700 hover:border-rose-500/50 text-slate-400 hover:text-rose-400 hover:bg-rose-500/5 transition-all"
+                className="h-8 px-3 border-edge hover:border-status-danger/50 text-content-muted hover:text-status-danger hover:bg-status-danger/5 transition-all"
               >
                 <FileText size={14} className="mr-1.5" />
                 PDF
@@ -183,7 +183,7 @@ export function ReportsToolbar({
                 size="sm"
                 onClick={onExportExcel}
                 disabled={loading}
-                className="h-8 px-3 border-slate-700 hover:border-emerald-500/50 text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/5 transition-all"
+                className="h-8 px-3 border-edge hover:border-status-success/50 text-content-muted hover:text-status-success hover:bg-status-success/5 transition-all"
               >
                 <FileSpreadsheet size={14} className="mr-1.5" />
                 Excel
@@ -197,7 +197,7 @@ export function ReportsToolbar({
                 size="sm"
                 onClick={() => setShowExportMenu(!showExportMenu)}
                 disabled={loading}
-                className="h-8 px-3 border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800"
+                className="h-8 px-3 border-edge text-content-muted hover:text-content-primary hover:bg-surface"
               >
                 <Download size={14} className="mr-1.5" />
                 Export
@@ -212,13 +212,13 @@ export function ReportsToolbar({
                     onClick={() => setShowExportMenu(false)}
                   />
                   {/* Menu */}
-                  <div className="absolute right-0 top-full mt-1 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                  <div className="absolute right-0 top-full mt-1 w-40 bg-surface border border-edge rounded-lg shadow-xl z-50 overflow-hidden">
                     <button
                       onClick={() => {
                         onExportPDF();
                         setShowExportMenu(false);
                       }}
-                      className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-slate-300 hover:bg-rose-500/10 hover:text-rose-400 transition-colors"
+                      className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-content-secondary hover:bg-status-danger/10 hover:text-status-danger transition-colors"
                     >
                       <FileText size={16} />
                       Exporter PDF
@@ -228,7 +228,7 @@ export function ReportsToolbar({
                         onExportExcel();
                         setShowExportMenu(false);
                       }}
-                      className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-slate-300 hover:bg-emerald-500/10 hover:text-emerald-400 transition-colors border-t border-slate-700/50"
+                      className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-content-secondary hover:bg-status-success-bg hover:text-status-success transition-colors border-t border-edge-subtle"
                     >
                       <FileSpreadsheet size={16} />
                       Exporter Excel
@@ -243,8 +243,8 @@ export function ReportsToolbar({
 
       {/* Loading indicator */}
       {loading && (
-        <div className="h-0.5 w-full bg-slate-800 overflow-hidden">
-          <div className="h-full w-1/3 bg-gradient-to-r from-cyan-500 to-blue-500 animate-[shimmer_1s_ease-in-out_infinite]"
+        <div className="h-0.5 w-full bg-surface overflow-hidden">
+          <div className="h-full w-1/3 bg-gradient-to-r from-accent to-status-info animate-[shimmer_1s_ease-in-out_infinite]"
                style={{ animation: 'shimmer 1s ease-in-out infinite' }} />
         </div>
       )}

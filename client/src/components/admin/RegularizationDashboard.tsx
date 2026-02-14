@@ -330,7 +330,7 @@ export default function RegularizationDashboard() {
         return (
           <div className="flex justify-center">
             {item.priorite === 'CRITICAL' ? (
-              <Zap className="w-5 h-5 text-red-500 animate-pulse" />
+              <Zap className="w-5 h-5 text-status-danger animate-pulse" />
             ) : (
               <Badge value={item.priorite[0]} variant={color} size="sm" />
             )}
@@ -344,10 +344,10 @@ export default function RegularizationDashboard() {
       primary: true,
       format: (_: unknown, item: RegularizationTask) => (
         <div className="flex flex-col gap-0.5 cursor-pointer group">
-          <span className="text-sm font-medium text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+          <span className="text-sm font-medium text-content-primary group-hover:text-status-info transition-colors">
             {item.typeLabel}
           </span>
-          <span className="text-xs text-slate-500 dark:text-slate-400 line-clamp-1">
+          <span className="text-xs text-content-muted line-clamp-1">
             {item.description}
           </span>
         </div>
@@ -359,11 +359,11 @@ export default function RegularizationDashboard() {
       align: 'right' as const,
       format: (val: string | null) =>
         val ? (
-          <span className="font-bold text-red-600 dark:text-red-400">
+          <span className="font-bold text-status-danger">
             {formatMoney(val)}
           </span>
         ) : (
-          <span className="text-slate-400">-</span>
+          <span className="text-content-muted">-</span>
         ),
     },
     {
@@ -401,18 +401,18 @@ export default function RegularizationDashboard() {
       format: (val: string | null) =>
         val ? (
           <div className="flex items-center gap-1.5">
-            <User className="w-3.5 h-3.5 text-slate-400" />
-            <span className="text-sm text-slate-700 dark:text-slate-300">{val}</span>
+            <User className="w-3.5 h-3.5 text-content-muted" />
+            <span className="text-sm text-content-secondary">{val}</span>
           </div>
         ) : (
-          <span className="text-slate-400 text-sm">Non assigné</span>
+          <span className="text-content-muted text-sm">Non assigné</span>
         ),
     },
     {
       key: 'createdAt',
       label: 'Créé le',
       format: (val: string) => (
-        <span className="text-sm text-slate-500">{formatDate(val)}</span>
+        <span className="text-sm text-content-muted">{formatDate(val)}</span>
       ),
     },
     {
@@ -427,7 +427,7 @@ export default function RegularizationDashboard() {
               size="sm"
               icon={CheckCircle2}
               onClick={() => handleOpenResolve(item)}
-              className="text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+              className="text-status-success hover:bg-status-success-bg"
             >
               Résoudre
             </Button>
@@ -448,9 +448,9 @@ export default function RegularizationDashboard() {
     return (
       <div className="p-8 flex justify-center">
         <div className="text-center">
-          <Lock className="mx-auto h-12 w-12 text-slate-300" />
-          <h3 className="mt-2 text-lg font-medium text-slate-900">Accès refusé</h3>
-          <p className="text-slate-500">Vous n'avez pas les permissions nécessaires.</p>
+          <Lock className="mx-auto h-12 w-12 text-content-secondary" />
+          <h3 className="mt-2 text-lg font-medium text-content-primary">Accès refusé</h3>
+          <p className="text-content-muted">Vous n'avez pas les permissions nécessaires.</p>
         </div>
       </div>
     );
@@ -461,10 +461,10 @@ export default function RegularizationDashboard() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
-          <h1 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">
+          <h1 className="text-lg sm:text-xl font-bold text-content-primary">
             Tâches de Régularisation
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+          <p className="text-xs sm:text-sm text-content-muted">
             Suivi et résolution des anomalies financières
           </p>
         </div>
@@ -519,7 +519,7 @@ export default function RegularizationDashboard() {
       )}
 
       {/* Filters Toolbar */}
-      <div className="bg-slate-800/50 p-2 sm:p-3 rounded-xl border border-slate-700 backdrop-blur-sm space-y-2 lg:space-y-0 lg:flex lg:justify-between lg:items-center lg:gap-3">
+      <div className="bg-surface/50 p-2 sm:p-3 rounded-xl border border-edge backdrop-blur-sm space-y-2 lg:space-y-0 lg:flex lg:justify-between lg:items-center lg:gap-3">
         {/* Status Tabs - scrollable on mobile */}
         <div className="overflow-x-auto -mx-2 px-2 sm:mx-0 sm:px-0 shrink-0">
           <TabGroup
@@ -580,7 +580,7 @@ export default function RegularizationDashboard() {
               checked={assignedToMe}
               onChange={setAssignedToMe}
             />
-            <span className="text-xs sm:text-sm text-slate-300 whitespace-nowrap">Mes tâches</span>
+            <span className="text-xs sm:text-sm text-content-secondary whitespace-nowrap">Mes tâches</span>
           </label>
         </div>
       </div>
@@ -611,8 +611,8 @@ export default function RegularizationDashboard() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 px-3 py-2 bg-slate-800/30 rounded-lg">
-          <span className="text-xs sm:text-sm text-slate-400 order-2 sm:order-1">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 px-3 py-2 bg-surface/30 rounded-lg">
+          <span className="text-xs sm:text-sm text-content-muted order-2 sm:order-1">
             {total} tâche{total > 1 ? 's' : ''}
           </span>
           <div className="flex items-center gap-1 sm:gap-2 order-1 sm:order-2">
@@ -626,7 +626,7 @@ export default function RegularizationDashboard() {
               <span className="hidden sm:inline">Précédent</span>
               <span className="sm:hidden">←</span>
             </Button>
-            <span className="text-xs sm:text-sm text-slate-300 min-w-[60px] sm:min-w-[80px] text-center">
+            <span className="text-xs sm:text-sm text-content-secondary min-w-[60px] sm:min-w-[80px] text-center">
               {page} / {totalPages}
             </span>
             <Button
@@ -652,7 +652,7 @@ export default function RegularizationDashboard() {
       >
         {selectedTask && (
           <div className="space-y-3">
-            <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-3">
+            <div className="bg-surface-muted rounded-lg p-3">
               <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
                 <Badge value={selectedTask.typeLabel} variant="info" size="sm" />
                 <Badge
@@ -661,11 +661,11 @@ export default function RegularizationDashboard() {
                   size="sm"
                 />
               </div>
-              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300">
+              <p className="text-xs sm:text-sm text-content-muted">
                 {selectedTask.description}
               </p>
               {selectedTask.montantEcart && (
-                <p className="text-xs sm:text-sm font-bold text-red-600 dark:text-red-400 mt-1.5">
+                <p className="text-xs sm:text-sm font-bold text-status-danger mt-1.5">
                   Montant: {formatMoney(selectedTask.montantEcart)}
                 </p>
               )}
@@ -682,7 +682,7 @@ export default function RegularizationDashboard() {
               helperText={resolution.length < 10 ? `${10 - resolution.length} caractères restants` : undefined}
             />
 
-            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-3 border-t border-edge">
               <Button
                 variant="ghost"
                 size="sm"
@@ -731,14 +731,14 @@ export default function RegularizationDashboard() {
                     size="sm"
                   />
                 </div>
-                <p className="text-sm text-slate-600 dark:text-slate-300">
+                <p className="text-sm text-content-muted">
                   {selectedTask.description}
                 </p>
               </div>
               {selectedTask.montantEcart && (
-                <div className="text-left sm:text-right bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg">
-                  <span className="text-xs text-slate-500">Montant écart</span>
-                  <p className="text-lg font-bold text-red-600 dark:text-red-400">
+                <div className="text-left sm:text-right bg-status-danger-bg px-3 py-2 rounded-lg">
+                  <span className="text-xs text-content-muted">Montant écart</span>
+                  <p className="text-lg font-bold text-status-danger">
                     {formatMoney(selectedTask.montantEcart)}
                   </p>
                 </div>
@@ -746,41 +746,41 @@ export default function RegularizationDashboard() {
             </div>
 
             {/* Details Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-surface-muted/50 rounded-lg p-3">
               <div>
-                <span className="text-[10px] sm:text-xs text-slate-500 uppercase">ID</span>
-                <p className="text-xs sm:text-sm font-mono text-slate-900 dark:text-white truncate">
+                <span className="text-[10px] sm:text-xs text-content-muted uppercase">ID</span>
+                <p className="text-xs sm:text-sm font-mono text-content-primary truncate">
                   {selectedTask.id.slice(0, 8)}...
                 </p>
               </div>
               <div>
-                <span className="text-[10px] sm:text-xs text-slate-500 uppercase">Source</span>
-                <p className="text-xs sm:text-sm text-slate-900 dark:text-white">
+                <span className="text-[10px] sm:text-xs text-content-muted uppercase">Source</span>
+                <p className="text-xs sm:text-sm text-content-primary">
                   {selectedTask.source === 'coffre' ? 'Inter-coffres' : 'Coffre-Caisse'}
                 </p>
               </div>
               <div>
-                <span className="text-[10px] sm:text-xs text-slate-500 uppercase">Créé le</span>
-                <p className="text-xs sm:text-sm text-slate-900 dark:text-white">
+                <span className="text-[10px] sm:text-xs text-content-muted uppercase">Créé le</span>
+                <p className="text-xs sm:text-sm text-content-primary">
                   {formatDate(selectedTask.createdAt)}
                 </p>
               </div>
               <div>
-                <span className="text-[10px] sm:text-xs text-slate-500 uppercase">Échéance</span>
-                <p className="text-xs sm:text-sm text-slate-900 dark:text-white">
+                <span className="text-[10px] sm:text-xs text-content-muted uppercase">Échéance</span>
+                <p className="text-xs sm:text-sm text-content-primary">
                   {selectedTask.dateEcheance ? formatDate(selectedTask.dateEcheance) : '-'}
                 </p>
               </div>
               <div>
-                <span className="text-[10px] sm:text-xs text-slate-500 uppercase">Assigné à</span>
-                <p className="text-xs sm:text-sm text-slate-900 dark:text-white">
+                <span className="text-[10px] sm:text-xs text-content-muted uppercase">Assigné à</span>
+                <p className="text-xs sm:text-sm text-content-primary">
                   {selectedTask.assignedToName || 'Non assigné'}
                 </p>
               </div>
               {selectedTask.transfertId && (
                 <div>
-                  <span className="text-[10px] sm:text-xs text-slate-500 uppercase">Transfert</span>
-                  <p className="text-xs sm:text-sm font-mono text-slate-900 dark:text-white truncate">
+                  <span className="text-[10px] sm:text-xs text-content-muted uppercase">Transfert</span>
+                  <p className="text-xs sm:text-sm font-mono text-content-primary truncate">
                     {selectedTask.transfertId.slice(0, 8)}...
                   </p>
                 </div>
@@ -789,18 +789,18 @@ export default function RegularizationDashboard() {
 
             {/* Resolution */}
             {selectedTask.resolution && (
-              <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg p-3">
+              <div className="bg-status-success-bg border border-status-success/30 rounded-lg p-3">
                 <div className="flex items-center gap-2 mb-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                  <span className="text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-status-success" />
+                  <span className="text-xs font-medium text-status-success">
                     Résolution
                   </span>
                 </div>
-                <p className="text-xs sm:text-sm text-emerald-800 dark:text-emerald-300">
+                <p className="text-xs sm:text-sm text-status-success">
                   {selectedTask.resolution}
                 </p>
                 {selectedTask.resolvedAt && (
-                  <p className="text-[10px] sm:text-xs text-emerald-600 dark:text-emerald-500 mt-1.5">
+                  <p className="text-[10px] sm:text-xs text-status-success mt-1.5">
                     Résolu le {formatDate(selectedTask.resolvedAt)}
                   </p>
                 )}
@@ -808,7 +808,7 @@ export default function RegularizationDashboard() {
             )}
 
             {/* Actions */}
-            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-3 border-t border-edge">
               <Button variant="ghost" size="sm" onClick={() => setDetailsModalOpen(false)}>
                 Fermer
               </Button>

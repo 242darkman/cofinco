@@ -90,15 +90,15 @@ export function LazyImage({
     >
       {/* Placeholder */}
       {!isLoaded && (
-        <div className="absolute inset-0 flex items-center justify-center bg-slate-700/50 animate-pulse">
+        <div className="absolute inset-0 flex items-center justify-center bg-surface-elevated/50 animate-pulse">
           {placeholder === 'icon' && (
-            <ImageIcon className="w-8 h-8 text-slate-500" />
+            <ImageIcon className="w-8 h-8 text-content-muted" />
           )}
           {placeholder === 'skeleton' && (
-            <div className="w-full h-full bg-slate-700/50" />
+            <div className="w-full h-full bg-surface-elevated/50" />
           )}
           {placeholder === 'blur' && (
-            <div className="w-full h-full bg-slate-700/30 backdrop-blur-sm" />
+            <div className="w-full h-full bg-surface-elevated/30 backdrop-blur-sm" />
           )}
         </div>
       )}
@@ -124,8 +124,8 @@ export function LazyImage({
 
       {/* Error fallback */}
       {hasError && !fallbackSrc && (
-        <div className="absolute inset-0 flex items-center justify-center bg-slate-700/50">
-          <ImageIcon className="w-8 h-8 text-slate-500" />
+        <div className="absolute inset-0 flex items-center justify-center bg-surface-elevated/50">
+          <ImageIcon className="w-8 h-8 text-content-muted" />
         </div>
       )}
     </div>
@@ -180,24 +180,24 @@ export function LazyAvatar({
     : src;
 
   const statusColors = {
-    online: 'bg-emerald-500',
-    offline: 'bg-slate-500',
-    away: 'bg-amber-500',
-    busy: 'bg-red-500',
+    online: 'bg-status-success',
+    offline: 'bg-content-muted',
+    away: 'bg-status-warning',
+    busy: 'bg-status-danger',
   };
 
   return (
     <div
       className={`
         relative flex-shrink-0 rounded-full overflow-hidden
-        ${showBorder ? 'ring-2 ring-slate-600' : ''}
+        ${showBorder ? 'ring-2 ring-edge-strong' : ''}
         ${className}
       `}
       style={{ width: sizeValue, height: sizeValue }}
     >
       {/* Fallback with initials */}
       {(!src || hasError) && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-cyan-600 to-blue-700">
+        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-accent-secondary to-accent">
           {fallbackInitials || initials ? (
             <span
               className="font-semibold text-white"
@@ -230,14 +230,14 @@ export function LazyAvatar({
 
       {/* Loading skeleton */}
       {src && !isLoaded && !hasError && (
-        <div className="absolute inset-0 bg-slate-700/50 animate-pulse" />
+        <div className="absolute inset-0 bg-surface-elevated/50 animate-pulse" />
       )}
 
       {/* Status indicator */}
       {status && (
         <div
           className={`
-            absolute bottom-0 right-0 rounded-full border-2 border-slate-800
+            absolute bottom-0 right-0 rounded-full border-2 border-surface
             ${statusColors[status]}
           `}
           style={{
@@ -299,7 +299,7 @@ export function LazyBackground({
       {/* Placeholder */}
       <div
         className={`
-          absolute inset-0 bg-slate-800
+          absolute inset-0 bg-surface
           transition-opacity duration-500
           ${isLoaded ? 'opacity-0' : 'opacity-100'}
         `}
@@ -318,7 +318,7 @@ export function LazyBackground({
       {/* Overlay */}
       {overlay && (
         <div
-          className="absolute inset-0 bg-slate-900"
+          className="absolute inset-0 bg-surface-base"
           style={{ opacity: overlayOpacity }}
         />
       )}

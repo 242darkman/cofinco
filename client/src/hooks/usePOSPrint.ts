@@ -6,6 +6,7 @@
  */
 
 import { useCallback, useState } from 'react';
+import { useBranding } from '@/contexts/BrandingContext';
 import { ReceiptData } from '@/components/ui/printable/ReceiptTemplate';
 import { currencySymbol } from '@shared/config/currency';
 
@@ -23,6 +24,7 @@ interface POSPrintResult {
 }
 
 export function usePOSPrint() {
+  const { branding } = useBranding();
   const [isPrinting, setIsPrinting] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
 
@@ -103,7 +105,7 @@ export function usePOSPrint() {
       </head>
       <body>
         <div class="header">
-          <div class="title">COFIN&CO</div>
+          <div class="title">${branding.appName}</div>
           <div class="subtitle">${data.title || 'REÇU'}</div>
         </div>
         
@@ -172,7 +174,7 @@ export function usePOSPrint() {
       </body>
       </html>
     `;
-  }, []);
+  }, [branding.appName]);
 
   /**
    * Print receipt using browser print dialog

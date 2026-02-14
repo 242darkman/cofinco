@@ -36,18 +36,18 @@ export default function DataChangesDetailModal({ change, onClose, formatTimestam
         if (JSON.stringify(oldValue) === JSON.stringify(newValue)) return null;
 
         return (
-          <div key={field} className="bg-slate-800 rounded-lg p-3 mb-2 border border-slate-700">
-            <div className="font-semibold text-cyan-400 mb-2">{field}</div>
+          <div key={field} className="bg-surface rounded-lg p-3 mb-2 border border-edge">
+            <div className="font-semibold text-accent mb-2">{field}</div>
             <div className="grid md:grid-cols-2 gap-4">
-              <div className="bg-blue-500/10 border border-blue-500/30 rounded p-2">
-                <div className="text-xs text-blue-400 mb-1">Avant</div>
-                <div className="text-white text-sm break-all font-mono">
+              <div className="bg-status-info-bg border border-status-info/30 rounded p-2">
+                <div className="text-xs text-status-info mb-1">Avant</div>
+                <div className="text-content-primary text-sm break-all font-mono">
                   {oldValue !== null && oldValue !== undefined ? String(oldValue) : '-'}
                 </div>
               </div>
-              <div className="bg-green-500/10 border border-green-500/30 rounded p-2">
-                <div className="text-xs text-green-400 mb-1">Après</div>
-                <div className="text-white text-sm break-all font-mono">
+              <div className="bg-status-success-bg border border-status-success/30 rounded p-2">
+                <div className="text-xs text-status-success mb-1">Après</div>
+                <div className="text-content-primary text-sm break-all font-mono">
                   {newValue !== null && newValue !== undefined ? String(newValue) : '-'}
                 </div>
               </div>
@@ -60,18 +60,18 @@ export default function DataChangesDetailModal({ change, onClose, formatTimestam
     return fields.map(field => {
       const changeDetail = changedFields.changes[field];
       return (
-        <div key={field} className="bg-slate-800 rounded-lg p-3 mb-2 border border-slate-700">
-          <div className="font-semibold text-cyan-400 mb-2">{field}</div>
+        <div key={field} className="bg-surface rounded-lg p-3 mb-2 border border-edge">
+          <div className="font-semibold text-accent mb-2">{field}</div>
           <div className="grid md:grid-cols-2 gap-4">
-            <div className="bg-blue-500/10 border border-blue-500/30 rounded p-2">
-              <div className="text-xs text-blue-400 mb-1">Avant</div>
-              <div className="text-white text-sm break-all font-mono">
+            <div className="bg-status-info-bg border border-status-info/30 rounded p-2">
+              <div className="text-xs text-status-info mb-1">Avant</div>
+              <div className="text-content-primary text-sm break-all font-mono">
                 {JSON.stringify(changeDetail?.old, null, 2) || '-'}
               </div>
             </div>
-            <div className="bg-green-500/10 border border-green-500/30 rounded p-2">
-              <div className="text-xs text-green-400 mb-1">Après</div>
-              <div className="text-white text-sm break-all font-mono">
+            <div className="bg-status-success-bg border border-status-success/30 rounded p-2">
+              <div className="text-xs text-status-success mb-1">Après</div>
+              <div className="text-content-primary text-sm break-all font-mono">
                 {JSON.stringify(changeDetail?.new, null, 2) || '-'}
               </div>
             </div>
@@ -90,41 +90,41 @@ export default function DataChangesDetailModal({ change, onClose, formatTimestam
     >
         <div className="space-y-6">
           <div className="grid md:grid-cols-3 gap-4">
-            <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
-              <div className="text-sm text-slate-400 mb-1">Opération</div>
+            <div className="bg-surface/50 rounded-xl p-4 border border-edge">
+              <div className="text-sm text-content-muted mb-1">Opération</div>
               <Badge value={change.operation} variant={getOperationVariant(change.operation)} size="lg" />
             </div>
-            <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
-              <div className="text-sm text-slate-400 mb-1">Table</div>
-              <div className="text-white font-semibold">{change.tableName}</div>
+            <div className="bg-surface/50 rounded-xl p-4 border border-edge">
+              <div className="text-sm text-content-muted mb-1">Table</div>
+              <div className="text-content-primary font-semibold">{change.tableName}</div>
             </div>
-            <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
-              <div className="text-sm text-slate-400 mb-1">Date</div>
-              <div className="text-white">{formatTimestamp(change.timestamp)}</div>
+            <div className="bg-surface/50 rounded-xl p-4 border border-edge">
+              <div className="text-sm text-content-muted mb-1">Date</div>
+              <div className="text-content-primary">{formatTimestamp(change.timestamp)}</div>
             </div>
           </div>
 
-          <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
-            <div className="text-sm text-slate-400 mb-2">Utilisateur</div>
-            <div className="text-white font-semibold">{change.userEmail || 'Système'}</div>
+          <div className="bg-surface/50 rounded-xl p-4 border border-edge">
+            <div className="text-sm text-content-muted mb-2">Utilisateur</div>
+            <div className="text-content-primary font-semibold">{change.userEmail || 'Système'}</div>
           </div>
 
-          <div className="bg-slate-900 rounded-xl p-4 border border-slate-700">
+          <div className="bg-surface-base rounded-xl p-4 border border-edge">
             <div className="flex items-center gap-2 mb-4">
-              <GitCompare className="text-emerald-400" size={24} />
-              <h3 className="text-lg font-bold text-white">Comparaison des Données</h3>
+              <GitCompare className="text-status-success" size={24} />
+              <h3 className="text-lg font-bold text-content-primary">Comparaison des Données</h3>
             </div>
             {change.operation === 'DELETE' ? (
-              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
-                <div className="text-blue-400 font-semibold mb-2">Données supprimées</div>
-                <pre className="text-white text-sm bg-slate-950 p-3 rounded overflow-x-auto border border-slate-800">
+              <div className="bg-status-info-bg border border-status-info/30 rounded-lg p-4">
+                <div className="text-status-info font-semibold mb-2">Données supprimées</div>
+                <pre className="text-content-primary text-sm bg-surface-base p-3 rounded overflow-x-auto border border-edge">
                   {JSON.stringify(change.oldData, null, 2)}
                 </pre>
               </div>
             ) : change.operation === 'INSERT' ? (
-              <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
-                <div className="text-green-400 font-semibold mb-2">Données créées</div>
-                <pre className="text-white text-sm bg-slate-950 p-3 rounded overflow-x-auto border border-slate-800">
+              <div className="bg-status-success-bg border border-status-success/30 rounded-lg p-4">
+                <div className="text-status-success font-semibold mb-2">Données créées</div>
+                <pre className="text-content-primary text-sm bg-surface-base p-3 rounded overflow-x-auto border border-edge">
                   {JSON.stringify(change.newData, null, 2)}
                 </pre>
               </div>

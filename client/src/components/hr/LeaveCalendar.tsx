@@ -15,9 +15,9 @@ const MONTHS_FR = [
 ];
 
 const STATUS_COLORS: Record<string, string> = {
-  [StatutConge.APPROVED]: 'bg-emerald-500/30 border-emerald-500/50 text-emerald-300',
-  [StatutConge.PENDING]: 'bg-amber-500/20 border-amber-500/40 text-amber-300',
-  [StatutConge.REJECTED]: 'bg-red-500/15 border-red-500/30 text-red-400',
+  [StatutConge.APPROVED]: 'bg-status-success/30 border-status-success/50 text-status-success',
+  [StatutConge.PENDING]: 'bg-status-warning-bg border-status-warning/40 text-status-warning',
+  [StatutConge.REJECTED]: 'bg-status-danger-bg border-status-danger/30 text-status-danger',
 };
 
 export default function LeaveCalendar({ demandes }: LeaveCalendarProps) {
@@ -93,11 +93,11 @@ export default function LeaveCalendar({ demandes }: LeaveCalendarProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="shrink-0 flex items-center justify-between px-3 py-2 border-b border-slate-800">
+      <div className="shrink-0 flex items-center justify-between px-3 py-2 border-b border-edge">
         <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="h-7 w-7 p-0">
           <ChevronLeft size={16} />
         </Button>
-        <h3 className="text-sm font-bold text-white">
+        <h3 className="text-sm font-bold text-content-primary">
           {MONTHS_FR[month]} {year}
         </h3>
         <Button variant="ghost" size="sm" onClick={() => navigate(1)} className="h-7 w-7 p-0">
@@ -106,9 +106,9 @@ export default function LeaveCalendar({ demandes }: LeaveCalendarProps) {
       </div>
 
       {/* Day headers */}
-      <div className="shrink-0 grid grid-cols-7 border-b border-slate-800">
+      <div className="shrink-0 grid grid-cols-7 border-b border-edge">
         {DAYS_FR.map((day) => (
-          <div key={day} className="text-center py-1.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+          <div key={day} className="text-center py-1.5 text-[10px] font-semibold text-content-muted uppercase tracking-wider">
             {day}
           </div>
         ))}
@@ -125,18 +125,18 @@ export default function LeaveCalendar({ demandes }: LeaveCalendarProps) {
           return (
             <div
               key={idx}
-              className={`relative border-b border-r border-slate-800/50 p-0.5 min-h-0 flex flex-col
+              className={`relative border-b border-r border-edge/50 p-0.5 min-h-0 flex flex-col
                 ${!cell.isCurrentMonth ? 'opacity-30' : ''}
-                ${isWeekend && cell.isCurrentMonth ? 'bg-slate-900/50' : ''}
-                ${isToday ? 'bg-cyan-950/30' : ''}
+                ${isWeekend && cell.isCurrentMonth ? 'bg-surface-base/50' : ''}
+                ${isToday ? 'bg-accent/10' : ''}
               `}
             >
               <span className={`text-[10px] font-medium px-1 ${
                 isToday
-                  ? 'text-cyan-400 font-bold'
+                  ? 'text-accent font-bold'
                   : cell.isCurrentMonth
-                    ? 'text-slate-400'
-                    : 'text-slate-600'
+                    ? 'text-content-muted'
+                    : 'text-content-muted'
               }`}>
                 {cell.date.getDate()}
               </span>
@@ -146,14 +146,14 @@ export default function LeaveCalendar({ demandes }: LeaveCalendarProps) {
                 {leaves.slice(0, 2).map((leave, li) => (
                   <div
                     key={`${leave.id}-${li}`}
-                    className={`text-[8px] leading-tight truncate px-1 py-px rounded border ${STATUS_COLORS[leave.statut] || 'bg-slate-700 border-slate-600 text-slate-300'}`}
+                    className={`text-[8px] leading-tight truncate px-1 py-px rounded border ${STATUS_COLORS[leave.statut] || 'bg-surface-elevated border-edge-strong text-content-secondary'}`}
                     title={`${leave.employeNom} - ${leave.type} (${leave.statut})`}
                   >
                     {leave.employeNom?.split(' ')[0]}
                   </div>
                 ))}
                 {leaves.length > 2 && (
-                  <div className="text-[8px] text-slate-500 px-1">
+                  <div className="text-[8px] text-content-muted px-1">
                     +{leaves.length - 2}
                   </div>
                 )}
@@ -164,15 +164,15 @@ export default function LeaveCalendar({ demandes }: LeaveCalendarProps) {
       </div>
 
       {/* Legend */}
-      <div className="shrink-0 flex items-center gap-4 px-3 py-1.5 border-t border-slate-800 text-[10px]">
+      <div className="shrink-0 flex items-center gap-4 px-3 py-1.5 border-t border-edge text-[10px]">
         <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-sm bg-emerald-500/50" /> Approuvé
+          <span className="w-2 h-2 rounded-sm bg-status-success/50" /> Approuvé
         </span>
         <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-sm bg-amber-500/50" /> En attente
+          <span className="w-2 h-2 rounded-sm bg-status-warning/50" /> En attente
         </span>
         <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-sm bg-red-500/30" /> Refusé
+          <span className="w-2 h-2 rounded-sm bg-status-danger/30" /> Refusé
         </span>
       </div>
     </div>

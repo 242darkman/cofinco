@@ -38,9 +38,9 @@ const DAYS_FULL = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", 
 // Scope Badge
 const ScopeBadge = ({ type }: { type: 'global' | 'guichet' | 'audit' }) => {
   const styles = {
-    global: "bg-purple-500/20 text-purple-400",
-    guichet: "bg-blue-500/20 text-blue-400",
-    audit: "bg-slate-500/20 text-slate-400"
+    global: "bg-status-info-bg text-status-info",
+    guichet: "bg-status-info-bg text-status-info",
+    audit: "bg-surface-subtle/40 text-content-muted"
   };
   const labels = { global: "Global", guichet: "Guichet", audit: "Audit" };
   return <span className={cn("text-[9px] uppercase font-bold px-1.5 py-0.5 rounded ml-1.5", styles[type])}>{labels[type]}</span>;
@@ -48,10 +48,10 @@ const ScopeBadge = ({ type }: { type: 'global' | 'guichet' | 'audit' }) => {
 
 // Section Header
 const SectionHeader = ({ icon: Icon, title, desc }: { icon: any; title: string; desc: string }) => (
-  <div className="flex items-center gap-2 pb-2 border-b border-slate-700/30 mb-2.5">
+  <div className="flex items-center gap-2 pb-2 border-b border-edge-subtle mb-2.5">
     <Icon className="h-3.5 w-3.5 text-primary" />
-    <span className="text-xs font-bold text-white uppercase tracking-wide">{title}</span>
-    <span className="text-[11px] text-slate-500">— {desc}</span>
+    <span className="text-xs font-bold text-content-primary uppercase tracking-wide">{title}</span>
+    <span className="text-[11px] text-content-muted">— {desc}</span>
   </div>
 );
 
@@ -61,8 +61,8 @@ const ToggleRow = ({ label, desc, checked, onChange, scope }: {
 }) => (
   <div className="flex items-center justify-between gap-2">
     <div className="min-w-0 flex-1">
-      <span className="text-[11px] font-medium text-white flex items-center">{label}{scope && <ScopeBadge type={scope} />}</span>
-      <span className="text-[10px] text-slate-500 block truncate">{desc}</span>
+      <span className="text-[11px] font-medium text-content-primary flex items-center">{label}{scope && <ScopeBadge type={scope} />}</span>
+      <span className="text-[10px] text-content-muted block truncate">{desc}</span>
     </div>
     <Switch checked={checked} onChange={onChange} size="sm" />
   </div>
@@ -73,13 +73,13 @@ const MiniInput = ({ label, value, onChange, placeholder }: {
   label: string; value: string | number; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; placeholder?: string;
 }) => (
   <div className="flex-1">
-    <label className="text-[10px] text-slate-400 uppercase block mb-1 truncate">{label}</label>
+    <label className="text-[10px] text-content-muted uppercase block mb-1 truncate">{label}</label>
     <input
       type="number"
       value={value}
       onChange={onChange}
       placeholder={placeholder}
-      className="w-full px-2 py-1.5 text-[11px] rounded border border-slate-700 bg-slate-900/50 text-white placeholder:text-slate-600 focus:border-primary/50 focus:outline-none"
+      className="w-full px-2 py-1.5 text-[11px] rounded border border-edge bg-surface-base/50 text-content-primary placeholder:text-content-muted focus:border-primary/50 focus:outline-none"
     />
   </div>
 );
@@ -163,15 +163,15 @@ export function CoffreAdminPanel({ agenceId }: CoffreAdminPanelProps) {
   return (
     <div className="flex flex-col h-full p-2 space-y-2">
       {/* Warning Banner */}
-      <div className="bg-amber-500/10 border border-amber-500/30 rounded px-3 py-1.5 flex gap-2 items-center shrink-0">
-        <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
-        <span className="font-semibold text-[11px] text-amber-400">Zone d'administration sensible</span>
+      <div className="bg-status-warning-bg border border-status-warning/30 rounded px-3 py-1.5 flex gap-2 items-center shrink-0">
+        <AlertTriangle className="h-3.5 w-3.5 text-status-warning" />
+        <span className="font-semibold text-[11px] text-status-warning">Zone d'administration sensible</span>
       </div>
 
       {/* Main Grid - 2x2 */}
       <div className="flex-1 grid grid-cols-2 gap-2">
         {/* 1. Sécurité & Workflow */}
-        <div className="bg-slate-900/40 border border-slate-700/40 rounded-lg p-3">
+        <div className="bg-surface-base/40 border border-edge/40 rounded-lg p-3">
           <SectionHeader icon={ShieldAlert} title="Sécurité" desc="Workflow" />
 
           <ToggleRow
@@ -188,20 +188,20 @@ export function CoffreAdminPanel({ agenceId }: CoffreAdminPanelProps) {
           </div>
 
           {/* Horaires inline */}
-          <div className="flex items-center gap-1.5 mt-2.5 pt-2 border-t border-slate-700/30">
-            <Clock className="h-3 w-3 text-slate-500" />
+          <div className="flex items-center gap-1.5 mt-2.5 pt-2 border-t border-edge-subtle">
+            <Clock className="h-3 w-3 text-content-muted" />
             <input type="time" value={config.horairesOuverture.debut} onChange={(e) => setConfig(p => ({ ...p, horairesOuverture: { ...p.horairesOuverture, debut: e.target.value } }))}
-              className="px-1.5 py-1 text-[11px] rounded border border-slate-700 bg-slate-900/50 text-white w-[70px]" />
-            <span className="text-slate-500 text-[11px]">→</span>
+              className="px-1.5 py-1 text-[11px] rounded border border-edge bg-surface-base/50 text-content-primary w-[70px]" />
+            <span className="text-content-muted text-[11px]">→</span>
             <input type="time" value={config.horairesOuverture.fin} onChange={(e) => setConfig(p => ({ ...p, horairesOuverture: { ...p.horairesOuverture, fin: e.target.value } }))}
-              className="px-1.5 py-1 text-[11px] rounded border border-slate-700 bg-slate-900/50 text-white w-[70px]" />
+              className="px-1.5 py-1 text-[11px] rounded border border-edge bg-surface-base/50 text-content-primary w-[70px]" />
           </div>
 
           <div className="flex gap-1 mt-1.5">
             {DAYS.map((day, i) => (
               <button key={day} onClick={() => toggleDay(DAYS_FULL[i])}
                 className={cn("flex-1 py-1 rounded text-[10px] font-medium transition-all",
-                  config.joursOuvrables.includes(DAYS_FULL[i]) ? "bg-primary text-white" : "bg-slate-800 text-slate-500 hover:bg-slate-700"
+                  config.joursOuvrables.includes(DAYS_FULL[i]) ? "bg-primary text-content-primary" : "bg-surface text-content-muted hover:bg-surface-elevated"
                 )}>
                 {day}
               </button>
@@ -210,7 +210,7 @@ export function CoffreAdminPanel({ agenceId }: CoffreAdminPanelProps) {
         </div>
 
         {/* 2. Limites Financières */}
-        <div className="bg-slate-900/40 border border-slate-700/40 rounded-lg p-3">
+        <div className="bg-surface-base/40 border border-edge/40 rounded-lg p-3">
           <SectionHeader icon={Coins} title="Limites" desc="Plafonds" />
 
           <div className="grid grid-cols-2 gap-2">
@@ -222,7 +222,7 @@ export function CoffreAdminPanel({ agenceId }: CoffreAdminPanelProps) {
         </div>
 
         {/* 3. Alertes */}
-        <div className="bg-slate-900/40 border border-slate-700/40 rounded-lg p-3">
+        <div className="bg-surface-base/40 border border-edge/40 rounded-lg p-3">
           <SectionHeader icon={Bell} title="Alertes" desc="Seuils" />
 
           <ToggleRow
@@ -236,27 +236,27 @@ export function CoffreAdminPanel({ agenceId }: CoffreAdminPanelProps) {
           <div className="mt-2 space-y-2">
             <div>
               <div className="flex justify-between text-[10px] mb-1">
-                <span className="text-amber-400">Alerte (Orange)</span>
-                <span className="font-mono text-amber-400">{config.seuilSoldeMin.toLocaleString()} F</span>
+                <span className="text-status-warning">Alerte (Orange)</span>
+                <span className="font-mono text-status-warning">{config.seuilSoldeMin.toLocaleString()} F</span>
               </div>
               <input type="range" min="0" max="10000000" step="100000" value={config.seuilSoldeMin}
                 onChange={(e) => setConfig(p => ({ ...p, seuilSoldeMin: Number(e.target.value) }))}
-                className="w-full h-1.5 bg-amber-500/20 rounded appearance-none cursor-pointer accent-amber-500" />
+                className="w-full h-1.5 bg-status-warning-bg rounded appearance-none cursor-pointer accent-amber-500" />
             </div>
             <div>
               <div className="flex justify-between text-[10px] mb-1">
-                <span className="text-red-400">Critique (Rouge)</span>
-                <span className="font-mono text-red-400">{config.seuilSoldeCritique.toLocaleString()} F</span>
+                <span className="text-status-danger">Critique (Rouge)</span>
+                <span className="font-mono text-status-danger">{config.seuilSoldeCritique.toLocaleString()} F</span>
               </div>
               <input type="range" min="0" max="5000000" step="50000" value={config.seuilSoldeCritique}
                 onChange={(e) => setConfig(p => ({ ...p, seuilSoldeCritique: Number(e.target.value) }))}
-                className="w-full h-1.5 bg-red-500/20 rounded appearance-none cursor-pointer accent-red-500" />
+                className="w-full h-1.5 bg-status-danger-bg rounded appearance-none cursor-pointer accent-red-500" />
             </div>
           </div>
         </div>
 
         {/* 4. Audit */}
-        <div className="bg-slate-900/40 border border-slate-700/40 rounded-lg p-3">
+        <div className="bg-surface-base/40 border border-edge/40 rounded-lg p-3">
           <SectionHeader icon={FileCheck} title="Audit" desc="Conformité" />
 
           <div className="space-y-1.5">

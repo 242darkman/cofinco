@@ -77,31 +77,31 @@ export default function AccountCard({ compte, onEdit, onAction, canSuspend = tru
     <Card
       variant="default"
       padding="sm"
-      className={`hover:border-cyan-500/30 transition-colors group relative overflow-visible ${isBloque ? 'border-amber-500/30' : ''}`}
+      className={`hover:border-accent/30 transition-colors group relative overflow-visible ${isBloque ? 'border-status-warning/30' : ''}`}
       onClick={() => onAction?.('history', compte)}
     >
         {/* Decorative background gradient */}
         {isBloque ? (
-            <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-2xl -mr-12 -mt-12 pointer-events-none transition-opacity group-hover:opacity-100 opacity-50"></div>
+            <div className="absolute top-0 right-0 w-24 h-24 bg-status-warning/5 rounded-full blur-2xl -mr-12 -mt-12 pointer-events-none transition-opacity group-hover:opacity-100 opacity-50"></div>
         ) : isEpargne ? (
-            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-2xl -mr-12 -mt-12 pointer-events-none transition-opacity group-hover:opacity-100 opacity-50"></div>
+            <div className="absolute top-0 right-0 w-24 h-24 bg-status-success/5 rounded-full blur-2xl -mr-12 -mt-12 pointer-events-none transition-opacity group-hover:opacity-100 opacity-50"></div>
         ) : (
-            <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/5 rounded-full blur-2xl -mr-12 -mt-12 pointer-events-none transition-opacity group-hover:opacity-100 opacity-50"></div>
+            <div className="absolute top-0 right-0 w-24 h-24 bg-accent/5 rounded-full blur-2xl -mr-12 -mt-12 pointer-events-none transition-opacity group-hover:opacity-100 opacity-50"></div>
         )}
 
       <div className={`flex items-start justify-between mb-3 relative ${showMenu ? 'z-50' : 'z-10'}`}>
         <div className="flex items-center gap-3">
-          <div className={`p-2 rounded-lg ${isBloque ? 'bg-amber-500/10 text-amber-400' : isEpargne ? 'bg-emerald-500/10 text-emerald-400' : 'bg-cyan-500/10 text-cyan-400'}`}>
+          <div className={`p-2 rounded-lg ${isBloque ? 'bg-status-warning-bg text-status-warning' : isEpargne ? 'bg-status-success-bg text-status-success' : 'bg-accent/10 text-accent'}`}>
             <Icon size={20} />
           </div>
           <div>
-            <h4 className="font-semibold text-white text-sm flex items-center gap-1.5">
+            <h4 className="font-semibold text-content-primary text-sm flex items-center gap-1.5">
               {compte.typeCompte}
-              {isBloque && <Lock size={12} className="text-amber-400" />}
+              {isBloque && <Lock size={12} className="text-status-warning" />}
             </h4>
             <div className="flex items-center gap-2 group/number">
-                <p className="text-[10px] text-slate-500 font-mono tracking-wider">{compte.numeroCompte}</p>
-                <button onClick={handleCopyNumber} className="opacity-0 group-hover/number:opacity-100 transition-opacity text-slate-600 hover:text-cyan-400">
+                <p className="text-[10px] text-content-muted font-mono tracking-wider">{compte.numeroCompte}</p>
+                <button onClick={handleCopyNumber} className="opacity-0 group-hover/number:opacity-100 transition-opacity text-content-muted hover:text-accent">
                     <Copy size={10} />
                 </button>
             </div>
@@ -112,34 +112,34 @@ export default function AccountCard({ compte, onEdit, onAction, canSuspend = tru
         <div className="relative" ref={menuRef}>
             <button 
                 onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
-                className="p-1.5 rounded bg-slate-800/50 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+                className="p-1.5 rounded bg-surface/50 hover:bg-surface-elevated text-content-muted hover:text-content-primary transition"
             >
                 <MoreVertical size={16} />
             </button>
             
             {showMenu && (
-                <div className="absolute right-0 top-full mt-1 w-48 bg-slate-900 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in duration-150">
-                    <button onClick={(e) => handleMenuAction('history', e)} className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2">
+                <div className="absolute right-0 top-full mt-1 w-48 bg-surface-base border border-edge rounded-lg shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in duration-150">
+                    <button onClick={(e) => handleMenuAction('history', e)} className="w-full text-left px-4 py-2 text-sm text-content-secondary hover:bg-surface hover:text-content-primary flex items-center gap-2">
                         <TrendingUp size={14} /> Historique
                     </button>
                     {!isTerminal && !isClosurePending && (
                       <>
-                        <div className="h-px bg-slate-800 my-1"></div>
+                        <div className="h-px bg-surface my-1"></div>
                         {isSuspended ? (
                           canUnsuspend && (
-                            <button onClick={(e) => handleMenuAction('unsuspend', e)} className="w-full text-left px-4 py-2 text-sm text-emerald-400 hover:bg-emerald-950/30 flex items-center gap-2">
+                            <button onClick={(e) => handleMenuAction('unsuspend', e)} className="w-full text-left px-4 py-2 text-sm text-status-success hover:bg-status-success-bg flex items-center gap-2">
                               <Check size={14} /> Lever la suspension
                             </button>
                           )
                         ) : (
                           canSuspend && (
-                            <button onClick={(e) => handleMenuAction('suspend', e)} className="w-full text-left px-4 py-2 text-sm text-amber-400 hover:bg-amber-950/30 flex items-center gap-2">
+                            <button onClick={(e) => handleMenuAction('suspend', e)} className="w-full text-left px-4 py-2 text-sm text-status-warning hover:bg-status-warning-bg flex items-center gap-2">
                               <Ban size={14} /> Suspendre
                             </button>
                           )
                         )}
                         {canCloseInitiate && (
-                          <button onClick={(e) => handleMenuAction('close', e)} className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-950/30 flex items-center gap-2">
+                          <button onClick={(e) => handleMenuAction('close', e)} className="w-full text-left px-4 py-2 text-sm text-status-danger hover:bg-status-danger-bg flex items-center gap-2">
                             <XCircle size={14} /> Clôturer
                           </button>
                         )}
@@ -147,12 +147,12 @@ export default function AccountCard({ compte, onEdit, onAction, canSuspend = tru
                     )}
                     {isClosurePending && (
                       <>
-                        <div className="h-px bg-slate-800 my-1"></div>
-                        <div className="px-4 py-2 text-xs text-purple-400 flex items-center gap-2">
+                        <div className="h-px bg-surface my-1"></div>
+                        <div className="px-4 py-2 text-xs text-status-info flex items-center gap-2">
                           <Clock size={12} /> Clôture en attente d'approbation
                         </div>
                         {canCloseCancel && (
-                          <button onClick={(e) => handleMenuAction('cancel_closure', e)} className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-red-950/30 flex items-center gap-2">
+                          <button onClick={(e) => handleMenuAction('cancel_closure', e)} className="w-full text-left px-4 py-2 text-sm text-status-danger hover:bg-status-danger-bg flex items-center gap-2">
                             <XCircle size={14} /> Annuler la clôture
                           </button>
                         )}
@@ -165,7 +165,7 @@ export default function AccountCard({ compte, onEdit, onAction, canSuspend = tru
 
       <div className="relative">
           <div className="flex justify-between items-end mb-1">
-             <p className="text-[10px] text-slate-500 uppercase tracking-tight">
+             <p className="text-[10px] text-content-muted uppercase tracking-tight">
                {isBloque ? 'Solde (Bloqué)' : 'Solde Disponible'}
              </p>
              <Badge
@@ -176,23 +176,23 @@ export default function AccountCard({ compte, onEdit, onAction, canSuspend = tru
           </div>
           
           <div className="flex items-baseline gap-1">
-              <span className={`text-2xl font-bold tracking-tight ${isBloque ? 'text-amber-300' : 'text-white'}`}>
+              <span className={`text-2xl font-bold tracking-tight ${isBloque ? 'text-status-warning' : 'text-content-primary'}`}>
                 {solde.toLocaleString()}
               </span>
-              <span className="text-xs font-medium text-slate-500">FCFA</span>
+              <span className="text-xs font-medium text-content-muted">FCFA</span>
           </div>
 
           {isEpargne && (compte.tauxInteret || 0) > 0 && (
               <div className="flex items-center gap-1 mt-1">
-                  <TrendingUp size={10} className="text-emerald-500" />
-                  <span className="text-[10px] text-emerald-500 font-medium">+{compte.tauxInteret}% d'intérêts</span>
+                  <TrendingUp size={10} className="text-status-success" />
+                  <span className="text-[10px] text-status-success font-medium">+{compte.tauxInteret}% d'intérêts</span>
               </div>
           )}
 
           {isBloque && compte.blocageFin && (
               <div className="flex items-center gap-1 mt-1">
-                  <Unlock size={10} className="text-amber-500" />
-                  <span className="text-[10px] text-amber-500 font-medium">
+                  <Unlock size={10} className="text-status-warning" />
+                  <span className="text-[10px] text-status-warning font-medium">
                     Déblocage: {new Date(compte.blocageFin).toLocaleDateString('fr-FR')}
                   </span>
               </div>

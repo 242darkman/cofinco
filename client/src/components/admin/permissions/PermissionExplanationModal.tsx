@@ -43,7 +43,7 @@ export default function PermissionExplanationModal({
       onClose={onClose}
       title={
         <div className="flex items-center gap-2">
-          <HelpCircle className="text-indigo-400" size={20} />
+          <HelpCircle className="text-accent" size={20} />
           <span>Pourquoi cette permission ?</span>
         </div>
       }
@@ -52,22 +52,22 @@ export default function PermissionExplanationModal({
     >
       <div className="space-y-4">
         {/* User & Permission Info */}
-        <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
+        <div className="bg-surface/50 rounded-lg p-3 border border-edge">
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div>
-              <span className="text-slate-500 text-xs">Utilisateur</span>
-              <p className="text-white font-medium truncate">{userName}</p>
+              <span className="text-content-muted text-xs">Utilisateur</span>
+              <p className="text-content-primary font-medium truncate">{userName}</p>
             </div>
             <div>
-              <span className="text-slate-500 text-xs">Permission</span>
-              <p className="text-white font-mono text-xs truncate">{permissionCode}</p>
+              <span className="text-content-muted text-xs">Permission</span>
+              <p className="text-content-primary font-mono text-xs truncate">{permissionCode}</p>
             </div>
           </div>
         </div>
 
         {/* Loading State */}
         {loading && (
-          <div className="flex flex-col items-center justify-center py-8 text-slate-400">
+          <div className="flex flex-col items-center justify-center py-8 text-content-muted">
             <Loader2 className="animate-spin mb-2" size={24} />
             <span className="text-sm">Analyse en cours...</span>
           </div>
@@ -75,7 +75,7 @@ export default function PermissionExplanationModal({
 
         {/* Error State */}
         {error && !loading && (
-          <div className="bg-rose-500/10 border border-rose-500/20 rounded-lg p-4 text-rose-400 text-sm">
+          <div className="bg-status-danger/10 border border-status-danger/20 rounded-lg p-4 text-status-danger text-sm">
             <div className="flex items-center gap-2">
               <AlertCircle size={16} />
               <span>Erreur: {error}</span>
@@ -91,31 +91,31 @@ export default function PermissionExplanationModal({
               className={`
                 rounded-lg p-4 border flex items-start gap-3
                 ${explanation.hasPermission
-                  ? 'bg-emerald-500/10 border-emerald-500/20'
-                  : 'bg-rose-500/10 border-rose-500/20'
+                  ? 'bg-status-success-bg border-status-success/20'
+                  : 'bg-status-danger/10 border-status-danger/20'
                 }
               `}
             >
               {explanation.hasPermission ? (
-                <CheckCircle className="text-emerald-400 shrink-0 mt-0.5" size={20} />
+                <CheckCircle className="text-status-success shrink-0 mt-0.5" size={20} />
               ) : (
-                <XCircle className="text-rose-400 shrink-0 mt-0.5" size={20} />
+                <XCircle className="text-status-danger shrink-0 mt-0.5" size={20} />
               )}
               <div>
                 <p
                   className={`font-semibold ${
-                    explanation.hasPermission ? 'text-emerald-400' : 'text-rose-400'
+                    explanation.hasPermission ? 'text-status-success' : 'text-status-danger'
                   }`}
                 >
                   {explanation.hasPermission ? 'Permission accordée' : 'Permission non accordée'}
                 </p>
-                <p className="text-slate-300 text-sm mt-1">{explanation.explanation}</p>
+                <p className="text-content-secondary text-sm mt-1">{explanation.explanation}</p>
               </div>
             </div>
 
             {/* Source Badge */}
             <div className="flex items-center gap-2">
-              <span className="text-slate-500 text-sm">Source:</span>
+              <span className="text-content-muted text-sm">Source:</span>
               <PermissionSourceBadge
                 source={explanation.source as PermissionSource}
                 granted={explanation.hasPermission}
@@ -126,17 +126,17 @@ export default function PermissionExplanationModal({
 
             {/* Details Section */}
             {explanation.details && Object.keys(explanation.details).length > 0 && (
-              <div className="bg-slate-900 rounded-lg border border-slate-700 overflow-hidden">
-                <div className="px-3 py-2 bg-slate-800/50 border-b border-slate-700">
-                  <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+              <div className="bg-surface-base rounded-lg border border-edge overflow-hidden">
+                <div className="px-3 py-2 bg-surface/50 border-b border-edge">
+                  <h4 className="text-xs font-semibold text-content-muted uppercase tracking-wide">
                     Détails techniques
                   </h4>
                 </div>
                 <div className="p-3 space-y-2 text-sm">
                   {Object.entries(explanation.details).map(([key, value]) => (
                     <div key={key} className="flex justify-between items-start gap-4">
-                      <span className="text-slate-500 text-xs">{formatDetailKey(key)}</span>
-                      <span className="text-slate-300 text-xs font-mono text-right truncate max-w-[200px]">
+                      <span className="text-content-muted text-xs">{formatDetailKey(key)}</span>
+                      <span className="text-content-secondary text-xs font-mono text-right truncate max-w-[200px]">
                         {formatDetailValue(value)}
                       </span>
                     </div>
@@ -148,7 +148,7 @@ export default function PermissionExplanationModal({
         )}
 
         {/* Close Button */}
-        <div className="flex justify-end pt-2 border-t border-slate-800">
+        <div className="flex justify-end pt-2 border-t border-edge">
           <Button variant="outline" size="sm" onClick={onClose}>
             Fermer
           </Button>

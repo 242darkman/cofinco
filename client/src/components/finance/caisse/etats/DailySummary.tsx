@@ -37,8 +37,8 @@ interface DailySummaryProps {
 }
 
 const COLORS = {
-  entrees: '#10b981',
-  sorties: '#f43f5e',
+  entrees: 'var(--color-success)',
+  sorties: 'var(--color-danger)',
   neutre: '#6366f1',
   accent: '#06b6d4',
 };
@@ -159,10 +159,10 @@ export function DailySummary({ sessions, transactions, loading = false }: DailyS
 
   if (loading) {
     return (
-      <Card className="bg-slate-900/80 border-slate-800 p-8">
+      <Card className="bg-surface-base/80 border-edge p-8">
         <div className="flex items-center justify-center gap-3">
-          <div className="animate-spin w-5 h-5 border-2 border-cyan-500 border-t-transparent rounded-full" />
-          <span className="text-slate-400">Chargement des statistiques...</span>
+          <div className="animate-spin w-5 h-5 border-2 border-accent border-t-transparent rounded-full" />
+          <span className="text-content-muted">Chargement des statistiques...</span>
         </div>
       </Card>
     );
@@ -172,62 +172,62 @@ export function DailySummary({ sessions, transactions, loading = false }: DailyS
     <div className="space-y-4">
       {/* KPIs Principaux - Compacted */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20 p-3">
+        <Card className="bg-gradient-to-br from-status-success/10 to-status-success/5 border-status-success/20 p-3">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-xs text-emerald-400/70 font-medium uppercase tracking-wide">
+              <p className="text-xs text-status-success/70 font-medium uppercase tracking-wide">
                 Total Entrées
               </p>
-              <p className="text-xl font-bold text-emerald-400 mt-0.5">
+              <p className="text-xl font-bold text-status-success mt-0.5">
                 {metrics.totalEntrees.toLocaleString('fr-FR')}
               </p>
-              <p className="text-[10px] text-emerald-400/50 mt-0.5">
+              <p className="text-[10px] text-status-success/50 mt-0.5">
                 Moy: {metrics.moyenneEntrees.toLocaleString('fr-FR', { maximumFractionDigits: 0 })}
               </p>
             </div>
-            <div className="p-1.5 bg-emerald-500/20 rounded-lg">
-              <TrendingUp size={16} className="text-emerald-400" />
+            <div className="p-1.5 bg-status-success-bg rounded-lg">
+              <TrendingUp size={16} className="text-status-success" />
             </div>
           </div>
         </Card>
 
-        <Card className="bg-gradient-to-br from-rose-500/10 to-rose-500/5 border-rose-500/20 p-3">
+        <Card className="bg-gradient-to-br from-status-danger/10 to-status-danger/5 border-status-danger/20 p-3">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-xs text-rose-400/70 font-medium uppercase tracking-wide">
+              <p className="text-xs text-status-danger/70 font-medium uppercase tracking-wide">
                 Total Sorties
               </p>
-              <p className="text-xl font-bold text-rose-400 mt-0.5">
+              <p className="text-xl font-bold text-status-danger mt-0.5">
                 {metrics.totalSorties.toLocaleString('fr-FR')}
               </p>
-              <p className="text-[10px] text-rose-400/50 mt-0.5">
+              <p className="text-[10px] text-status-danger/50 mt-0.5">
                 Moy: {metrics.moyenneSorties.toLocaleString('fr-FR', { maximumFractionDigits: 0 })}
               </p>
             </div>
-            <div className="p-1.5 bg-rose-500/20 rounded-lg">
-              <TrendingDown size={16} className="text-rose-400" />
+            <div className="p-1.5 bg-status-danger-bg rounded-lg">
+              <TrendingDown size={16} className="text-status-danger" />
             </div>
           </div>
         </Card>
 
-        <Card className="bg-gradient-to-br from-cyan-500/10 to-cyan-500/5 border-cyan-500/20 p-3">
+        <Card className="bg-gradient-to-br from-accent/10 to-accent/5 border-accent/20 p-3">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-xs text-cyan-400/70 font-medium uppercase tracking-wide">
+              <p className="text-xs text-accent/70 font-medium uppercase tracking-wide">
                 Solde Net
               </p>
               <p
                 className={`text-xl font-bold mt-0.5 ${
-                  metrics.soldeNet >= 0 ? 'text-cyan-400' : 'text-amber-400'
+                  metrics.soldeNet >= 0 ? 'text-accent' : 'text-status-warning'
                 }`}
               >
                 {metrics.soldeNet >= 0 ? '+' : ''}
                 {metrics.soldeNet.toLocaleString('fr-FR')}
               </p>
-              <p className="text-[10px] text-cyan-400/50 mt-0.5">{metrics.nbTransactions} ops</p>
+              <p className="text-[10px] text-accent/50 mt-0.5">{metrics.nbTransactions} ops</p>
             </div>
-            <div className="p-1.5 bg-cyan-500/20 rounded-lg">
-              <DollarSign size={16} className="text-cyan-400" />
+            <div className="p-1.5 bg-accent/10 rounded-lg">
+              <DollarSign size={16} className="text-accent" />
             </div>
           </div>
         </Card>
@@ -235,10 +235,10 @@ export function DailySummary({ sessions, transactions, loading = false }: DailyS
         <Card
           className={`bg-gradient-to-br p-3 ${
             metrics.tauxConformite >= 95
-              ? 'from-emerald-500/10 to-emerald-500/5 border-emerald-500/20'
+              ? 'from-status-success/10 to-status-success/5 border-status-success/20'
               : metrics.tauxConformite >= 80
-                ? 'from-amber-500/10 to-amber-500/5 border-amber-500/20'
-                : 'from-rose-500/10 to-rose-500/5 border-rose-500/20'
+                ? 'from-status-warning/10 to-status-warning/5 border-status-warning/20'
+                : 'from-status-danger/10 to-status-danger/5 border-status-danger/20'
           }`}
         >
           <div className="flex items-start justify-between">
@@ -246,10 +246,10 @@ export function DailySummary({ sessions, transactions, loading = false }: DailyS
               <p
                 className={`text-xs font-medium uppercase tracking-wide ${
                   metrics.tauxConformite >= 95
-                    ? 'text-emerald-400/70'
+                    ? 'text-status-success/70'
                     : metrics.tauxConformite >= 80
-                      ? 'text-amber-400/70'
-                      : 'text-rose-400/70'
+                      ? 'text-status-warning/70'
+                      : 'text-status-danger/70'
                 }`}
               >
                 Conformité
@@ -257,10 +257,10 @@ export function DailySummary({ sessions, transactions, loading = false }: DailyS
               <p
                 className={`text-xl font-bold mt-0.5 ${
                   metrics.tauxConformite >= 95
-                    ? 'text-emerald-400'
+                    ? 'text-status-success'
                     : metrics.tauxConformite >= 80
-                      ? 'text-amber-400'
-                      : 'text-rose-400'
+                      ? 'text-status-warning'
+                      : 'text-status-danger'
                 }`}
               >
                 {metrics.tauxConformite.toFixed(1)}%
@@ -268,10 +268,10 @@ export function DailySummary({ sessions, transactions, loading = false }: DailyS
               <p
                 className={`text-[10px] mt-0.5 ${
                   metrics.tauxConformite >= 95
-                    ? 'text-emerald-400/50'
+                    ? 'text-status-success/50'
                     : metrics.tauxConformite >= 80
-                      ? 'text-amber-400/50'
-                      : 'text-rose-400/50'
+                      ? 'text-status-warning/50'
+                      : 'text-status-danger/50'
                 }`}
               >
                 {metrics.sessionsTerminees}/{metrics.nbSessions} sessions
@@ -280,16 +280,16 @@ export function DailySummary({ sessions, transactions, loading = false }: DailyS
             <div
               className={`p-1.5 rounded-lg ${
                 metrics.tauxConformite >= 95
-                  ? 'bg-emerald-500/20'
+                  ? 'bg-status-success-bg'
                   : metrics.tauxConformite >= 80
-                    ? 'bg-amber-500/20'
-                    : 'bg-rose-500/20'
+                    ? 'bg-status-warning-bg'
+                    : 'bg-status-danger-bg'
               }`}
             >
               {metrics.tauxConformite >= 95 ? (
-                <CheckCircle size={16} className="text-emerald-400" />
+                <CheckCircle size={16} className="text-status-success" />
               ) : (
-                <AlertTriangle size={16} className={metrics.tauxConformite >= 80 ? 'text-amber-400' : 'text-rose-400'} />
+                <AlertTriangle size={16} className={metrics.tauxConformite >= 80 ? 'text-status-warning' : 'text-status-danger'} />
               )}
             </div>
           </div>
@@ -299,36 +299,36 @@ export function DailySummary({ sessions, transactions, loading = false }: DailyS
       {/* Graphiques - Compacted Heights */}
       <div className="grid lg:grid-cols-2 gap-4">
         {/* Évolution journalière */}
-        <Card className="bg-slate-900/80 border-slate-800 p-4">
-          <h3 className="text-xs font-bold text-white mb-2 flex items-center gap-2">
-            <Activity size={14} className="text-cyan-400" />
+        <Card className="bg-surface-base/80 border-edge p-4">
+          <h3 className="text-xs font-bold text-content-primary mb-2 flex items-center gap-2">
+            <Activity size={14} className="text-accent" />
             Mouvements par Jour
           </h3>
           {dailyData.length > 0 ? (
             <div className="h-[200px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={dailyData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-default)" vertical={false} />
                   <XAxis
                     dataKey="date"
-                    tick={{ fill: '#94a3b8', fontSize: 10 }}
+                    tick={{ fill: 'var(--text-muted)', fontSize: 10 }}
                     tickLine={false}
-                    axisLine={{ stroke: '#475569' }}
+                    axisLine={{ stroke: 'var(--border-default)' }}
                     dy={5}
                   />
                   <YAxis
-                    tick={{ fill: '#94a3b8', fontSize: 10 }}
+                    tick={{ fill: 'var(--text-muted)', fontSize: 10 }}
                     tickLine={false}
                     axisLine={false}
                     tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
                   />
                   <Tooltip
-                    cursor={{ fill: '#334155', opacity: 0.2 }}
+                    cursor={{ fill: 'var(--bg-elevated)', opacity: 0.2 }}
                     contentStyle={{
-                      backgroundColor: '#1e293b',
-                      border: '1px solid #334155',
+                      backgroundColor: 'var(--bg-elevated)',
+                      border: '1px solid var(--border-default)',
                       borderRadius: '8px',
-                      color: '#f8fafc',
+                      color: 'var(--text-primary)',
                       fontSize: '12px',
                       padding: '8px'
                     }}
@@ -340,16 +340,16 @@ export function DailySummary({ sessions, transactions, loading = false }: DailyS
               </ResponsiveContainer>
             </div>
           ) : (
-            <div className="h-[200px] flex items-center justify-center text-slate-500 text-xs">
+            <div className="h-[200px] flex items-center justify-center text-content-muted text-xs">
               Aucune donnée disponible
             </div>
           )}
         </Card>
 
         {/* Répartition par type */}
-        <Card className="bg-slate-900/80 border-slate-800 p-4">
-          <h3 className="text-xs font-bold text-white mb-2 flex items-center gap-2">
-            <Percent size={14} className="text-purple-400" />
+        <Card className="bg-surface-base/80 border-edge p-4">
+          <h3 className="text-xs font-bold text-content-primary mb-2 flex items-center gap-2">
+            <Percent size={14} className="text-status-info" />
             Répartition par Type
           </h3>
           {operationTypeData.length > 0 ? (
@@ -373,10 +373,10 @@ export function DailySummary({ sessions, transactions, loading = false }: DailyS
                   </Pie>
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: '#1e293b',
-                      border: '1px solid #334155',
+                      backgroundColor: 'var(--bg-elevated)',
+                      border: '1px solid var(--border-default)',
                       borderRadius: '8px',
-                      color: '#f8fafc',
+                      color: 'var(--text-primary)',
                       fontSize: '12px',
                       padding: '8px'
                     }}
@@ -392,7 +392,7 @@ export function DailySummary({ sessions, transactions, loading = false }: DailyS
               </ResponsiveContainer>
             </div>
           ) : (
-            <div className="h-[200px] flex items-center justify-center text-slate-500 text-xs">
+            <div className="h-[200px] flex items-center justify-center text-content-muted text-xs">
               Aucune donnée disponible
             </div>
           )}
@@ -401,9 +401,9 @@ export function DailySummary({ sessions, transactions, loading = false }: DailyS
 
       {/* Évolution du solde - Compacted */}
       {soldeEvolution.length > 0 && (
-        <Card className="bg-slate-900/80 border-slate-800 p-4">
-          <h3 className="text-xs font-bold text-white mb-2 flex items-center gap-2">
-            <TrendingUp size={14} className="text-emerald-400" />
+        <Card className="bg-surface-base/80 border-edge p-4">
+          <h3 className="text-xs font-bold text-content-primary mb-2 flex items-center gap-2">
+            <TrendingUp size={14} className="text-status-success" />
             Évolution du Solde Net
           </h3>
           <div className="h-[180px]">
@@ -411,30 +411,30 @@ export function DailySummary({ sessions, transactions, loading = false }: DailyS
               <AreaChart data={soldeEvolution} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="soldeGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#06b6d4" stopOpacity={0} />
+                    <stop offset="5%" stopColor="var(--accent-primary)" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="var(--accent-primary)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-default)" vertical={false} />
                 <XAxis
                   dataKey="date"
-                  tick={{ fill: '#94a3b8', fontSize: 10 }}
+                  tick={{ fill: 'var(--text-muted)', fontSize: 10 }}
                   tickLine={false}
-                  axisLine={{ stroke: '#475569' }}
+                  axisLine={{ stroke: 'var(--border-default)' }}
                   dy={5}
                 />
                 <YAxis
-                  tick={{ fill: '#94a3b8', fontSize: 10 }}
+                  tick={{ fill: 'var(--text-muted)', fontSize: 10 }}
                   tickLine={false}
                   axisLine={false}
                   tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
                 />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: '#1e293b',
-                    border: '1px solid #334155',
+                    backgroundColor: 'var(--bg-elevated)',
+                    border: '1px solid var(--border-default)',
                     borderRadius: '8px',
-                    color: '#f8fafc',
+                    color: 'var(--text-primary)',
                     fontSize: '12px',
                     padding: '8px'
                   }}
@@ -443,7 +443,7 @@ export function DailySummary({ sessions, transactions, loading = false }: DailyS
                 <Area
                   type="monotone"
                   dataKey="solde"
-                  stroke="#06b6d4"
+                  stroke="var(--accent-primary)"
                   strokeWidth={2}
                   fill="url(#soldeGradient)"
                 />
@@ -455,46 +455,46 @@ export function DailySummary({ sessions, transactions, loading = false }: DailyS
 
       {/* Stats secondaires - Hidden to save space or made extremely compact */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 pb-2">
-        <Card className="bg-slate-900/60 border-slate-800 p-3 flex items-center gap-3">
-            <div className="p-1.5 bg-blue-500/10 rounded-lg shrink-0">
-              <Users size={16} className="text-blue-400" />
+        <Card className="bg-surface-base/60 border-edge p-3 flex items-center gap-3">
+            <div className="p-1.5 bg-status-info-bg rounded-lg shrink-0">
+              <Users size={16} className="text-status-info" />
             </div>
             <div>
-              <p className="text-[10px] text-slate-400 uppercase tracking-wide">Sessions</p>
-              <p className="text-sm font-bold text-white">{metrics.nbSessions}</p>
+              <p className="text-[10px] text-content-muted uppercase tracking-wide">Sessions</p>
+              <p className="text-sm font-bold text-content-primary">{metrics.nbSessions}</p>
             </div>
         </Card>
 
-        <Card className="bg-slate-900/60 border-slate-800 p-3 flex items-center gap-3">
-            <div className="p-1.5 bg-purple-500/10 rounded-lg shrink-0">
-              <Activity size={16} className="text-purple-400" />
+        <Card className="bg-surface-base/60 border-edge p-3 flex items-center gap-3">
+            <div className="p-1.5 bg-status-info-bg rounded-lg shrink-0">
+              <Activity size={16} className="text-status-info" />
             </div>
             <div>
-              <p className="text-[10px] text-slate-400 uppercase tracking-wide">Opérations</p>
-              <p className="text-sm font-bold text-white">{metrics.nbTransactions}</p>
+              <p className="text-[10px] text-content-muted uppercase tracking-wide">Opérations</p>
+              <p className="text-sm font-bold text-content-primary">{metrics.nbTransactions}</p>
             </div>
         </Card>
 
-        <Card className="bg-slate-900/60 border-slate-800 p-3 flex items-center gap-3">
-            <div className="p-1.5 bg-emerald-500/10 rounded-lg shrink-0">
-              <CheckCircle size={16} className="text-emerald-400" />
+        <Card className="bg-surface-base/60 border-edge p-3 flex items-center gap-3">
+            <div className="p-1.5 bg-status-success-bg rounded-lg shrink-0">
+              <CheckCircle size={16} className="text-status-success" />
             </div>
             <div>
-              <p className="text-[10px] text-slate-400 uppercase tracking-wide">Fermées</p>
-              <p className="text-sm font-bold text-white">{metrics.sessionsTerminees}</p>
+              <p className="text-[10px] text-content-muted uppercase tracking-wide">Fermées</p>
+              <p className="text-sm font-bold text-content-primary">{metrics.sessionsTerminees}</p>
             </div>
         </Card>
 
-        <Card className="bg-slate-900/60 border-slate-800 p-3 flex items-center gap-3">
-            <div className={`p-1.5 rounded-lg shrink-0 ${metrics.totalEcarts > 0 ? 'bg-amber-500/10' : 'bg-emerald-500/10'}`}>
+        <Card className="bg-surface-base/60 border-edge p-3 flex items-center gap-3">
+            <div className={`p-1.5 rounded-lg shrink-0 ${metrics.totalEcarts > 0 ? 'bg-status-warning-bg' : 'bg-status-success-bg'}`}>
               <AlertTriangle
                 size={16}
-                className={metrics.totalEcarts > 0 ? 'text-amber-400' : 'text-emerald-400'}
+                className={metrics.totalEcarts > 0 ? 'text-status-warning' : 'text-status-success'}
               />
             </div>
             <div>
-              <p className="text-[10px] text-slate-400 uppercase tracking-wide">Total Écarts</p>
-              <p className={`text-sm font-bold ${metrics.totalEcarts > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
+              <p className="text-[10px] text-content-muted uppercase tracking-wide">Total Écarts</p>
+              <p className={`text-sm font-bold ${metrics.totalEcarts > 0 ? 'text-status-warning' : 'text-status-success'}`}>
                 {metrics.totalEcarts.toLocaleString('fr-FR')}
               </p>
             </div>

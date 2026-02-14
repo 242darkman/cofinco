@@ -145,7 +145,7 @@ export default function GlobalSearchModal({ isOpen, onClose, onNavigate }: Globa
             <div className="space-y-3">
               {results!.clients.length > 0 && (
                 <div>
-                  <p className="text-[10px] font-bold text-blue-400 uppercase tracking-wider px-2 py-1.5 flex items-center gap-1">
+                  <p className="text-[10px] font-bold text-status-info uppercase tracking-wider px-2 py-1.5 flex items-center gap-1">
                     <Users size={12} /> Clients ({results!.clients.length})
                   </p>
                   <div className="space-y-0.5">
@@ -153,7 +153,7 @@ export default function GlobalSearchModal({ isOpen, onClose, onNavigate }: Globa
                       <ResultItem 
                         key={client.id}
                         icon={Users}
-                        iconBg="bg-blue-500/10 text-blue-400"
+                        iconBg="bg-status-info-bg text-status-info"
                         label={client.nom}
                         sublabel={client.telephone}
                         onClick={() => onNavigate('clients', client.id, 'client')}
@@ -165,7 +165,7 @@ export default function GlobalSearchModal({ isOpen, onClose, onNavigate }: Globa
 
               {results!.credits.length > 0 && (
                 <div>
-                  <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider px-2 py-1.5 flex items-center gap-1">
+                  <p className="text-[10px] font-bold text-status-success uppercase tracking-wider px-2 py-1.5 flex items-center gap-1">
                     <CreditCard size={12} /> Crédits ({results!.credits.length})
                   </p>
                   <div className="space-y-0.5">
@@ -173,7 +173,7 @@ export default function GlobalSearchModal({ isOpen, onClose, onNavigate }: Globa
                       <ResultItem 
                         key={credit.id}
                         icon={CreditCard}
-                        iconBg="bg-emerald-500/10 text-emerald-400"
+                        iconBg="bg-status-success-bg text-status-success"
                         label={credit.clientNom || credit.typeCredit || 'Crédit'}
                         sublabel={`${credit.montant ? Number(credit.montant).toLocaleString() + ' FCFA' : ''} • ${ALL_STATUS_LABELS[credit.statut || ''] || credit.statut || ''}`}
                         onClick={() => onNavigate('credits', credit.id, 'credit')}
@@ -185,7 +185,7 @@ export default function GlobalSearchModal({ isOpen, onClose, onNavigate }: Globa
 
               {results!.tontines.length > 0 && (
                 <div>
-                  <p className="text-[10px] font-bold text-amber-400 uppercase tracking-wider px-2 py-1.5 flex items-center gap-1">
+                  <p className="text-[10px] font-bold text-status-warning uppercase tracking-wider px-2 py-1.5 flex items-center gap-1">
                     <DollarSign size={12} /> Tontines ({results!.tontines.length})
                   </p>
                   <div className="space-y-0.5">
@@ -193,7 +193,7 @@ export default function GlobalSearchModal({ isOpen, onClose, onNavigate }: Globa
                       <ResultItem 
                         key={tontine.id}
                         icon={DollarSign}
-                        iconBg="bg-amber-500/10 text-amber-400"
+                        iconBg="bg-status-warning-bg text-status-warning"
                         label={tontine.nom}
                         sublabel={ALL_STATUS_LABELS[tontine.statut || ''] || tontine.statut}
                         onClick={() => onNavigate('tontines', tontine.id, 'tontine')}
@@ -205,7 +205,7 @@ export default function GlobalSearchModal({ isOpen, onClose, onNavigate }: Globa
 
               {results!.agents.length > 0 && (
                 <div>
-                  <p className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider px-2 py-1.5 flex items-center gap-1">
+                  <p className="text-[10px] font-bold text-accent uppercase tracking-wider px-2 py-1.5 flex items-center gap-1">
                     <MapPin size={12} /> Agents ({results!.agents.length})
                   </p>
                   <div className="space-y-0.5">
@@ -213,7 +213,7 @@ export default function GlobalSearchModal({ isOpen, onClose, onNavigate }: Globa
                       <ResultItem 
                         key={agent.id}
                         icon={MapPin}
-                        iconBg="bg-cyan-500/10 text-cyan-400"
+                        iconBg="bg-accent/10 text-accent"
                         label={`${agent.nom} ${agent.prenom || ''}`}
                         sublabel={agent.zoneAffectation}
                         onClick={() => onNavigate('agentTerrain', agent.id, 'agent')}
@@ -234,10 +234,10 @@ export default function GlobalSearchModal({ isOpen, onClose, onNavigate }: Globa
                 Accès rapide
               </p>
               <div className="space-y-0.5">
-                <QuickAction icon={Users} iconBg="bg-blue-500/10 text-blue-400" label="Clients" onClick={() => onNavigate('clients')} />
-                <QuickAction icon={TrendingUp} iconBg="bg-emerald-500/10 text-emerald-400" label="Crédits" onClick={() => onNavigate('credits')} />
-                <QuickAction icon={DollarSign} iconBg="bg-amber-500/10 text-amber-400" label="Tontines" onClick={() => onNavigate('tontines')} />
-                <QuickAction icon={MapPin} iconBg="bg-cyan-500/10 text-cyan-400" label="Agents Terrain" onClick={() => onNavigate('agentTerrain')} />
+                <QuickAction icon={Users} iconBg="bg-status-info-bg text-status-info" label="Clients" onClick={() => onNavigate('clients')} />
+                <QuickAction icon={TrendingUp} iconBg="bg-status-success-bg text-status-success" label="Crédits" onClick={() => onNavigate('credits')} />
+                <QuickAction icon={DollarSign} iconBg="bg-status-warning-bg text-status-warning" label="Tontines" onClick={() => onNavigate('tontines')} />
+                <QuickAction icon={MapPin} iconBg="bg-accent/10 text-accent" label="Agents Terrain" onClick={() => onNavigate('agentTerrain')} />
               </div>
             </>
           )}

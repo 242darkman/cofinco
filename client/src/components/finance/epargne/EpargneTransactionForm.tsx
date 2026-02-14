@@ -46,8 +46,8 @@ interface EpargneTransactionFormProps {
 type ModePaiement = 'CASH' | 'MOBILE_MONEY' | 'CHECK' | 'TRANSFER';
 
 const MOBILE_OPERATORS = [
-  { id: 'mtn', name: 'MTN Mobile Money', color: 'bg-yellow-500', prefix: '+242 05/06' },
-  { id: 'airtel', name: 'Airtel Money', color: 'bg-red-500', prefix: '+242 04' }
+  { id: 'mtn', name: 'MTN Mobile Money', color: 'bg-status-warning-bg0', prefix: '+242 05/06' },
+  { id: 'airtel', name: 'Airtel Money', color: 'bg-status-danger', prefix: '+242 04' }
 ] as const;
 
 const PAYMENT_MODES: { id: ModePaiement; icon: typeof Banknote; label: string }[] = [
@@ -250,10 +250,10 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
 
   const isDeposit = type === 'Dépôt';
   const isInitialDeposit = isPendingActivation && isDeposit;
-  const headerBgClass = isInitialDeposit ? 'bg-amber-500/10' : (isDeposit ? 'bg-green-500/10' : 'bg-blue-500/10');
+  const headerBgClass = isInitialDeposit ? 'bg-status-warning-bg' : (isDeposit ? 'bg-status-success-bg' : 'bg-status-info-bg');
   const IconComponent = isInitialDeposit ? Banknote : (isDeposit ? TrendingUp : TrendingDown);
-  const iconColorClass = isInitialDeposit ? 'text-amber-400' : (isDeposit ? 'text-green-400' : 'text-blue-400');
-  const buttonColorClass = isInitialDeposit ? 'bg-amber-600 hover:bg-amber-700' : (isDeposit ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700');
+  const iconColorClass = isInitialDeposit ? 'text-status-warning' : (isDeposit ? 'text-status-success' : 'text-status-info');
+  const buttonColorClass = isInitialDeposit ? 'bg-status-warning hover:bg-status-warning' : (isDeposit ? 'bg-status-success hover:bg-status-success' : 'bg-status-info hover:bg-status-info');
 
   return (
     <>
@@ -263,23 +263,23 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
         aria-modal="true"
         aria-labelledby="transaction-form-title"
       >
-        <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-lg my-8">
+        <div className="bg-surface rounded-xl border border-edge w-full max-w-lg my-8">
           {/* Header */}
-          <div className={`border-b border-slate-700 p-6 flex justify-between items-center sticky top-0 z-10 rounded-t-xl ${headerBgClass}`}>
+          <div className={`border-b border-edge p-6 flex justify-between items-center sticky top-0 z-10 rounded-t-xl ${headerBgClass}`}>
             <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-lg ${isDeposit ? 'bg-green-500/20' : 'bg-blue-500/20'}`}>
+              <div className={`p-2 rounded-lg ${isDeposit ? 'bg-status-success-bg' : 'bg-status-info-bg'}`}>
                 <IconComponent className={iconColorClass} size={24} aria-hidden="true" />
               </div>
               <div>
-                <h2 id="transaction-form-title" className="text-2xl font-bold text-white">
+                <h2 id="transaction-form-title" className="text-2xl font-bold text-content-primary">
                   {isInitialDeposit ? 'Encaissement Initial' : type}
                 </h2>
-                <p className="text-slate-400 text-sm">{safeNumeroCompte}</p>
+                <p className="text-content-muted text-sm">{safeNumeroCompte}</p>
               </div>
             </div>
             <button
               onClick={onClose}
-              className="text-slate-400 hover:text-white transition-colors hover:bg-slate-700 rounded-lg p-2"
+              className="text-content-muted hover:text-content-primary transition-colors hover:bg-surface-elevated rounded-lg p-2"
               type="button"
               aria-label="Fermer"
               disabled={loading}
@@ -291,9 +291,9 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
           <form onSubmit={handleSubmit} className="p-6 space-y-6">
             {/* Offline Indicator */}
             {isOffline && (
-              <div className="bg-amber-500/20 border border-amber-500/50 rounded-lg p-3 flex items-center gap-3" role="status">
-                <WifiOff className="text-amber-400 flex-shrink-0" size={18} aria-hidden="true" />
-                <span className="text-amber-300 text-sm">
+              <div className="bg-status-warning-bg border border-status-warning/50 rounded-lg p-3 flex items-center gap-3" role="status">
+                <WifiOff className="text-status-warning flex-shrink-0" size={18} aria-hidden="true" />
+                <span className="text-status-warning text-sm">
                   Mode hors ligne — {formData.mode_paiement === 'CASH'
                     ? 'Les opérations en espèces seront synchronisées automatiquement.'
                     : 'Seules les opérations en espèces sont disponibles hors ligne.'}
@@ -303,19 +303,19 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
 
             {/* General Error */}
             {errors.general && (
-              <div className="bg-red-500/20 border border-red-500 rounded-lg p-4 flex items-center gap-3" role="alert">
-                <AlertCircle className="text-red-400 flex-shrink-0" size={20} aria-hidden="true" />
-                <span className="text-red-400">{errors.general}</span>
+              <div className="bg-status-danger-bg border border-status-danger rounded-lg p-4 flex items-center gap-3" role="alert">
+                <AlertCircle className="text-status-danger flex-shrink-0" size={20} aria-hidden="true" />
+                <span className="text-status-danger">{errors.general}</span>
               </div>
             )}
 
             {/* Pending Activation Alert */}
             {isPendingActivation && type === 'Dépôt' && (
-              <div className="bg-amber-500/20 border border-amber-500/50 rounded-lg p-4 flex items-start gap-3" role="alert">
-                <AlertTriangle className="text-amber-400 flex-shrink-0 mt-0.5" size={20} aria-hidden="true" />
+              <div className="bg-status-warning-bg border border-status-warning/50 rounded-lg p-4 flex items-start gap-3" role="alert">
+                <AlertTriangle className="text-status-warning flex-shrink-0 mt-0.5" size={20} aria-hidden="true" />
                 <div>
-                  <p className="text-amber-400 font-semibold">Encaissement du dépôt initial</p>
-                  <p className="text-amber-300/80 text-sm mt-1">
+                  <p className="text-status-warning font-semibold">Encaissement du dépôt initial</p>
+                  <p className="text-status-warning/80 text-sm mt-1">
                     Ce compte est en attente d'activation. Encaissez le montant prévu ({formatMoney(pendingDepositAmount)}) pour activer le compte.
                   </p>
                 </div>
@@ -323,38 +323,38 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
             )}
 
             {/* Account Info */}
-            <div className="bg-slate-700/50 rounded-lg p-4" role="region" aria-label="Informations du compte">
+            <div className="bg-surface-elevated/50 rounded-lg p-4" role="region" aria-label="Informations du compte">
               <div className="flex justify-between items-center mb-2">
-                <span className="text-slate-400 text-sm">Client</span>
-                <span className="text-white font-semibold">{safeClientName}</span>
+                <span className="text-content-muted text-sm">Client</span>
+                <span className="text-content-primary font-semibold">{safeClientName}</span>
               </div>
               <div className="flex justify-between items-center mb-2">
-                <span className="text-slate-400 text-sm">Type de compte</span>
-                <span className="text-white">{getTypeCompteLabel((compte.typeCompte || compte.type_compte) as string)}</span>
+                <span className="text-content-muted text-sm">Type de compte</span>
+                <span className="text-content-primary">{getTypeCompteLabel((compte.typeCompte || compte.type_compte) as string)}</span>
               </div>
               {isPendingActivation ? (
                 <>
                   <div className="flex justify-between items-center mb-2">
-                    <span className="text-slate-400 text-sm">Solde réel actuel</span>
-                    <span className="text-xl font-bold text-slate-500">0 FCFA</span>
+                    <span className="text-content-muted text-sm">Solde réel actuel</span>
+                    <span className="text-xl font-bold text-content-muted">0 FCFA</span>
                   </div>
-                  <div className="flex justify-between items-center border-t border-slate-600 pt-2 mt-2">
-                    <span className="text-amber-400 text-sm font-medium">Montant à encaisser</span>
-                    <span className="text-2xl font-bold text-amber-400">{formatMoney(pendingDepositAmount)}</span>
+                  <div className="flex justify-between items-center border-t border-edge-strong pt-2 mt-2">
+                    <span className="text-status-warning text-sm font-medium">Montant à encaisser</span>
+                    <span className="text-2xl font-bold text-status-warning">{formatMoney(pendingDepositAmount)}</span>
                   </div>
                 </>
               ) : (
                 <div className="flex justify-between items-center">
-                  <span className="text-slate-400 text-sm">Solde actuel</span>
-                  <span className="text-2xl font-bold text-green-400">{formatMoney(actualBalance)}</span>
+                  <span className="text-content-muted text-sm">Solde actuel</span>
+                  <span className="text-2xl font-bold text-status-success">{formatMoney(actualBalance)}</span>
                 </div>
               )}
             </div>
 
             {/* Payment Mode Selection */}
             <fieldset>
-              <legend className="block text-sm font-semibold text-slate-300 mb-2">
-                Mode de Paiement <span className="text-red-400">*</span>
+              <legend className="block text-sm font-semibold text-content-secondary mb-2">
+                Mode de Paiement <span className="text-status-danger">*</span>
               </legend>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" role="radiogroup" aria-label="Sélectionner le mode de paiement">
                 {PAYMENT_MODES.map(({ id, icon: Icon, label }) => (
@@ -365,10 +365,10 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
                     aria-checked={formData.mode_paiement === id}
                     onClick={() => handleModeChange(id)}
                     disabled={loading || (isOffline && id !== 'CASH')}
-                    className={`flex flex-col items-center justify-center p-3 rounded-lg border transition focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    className={`flex flex-col items-center justify-center p-3 rounded-lg border transition focus:outline-none focus:ring-2 focus:ring-status-info ${
                       formData.mode_paiement === id
-                        ? 'bg-blue-600 border-blue-500 text-white'
-                        : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'
+                        ? 'bg-status-info border-status-info text-white'
+                        : 'bg-surface-elevated border-edge-strong text-content-secondary hover:bg-surface-subtle'
                     } disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
                     <Icon size={20} className="mb-1" aria-hidden="true" />
@@ -381,9 +381,9 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
             {/* Mobile Operator Selection */}
             {formData.mode_paiement === 'MOBILE_MONEY' && type === 'Dépôt' && (
               <fieldset>
-                <legend className="block text-sm font-semibold text-slate-300 mb-2">
+                <legend className="block text-sm font-semibold text-content-secondary mb-2">
                   <Smartphone size={16} className="inline mr-2" aria-hidden="true" />
-                  Sélectionner l'opérateur <span className="text-red-400">*</span>
+                  Sélectionner l'opérateur <span className="text-status-danger">*</span>
                 </legend>
                 <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Sélectionner l'opérateur mobile">
                   {MOBILE_OPERATORS.map(op => (
@@ -394,14 +394,14 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
                       aria-checked={selectedOperator === op.id}
                       onClick={() => setSelectedOperator(op.id)}
                       disabled={loading}
-                      className={`flex items-center gap-2 p-3 rounded-lg border-2 transition focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      className={`flex items-center gap-2 p-3 rounded-lg border-2 transition focus:outline-none focus:ring-2 focus:ring-status-info ${
                         selectedOperator === op.id
-                          ? `${op.color} border-white text-white`
-                          : 'bg-slate-700 border-slate-600 text-slate-300 hover:border-slate-500'
+                          ? `${op.color} border-white text-content-primary`
+                          : 'bg-surface-elevated border-edge-strong text-content-secondary hover:border-edge-strong'
                       } disabled:opacity-50 disabled:cursor-not-allowed`}
                     >
                       <div className={`w-8 h-8 rounded-full ${selectedOperator === op.id ? 'bg-white/20' : op.color} flex items-center justify-center`}>
-                        <Smartphone size={16} className="text-white" aria-hidden="true" />
+                        <Smartphone size={16} className="text-content-primary" aria-hidden="true" />
                       </div>
                       <div className="text-left text-xs">
                         <p className="font-semibold">{op.name.split(' ')[0]}</p>
@@ -411,16 +411,16 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
                   ))}
                 </div>
                 {errors.operateur && (
-                  <p className="text-red-400 text-sm mt-1" role="alert">{errors.operateur}</p>
+                  <p className="text-status-danger text-sm mt-1" role="alert">{errors.operateur}</p>
                 )}
               </fieldset>
             )}
 
             {/* Amount Input */}
             <div>
-              <label htmlFor="montant" className="block text-sm font-semibold text-slate-300 mb-2">
+              <label htmlFor="montant" className="block text-sm font-semibold text-content-secondary mb-2">
                 <DollarSign size={16} className="inline mr-2" aria-hidden="true" />
-                Montant (FCFA) <span className="text-red-400">*</span>
+                Montant (FCFA) <span className="text-status-danger">*</span>
               </label>
               <input
                 id="montant"
@@ -428,7 +428,7 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
                 inputMode="numeric"
                 value={formData.montant}
                 onChange={(e) => handleInputChange('montant', e.target.value)}
-                className={`w-full bg-slate-700 border ${errors.montant ? 'border-red-500' : 'border-slate-600'} rounded-lg px-4 py-3 text-white text-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
+                className={`w-full bg-surface-elevated border ${errors.montant ? 'border-status-danger' : 'border-edge-strong'} rounded-lg px-4 py-3 text-content-primary text-lg focus:outline-none focus:ring-2 focus:ring-status-info`}
                 placeholder="0"
                 autoFocus
                 disabled={loading}
@@ -438,15 +438,15 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
                 aria-describedby={errors.montant ? 'montant-error' : type === 'Retrait' ? 'montant-help' : undefined}
               />
               {errors.montant && (
-                <p id="montant-error" className="text-red-400 text-sm mt-1" role="alert">{errors.montant}</p>
+                <p id="montant-error" className="text-status-danger text-sm mt-1" role="alert">{errors.montant}</p>
               )}
               {type === 'Retrait' && !errors.montant && (
-                <p id="montant-help" className="text-xs text-slate-400 mt-1">
+                <p id="montant-help" className="text-xs text-content-muted mt-1">
                   Maximum disponible: {formatMoney(actualBalance)}
                 </p>
               )}
               {isPendingActivation && type === 'Dépôt' && !errors.montant && (
-                <p className="text-xs text-amber-400 mt-1">
+                <p className="text-xs text-status-warning mt-1">
                   Montant prévu pour activation: {formatMoney(pendingDepositAmount)}
                 </p>
               )}
@@ -456,15 +456,15 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
             {montantNum > 0 && (
               <div
                 className={`p-4 rounded-lg border ${
-                  isDeposit ? 'bg-green-500/10 border-green-500/50' : 'bg-blue-500/10 border-blue-500/50'
+                  isDeposit ? 'bg-status-success-bg border-status-success/50' : 'bg-status-info-bg border-status-info/50'
                 }`}
                 role="region"
                 aria-label="Aperçu du nouveau solde"
                 aria-live="polite"
               >
                 <div className="flex justify-between items-center">
-                  <span className="text-slate-300">Nouveau solde</span>
-                  <span className={`text-2xl font-bold ${isDeposit ? 'text-green-400' : 'text-emerald-400'}`}>
+                  <span className="text-content-secondary">Nouveau solde</span>
+                  <span className={`text-2xl font-bold ${isDeposit ? 'text-status-success' : 'text-status-success'}`}>
                     {formatMoney(nouveauSolde)}
                   </span>
                 </div>
@@ -474,7 +474,7 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
             {/* Reference Field for Check/Transfer */}
             {(formData.mode_paiement === 'CHECK' || formData.mode_paiement === 'TRANSFER') && (
               <div>
-                <label htmlFor="reference" className="block text-sm font-semibold text-slate-300 mb-2">
+                <label htmlFor="reference" className="block text-sm font-semibold text-content-secondary mb-2">
                   Référence
                 </label>
                 <input
@@ -482,7 +482,7 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
                   type="text"
                   value={formData.reference}
                   onChange={(e) => handleInputChange('reference', e.target.value)}
-                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-surface-elevated border border-edge-strong rounded-lg px-4 py-3 text-content-primary focus:outline-none focus:ring-2 focus:ring-status-info"
                   placeholder="N° chèque, référence virement..."
                   disabled={loading}
                   maxLength={100}
@@ -492,7 +492,7 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
 
             {/* Description */}
             <div>
-              <label htmlFor="description" className="block text-sm font-semibold text-slate-300 mb-2">
+              <label htmlFor="description" className="block text-sm font-semibold text-content-secondary mb-2">
                 <FileText size={16} className="inline mr-2" aria-hidden="true" />
                 Description
               </label>
@@ -500,7 +500,7 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
                 id="description"
                 value={formData.description}
                 onChange={(e) => handleInputChange('description', e.target.value)}
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full bg-surface-elevated border border-edge-strong rounded-lg px-4 py-3 text-content-primary focus:outline-none focus:ring-2 focus:ring-status-info"
                 rows={2}
                 placeholder="Notes additionnelles..."
                 disabled={loading}
@@ -514,14 +514,14 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
                 type="button"
                 onClick={onClose}
                 disabled={loading}
-                className="flex-1 px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-slate-500"
+                className="flex-1 px-6 py-3 bg-surface-elevated hover:bg-surface-subtle text-content-primary rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-edge-strong"
               >
                 Annuler
               </button>
               <button
                 type="submit"
                 disabled={loading || montantNum <= 0 || (isOffline && formData.mode_paiement !== 'CASH')}
-                className={`flex-1 px-6 py-3 ${buttonColorClass} text-white rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-center gap-2`}
+                className={`flex-1 px-6 py-3 ${buttonColorClass} text-content-primary rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-status-info flex items-center justify-center gap-2`}
               >
                 {loading ? (
                   <>

@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { toast } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
+import { currencySymbol } from '@shared/config/currency';
 import {
   openDaySession,
   closeDaySession,
@@ -45,7 +46,7 @@ interface OfflineDaySessionProps {
   agenceId: string;
 }
 
-// Cash denomination structure for XAF
+// Cash denomination structure
 const DENOMINATIONS = [
   { value: 10000, label: '10 000' },
   { value: 5000, label: '5 000' },
@@ -174,7 +175,7 @@ export default function OfflineDaySession({ agentId, agenceId }: OfflineDaySessi
         toast.success('Session fermee. Solde exact !');
       } else {
         toast.warning(
-          `Session fermee. Ecart de ${formatMoney(Math.abs(discrepancy))} XAF ${discrepancy > 0 ? '(surplus)' : '(deficit)'}`
+          `Session fermee. Ecart de ${formatMoney(Math.abs(discrepancy))} ${discrepancy > 0 ? '(surplus)' : '(deficit)'}`
         );
       }
     } catch (err: any) {
@@ -195,7 +196,7 @@ export default function OfflineDaySession({ agentId, agenceId }: OfflineDaySessi
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
-        <Loader2 className="animate-spin text-blue-400" size={24} />
+        <Loader2 className="animate-spin text-status-info" size={24} />
       </div>
     );
   }
@@ -203,16 +204,16 @@ export default function OfflineDaySession({ agentId, agenceId }: OfflineDaySessi
   // ===== NO SESSION =====
   if (!session || session.syncStatus === 'reconciled') {
     return (
-      <div className="bg-slate-800 rounded-xl border border-slate-700 p-6">
-        <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-          <Play size={20} className="text-green-400" />
+      <div className="bg-surface rounded-xl border border-edge p-6">
+        <h3 className="text-lg font-bold text-content-primary mb-4 flex items-center gap-2">
+          <Play size={20} className="text-status-success" />
           Ouvrir la session du jour
         </h3>
 
         {!showBilletage ? (
           <button
             onClick={() => setShowBilletage(true)}
-            className="w-full py-3 bg-green-600 hover:bg-green-500 text-white rounded-lg font-semibold transition"
+            className="w-full py-3 bg-status-success hover:bg-status-success text-white rounded-lg font-semibold transition"
           >
             Commencer le billetage d'ouverture
           </button>
@@ -227,14 +228,14 @@ export default function OfflineDaySession({ agentId, agenceId }: OfflineDaySessi
             <div className="flex gap-3">
               <button
                 onClick={() => { setShowBilletage(false); setBilletage({}); }}
-                className="flex-1 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold transition"
+                className="flex-1 py-3 bg-surface-elevated hover:bg-surface-subtle text-content-primary rounded-lg font-semibold transition"
               >
                 Annuler
               </button>
               <button
                 onClick={handleOpenDay}
                 disabled={actionLoading || billetageTotal <= 0}
-                className="flex-1 py-3 bg-green-600 hover:bg-green-500 text-white rounded-lg font-semibold transition disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 py-3 bg-status-success hover:bg-status-success text-white rounded-lg font-semibold transition disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {actionLoading && <Loader2 size={16} className="animate-spin" />}
                 Ouvrir ({formatMoney(billetageTotal)})
@@ -251,18 +252,18 @@ export default function OfflineDaySession({ agentId, agenceId }: OfflineDaySessi
   const isClosed = session.syncStatus === 'closed';
 
   return (
-    <div className="bg-slate-800 rounded-xl border border-slate-700">
+    <div className="bg-surface rounded-xl border border-edge">
       {/* Header */}
-      <div className="p-4 border-b border-slate-700 flex items-center justify-between">
+      <div className="p-4 border-b border-edge flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className={`w-3 h-3 rounded-full ${isOpen ? 'bg-green-400 animate-pulse' : 'bg-amber-400'}`} />
-          <h3 className="text-lg font-bold text-white">
+          <div className={`w-3 h-3 rounded-full ${isOpen ? 'bg-status-success animate-pulse' : 'bg-status-warning'}`} />
+          <h3 className="text-lg font-bold text-content-primary">
             Session du {session.date}
           </h3>
         </div>
-        <div className="flex items-center gap-2 text-sm text-slate-400">
+        <div className="flex items-center gap-2 text-sm text-content-muted">
           {hasPending && (
-            <span className="flex items-center gap-1 text-amber-400">
+            <span className="flex items-center gap-1 text-status-warning">
               <WifiOff size={14} />
               {pendingCount} en attente
             </span>
@@ -273,47 +274,47 @@ export default function OfflineDaySession({ agentId, agenceId }: OfflineDaySessi
       </div>
 
       {/* Cash Balance */}
-      <div className="p-4 bg-gradient-to-r from-slate-800 to-slate-700">
+      <div className="p-4 bg-gradient-to-r from-surface to-surface-elevated">
         <div className="text-center">
-          <p className="text-slate-400 text-sm">Solde caisse actuel</p>
-          <p className="text-3xl font-bold text-white mt-1">
+          <p className="text-content-muted text-sm">Solde caisse actuel</p>
+          <p className="text-3xl font-bold text-content-primary mt-1">
             {formatMoney(session.currentCashBalance)}
           </p>
         </div>
 
         <div className="grid grid-cols-3 gap-4 mt-4">
           <div className="text-center">
-            <p className="text-xs text-slate-400">Ouverture</p>
-            <p className="text-sm font-semibold text-white">{formatMoney(session.openingBalance)}</p>
+            <p className="text-xs text-content-muted">Ouverture</p>
+            <p className="text-sm font-semibold text-content-primary">{formatMoney(session.openingBalance)}</p>
           </div>
           <div className="text-center">
-            <p className="text-xs text-green-400">Collectes</p>
-            <p className="text-sm font-semibold text-green-400">
+            <p className="text-xs text-status-success">Collectes</p>
+            <p className="text-sm font-semibold text-status-success">
               <TrendingUp size={12} className="inline mr-1" />
               {formatMoney(session.totalCollected)}
             </p>
           </div>
           <div className="text-center">
-            <p className="text-xs text-red-400">Decaissements</p>
-            <p className="text-sm font-semibold text-red-400">
+            <p className="text-xs text-status-danger">Decaissements</p>
+            <p className="text-sm font-semibold text-status-danger">
               <TrendingDown size={12} className="inline mr-1" />
               {formatMoney(session.totalDisbursed)}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center justify-center gap-4 mt-3 text-sm text-slate-400">
+        <div className="flex items-center justify-center gap-4 mt-3 text-sm text-content-muted">
           <span>{session.operationCount} operations</span>
-          <span className="text-slate-600">|</span>
+          <span className="text-content-muted">|</span>
           <span>Volume: {formatMoney(session.dailyVolume)}</span>
         </div>
       </div>
 
       {/* Reconciliation Warning */}
       {reconciliation?.hasDiscrepancy && (
-        <div className="px-4 py-3 bg-amber-500/10 border-b border-amber-500/20 flex items-center gap-2">
-          <AlertTriangle size={16} className="text-amber-400" />
-          <span className="text-sm text-amber-300">
+        <div className="px-4 py-3 bg-status-warning-bg border-b border-status-warning/20 flex items-center gap-2">
+          <AlertTriangle size={16} className="text-status-warning" />
+          <span className="text-sm text-status-warning">
             Ecart detecte entre le journal et le solde calcule.
           </span>
         </div>
@@ -326,14 +327,14 @@ export default function OfflineDaySession({ agentId, agenceId }: OfflineDaySessi
             <button
               onClick={() => journalSync.triggerSync()}
               disabled={journalSync.isSyncing || !hasPending}
-              className="flex-1 py-2 bg-blue-600/20 border border-blue-600/40 text-blue-400 rounded-lg text-sm font-medium transition hover:bg-blue-600/30 disabled:opacity-50 flex items-center justify-center gap-2"
+              className="flex-1 py-2 bg-status-info-bg border border-status-info/40 text-status-info rounded-lg text-sm font-medium transition hover:bg-status-info/30 disabled:opacity-50 flex items-center justify-center gap-2"
             >
               <RefreshCw size={14} className={journalSync.isSyncing ? 'animate-spin' : ''} />
               Synchroniser ({pendingCount})
             </button>
             <button
               onClick={() => setShowBilletage(true)}
-              className="flex-1 py-2 bg-red-600/20 border border-red-600/40 text-red-400 rounded-lg text-sm font-medium transition hover:bg-red-600/30 flex items-center justify-center gap-2"
+              className="flex-1 py-2 bg-status-danger-bg border border-status-danger/40 text-status-danger rounded-lg text-sm font-medium transition hover:bg-status-danger/30 flex items-center justify-center gap-2"
             >
               <StopCircle size={14} />
               Fermer la session
@@ -344,7 +345,7 @@ export default function OfflineDaySession({ agentId, agenceId }: OfflineDaySessi
         {/* Close Day Billetage */}
         {isOpen && showBilletage && (
           <div className="space-y-4">
-            <h4 className="font-semibold text-white flex items-center gap-2">
+            <h4 className="font-semibold text-content-primary flex items-center gap-2">
               <Banknote size={16} />
               Billetage de fermeture
             </h4>
@@ -357,23 +358,23 @@ export default function OfflineDaySession({ agentId, agenceId }: OfflineDaySessi
 
             {/* Expected vs Declared */}
             {billetageTotal > 0 && (
-              <div className="bg-slate-700/50 rounded-lg p-3">
+              <div className="bg-surface-elevated/50 rounded-lg p-3">
                 <div className="flex justify-between text-sm">
-                  <span className="text-slate-400">Solde attendu</span>
-                  <span className="text-white font-medium">{formatMoney(session.currentCashBalance)}</span>
+                  <span className="text-content-muted">Solde attendu</span>
+                  <span className="text-content-primary font-medium">{formatMoney(session.currentCashBalance)}</span>
                 </div>
                 <div className="flex justify-between text-sm mt-1">
-                  <span className="text-slate-400">Solde declare</span>
-                  <span className="text-white font-medium">{formatMoney(billetageTotal)}</span>
+                  <span className="text-content-muted">Solde declare</span>
+                  <span className="text-content-primary font-medium">{formatMoney(billetageTotal)}</span>
                 </div>
-                <div className="border-t border-slate-600 mt-2 pt-2 flex justify-between text-sm">
-                  <span className="text-slate-400">Ecart</span>
+                <div className="border-t border-edge-strong mt-2 pt-2 flex justify-between text-sm">
+                  <span className="text-content-muted">Ecart</span>
                   <span className={`font-bold ${
                     Math.abs(billetageTotal - session.currentCashBalance) < 0.01
-                      ? 'text-green-400'
-                      : 'text-amber-400'
+                      ? 'text-status-success'
+                      : 'text-status-warning'
                   }`}>
-                    {formatMoney(billetageTotal - session.currentCashBalance)} XAF
+                    {formatMoney(billetageTotal - session.currentCashBalance)}
                   </span>
                 </div>
               </div>
@@ -382,13 +383,13 @@ export default function OfflineDaySession({ agentId, agenceId }: OfflineDaySessi
             {/* Justification for discrepancy */}
             {billetageTotal > 0 && Math.abs(billetageTotal - session.currentCashBalance) > 0.01 && (
               <div>
-                <label className="block text-sm text-slate-300 mb-1">
+                <label className="block text-sm text-content-secondary mb-1">
                   Justification de l'ecart
                 </label>
                 <textarea
                   value={justification}
                   onChange={(e) => setJustification(e.target.value)}
-                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm"
+                  className="w-full bg-surface-elevated border border-edge-strong rounded-lg px-3 py-2 text-content-primary text-sm"
                   rows={2}
                   placeholder="Expliquez l'ecart..."
                 />
@@ -398,14 +399,14 @@ export default function OfflineDaySession({ agentId, agenceId }: OfflineDaySessi
             <div className="flex gap-3">
               <button
                 onClick={() => { setShowBilletage(false); setBilletage({}); setJustification(''); }}
-                className="flex-1 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition"
+                className="flex-1 py-2 bg-surface-elevated hover:bg-surface-subtle text-content-primary rounded-lg text-sm font-medium transition"
               >
                 Annuler
               </button>
               <button
                 onClick={handleCloseDay}
                 disabled={actionLoading || billetageTotal <= 0}
-                className="flex-1 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg text-sm font-semibold transition disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 py-2 bg-status-danger hover:bg-status-danger text-white rounded-lg text-sm font-semibold transition disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {actionLoading && <Loader2 size={14} className="animate-spin" />}
                 Fermer la session
@@ -416,29 +417,29 @@ export default function OfflineDaySession({ agentId, agenceId }: OfflineDaySessi
 
         {/* Closed Session Summary */}
         {isClosed && (
-          <div className="bg-slate-700/50 rounded-lg p-4">
+          <div className="bg-surface-elevated/50 rounded-lg p-4">
             <div className="flex items-center gap-2 mb-3">
               {session.discrepancy != null && Math.abs(session.discrepancy) < 0.01 ? (
-                <CheckCircle size={18} className="text-green-400" />
+                <CheckCircle size={18} className="text-status-success" />
               ) : (
-                <AlertTriangle size={18} className="text-amber-400" />
+                <AlertTriangle size={18} className="text-status-warning" />
               )}
-              <span className="text-white font-semibold">Session fermee</span>
+              <span className="text-content-primary font-semibold">Session fermee</span>
             </div>
 
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
-                <span className="text-slate-400">Fermeture</span>
-                <p className="text-white font-medium">{formatMoney(session.closingBalance || 0)}</p>
+                <span className="text-content-muted">Fermeture</span>
+                <p className="text-content-primary font-medium">{formatMoney(session.closingBalance || 0)}</p>
               </div>
               <div>
-                <span className="text-slate-400">Ecart</span>
+                <span className="text-content-muted">Ecart</span>
                 <p className={`font-medium ${
                   session.discrepancy != null && Math.abs(session.discrepancy) < 0.01
-                    ? 'text-green-400'
-                    : 'text-amber-400'
+                    ? 'text-status-success'
+                    : 'text-status-warning'
                 }`}>
-                  {formatMoney(session.discrepancy || 0)} XAF
+                  {formatMoney(session.discrepancy || 0)}
                 </p>
               </div>
             </div>
@@ -447,7 +448,7 @@ export default function OfflineDaySession({ agentId, agenceId }: OfflineDaySessi
               <button
                 onClick={() => journalSync.triggerSync()}
                 disabled={journalSync.isSyncing}
-                className="w-full mt-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition flex items-center justify-center gap-2"
+                className="w-full mt-3 py-2 bg-status-info hover:bg-status-info text-white rounded-lg text-sm font-medium transition flex items-center justify-center gap-2"
               >
                 <RefreshCw size={14} className={journalSync.isSyncing ? 'animate-spin' : ''} />
                 Synchroniser maintenant ({pendingCount} en attente)
@@ -475,7 +476,7 @@ function BilletageInput({
 }) {
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-3 gap-2 text-xs text-slate-400 px-1">
+      <div className="grid grid-cols-3 gap-2 text-xs text-content-muted px-1">
         <span>Coupure</span>
         <span>Nombre</span>
         <span className="text-right">Sous-total</span>
@@ -487,25 +488,25 @@ function BilletageInput({
 
         return (
           <div key={value} className="grid grid-cols-3 gap-2 items-center">
-            <span className="text-sm text-slate-300 font-medium">{label} XAF</span>
+            <span className="text-sm text-content-secondary font-medium">{label} {currencySymbol()}</span>
             <input
               type="number"
               min={0}
               value={count || ''}
               onChange={(e) => onChange(String(value), parseInt(e.target.value) || 0)}
-              className="bg-slate-700 border border-slate-600 rounded px-2 py-1.5 text-white text-sm text-center w-full"
+              className="bg-surface-elevated border border-edge-strong rounded px-2 py-1.5 text-content-primary text-sm text-center w-full"
               placeholder="0"
             />
-            <span className="text-sm text-slate-400 text-right">
+            <span className="text-sm text-content-muted text-right">
               {subtotal > 0 ? formatMoney(subtotal) : '-'}
             </span>
           </div>
         );
       })}
 
-      <div className="border-t border-slate-600 pt-2 flex justify-between items-center">
-        <span className="text-sm font-semibold text-slate-300">Total</span>
-        <span className="text-lg font-bold text-white">{formatMoney(total)}</span>
+      <div className="border-t border-edge-strong pt-2 flex justify-between items-center">
+        <span className="text-sm font-semibold text-content-secondary">Total</span>
+        <span className="text-lg font-bold text-content-primary">{formatMoney(total)}</span>
       </div>
     </div>
   );

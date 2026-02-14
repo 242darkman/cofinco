@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { addPdfLogoHeader, addPdfLogoFooter } from '@/lib/pdf-logo';
+import { useBranding } from '@/contexts/BrandingContext';
 import { formatMoney as formatCurrency, currencyCode } from '@shared/config/currency';
 // P4.1: Lazy-load heavy export libraries
 import { loadPDFLibraries } from '@/lib/lazy-export';
@@ -97,14 +98,14 @@ const STEPS = [
 ];
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  DRAFT: { label: 'Brouillon', color: 'bg-slate-500' },
-  PENDING: { label: 'En attente', color: 'bg-yellow-500' },
-  SCHEDULED: { label: 'Planifié', color: 'bg-blue-500' },
-  PRE_FLIGHT_CHECK: { label: 'Vérifications', color: 'bg-purple-500' },
-  PROCESSING: { label: 'En cours', color: 'bg-orange-500' },
-  COMPLETED: { label: 'Terminé', color: 'bg-green-500' },
-  FAILED: { label: 'Échoué', color: 'bg-red-500' },
-  CANCELLED: { label: 'Annulé', color: 'bg-gray-500' },
+  DRAFT: { label: 'Brouillon', color: 'bg-surface-muted0' },
+  PENDING: { label: 'En attente', color: 'bg-status-warning' },
+  SCHEDULED: { label: 'Planifié', color: 'bg-status-info' },
+  PRE_FLIGHT_CHECK: { label: 'Vérifications', color: 'bg-status-info' },
+  PROCESSING: { label: 'En cours', color: 'bg-status-warning' },
+  COMPLETED: { label: 'Terminé', color: 'bg-status-success' },
+  FAILED: { label: 'Échoué', color: 'bg-status-danger' },
+  CANCELLED: { label: 'Annulé', color: 'bg-surface-muted0' },
 };
 
 // ============================================
@@ -113,6 +114,7 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
 
 export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess }: MigrationWizardProps) {
   const queryClient = useQueryClient();
+  const { branding } = useBranding();
 
   // State
   const [currentStep, setCurrentStep] = useState(0);
@@ -379,6 +381,7 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
         title: "Rapport de Migration d'Agence",
         subtitle: `Réf: ${migrationStatus.reference} — Statut: ${migrationStatus.status}`,
         dateRight: completedDate ? `Terminée le: ${completedDate}` : undefined,
+        appName: branding.appName,
       });
 
       // Source agency info
@@ -492,7 +495,7 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
       }
 
       // Footer with logo
-      addPdfLogoFooter(doc, 'Rapport de Migration');
+      addPdfLogoFooter(doc, 'Rapport de Migration', branding.appName);
 
       doc.save(`rapport-migration-${migrationStatus.reference}-${Date.now()}.pdf`);
       toast.success('Rapport PDF téléchargé');
@@ -564,23 +567,23 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
       <div className="space-y-6">
         {/* Stepper Header */}
         <div className="flex justify-between relative overflow-x-auto pb-2">
-          <div className="absolute top-5 left-0 w-full h-0.5 bg-slate-700 -z-10" />
+          <div className="absolute top-5 left-0 w-full h-0.5 bg-surface-elevated -z-10" />
           {STEPS.map((step, idx) => {
             const Icon = step.icon;
             const isActive = idx === currentStep;
             const isCompleted = idx < currentStep;
 
             return (
-              <div key={step.id} className="flex flex-col items-center bg-slate-800 px-2 min-w-[70px]">
+              <div key={step.id} className="flex flex-col items-center bg-surface px-2 min-w-[70px]">
                 <div className={`
                   w-10 h-10 rounded-full flex items-center justify-center border-2 transition-colors
-                  ${isActive ? 'border-blue-500 bg-blue-500/20 text-blue-400' :
-                    isCompleted ? 'border-green-500 bg-green-500/20 text-green-400' :
-                      'border-slate-600 bg-slate-800 text-slate-500'}
+                  ${isActive ? 'border-status-info bg-status-info-bg text-status-info' :
+                    isCompleted ? 'border-status-success bg-status-success-bg text-status-success' :
+                      'border-edge-strong bg-surface text-content-muted'}
                 `}>
                   <Icon size={18} />
                 </div>
-                <span className={`text-xs mt-2 font-medium text-center ${isActive ? 'text-white' : 'text-slate-500'}`}>
+                <span className={`text-xs mt-2 font-medium text-center ${isActive ? 'text-content-primary' : 'text-content-muted'}`}>
                   {step.title}
                 </span>
               </div>
@@ -593,29 +596,29 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
           {/* Processing State */}
           {isProcessing && (
             <div className="flex flex-col items-center justify-center p-8 space-y-4">
-              <Loader2 className="animate-spin text-blue-500" size={48} />
-              <h3 className="text-xl font-bold text-white">Migration en cours...</h3>
-              <p className="text-slate-400 text-sm">{migrationStatus?.currentStep || 'Initialisation'}</p>
+              <Loader2 className="animate-spin text-status-info" size={48} />
+              <h3 className="text-xl font-bold text-content-primary">Migration en cours...</h3>
+              <p className="text-content-muted text-sm">{migrationStatus?.currentStep || 'Initialisation'}</p>
               <div className="w-full max-w-md">
                 <ProgressBar value={migrationStatus?.progress || 0} max={100} color="primary" size="md" />
               </div>
-              <p className="text-slate-400 text-center">
+              <p className="text-content-muted text-center">
                 Ne fermez pas cette fenêtre. Progression: {migrationStatus?.progress || 0}%
               </p>
 
               {/* Steps Log */}
               {migrationStatus?.logs && migrationStatus.logs.length > 0 && (
-                <div className="w-full max-w-md mt-4 bg-slate-900 rounded-lg p-4 max-h-40 overflow-y-auto">
+                <div className="w-full max-w-md mt-4 bg-surface-base rounded-lg p-4 max-h-40 overflow-y-auto">
                   {migrationStatus.logs.map((log, idx) => (
                     <div key={idx} className="flex items-center gap-2 text-sm py-1">
                       {log.success ? (
-                        <CheckCircle className="text-green-500 shrink-0" size={14} />
+                        <CheckCircle className="text-status-success shrink-0" size={14} />
                       ) : (
-                        <X className="text-red-500 shrink-0" size={14} />
+                        <X className="text-status-danger shrink-0" size={14} />
                       )}
-                      <span className="text-slate-300">{log.step}</span>
+                      <span className="text-content-secondary">{log.step}</span>
                       {log.count !== undefined && (
-                        <span className="text-slate-500">({log.count})</span>
+                        <span className="text-content-muted">({log.count})</span>
                       )}
                     </div>
                   ))}
@@ -627,38 +630,38 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
           {/* Completed State */}
           {isCompleted && (
             <div className="flex flex-col items-center justify-center p-8 space-y-4">
-              <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center">
-                <CheckCircle className="text-green-500" size={48} />
+              <div className="w-20 h-20 rounded-full bg-status-success-bg flex items-center justify-center">
+                <CheckCircle className="text-status-success" size={48} />
               </div>
-              <h3 className="text-xl font-bold text-white">Migration Terminée !</h3>
-              <p className="text-slate-400 text-center">
+              <h3 className="text-xl font-bold text-content-primary">Migration Terminée !</h3>
+              <p className="text-content-muted text-center">
                 L'agence {sourceAgence.nom} a été fermée avec succès.<br />
                 Toutes les données ont été transférées.
               </p>
 
               {migrationStatus?.report && (
-                <div className="w-full max-w-md bg-slate-900 rounded-lg p-4 mt-4">
-                  <h4 className="font-medium text-white mb-3">Résumé de la Migration</h4>
+                <div className="w-full max-w-md bg-surface-base rounded-lg p-4 mt-4">
+                  <h4 className="font-medium text-content-primary mb-3">Résumé de la Migration</h4>
                   <div className="grid grid-cols-2 gap-2 text-sm">
-                    <span className="text-slate-400">Clients migrés:</span>
-                    <span className="text-white">{migrationStatus.report.volumetry?.clients || 0}</span>
-                    <span className="text-slate-400">Comptes migrés:</span>
-                    <span className="text-white">{migrationStatus.report.volumetry?.comptes || 0}</span>
-                    <span className="text-slate-400">Crédits migrés:</span>
-                    <span className="text-white">{migrationStatus.report.volumetry?.credits || 0}</span>
-                    <span className="text-slate-400">Fonds transférés:</span>
-                    <span className="text-white">{formatMoney(migrationStatus.report.financials?.soldesCoffresTransferes || 0)}</span>
+                    <span className="text-content-muted">Clients migrés:</span>
+                    <span className="text-content-primary">{migrationStatus.report.volumetry?.clients || 0}</span>
+                    <span className="text-content-muted">Comptes migrés:</span>
+                    <span className="text-content-primary">{migrationStatus.report.volumetry?.comptes || 0}</span>
+                    <span className="text-content-muted">Crédits migrés:</span>
+                    <span className="text-content-primary">{migrationStatus.report.volumetry?.credits || 0}</span>
+                    <span className="text-content-muted">Fonds transférés:</span>
+                    <span className="text-content-primary">{formatMoney(migrationStatus.report.financials?.soldesCoffresTransferes || 0)}</span>
                   </div>
                 </div>
               )}
 
               {canRollback && (
-                <div className="w-full max-w-md bg-amber-500/10 rounded-lg p-4 border border-amber-500/20">
+                <div className="w-full max-w-md bg-status-warning-bg rounded-lg p-4 border border-status-warning/20">
                   <div className="flex items-start gap-3">
-                    <AlertTriangle className="text-amber-400 shrink-0 mt-0.5" size={18} />
+                    <AlertTriangle className="text-status-warning shrink-0 mt-0.5" size={18} />
                     <div className="flex-1">
-                      <h4 className="font-medium text-amber-400 text-sm">Rollback disponible</h4>
-                      <p className="text-xs text-slate-400 mt-1">
+                      <h4 className="font-medium text-status-warning text-sm">Rollback disponible</h4>
+                      <p className="text-xs text-content-muted mt-1">
                         Vous pouvez annuler cette migration dans les {Math.floor(rollbackHoursLeft)}h{Math.round((rollbackHoursLeft % 1) * 60).toString().padStart(2, '0')} restantes.
                         Cette action restaurera toutes les données à leur état d'origine.
                       </p>
@@ -699,12 +702,12 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
           {/* Failed State */}
           {isFailed && (
             <div className="flex flex-col items-center justify-center p-8 space-y-4">
-              <div className="w-20 h-20 rounded-full bg-red-500/20 flex items-center justify-center">
-                <X className="text-red-500" size={48} />
+              <div className="w-20 h-20 rounded-full bg-status-danger-bg flex items-center justify-center">
+                <X className="text-status-danger" size={48} />
               </div>
-              <h3 className="text-xl font-bold text-white">Migration Échouée</h3>
-              <p className="text-red-400 text-center">{migrationStatus?.error}</p>
-              <p className="text-slate-400 text-sm text-center">
+              <h3 className="text-xl font-bold text-content-primary">Migration Échouée</h3>
+              <p className="text-status-danger text-center">{migrationStatus?.error}</p>
+              <p className="text-content-muted text-sm text-center">
                 La migration a été annulée. Aucune donnée n'a été modifiée.
               </p>
               <div className="flex gap-3 mt-4">
@@ -729,18 +732,18 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
           {/* Scheduled State */}
           {isScheduled && (
             <div className="flex flex-col items-center justify-center p-8 space-y-4">
-              <div className="w-20 h-20 rounded-full bg-blue-500/20 flex items-center justify-center">
-                <Calendar className="text-blue-500" size={48} />
+              <div className="w-20 h-20 rounded-full bg-status-info-bg flex items-center justify-center">
+                <Calendar className="text-status-info" size={48} />
               </div>
-              <h3 className="text-xl font-bold text-white">Migration Planifiée</h3>
-              <p className="text-slate-400 text-center">
+              <h3 className="text-xl font-bold text-content-primary">Migration Planifiée</h3>
+              <p className="text-content-muted text-center">
                 La migration sera exécutée automatiquement le:<br />
-                <span className="text-white font-medium">
+                <span className="text-content-primary font-medium">
                   {migrationStatus?.scheduledAt &&
                     format(new Date(migrationStatus.scheduledAt), "EEEE d MMMM yyyy 'à' HH:mm", { locale: fr })}
                 </span>
               </p>
-              <p className="text-amber-400 text-sm text-center flex items-center gap-2">
+              <p className="text-status-warning text-sm text-center flex items-center gap-2">
                 <AlertCircle size={16} />
                 L'agence est maintenant en mode "Lecture seule"
               </p>
@@ -765,11 +768,11 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
               {/* Step 0: Clients */}
               {currentStep === 0 && (
                 <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
-                  <div className="bg-blue-500/10 p-4 rounded-lg flex gap-3 border border-blue-500/20 font-sans">
-                    <Users className="text-blue-400 shrink-0" />
+                  <div className="bg-status-info-bg p-4 rounded-lg flex gap-3 border border-status-info/20 font-sans">
+                    <Users className="text-status-info shrink-0" />
                     <div>
-                      <h4 className="font-bold text-blue-400">Transfert de la Clientèle</h4>
-                      <p className="text-sm text-slate-300">
+                      <h4 className="font-bold text-status-info">Transfert de la Clientèle</h4>
+                      <p className="text-sm text-content-secondary">
                         Sélectionnez l'agence qui reprendra la gestion des clients, comptes, crédits et tontines de {sourceAgence.nom}.
                       </p>
                     </div>
@@ -788,11 +791,11 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
               {/* Step 1: Employees */}
               {currentStep === 1 && (
                 <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
-                  <div className="bg-purple-500/10 p-4 rounded-lg flex gap-3 border border-purple-500/20 font-sans">
-                    <Building2 className="text-purple-400 shrink-0" />
+                  <div className="bg-status-info-bg p-4 rounded-lg flex gap-3 border border-status-info/20 font-sans">
+                    <Building2 className="text-status-info shrink-0" />
                     <div>
-                      <h4 className="font-bold text-purple-400">Réaffectation du Personnel</h4>
-                      <p className="text-sm text-slate-300">
+                      <h4 className="font-bold text-status-info">Réaffectation du Personnel</h4>
+                      <p className="text-sm text-content-secondary">
                         Les employés seront rattachés administrativement à la nouvelle agence.
                       </p>
                     </div>
@@ -811,11 +814,11 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
               {/* Step 2: Treasury */}
               {currentStep === 2 && (
                 <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
-                  <div className="bg-amber-500/10 p-4 rounded-lg flex gap-3 border border-amber-500/20 font-sans">
-                    <Receipt className="text-amber-400 shrink-0" />
+                  <div className="bg-status-warning-bg p-4 rounded-lg flex gap-3 border border-status-warning/20 font-sans">
+                    <Receipt className="text-status-warning shrink-0" />
                     <div>
-                      <h4 className="font-bold text-amber-400">Transfert de Fonds (Trésorerie)</h4>
-                      <p className="text-sm text-slate-300">
+                      <h4 className="font-bold text-status-warning">Transfert de Fonds (Trésorerie)</h4>
+                      <p className="text-sm text-content-secondary">
                         Le solde du coffre-fort sera transféré comptablement vers le coffre de l'agence cible.
                       </p>
                     </div>
@@ -834,54 +837,54 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
               {/* Step 3: Schedule */}
               {currentStep === 3 && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
-                  <div className="bg-indigo-500/10 p-4 rounded-lg flex gap-3 border border-indigo-500/20 font-sans">
-                    <Calendar className="text-indigo-400 shrink-0" />
+                  <div className="bg-accent/10 p-4 rounded-lg flex gap-3 border border-accent/20 font-sans">
+                    <Calendar className="text-accent shrink-0" />
                     <div>
-                      <h4 className="font-bold text-indigo-400">Planification de l'Exécution</h4>
-                      <p className="text-sm text-slate-300">
+                      <h4 className="font-bold text-accent">Planification de l'Exécution</h4>
+                      <p className="text-sm text-content-secondary">
                         Choisissez quand effectuer la migration. Une planification différée permet de préparer l'équipe.
                       </p>
                     </div>
                   </div>
 
                   <div className="space-y-4">
-                    <label className="flex items-center gap-3 p-4 bg-slate-900 rounded-lg cursor-pointer border border-slate-700 hover:border-blue-500 transition-colors">
+                    <label className="flex items-center gap-3 p-4 bg-surface-base rounded-lg cursor-pointer border border-edge hover:border-status-info transition-colors">
                       <input
                         type="radio"
                         name="schedule"
                         checked={executeNow}
                         onChange={() => setExecuteNow(true)}
-                        className="w-5 h-5 text-blue-500"
+                        className="w-5 h-5 text-status-info"
                       />
                       <div>
-                        <span className="font-medium text-white">Exécuter maintenant</span>
-                        <p className="text-sm text-slate-400">La migration démarrera immédiatement après confirmation</p>
+                        <span className="font-medium text-content-primary">Exécuter maintenant</span>
+                        <p className="text-sm text-content-muted">La migration démarrera immédiatement après confirmation</p>
                       </div>
                     </label>
 
-                    <label className="flex items-center gap-3 p-4 bg-slate-900 rounded-lg cursor-pointer border border-slate-700 hover:border-blue-500 transition-colors">
+                    <label className="flex items-center gap-3 p-4 bg-surface-base rounded-lg cursor-pointer border border-edge hover:border-status-info transition-colors">
                       <input
                         type="radio"
                         name="schedule"
                         checked={!executeNow}
                         onChange={() => setExecuteNow(false)}
-                        className="w-5 h-5 text-blue-500"
+                        className="w-5 h-5 text-status-info"
                       />
                       <div className="flex-1">
-                        <span className="font-medium text-white">Planifier pour plus tard</span>
-                        <p className="text-sm text-slate-400">L'agence passera en mode "lecture seule" jusqu'à la migration</p>
+                        <span className="font-medium text-content-primary">Planifier pour plus tard</span>
+                        <p className="text-sm text-content-muted">L'agence passera en mode "lecture seule" jusqu'à la migration</p>
                       </div>
                     </label>
 
                     {!executeNow && (
                       <div className="ml-8 mt-2">
-                        <label className="block text-sm text-slate-400 mb-2">Date et heure d'exécution</label>
+                        <label className="block text-sm text-content-muted mb-2">Date et heure d'exécution</label>
                         <input
                           type="datetime-local"
                           value={scheduledAt}
                           onChange={(e) => setScheduledAt(e.target.value)}
                           min={new Date().toISOString().slice(0, 16)}
-                          className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-white focus:border-blue-500 focus:outline-none"
+                          className="w-full bg-surface border border-edge-strong rounded-lg px-4 py-2 text-content-primary focus:border-accent focus:outline-none"
                         />
                       </div>
                     )}
@@ -894,16 +897,16 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
                 <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
                   {isAnalyzing ? (
                     <div className="flex flex-col items-center justify-center p-8">
-                      <Loader2 className="animate-spin text-blue-500 mb-4" size={40} />
-                      <p className="text-slate-300">Analyse en cours...</p>
+                      <Loader2 className="animate-spin text-status-info mb-4" size={40} />
+                      <p className="text-content-secondary">Analyse en cours...</p>
                     </div>
                   ) : dryRunFailed ? (
                     <div className="flex flex-col items-center justify-center p-8 space-y-4">
-                      <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center">
-                        <X className="text-red-500" size={32} />
+                      <div className="w-16 h-16 rounded-full bg-status-danger-bg flex items-center justify-center">
+                        <X className="text-status-danger" size={32} />
                       </div>
-                      <h4 className="text-lg font-bold text-white">Échec de l'analyse</h4>
-                      <p className="text-slate-400 text-sm text-center">
+                      <h4 className="text-lg font-bold text-content-primary">Échec de l'analyse</h4>
+                      <p className="text-content-muted text-sm text-center">
                         L'analyse préalable a échoué. Vous pouvez réessayer sans avoir à recréer la migration.
                       </p>
                       <div className="flex gap-3">
@@ -923,27 +926,27 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
                   ) : dryRunResult ? (
                     <>
                       {/* Pre-flight checks */}
-                      <div className="bg-slate-900 rounded-lg p-4 border border-slate-700">
-                        <h4 className="font-medium text-white mb-3 flex items-center gap-2">
+                      <div className="bg-surface-base rounded-lg p-4 border border-edge">
+                        <h4 className="font-medium text-content-primary mb-3 flex items-center gap-2">
                           <Shield size={18} />
                           Vérifications Préalables
                         </h4>
                         <div className="space-y-2">
                           {dryRunResult.preFlightChecks.map((check, idx) => (
-                            <div key={idx} className="flex items-start gap-3 p-2 rounded bg-slate-800">
+                            <div key={idx} className="flex items-start gap-3 p-2 rounded bg-surface">
                               {check.passed ? (
-                                <CheckCircle className="text-green-500 shrink-0 mt-0.5" size={18} />
+                                <CheckCircle className="text-status-success shrink-0 mt-0.5" size={18} />
                               ) : check.blocking ? (
-                                <X className="text-red-500 shrink-0 mt-0.5" size={18} />
+                                <X className="text-status-danger shrink-0 mt-0.5" size={18} />
                               ) : (
-                                <AlertCircle className="text-yellow-500 shrink-0 mt-0.5" size={18} />
+                                <AlertCircle className="text-status-warning shrink-0 mt-0.5" size={18} />
                               )}
                               <div className="flex-1">
-                                <span className={check.passed ? 'text-green-400' : check.blocking ? 'text-red-400' : 'text-yellow-400'}>
+                                <span className={check.passed ? 'text-status-success' : check.blocking ? 'text-status-danger' : 'text-status-warning'}>
                                   {check.message}
                                 </span>
                                 {!check.passed && check.resolution && (
-                                  <p className="text-xs text-slate-400 mt-1">{check.resolution}</p>
+                                  <p className="text-xs text-content-muted mt-1">{check.resolution}</p>
                                 )}
                               </div>
                             </div>
@@ -952,65 +955,65 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
                       </div>
 
                       {/* Volumetry */}
-                      <div className="bg-slate-900 rounded-lg p-4 border border-slate-700">
-                        <h4 className="font-medium text-white mb-3 flex items-center gap-2">
+                      <div className="bg-surface-base rounded-lg p-4 border border-edge">
+                        <h4 className="font-medium text-content-primary mb-3 flex items-center gap-2">
                           <FileText size={18} />
                           Données à Migrer
                         </h4>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                          <div className="text-center p-3 bg-slate-800 rounded-lg">
-                            <div className="text-2xl font-bold text-blue-400">{dryRunResult.volumetry.clients}</div>
-                            <div className="text-xs text-slate-400">Clients</div>
+                          <div className="text-center p-3 bg-surface rounded-lg">
+                            <div className="text-2xl font-bold text-status-info">{dryRunResult.volumetry.clients}</div>
+                            <div className="text-xs text-content-muted">Clients</div>
                           </div>
-                          <div className="text-center p-3 bg-slate-800 rounded-lg">
-                            <div className="text-2xl font-bold text-green-400">{dryRunResult.volumetry.comptes}</div>
-                            <div className="text-xs text-slate-400">Comptes</div>
+                          <div className="text-center p-3 bg-surface rounded-lg">
+                            <div className="text-2xl font-bold text-status-success">{dryRunResult.volumetry.comptes}</div>
+                            <div className="text-xs text-content-muted">Comptes</div>
                           </div>
-                          <div className="text-center p-3 bg-slate-800 rounded-lg">
-                            <div className="text-2xl font-bold text-amber-400">{dryRunResult.volumetry.credits}</div>
-                            <div className="text-xs text-slate-400">Crédits</div>
+                          <div className="text-center p-3 bg-surface rounded-lg">
+                            <div className="text-2xl font-bold text-status-warning">{dryRunResult.volumetry.credits}</div>
+                            <div className="text-xs text-content-muted">Crédits</div>
                           </div>
-                          <div className="text-center p-3 bg-slate-800 rounded-lg">
-                            <div className="text-2xl font-bold text-purple-400">{dryRunResult.volumetry.employes}</div>
-                            <div className="text-xs text-slate-400">Employés</div>
+                          <div className="text-center p-3 bg-surface rounded-lg">
+                            <div className="text-2xl font-bold text-status-info">{dryRunResult.volumetry.employes}</div>
+                            <div className="text-xs text-content-muted">Employés</div>
                           </div>
                         </div>
                       </div>
 
                       {/* Financials */}
-                      <div className="bg-slate-900 rounded-lg p-4 border border-slate-700">
-                        <h4 className="font-medium text-white mb-3 flex items-center gap-2">
+                      <div className="bg-surface-base rounded-lg p-4 border border-edge">
+                        <h4 className="font-medium text-content-primary mb-3 flex items-center gap-2">
                           <Receipt size={18} />
                           Impact Financier
                         </h4>
                         <div className="grid grid-cols-2 gap-4 text-sm">
                           <div className="flex justify-between">
-                            <span className="text-slate-400">Solde coffre à transférer:</span>
-                            <span className="text-white font-medium">{formatMoney(dryRunResult.financials.soldesCoffresTransferes)}</span>
+                            <span className="text-content-muted">Solde coffre à transférer:</span>
+                            <span className="text-content-primary font-medium">{formatMoney(dryRunResult.financials.soldesCoffresTransferes)}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-slate-400">Total soldes comptes:</span>
-                            <span className="text-white font-medium">{formatMoney(dryRunResult.financials.totalSoldesComptes)}</span>
+                            <span className="text-content-muted">Total soldes comptes:</span>
+                            <span className="text-content-primary font-medium">{formatMoney(dryRunResult.financials.totalSoldesComptes)}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-slate-400">Crédits en cours:</span>
-                            <span className="text-white font-medium">{formatMoney(dryRunResult.financials.totalCreditsEnCours)}</span>
+                            <span className="text-content-muted">Crédits en cours:</span>
+                            <span className="text-content-primary font-medium">{formatMoney(dryRunResult.financials.totalCreditsEnCours)}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-slate-400">Demandes en attente:</span>
-                            <span className="text-white font-medium">{formatMoney(dryRunResult.financials.totalDemandesEnAttente)}</span>
+                            <span className="text-content-muted">Demandes en attente:</span>
+                            <span className="text-content-primary font-medium">{formatMoney(dryRunResult.financials.totalDemandesEnAttente)}</span>
                           </div>
                         </div>
                       </div>
 
                       {/* Warnings */}
                       {dryRunResult.warnings.length > 0 && (
-                        <div className="bg-yellow-500/10 rounded-lg p-4 border border-yellow-500/20">
-                          <h4 className="font-medium text-yellow-400 mb-2 flex items-center gap-2">
+                        <div className="bg-status-warning-bg rounded-lg p-4 border border-status-warning/20">
+                          <h4 className="font-medium text-status-warning mb-2 flex items-center gap-2">
                             <AlertTriangle size={18} />
                             Avertissements
                           </h4>
-                          <ul className="text-sm text-slate-300 space-y-1">
+                          <ul className="text-sm text-content-secondary space-y-1">
                             {dryRunResult.warnings.map((w, idx) => (
                               <li key={idx}>• {w}</li>
                             ))}
@@ -1020,12 +1023,12 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
 
                       {/* Can Proceed? */}
                       {!dryRunResult.canProceed && (
-                        <div className="bg-red-500/10 rounded-lg p-4 border border-red-500/20">
-                          <h4 className="font-medium text-red-400 mb-2 flex items-center gap-2">
+                        <div className="bg-status-danger-bg rounded-lg p-4 border border-status-danger/20">
+                          <h4 className="font-medium text-status-danger mb-2 flex items-center gap-2">
                             <Ban size={18} />
                             Migration Bloquée
                           </h4>
-                          <ul className="text-sm text-slate-300 space-y-1">
+                          <ul className="text-sm text-content-secondary space-y-1">
                             {dryRunResult.blockingReasons.map((r, idx) => (
                               <li key={idx}>• {r}</li>
                             ))}
@@ -1040,34 +1043,34 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
               {/* Step 5: Confirmation */}
               {currentStep === 5 && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
-                  <div className="bg-red-500/10 p-4 rounded-lg flex gap-3 border border-red-500/20">
-                    <AlertTriangle className="text-red-400 shrink-0" />
+                  <div className="bg-status-danger-bg p-4 rounded-lg flex gap-3 border border-status-danger/20">
+                    <AlertTriangle className="text-status-danger shrink-0" />
                     <div>
-                      <h4 className="font-bold text-red-400">Attention : Action Irréversible</h4>
-                      <p className="text-sm text-slate-300">
+                      <h4 className="font-bold text-status-danger">Attention : Action Irréversible</h4>
+                      <p className="text-sm text-content-secondary">
                         Une fois confirmée, l'agence <strong>{sourceAgence.nom}</strong> sera définitivement fermée.
                       </p>
                     </div>
                   </div>
 
-                  <div className="bg-slate-900 rounded-lg p-4 space-y-3 border border-slate-700">
-                    <h4 className="font-medium text-white border-b border-slate-700 pb-2">Récapitulatif Final</h4>
+                  <div className="bg-surface-base rounded-lg p-4 space-y-3 border border-edge">
+                    <h4 className="font-medium text-content-primary border-b border-edge pb-2">Récapitulatif Final</h4>
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
-                        <span className="text-slate-400">Clients, Comptes, Crédits vers:</span>
-                        <span className="text-white">{agences?.find((a: Agency) => a.id === targetClients)?.nom}</span>
+                        <span className="text-content-muted">Clients, Comptes, Crédits vers:</span>
+                        <span className="text-content-primary">{agences?.find((a: Agency) => a.id === targetClients)?.nom}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-slate-400">Employés vers:</span>
-                        <span className="text-white">{agences?.find((a: Agency) => a.id === targetEmployees)?.nom}</span>
+                        <span className="text-content-muted">Employés vers:</span>
+                        <span className="text-content-primary">{agences?.find((a: Agency) => a.id === targetEmployees)?.nom}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-slate-400">Fonds vers:</span>
-                        <span className="text-white">{agences?.find((a: Agency) => a.id === targetTreasury)?.nom}</span>
+                        <span className="text-content-muted">Fonds vers:</span>
+                        <span className="text-content-primary">{agences?.find((a: Agency) => a.id === targetTreasury)?.nom}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-slate-400">Exécution:</span>
-                        <span className="text-white">
+                        <span className="text-content-muted">Exécution:</span>
+                        <span className="text-content-primary">
                           {executeNow ? 'Immédiate' : format(new Date(scheduledAt), "d MMM yyyy 'à' HH:mm", { locale: fr })}
                         </span>
                       </div>
@@ -1075,23 +1078,23 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
                   </div>
 
                   {dryRunResult && (
-                    <div className="bg-slate-900 rounded-lg p-4 border border-slate-700">
+                    <div className="bg-surface-base rounded-lg p-4 border border-edge">
                       <div className="grid grid-cols-4 gap-4 text-center">
                         <div>
-                          <div className="text-xl font-bold text-blue-400">{dryRunResult.volumetry.clients}</div>
-                          <div className="text-xs text-slate-400">Clients</div>
+                          <div className="text-xl font-bold text-status-info">{dryRunResult.volumetry.clients}</div>
+                          <div className="text-xs text-content-muted">Clients</div>
                         </div>
                         <div>
-                          <div className="text-xl font-bold text-green-400">{dryRunResult.volumetry.comptes}</div>
-                          <div className="text-xs text-slate-400">Comptes</div>
+                          <div className="text-xl font-bold text-status-success">{dryRunResult.volumetry.comptes}</div>
+                          <div className="text-xs text-content-muted">Comptes</div>
                         </div>
                         <div>
-                          <div className="text-xl font-bold text-amber-400">{dryRunResult.volumetry.credits}</div>
-                          <div className="text-xs text-slate-400">Crédits</div>
+                          <div className="text-xl font-bold text-status-warning">{dryRunResult.volumetry.credits}</div>
+                          <div className="text-xs text-content-muted">Crédits</div>
                         </div>
                         <div>
-                          <div className="text-xl font-bold text-purple-400">{formatMoney(dryRunResult.financials.soldesCoffresTransferes)}</div>
-                          <div className="text-xs text-slate-400">Fonds</div>
+                          <div className="text-xl font-bold text-status-info">{formatMoney(dryRunResult.financials.soldesCoffresTransferes)}</div>
+                          <div className="text-xs text-content-muted">Fonds</div>
                         </div>
                       </div>
                     </div>
@@ -1104,7 +1107,7 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
 
         {/* Footer */}
         {!isProcessing && !isCompleted && !isFailed && !isScheduled && (
-          <div className="space-y-2 pt-4 border-t border-slate-700">
+          <div className="space-y-2 pt-4 border-t border-edge">
             <div className="flex justify-between">
               <Button
                 variant="outline"
@@ -1131,7 +1134,7 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
                 )}
               </Button>
             </div>
-            <p className="text-xs text-slate-600 text-center">
+            <p className="text-xs text-content-muted text-center">
               Raccourcis : ← Retour · → ou Entrée pour avancer
             </p>
           </div>
@@ -1141,16 +1144,16 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
         {showCancelPrompt && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
             <div className="fixed inset-0 bg-black/40" onClick={() => setShowCancelPrompt(false)} />
-            <div className="relative z-[210] bg-slate-800 rounded-xl border border-slate-700 p-6 w-full max-w-md shadow-xl animate-in fade-in zoom-in-95">
-              <h4 className="font-bold text-white mb-2">Raison de l'annulation</h4>
-              <p className="text-sm text-slate-400 mb-4">
+            <div className="relative z-[210] bg-surface rounded-xl border border-edge p-6 w-full max-w-md shadow-xl animate-in fade-in zoom-in-95">
+              <h4 className="font-bold text-content-primary mb-2">Raison de l'annulation</h4>
+              <p className="text-sm text-content-muted mb-4">
                 Veuillez indiquer la raison de l'annulation de cette migration.
               </p>
               <textarea
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)}
                 placeholder="Ex: Changement de stratégie, erreur de sélection d'agence..."
-                className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-white text-sm focus:border-blue-500 focus:outline-none resize-none"
+                className="w-full bg-surface-base border border-edge-strong rounded-lg px-4 py-3 text-content-primary text-sm focus:border-accent focus:outline-none resize-none"
                 rows={3}
                 autoFocus
                 onKeyDown={(e) => {

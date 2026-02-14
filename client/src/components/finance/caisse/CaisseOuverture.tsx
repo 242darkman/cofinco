@@ -517,18 +517,18 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
       
       {/* Container Modale "Zero Scroll" */}
-      <div className="w-full max-w-4xl bg-slate-950 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row h-auto md:h-[600px]">
+      <div className="w-full max-w-4xl bg-surface-base border border-edge rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row h-auto md:h-[600px]">
         
         {/* COLONNE GAUCHE : CONTEXTE & INFO (Visuel) */}
-        <div className="md:w-1/3 bg-slate-900 p-6 flex flex-col border-r border-slate-800 relative">
+        <div className="md:w-1/3 bg-surface-base p-6 flex flex-col border-r border-edge relative">
            
            {/* Header Context */}
            <div className="mb-8">
-             <div className="flex items-center gap-2 text-emerald-400 font-bold mb-2">
+             <div className="flex items-center gap-2 text-status-success font-bold mb-2">
                <Shield className="h-6 w-6" />
                <span>Ouverture Sécurisée</span>
              </div>
-             <p className="text-xs text-slate-400 leading-relaxed">
+             <p className="text-xs text-content-muted leading-relaxed">
                Ouvrez votre caisse directement ou demandez un approvisionnement au coffre-fort.
              </p>
            </div>
@@ -556,12 +556,12 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
            </div>
 
            {/* Agence Info */}
-           <div className="mt-auto pt-6 border-t border-slate-800">
+           <div className="mt-auto pt-6 border-t border-edge">
              <div className="flex items-center gap-3 opacity-70">
-                <Monitor className="text-slate-500 h-5 w-5" />
+                <Monitor className="text-content-muted h-5 w-5" />
                 <div>
-                   <div className="text-xs text-slate-500 uppercase">Agence</div>
-                   <div className="text-sm font-bold text-white">
+                   <div className="text-xs text-content-muted uppercase">Agence</div>
+                   <div className="text-sm font-bold text-content-primary">
                      {agences.find(a => a.id === selectedAgenceId)?.nom || 'Siège Principal'}
                    </div>
                 </div>
@@ -570,37 +570,37 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
         </div>
 
         {/* COLONNE DROITE : ACTION (Interactive) */}
-        <div className="flex-1 p-6 md:p-8 flex flex-col bg-slate-950 overflow-y-auto">
+        <div className="flex-1 p-6 md:p-8 flex flex-col bg-surface-base overflow-y-auto">
            
            <div className="flex justify-between items-start mb-4">
               <div>
-                <h2 className="text-lg font-bold text-white">
+                <h2 className="text-lg font-bold text-content-primary">
                   {step === 'auth' && 'Initialisation Caisse'}
                   {step === 'waiting' && 'Vérification en cours...'}
                   {step === 'confirm' && 'Confirmation des fonds'}
                 </h2>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-content-muted">
                   {step === 'auth' && 'Sélectionnez votre caisse et le mode d\'ouverture.'}
                   {step === 'waiting' && 'En attente de l\'approbation du responsable.'}
                   {step === 'confirm' && 'Veuillez confirmer le billetage reçu.'}
                 </p>
               </div>
-              <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors">
+              <button onClick={onClose} className="text-content-muted hover:text-content-primary transition-colors">
                 <X size={20}/>
               </button>
            </div>
 
            {/* Messages d'erreur/succès */}
            {error && (
-             <div className="mb-4 p-3 bg-red-500/10 border border-red-500/50 rounded-xl flex items-center gap-3 text-red-200 text-sm animate-in slide-in-from-top-2">
-               <AlertCircle className="h-5 w-5 flex-shrink-0 text-red-400" />
+             <div className="mb-4 p-3 bg-status-danger-bg border border-status-danger/50 rounded-xl flex items-center gap-3 text-status-danger-text text-sm animate-in slide-in-from-top-2">
+               <AlertCircle className="h-5 w-5 flex-shrink-0 text-status-danger" />
                <span>{error}</span>
              </div>
            )}
 
            {successMessage && (
-             <div className="mb-4 p-3 bg-emerald-500/10 border border-emerald-500/50 rounded-xl flex items-center gap-3 text-emerald-200 text-sm animate-in slide-in-from-top-2">
-               <CheckCircle2 className="h-5 w-5 flex-shrink-0 text-emerald-400" />
+             <div className="mb-4 p-3 bg-status-success-bg border border-status-success/50 rounded-xl flex items-center gap-3 text-status-success-text text-sm animate-in slide-in-from-top-2">
+               <CheckCircle2 className="h-5 w-5 flex-shrink-0 text-status-success" />
                <span>{successMessage}</span>
              </div>
            )}
@@ -613,29 +613,29 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {isAdmin && (
                       <div className="space-y-1">
-                         <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Agence</label>
+                         <label className="text-[10px] font-bold text-content-muted uppercase ml-1">Agence</label>
                          <div className="relative">
-                            <Monitor className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+                            <Monitor className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" size={16} />
                             <select
                               value={selectedAgenceId}
                               onChange={(e) => setSelectedAgenceId(e.target.value)}
-                              className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-8 py-2.5 text-sm text-white appearance-none focus:ring-2 focus:ring-emerald-500 outline-none transition-all cursor-pointer hover:bg-slate-800"
+                              className="w-full bg-surface-base border border-edge rounded-xl pl-10 pr-8 py-2.5 text-sm text-content-primary appearance-none focus:ring-2 focus:ring-status-success outline-none transition-all cursor-pointer hover:bg-surface"
                             >
                               {agences.map(a => <option key={a.id} value={a.id}>{a.nom}</option>)}
                             </select>
                             <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                              <span className="text-slate-500 text-xs">▼</span>
+                              <span className="text-content-muted text-xs">▼</span>
                             </div>
                          </div>
                       </div>
                     )}
 
                     <div className="space-y-1">
-                       <label className="text-[10px] font-bold text-slate-500 uppercase ml-1">Sélectionner votre caisse</label>
+                       <label className="text-[10px] font-bold text-content-muted uppercase ml-1">Sélectionner votre caisse</label>
                        <div className="relative">
-                          <Wallet className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+                          <Wallet className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" size={16} />
                           {loadingCaisses ? (
-                            <div className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-slate-400 flex items-center gap-2">
+                            <div className="w-full bg-surface-base border border-edge rounded-xl pl-10 pr-4 py-2.5 text-content-muted flex items-center gap-2">
                               <Loader2 className="h-4 w-4 animate-spin" />
                               <span className="text-sm">Chargement...</span>
                             </div>
@@ -644,7 +644,7 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                               <select
                                 value={selectedCaisseId}
                                 onChange={(e) => setSelectedCaisseId(e.target.value)}
-                                className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-8 py-2.5 text-sm text-white appearance-none focus:ring-2 focus:ring-emerald-500 outline-none transition-all cursor-pointer hover:bg-slate-800"
+                                className="w-full bg-surface-base border border-edge rounded-xl pl-10 pr-8 py-2.5 text-sm text-content-primary appearance-none focus:ring-2 focus:ring-status-success outline-none transition-all cursor-pointer hover:bg-surface"
                               >
                                 <option value="">Choisir une caisse</option>
                                 {caisses.map(c => (
@@ -654,7 +654,7 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                                 ))}
                               </select>
                               <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                                <span className="text-slate-500 text-xs">▼</span>
+                                <span className="text-content-muted text-xs">▼</span>
                               </div>
                             </>
                           )}
@@ -664,12 +664,12 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
 
                   {/* CHOIX DU MODE D'OUVERTURE */}
                   {selectedCaisseId && (
-                    <div className={`p-3 ${hasFondsReporte ? 'bg-amber-500/10 border-amber-500/30' : 'bg-slate-900/50 border-slate-700'} border rounded-xl space-y-3 animate-in slide-in-from-top-2`}>
+                    <div className={`p-3 ${hasFondsReporte ? 'bg-status-warning-bg border-status-warning/30' : 'bg-surface-base/50 border-edge'} border rounded-xl space-y-3 animate-in slide-in-from-top-2`}>
                       {hasFondsReporte && (
                         <div className="flex items-center gap-2">
-                          <Banknote className="h-4 w-4 text-amber-400 shrink-0" />
-                          <p className="text-xs text-amber-300/70">
-                            Fonds reporté : <span className="font-bold text-amber-200">{formatMoney(soldeExistant)}</span>
+                          <Banknote className="h-4 w-4 text-status-warning shrink-0" />
+                          <p className="text-xs text-status-warning/70">
+                            Fonds reporté : <span className="font-bold text-status-warning-text">{formatMoney(soldeExistant)}</span>
                           </p>
                         </div>
                       )}
@@ -680,17 +680,17 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                           onClick={() => setOpeningMode('direct')}
                           className={`p-2.5 rounded-xl border text-left transition-all ${
                             openingMode === 'direct'
-                              ? 'bg-emerald-500/20 border-emerald-500 ring-1 ring-emerald-500'
-                              : 'bg-slate-900/50 border-slate-700 hover:border-slate-500'
+                              ? 'bg-status-success-bg border-status-success ring-1 ring-status-success'
+                              : 'bg-surface-base/50 border-edge hover:border-edge-strong'
                           }`}
                         >
                           <div className="flex items-center gap-1.5 mb-0.5">
-                            <Unlock className={`h-3.5 w-3.5 ${openingMode === 'direct' ? 'text-emerald-400' : 'text-slate-400'}`} />
-                            <span className={`text-xs font-semibold ${openingMode === 'direct' ? 'text-emerald-300' : 'text-slate-300'}`}>
+                            <Unlock className={`h-3.5 w-3.5 ${openingMode === 'direct' ? 'text-status-success' : 'text-content-muted'}`} />
+                            <span className={`text-xs font-semibold ${openingMode === 'direct' ? 'text-status-success' : 'text-content-secondary'}`}>
                               {hasFondsReporte ? 'Ouverture rapide' : 'Ouverture à vide'}
                             </span>
                           </div>
-                          <p className="text-[10px] text-slate-400 leading-tight">
+                          <p className="text-[10px] text-content-muted leading-tight">
                             {hasFondsReporte
                               ? `Ouvrir avec le fonds existant`
                               : 'Ouvrir à 0 FCFA sans approvisionnement'}
@@ -702,17 +702,17 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                           onClick={() => setOpeningMode('request')}
                           className={`p-2.5 rounded-xl border text-left transition-all ${
                             openingMode === 'request'
-                              ? 'bg-cyan-500/20 border-cyan-500 ring-1 ring-cyan-500'
-                              : 'bg-slate-900/50 border-slate-700 hover:border-slate-500'
+                              ? 'bg-accent/10 border-accent ring-1 ring-accent'
+                              : 'bg-surface-base/50 border-edge hover:border-edge-strong'
                           }`}
                         >
                           <div className="flex items-center gap-1.5 mb-0.5">
-                            <Plus className={`h-3.5 w-3.5 ${openingMode === 'request' ? 'text-cyan-400' : 'text-slate-400'}`} />
-                            <span className={`text-xs font-semibold ${openingMode === 'request' ? 'text-cyan-300' : 'text-slate-300'}`}>
+                            <Plus className={`h-3.5 w-3.5 ${openingMode === 'request' ? 'text-accent' : 'text-content-muted'}`} />
+                            <span className={`text-xs font-semibold ${openingMode === 'request' ? 'text-accent' : 'text-content-secondary'}`}>
                               {hasFondsReporte ? 'Avec complément' : 'Demander au coffre'}
                             </span>
                           </div>
-                          <p className="text-[10px] text-slate-400 leading-tight">
+                          <p className="text-[10px] text-content-muted leading-tight">
                             {hasFondsReporte
                               ? 'Demander des fonds supplémentaires'
                               : 'Demander un approvisionnement au coffre-fort'}
@@ -725,17 +725,17 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                   {/* 2. MONTANT DOTATION - uniquement si mode "request" (demande au coffre) */}
                   {openingMode === 'request' && (
                   <div className="space-y-3">
-                     <label className="text-xs font-bold text-slate-500 uppercase ml-1">Dotation souhaitée (FCFA)</label>
+                     <label className="text-xs font-bold text-content-muted uppercase ml-1">Dotation souhaitée (FCFA)</label>
                      
                      {/* Input Géant */}
                      <div className="relative group">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold text-xl group-focus-within:text-emerald-400">F</span>
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-content-muted font-bold text-xl group-focus-within:text-status-success">F</span>
                         <input 
                           type="number" 
                           value={montantDemande}
                           onChange={(e) => setMontantDemande(Number(e.target.value))}
                           placeholder="0"
-                          className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-4 py-5 text-3xl font-bold text-white placeholder-slate-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none transition-all"
+                          className="w-full bg-surface-base border border-edge rounded-xl pl-10 pr-4 py-5 text-3xl font-bold text-content-primary placeholder-content-muted focus:border-status-success focus:ring-1 focus:ring-status-success outline-none transition-all"
                         />
                      </div>
 
@@ -746,10 +746,10 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                             key={amt}
                             type="button"
                             onClick={() => setMontantDemande(amt)}
-                            className={`px-4 py-2 bg-slate-900 border rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                            className={`px-4 py-2 bg-surface-base border rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
                               montantDemande === amt 
-                                ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400' 
-                                : 'border-slate-700 text-slate-400 hover:border-slate-500 hover:text-white'
+                                ? 'border-status-success bg-status-success-bg text-status-success' 
+                                : 'border-edge text-content-muted hover:border-edge-strong hover:text-content-primary'
                             }`}
                           >
                             {new Intl.NumberFormat('fr-FR').format(amt)}
@@ -762,21 +762,21 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                   {/* 3. AUTHENTIFICATION (PIN ou Code d'accès — mutuellement exclusif) */}
                   {checkingPinStatus ? (
                     <div className="flex items-center justify-center py-3">
-                      <Loader2 className="h-4 w-4 animate-spin text-slate-500" />
-                      <span className="ml-2 text-xs text-slate-500">Vérification...</span>
+                      <Loader2 className="h-4 w-4 animate-spin text-content-muted" />
+                      <span className="ml-2 text-xs text-content-muted">Vérification...</span>
                     </div>
                   ) : (
                     <div className="space-y-2">
                       {/* Toggle PIN / Code d'accès */}
                       {hasPinConfigured ? (
-                        <div className="flex items-center bg-slate-800/50 rounded-lg p-0.5 border border-slate-700/50">
+                        <div className="flex items-center bg-surface/50 rounded-lg p-0.5 border border-edge-subtle">
                           <button
                             type="button"
                             onClick={() => { setUseAccessCode(false); setAccessCode(''); setAccessCodeValidated(false); setAccessCodeError(''); }}
                             className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium transition-all ${
                               !useAccessCode
-                                ? 'bg-emerald-600 text-white shadow-sm'
-                                : 'text-slate-400 hover:text-white'
+                                ? 'bg-status-success text-white shadow-sm'
+                                : 'text-content-muted hover:text-content-primary'
                             }`}
                           >
                             <Lock size={12} />
@@ -787,8 +787,8 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                             onClick={() => { setUseAccessCode(true); setAuthData({ pin: '' }); }}
                             className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium transition-all ${
                               useAccessCode
-                                ? 'bg-amber-600 text-white shadow-sm'
-                                : 'text-slate-400 hover:text-white'
+                                ? 'bg-status-warning text-white shadow-sm'
+                                : 'text-content-muted hover:text-content-primary'
                             }`}
                           >
                             <KeyRound size={12} />
@@ -796,33 +796,33 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                           </button>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 rounded-lg p-2">
-                          <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                          <p className="text-[10px] text-amber-300">PIN non configuré — utilisez un code d'accès admin.</p>
+                        <div className="flex items-center gap-2 bg-status-warning-bg border border-status-warning/30 rounded-lg p-2">
+                          <AlertCircle className="w-3.5 h-3.5 text-status-warning shrink-0" />
+                          <p className="text-[10px] text-status-warning">PIN non configuré — utilisez un code d'accès admin.</p>
                         </div>
                       )}
 
                       {/* Champ PIN */}
                       {hasPinConfigured && !useAccessCode && (
                         <div className="relative">
-                          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+                          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" size={16} />
                           <input
                             type={showPin ? 'text' : 'password'}
                             placeholder="••••••"
                             maxLength={6}
                             value={authData.pin}
                             onChange={(e) => setAuthData({ ...authData, pin: e.target.value })}
-                            className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-10 py-3 text-white tracking-[0.8em] font-mono text-lg focus:border-emerald-500 outline-none transition-all placeholder-slate-700"
+                            className="w-full bg-surface-base border border-edge rounded-xl pl-10 pr-10 py-3 text-content-primary tracking-[0.8em] font-mono text-lg focus:border-status-success outline-none transition-all placeholder-content-muted"
                           />
                           {authData.pin.length === 6 ? (
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-500 animate-in zoom-in">
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-status-success animate-in zoom-in">
                               <CheckCircle2 size={20} />
                             </div>
                           ) : (
                             <button
                               type="button"
                               onClick={() => setShowPin(!showPin)}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-content-muted hover:text-content-primary transition-colors"
                             >
                               {showPin ? <EyeOff size={16} /> : <Eye size={16} />}
                             </button>
@@ -835,7 +835,7 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                         <>
                           <div className="flex gap-2">
                             <div className="relative flex-1">
-                              <Shield className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-500" size={16} />
+                              <Shield className="absolute left-3 top-1/2 -translate-y-1/2 text-status-warning" size={16} />
                               <input
                                 type={showAccessCode ? 'text' : 'password'}
                                 placeholder="XXXXXX"
@@ -848,14 +848,14 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                                 }}
                                 disabled={accessCodeValidated}
                                 autoFocus
-                                className={`w-full bg-slate-900 border rounded-xl pl-10 pr-10 py-3 text-white font-mono tracking-[0.3em] text-lg focus:ring-1 outline-none transition-all placeholder-slate-700 disabled:opacity-50 ${
-                                  accessCodeValidated ? 'border-emerald-500 focus:ring-emerald-500' : 'border-amber-500/50 focus:border-amber-500 focus:ring-amber-500/20'
+                                className={`w-full bg-surface-base border rounded-xl pl-10 pr-10 py-3 text-content-primary font-mono tracking-[0.3em] text-lg focus:ring-1 outline-none transition-all placeholder-content-muted disabled:opacity-50 ${
+                                  accessCodeValidated ? 'border-status-success focus:ring-status-success' : 'border-status-warning/50 focus:border-status-warning focus:ring-status-warning/20'
                                 }`}
                               />
                               <button
                                 type="button"
                                 onClick={() => setShowAccessCode(!showAccessCode)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-content-muted hover:text-content-primary transition-colors"
                               >
                                 {showAccessCode ? <EyeOff size={16} /> : <Eye size={16} />}
                               </button>
@@ -864,7 +864,7 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                               type="button"
                               onClick={handleValidateAccessCode}
                               disabled={accessCodeLoading || accessCodeValidated || accessCode.length < 6}
-                              className="px-4 py-3 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-sm font-bold rounded-xl transition-all flex items-center gap-1.5"
+                              className="px-4 py-3 bg-status-warning hover:bg-status-warning disabled:bg-surface disabled:text-content-muted text-white text-sm font-bold rounded-xl transition-all flex items-center gap-1.5"
                             >
                               {accessCodeLoading ? (
                                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -876,13 +876,13 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                             </button>
                           </div>
                           {accessCodeError && (
-                            <p className="text-[10px] text-red-400 flex items-center gap-1">
+                            <p className="text-[10px] text-status-danger flex items-center gap-1">
                               <AlertCircle size={11} />
                               {accessCodeError}
                             </p>
                           )}
                           {accessCodeValidated && (
-                            <p className="text-[10px] text-emerald-400 flex items-center gap-1">
+                            <p className="text-[10px] text-status-success flex items-center gap-1">
                               <CheckCircle2 size={11} />
                               Code validé — vous pouvez ouvrir la session
                             </p>
@@ -898,30 +898,30 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
               {step === 'waiting' && (
                 <div className="h-full flex flex-col items-center justify-center text-center space-y-6 animate-in fade-in zoom-in-95">
                   <div className="relative w-24 h-24">
-                    <div className="absolute inset-0 border-4 border-emerald-500/20 rounded-full animate-ping" />
-                    <div className="absolute inset-0 flex items-center justify-center bg-emerald-500/10 border-2 border-emerald-500/30 rounded-full">
-                      <Clock className="h-10 w-10 text-emerald-400" />
+                    <div className="absolute inset-0 border-4 border-status-success/20 rounded-full animate-ping" />
+                    <div className="absolute inset-0 flex items-center justify-center bg-status-success-bg border-2 border-status-success/30 rounded-full">
+                      <Clock className="h-10 w-10 text-status-success" />
                     </div>
                   </div>
                   
                   <div className="space-y-2 max-w-sm">
-                    <h3 className="text-lg font-bold text-white">Transmission au coffre...</h3>
-                    <p className="text-sm text-slate-400">
+                    <h3 className="text-lg font-bold text-content-primary">Transmission au coffre...</h3>
+                    <p className="text-sm text-content-muted">
                       Veuillez patienter pendant que le responsable valide votre dotation de 
-                      <span className="text-white font-bold mx-1">
+                      <span className="text-content-primary font-bold mx-1">
                         {Number(session?.montantDemande || montantDemande).toLocaleString('fr-FR')} FCFA
                       </span>
                     </p>
                   </div>
 
-                  <div className="w-full max-w-xs bg-slate-900/50 border border-slate-800 rounded-2xl p-4 text-left space-y-3">
+                  <div className="w-full max-w-xs bg-surface-base/50 border border-edge rounded-2xl p-4 text-left space-y-3">
                     <div className="flex justify-between items-center text-xs">
-                       <span className="text-slate-500">Caisse</span>
-                       <span className="text-white font-medium">{session?.caisse?.nom || selectedCaisse?.nom}</span>
+                       <span className="text-content-muted">Caisse</span>
+                       <span className="text-content-primary font-medium">{session?.caisse?.nom || selectedCaisse?.nom}</span>
                     </div>
                     <div className="flex justify-between items-center text-xs">
-                       <span className="text-slate-500">Statut</span>
-                       <span className="px-2 py-0.5 bg-amber-500/10 text-amber-500 border border-amber-500/30 rounded-full text-[10px] uppercase font-bold tracking-wider">
+                       <span className="text-content-muted">Statut</span>
+                       <span className="px-2 py-0.5 bg-status-warning-bg text-status-warning border border-status-warning/30 rounded-full text-[10px] uppercase font-bold tracking-wider">
                          Validation en cours
                        </span>
                     </div>
@@ -930,7 +930,7 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                   <button 
                     onClick={handleCancelRequest}
                     disabled={loading}
-                    className="text-slate-500 hover:text-red-400 text-xs font-bold transition-colors flex items-center gap-2"
+                    className="text-content-muted hover:text-status-danger text-xs font-bold transition-colors flex items-center gap-2"
                   >
                     {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Ban size={14} />}
                     Annuler la demande
@@ -941,22 +941,22 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
               {/* PHASE C: Confirmation de réception */}
               {step === 'confirm' && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
-                  <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 flex items-center gap-4">
-                    <div className="w-12 h-12 bg-emerald-500/20 border-2 border-emerald-500/30 rounded-xl flex items-center justify-center">
-                      <Package className="h-6 w-6 text-emerald-400" />
+                  <div className="bg-status-success-bg border border-status-success/20 rounded-2xl p-4 flex items-center gap-4">
+                    <div className="w-12 h-12 bg-status-success-bg border-2 border-status-success/30 rounded-xl flex items-center justify-center">
+                      <Package className="h-6 w-6 text-status-success" />
                     </div>
                     <div>
-                       <div className="text-xs font-bold text-emerald-500/70 uppercase">Fonds Prêts</div>
-                       <div className="text-xl font-black text-white">
-                         {Number(session?.montantDemande || montantDemande).toLocaleString('fr-FR')} <span className="text-xs font-bold text-slate-500">FCFA</span>
+                       <div className="text-xs font-bold text-status-success/70 uppercase">Fonds Prêts</div>
+                       <div className="text-xl font-black text-content-primary">
+                         {Number(session?.montantDemande || montantDemande).toLocaleString('fr-FR')} <span className="text-xs font-bold text-content-muted">FCFA</span>
                        </div>
                     </div>
                   </div>
 
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Billetage de réception</h4>
-                      <div className="text-xs font-bold text-emerald-400">
+                      <h4 className="text-xs font-bold text-content-muted uppercase tracking-widest">Billetage de réception</h4>
+                      <div className="text-xs font-bold text-status-success">
                         Total compté: {calculerTotal().toLocaleString()} F
                       </div>
                     </div>
@@ -969,13 +969,13 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                         const stateKey = value === 500 ? 'billets_500' : key;
                         
                         return (
-                          <div key={value} className="bg-slate-900 border border-slate-800 rounded-xl p-2 focus-within:border-emerald-500/50 transition-all">
-                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1 ml-1">{value} F</label>
+                          <div key={value} className="bg-surface-base border border-edge rounded-xl p-2 focus-within:border-status-success/50 transition-all">
+                            <label className="block text-[10px] font-bold text-content-muted uppercase mb-1 ml-1">{value} F</label>
                             <input 
                               type="number" 
                               value={billetage[stateKey as keyof typeof billetage] || ''}
                               onChange={(e) => setBilletage({ ...billetage, [stateKey]: Number(e.target.value) || 0 })}
-                              className="w-full bg-transparent text-white font-bold text-sm outline-none px-1"
+                              className="w-full bg-transparent text-content-primary font-bold text-sm outline-none px-1"
                               placeholder="0"
                             />
                           </div>
@@ -985,8 +985,8 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                     
                     {/* Alerte écart */}
                     {Math.abs(calculerTotal() - Number(session?.montantDemande || montantDemande)) > 0 && calculerTotal() > 0 && (
-                      <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center gap-3 text-amber-200 text-xs">
-                        <AlertCircle className="h-4 w-4 text-amber-400" />
+                      <div className="p-3 bg-status-warning-bg border border-status-warning/30 rounded-xl flex items-center gap-3 text-status-warning-text text-xs">
+                        <AlertCircle className="h-4 w-4 text-status-warning" />
                         <span>Écart de {Math.abs(calculerTotal() - Number(session?.montantDemande || montantDemande)).toLocaleString()} F.</span>
                       </div>
                     )}
@@ -996,7 +996,7 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
            </div>
 
            {/* FOOTER ACTION */}
-           <div className="mt-auto pt-4 border-t border-slate-800">
+           <div className="mt-auto pt-4 border-t border-edge">
               {step === 'auth' && (
                 <button
                   onClick={openingMode === 'direct' ? handleDirectOpening : handleRequestOpening}
@@ -1006,10 +1006,10 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                     !selectedCaisseId ||
                     (useAccessCode || !hasPinConfigured ? !accessCodeValidated : authData.pin.length < 6)
                   }
-                  className={`w-full py-3 rounded-xl font-bold text-base shadow-lg flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:bg-slate-800 disabled:text-slate-500 ${
+                  className={`w-full py-3 rounded-xl font-bold text-base shadow-lg flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:bg-surface disabled:text-content-muted ${
                     openingMode === 'direct'
-                      ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-900/20 text-white'
-                      : 'bg-cyan-600 hover:bg-cyan-500 shadow-cyan-900/20 text-white'
+                      ? 'bg-status-success hover:bg-status-success shadow-status-success/20 text-white'
+                      : 'bg-accent-secondary hover:bg-accent-secondary shadow-accent/20 text-content-primary'
                   }`}
                 >
                    {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : (
@@ -1032,7 +1032,7 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                   <button
                     onClick={handleConfirmReception}
                     disabled={loading || calculerTotal() <= 0}
-                    className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-3 transition-all"
+                    className="w-full bg-status-success hover:bg-status-success disabled:opacity-50 text-white py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-3 transition-all"
                   >
                      {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : (
                        <>
@@ -1044,7 +1044,7 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                   <button
                     onClick={handleCancelRequest}
                     disabled={loading}
-                    className="w-full text-slate-500 hover:text-red-400 text-xs font-bold transition-colors flex items-center justify-center gap-2 py-2"
+                    className="w-full text-content-muted hover:text-status-danger text-xs font-bold transition-colors flex items-center justify-center gap-2 py-2"
                   >
                     {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Ban size={14} />}
                     Annuler l'ouverture et restituer les fonds au coffre
@@ -1065,16 +1065,16 @@ function StepItem({ number, label, active, completed }: { number: string; label:
     <div className={`flex items-center gap-4 transition-all duration-300 ${active || completed ? 'opacity-100' : 'opacity-30'}`}>
        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-sm border-2 transition-all ${
          completed 
-           ? 'bg-emerald-500 border-emerald-500 text-white' 
+           ? 'bg-status-success border-status-success text-white' 
            : active 
-             ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' 
-             : 'bg-transparent border-slate-700 text-slate-500'
+             ? 'bg-status-success-bg border-status-success text-status-success' 
+             : 'bg-transparent border-edge text-content-muted'
        }`}>
          {completed ? <Check size={18} /> : number}
        </div>
        <div className="flex flex-col">
-         <span className={`text-[10px] uppercase font-bold tracking-wider ${active ? 'text-emerald-500' : 'text-slate-500'}`}>Étape {number}</span>
-         <span className={`text-sm font-bold ${active || completed ? 'text-white' : 'text-slate-500'}`}>{label}</span>
+         <span className={`text-[10px] uppercase font-bold tracking-wider ${active ? 'text-status-success' : 'text-content-muted'}`}>Étape {number}</span>
+         <span className={`text-sm font-bold ${active || completed ? 'text-content-primary' : 'text-content-muted'}`}>{label}</span>
        </div>
     </div>
   )

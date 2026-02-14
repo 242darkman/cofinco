@@ -2,6 +2,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { Download, Printer, Filter, Calendar, BarChart3, RefreshCw, ChevronDown } from 'lucide-react';
 import { toast, handleApiError } from '../../../lib/toast';
 import { addPdfLogoHeader } from '../../../lib/pdf-logo';
+import { useBranding } from '../../../contexts/BrandingContext';
 import { useBalanceGenerale, useAccountingWebSocket } from '../../../hooks/accounting/useAccounting';
 // P4.1: Lazy-load heavy export libraries
 import { loadExportLibraries } from '../../../lib/lazy-export';
@@ -20,6 +21,7 @@ interface BalanceCompte {
 }
 
 export default function BalanceGenerale() {
+  const { branding } = useBranding();
   const [dateDebut, setDateDebut] = useState(new Date().getFullYear() + '-01-01');
   const [dateFin, setDateFin] = useState(new Date().toISOString().split('T')[0]);
   const [filtreClasse, setFiltreClasse] = useState<string>('all');
@@ -119,6 +121,7 @@ export default function BalanceGenerale() {
         title: 'BALANCE GÉNÉRALE OHADA',
         subtitle: 'Système Comptable OHADA',
         dateRight: `Période: ${dateDebut} au ${dateFin}`,
+        appName: branding.appName,
       });
 
       doc.setFontSize(10);
@@ -189,7 +192,7 @@ export default function BalanceGenerale() {
   return (
     <div className="space-y-3">
       {/* Header compact - UNE SEULE LIGNE */}
-      <div className="bg-gradient-to-r from-green-600 to-emerald-600 rounded-xl p-3">
+      <div className="bg-gradient-to-r from-status-success to-status-success rounded-xl p-3">
         <div className="flex items-center gap-3 overflow-x-auto">
           {/* Titre */}
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -223,7 +226,7 @@ export default function BalanceGenerale() {
             </div>
             <div className="bg-white/15 rounded-lg px-3 py-1.5 flex items-center gap-2">
               <div>
-                <div className="text-base font-bold text-green-300 leading-none">
+                <div className="text-base font-bold text-white leading-none">
                   {formatCompact(totaux.solde_debiteur)}
                 </div>
                 <div className="text-[9px] text-white/70">Solde D.</div>
@@ -231,7 +234,7 @@ export default function BalanceGenerale() {
             </div>
             <div className="bg-white/15 rounded-lg px-3 py-1.5 flex items-center gap-2">
               <div>
-                <div className="text-base font-bold text-cyan-300 leading-none">
+                <div className="text-base font-bold text-white leading-none">
                   {formatCompact(totaux.solde_crediteur)}
                 </div>
                 <div className="text-[9px] text-white/70">Solde C.</div>
@@ -240,11 +243,7 @@ export default function BalanceGenerale() {
           </div>
 
           {/* Indicateur équilibre */}
-          <div className={`px-2 py-1 rounded-full text-[10px] font-bold flex-shrink-0 ${
-            isEquilibre 
-              ? 'bg-green-400/30 text-green-200' 
-              : 'bg-red-400/30 text-red-200'
-          }`}>
+          <div className="px-2 py-1 rounded-full text-[10px] font-bold flex-shrink-0 bg-white/25 text-white">
             {isEquilibre ? '✓ Équilibrée' : '✗ Déséquilibrée'}
           </div>
 
@@ -260,7 +259,7 @@ export default function BalanceGenerale() {
               <Download className="w-3.5 h-3.5" />
               <span>Excel</span>
             </button>
-            <button 
+            <button
               onClick={handleExportPDF}
               className="bg-white/20 hover:bg-white/30 text-white px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors"
             >
@@ -272,37 +271,37 @@ export default function BalanceGenerale() {
       </div>
 
       {/* Filtres compacts */}
-      <div className="bg-slate-800 rounded-xl p-3">
+      <div className="bg-surface rounded-xl p-3">
         <div className="flex flex-wrap items-end gap-3">
           {/* Date Début */}
           <div className="flex-1 min-w-[140px] max-w-[180px]">
-            <label className="block text-[10px] font-medium text-slate-400 mb-1">Date Début</label>
+            <label className="block text-[10px] font-medium text-content-muted mb-1">Date Début</label>
             <input
               type="date"
               value={dateDebut}
               onChange={(e) => setDateDebut(e.target.value)}
-              className="w-full bg-slate-700 text-white text-xs px-3 py-2 rounded-lg border border-slate-600 focus:outline-none focus:ring-1 focus:ring-green-500"
+              className="w-full bg-surface-elevated text-content-primary text-xs px-3 py-2 rounded-lg border border-edge-strong focus:outline-none focus:ring-1 focus:ring-status-success"
             />
           </div>
 
           {/* Date Fin */}
           <div className="flex-1 min-w-[140px] max-w-[180px]">
-            <label className="block text-[10px] font-medium text-slate-400 mb-1">Date Fin</label>
+            <label className="block text-[10px] font-medium text-content-muted mb-1">Date Fin</label>
             <input
               type="date"
               value={dateFin}
               onChange={(e) => setDateFin(e.target.value)}
-              className="w-full bg-slate-700 text-white text-xs px-3 py-2 rounded-lg border border-slate-600 focus:outline-none focus:ring-1 focus:ring-green-500"
+              className="w-full bg-surface-elevated text-content-primary text-xs px-3 py-2 rounded-lg border border-edge-strong focus:outline-none focus:ring-1 focus:ring-status-success"
             />
           </div>
 
           {/* Classe */}
           <div className="flex-1 min-w-[160px] max-w-[200px]">
-            <label className="block text-[10px] font-medium text-slate-400 mb-1">Classe</label>
+            <label className="block text-[10px] font-medium text-content-muted mb-1">Classe</label>
             <select
               value={filtreClasse}
               onChange={(e) => setFiltreClasse(e.target.value)}
-              className="w-full bg-slate-700 text-white text-xs px-3 py-2 rounded-lg border border-slate-600 focus:outline-none focus:ring-1 focus:ring-green-500"
+              className="w-full bg-surface-elevated text-content-primary text-xs px-3 py-2 rounded-lg border border-edge-strong focus:outline-none focus:ring-1 focus:ring-status-success"
             >
               <option value="all">Toutes les classes</option>
               <option value="1">1 - Ressources Durables</option>
@@ -320,7 +319,7 @@ export default function BalanceGenerale() {
           <button
             onClick={() => fetchBalance()}
             disabled={loading}
-            className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors"
+            className="px-4 py-2 bg-status-success hover:bg-status-success disabled:opacity-50 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             <span>Actualiser</span>
@@ -329,19 +328,19 @@ export default function BalanceGenerale() {
       </div>
 
       {/* Contenu principal */}
-      <div className="bg-slate-800 rounded-xl overflow-hidden">
+      <div className="bg-surface rounded-xl overflow-hidden">
         {loading ? (
           <div className="animate-pulse">
             {/* Table header skeleton */}
-            <div className="h-10 bg-slate-700/50 rounded-t-lg" />
+            <div className="h-10 bg-surface-elevated/50 rounded-t-lg" />
             {/* Table rows skeleton */}
             {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-4 px-4 py-3 border-t border-slate-700/20">
-                <div className="h-3 bg-slate-700 rounded w-16" />
-                <div className="h-3 bg-slate-700 rounded flex-1" />
-                <div className="h-3 bg-slate-700 rounded w-24" />
-                <div className="h-3 bg-slate-700 rounded w-24" />
-                <div className="h-3 bg-slate-700 rounded w-20" />
+              <div key={i} className="flex items-center gap-4 px-4 py-3 border-t border-edge/20">
+                <div className="h-3 bg-surface-elevated rounded w-16" />
+                <div className="h-3 bg-surface-elevated rounded flex-1" />
+                <div className="h-3 bg-surface-elevated rounded w-24" />
+                <div className="h-3 bg-surface-elevated rounded w-24" />
+                <div className="h-3 bg-surface-elevated rounded w-20" />
               </div>
             ))}
           </div>
@@ -349,9 +348,9 @@ export default function BalanceGenerale() {
           <>
             {/* Message d'équilibre/déséquilibre compact */}
             {!isEquilibre && (
-              <div className="bg-red-500/10 border-b border-red-500/30 px-4 py-2 flex items-center gap-2">
-                <BarChart3 className="text-red-400 w-4 h-4" />
-                <span className="text-xs font-medium text-red-400">
+              <div className="bg-status-danger-bg border-b border-status-danger/30 px-4 py-2 flex items-center gap-2">
+                <BarChart3 className="text-status-danger w-4 h-4" />
+                <span className="text-xs font-medium text-status-danger">
                   Balance Déséquilibrée • Écart: {Math.abs(totaux.debit - totaux.credit).toLocaleString()} FCFA
                 </span>
               </div>
@@ -360,53 +359,53 @@ export default function BalanceGenerale() {
             {/* Tableau */}
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-slate-700/50">
+                <thead className="bg-surface-elevated/50">
                   <tr>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-slate-400">N° Compte</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-slate-400">Intitulé</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 hidden md:table-cell">Type</th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-slate-400">Débit</th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-slate-400">Crédit</th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-slate-400 hidden lg:table-cell">Solde D.</th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-slate-400 hidden lg:table-cell">Solde C.</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-content-muted">N° Compte</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-content-muted">Intitulé</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-content-muted hidden md:table-cell">Type</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-content-muted">Débit</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-content-muted">Crédit</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-content-muted hidden lg:table-cell">Solde D.</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-content-muted hidden lg:table-cell">Solde C.</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-700/50">
+                <tbody className="divide-y divide-edge/50">
                   {filteredBalance.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-4 py-8 text-center text-slate-400 text-sm">
+                      <td colSpan={7} className="px-4 py-8 text-center text-content-muted text-sm">
                         Aucune écriture validée pour cette période
                       </td>
                     </tr>
                   ) : (
                     filteredBalance.map((compte) => {
                       return (
-                        <tr key={compte.compteId || compte.numeroCompte} className="hover:bg-slate-700/30 transition-colors">
+                        <tr key={compte.compteId || compte.numeroCompte} className="hover:bg-surface-elevated/30 transition-colors">
                           <td className="px-3 py-2">
-                            <span className="text-cyan-400 font-mono text-xs font-medium">{compte.numeroCompte}</span>
+                            <span className="text-accent font-mono text-xs font-medium">{compte.numeroCompte}</span>
                           </td>
-                          <td className="px-3 py-2 text-white text-xs truncate max-w-[200px]">{compte.intitule}</td>
+                          <td className="px-3 py-2 text-content-primary text-xs truncate max-w-[200px]">{compte.intitule}</td>
                           <td className="px-3 py-2 hidden md:table-cell">
                             <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                              compte.typeCompte === 'Actif' ? 'bg-green-500/20 text-green-400' :
-                              compte.typeCompte === 'Passif' ? 'bg-blue-500/20 text-blue-400' :
-                              compte.typeCompte === 'Charge' ? 'bg-red-500/20 text-red-400' :
-                              compte.typeCompte === 'Produit' ? 'bg-purple-500/20 text-purple-400' :
-                              'bg-slate-500/20 text-slate-400'
+                              compte.typeCompte === 'Actif' ? 'bg-status-success-bg text-status-success' :
+                              compte.typeCompte === 'Passif' ? 'bg-status-info-bg text-status-info' :
+                              compte.typeCompte === 'Charge' ? 'bg-status-danger-bg text-status-danger' :
+                              compte.typeCompte === 'Produit' ? 'bg-status-info-bg text-status-info' :
+                              'bg-surface-subtle/40 text-content-muted'
                             }`}>
                               {compte.typeCompte}
                             </span>
                           </td>
-                          <td className="px-3 py-2 text-right text-white text-xs font-mono">
+                          <td className="px-3 py-2 text-right text-content-primary text-xs font-mono">
                             {compte.totalDebit > 0 ? compte.totalDebit.toLocaleString() : '-'}
                           </td>
-                          <td className="px-3 py-2 text-right text-white text-xs font-mono">
+                          <td className="px-3 py-2 text-right text-content-primary text-xs font-mono">
                             {compte.totalCredit > 0 ? compte.totalCredit.toLocaleString() : '-'}
                           </td>
-                          <td className="px-3 py-2 text-right text-green-400 text-xs font-mono font-medium hidden lg:table-cell">
+                          <td className="px-3 py-2 text-right text-status-success text-xs font-mono font-medium hidden lg:table-cell">
                             {compte.soldeDebiteur > 0 ? compte.soldeDebiteur.toLocaleString() : '-'}
                           </td>
-                          <td className="px-3 py-2 text-right text-cyan-400 text-xs font-mono font-medium hidden lg:table-cell">
+                          <td className="px-3 py-2 text-right text-accent text-xs font-mono font-medium hidden lg:table-cell">
                             {compte.soldeCrediteur > 0 ? compte.soldeCrediteur.toLocaleString() : '-'}
                           </td>
                         </tr>
@@ -414,19 +413,19 @@ export default function BalanceGenerale() {
                     })
                   )}
                 </tbody>
-                <tfoot className="bg-slate-700">
+                <tfoot className="bg-surface-elevated">
                   <tr className="font-bold">
-                    <td colSpan={3} className="px-3 py-2 text-white text-sm">TOTAUX</td>
-                    <td className="px-3 py-2 text-right text-blue-400 text-sm font-mono">
+                    <td colSpan={3} className="px-3 py-2 text-content-primary text-sm">TOTAUX</td>
+                    <td className="px-3 py-2 text-right text-status-info text-sm font-mono">
                       {totaux.debit.toLocaleString()}
                     </td>
-                    <td className="px-3 py-2 text-right text-blue-400 text-sm font-mono">
+                    <td className="px-3 py-2 text-right text-status-info text-sm font-mono">
                       {totaux.credit.toLocaleString()}
                     </td>
-                    <td className="px-3 py-2 text-right text-green-400 text-sm font-mono hidden lg:table-cell">
+                    <td className="px-3 py-2 text-right text-status-success text-sm font-mono hidden lg:table-cell">
                       {totaux.solde_debiteur.toLocaleString()}
                     </td>
-                    <td className="px-3 py-2 text-right text-cyan-400 text-sm font-mono hidden lg:table-cell">
+                    <td className="px-3 py-2 text-right text-accent text-sm font-mono hidden lg:table-cell">
                       {totaux.solde_crediteur.toLocaleString()}
                     </td>
                   </tr>
@@ -436,9 +435,9 @@ export default function BalanceGenerale() {
 
             {/* Message équilibre en bas */}
             {isEquilibre && filteredBalance.length > 0 && (
-              <div className="bg-green-500/10 border-t border-green-500/30 px-4 py-2 flex items-center gap-2">
-                <BarChart3 className="text-green-400 w-4 h-4" />
-                <span className="text-xs font-medium text-green-400">
+              <div className="bg-status-success-bg border-t border-status-success/30 px-4 py-2 flex items-center gap-2">
+                <BarChart3 className="text-status-success w-4 h-4" />
+                <span className="text-xs font-medium text-status-success">
                   Balance Équilibrée ✓ • Conforme aux normes OHADA
                 </span>
               </div>

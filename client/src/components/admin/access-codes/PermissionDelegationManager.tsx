@@ -65,21 +65,21 @@ export default function PermissionDelegationManager({ permissions, users, onRefr
   ) || [];
 
   return (
-    <Card className="bg-slate-900 border-slate-800 p-0 overflow-hidden">
+    <Card className="bg-surface-base border-edge p-0 overflow-hidden">
       {/* Header */}
-      <div className="px-3 sm:px-4 py-3 border-b border-slate-800 flex items-center justify-between">
+      <div className="px-3 sm:px-4 py-3 border-b border-edge flex items-center justify-between">
         <div>
-          <h3 className="text-sm sm:text-base font-semibold text-white">Autorisations Actives</h3>
-          <p className="text-[10px] sm:text-xs text-slate-500">
+          <h3 className="text-sm sm:text-base font-semibold text-content-primary">Autorisations Actives</h3>
+          <p className="text-[10px] sm:text-xs text-content-muted">
             {activeAuthorizations.length} utilisateur{activeAuthorizations.length !== 1 ? 's' : ''} autorisé{activeAuthorizations.length !== 1 ? 's' : ''}
           </p>
         </div>
       </div>
 
       {/* Info Banner - Compact */}
-      <div className="px-3 sm:px-4 py-2 bg-blue-500/10 border-b border-blue-500/20 flex items-center gap-2">
-        <Info size={14} className="text-blue-400 flex-shrink-0" />
-        <p className="text-[10px] sm:text-xs text-blue-300">
+      <div className="px-3 sm:px-4 py-2 bg-status-info-bg border-b border-status-info/20 flex items-center gap-2">
+        <Info size={14} className="text-status-info flex-shrink-0" />
+        <p className="text-[10px] sm:text-xs text-status-info">
           Les utilisateurs ci-dessous ont validé un code d'accès et peuvent accéder aux caisses jusqu'à expiration.
         </p>
       </div>
@@ -94,20 +94,20 @@ export default function PermissionDelegationManager({ permissions, users, onRefr
           />
         </div>
       ) : (
-        <div className="divide-y divide-slate-800">
+        <div className="divide-y divide-edge">
           {/* Active Authorizations */}
           {activeAuthorizations.map((auth) => (
             <div
               key={auth.id}
-              className="px-3 sm:px-4 py-3 hover:bg-slate-800/50 transition-colors"
+              className="px-3 sm:px-4 py-3 hover:bg-surface/50 transition-colors"
             >
               {/* Authorization Row */}
               <div className="flex items-center justify-between gap-3 mb-2">
                 <div className="flex items-center gap-2 min-w-0">
-                  <div className="p-1.5 bg-emerald-500/20 rounded">
-                    <User size={14} className="text-emerald-400" />
+                  <div className="p-1.5 bg-status-success-bg rounded">
+                    <User size={14} className="text-status-success" />
                   </div>
-                  <span className="font-semibold text-white text-sm truncate">
+                  <span className="font-semibold text-content-primary text-sm truncate">
                     {getUserName(auth.userId)}
                   </span>
                   {getStatusBadge(auth)}
@@ -122,7 +122,7 @@ export default function PermissionDelegationManager({ permissions, users, onRefr
                         onRevoke(auth.id, reason || undefined);
                       }
                     }}
-                    className="text-red-400 hover:text-red-300 hover:bg-red-500/10 p-1.5"
+                    className="text-status-danger hover:text-status-danger hover:bg-status-danger-bg p-1.5"
                   >
                     <Ban size={14} />
                   </Button>
@@ -130,18 +130,18 @@ export default function PermissionDelegationManager({ permissions, users, onRefr
               </div>
 
               {/* Details */}
-              <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] sm:text-xs text-slate-400">
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] sm:text-xs text-content-muted">
                 <span className="flex items-center gap-1">
                   <Clock size={10} />
-                  Expire dans: <span className="text-emerald-400 font-medium">{formatRelativeTime(auth.expiresAt)}</span>
+                  Expire dans: <span className="text-status-success font-medium">{formatRelativeTime(auth.expiresAt)}</span>
                 </span>
-                <span>Accordée: <span className="text-slate-300">{formatDate(auth.grantedAt)}</span></span>
+                <span>Accordée: <span className="text-content-secondary">{formatDate(auth.grantedAt)}</span></span>
                 {auth.ipAddress && (
-                  <span>IP: <span className="text-slate-300">{auth.ipAddress}</span></span>
+                  <span>IP: <span className="text-content-secondary">{auth.ipAddress}</span></span>
                 )}
               </div>
               {auth.reason && (
-                <p className="text-[10px] sm:text-xs text-slate-500 mt-1">
+                <p className="text-[10px] sm:text-xs text-content-muted mt-1">
                   {auth.reason}
                 </p>
               )}
@@ -151,21 +151,21 @@ export default function PermissionDelegationManager({ permissions, users, onRefr
           {/* Expired Authorizations (collapsed) */}
           {expiredAuthorizations.length > 0 && (
             <details className="group">
-              <summary className="px-3 sm:px-4 py-2 bg-slate-800/50 text-slate-400 text-xs cursor-pointer hover:bg-slate-800 list-none flex items-center gap-2">
-                <span className="text-slate-500">▸</span>
+              <summary className="px-3 sm:px-4 py-2 bg-surface/50 text-content-muted text-xs cursor-pointer hover:bg-surface list-none flex items-center gap-2">
+                <span className="text-content-muted">▸</span>
                 <span>{expiredAuthorizations.length} autorisation{expiredAuthorizations.length !== 1 ? 's' : ''} expirée{expiredAuthorizations.length !== 1 ? 's' : ''}</span>
               </summary>
               {expiredAuthorizations.map((auth) => (
                 <div
                   key={auth.id}
-                  className="px-3 sm:px-4 py-2 bg-slate-800/30 border-t border-slate-800/50"
+                  className="px-3 sm:px-4 py-2 bg-surface/30 border-t border-edge/50"
                 >
-                  <div className="flex items-center gap-2 text-sm text-slate-500">
+                  <div className="flex items-center gap-2 text-sm text-content-muted">
                     <User size={12} />
                     <span>{getUserName(auth.userId)}</span>
                     <Badge value="Expirée" variant="warning" size="sm" />
                   </div>
-                  <div className="text-[10px] text-slate-600 mt-1">
+                  <div className="text-[10px] text-content-muted mt-1">
                     Expirée le {formatDate(auth.expiresAt)}
                   </div>
                 </div>

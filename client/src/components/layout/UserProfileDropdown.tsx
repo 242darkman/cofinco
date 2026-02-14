@@ -35,10 +35,10 @@ const MenuItem = React.forwardRef<HTMLButtonElement, MenuItemProps>(
       onClick={onClick}
       role="menuitem"
       tabIndex={isActive ? 0 : -1}
-      className={`w-full flex items-center gap-3 p-3 rounded-lg text-sm text-slate-300 hover:bg-slate-800 transition-colors cursor-pointer group outline-none focus:ring-2 focus:ring-indigo-500/50 ${isActive ? 'bg-slate-800/50 ring-1 ring-indigo-500/50' : ''}`}
+      className={`w-full flex items-center gap-3 p-3 rounded-lg text-sm text-content-secondary hover:bg-surface transition-colors cursor-pointer group outline-none focus:ring-2 focus:ring-accent/50 ${isActive ? 'bg-surface/50 ring-1 ring-accent/50' : ''}`}
     >
-      <Icon size={18} className="text-slate-500 group-hover:text-indigo-400 transition-colors" />
-      <span className="group-hover:text-white transition-colors">{label}</span>
+      <Icon size={18} className="text-content-muted group-hover:text-accent transition-colors" />
+      <span className="group-hover:text-content-primary transition-colors">{label}</span>
     </button>
   )
 );
@@ -93,12 +93,12 @@ const Avatar: React.FC<AvatarProps> = ({ photoUrl, fullName, initials, size, cla
     : 'w-12 h-12 text-lg';
 
   const borderClasses = size === 'sm'
-    ? 'border-2 border-slate-700'
-    : 'border-2 border-slate-600';
+    ? 'border-2 border-edge'
+    : 'border-2 border-edge-strong';
 
   // Initiales (fallback seulement)
   const initialsElement = (
-    <div className={`${sizeClasses} rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-semibold ${borderClasses} ${className}`}>
+    <div className={`${sizeClasses} rounded-full bg-gradient-to-br from-accent to-status-info flex items-center justify-center text-white font-semibold ${borderClasses} ${className}`}>
       {initials}
     </div>
   );
@@ -124,7 +124,7 @@ const Avatar: React.FC<AvatarProps> = ({ photoUrl, fullName, initials, size, cla
 
   // En chargement - afficher skeleton minimal
   return (
-    <div className={`${sizeClasses} rounded-full bg-slate-700/50 ${borderClasses} ${className} animate-pulse`} />
+    <div className={`${sizeClasses} rounded-full bg-surface-elevated/50 ${borderClasses} ${className} animate-pulse`} />
   );
 };
 
@@ -284,12 +284,12 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({
         right: menuPosition.right,
         zIndex: 99999,
       }}
-      className="w-72 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl shadow-black/60 overflow-hidden animate-in fade-in zoom-in-95 duration-100"
+      className="w-72 bg-surface-base border border-edge rounded-xl shadow-2xl shadow-black/60 overflow-hidden animate-in fade-in zoom-in-95 duration-100"
       role="menu"
       aria-orientation="vertical"
     >
       {/* ZONE 1: HEADER IDENTITÉ */}
-      <div className="p-4 bg-slate-800/50 border-b border-slate-700">
+      <div className="p-4 bg-surface/50 border-b border-edge">
         <div className="flex items-center gap-4">
           {/* Avatar plus grand avec skeleton et gestion d'erreur */}
           <Avatar
@@ -301,23 +301,23 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({
 
           <div className="flex-1 min-w-0">
             {/* Nom complet */}
-            <h4 className="text-white font-medium truncate">{fullName}</h4>
+            <h4 className="text-content-primary font-medium truncate">{fullName}</h4>
 
             {/* Rôle */}
-            <p className="text-xs text-slate-400 truncate">
+            <p className="text-xs text-content-muted truncate">
               {getRoleLabel(user?.role || '')}
             </p>
 
             {/* Email */}
-            <p className="text-xs text-slate-500 truncate mt-0.5">
+            <p className="text-xs text-content-muted truncate mt-0.5">
               {user?.email}
             </p>
 
             {/* Badge Agence */}
             {user?.agence && (
-              <div className="mt-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700">
-                <Building2 size={10} className="text-slate-400" />
-                <span className="text-[10px] text-slate-300">{user.agence}</span>
+              <div className="mt-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-surface border border-edge">
+                <Building2 size={10} className="text-content-muted" />
+                <span className="text-[10px] text-content-secondary">{user.agence}</span>
               </div>
             )}
           </div>
@@ -342,18 +342,18 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({
       </div>
 
       {/* ZONE 3: FOOTER */}
-      <div className="p-2 border-t border-slate-800">
+      <div className="p-2 border-t border-edge">
         <button
           ref={el => { menuItemRefs.current[menuItems.length] = el; }}
           onClick={() => {
             setIsOpen(false);
             onLogout();
           }}
-          className={`w-full flex items-center gap-3 p-3 rounded-lg text-sm text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors group ${activeIndex === menuItems.length ? 'bg-rose-500/10 ring-1 ring-rose-500/50 text-rose-400' : ''}`}
+          className={`w-full flex items-center gap-3 p-3 rounded-lg text-sm text-content-muted hover:text-status-danger hover:bg-status-danger/10 transition-colors group ${activeIndex === menuItems.length ? 'bg-status-danger/10 ring-1 ring-status-danger/50 text-status-danger' : ''}`}
           role="menuitem"
           tabIndex={activeIndex === menuItems.length ? 0 : -1}
         >
-          <LogOut size={16} className="group-hover:text-rose-400 transition-colors" />
+          <LogOut size={16} className="group-hover:text-status-danger transition-colors" />
           <span>Déconnexion</span>
         </button>
       </div>
@@ -366,7 +366,7 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({
       <button
         ref={triggerRef}
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 p-1 pr-2 rounded-full hover:bg-slate-800 transition-colors border border-transparent hover:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+        className="flex items-center gap-2 p-1 pr-2 rounded-full hover:bg-surface transition-colors border border-transparent hover:border-edge focus:outline-none focus:ring-2 focus:ring-accent/50"
         aria-label="Menu utilisateur"
         aria-expanded={isOpen}
         aria-haspopup="true"
@@ -380,11 +380,11 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({
             size="sm"
           />
           {/* Indicateur de statut en ligne */}
-          <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-slate-900 rounded-full" />
+          <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-status-success border-2 border-edge rounded-full" />
         </div>
         <ChevronDown
           size={14}
-          className={`text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+          className={`text-content-muted transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
         />
       </button>
 

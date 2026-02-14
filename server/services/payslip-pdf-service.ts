@@ -57,7 +57,7 @@ export interface PayslipPdfData {
     conventionCollective: string | null;
   } | null;
   company: {
-    agenceName: string | null;
+    appName: string | null;
     adresse: string | null;
     telephone: string | null;
     niu: string | null;
@@ -143,7 +143,7 @@ export async function generatePayslipPdf(data: PayslipPdfData): Promise<Buffer> 
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
-  doc.text('COFIN&CO-M', 32, 12);
+  doc.text(company?.appName || 'COFIN&CO-M', 32, 12);
   doc.setFontSize(7);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(180, 190, 200);

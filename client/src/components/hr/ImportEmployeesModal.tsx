@@ -94,15 +94,15 @@ export default function ImportEmployeesModal({ isOpen, onClose, onSuccess }: Imp
     <Modal isOpen={isOpen} onClose={handleClose} title="Importer des employés (CSV)" size="lg">
       <div className="space-y-4">
         {/* Instructions */}
-        <div className="bg-slate-800/50 rounded-lg p-3 text-xs text-slate-400">
-          <p className="font-medium text-slate-300 mb-1">Format CSV attendu :</p>
+        <div className="bg-surface/50 rounded-lg p-3 text-xs text-content-muted">
+          <p className="font-medium text-content-secondary mb-1">Format CSV attendu :</p>
           <p className="font-mono text-[10px]">nom;prenom;email;telephone;sexe;matricule;typeContrat;dateEmbauche;salaireBase</p>
           <p className="mt-1">Séparateur : virgule ou point-virgule. Encodage : UTF-8.</p>
         </div>
 
         {/* File Input */}
         <div
-          className="border-2 border-dashed border-slate-700 rounded-lg p-6 text-center cursor-pointer hover:border-cyan-600 transition"
+          className="border-2 border-dashed border-edge rounded-lg p-6 text-center cursor-pointer hover:border-accent transition"
           onClick={() => fileInputRef.current?.click()}
         >
           <input
@@ -113,15 +113,15 @@ export default function ImportEmployeesModal({ isOpen, onClose, onSuccess }: Imp
             className="hidden"
           />
           {file ? (
-            <div className="flex items-center justify-center gap-2 text-sm text-slate-300">
-              <FileText size={18} className="text-cyan-400" />
+            <div className="flex items-center justify-center gap-2 text-sm text-content-secondary">
+              <FileText size={18} className="text-accent" />
               <span>{file.name}</span>
-              <span className="text-slate-500">({(file.size / 1024).toFixed(1)} KB)</span>
+              <span className="text-content-muted">({(file.size / 1024).toFixed(1)} KB)</span>
             </div>
           ) : (
             <div className="space-y-2">
-              <Upload size={24} className="mx-auto text-slate-500" />
-              <p className="text-sm text-slate-400">Cliquez pour sélectionner un fichier CSV</p>
+              <Upload size={24} className="mx-auto text-content-muted" />
+              <p className="text-sm text-content-muted">Cliquez pour sélectionner un fichier CSV</p>
             </div>
           )}
         </div>
@@ -130,23 +130,23 @@ export default function ImportEmployeesModal({ isOpen, onClose, onSuccess }: Imp
         {preview && !result && (
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-400">{preview.totalRows} ligne(s) détectée(s)</span>
-              <span className="text-slate-500">Aperçu des 10 premières lignes</span>
+              <span className="text-content-muted">{preview.totalRows} ligne(s) détectée(s)</span>
+              <span className="text-content-muted">Aperçu des 10 premières lignes</span>
             </div>
-            <div className="overflow-x-auto max-h-48 rounded border border-slate-700">
+            <div className="overflow-x-auto max-h-48 rounded border border-edge">
               <table className="w-full text-[10px]">
-                <thead className="bg-slate-800 sticky top-0">
+                <thead className="bg-surface sticky top-0">
                   <tr>
                     {preview.headers.map((h) => (
-                      <th key={h} className="text-left px-2 py-1 text-slate-400 font-medium">{h}</th>
+                      <th key={h} className="text-left px-2 py-1 text-content-muted font-medium">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {preview.preview.map((row, i) => (
-                    <tr key={i} className="border-t border-slate-800">
+                    <tr key={i} className="border-t border-edge">
                       {preview.headers.map((h) => (
-                        <td key={h} className="px-2 py-1 text-slate-300 truncate max-w-[120px]">{row[h] || '-'}</td>
+                        <td key={h} className="px-2 py-1 text-content-secondary truncate max-w-[120px]">{row[h] || '-'}</td>
                       ))}
                     </tr>
                   ))}
@@ -160,26 +160,26 @@ export default function ImportEmployeesModal({ isOpen, onClose, onSuccess }: Imp
         {result && (
           <div className="space-y-3">
             <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="bg-slate-800 rounded-lg p-3">
-                <div className="text-lg font-bold text-white">{result.total}</div>
-                <div className="text-[10px] text-slate-400">Total</div>
+              <div className="bg-surface rounded-lg p-3">
+                <div className="text-lg font-bold text-content-primary">{result.total}</div>
+                <div className="text-[10px] text-content-muted">Total</div>
               </div>
-              <div className="bg-emerald-900/30 border border-emerald-800/50 rounded-lg p-3">
-                <div className="text-lg font-bold text-emerald-400">{result.created}</div>
-                <div className="text-[10px] text-emerald-400/70">Créés</div>
+              <div className="bg-status-success-bg border border-status-success/30/50 rounded-lg p-3">
+                <div className="text-lg font-bold text-status-success">{result.created}</div>
+                <div className="text-[10px] text-status-success/70">Créés</div>
               </div>
-              <div className={`rounded-lg p-3 ${result.skipped > 0 ? 'bg-red-900/30 border border-red-800/50' : 'bg-slate-800'}`}>
-                <div className={`text-lg font-bold ${result.skipped > 0 ? 'text-red-400' : 'text-slate-500'}`}>{result.skipped}</div>
-                <div className="text-[10px] text-slate-400">Ignorés</div>
+              <div className={`rounded-lg p-3 ${result.skipped > 0 ? 'bg-status-danger-bg border border-status-danger/30/50' : 'bg-surface'}`}>
+                <div className={`text-lg font-bold ${result.skipped > 0 ? 'text-status-danger' : 'text-content-muted'}`}>{result.skipped}</div>
+                <div className="text-[10px] text-content-muted">Ignorés</div>
               </div>
             </div>
 
             {result.errors.length > 0 && (
-              <div className="max-h-40 overflow-y-auto rounded border border-red-900/50 bg-red-950/20 p-2 space-y-1">
+              <div className="max-h-40 overflow-y-auto rounded border border-status-danger/30 bg-status-danger-bg p-2 space-y-1">
                 {result.errors.map((err, i) => (
                   <div key={i} className="flex items-start gap-2 text-[10px]">
-                    <AlertCircle size={12} className="text-red-400 shrink-0 mt-0.5" />
-                    <span className="text-red-300">
+                    <AlertCircle size={12} className="text-status-danger shrink-0 mt-0.5" />
+                    <span className="text-status-danger">
                       Ligne {err.row}{err.field ? ` (${err.field})` : ''}: {err.message}
                     </span>
                   </div>
@@ -190,7 +190,7 @@ export default function ImportEmployeesModal({ isOpen, onClose, onSuccess }: Imp
         )}
 
         {/* Actions */}
-        <div className="flex justify-end gap-3 pt-2 border-t border-slate-700">
+        <div className="flex justify-end gap-3 pt-2 border-t border-edge">
           <Button variant="secondary" onClick={handleClose}>
             {result ? 'Fermer' : 'Annuler'}
           </Button>

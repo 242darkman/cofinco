@@ -14,25 +14,25 @@ export default function ActivityStatsCards({ stats }: ActivityStatsCardsProps) {
         title="Total Utilisateurs"
         value={stats.totalUsers}
         icon={Users}
-        className="from-blue-500 to-cyan-500"
+        className="from-status-info to-accent"
       />
       <StatCard
         title="Actifs Aujourd'hui"
         value={stats.activeToday}
         icon={Activity}
-        className="from-green-500 to-emerald-500"
+        className="from-status-success to-status-success"
       />
       <StatCard
         title="Total Actions"
         value={stats.totalActions.toLocaleString()}
         icon={BarChart3}
-        className="from-emerald-500 to-cyan-500"
+        className="from-status-success to-accent"
       />
       <StatCard
         title="Moy. / Utilisateur"
         value={stats.avgActionsPerUser}
         icon={Clock}
-        className="from-emerald-500 to-blue-500"
+        className="from-status-success to-status-info"
       />
     </div>
   );

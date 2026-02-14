@@ -23,7 +23,7 @@ interface ExportConfig {
 }
 
 const DEFAULT_CONFIG: ExportConfig = {
-  companyName: 'COFINCO',
+  companyName: 'COFIN&CO-M',
   companySubtitle: 'Coopérative Financière du Congo',
   dateDebut: '',
   dateFin: '',
@@ -119,6 +119,7 @@ function addPDFHeader(doc: jsPDF, title: string, subtitle: string, config: Expor
     title,
     subtitle,
     dateRight: `Généré le ${formatDateTime(new Date())}`,
+    appName: config.companyName,
   });
 
   // Period info below header
@@ -132,8 +133,8 @@ function addPDFHeader(doc: jsPDF, title: string, subtitle: string, config: Expor
   return y;
 }
 
-function addPDFFooter(doc: jsPDF) {
-  addSharedLogoFooter(doc);
+function addPDFFooter(doc: jsPDF, config: ExportConfig) {
+  addSharedLogoFooter(doc, undefined, config.companyName);
 }
 
 // ============================================================================
@@ -344,7 +345,7 @@ export function exportJournalPDF(
     margin: { left: 14, right: 14 },
   });
 
-  addPDFFooter(doc);
+  addPDFFooter(doc, fullConfig);
   doc.save(`journal_caisse_${new Date().toISOString().slice(0, 10)}.pdf`);
 }
 
@@ -542,7 +543,7 @@ export function exportSynthesePDF(
     margin: { left: 14, right: 14 },
   });
 
-  addPDFFooter(doc);
+  addPDFFooter(doc, fullConfig);
   doc.save(`synthese_financiere_${new Date().toISOString().slice(0, 10)}.pdf`);
 }
 
@@ -794,7 +795,7 @@ export function exportEcartsPDF(
     margin: { left: 14, right: 14 },
   });
 
-  addPDFFooter(doc);
+  addPDFFooter(doc, fullConfig);
   doc.save(`rapport_ecarts_${new Date().toISOString().slice(0, 10)}.pdf`);
 }
 

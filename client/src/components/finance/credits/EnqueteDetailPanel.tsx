@@ -63,16 +63,16 @@ export default function EnqueteDetailPanel({
   const geotaggedPhotos = allPhotos.filter(p => p.latitude && p.longitude);
 
   return (
-    <div className={`bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden ${compact ? 'p-3' : 'p-4'}`}>
+    <div className={`bg-surface/50 rounded-xl border border-edge-subtle overflow-hidden ${compact ? 'p-3' : 'p-4'}`}>
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg bg-emerald-500/20">
-            <FileText size={16} className="text-emerald-400" />
+          <div className="p-1.5 rounded-lg bg-status-success-bg">
+            <FileText size={16} className="text-status-success" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-white">Détail Enquête</h3>
-            <p className="text-[10px] text-slate-400">
+            <h3 className="text-sm font-semibold text-content-primary">Détail Enquête</h3>
+            <p className="text-[10px] text-content-muted">
               {enquete.dateEnquete
                 ? new Date(enquete.dateEnquete).toLocaleDateString('fr-FR', {
                     day: 'numeric',
@@ -87,7 +87,7 @@ export default function EnqueteDetailPanel({
         {onClose && (
           <button
             onClick={onClose}
-            className="p-1 rounded hover:bg-slate-700/50 text-slate-400 hover:text-white transition-colors"
+            className="p-1 rounded hover:bg-surface-elevated/50 text-content-muted hover:text-content-primary transition-colors"
           >
             <X size={16} />
           </button>
@@ -98,8 +98,8 @@ export default function EnqueteDetailPanel({
       {showMap && hasGeoData && latitude && longitude && (
         <div className="mb-3">
           <Suspense fallback={
-            <div className="h-[180px] bg-slate-700/30 rounded-lg animate-pulse flex items-center justify-center">
-              <MapPin className="text-slate-500" size={24} />
+            <div className="h-[180px] bg-surface-elevated/30 rounded-lg animate-pulse flex items-center justify-center">
+              <MapPin className="text-content-muted" size={24} />
             </div>
           }>
             <EnqueteMiniMap
@@ -126,27 +126,27 @@ export default function EnqueteDetailPanel({
       {/* GPS Info Compact */}
       {hasGeoData && (
         <div className="grid grid-cols-2 gap-2 mb-3">
-          <div className="bg-slate-700/30 rounded-lg p-2">
-            <div className="flex items-center gap-1 text-[10px] text-slate-400 mb-0.5">
+          <div className="bg-surface-elevated/30 rounded-lg p-2">
+            <div className="flex items-center gap-1 text-[10px] text-content-muted mb-0.5">
               <Crosshair size={10} />
               Précision GPS
             </div>
             <div className={`text-sm font-medium ${
-              accuracy && accuracy < 30 ? 'text-emerald-400' :
-              accuracy && accuracy < 100 ? 'text-amber-400' : 'text-red-400'
+              accuracy && accuracy < 30 ? 'text-status-success' :
+              accuracy && accuracy < 100 ? 'text-status-warning' : 'text-status-danger'
             }`}>
               ±{accuracy ? Math.round(accuracy) : '?'}m
             </div>
           </div>
 
           {distance !== null && (
-            <div className={`rounded-lg p-2 ${isDistanceWarning ? 'bg-red-500/10' : 'bg-emerald-500/10'}`}>
-              <div className="flex items-center gap-1 text-[10px] text-slate-400 mb-0.5">
+            <div className={`rounded-lg p-2 ${isDistanceWarning ? 'bg-status-danger-bg' : 'bg-status-success-bg'}`}>
+              <div className="flex items-center gap-1 text-[10px] text-content-muted mb-0.5">
                 <Navigation size={10} />
                 Distance client
               </div>
               <div className={`text-sm font-medium flex items-center gap-1 ${
-                isDistanceWarning ? 'text-red-400' : 'text-emerald-400'
+                isDistanceWarning ? 'text-status-danger' : 'text-status-success'
               }`}>
                 {isDistanceWarning && <AlertTriangle size={12} />}
                 {distance < 1000 ? `${Math.round(distance)}m` : `${(distance/1000).toFixed(1)}km`}
@@ -189,11 +189,11 @@ export default function EnqueteDetailPanel({
       {/* Photos Section */}
       {allPhotos.length > 0 && (
         <div className="mb-3">
-          <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mb-2">
+          <div className="flex items-center gap-1.5 text-[10px] text-content-muted mb-2">
             <Camera size={12} />
             Photos ({allPhotos.length})
             {geotaggedPhotos.length > 0 && (
-              <span className="text-emerald-400">• {geotaggedPhotos.length} géotaggées</span>
+              <span className="text-status-success">• {geotaggedPhotos.length} géotaggées</span>
             )}
           </div>
           <div className="flex gap-1.5 overflow-x-auto pb-1">
@@ -204,7 +204,7 @@ export default function EnqueteDetailPanel({
                   setSelectedPhoto(photo);
                   setShowPhotoModal(true);
                 }}
-                className="relative flex-shrink-0 rounded-lg overflow-hidden border border-slate-600/50 hover:border-slate-500 transition-colors"
+                className="relative flex-shrink-0 rounded-lg overflow-hidden border border-edge-strong/50 hover:border-edge-strong transition-colors"
               >
                 <img
                   src={photo.url}
@@ -212,14 +212,14 @@ export default function EnqueteDetailPanel({
                   className="w-16 h-16 object-cover"
                 />
                 {photo.latitude && photo.longitude && (
-                  <div className="absolute bottom-0.5 right-0.5 bg-emerald-500 rounded-full p-0.5">
-                    <MapPin size={8} className="text-white" />
+                  <div className="absolute bottom-0.5 right-0.5 bg-status-success rounded-full p-0.5">
+                    <MapPin size={8} className="text-content-primary" />
                   </div>
                 )}
               </button>
             ))}
             {allPhotos.length > 4 && (
-              <div className="flex-shrink-0 w-16 h-16 rounded-lg bg-slate-700/50 flex items-center justify-center text-xs text-slate-400">
+              <div className="flex-shrink-0 w-16 h-16 rounded-lg bg-surface-elevated/50 flex items-center justify-center text-xs text-content-muted">
                 +{allPhotos.length - 4}
               </div>
             )}
@@ -229,9 +229,9 @@ export default function EnqueteDetailPanel({
 
       {/* Recommandation */}
       {enquete.recommandation && (
-        <div className="bg-slate-700/30 rounded-lg p-2">
-          <div className="text-[10px] text-slate-400 mb-1">Recommandation</div>
-          <p className="text-xs text-slate-300 line-clamp-2">{enquete.recommandation}</p>
+        <div className="bg-surface-elevated/30 rounded-lg p-2">
+          <div className="text-[10px] text-content-muted mb-1">Recommandation</div>
+          <p className="text-xs text-content-secondary line-clamp-2">{enquete.recommandation}</p>
         </div>
       )}
 
@@ -242,7 +242,7 @@ export default function EnqueteDetailPanel({
           onClick={() => setShowPhotoModal(false)}
         >
           <div
-            className="relative max-w-2xl max-h-[80vh] bg-slate-900 rounded-xl overflow-hidden"
+            className="relative max-w-2xl max-h-[80vh] bg-surface-base rounded-xl overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
             <img
@@ -253,15 +253,15 @@ export default function EnqueteDetailPanel({
             <div className="absolute top-2 right-2">
               <button
                 onClick={() => setShowPhotoModal(false)}
-                className="p-2 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+                className="p-2 rounded-full bg-black/50 text-content-primary hover:bg-black/70 transition-colors"
               >
                 <X size={20} />
               </button>
             </div>
             {selectedPhoto.latitude && selectedPhoto.longitude && (
               <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3">
-                <div className="flex items-center gap-2 text-sm text-white">
-                  <MapPin size={14} className="text-emerald-400" />
+                <div className="flex items-center gap-2 text-sm text-content-primary">
+                  <MapPin size={14} className="text-status-success" />
                   <span>
                     {selectedPhoto.latitude.toFixed(5)}, {selectedPhoto.longitude.toFixed(5)}
                   </span>
@@ -270,7 +270,7 @@ export default function EnqueteDetailPanel({
                   )}
                 </div>
                 {selectedPhoto.timestamp && (
-                  <div className="flex items-center gap-2 text-xs text-slate-400 mt-1">
+                  <div className="flex items-center gap-2 text-xs text-content-muted mt-1">
                     <Clock size={12} />
                     {new Date(selectedPhoto.timestamp).toLocaleString('fr-FR')}
                   </div>
@@ -299,16 +299,16 @@ function InfoCard({
   truncate?: boolean;
 }) {
   const colorClasses = {
-    blue: 'text-blue-400',
-    emerald: 'text-emerald-400',
-    purple: 'text-purple-400',
-    slate: 'text-slate-300',
-    amber: 'text-amber-400',
+    blue: 'text-status-info',
+    emerald: 'text-status-success',
+    purple: 'text-status-info',
+    slate: 'text-content-secondary',
+    amber: 'text-status-warning',
   };
 
   return (
-    <div className="bg-slate-700/30 rounded-lg p-2">
-      <div className="flex items-center gap-1 text-[10px] text-slate-400 mb-0.5">
+    <div className="bg-surface-elevated/30 rounded-lg p-2">
+      <div className="flex items-center gap-1 text-[10px] text-content-muted mb-0.5">
         {icon}
         {label}
       </div>

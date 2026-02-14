@@ -70,17 +70,17 @@ interface SecurityCodeManagerProps {
 const codeTypeLabels: Record<string, { label: string; color: string; description: string }> = {
   EMERGENCY: {
     label: 'Urgence',
-    color: 'text-red-400 bg-red-500/10',
+    color: 'text-status-danger bg-status-danger-bg',
     description: 'Accès ponctuel hors horaires'
   },
   DAILY: {
     label: 'Journalier',
-    color: 'text-blue-400 bg-blue-500/10',
+    color: 'text-status-info bg-status-info-bg',
     description: 'Code rotatif quotidien'
   },
   PERMANENT: {
     label: 'Permanent',
-    color: 'text-emerald-400 bg-emerald-500/10',
+    color: 'text-status-success bg-status-success-bg',
     description: 'Pour administrateurs'
   },
 };
@@ -246,10 +246,10 @@ export default function SecurityCodeManager({ agenceId }: SecurityCodeManagerPro
     const expiry = new Date(expiresAt);
     const daysLeft = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
-    if (daysLeft <= 0) return { label: 'Expiré', color: 'text-red-400' };
-    if (daysLeft <= 3) return { label: `${daysLeft}j`, color: 'text-amber-400' };
-    if (daysLeft <= 7) return { label: `${daysLeft}j`, color: 'text-yellow-400' };
-    return { label: `${daysLeft}j`, color: 'text-slate-400' };
+    if (daysLeft <= 0) return { label: 'Expiré', color: 'text-status-danger' };
+    if (daysLeft <= 3) return { label: `${daysLeft}j`, color: 'text-status-warning' };
+    if (daysLeft <= 7) return { label: `${daysLeft}j`, color: 'text-status-warning' };
+    return { label: `${daysLeft}j`, color: 'text-content-muted' };
   };
 
   const tabs = [
@@ -262,14 +262,14 @@ export default function SecurityCodeManager({ agenceId }: SecurityCodeManagerPro
     <>
       <Card className="overflow-hidden">
         {/* En-tête */}
-        <div className="px-4 py-3 bg-indigo-500/10 border-b border-indigo-500/20 flex items-center justify-between">
+        <div className="px-4 py-3 bg-accent/10 border-b border-accent/20 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-500/20 flex items-center justify-center">
-              <Shield className="w-5 h-5 text-indigo-400" />
+            <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center">
+              <Shield className="w-5 h-5 text-accent" />
             </div>
             <div>
-              <h3 className="font-semibold text-white">Codes de Sécurité</h3>
-              <p className="text-xs text-slate-400">Gestion des accès et rotation</p>
+              <h3 className="font-semibold text-content-primary">Codes de Sécurité</h3>
+              <p className="text-xs text-content-muted">Gestion des accès et rotation</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -300,7 +300,7 @@ export default function SecurityCodeManager({ agenceId }: SecurityCodeManagerPro
         </div>
 
         {/* Onglets */}
-        <div className="flex border-b border-slate-700/50">
+        <div className="flex border-b border-edge-subtle">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
@@ -309,8 +309,8 @@ export default function SecurityCodeManager({ agenceId }: SecurityCodeManagerPro
                 onClick={() => setActiveTab(tab.id as typeof activeTab)}
                 className={`flex-1 px-4 py-3 flex items-center justify-center gap-2 text-sm font-medium transition-colors ${
                   activeTab === tab.id
-                    ? 'text-indigo-400 border-b-2 border-indigo-400 bg-indigo-500/5'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                    ? 'text-accent border-b-2 border-accent bg-accent/5'
+                    : 'text-content-muted hover:text-content-primary hover:bg-surface/50'
                 }`}
               >
                 <Icon className="w-4 h-4" />
@@ -327,10 +327,10 @@ export default function SecurityCodeManager({ agenceId }: SecurityCodeManagerPro
             <div className="space-y-3">
               {codesLoading ? (
                 <div className="flex items-center justify-center py-8">
-                  <RefreshCw className="w-5 h-5 animate-spin text-slate-400" />
+                  <RefreshCw className="w-5 h-5 animate-spin text-content-muted" />
                 </div>
               ) : codes?.length === 0 ? (
-                <div className="text-center py-8 text-slate-400">
+                <div className="text-center py-8 text-content-muted">
                   <Key className="w-12 h-12 mx-auto mb-3 opacity-50" />
                   <p>Aucun code actif</p>
                 </div>
@@ -344,7 +344,7 @@ export default function SecurityCodeManager({ agenceId }: SecurityCodeManagerPro
                       key={code.id}
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="bg-slate-800/50 rounded-lg p-4"
+                      className="bg-surface/50 rounded-lg p-4"
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex items-start gap-3">
@@ -363,10 +363,10 @@ export default function SecurityCodeManager({ agenceId }: SecurityCodeManagerPro
                                 </span>
                               )}
                             </div>
-                            <p className="text-sm text-slate-300 mt-1">
+                            <p className="text-sm text-content-secondary mt-1">
                               {code.description || typeInfo.description}
                             </p>
-                            <div className="flex items-center gap-4 mt-2 text-xs text-slate-500">
+                            <div className="flex items-center gap-4 mt-2 text-xs text-content-muted">
                               <span>
                                 Utilisations: {code.usageCount}
                                 {code.maxUsages ? `/${code.maxUsages}` : ''}
@@ -404,13 +404,13 @@ export default function SecurityCodeManager({ agenceId }: SecurityCodeManagerPro
             <div className="space-y-4">
               {policyLoading ? (
                 <div className="flex items-center justify-center py-8">
-                  <RefreshCw className="w-5 h-5 animate-spin text-slate-400" />
+                  <RefreshCw className="w-5 h-5 animate-spin text-content-muted" />
                 </div>
               ) : (
                 <>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm text-slate-400 mb-1">
+                      <label className="block text-sm text-content-muted mb-1">
                         Fréquence de rotation (jours)
                       </label>
                       <input
@@ -419,11 +419,11 @@ export default function SecurityCodeManager({ agenceId }: SecurityCodeManagerPro
                         onChange={(e) => setPolicyDays(parseInt(e.target.value) || 30)}
                         min={1}
                         max={365}
-                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white"
+                        className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-content-primary"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm text-slate-400 mb-1">
+                      <label className="block text-sm text-content-muted mb-1">
                         Notification avant expiration (jours)
                       </label>
                       <input
@@ -432,11 +432,11 @@ export default function SecurityCodeManager({ agenceId }: SecurityCodeManagerPro
                         onChange={(e) => setPolicyNotifyDays(parseInt(e.target.value) || 7)}
                         min={1}
                         max={30}
-                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white"
+                        className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-content-primary"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm text-slate-400 mb-1">
+                      <label className="block text-sm text-content-muted mb-1">
                         Max utilisations avant rotation
                       </label>
                       <input
@@ -445,7 +445,7 @@ export default function SecurityCodeManager({ agenceId }: SecurityCodeManagerPro
                         onChange={(e) => setPolicyMaxUsage(parseInt(e.target.value) || undefined)}
                         placeholder="Illimité"
                         min={1}
-                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500"
+                        className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-content-primary placeholder-content-muted"
                       />
                     </div>
                     <div className="flex items-center">
@@ -454,16 +454,16 @@ export default function SecurityCodeManager({ agenceId }: SecurityCodeManagerPro
                           type="checkbox"
                           checked={policyAutoGenerate}
                           onChange={(e) => setPolicyAutoGenerate(e.target.checked)}
-                          className="w-5 h-5 rounded border-slate-600 bg-slate-800 text-indigo-500 focus:ring-indigo-500"
+                          className="w-5 h-5 rounded border-edge-strong bg-surface text-accent focus:ring-accent"
                         />
-                        <span className="text-sm text-slate-300">
+                        <span className="text-sm text-content-secondary">
                           Auto-générer à l'expiration
                         </span>
                       </label>
                     </div>
                   </div>
 
-                  <div className="flex justify-end pt-4 border-t border-slate-700/50">
+                  <div className="flex justify-end pt-4 border-t border-edge-subtle">
                     <Button
                       variant="primary"
                       onClick={() => updatePolicyMutation.mutate()}
@@ -482,22 +482,22 @@ export default function SecurityCodeManager({ agenceId }: SecurityCodeManagerPro
           {activeTab === 'stats' && stats && (
             <div className="space-y-4">
               <div className="grid grid-cols-3 gap-4">
-                <div className="bg-slate-800/50 rounded-lg p-4 text-center">
-                  <div className="text-3xl font-bold text-emerald-400">{stats.totalActive}</div>
-                  <div className="text-sm text-slate-400">Codes actifs</div>
+                <div className="bg-surface/50 rounded-lg p-4 text-center">
+                  <div className="text-3xl font-bold text-status-success">{stats.totalActive}</div>
+                  <div className="text-sm text-content-muted">Codes actifs</div>
                 </div>
-                <div className="bg-slate-800/50 rounded-lg p-4 text-center">
-                  <div className="text-3xl font-bold text-amber-400">{stats.expiringIn7Days}</div>
-                  <div className="text-sm text-slate-400">Expirent sous 7j</div>
+                <div className="bg-surface/50 rounded-lg p-4 text-center">
+                  <div className="text-3xl font-bold text-status-warning">{stats.expiringIn7Days}</div>
+                  <div className="text-sm text-content-muted">Expirent sous 7j</div>
                 </div>
-                <div className="bg-slate-800/50 rounded-lg p-4 text-center">
-                  <div className="text-3xl font-bold text-blue-400">{stats.usageCountToday}</div>
-                  <div className="text-sm text-slate-400">Utilisations aujourd'hui</div>
+                <div className="bg-surface/50 rounded-lg p-4 text-center">
+                  <div className="text-3xl font-bold text-status-info">{stats.usageCountToday}</div>
+                  <div className="text-sm text-content-muted">Utilisations aujourd'hui</div>
                 </div>
               </div>
 
-              <div className="bg-slate-800/50 rounded-lg p-4">
-                <h4 className="text-sm font-medium text-slate-400 mb-3">Par type</h4>
+              <div className="bg-surface/50 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-content-muted mb-3">Par type</h4>
                 <div className="space-y-2">
                   {Object.entries(stats.totalByType).map(([type, count]) => {
                     const typeInfo = codeTypeLabels[type] || codeTypeLabels.EMERGENCY;
@@ -506,16 +506,16 @@ export default function SecurityCodeManager({ agenceId }: SecurityCodeManagerPro
                         <span className={`px-2 py-0.5 rounded text-xs font-medium ${typeInfo.color}`}>
                           {typeInfo.label}
                         </span>
-                        <span className="text-white font-medium">{count}</span>
+                        <span className="text-content-primary font-medium">{count}</span>
                       </div>
                     );
                   })}
                 </div>
               </div>
 
-              <div className="bg-slate-800/30 rounded-lg p-4">
-                <div className="flex items-center gap-2 text-sm text-slate-400">
-                  <AlertTriangle className="w-4 h-4 text-amber-500" />
+              <div className="bg-surface/30 rounded-lg p-4">
+                <div className="flex items-center gap-2 text-sm text-content-muted">
+                  <AlertTriangle className="w-4 h-4 text-status-warning" />
                   <span>{stats.totalExpired} codes expirés ou révoqués</span>
                 </div>
               </div>
@@ -541,11 +541,11 @@ export default function SecurityCodeManager({ agenceId }: SecurityCodeManagerPro
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="relative w-full max-w-md bg-slate-800 rounded-xl shadow-xl border border-slate-700 overflow-hidden"
+              className="relative w-full max-w-md bg-surface rounded-xl shadow-xl border border-edge overflow-hidden"
             >
-              <div className="px-4 py-3 bg-indigo-500/10 border-b border-slate-700">
-                <h3 className="font-semibold text-white flex items-center gap-2">
-                  <Key className="w-5 h-5 text-indigo-400" />
+              <div className="px-4 py-3 bg-accent/10 border-b border-edge">
+                <h3 className="font-semibold text-content-primary flex items-center gap-2">
+                  <Key className="w-5 h-5 text-accent" />
                   {generatedCode ? 'Code généré' : 'Nouveau code de sécurité'}
                 </h3>
               </div>
@@ -555,11 +555,11 @@ export default function SecurityCodeManager({ agenceId }: SecurityCodeManagerPro
                   // Afficher le code généré
                   <div className="text-center">
                     <div className="mb-4">
-                      <p className="text-slate-400 text-sm mb-2">
+                      <p className="text-content-muted text-sm mb-2">
                         Ce code ne sera affiché qu'une seule fois
                       </p>
-                      <div className="bg-slate-900 rounded-lg p-6 border-2 border-indigo-500/30">
-                        <div className="text-4xl font-mono font-bold text-indigo-400 tracking-wider">
+                      <div className="bg-surface-base rounded-lg p-6 border-2 border-accent/30">
+                        <div className="text-4xl font-mono font-bold text-accent tracking-wider">
                           {generatedCode}
                         </div>
                       </div>
@@ -587,7 +587,7 @@ export default function SecurityCodeManager({ agenceId }: SecurityCodeManagerPro
                   // Formulaire de génération
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm text-slate-400 mb-2">
+                      <label className="block text-sm text-content-muted mb-2">
                         Type de code
                       </label>
                       <div className="grid grid-cols-3 gap-2">
@@ -600,7 +600,7 @@ export default function SecurityCodeManager({ agenceId }: SecurityCodeManagerPro
                               className={`p-3 rounded-lg border text-center transition-colors ${
                                 newCodeType === type
                                   ? `${info.color} border-current`
-                                  : 'border-slate-700 text-slate-400 hover:border-slate-600'
+                                  : 'border-edge text-content-muted hover:border-edge-strong'
                               }`}
                             >
                               <div className="text-sm font-medium">{info.label}</div>
@@ -612,7 +612,7 @@ export default function SecurityCodeManager({ agenceId }: SecurityCodeManagerPro
                     </div>
 
                     <div>
-                      <label className="block text-sm text-slate-400 mb-1">
+                      <label className="block text-sm text-content-muted mb-1">
                         Description (optionnel)
                       </label>
                       <input
@@ -620,13 +620,13 @@ export default function SecurityCodeManager({ agenceId }: SecurityCodeManagerPro
                         value={newCodeDescription}
                         onChange={(e) => setNewCodeDescription(e.target.value)}
                         placeholder="Ex: Accès maintenance..."
-                        className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500"
+                        className="w-full px-3 py-2 bg-surface-elevated/50 border border-edge-strong rounded-lg text-content-primary placeholder-content-muted"
                       />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm text-slate-400 mb-1">
+                        <label className="block text-sm text-content-muted mb-1">
                           Max utilisations
                         </label>
                         <input
@@ -635,11 +635,11 @@ export default function SecurityCodeManager({ agenceId }: SecurityCodeManagerPro
                           onChange={(e) => setNewCodeMaxUsages(parseInt(e.target.value) || undefined)}
                           placeholder="Illimité"
                           min={1}
-                          className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500"
+                          className="w-full px-3 py-2 bg-surface-elevated/50 border border-edge-strong rounded-lg text-content-primary placeholder-content-muted"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm text-slate-400 mb-1">
+                        <label className="block text-sm text-content-muted mb-1">
                           Expire dans (heures)
                         </label>
                         <input
@@ -648,12 +648,12 @@ export default function SecurityCodeManager({ agenceId }: SecurityCodeManagerPro
                           onChange={(e) => setNewCodeExpiresInHours(parseInt(e.target.value) || undefined)}
                           placeholder="Par défaut"
                           min={1}
-                          className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500"
+                          className="w-full px-3 py-2 bg-surface-elevated/50 border border-edge-strong rounded-lg text-content-primary placeholder-content-muted"
                         />
                       </div>
                     </div>
 
-                    <div className="flex justify-end gap-2 pt-4 border-t border-slate-700">
+                    <div className="flex justify-end gap-2 pt-4 border-t border-edge">
                       <Button
                         variant="ghost"
                         onClick={() => setShowGenerateModal(false)}

@@ -42,7 +42,7 @@ const formatCurrency = (val: number) => {
 
 function ChartSkeleton() {
   return (
-    <div className="w-full h-[200px] bg-slate-100 dark:bg-slate-800/50 rounded-lg animate-pulse flex items-center justify-center">
+    <div className="w-full h-[200px] bg-surface-muted/50 rounded-lg animate-pulse flex items-center justify-center">
       <TrendingUp size={40} className="opacity-10" />
     </div>
   );
@@ -337,8 +337,8 @@ export function TreasurySupervision() {
         <div className="flex items-center gap-3">
           <TrendingUp className="w-5 h-5 text-primary" />
           <div>
-            <h2 className="text-sm font-bold text-white">Supervision Trésorerie</h2>
-            <p className="text-[10px] text-slate-500">{globalStats?.breakdown.length || 0} agences</p>
+            <h2 className="text-sm font-bold text-content-primary">Supervision Trésorerie</h2>
+            <p className="text-[10px] text-content-muted">{globalStats?.breakdown.length || 0} agences</p>
           </div>
         </div>
         <div className="flex items-center gap-1">
@@ -356,13 +356,13 @@ export function TreasurySupervision() {
                 <div className="fixed inset-0 z-40" onClick={() => setShowExportMenu(false)} />
                 <div className="absolute right-0 top-full mt-1 w-36 bg-card border border-border rounded-lg shadow-xl z-50 py-1">
                   <button onClick={() => handleExport('csv')} className="w-full px-3 py-1.5 text-left text-[10px] hover:bg-muted flex items-center gap-2">
-                    <FileText size={12} className="text-slate-500" /> CSV
+                    <FileText size={12} className="text-content-muted" /> CSV
                   </button>
                   <button onClick={() => handleExport('excel')} className="w-full px-3 py-1.5 text-left text-[10px] hover:bg-muted flex items-center gap-2">
-                    <FileSpreadsheet size={12} className="text-emerald-500" /> Excel
+                    <FileSpreadsheet size={12} className="text-status-success" /> Excel
                   </button>
                   <button onClick={() => handleExport('pdf')} className="w-full px-3 py-1.5 text-left text-[10px] hover:bg-muted flex items-center gap-2">
-                    <FileText size={12} className="text-red-500" /> PDF
+                    <FileText size={12} className="text-status-danger" /> PDF
                   </button>
                 </div>
               </>
@@ -375,47 +375,47 @@ export function TreasurySupervision() {
       <div className="grid grid-cols-12 gap-2 px-1 shrink-0">
         {/* Stats Column */}
         <div className="col-span-12 md:col-span-4 flex flex-col gap-2">
-          <Card className="relative overflow-hidden bg-gradient-to-r from-blue-900/40 to-slate-900/40 border-blue-500/20 p-2.5">
-            <p className="text-[9px] font-bold text-blue-400 uppercase tracking-wider">Trésorerie Globale</p>
+          <Card className="relative overflow-hidden bg-gradient-to-r from-status-info/10 to-surface-base/40 border-status-info/20 p-2.5">
+            <p className="text-[9px] font-bold text-status-info uppercase tracking-wider">Trésorerie Globale</p>
             <div className="flex items-baseline justify-between">
               <div className="flex items-baseline gap-1">
                 <span className="text-xl font-black font-mono text-foreground">
                   {formatCurrency(globalStats?.globalBalance || 0)}
                 </span>
-                <span className="text-[9px] text-slate-500">FCFA</span>
+                <span className="text-[9px] text-content-muted">FCFA</span>
               </div>
-              <div className={`flex items-center text-[10px] font-bold ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+              <div className={`flex items-center text-[10px] font-bold ${isPositive ? 'text-status-success' : 'text-status-danger'}`}>
                 {isPositive ? <TrendingUp size={10} className="mr-0.5" /> : <TrendingDown size={10} className="mr-0.5" />}
                 {Math.abs(globalGrowth).toFixed(1)}%
               </div>
             </div>
           </Card>
-          <Card className="bg-slate-900/20 border-slate-800 p-2.5 flex items-center gap-2">
-            <Building2 size={16} className="text-indigo-400 shrink-0" />
+          <Card className="bg-surface-base/20 border-edge p-2.5 flex items-center gap-2">
+            <Building2 size={16} className="text-accent shrink-0" />
             <div className="min-w-0">
-              <p className="text-[9px] font-bold text-slate-500 uppercase truncate">Moyenne/Agence</p>
+              <p className="text-[9px] font-bold text-content-muted uppercase truncate">Moyenne/Agence</p>
               <span className="text-base font-bold text-foreground">
                 {globalStats?.breakdown.length ? Math.round((globalStats.globalBalance / globalStats.breakdown.length)).toLocaleString() : 0}
-                <span className="text-[9px] text-slate-500 ml-1">F</span>
+                <span className="text-[9px] text-content-muted ml-1">F</span>
               </span>
             </div>
           </Card>
         </div>
 
         {/* Chart Column */}
-        <Card className="col-span-12 md:col-span-8 p-2 border-slate-800 bg-slate-950/30">
+        <Card className="col-span-12 md:col-span-8 p-2 border-edge bg-surface-base/30">
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2 min-w-0">
-              <span className="text-[10px] font-medium text-slate-400 shrink-0">{getChartTitle()}</span>
+              <span className="text-[10px] font-medium text-content-muted shrink-0">{getChartTitle()}</span>
               {selectedAgencies.length > 0 && (
                 <div className="flex gap-1 overflow-x-auto">
                   {selectedAgencies.map(id => {
                     const agence = globalStats?.breakdown.find(a => a.agenceId === id);
                     return (
-                      <div key={id} className="flex items-center gap-1 px-1.5 py-0.5 bg-slate-800 rounded-full border border-slate-700 shrink-0">
+                      <div key={id} className="flex items-center gap-1 px-1.5 py-0.5 bg-surface rounded-full border border-edge shrink-0">
                         <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: getAgencyColor(id) }} />
-                        <span className="text-[8px] font-medium text-slate-300">{agence?.agenceNom}</span>
-                        <button onClick={(e) => { e.stopPropagation(); toggleAgency(id); }} className="text-slate-500 hover:text-white">
+                        <span className="text-[8px] font-medium text-content-secondary">{agence?.agenceNom}</span>
+                        <button onClick={(e) => { e.stopPropagation(); toggleAgency(id); }} className="text-content-muted hover:text-content-primary">
                           <X size={8} />
                         </button>
                       </div>
@@ -424,14 +424,14 @@ export function TreasurySupervision() {
                 </div>
               )}
             </div>
-            <div className="flex items-center bg-slate-900 rounded p-0.5 shrink-0">
+            <div className="flex items-center bg-surface-base rounded p-0.5 shrink-0">
               {PERIOD_OPTIONS.map(opt => (
                 <button
                   key={opt.value}
                   onClick={() => setPeriod(opt.value)}
                   className={cn(
                     "px-1.5 py-0.5 rounded text-[9px] font-medium transition-all",
-                    period === opt.value ? "bg-primary text-white" : "text-slate-500 hover:text-slate-300"
+                    period === opt.value ? "bg-primary text-content-primary" : "text-content-muted hover:text-content-secondary"
                   )}
                 >
                   {opt.label}
@@ -457,9 +457,9 @@ export function TreasurySupervision() {
                   </defs>
                   <XAxis
                     dataKey="date"
-                    tick={{ fontSize: 8, fill: '#64748b' }}
+                    tick={{ fontSize: 8, fill: 'var(--text-muted)' }}
                     tickLine={false}
-                    axisLine={{ stroke: '#334155', strokeWidth: 0.5 }}
+                    axisLine={{ stroke: 'var(--border-default)', strokeWidth: 0.5 }}
                     tickFormatter={(value) => {
                       const d = new Date(value);
                       if (period === 'today') return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
@@ -469,7 +469,7 @@ export function TreasurySupervision() {
                     interval="preserveStartEnd"
                   />
                   <YAxis
-                    tick={{ fontSize: 8, fill: '#64748b' }}
+                    tick={{ fontSize: 8, fill: 'var(--text-muted)' }}
                     tickLine={false}
                     axisLine={false}
                     width={45}
@@ -486,7 +486,7 @@ export function TreasurySupervision() {
                     wrapperStyle={{ paddingTop: 0, fontSize: '9px' }}
                     iconSize={8}
                     iconType="circle"
-                    formatter={(value) => <span className="text-[9px] text-slate-400 ml-0.5">{value}</span>}
+                    formatter={(value) => <span className="text-[9px] text-content-muted ml-0.5">{value}</span>}
                   />
                   {selectedAgencies.length === 0 ? (
                     <Area type="monotone" dataKey="balance" name="Flux Global" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorBalance)" />
@@ -507,18 +507,18 @@ export function TreasurySupervision() {
 
       {/* 3. Agency Grid - Compact */}
       <div className="flex-1 min-h-0 px-1 space-y-2">
-        <div className="flex items-center justify-between bg-slate-900/20 px-2 py-1.5 rounded-lg border border-slate-800/50">
+        <div className="flex items-center justify-between bg-surface-base/20 px-2 py-1.5 rounded-lg border border-edge/50">
           <div className="flex items-center gap-2">
-            <Building2 className="w-3.5 h-3.5 text-slate-500" />
-            <span className="text-[10px] font-semibold text-slate-300">Réseau</span>
+            <Building2 className="w-3.5 h-3.5 text-content-muted" />
+            <span className="text-[10px] font-semibold text-content-secondary">Réseau</span>
             <Badge value={filteredAgencies.length} variant="neutral" size="sm" className="h-4 text-[9px]" />
           </div>
           <div className="relative w-40">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-500" />
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-content-muted" />
             <input
               type="text"
               placeholder="Filtrer..."
-              className="w-full pl-6 pr-2 py-1 text-[10px] bg-slate-950 border border-slate-800 rounded focus:outline-none focus:border-primary/50 text-slate-200"
+              className="w-full pl-6 pr-2 py-1 text-[10px] bg-surface-base border border-edge rounded focus:outline-none focus:border-primary/50 text-content-secondary"
               value={searchTerm}
               onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
             />
@@ -532,8 +532,8 @@ export function TreasurySupervision() {
               <Card
                 key={agency.agenceId}
                 className={cn(
-                  "cursor-pointer transition-all duration-150 hover:bg-slate-800/50 relative overflow-hidden border-slate-800 p-2",
-                  isSelected ? "ring-1 ring-primary border-primary bg-primary/[0.05]" : "hover:border-slate-700"
+                  "cursor-pointer transition-all duration-150 hover:bg-surface/50 relative overflow-hidden border-edge p-2",
+                  isSelected ? "ring-1 ring-primary border-primary bg-primary/[0.05]" : "hover:border-edge"
                 )}
                 onClick={() => toggleAgency(agency.agenceId)}
               >
@@ -541,7 +541,7 @@ export function TreasurySupervision() {
                   <div className="absolute top-0 left-0 w-0.5 h-full" style={{ backgroundColor: getAgencyColor(agency.agenceId) }} />
                 )}
                 <div className="flex justify-between items-start mb-0.5">
-                  <h4 className="font-semibold text-[11px] truncate text-slate-200 max-w-[70%]">{agency.agenceNom}</h4>
+                  <h4 className="font-semibold text-[11px] truncate text-content-secondary max-w-[70%]">{agency.agenceNom}</h4>
                   <Badge
                     value={agency.solde > 0 ? 'Actif' : '—'}
                     variant={agency.solde > 0 ? 'success' : 'neutral'}
@@ -550,10 +550,10 @@ export function TreasurySupervision() {
                   />
                 </div>
                 <div className="flex items-end justify-between">
-                  <span className="text-[9px] text-slate-500 truncate max-w-[40%]">{agency.ville || '—'}</span>
-                  <div className="text-xs font-bold font-mono text-white">
+                  <span className="text-[9px] text-content-muted truncate max-w-[40%]">{agency.ville || '—'}</span>
+                  <div className="text-xs font-bold font-mono text-content-primary">
                     {agency.solde.toLocaleString()}
-                    <span className="text-[8px] font-sans text-slate-500 ml-0.5">F</span>
+                    <span className="text-[8px] font-sans text-content-muted ml-0.5">F</span>
                   </div>
                 </div>
               </Card>
@@ -566,7 +566,7 @@ export function TreasurySupervision() {
             <Button variant="ghost" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="h-5 w-5 p-0">
               <ChevronLeft size={12} />
             </Button>
-            <span className="text-[10px] font-medium text-slate-500">{page}/{totalPages}</span>
+            <span className="text-[10px] font-medium text-content-muted">{page}/{totalPages}</span>
             <Button variant="ghost" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="h-5 w-5 p-0">
               <ChevronRight size={12} />
             </Button>

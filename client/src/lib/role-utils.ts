@@ -2,14 +2,14 @@ import { ROLE_LABELS, SystemRole, normalizeRole } from '@shared/types/roles';
 import { StatutUser } from '@shared/enum/status-constants';
 
 const ROLE_CLASSES: Record<SystemRole, string> = {
-  [SystemRole.ADMIN]: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
-  [SystemRole.CHEF_AGENCE]: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-  [SystemRole.COMPTABLE]: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-  [SystemRole.GESTIONNAIRE_CREDIT]: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
-  [SystemRole.SUPERVISEUR]: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
-  [SystemRole.CAISSIER]: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+  [SystemRole.ADMIN]: 'bg-accent/10 text-accent border-accent/20',
+  [SystemRole.CHEF_AGENCE]: 'bg-status-success-bg text-status-success border-status-success/20',
+  [SystemRole.COMPTABLE]: 'bg-status-warning-bg text-status-warning border-status-warning/20',
+  [SystemRole.GESTIONNAIRE_CREDIT]: 'bg-status-info-bg text-status-info border-status-info/20',
+  [SystemRole.SUPERVISEUR]: 'bg-accent/10 text-accent border-accent/20',
+  [SystemRole.CAISSIER]: 'bg-status-info-bg text-status-info border-status-info/20',
   [SystemRole.AGENT_TERRAIN]: 'bg-pink-500/10 text-pink-400 border-pink-500/20',
-  [SystemRole.CLIENT]: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
+  [SystemRole.CLIENT]: 'bg-surface-subtle/30 text-content-muted border-edge-strong/20',
 };
 
 /**
@@ -17,13 +17,13 @@ const ROLE_CLASSES: Record<SystemRole, string> = {
  */
 export const getRoleBadgeStyle = (role: string) => {
   if (!role) {
-    return { label: 'Inconnu', classes: 'bg-slate-500/10 text-slate-400 border-slate-500/20' };
+    return { label: 'Inconnu', classes: 'bg-surface-subtle/30 text-content-muted border-edge-strong/20' };
   }
   const normalizedRole = normalizeRole(role);
   if (!normalizedRole) {
     return { 
       label: role.charAt(0).toUpperCase() + role.slice(1).replace(/_/g, ' '), 
-      classes: 'bg-slate-500/10 text-slate-400 border-slate-500/20' 
+      classes: 'bg-surface-subtle/30 text-content-muted border-edge-strong/20' 
     };
   }
 
@@ -36,11 +36,11 @@ export const getRoleBadgeStyle = (role: string) => {
 export const STATUS_STYLES: Record<string, { label: string; classes: string }> = {
   'Actif': {
     label: 'Actif',
-    classes: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+    classes: 'bg-status-success-bg text-status-success border-status-success/20'
   },
   'Inactif': {
     label: 'Inactif',
-    classes: 'bg-red-500/10 text-red-400 border-red-500/20'
+    classes: 'bg-status-danger-bg text-status-danger border-status-danger/20'
   }
 };
 
@@ -60,6 +60,6 @@ export const getStatusBadgeStyle = (status: string) => {
 
   return {
     label: s || 'N/A',
-    classes: 'bg-slate-500/10 text-slate-400 border-slate-700/50'
+    classes: 'bg-surface-subtle/30 text-content-muted border-edge-subtle'
   };
 };

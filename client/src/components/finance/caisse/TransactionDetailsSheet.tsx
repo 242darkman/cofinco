@@ -278,7 +278,7 @@ export default function TransactionDetailsSheet({
         if (!transaction) return null;
 
         return (
-            <div className="flex flex-col h-full bg-white dark:bg-slate-900 rounded-t-[10px] md:rounded-l-[16px] md:rounded-tr-none overflow-hidden relative">
+            <div className="flex flex-col h-full bg-surface rounded-t-[10px] md:rounded-l-[16px] md:rounded-tr-none overflow-hidden relative">
                  {/* Hidden Print Templates */}
                  {receiptData && (
                     <div
@@ -300,20 +300,20 @@ export default function TransactionDetailsSheet({
                 {/* Header Section */}
                 <div className={`
                     relative p-6 pt-10 text-center
-                    ${isCredit 
-                        ? 'bg-gradient-to-b from-emerald-50 to-white dark:from-emerald-950/30 dark:to-slate-900' 
-                        : isDebit 
-                            ? 'bg-gradient-to-b from-red-50 to-white dark:from-red-950/30 dark:to-slate-900'
-                            : 'bg-gradient-to-b from-blue-50 to-white dark:from-blue-950/30 dark:to-slate-900'
+                    ${isCredit
+                        ? 'bg-gradient-to-b from-status-success/10'
+                        : isDebit
+                            ? 'bg-gradient-to-b from-status-danger/10'
+                            : 'bg-gradient-to-b from-status-info/10'
                     }
                 `}>
                     {/* Close Button (Mobile Only visible via overlay usually, but good to have explicit) */}
                     {isDesktop && (
                          <button 
                             onClick={onClose}
-                            className="absolute top-4 right-4 p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                            className="absolute top-4 right-4 p-2 rounded-full hover:bg-white/10 transition-colors"
                          >
-                            <X size={20} className="text-slate-500" />
+                            <X size={20} className="text-content-muted" />
                          </button>
                     )}
 
@@ -322,8 +322,8 @@ export default function TransactionDetailsSheet({
                         <span className={`
                             inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide border
                             ${transaction.status === 'Succès' 
-                                ? 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20' 
-                                : 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'}
+                                ? 'bg-status-success-bg text-status-success border-status-success/20' 
+                                : 'bg-surface-muted text-content-muted border-edge'}
                         `}>
                             {transaction.status === 'Succès' && <CheckCircle size={12} strokeWidth={3} />}
                             {ALL_STATUS_LABELS[transaction.status] || transaction.status}
@@ -332,13 +332,13 @@ export default function TransactionDetailsSheet({
 
                     {/* Amount & Type */}
                     <h2 className={`text-4xl font-bold mb-1 ${
-                        isCredit ? 'text-emerald-700 dark:text-emerald-400' : 
-                        isDebit ? 'text-red-700 dark:text-red-400' : 'text-slate-900 dark:text-white'
+                        isCredit ? 'text-status-success' :
+                        isDebit ? 'text-status-danger' : 'text-content-primary'
                     }`}>
                         {isCredit ? '+' : isDebit ? '-' : ''} {formatMoney(transaction.amount, { showCurrency: false })} 
-                        <span className="text-lg text-slate-400 font-medium ml-1">FCFA</span>
+                        <span className="text-lg text-content-muted font-medium ml-1">FCFA</span>
                     </h2>
-                    <p className="text-lg font-medium text-slate-500 flex items-center justify-center gap-2">
+                    <p className="text-lg font-medium text-content-muted flex items-center justify-center gap-2">
                         {isCredit ? <ArrowDownLeft size={20} /> : <ArrowUpRight size={20} />}
                         {transaction.type}
                     </p>
@@ -346,12 +346,12 @@ export default function TransactionDetailsSheet({
                     {/* Reference (Copy-able) */}
                     <button 
                         onClick={handleCopyId}
-                        className="mt-6 mx-auto flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors group"
+                        className="mt-6 mx-auto flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-muted hover:bg-surface-subtle-elevated transition-colors group"
                     >
-                        <span className="text-sm font-mono text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200">
+                        <span className="text-sm font-mono text-content-muted group-hover:text-content-secondary">
                             Ref: {transaction.reference}
                         </span>
-                        <Copy size={14} className="text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300" />
+                        <Copy size={14} className="text-content-muted group-hover:text-content-secondary" />
                     </button>
                 </div>
 
@@ -362,10 +362,10 @@ export default function TransactionDetailsSheet({
                         {/* Client Info */}
                         {transaction.client && (
                             <section>
-                                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                <h3 className="text-xs font-bold text-content-muted uppercase tracking-wider mb-3 flex items-center gap-2">
                                     <User size={14} /> Client
                                 </h3>
-                                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 space-y-3">
+                                <div className="bg-surface-muted/50 rounded-xl p-4 space-y-3">
                                     <DetailRow label="Nom" value={transaction.client.name} />
                                     <DetailRow label="Téléphone" value={transaction.client.phone} />
                                     <DetailRow label="Compte" value={transaction.client.accountNumber || 'Espèces'} />
@@ -375,10 +375,10 @@ export default function TransactionDetailsSheet({
 
                         {/* Transaction Meta */}
                         <section>
-                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                            <h3 className="text-xs font-bold text-content-muted uppercase tracking-wider mb-3 flex items-center gap-2">
                                 <FileText size={14} /> Détails
                             </h3>
-                            <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 space-y-3">
+                            <div className="bg-surface-muted/50 rounded-xl p-4 space-y-3">
                                 <DetailRow label="Date" value={formatDate(transaction.date, { format: 'datetime' })} />
                                 <DetailRow label="Agent" value={transaction.agent || 'Système'} />
                                 {transaction.description && (
@@ -390,13 +390,13 @@ export default function TransactionDetailsSheet({
                         {/* Linked Operations Chain */}
                         {operationChain.length > 1 && (
                             <section>
-                                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                <h3 className="text-xs font-bold text-content-muted uppercase tracking-wider mb-3 flex items-center gap-2">
                                     <Link2 size={14} /> Opérations liées
                                 </h3>
-                                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4">
+                                <div className="bg-surface-muted/50 rounded-xl p-4">
                                     <div className="relative">
                                         {/* Vertical timeline line */}
-                                        <div className="absolute left-3 top-2 bottom-2 w-px bg-slate-200 dark:bg-slate-700" />
+                                        <div className="absolute left-3 top-2 bottom-2 w-px bg-surface-subtle-elevated" />
                                         <div className="space-y-4">
                                             {operationChain.map((op, idx) => {
                                                 const isReversal = !!op.reversal_of_id || !!op.reversalOfId;
@@ -406,36 +406,36 @@ export default function TransactionDetailsSheet({
                                                         {/* Timeline dot */}
                                                         <div className={`relative z-10 w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
                                                             isReversal
-                                                                ? 'bg-red-100 dark:bg-red-500/20'
-                                                                : 'bg-emerald-100 dark:bg-emerald-500/20'
-                                                        } ${isCurrent ? 'ring-2 ring-cyan-400' : ''}`}>
+                                                                ? 'bg-status-danger-bg'
+                                                                : 'bg-status-success-bg'
+                                                        } ${isCurrent ? 'ring-2 ring-accent' : ''}`}>
                                                             {isReversal ? (
-                                                                <RotateCcw size={12} className="text-red-500 dark:text-red-400" />
+                                                                <RotateCcw size={12} className="text-status-danger" />
                                                             ) : (
-                                                                <CheckCircle size={12} className="text-emerald-500 dark:text-emerald-400" />
+                                                                <CheckCircle size={12} className="text-status-success" />
                                                             )}
                                                         </div>
                                                         {/* Details */}
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center gap-2">
-                                                                <span className={`text-xs font-bold ${isReversal ? 'text-red-500 dark:text-red-400' : 'text-slate-700 dark:text-slate-200'}`}>
+                                                                <span className={`text-xs font-bold ${isReversal ? 'text-status-danger' : 'text-content-secondary'}`}>
                                                                     {isReversal ? 'Annulation' : (op.typeOperation || 'Opération')}
                                                                 </span>
                                                                 {isCurrent && (
-                                                                    <span className="text-[10px] px-1.5 py-0.5 bg-cyan-100 dark:bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 rounded font-medium">
+                                                                    <span className="text-[10px] px-1.5 py-0.5 bg-accent/10 text-accent rounded font-medium">
                                                                         actuelle
                                                                     </span>
                                                                 )}
                                                             </div>
-                                                            <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                                                            <div className="text-[11px] text-content-muted mt-0.5">
                                                                 {formatMoney(Number(op.montant), { showCurrency: true })} · {formatDate(op.createdAt, { format: 'datetime' })}
                                                             </div>
                                                             {op.reversalReason && (
-                                                                <div className="text-[10px] text-red-400 mt-0.5 italic">
+                                                                <div className="text-[10px] text-status-danger mt-0.5 italic">
                                                                     Motif: {op.reversalReason}
                                                                 </div>
                                                             )}
-                                                            <div className="text-[10px] text-slate-500 font-mono mt-0.5">
+                                                            <div className="text-[10px] text-content-muted font-mono mt-0.5">
                                                                 {op.reference}
                                                             </div>
                                                         </div>
@@ -453,8 +453,8 @@ export default function TransactionDetailsSheet({
 
                 {/* Cancel Confirmation Dialog */}
                 {showCancelConfirm && (
-                    <div className="p-4 border-t border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30">
-                        <div className="flex items-center gap-2 mb-3 text-amber-700 dark:text-amber-400">
+                    <div className="p-4 border-t border-status-warning/30 bg-status-warning-bg">
+                        <div className="flex items-center gap-2 mb-3 text-status-warning">
                             <AlertTriangle size={18} />
                             <span className="font-semibold text-sm">Confirmer l'annulation</span>
                         </div>
@@ -462,7 +462,7 @@ export default function TransactionDetailsSheet({
                             value={cancelReason}
                             onChange={(e) => setCancelReason(e.target.value)}
                             placeholder="Motif d'annulation (obligatoire)..."
-                            className="w-full p-3 text-sm border border-amber-300 dark:border-amber-700 rounded-lg bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-none"
+                            className="w-full p-3 text-sm border border-status-warning rounded-lg bg-surface text-content-primary placeholder-content-muted focus:ring-2 focus:ring-status-warning focus:border-transparent resize-none"
                             rows={2}
                             autoFocus
                         />
@@ -477,7 +477,7 @@ export default function TransactionDetailsSheet({
                             </Button>
                             <Button
                                 variant="primary"
-                                className="flex-1 h-10 rounded-lg text-sm bg-red-600 hover:bg-red-500 text-white"
+                                className="flex-1 h-10 rounded-lg text-sm bg-status-danger hover:bg-status-danger text-white"
                                 onClick={handleCancel}
                                 disabled={isCancelling || cancelReason.trim().length < 3}
                             >
@@ -489,13 +489,13 @@ export default function TransactionDetailsSheet({
 
                 {/* Footer Actions */}
                 {!showCancelConfirm && (
-                <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 safe-area-bottom">
+                <div className="p-4 border-t border-edge-subtle bg-surface safe-area-bottom">
                     <div className="flex gap-3">
                          {/* Cancel Button (only for POSTED operations) */}
                          {!isReversed && (
                             <Button
                                 variant="outline"
-                                className="h-12 rounded-xl border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-950/30 text-red-600 dark:text-red-400"
+                                className="h-12 rounded-xl border-status-danger/30 hover:bg-status-danger-bg text-status-danger"
                                 onClick={() => setShowCancelConfirm(true)}
                                 title="Annuler cette opération"
                             >
@@ -506,7 +506,7 @@ export default function TransactionDetailsSheet({
                          {/* Send Receipt SMS */}
                          <Button
                              variant="outline"
-                             className="h-12 rounded-xl border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200"
+                             className="h-12 rounded-xl border-edge hover:bg-surface-muted text-content-secondary"
                              onClick={() => handleSendReceipt("SMS")}
                              disabled={isSendingReceipt}
                              title="Envoyer le reçu par SMS"
@@ -517,7 +517,7 @@ export default function TransactionDetailsSheet({
                          {/* Send Receipt Email */}
                          <Button
                              variant="outline"
-                             className="h-12 rounded-xl border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200"
+                             className="h-12 rounded-xl border-edge hover:bg-surface-muted text-content-secondary"
                              onClick={() => handleSendReceipt("EMAIL")}
                              disabled={isSendingReceipt}
                              title="Envoyer le reçu par Email"
@@ -528,7 +528,7 @@ export default function TransactionDetailsSheet({
                          {/* PDF Download Button */}
                         <Button
                             variant="outline"
-                            className="flex-1 h-12 rounded-xl border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200"
+                            className="flex-1 h-12 rounded-xl border-edge hover:bg-surface-muted text-content-secondary"
                             onClick={() => downloadPDF(ticketRef)}
                         >
                             <Download size={18} className="mr-2" /> PDF
@@ -537,12 +537,12 @@ export default function TransactionDetailsSheet({
                         {/* Print Button */}
                         <Button
                             variant="primary"
-                            className={`flex-1 h-12 rounded-xl text-white shadow-lg shadow-${themeColor}-500/20
+                            className={`flex-1 h-12 rounded-xl text-content-primary shadow-lg shadow-${themeColor}-500/20
                                 ${isCredit
-                                    ? 'bg-emerald-600 hover:bg-emerald-500'
+                                    ? 'bg-status-success hover:bg-status-success'
                                     : isDebit
-                                        ? 'bg-red-600 hover:bg-red-500'
-                                        : 'bg-blue-600 hover:bg-blue-500'
+                                        ? 'bg-status-danger hover:bg-status-danger'
+                                        : 'bg-status-info hover:bg-status-info'
                                 }
                             `}
                             onClick={handlePrint}
@@ -571,7 +571,7 @@ export default function TransactionDetailsSheet({
                 />
                 
                 {/* Slideover Content */}
-                <div className="relative w-full max-w-md h-full bg-white dark:bg-slate-900 shadow-2xl animate-in slide-in-from-right duration-300 flex flex-col border-l border-slate-200 dark:border-slate-800">
+                <div className="relative w-full max-w-md h-full bg-surface shadow-2xl animate-in slide-in-from-right duration-300 flex flex-col border-l border-edge">
                     <Content />
                 </div>
              </div>
@@ -583,13 +583,13 @@ export default function TransactionDetailsSheet({
         <Drawer.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
             <Drawer.Portal>
                 <Drawer.Overlay className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm" />
-                <Drawer.Content className="bg-white dark:bg-slate-900 flex flex-col rounded-t-[20px] h-[85vh] fixed bottom-0 left-0 right-0 z-50 outline-none">
+                <Drawer.Content className="bg-surface flex flex-col rounded-t-[20px] h-[85vh] fixed bottom-0 left-0 right-0 z-50 outline-none">
                     {/* Handle Bar */}
-                    <div className="p-4 bg-white dark:bg-slate-900 rounded-t-[20px] flex justify-center shrink-0">
-                         <div className="w-12 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full" />
+                    <div className="p-4 bg-surface rounded-t-[20px] flex justify-center shrink-0">
+                         <div className="w-12 h-1.5 bg-surface-subtle-elevated rounded-full" />
                     </div>
                     
-                    <div className="flex-1 overflow-hidden flex flex-col bg-white dark:bg-slate-900">
+                    <div className="flex-1 overflow-hidden flex flex-col bg-surface">
                         <Content />
                     </div>
                 </Drawer.Content>
@@ -602,9 +602,9 @@ export default function TransactionDetailsSheet({
 function DetailRow({ label, value, className = '' }: { label: string, value?: string | React.ReactNode, className?: string }) {
     if (!value) return null;
     return (
-        <div className="flex items-start justify-between py-1 border-b border-dashed border-slate-100 dark:border-slate-700/50 last:border-0">
-            <dt className="text-sm font-medium text-slate-500 dark:text-slate-400">{label}</dt>
-            <dd className={`text-sm font-bold text-slate-900 dark:text-slate-200 text-right max-w-[60%] ${className}`}>
+        <div className="flex items-start justify-between py-1 border-b border-dashed border-edge-subtle-subtle last:border-0">
+            <dt className="text-sm font-medium text-content-muted">{label}</dt>
+            <dd className={`text-sm font-bold text-content-primary text-right max-w-[60%] ${className}`}>
                 {value}
             </dd>
         </div>

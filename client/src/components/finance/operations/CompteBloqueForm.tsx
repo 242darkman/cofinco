@@ -130,37 +130,37 @@ export default function CompteBloqueForm({ onClose, onSuccess, clientId }: Compt
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="bg-gradient-to-r from-emerald-500/20 to-blue-500/20 border-b border-slate-700 p-6 flex justify-between items-center">
+      <div className="bg-surface rounded-xl border border-edge w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="bg-gradient-to-r from-status-success/20 to-status-info/20 border-b border-edge p-6 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <Lock className="text-emerald-400" size={24} />
+            <Lock className="text-status-success" size={24} />
             <div>
-              <h2 className="text-2xl font-bold text-white">Nouveau Compte Bloqué</h2>
-              <p className="text-slate-400 text-sm">Compte à terme avec taux d'intérêt fixe</p>
+              <h2 className="text-2xl font-bold text-content-primary">Nouveau Compte Bloqué</h2>
+              <p className="text-content-muted text-sm">Compte à terme avec taux d'intérêt fixe</p>
             </div>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white">
+          <button onClick={onClose} className="text-content-muted hover:text-content-primary">
             <X size={24} />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           {errors.general && (
-            <div className="bg-blue-500/20 border border-blue-500 rounded-lg p-4">
-              <span className="text-blue-400">{errors.general}</span>
+            <div className="bg-status-info-bg border border-status-info rounded-lg p-4">
+              <span className="text-status-info">{errors.general}</span>
             </div>
           )}
 
           <div className="grid md:grid-cols-2 gap-6">
             <div className="md:col-span-2">
-              <label className="block text-sm font-semibold text-slate-300 mb-2">
+              <label className="block text-sm font-semibold text-content-secondary mb-2">
                 <User size={16} className="inline mr-2" />
                 Client *
               </label>
               <select
                 value={formData.client_id}
                 onChange={(e) => setFormData({ ...formData, client_id: e.target.value })}
-                className={`w-full bg-slate-700 border ${errors.client_id ? 'border-blue-500' : 'border-slate-600'} rounded-lg px-4 py-3 text-white`}
+                className={`w-full bg-surface-elevated border ${errors.client_id ? 'border-status-info' : 'border-edge-strong'} rounded-lg px-4 py-3 text-content-primary`}
                 disabled={!!clientId}
               >
                 <option value="">Sélectionner un client</option>
@@ -170,11 +170,11 @@ export default function CompteBloqueForm({ onClose, onSuccess, clientId }: Compt
                   </option>
                 ))}
               </select>
-              {errors.client_id && <p className="text-blue-400 text-sm mt-1">{errors.client_id}</p>}
+              {errors.client_id && <p className="text-status-info text-sm mt-1">{errors.client_id}</p>}
             </div>
 
             <div className="md:col-span-2">
-              <label className="block text-sm font-semibold text-slate-300 mb-2">
+              <label className="block text-sm font-semibold text-content-secondary mb-2">
                 <DollarSign size={16} className="inline mr-2" />
                 Montant à Bloquer (FC) *
               </label>
@@ -182,21 +182,21 @@ export default function CompteBloqueForm({ onClose, onSuccess, clientId }: Compt
                 type="number"
                 value={formData.montant_initial}
                 onChange={(e) => setFormData({ ...formData, montant_initial: e.target.value })}
-                className={`w-full bg-slate-700 border ${errors.montant_initial ? 'border-blue-500' : 'border-slate-600'} rounded-lg px-4 py-3 text-white text-lg`}
+                className={`w-full bg-surface-elevated border ${errors.montant_initial ? 'border-status-info' : 'border-edge-strong'} rounded-lg px-4 py-3 text-content-primary text-lg`}
                 placeholder="Montant minimum requis"
               />
-              {errors.montant_initial && <p className="text-blue-400 text-sm mt-1">{errors.montant_initial}</p>}
+              {errors.montant_initial && <p className="text-status-info text-sm mt-1">{errors.montant_initial}</p>}
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-300 mb-2">
+              <label className="block text-sm font-semibold text-content-secondary mb-2">
                 <Calendar size={16} className="inline mr-2" />
                 Durée (mois) *
               </label>
               <select
                 value={formData.duree_mois}
                 onChange={(e) => setFormData({ ...formData, duree_mois: e.target.value })}
-                className={`w-full bg-slate-700 border ${errors.duree_mois ? 'border-blue-500' : 'border-slate-600'} rounded-lg px-4 py-3 text-white`}
+                className={`w-full bg-surface-elevated border ${errors.duree_mois ? 'border-status-info' : 'border-edge-strong'} rounded-lg px-4 py-3 text-content-primary`}
               >
                 <option value="3">3 mois</option>
                 <option value="6">6 mois</option>
@@ -204,11 +204,11 @@ export default function CompteBloqueForm({ onClose, onSuccess, clientId }: Compt
                 <option value="24">24 mois</option>
                 <option value="36">36 mois</option>
               </select>
-              {errors.duree_mois && <p className="text-blue-400 text-sm mt-1">{errors.duree_mois}</p>}
+              {errors.duree_mois && <p className="text-status-info text-sm mt-1">{errors.duree_mois}</p>}
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-300 mb-2">
+              <label className="block text-sm font-semibold text-content-secondary mb-2">
                 <Percent size={16} className="inline mr-2" />
                 Taux d'Intérêt Annuel (%) *
               </label>
@@ -217,14 +217,14 @@ export default function CompteBloqueForm({ onClose, onSuccess, clientId }: Compt
                 step="0.1"
                 value={formData.taux_interet}
                 onChange={(e) => setFormData({ ...formData, taux_interet: e.target.value })}
-                className={`w-full bg-slate-700 border ${errors.taux_interet ? 'border-blue-500' : 'border-slate-600'} rounded-lg px-4 py-3 text-white`}
+                className={`w-full bg-surface-elevated border ${errors.taux_interet ? 'border-status-info' : 'border-edge-strong'} rounded-lg px-4 py-3 text-content-primary`}
                 placeholder="8.0"
               />
-              {errors.taux_interet && <p className="text-blue-400 text-sm mt-1">{errors.taux_interet}</p>}
+              {errors.taux_interet && <p className="text-status-info text-sm mt-1">{errors.taux_interet}</p>}
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-slate-300 mb-2">
+              <label className="block text-sm font-semibold text-content-secondary mb-2">
                 Pénalité Retrait Anticipé (%)
               </label>
               <input
@@ -232,20 +232,20 @@ export default function CompteBloqueForm({ onClose, onSuccess, clientId }: Compt
                 step="0.1"
                 value={formData.penalite_retrait_anticipe}
                 onChange={(e) => setFormData({ ...formData, penalite_retrait_anticipe: e.target.value })}
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-white"
+                className="w-full bg-surface-elevated border border-edge-strong rounded-lg px-4 py-3 text-content-primary"
                 placeholder="10"
               />
-              <p className="text-xs text-slate-400 mt-1">Appliqué sur les intérêts en cas de retrait anticipé</p>
+              <p className="text-xs text-content-muted mt-1">Appliqué sur les intérêts en cas de retrait anticipé</p>
             </div>
 
             <div className="md:col-span-2">
-              <label className="block text-sm font-semibold text-slate-300 mb-2">
+              <label className="block text-sm font-semibold text-content-secondary mb-2">
                 Description
               </label>
               <textarea
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-white"
+                className="w-full bg-surface-elevated border border-edge-strong rounded-lg px-4 py-3 text-content-primary"
                 rows={2}
                 placeholder="Objectif du placement..."
               />
@@ -253,31 +253,31 @@ export default function CompteBloqueForm({ onClose, onSuccess, clientId }: Compt
           </div>
 
           {formData.montant_initial && (
-            <div className="bg-gradient-to-br from-emerald-500/20 to-blue-500/20 border border-emerald-500/50 rounded-lg p-6">
-              <h3 className="text-lg font-bold text-white mb-4">Estimation du Placement</h3>
+            <div className="bg-gradient-to-br from-status-success/20 to-status-info/20 border border-status-success/50 rounded-lg p-6">
+              <h3 className="text-lg font-bold text-content-primary mb-4">Estimation du Placement</h3>
               <div className="grid md:grid-cols-3 gap-4">
                 <div>
-                  <div className="text-slate-400 text-sm mb-1">Date d'échéance</div>
-                  <div className="text-white font-bold">{echeance.toLocaleDateString()}</div>
+                  <div className="text-content-muted text-sm mb-1">Date d'échéance</div>
+                  <div className="text-content-primary font-bold">{echeance.toLocaleDateString()}</div>
                 </div>
                 <div>
-                  <div className="text-slate-400 text-sm mb-1">Intérêts estimés</div>
-                  <div className="text-green-400 font-bold text-lg">{interetsEstimes.toLocaleString()} FCFA</div>
+                  <div className="text-content-muted text-sm mb-1">Intérêts estimés</div>
+                  <div className="text-status-success font-bold text-lg">{interetsEstimes.toLocaleString()} FCFA</div>
                 </div>
                 <div>
-                  <div className="text-slate-400 text-sm mb-1">Montant total à l'échéance</div>
-                  <div className="text-emerald-400 font-bold text-xl">{montantFinal.toLocaleString()} FCFA</div>
+                  <div className="text-content-muted text-sm mb-1">Montant total à l'échéance</div>
+                  <div className="text-status-success font-bold text-xl">{montantFinal.toLocaleString()} FCFA</div>
                 </div>
               </div>
             </div>
           )}
 
-          <div className="bg-blue-500/10 border border-blue-500/50 rounded-lg p-4">
+          <div className="bg-status-info-bg border border-status-info/50 rounded-lg p-4">
             <div className="flex items-start gap-3">
-              <AlertCircle className="text-blue-400 flex-shrink-0 mt-1" size={20} />
-              <div className="text-sm text-slate-300">
-                <p className="font-semibold text-white mb-1">Conditions du Compte Bloqué</p>
-                <ul className="space-y-1 text-slate-400">
+              <AlertCircle className="text-status-info flex-shrink-0 mt-1" size={20} />
+              <div className="text-sm text-content-secondary">
+                <p className="font-semibold text-content-primary mb-1">Conditions du Compte Bloqué</p>
+                <ul className="space-y-1 text-content-muted">
                   <li>• Le montant sera bloqué jusqu'à la date d'échéance</li>
                   <li>• Les intérêts sont calculés sur toute la durée</li>
                   <li>• Retrait anticipé possible avec pénalité de {formData.penalite_retrait_anticipe}%</li>
@@ -292,14 +292,14 @@ export default function CompteBloqueForm({ onClose, onSuccess, clientId }: Compt
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-semibold transition"
+              className="flex-1 px-6 py-3 bg-surface-elevated hover:bg-surface-subtle text-content-primary rounded-lg font-semibold transition"
             >
               Annuler
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold transition disabled:opacity-50"
+              className="flex-1 px-6 py-3 bg-status-success hover:bg-status-success text-white rounded-lg font-semibold transition disabled:opacity-50"
             >
               {loading ? 'Création...' : 'Bloquer le Montant'}
             </button>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { requestAllPages } from '../../lib/api-client';
 import { FileText, Download, TrendingUp, Users, DollarSign, Activity, BarChart3, Filter, ChevronLeft, ChevronRight, Eye, Calendar, Loader2 } from 'lucide-react';
 import { addPdfLogoHeader } from '@/lib/pdf-logo';
+import { useBranding } from '@/contexts/BrandingContext';
 import { toast } from '../../lib/toast';
 import { loadPDFLibraries } from '@/lib/lazy-export';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../ui/sheet';
@@ -28,6 +29,7 @@ interface Rapport {
 }
 
 export default function AgentRapports({ agentId }: { agentId?: string }) {
+  const { branding } = useBranding();
   const [rapports, setRapports] = useState<Rapport[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -123,6 +125,7 @@ export default function AgentRapports({ agentId }: { agentId?: string }) {
       title: 'Rapport Agent Terrain',
       subtitle: `Période: ${periodeDu} au ${periodeAu} | Type: ${typeRapport}`,
       dateRight: `Généré le: ${new Date().toLocaleDateString('fr-FR')}`,
+      appName: branding.appName,
     });
 
     doc.setFontSize(10);
@@ -170,15 +173,15 @@ export default function AgentRapports({ agentId }: { agentId?: string }) {
       </div>
 
       {/* Generation Form Compact */}
-      <div className="bg-slate-900/50 rounded-xl p-3 border border-slate-800">
+      <div className="bg-surface-base/50 rounded-xl p-3 border border-edge">
         <div className="flex flex-col md:flex-row gap-2 items-end">
           <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-2 w-full">
             <div>
-              <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Type</label>
+              <label className="block text-[10px] uppercase font-bold text-content-muted mb-1">Type</label>
               <select
                 value={typeRapport}
                 onChange={(e) => setTypeRapport(e.target.value)}
-                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs"
+                className="w-full px-2 py-1.5 bg-surface border border-edge rounded-lg text-content-primary text-xs"
               >
                 <option value="Quotidien">Quotidien</option>
                 <option value="Hebdomadaire">Hebdomadaire</option>
@@ -189,22 +192,22 @@ export default function AgentRapports({ agentId }: { agentId?: string }) {
             </div>
 
             <div>
-              <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Du</label>
+              <label className="block text-[10px] uppercase font-bold text-content-muted mb-1">Du</label>
               <input
                 type="date"
                 value={periodeDu}
                 onChange={(e) => setPeriodeDu(e.target.value)}
-                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs"
+                className="w-full px-2 py-1.5 bg-surface border border-edge rounded-lg text-content-primary text-xs"
               />
             </div>
 
             <div>
-              <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Au</label>
+              <label className="block text-[10px] uppercase font-bold text-content-muted mb-1">Au</label>
               <input
                 type="date"
                 value={periodeAu}
                 onChange={(e) => setPeriodeAu(e.target.value)}
-                className="w-full px-2 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs"
+                className="w-full px-2 py-1.5 bg-surface border border-edge rounded-lg text-content-primary text-xs"
               />
             </div>
             
@@ -212,7 +215,7 @@ export default function AgentRapports({ agentId }: { agentId?: string }) {
               <button
                 onClick={genererRapport}
                 disabled={generating || !selectedAgent}
-                className="flex-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold text-xs transition disabled:opacity-50 flex items-center justify-center gap-1.5"
+                className="flex-1 px-3 py-1.5 bg-status-info hover:bg-status-info text-white rounded-lg font-bold text-xs transition disabled:opacity-50 flex items-center justify-center gap-1.5"
               >
                 {generating ? <Loader2 size={14} className="animate-spin" /> : <Filter size={14} />}
                 Générer
@@ -220,7 +223,7 @@ export default function AgentRapports({ agentId }: { agentId?: string }) {
               <button
                 onClick={exportPDF}
                 disabled={rapports.length === 0}
-                className="px-3 py-1.5 bg-green-600 hover:bg-green-500 text-white rounded-lg flex items-center gap-1.5 text-xs font-bold transition disabled:opacity-50"
+                className="px-3 py-1.5 bg-status-success hover:bg-status-success text-white rounded-lg flex items-center gap-1.5 text-xs font-bold transition disabled:opacity-50"
               >
                 <Download size={14} />
                 PDF
@@ -231,65 +234,65 @@ export default function AgentRapports({ agentId }: { agentId?: string }) {
       </div>
 
       {/* Reports List */}
-      <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between bg-slate-900/30">
-          <h3 className="text-sm font-bold text-white flex items-center gap-2">
-            <FileText size={16} className="text-blue-400" />
+      <div className="bg-surface rounded-xl border border-edge overflow-hidden">
+        <div className="px-4 py-3 border-b border-edge flex items-center justify-between bg-surface-base/30">
+          <h3 className="text-sm font-bold text-content-primary flex items-center gap-2">
+            <FileText size={16} className="text-status-info" />
             Rapports Générés
           </h3>
-          <span className="text-[10px] text-slate-500 font-medium">{rapports.length} rapports</span>
+          <span className="text-[10px] text-content-muted font-medium">{rapports.length} rapports</span>
         </div>
         
         {loading ? (
-          <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-cyan-500" /></div>
+          <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent" /></div>
         ) : rapports.length === 0 ? (
           <div className="text-center py-12 opacity-50">
-            <FileText size={32} className="mx-auto mb-2 text-slate-500" />
-            <p className="text-sm text-slate-400">Aucun rapport disponible</p>
+            <FileText size={32} className="mx-auto mb-2 text-content-muted" />
+            <p className="text-sm text-content-muted">Aucun rapport disponible</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-slate-900/50">
+              <thead className="bg-surface-base/50">
                 <tr>
-                  <th className="px-3 py-2 text-left text-xs font-bold text-slate-400 uppercase">Période</th>
-                  <th className="px-3 py-2 text-left text-xs font-bold text-slate-400 uppercase">Type</th>
-                  <th className="px-3 py-2 text-right text-xs font-bold text-slate-400 uppercase hidden sm:table-cell">Visites</th>
-                  <th className="px-3 py-2 text-right text-xs font-bold text-slate-400 uppercase hidden md:table-cell">Collectes</th>
-                  <th className="px-3 py-2 text-right text-xs font-bold text-slate-400 uppercase">Montant</th>
-                  <th className="px-3 py-2 text-right text-xs font-bold text-slate-400 uppercase hidden lg:table-cell">Taux</th>
-                  <th className="px-3 py-2 text-right text-xs font-bold text-slate-400 uppercase"></th>
+                  <th className="px-3 py-2 text-left text-xs font-bold text-content-muted uppercase">Période</th>
+                  <th className="px-3 py-2 text-left text-xs font-bold text-content-muted uppercase">Type</th>
+                  <th className="px-3 py-2 text-right text-xs font-bold text-content-muted uppercase hidden sm:table-cell">Visites</th>
+                  <th className="px-3 py-2 text-right text-xs font-bold text-content-muted uppercase hidden md:table-cell">Collectes</th>
+                  <th className="px-3 py-2 text-right text-xs font-bold text-content-muted uppercase">Montant</th>
+                  <th className="px-3 py-2 text-right text-xs font-bold text-content-muted uppercase hidden lg:table-cell">Taux</th>
+                  <th className="px-3 py-2 text-right text-xs font-bold text-content-muted uppercase"></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-700/50">
+              <tbody className="divide-y divide-edge/50">
                 {paginatedRapports.map((rapport) => (
                   <tr 
                     key={rapport.id} 
-                    className="hover:bg-slate-700/30 transition cursor-pointer group"
+                    className="hover:bg-surface-elevated/30 transition cursor-pointer group"
                     onClick={() => setSelectedRapport(rapport)}
                   >
-                    <td className="px-3 py-2 text-xs text-white">
+                    <td className="px-3 py-2 text-xs text-content-primary">
                       {new Date(rapport.periodeDebut).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })} - {new Date(rapport.periodeFin).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
                     </td>
                     <td className="px-3 py-2">
-                      <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded text-[10px] font-bold uppercase">
+                      <span className="px-2 py-0.5 bg-status-info-bg text-status-info rounded text-[10px] font-bold uppercase">
                         {rapport.typeRapport}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-right text-xs text-slate-300 hidden sm:table-cell">{rapport.nombreVisites}</td>
-                    <td className="px-3 py-2 text-right text-xs text-green-400 hidden md:table-cell">{rapport.nombreCollectes}</td>
-                    <td className="px-3 py-2 text-right text-xs text-white font-bold">{rapport.montantTotalCollecte.toLocaleString()}</td>
+                    <td className="px-3 py-2 text-right text-xs text-content-secondary hidden sm:table-cell">{rapport.nombreVisites}</td>
+                    <td className="px-3 py-2 text-right text-xs text-status-success hidden md:table-cell">{rapport.nombreCollectes}</td>
+                    <td className="px-3 py-2 text-right text-xs text-content-primary font-bold">{rapport.montantTotalCollecte.toLocaleString()}</td>
                     <td className="px-3 py-2 text-right text-xs hidden lg:table-cell">
                       <span className={`font-bold ${
-                        rapport.tauxReussite >= 80 ? 'text-green-400' :
-                        rapport.tauxReussite >= 60 ? 'text-cyan-400' :
-                        'text-amber-400'
+                        rapport.tauxReussite >= 80 ? 'text-status-success' :
+                        rapport.tauxReussite >= 60 ? 'text-accent' :
+                        'text-status-warning'
                       }`}>
                         {rapport.tauxReussite.toFixed(1)}%
                       </span>
                     </td>
                     <td className="px-3 py-2 text-right">
-                      <Eye size={14} className="text-slate-600 group-hover:text-cyan-400 inline-block" />
+                      <Eye size={14} className="text-content-muted group-hover:text-accent inline-block" />
                     </td>
                   </tr>
                 ))}
@@ -300,20 +303,20 @@ export default function AgentRapports({ agentId }: { agentId?: string }) {
 
         {/* Pagination Footer */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-3 py-2 border-t border-slate-700/50 bg-slate-900/20">
-            <span className="text-[10px] text-slate-500">Page {currentPage} sur {totalPages}</span>
+          <div className="flex items-center justify-between px-3 py-2 border-t border-edge-subtle bg-surface-base/20">
+            <span className="text-[10px] text-content-muted">Page {currentPage} sur {totalPages}</span>
             <div className="flex gap-1">
               <button
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
-                className="p-1 rounded bg-slate-800 border border-slate-700 text-slate-400 hover:text-white disabled:opacity-30 transition"
+                className="p-1 rounded bg-surface border border-edge text-content-muted hover:text-content-primary disabled:opacity-30 transition"
               >
                 <ChevronLeft size={12} />
               </button>
               <button
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
-                className="p-1 rounded bg-slate-800 border border-slate-700 text-slate-400 hover:text-white disabled:opacity-30 transition"
+                className="p-1 rounded bg-surface border border-edge text-content-muted hover:text-content-primary disabled:opacity-30 transition"
               >
                 <ChevronRight size={12} />
               </button>
@@ -324,24 +327,24 @@ export default function AgentRapports({ agentId }: { agentId?: string }) {
 
       {/* Detail Sheet */}
       <Sheet open={!!selectedRapport} onOpenChange={(open) => !open && setSelectedRapport(null)}>
-        <SheetContent className="w-full sm:max-w-md bg-slate-950 border-l-slate-800 p-0 overflow-y-auto">
+        <SheetContent className="w-full sm:max-w-md bg-surface-base border-l-edge p-0 overflow-y-auto">
           {selectedRapport && (
             <>
-              <SheetHeader className="px-6 py-4 border-b border-slate-800 bg-slate-950/50 backdrop-blur sticky top-0 z-10">
-                <SheetTitle className="text-white flex items-center gap-2">
-                  <FileText size={16} className="text-blue-400" />
+              <SheetHeader className="px-6 py-4 border-b border-edge bg-surface-base/50 backdrop-blur sticky top-0 z-10">
+                <SheetTitle className="text-content-primary flex items-center gap-2">
+                  <FileText size={16} className="text-status-info" />
                   Détail Rapport
                 </SheetTitle>
-                <SheetDescription className="text-slate-400">
+                <SheetDescription className="text-content-muted">
                   {selectedRapport.typeRapport} • {new Date(selectedRapport.periodeDebut).toLocaleDateString('fr-FR')} au {new Date(selectedRapport.periodeFin).toLocaleDateString('fr-FR')}
                 </SheetDescription>
               </SheetHeader>
 
               <div className="p-6 space-y-6">
                 {/* Main Summary Card */}
-                <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 text-center">
-                  <div className="text-xs text-slate-400 uppercase font-bold mb-1">Montant Total Collecté</div>
-                  <div className="text-2xl font-bold text-white">{selectedRapport.montantTotalCollecte.toLocaleString()} FCFA</div>
+                <div className="bg-surface-base/50 border border-edge rounded-xl p-4 text-center">
+                  <div className="text-xs text-content-muted uppercase font-bold mb-1">Montant Total Collecté</div>
+                  <div className="text-2xl font-bold text-content-primary">{selectedRapport.montantTotalCollecte.toLocaleString()} FCFA</div>
                 </div>
 
                 {/* Stats Grid */}
@@ -357,16 +360,16 @@ export default function AgentRapports({ agentId }: { agentId?: string }) {
                 {/* Notes */}
                 {selectedRapport.notes && (
                   <div className="space-y-2">
-                    <h4 className="text-xs font-bold text-slate-500 uppercase">Notes</h4>
-                    <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg text-sm text-slate-300 italic">
+                    <h4 className="text-xs font-bold text-content-muted uppercase">Notes</h4>
+                    <div className="p-3 bg-surface-base border border-edge rounded-lg text-sm text-content-secondary italic">
                       "{selectedRapport.notes}"
                     </div>
                   </div>
                 )}
 
                 {/* Meta */}
-                <div className="pt-4 border-t border-slate-800">
-                  <div className="text-[10px] text-slate-500 text-center">
+                <div className="pt-4 border-t border-edge">
+                  <div className="text-[10px] text-content-muted text-center">
                     Créé le {new Date(selectedRapport.createdAt).toLocaleString('fr-FR')}
                   </div>
                 </div>
@@ -385,10 +388,10 @@ export default function AgentRapports({ agentId }: { agentId?: string }) {
 
 function StatCard({ icon, label, value, color }: { icon: React.ReactNode, label: string, value: string, color: string }) {
     const colorClasses: Record<string, string> = {
-        blue: 'from-blue-500/20 to-blue-600/5 border-blue-500/20 text-blue-400',
-        green: 'from-green-500/20 to-green-600/5 border-green-500/20 text-green-400',
-        emerald: 'from-emerald-500/20 to-emerald-600/5 border-emerald-500/20 text-emerald-400',
-        cyan: 'from-cyan-500/20 to-cyan-600/5 border-cyan-500/20 text-cyan-400',
+        blue: 'from-status-info/20 to-status-info/5 border-status-info/20 text-status-info',
+        green: 'from-status-success/20 to-status-success/5 border-status-success/20 text-status-success',
+        emerald: 'from-status-success/20 to-status-success/5 border-status-success/20 text-status-success',
+        cyan: 'from-accent/20 to-accent/5 border-accent/20 text-accent',
     };
     
     return (
@@ -396,7 +399,7 @@ function StatCard({ icon, label, value, color }: { icon: React.ReactNode, label:
             <div className="flex justify-between items-start mb-1">
                 <div className="p-1.5 rounded-lg bg-white/5">{icon}</div>
             </div>
-            <div className="text-lg font-bold text-white truncate">{value}</div>
+            <div className="text-lg font-bold text-content-primary truncate">{value}</div>
             <div className="text-[10px] uppercase font-bold opacity-70 tracking-wide">{label}</div>
         </div>
     );
@@ -404,9 +407,9 @@ function StatCard({ icon, label, value, color }: { icon: React.ReactNode, label:
 
 function InfoItem({ label, value }: { label: string, value: string }) {
     return (
-        <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800">
-            <div className="text-[10px] uppercase font-bold text-slate-500 mb-0.5">{label}</div>
-            <div className="text-sm font-medium text-slate-200">{value}</div>
+        <div className="p-2.5 bg-surface-base rounded-lg border border-edge">
+            <div className="text-[10px] uppercase font-bold text-content-muted mb-0.5">{label}</div>
+            <div className="text-sm font-medium text-content-secondary">{value}</div>
         </div>
     );
 }

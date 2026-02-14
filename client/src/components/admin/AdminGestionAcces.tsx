@@ -279,13 +279,13 @@ export default function AdminGestionAcces() {
   const getStatusColor = (statut?: string) => {
     switch (statut) {
       case StatutUser.ACTIVE:
-        return 'bg-green-500/20 text-green-400';
+        return 'bg-status-success-bg text-status-success';
       case StatutUser.INACTIVE:
-        return 'bg-slate-500/20 text-slate-400';
+        return 'bg-surface-subtle/40 text-content-muted';
       case StatutUser.SUSPENDED:
-        return 'bg-blue-500/20 text-blue-400';
+        return 'bg-status-info-bg text-status-info';
       default:
-        return 'bg-slate-500/20 text-slate-400';
+        return 'bg-surface-subtle/40 text-content-muted';
     }
   };
 
@@ -348,7 +348,7 @@ export default function AdminGestionAcces() {
   ];
 
   return (
-    <div className="space-y-4 sm:space-y-6 font-sans selection:bg-cyan-500/30 animate-in fade-in duration-500">
+    <div className="space-y-4 sm:space-y-6 font-sans selection:bg-accent-bg animate-in fade-in duration-500">
       
       {/* Header Stat Cards */}
       {stats && (
@@ -359,7 +359,7 @@ export default function AdminGestionAcces() {
             icon={Users}
             color="primary"
             trend={`${stats.activeUsers} actifs`}
-            className="bg-slate-900/50 backdrop-blur-md border-slate-800/60"
+            className="bg-surface-base/50 backdrop-blur-md border-edge/60"
           />
           <StatCard
             title="En Ligne"
@@ -367,7 +367,7 @@ export default function AdminGestionAcces() {
             icon={UserCheck}
             color="success"
             trend={`${stats.activeSessions} sessions`}
-            className="bg-slate-900/50 backdrop-blur-md border-slate-800/60"
+            className="bg-surface-base/50 backdrop-blur-md border-edge/60"
           />
           <StatCard
             title="Nouveaux"
@@ -375,7 +375,7 @@ export default function AdminGestionAcces() {
             icon={TrendingUp}
             color="primary"
             trend={`${stats.newUsersWeek} sem.`}
-            className="bg-slate-900/50 backdrop-blur-md border-slate-800/60"
+            className="bg-surface-base/50 backdrop-blur-md border-edge/60"
           />
           <StatCard
             title="Connexions"
@@ -383,7 +383,7 @@ export default function AdminGestionAcces() {
             icon={Activity}
             color="warning"
             trend="Auj."
-            className="bg-slate-900/50 backdrop-blur-md border-slate-800/60"
+            className="bg-surface-base/50 backdrop-blur-md border-edge/60"
           />
           <StatCard
             title="Échecs"
@@ -391,15 +391,15 @@ export default function AdminGestionAcces() {
             icon={AlertTriangle}
             color="danger"
             trend={`${stats.lockedUsers} bloqués`}
-            className="bg-slate-900/50 backdrop-blur-md border-slate-800/60"
+            className="bg-surface-base/50 backdrop-blur-md border-edge/60"
           />
         </div>
       )}
 
       {/* Main Content Area */}
-      <Card className="bg-slate-900/80 backdrop-blur-xl border-slate-800 shadow-xl overflow-hidden min-h-[500px]">
+      <Card className="bg-surface-base/80 backdrop-blur-xl border-edge shadow-xl overflow-hidden min-h-[500px]">
         {/* Navigation Tabs */}
-        <div className="p-2 border-b border-slate-800 bg-slate-950/30 sticky top-0 z-10">
+        <div className="p-2 border-b border-edge bg-surface-base/30 sticky top-0 z-10">
            <TabGroup
               activeTab={activeTab}
               onTabChange={(key) => setActiveTab(key as any)}
@@ -415,10 +415,10 @@ export default function AdminGestionAcces() {
               <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
-                      <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                          <Users size={20} className="text-cyan-400" />
+                      <h3 className="text-lg font-bold text-content-primary flex items-center gap-2">
+                          <Users size={20} className="text-accent" />
                           Gestion des Utilisateurs
-                          <span className="text-sm font-medium text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full ml-2">{filteredUsers.length}</span>
+                          <span className="text-sm font-medium text-content-muted bg-surface px-2 py-0.5 rounded-full ml-2">{filteredUsers.length}</span>
                       </h3>
                   </div>
                   
@@ -429,13 +429,13 @@ export default function AdminGestionAcces() {
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         placeholder="Rechercher..."
-                        className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none transition-all placeholder:text-slate-500"
+                        className="w-full px-4 py-2 bg-surface border border-edge rounded-lg text-sm text-content-primary focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all placeholder:text-content-muted"
                         />
                     </div>
                     <select
                       value={filterRole}
                       onChange={(e) => setFilterRole(e.target.value as SystemRole | '')}
-                      className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:border-cyan-500 outline-none"
+                      className="px-3 py-2 bg-surface border border-edge rounded-lg text-sm text-content-primary focus:border-accent outline-none"
                     >
                       <option value="">Rôles</option>
                       {roles.map((role) => (
@@ -445,7 +445,7 @@ export default function AdminGestionAcces() {
                     <select
                       value={filterStatus}
                       onChange={(e) => setFilterStatus(e.target.value)}
-                      className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:border-cyan-500 outline-none"
+                      className="px-3 py-2 bg-surface border border-edge rounded-lg text-sm text-content-primary focus:border-accent outline-none"
                     >
                       <option value="">Statut</option>
                       <option value={StatutUser.ACTIVE}>Actif</option>
@@ -459,7 +459,7 @@ export default function AdminGestionAcces() {
                             variant="outline"
                             size="sm"
                             onClick={exportUsers}
-                            className="h-9 w-9 p-0 rounded-lg border-slate-700 text-slate-400 hover:text-blue-400 hover:border-blue-500/50"
+                            className="h-9 w-9 p-0 rounded-lg border-edge text-content-muted hover:text-status-info hover:border-status-info/50"
                             title="Exporter CSV"
                         >
                             <Download size={16} />
@@ -470,7 +470,7 @@ export default function AdminGestionAcces() {
                             variant="outline"
                             size="sm"
                             onClick={() => setShowImportCSV(true)}
-                            className="h-9 w-9 p-0 rounded-lg border-slate-700 text-slate-400 hover:text-emerald-400 hover:border-emerald-500/50"
+                            className="h-9 w-9 p-0 rounded-lg border-edge text-content-muted hover:text-status-success hover:border-status-success/50"
                             title="Importer CSV"
                         >
                             <Upload size={16} />
@@ -481,7 +481,7 @@ export default function AdminGestionAcces() {
                             variant="primary"
                             size="sm"
                             onClick={() => setShowUserForm(true)}
-                            className="ml-2 shadow-lg shadow-cyan-500/20"
+                            className="ml-2 shadow-lg shadow-accent/20"
                         >
                             <Plus size={16} className="mr-1.5" />
                             Nouveau
@@ -491,10 +491,10 @@ export default function AdminGestionAcces() {
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-slate-800 overflow-hidden bg-slate-950/30">
+                <div className="rounded-xl border border-edge overflow-hidden bg-surface-base/30">
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left">
-                        <thead className="bg-slate-900/80 text-xs font-bold uppercase text-slate-500 tracking-wider">
+                        <thead className="bg-surface-base/80 text-xs font-bold uppercase text-content-muted tracking-wider">
                         <tr>
                             <th className="px-6 py-4">Utilisateur</th>
                             <th className="px-6 py-4">Rôle</th>
@@ -505,19 +505,19 @@ export default function AdminGestionAcces() {
                             <th className="px-6 py-4 text-right">Actions</th>
                         </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-800">
+                        <tbody className="divide-y divide-edge">
                         {filteredUsers.map(user => (
-                            <tr key={user.id} className="hover:bg-slate-800/50 transition-colors group">
+                            <tr key={user.id} className="hover:bg-surface/50 transition-colors group">
                             <td className="px-6 py-4">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-9 h-9 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 font-bold border border-slate-700">
+                                    <div className="w-9 h-9 rounded-full bg-surface flex items-center justify-center text-content-muted font-bold border border-edge">
                                         {(user.prenom?.[0] || user.nom?.[0] || user.email[0]).toUpperCase()}
                                     </div>
                                     <div>
-                                        <div className="font-semibold text-white group-hover:text-cyan-400 transition-colors">
+                                        <div className="font-semibold text-content-primary group-hover:text-accent transition-colors">
                                             {user.nom || user.prenom ? `${user.prenom || ''} ${user.nom || ''}`.trim() : 'Utilisateur'}
                                         </div>
-                                        <div className="text-xs text-slate-500">{user.email}</div>
+                                        <div className="text-xs text-content-muted">{user.email}</div>
                                     </div>
                                 </div>
                             </td>
@@ -537,31 +537,31 @@ export default function AdminGestionAcces() {
                             </td>
                             <td className="px-6 py-4 text-center">
                                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide border ${
-                                    user.statut === StatutUser.ACTIVE ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                                    user.statut === StatutUser.SUSPENDED ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
-                                    'bg-slate-500/10 text-slate-400 border-slate-500/20'
+                                    user.statut === StatutUser.ACTIVE ? 'bg-status-success-bg text-status-success border-status-success/20' :
+                                    user.statut === StatutUser.SUSPENDED ? 'bg-status-info-bg text-status-info border-status-info/20' :
+                                    'bg-surface-subtle/30 text-content-muted border-edge-strong/20'
                                 }`}>
                                 {ALL_STATUS_LABELS[user.statut || ''] || user.statut || 'inconnu'}
                                 </span>
                             </td>
                             <td className="px-6 py-4 text-center">
                                 {user.activeSessions ? (
-                                    <span className="font-mono font-bold text-cyan-400">{user.activeSessions}</span> 
+                                    <span className="font-mono font-bold text-accent">{user.activeSessions}</span>
                                 ) : (
-                                    <span className="text-slate-600">-</span>
+                                    <span className="text-content-muted">-</span>
                                 )}
                             </td>
                             <td className="px-6 py-4">
-                                <span className="text-slate-400 font-medium text-xs whitespace-nowrap">{formatTimeAgo(user.lastActivity)}</span>
+                                <span className="text-content-muted font-medium text-xs whitespace-nowrap">{formatTimeAgo(user.lastActivity)}</span>
                             </td>
                             <td className="px-6 py-4 text-center">
                                 {(user.failedLogins24h || 0) > 0 ? (
-                                <span className="inline-flex items-center gap-1 text-orange-400 font-bold text-xs bg-orange-500/10 px-2 py-0.5 rounded-full">
+                                <span className="inline-flex items-center gap-1 text-status-warning font-bold text-xs bg-status-warning-bg px-2 py-0.5 rounded-full">
                                     <AlertTriangle size={12} />
                                     {user.failedLogins24h}
                                 </span>
                                 ) : (
-                                <span className="text-slate-600">-</span>
+                                <span className="text-content-muted">-</span>
                                 )}
                             </td>
                             <td className="px-6 py-4 text-right">
@@ -571,7 +571,7 @@ export default function AdminGestionAcces() {
                                         variant="ghost"
                                         size="sm"
                                         onClick={() => { setSelectedUser(user); setShowUserForm(true); }}
-                                        className="h-8 w-8 p-0 text-slate-400 hover:text-blue-400 hover:bg-blue-500/10"
+                                        className="h-8 w-8 p-0 text-content-muted hover:text-status-info hover:bg-status-info-bg"
                                     >
                                         <Edit2 size={14} />
                                     </Button>
@@ -581,7 +581,7 @@ export default function AdminGestionAcces() {
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => user.statut === StatutUser.SUSPENDED ? unblockUser(user.id) : blockUser(user.id)}
-                                    className={`h-8 w-8 p-0 ${user.statut === StatutUser.SUSPENDED ? 'text-emerald-400 hover:bg-emerald-500/10' : 'text-orange-400 hover:bg-orange-500/10'}`}
+                                    className={`h-8 w-8 p-0 ${user.statut === StatutUser.SUSPENDED ? 'text-status-success hover:bg-status-success-bg' : 'text-status-warning hover:bg-status-warning-bg'}`}
                                     >
                                         {user.statut === StatutUser.SUSPENDED ? <Unlock size={14} /> : <Lock size={14} />}
                                     </Button>
@@ -591,7 +591,7 @@ export default function AdminGestionAcces() {
                                         variant="ghost"
                                         size="sm"
                                         onClick={() => deleteUser(user.id, user.email)}
-                                        className="h-8 w-8 p-0 text-slate-400 hover:text-red-400 hover:bg-red-500/10"
+                                        className="h-8 w-8 p-0 text-content-muted hover:text-status-danger hover:bg-status-danger-bg"
                                     >
                                         <Trash2 size={14} />
                                     </Button>
@@ -609,20 +609,20 @@ export default function AdminGestionAcces() {
 
             {activeTab === 'roles' && (
               <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                    <Shield size={20} className="text-purple-400" />
+                <h3 className="text-lg font-bold text-content-primary flex items-center gap-2">
+                    <Shield size={20} className="text-accent" />
                     Rôles & Permissions
                 </h3>
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {roles.map(role => (
                     <Card key={role.id} variant="glass" padding="md" className="border-l-4 hover:border-l-4 transition-all" style={{ borderLeftColor: role.couleur }}>
                       <div className="flex justify-between items-start mb-3">
-                         <h4 className="text-white font-bold text-lg">{role.nom}</h4>
-                         <span className="text-xs font-bold text-slate-500 bg-slate-800 px-2 py-1 rounded">NV {role.niveau}</span>
+                         <h4 className="text-content-primary font-bold text-lg">{role.nom}</h4>
+                         <span className="text-xs font-bold text-content-muted bg-surface px-2 py-1 rounded">NV {role.niveau}</span>
                       </div>
-                      <p className="text-slate-400 text-sm leading-relaxed mb-4">{role.description}</p>
+                      <p className="text-content-muted text-sm leading-relaxed mb-4">{role.description}</p>
                       
-                      <div className="flex items-center justify-between text-xs text-slate-500 pt-3 border-t border-slate-800">
+                      <div className="flex items-center justify-between text-xs text-content-muted pt-3 border-t border-edge">
                           <span>{role.actif ? 'Actif' : 'Inactif'}</span>
                           <span>{role.code}</span>
                       </div>
@@ -634,35 +634,35 @@ export default function AdminGestionAcces() {
 
             {activeTab === 'sessions' && (
               <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                    <Monitor size={20} className="text-emerald-400" />
+                <h3 className="text-lg font-bold text-content-primary flex items-center gap-2">
+                    <Monitor size={20} className="text-status-success" />
                     Sessions Actives
-                    <span className="text-sm font-medium text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full ml-2">{sessions.length}</span>
+                    <span className="text-sm font-medium text-content-muted bg-surface px-2 py-0.5 rounded-full ml-2">{sessions.length}</span>
                 </h3>
 
                 {sessions.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-16 text-slate-500">
+                    <div className="flex flex-col items-center justify-center py-16 text-content-muted">
                         <Monitor size={48} className="mb-4 opacity-20" />
                         <p>Aucune session active détectée</p>
                     </div>
                 ) : (
                   <div className="grid gap-3">
                     {sessions.map(session => (
-                      <Card key={session.id} variant="glass" padding="md" className="flex items-center justify-between group hover:border-slate-600 transition-colors">
+                      <Card key={session.id} variant="glass" padding="md" className="flex items-center justify-between group hover:border-edge-strong transition-colors">
                         <div className="flex items-center gap-4">
-                            <div className="p-3 rounded-full bg-emerald-500/10 text-emerald-400">
+                            <div className="p-3 rounded-full bg-status-success-bg text-status-success">
                                 <Monitor size={20} />
                             </div>
                             <div>
-                                <p className="text-white font-bold">{session.userEmail}</p>
-                                <div className="flex items-center gap-3 text-xs text-slate-400 mt-1">
+                                <p className="text-content-primary font-bold">{session.userEmail}</p>
+                                <div className="flex items-center gap-3 text-xs text-content-muted mt-1">
                                     <span className="flex items-center gap-1"><Clock size={12}/> {formatTimeAgo(session.startedAt)}</span>
                                     <span>•</span>
                                     <span>{session.ipAddress || 'IP Masquée'}</span>
                                 </div>
                             </div>
                         </div>
-                        <Button variant="ghost" size="sm" className="text-slate-400 hover:text-red-400">
+                        <Button variant="ghost" size="sm" className="text-content-muted hover:text-status-danger">
                           <LogOut size={18} />
                         </Button>
                       </Card>
@@ -675,9 +675,9 @@ export default function AdminGestionAcces() {
             {activeTab === 'activity' && <AdminActivityLogs variant="compact" />}
             {activeTab === 'alerts' && <AdminAlerts />}
             {activeTab === 'analytics' && (
-              <div className="text-center py-20 text-slate-500">
+              <div className="text-center py-20 text-content-muted">
                 <BarChart3 size={64} className="mx-auto mb-6 opacity-20" />
-                <h3 className="text-lg font-bold text-slate-300 mb-2">Analytics Avancés</h3>
+                <h3 className="text-lg font-bold text-content-secondary mb-2">Analytics Avancés</h3>
                 <p>Module en cours de développement</p>
               </div>
             )}

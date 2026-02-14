@@ -105,8 +105,16 @@ export const ROUTES: RouteConfig[] = [
     labelKey: 'menuCredits',
     group: 'Services Clients',
     subRoutes: [
-      { path: '/credits/demandes', subModule: 'demandes', label: 'Demandes de crédit' },
-      { path: '/credits/portefeuille', subModule: 'portefeuille', label: 'Portefeuille' },
+      { path: '/credits/synthese', subModule: 'dashboard', label: 'Synthèse' },
+      { path: '/credits/portefeuille', subModule: 'credits', label: 'Portefeuille' },
+      { path: '/credits/a-traiter', subModule: 'demandes', label: 'À traiter' },
+      { path: '/credits/enquetes', subModule: 'enquetes', label: 'Enquêtes' },
+      { path: '/credits/approbation', subModule: 'approbation', label: 'Approbation' },
+      { path: '/credits/comite', subModule: 'commission', label: 'Comité' },
+      { path: '/credits/reevaluations', subModule: 'reevaluations', label: 'Réévaluations' },
+      { path: '/credits/remboursements', subModule: 'remboursements', label: 'Remboursements' },
+      { path: '/credits/echeancier', subModule: 'echeancier', label: 'Échéancier' },
+      { path: '/credits/archives', subModule: 'archives', label: 'Archives' },
     ],
   },
   {
@@ -314,6 +322,7 @@ export const ROUTES: RouteConfig[] = [
       { path: '/administration/taux-produits', subModule: 'product-rates', label: 'Taux Produits' },
       { path: '/administration/zones-commerciales', subModule: 'zones-commerciales', label: 'Arrondissements & Marchés' },
       { path: '/administration/devise', subModule: 'currency', label: 'Devise' },
+      { path: '/administration/branding', subModule: 'branding', label: 'Branding' },
     ],
   },
   {

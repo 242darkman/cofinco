@@ -61,16 +61,16 @@ export function ReevaluationEligibilityCheck({ demandeId, onEligibilityChange }:
 
   if (loading) {
     return (
-      <div className="animate-pulse h-20 bg-slate-700/50 rounded-lg mt-3 flex items-center justify-center">
-        <Loader2 className="animate-spin text-slate-400" size={20} />
+      <div className="animate-pulse h-20 bg-surface-elevated/50 rounded-lg mt-3 flex items-center justify-center">
+        <Loader2 className="animate-spin text-content-muted" size={20} />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="mt-3 p-2 bg-red-500/10 border border-red-500/30 rounded-lg">
-        <p className="text-xs text-red-400">{error}</p>
+      <div className="mt-3 p-2 bg-status-danger-bg border border-status-danger/30 rounded-lg">
+        <p className="text-xs text-status-danger">{error}</p>
       </div>
     );
   }
@@ -79,29 +79,29 @@ export function ReevaluationEligibilityCheck({ demandeId, onEligibilityChange }:
 
   const StatusIcon = ({ ok }: { ok: boolean }) => (
     ok ? (
-      <Check size={14} className="text-emerald-400" />
+      <Check size={14} className="text-status-success" />
     ) : (
-      <X size={14} className="text-red-400" />
+      <X size={14} className="text-status-danger" />
     )
   );
 
   return (
     <div className="mt-3 space-y-2">
-      <div className="text-sm font-medium text-slate-300">Vérification d'éligibilité:</div>
+      <div className="text-sm font-medium text-content-secondary">Vérification d'éligibilité:</div>
       
       <div className="grid grid-cols-3 gap-2">
         {/* Délai */}
         <div className={`p-2 rounded-lg text-center ${
           eligibility.delaiOk 
-            ? 'bg-emerald-500/20 border border-emerald-500/30' 
-            : 'bg-red-500/20 border border-red-500/30'
+            ? 'bg-status-success-bg border border-status-success/30' 
+            : 'bg-status-danger-bg border border-status-danger/30'
         }`}>
           <div className="flex justify-center">
             <StatusIcon ok={eligibility.delaiOk} />
           </div>
-          <div className="text-xs text-slate-400 mt-1">Délai</div>
+          <div className="text-xs text-content-muted mt-1">Délai</div>
           <div className={`text-sm font-bold ${
-            eligibility.delaiOk ? 'text-emerald-400' : 'text-red-400'
+            eligibility.delaiOk ? 'text-status-success' : 'text-status-danger'
           }`}>
             {eligibility.delaiMinimum > 0 
               ? `${eligibility.joursDepuisRejet}j / ${eligibility.delaiMinimum}j` 
@@ -112,15 +112,15 @@ export function ReevaluationEligibilityCheck({ demandeId, onEligibilityChange }:
         {/* Nombre réévaluations */}
         <div className={`p-2 rounded-lg text-center ${
           eligibility.nombreOk 
-            ? 'bg-emerald-500/20 border border-emerald-500/30' 
-            : 'bg-red-500/20 border border-red-500/30'
+            ? 'bg-status-success-bg border border-status-success/30' 
+            : 'bg-status-danger-bg border border-status-danger/30'
         }`}>
           <div className="flex justify-center">
             <StatusIcon ok={eligibility.nombreOk} />
           </div>
-          <div className="text-xs text-slate-400 mt-1">Tentatives</div>
+          <div className="text-xs text-content-muted mt-1">Tentatives</div>
           <div className={`text-sm font-bold ${
-            eligibility.nombreOk ? 'text-emerald-400' : 'text-red-400'
+            eligibility.nombreOk ? 'text-status-success' : 'text-status-danger'
           }`}>
             {eligibility.nombreReevaluations} / {eligibility.maxAutorise}
           </div>
@@ -129,15 +129,15 @@ export function ReevaluationEligibilityCheck({ demandeId, onEligibilityChange }:
         {/* Motif */}
         <div className={`p-2 rounded-lg text-center ${
           !eligibility.motifBlackliste 
-            ? 'bg-emerald-500/20 border border-emerald-500/30' 
-            : 'bg-red-500/20 border border-red-500/30'
+            ? 'bg-status-success-bg border border-status-success/30' 
+            : 'bg-status-danger-bg border border-status-danger/30'
         }`}>
           <div className="flex justify-center">
             <StatusIcon ok={!eligibility.motifBlackliste} />
           </div>
-          <div className="text-xs text-slate-400 mt-1">Motif</div>
+          <div className="text-xs text-content-muted mt-1">Motif</div>
           <div className={`text-sm font-bold ${
-            !eligibility.motifBlackliste ? 'text-emerald-400' : 'text-red-400'
+            !eligibility.motifBlackliste ? 'text-status-success' : 'text-status-danger'
           }`}>
             {!eligibility.motifBlackliste ? 'Éligible' : 'Bloqué'}
           </div>
@@ -145,8 +145,8 @@ export function ReevaluationEligibilityCheck({ demandeId, onEligibilityChange }:
       </div>
 
       {eligibility.reevaluationEnCours && (
-        <div className="p-2 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-          <p className="text-xs text-blue-400 flex items-center gap-2">
+        <div className="p-2 bg-status-info-bg border border-status-info/30 rounded-lg">
+          <p className="text-xs text-status-info flex items-center gap-2">
             <Loader2 size={12} className="animate-spin" />
             Une réévaluation est déjà en cours
           </p>

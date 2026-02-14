@@ -36,13 +36,13 @@ const ProviderLogo = ({ provider, size = 'sm' }: { provider: string; size?: 'sm'
 // Status badge component
 const StatusBadge = ({ status }: { status: string }) => {
   const config: Record<string, { bg: string; text: string; icon: React.ElementType }> = {
-    CREATED: { bg: 'bg-slate-500/20', text: 'text-slate-400', icon: Clock },
-    PENDING: { bg: 'bg-cyan-500/20', text: 'text-cyan-400', icon: Clock },
-    SUCCESS: { bg: 'bg-emerald-500/20', text: 'text-emerald-400', icon: CheckCircle2 },
-    FAILED: { bg: 'bg-red-500/20', text: 'text-red-400', icon: XCircle },
-    EXPIRED: { bg: 'bg-amber-500/20', text: 'text-amber-400', icon: Clock },
-    REVERSED: { bg: 'bg-orange-500/20', text: 'text-orange-400', icon: AlertTriangle },
-    CANCELLED: { bg: 'bg-slate-500/20', text: 'text-slate-400', icon: XCircle },
+    CREATED: { bg: 'bg-surface-subtle/40', text: 'text-content-muted', icon: Clock },
+    PENDING: { bg: 'bg-accent/10', text: 'text-accent', icon: Clock },
+    SUCCESS: { bg: 'bg-status-success-bg', text: 'text-status-success', icon: CheckCircle2 },
+    FAILED: { bg: 'bg-status-danger-bg', text: 'text-status-danger', icon: XCircle },
+    EXPIRED: { bg: 'bg-status-warning-bg', text: 'text-status-warning', icon: Clock },
+    REVERSED: { bg: 'bg-status-warning-bg', text: 'text-status-warning', icon: AlertTriangle },
+    CANCELLED: { bg: 'bg-surface-subtle/40', text: 'text-content-muted', icon: XCircle },
   };
 
   const { bg, text, icon: Icon } = config[status] || config.PENDING;
@@ -211,15 +211,15 @@ export default function MobileMoneyTransactionsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-white">Transactions Mobile Money</h1>
-          <p className="text-sm text-slate-400 mt-1">
+          <h1 className="text-2xl font-bold text-content-primary">Transactions Mobile Money</h1>
+          <p className="text-sm text-content-muted mt-1">
             Suivi des paiements MTN et Airtel Money
           </p>
         </div>
         <button
           onClick={() => refetch()}
           disabled={isFetching}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-white transition-colors disabled:opacity-50"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-surface hover:bg-surface-elevated text-content-primary transition-colors disabled:opacity-50"
         >
           <RefreshCw size={16} className={isFetching ? 'animate-spin' : ''} />
           Actualiser
@@ -227,18 +227,18 @@ export default function MobileMoneyTransactionsPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 mb-6">
+      <div className="bg-surface-base/50 border border-edge rounded-xl p-4 mb-6">
         <div className="flex flex-wrap items-center gap-4">
           {/* Search */}
           <div className="flex-1 min-w-[200px]">
             <div className="relative">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" />
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Rechercher (téléphone, référence, client...)"
-                className="w-full h-10 pl-9 pr-4 rounded-lg bg-slate-800 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50"
+                className="w-full h-10 pl-9 pr-4 rounded-lg bg-input-bg border border-input-border text-content-primary placeholder-content-muted focus:outline-none focus:border-accent/50"
               />
             </div>
           </div>
@@ -248,7 +248,7 @@ export default function MobileMoneyTransactionsPage() {
             <select
               value={filterStatus}
               onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
-              className="h-10 pl-3 pr-8 rounded-lg bg-slate-800 border border-slate-700 text-white appearance-none cursor-pointer focus:outline-none focus:border-cyan-500/50"
+              className="h-10 pl-3 pr-8 rounded-lg bg-input-bg border border-input-border text-content-primary appearance-none cursor-pointer focus:outline-none focus:border-accent/50"
             >
               <option value="">Tous statuts</option>
               <option value="PENDING">En attente</option>
@@ -257,7 +257,7 @@ export default function MobileMoneyTransactionsPage() {
               <option value="EXPIRED">Expiré</option>
               <option value="REVERSED">Annulé</option>
             </select>
-            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-content-muted pointer-events-none" />
           </div>
 
           {/* Provider filter */}
@@ -265,13 +265,13 @@ export default function MobileMoneyTransactionsPage() {
             <select
               value={filterProvider}
               onChange={(e) => { setFilterProvider(e.target.value); setPage(1); }}
-              className="h-10 pl-3 pr-8 rounded-lg bg-slate-800 border border-slate-700 text-white appearance-none cursor-pointer focus:outline-none focus:border-cyan-500/50"
+              className="h-10 pl-3 pr-8 rounded-lg bg-input-bg border border-input-border text-content-primary appearance-none cursor-pointer focus:outline-none focus:border-accent/50"
             >
               <option value="">Tous providers</option>
               <option value="MTN">MTN MoMo</option>
               <option value="AIRTEL">Airtel Money</option>
             </select>
-            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-content-muted pointer-events-none" />
           </div>
 
           {/* Type filter */}
@@ -279,45 +279,45 @@ export default function MobileMoneyTransactionsPage() {
             <select
               value={filterType}
               onChange={(e) => { setFilterType(e.target.value); setPage(1); }}
-              className="h-10 pl-3 pr-8 rounded-lg bg-slate-800 border border-slate-700 text-white appearance-none cursor-pointer focus:outline-none focus:border-cyan-500/50"
+              className="h-10 pl-3 pr-8 rounded-lg bg-input-bg border border-input-border text-content-primary appearance-none cursor-pointer focus:outline-none focus:border-accent/50"
             >
               <option value="">Tous types</option>
               <option value="COLLECTION">Collection</option>
               <option value="PAYOUT">Décaissement</option>
             </select>
-            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+            <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-content-muted pointer-events-none" />
           </div>
         </div>
       </div>
 
       {/* Provider Balances */}
-      <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-3 mb-4">
+      <div className="bg-surface-base/50 border border-edge rounded-xl p-3 mb-4">
         <ProviderBalanceWidget />
       </div>
 
       {/* Stats summary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         {[
-          { label: 'Total', value: total, color: 'slate' },
-          { label: 'En attente', value: payments.filter(p => p.status === 'PENDING').length, color: 'cyan' },
-          { label: 'Succès', value: payments.filter(p => p.status === 'SUCCESS').length, color: 'emerald' },
-          { label: 'Échoués', value: payments.filter(p => ['FAILED', 'EXPIRED'].includes(p.status)).length, color: 'red' },
+          { label: 'Total', value: total, bg: 'bg-surface-subtle/40', border: 'border-edge', text: 'text-content-muted', num: 'text-content-secondary' },
+          { label: 'En attente', value: payments.filter(p => p.status === 'PENDING').length, bg: 'bg-accent/10', border: 'border-accent/20', text: 'text-accent', num: 'text-accent' },
+          { label: 'Succès', value: payments.filter(p => p.status === 'SUCCESS').length, bg: 'bg-status-success-bg', border: 'border-status-success/20', text: 'text-status-success', num: 'text-status-success' },
+          { label: 'Échoués', value: payments.filter(p => ['FAILED', 'EXPIRED'].includes(p.status)).length, bg: 'bg-status-danger-bg', border: 'border-status-danger/20', text: 'text-status-danger', num: 'text-status-danger' },
         ].map((stat) => (
-          <div key={stat.label} className={`bg-${stat.color}-500/10 border border-${stat.color}-500/20 rounded-xl p-4`}>
-            <p className={`text-xs text-${stat.color}-400 uppercase tracking-wider`}>{stat.label}</p>
-            <p className={`text-2xl font-bold text-${stat.color}-300 mt-1`}>{stat.value}</p>
+          <div key={stat.label} className={`${stat.bg} border ${stat.border} rounded-xl p-4`}>
+            <p className={`text-xs ${stat.text} uppercase tracking-wider`}>{stat.label}</p>
+            <p className={`text-2xl font-bold ${stat.num} mt-1`}>{stat.value}</p>
           </div>
         ))}
       </div>
 
       {/* Table */}
-      <div className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
+      <div className="bg-surface-base/50 border border-edge rounded-xl overflow-hidden">
         {isLoading ? (
           <div className="flex items-center justify-center h-64">
-            <Loader2 size={32} className="text-cyan-500 animate-spin" />
+            <Loader2 size={32} className="text-accent animate-spin" />
           </div>
         ) : filteredPayments.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-slate-500">
+          <div className="flex flex-col items-center justify-center h-64 text-content-muted">
             <Phone size={48} className="mb-4 opacity-50" />
             <p>Aucune transaction trouvée</p>
           </div>
@@ -325,57 +325,57 @@ export default function MobileMoneyTransactionsPage() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-slate-800">
-                  <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3">Provider</th>
-                  <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3">Type</th>
-                  <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3">Téléphone</th>
-                  <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3">Client</th>
-                  <th className="text-right text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3">Montant</th>
-                  <th className="text-center text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3">Statut</th>
-                  <th className="text-left text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3">Date</th>
-                  <th className="text-center text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3">Actions</th>
+                <tr className="border-b border-edge">
+                  <th className="text-left text-xs font-semibold text-content-muted uppercase tracking-wider px-4 py-3">Provider</th>
+                  <th className="text-left text-xs font-semibold text-content-muted uppercase tracking-wider px-4 py-3">Type</th>
+                  <th className="text-left text-xs font-semibold text-content-muted uppercase tracking-wider px-4 py-3">Téléphone</th>
+                  <th className="text-left text-xs font-semibold text-content-muted uppercase tracking-wider px-4 py-3">Client</th>
+                  <th className="text-right text-xs font-semibold text-content-muted uppercase tracking-wider px-4 py-3">Montant</th>
+                  <th className="text-center text-xs font-semibold text-content-muted uppercase tracking-wider px-4 py-3">Statut</th>
+                  <th className="text-left text-xs font-semibold text-content-muted uppercase tracking-wider px-4 py-3">Date</th>
+                  <th className="text-center text-xs font-semibold text-content-muted uppercase tracking-wider px-4 py-3">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800">
+              <tbody className="divide-y divide-edge">
                 {filteredPayments.map((payment) => (
-                  <tr key={payment.id} className="hover:bg-slate-800/30 transition-colors">
+                  <tr key={payment.id} className="hover:bg-surface/30 transition-colors">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <ProviderLogo provider={payment.provider} />
-                        <span className="text-sm text-white">{payment.provider}</span>
+                        <span className="text-sm text-content-primary">{payment.provider}</span>
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       <span className={`text-xs font-medium px-2 py-1 rounded ${
                         payment.type === 'COLLECTION'
-                          ? 'bg-emerald-500/10 text-emerald-400'
-                          : 'bg-amber-500/10 text-amber-400'
+                          ? 'bg-status-success-bg text-status-success'
+                          : 'bg-status-warning-bg text-status-warning'
                       }`}>
                         {payment.type === 'COLLECTION' ? 'Collection' : 'Payout'}
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="text-sm text-white font-mono">{payment.phone}</span>
+                      <span className="text-sm text-content-primary font-mono">{payment.phone}</span>
                     </td>
                     <td className="px-4 py-3">
                       {payment.client ? (
-                        <span className="text-sm text-white">
+                        <span className="text-sm text-content-primary">
                           {payment.client.nom} {payment.client.prenom || ''}
                         </span>
                       ) : (
-                        <span className="text-sm text-slate-500">-</span>
+                        <span className="text-sm text-content-muted">-</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className="text-sm font-semibold text-white">
-                        {Number(payment.amount).toLocaleString()} <span className="text-xs text-slate-500">FCFA</span>
+                      <span className="text-sm font-semibold text-content-primary">
+                        {Number(payment.amount).toLocaleString()} <span className="text-xs text-content-muted">FCFA</span>
                       </span>
                     </td>
                     <td className="px-4 py-3 text-center">
                       <StatusBadge status={payment.status} />
                     </td>
                     <td className="px-4 py-3">
-                      <span className="text-sm text-slate-400">
+                      <span className="text-sm text-content-muted">
                         {safeDateFormat(payment.createdAt, 'dd/MM/yyyy HH:mm')}
                       </span>
                     </td>
@@ -383,7 +383,7 @@ export default function MobileMoneyTransactionsPage() {
                       <div className="flex items-center justify-center gap-1">
                         <button
                           onClick={() => handleViewDetails(payment)}
-                          className="p-2 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+                          className="p-2 rounded-lg hover:bg-surface-elevated text-content-muted hover:text-content-primary transition-colors"
                           title="Voir détails"
                         >
                           <Eye size={16} />
@@ -391,7 +391,7 @@ export default function MobileMoneyTransactionsPage() {
                         {payment.status === 'PENDING' && (
                           <button
                             onClick={() => handleViewDetails(payment)}
-                            className="p-2 rounded-lg hover:bg-amber-500/20 text-amber-400 transition-colors"
+                            className="p-2 rounded-lg hover:bg-status-warning-bg text-status-warning transition-colors"
                             title="Réconcilier"
                           >
                             <RotateCcw size={16} />
@@ -408,22 +408,22 @@ export default function MobileMoneyTransactionsPage() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-slate-800">
-            <p className="text-sm text-slate-500">
+          <div className="flex items-center justify-between px-4 py-3 border-t border-edge">
+            <p className="text-sm text-content-muted">
               Page {page} sur {totalPages} ({total} transactions)
             </p>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setPage(Math.max(1, page - 1))}
                 disabled={page === 1}
-                className="px-3 py-1.5 rounded-lg bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 py-1.5 rounded-lg bg-surface text-content-primary hover:bg-surface-elevated disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Précédent
               </button>
               <button
                 onClick={() => setPage(Math.min(totalPages, page + 1))}
                 disabled={page === totalPages}
-                className="px-3 py-1.5 rounded-lg bg-slate-800 text-white hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 py-1.5 rounded-lg bg-surface text-content-primary hover:bg-surface-elevated disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Suivant
               </button>

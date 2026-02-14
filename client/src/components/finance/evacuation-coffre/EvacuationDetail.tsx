@@ -184,26 +184,26 @@ export default function EvacuationDetail({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-surface-base border border-edge rounded-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-800">
+        <div className="flex items-center justify-between p-4 border-b border-edge">
           <div>
             <div className="flex items-center gap-2">
-              <Vault size={16} className="text-blue-400" />
-              <h2 className="text-sm font-semibold text-white">{evacuation.reference}</h2>
+              <Vault size={16} className="text-status-info" />
+              <h2 className="text-sm font-semibold text-content-primary">{evacuation.reference}</h2>
             </div>
-            <p className="text-[10px] text-slate-500 mt-0.5">
+            <p className="text-[10px] text-content-muted mt-0.5">
               Créée le {new Date(evacuation.createdAt).toLocaleString('fr-FR')}
             </p>
           </div>
-          <button onClick={onClose} className="p-1 text-slate-400 hover:text-white transition">
+          <button onClick={onClose} className="p-1 text-content-muted hover:text-content-primary transition">
             <X size={16} />
           </button>
         </div>
 
         {/* Workflow Progress */}
         {!isTerminal && (
-          <div className="px-4 pt-3 pb-2 border-b border-slate-800/50">
+          <div className="px-4 pt-3 pb-2 border-b border-edge/50">
             <div className="flex items-center gap-0">
               {WORKFLOW_STEPS.map((step, idx) => {
                 const done = idx <= currentIdx;
@@ -212,16 +212,16 @@ export default function EvacuationDetail({
                 return (
                   <React.Fragment key={step.key}>
                     {idx > 0 && (
-                      <div className={`flex-1 h-0.5 ${idx <= currentIdx ? 'bg-blue-500' : 'bg-slate-700'}`} />
+                      <div className={`flex-1 h-0.5 ${idx <= currentIdx ? 'bg-status-info' : 'bg-surface-elevated'}`} />
                     )}
                     <div className="flex flex-col items-center" title={step.label}>
                       <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                        active ? 'bg-blue-500 text-white ring-2 ring-blue-500/30' :
-                        done ? 'bg-blue-500/20 text-blue-400' : 'bg-slate-800 text-slate-600'
+                        active ? 'bg-status-info text-white ring-2 ring-status-info/30' :
+                        done ? 'bg-status-info-bg text-status-info' : 'bg-surface text-content-muted'
                       }`}>
                         <Icon size={11} />
                       </div>
-                      <span className={`text-[8px] mt-0.5 ${active ? 'text-blue-400 font-bold' : done ? 'text-slate-400' : 'text-slate-600'}`}>
+                      <span className={`text-[8px] mt-0.5 ${active ? 'text-status-info font-bold' : done ? 'text-content-muted' : 'text-content-muted'}`}>
                         {step.label}
                       </span>
                     </div>
@@ -234,30 +234,30 @@ export default function EvacuationDetail({
 
         {/* Terminal status banner */}
         {statut === StatutEvacuationCoffre.REJECTED && (
-          <div className="mx-4 mt-3 p-2.5 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2">
-            <XCircle size={14} className="text-red-400 shrink-0" />
+          <div className="mx-4 mt-3 p-2.5 bg-status-danger-bg border border-status-danger/20 rounded-lg flex items-center gap-2">
+            <XCircle size={14} className="text-status-danger shrink-0" />
             <div>
-              <span className="text-[11px] font-semibold text-red-400">Rejetée</span>
-              {evacuation.motifRejet && <p className="text-[10px] text-red-400/70 mt-0.5">{evacuation.motifRejet}</p>}
+              <span className="text-[11px] font-semibold text-status-danger">Rejetée</span>
+              {evacuation.motifRejet && <p className="text-[10px] text-status-danger/70 mt-0.5">{evacuation.motifRejet}</p>}
             </div>
           </div>
         )}
         {statut === StatutEvacuationCoffre.CANCELLED && (
-          <div className="mx-4 mt-3 p-2.5 bg-slate-500/10 border border-slate-500/20 rounded-lg flex items-center gap-2">
-            <Ban size={14} className="text-slate-400 shrink-0" />
+          <div className="mx-4 mt-3 p-2.5 bg-surface-subtle/30 border border-edge-strong/20 rounded-lg flex items-center gap-2">
+            <Ban size={14} className="text-content-muted shrink-0" />
             <div>
-              <span className="text-[11px] font-semibold text-slate-400">Annulée</span>
-              {evacuation.motifAnnulation && <p className="text-[10px] text-slate-400/70 mt-0.5">{evacuation.motifAnnulation}</p>}
+              <span className="text-[11px] font-semibold text-content-muted">Annulée</span>
+              {evacuation.motifAnnulation && <p className="text-[10px] text-content-muted/70 mt-0.5">{evacuation.motifAnnulation}</p>}
             </div>
           </div>
         )}
         {statut === StatutEvacuationCoffre.DISCREPANCY && (
-          <div className="mx-4 mt-3 p-2.5 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2">
-            <AlertTriangle size={14} className="text-red-400 shrink-0" />
+          <div className="mx-4 mt-3 p-2.5 bg-status-danger-bg border border-status-danger/20 rounded-lg flex items-center gap-2">
+            <AlertTriangle size={14} className="text-status-danger shrink-0" />
             <div>
-              <span className="text-[11px] font-semibold text-red-400">Écart détecté</span>
+              <span className="text-[11px] font-semibold text-status-danger">Écart détecté</span>
               {evacuation.ecartMontant && (
-                <p className="text-[10px] text-red-400/70 mt-0.5">
+                <p className="text-[10px] text-status-danger/70 mt-0.5">
                   Écart: {formatMoney(evacuation.ecartMontant)} — {evacuation.motifEcart || 'Non spécifié'}
                 </p>
               )}
@@ -266,7 +266,7 @@ export default function EvacuationDetail({
         )}
 
         {/* Section tabs */}
-        <div className="flex items-center gap-0.5 px-4 pt-2 border-b border-slate-800/50">
+        <div className="flex items-center gap-0.5 px-4 pt-2 border-b border-edge/50">
           {[
             { id: 'info' as const, label: 'Détails' },
             ...(statut === StatutEvacuationCoffre.APPROVED || evacuation.montantCompte ? [{ id: 'preparation' as const, label: 'Préparation' }] : []),
@@ -278,12 +278,12 @@ export default function EvacuationDetail({
               key={tab.id}
               onClick={() => setActiveSection(tab.id)}
               className={`px-2.5 py-2 text-[10px] font-medium transition relative ${
-                activeSection === tab.id ? 'text-blue-400' : 'text-slate-500 hover:text-slate-300'
+                activeSection === tab.id ? 'text-status-info' : 'text-content-muted hover:text-content-secondary'
               }`}
             >
               {tab.label}
               {activeSection === tab.id && (
-                <span className="absolute bottom-0 inset-x-1 h-[2px] bg-blue-500 rounded-full" />
+                <span className="absolute bottom-0 inset-x-1 h-[2px] bg-status-info rounded-full" />
               )}
             </button>
           ))}
@@ -310,8 +310,8 @@ export default function EvacuationDetail({
 
               {/* Workflow participants */}
               {(evacuation.submittedBy || evacuation.approvedBy || evacuation.preparedBy) && (
-                <div className="mt-3 p-3 bg-slate-800/30 border border-slate-700/40 rounded-lg">
-                  <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Intervenants</h4>
+                <div className="mt-3 p-3 bg-surface/30 border border-edge/40 rounded-lg">
+                  <h4 className="text-[10px] font-bold text-content-muted uppercase tracking-widest mb-2">Intervenants</h4>
                   <div className="grid grid-cols-2 gap-2 text-[10px]">
                     {evacuation.createdByName && <InfoRow label="Créé par" value={evacuation.createdByName} />}
                     {evacuation.submittedAt && <InfoRow label="Soumis" value={new Date(evacuation.submittedAt).toLocaleString('fr-FR')} />}
@@ -337,9 +337,9 @@ export default function EvacuationDetail({
                   <InfoRow label="N° scellé" value={evacuation.numeroScelle || '—'} />
                   {evacuation.agentsTransport && (
                     <div>
-                      <span className="text-[10px] text-slate-500">Agents transport:</span>
+                      <span className="text-[10px] text-content-muted">Agents transport:</span>
                       {evacuation.agentsTransport.map((a: any, i: number) => (
-                        <p key={i} className="text-[10px] text-white ml-2">{a.nom} — {a.contact}</p>
+                        <p key={i} className="text-[10px] text-content-primary ml-2">{a.nom} — {a.contact}</p>
                       ))}
                     </div>
                   )}
@@ -347,24 +347,24 @@ export default function EvacuationDetail({
               ) : statut === StatutEvacuationCoffre.APPROVED ? (
                 // Preparation form
                 <div className="space-y-3">
-                  <p className="text-[10px] text-slate-400">Comptez les fonds physiquement et enregistrez la préparation.</p>
+                  <p className="text-[10px] text-content-muted">Comptez les fonds physiquement et enregistrez la préparation.</p>
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 mb-1">Montant compté (FCFA)</label>
+                    <label className="block text-[10px] font-bold text-content-muted mb-1">Montant compté (FCFA)</label>
                     <input
                       type="number"
                       value={montantCompte}
                       onChange={(e) => setMontantCompte(e.target.value)}
                       placeholder={evacuation.montant}
-                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500/50"
+                      className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-status-info/50"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Conditionnement</label>
+                      <label className="block text-[10px] font-bold text-content-muted mb-1">Conditionnement</label>
                       <select
                         value={typeConditionnement}
                         onChange={(e) => setTypeConditionnement(e.target.value)}
-                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-blue-500/50"
+                        className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-xs text-content-primary focus:outline-none focus:border-status-info/50"
                       >
                         <option>Sac scellé</option>
                         <option>Mallette sécurisée</option>
@@ -373,19 +373,19 @@ export default function EvacuationDetail({
                       </select>
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 mb-1">N° scellé (optionnel)</label>
+                      <label className="block text-[10px] font-bold text-content-muted mb-1">N° scellé (optionnel)</label>
                       <input
                         type="text"
                         value={numeroScelle}
                         onChange={(e) => setNumeroScelle(e.target.value)}
                         placeholder="N° du scellé"
-                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500/50"
+                        className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-status-info/50"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 mb-1">Agents de transport</label>
+                    <label className="block text-[10px] font-bold text-content-muted mb-1">Agents de transport</label>
                     {agentsTransport.map((agent, idx) => (
                       <div key={idx} className="grid grid-cols-2 gap-2 mb-2">
                         <input
@@ -397,7 +397,7 @@ export default function EvacuationDetail({
                             setAgentsTransport(updated);
                           }}
                           placeholder={`Agent ${idx + 1} — Nom`}
-                          className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500/50"
+                          className="px-3 py-1.5 bg-surface border border-edge rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-status-info/50"
                         />
                         <input
                           type="text"
@@ -408,7 +408,7 @@ export default function EvacuationDetail({
                             setAgentsTransport(updated);
                           }}
                           placeholder="Contact"
-                          className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500/50"
+                          className="px-3 py-1.5 bg-surface border border-edge rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-status-info/50"
                         />
                       </div>
                     ))}
@@ -433,25 +433,25 @@ export default function EvacuationDetail({
                 </div>
               ) : statut === StatutEvacuationCoffre.IN_TRANSIT ? (
                 <div className="space-y-3">
-                  <p className="text-[10px] text-slate-400">Confirmez le dépôt des fonds à destination.</p>
+                  <p className="text-[10px] text-content-muted">Confirmez le dépôt des fonds à destination.</p>
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 mb-1">Montant déposé (FCFA)</label>
+                    <label className="block text-[10px] font-bold text-content-muted mb-1">Montant déposé (FCFA)</label>
                     <input
                       type="number"
                       value={montantDepose}
                       onChange={(e) => setMontantDepose(e.target.value)}
                       placeholder={evacuation.montant}
-                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500/50"
+                      className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-status-info/50"
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 mb-1">Référence bordereau (optionnel)</label>
+                    <label className="block text-[10px] font-bold text-content-muted mb-1">Référence bordereau (optionnel)</label>
                     <input
                       type="text"
                       value={referenceBordereau}
                       onChange={(e) => setReferenceBordereau(e.target.value)}
                       placeholder="N° bordereau de remise"
-                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500/50"
+                      className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-status-info/50"
                     />
                   </div>
                   <Button size="sm" onClick={handleDeposit} disabled={loading}>
@@ -474,9 +474,9 @@ export default function EvacuationDetail({
                 </div>
               ) : statut === StatutEvacuationCoffre.DEPOSITED ? (
                 <div className="space-y-3">
-                  <p className="text-[10px] text-slate-400">Réconciliez le montant réellement reçu avec le montant évacué.</p>
+                  <p className="text-[10px] text-content-muted">Réconciliez le montant réellement reçu avec le montant évacué.</p>
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 mb-1">Montant confirmé par destination (FCFA)</label>
+                    <label className="block text-[10px] font-bold text-content-muted mb-1">Montant confirmé par destination (FCFA)</label>
                     <input
                       type="number"
                       value={montantConfirme}
@@ -487,10 +487,10 @@ export default function EvacuationDetail({
                         setConforme(confirmed === original);
                       }}
                       placeholder={evacuation.montant}
-                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500/50"
+                      className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-status-info/50"
                     />
                     {montantConfirme && Number(montantConfirme) !== Number(evacuation.montant) && (
-                      <p className="text-[10px] text-amber-400 mt-1">
+                      <p className="text-[10px] text-status-warning mt-1">
                         Écart détecté: {formatMoney(Number(montantConfirme) - Number(evacuation.montant))}
                       </p>
                     )}
@@ -502,20 +502,20 @@ export default function EvacuationDetail({
                       id="conforme"
                       checked={conforme}
                       onChange={(e) => setConforme(e.target.checked)}
-                      className="rounded border-slate-600"
+                      className="rounded border-edge-strong"
                     />
-                    <label htmlFor="conforme" className="text-[10px] text-slate-400">Montant conforme</label>
+                    <label htmlFor="conforme" className="text-[10px] text-content-muted">Montant conforme</label>
                   </div>
 
                   {!conforme && (
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Motif de l'écart</label>
+                      <label className="block text-[10px] font-bold text-content-muted mb-1">Motif de l'écart</label>
                       <textarea
                         value={motifEcart}
                         onChange={(e) => setMotifEcart(e.target.value)}
                         placeholder="Décrivez la raison de l'écart..."
                         rows={2}
-                        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500/50 resize-none"
+                        className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-status-info/50 resize-none"
                       />
                     </div>
                   )}
@@ -533,31 +533,31 @@ export default function EvacuationDetail({
             <div className="space-y-2">
               {evacuation.auditLogs?.length > 0 ? (
                 evacuation.auditLogs.map((log: any, idx: number) => (
-                  <div key={idx} className="flex items-start gap-2 p-2 bg-slate-800/30 border border-slate-700/30 rounded-lg">
-                    <History size={12} className="text-slate-500 mt-0.5 shrink-0" />
+                  <div key={idx} className="flex items-start gap-2 p-2 bg-surface/30 border border-edge-subtle rounded-lg">
+                    <History size={12} className="text-content-muted mt-0.5 shrink-0" />
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-semibold text-white">{log.action}</span>
-                        <span className="text-[9px] text-slate-600">{log.statutAvant} → {log.statutApres}</span>
+                        <span className="text-[10px] font-semibold text-content-primary">{log.action}</span>
+                        <span className="text-[9px] text-content-muted">{log.statutAvant} → {log.statutApres}</span>
                       </div>
-                      <p className="text-[10px] text-slate-400 mt-0.5">
+                      <p className="text-[10px] text-content-muted mt-0.5">
                         {log.userName || 'Système'} — {new Date(log.createdAt).toLocaleString('fr-FR')}
                       </p>
                       {log.details && typeof log.details === 'object' && log.details.commentaire && (
-                        <p className="text-[10px] text-slate-500 mt-0.5 italic">{log.details.commentaire}</p>
+                        <p className="text-[10px] text-content-muted mt-0.5 italic">{log.details.commentaire}</p>
                       )}
                     </div>
                   </div>
                 ))
               ) : (
-                <p className="text-xs text-slate-500 text-center py-4">Aucun log d'audit</p>
+                <p className="text-xs text-content-muted text-center py-4">Aucun log d'audit</p>
               )}
             </div>
           )}
         </div>
 
         {/* Action bar */}
-        <div className="flex items-center justify-between gap-2 p-4 border-t border-slate-800">
+        <div className="flex items-center justify-between gap-2 p-4 border-t border-edge">
           <Button variant="ghost" size="sm" onClick={onClose}>Fermer</Button>
 
           <div className="flex items-center gap-2">
@@ -571,7 +571,7 @@ export default function EvacuationDetail({
                       value={reason}
                       onChange={(e) => setReason(e.target.value)}
                       placeholder="Motif..."
-                      className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-[10px] text-white placeholder:text-slate-600 w-32 focus:outline-none"
+                      className="px-2 py-1 bg-surface border border-edge rounded text-[10px] text-content-primary placeholder:text-content-muted w-32 focus:outline-none"
                     />
                     <Button variant="danger" size="sm" onClick={handleCancel} disabled={loading}>
                       <Ban size={11} className="mr-1" /> Annuler
@@ -624,8 +624,8 @@ export default function EvacuationDetail({
 function InfoRow({ label, value, bold, span2 }: { label: string; value: string; bold?: boolean; span2?: boolean }) {
   return (
     <div className={span2 ? 'col-span-2' : ''}>
-      <span className="text-[10px] text-slate-500 block">{label}</span>
-      <span className={`text-[11px] ${bold ? 'font-bold text-white' : 'text-slate-300'}`}>{value}</span>
+      <span className="text-[10px] text-content-muted block">{label}</span>
+      <span className={`text-[11px] ${bold ? 'font-bold text-content-primary' : 'text-content-secondary'}`}>{value}</span>
     </div>
   );
 }

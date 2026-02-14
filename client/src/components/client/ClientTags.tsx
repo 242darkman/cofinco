@@ -188,14 +188,14 @@ export default function ClientTags({ clientId, compact = false }: ClientTagsProp
         {compact ? (
              <button
               onClick={() => setShowTagModal(true)}
-              className="px-2 py-0.5 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 text-[10px] flex items-center gap-1 transition border border-dashed border-slate-600 hover:border-slate-500 hover:text-slate-300"
+              className="px-2 py-0.5 rounded-full bg-surface hover:bg-surface-elevated text-content-muted text-[10px] flex items-center gap-1 transition border border-dashed border-edge-strong hover:border-edge-strong hover:text-content-secondary"
             >
               <Plus size={10} /> {validClientTags.length === 0 ? 'Tags' : ''}
             </button>
         ) : (
             <button
             onClick={() => setShowTagModal(true)}
-            className="px-3 py-1 rounded-full bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm flex items-center gap-1 transition border border-dashed border-slate-500"
+            className="px-3 py-1 rounded-full bg-surface-elevated hover:bg-surface-subtle text-content-secondary text-sm flex items-center gap-1 transition border border-dashed border-edge-strong"
             >
             <Plus size={14} /> Gérer les tags
             </button>
@@ -205,13 +205,13 @@ export default function ClientTags({ clientId, compact = false }: ClientTagsProp
 
       {showTagModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-md shadow-2xl overflow-hidden">
-            <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-900/50">
-              <h3 className="font-bold text-white flex items-center gap-2">
-                <Tag size={18} className="text-emerald-500" />
+          <div className="bg-surface border border-edge rounded-xl w-full max-w-md shadow-2xl overflow-hidden">
+            <div className="p-4 border-b border-edge flex justify-between items-center bg-surface-base/50">
+              <h3 className="font-bold text-content-primary flex items-center gap-2">
+                <Tag size={18} className="text-status-success" />
                 Gestion des Tags
               </h3>
-              <button onClick={() => setShowTagModal(false)} className="text-slate-400 hover:text-white">
+              <button onClick={() => setShowTagModal(false)} className="text-content-muted hover:text-content-primary">
                 <X size={20} />
               </button>
             </div>
@@ -220,7 +220,7 @@ export default function ClientTags({ clientId, compact = false }: ClientTagsProp
               {/* Tags assignés au client */}
               {validClientTags.length > 0 && (
                 <div>
-                  <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-2 font-medium">Tags assignés</p>
+                  <p className="text-[10px] text-content-muted uppercase tracking-wider mb-2 font-medium">Tags assignés</p>
                   <div className="flex flex-wrap gap-1.5">
                     {validClientTags.map(ct => (
                       <span
@@ -252,7 +252,7 @@ export default function ClientTags({ clientId, compact = false }: ClientTagsProp
                     placeholder="Nouveau tag..."
                     value={newTag.name}
                     onChange={e => setNewTag({ ...newTag, name: e.target.value })}
-                    className="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-emerald-500 outline-none"
+                    className="flex-1 bg-surface-base border border-edge-strong rounded-lg px-3 py-2 text-content-primary focus:ring-2 focus:ring-status-success outline-none"
                   />
                   <input
                     type="color"
@@ -263,7 +263,7 @@ export default function ClientTags({ clientId, compact = false }: ClientTagsProp
                   <button
                     onClick={handleAddTag}
                     disabled={!newTag.name}
-                    className="bg-emerald-500 hover:bg-emerald-600 text-white p-2 rounded-lg disabled:opacity-50"
+                    className="bg-status-success hover:bg-status-success/80 text-white p-2 rounded-lg disabled:opacity-50"
                   >
                     <Plus size={20} />
                   </button>
@@ -272,24 +272,24 @@ export default function ClientTags({ clientId, compact = false }: ClientTagsProp
 
               {/* Recherche et tags disponibles */}
               <div className="relative">
-                <Search size={16} className="absolute left-3 top-3 text-slate-500" />
+                <Search size={16} className="absolute left-3 top-3 text-content-muted" />
                 <input
                   type="text"
                   placeholder="Rechercher un tag existant..."
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-600 rounded-lg pl-9 pr-3 py-2 text-white text-sm outline-none focus:border-slate-500"
+                  className="w-full bg-surface-base border border-edge-strong rounded-lg pl-9 pr-3 py-2 text-content-primary text-sm outline-none focus:border-edge-strong"
                 />
               </div>
 
               <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
                 {filteredTags.length === 0 ? (
-                  <div className="text-center text-slate-500 py-4 text-sm">Aucun tag disponible</div>
+                  <div className="text-center text-content-muted py-4 text-sm">Aucun tag disponible</div>
                 ) : (
                   filteredTags.map(tag => (
                     <div
                       key={tag.id}
-                      className="flex items-center justify-between p-2 hover:bg-slate-700/50 rounded-lg group"
+                      className="flex items-center justify-between p-2 hover:bg-surface-elevated/50 rounded-lg group"
                     >
                       <span
                         className="px-2 py-1 rounded text-xs font-medium"
@@ -301,7 +301,7 @@ export default function ClientTags({ clientId, compact = false }: ClientTagsProp
                         {canAssignTags && (
                           <button
                             onClick={() => handleAssignTag(tag.id)}
-                            className="text-slate-400 hover:text-emerald-500 p-1"
+                            className="text-content-muted hover:text-status-success p-1"
                             title="Assigner"
                           >
                             <Plus size={16} />
@@ -310,7 +310,7 @@ export default function ClientTags({ clientId, compact = false }: ClientTagsProp
                         {canDeleteTags && (
                           <button
                             onClick={() => handleDeleteTagDef(tag.id)}
-                            className="text-slate-600 hover:text-red-400 p-1 opacity-0 group-hover:opacity-100 transition"
+                            className="text-content-muted hover:text-status-danger p-1 opacity-0 group-hover:opacity-100 transition"
                             title="Supprimer définitivement"
                           >
                             <X size={16} />

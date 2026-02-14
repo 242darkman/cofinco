@@ -169,20 +169,20 @@ export default function EpargneSavingsGoals({ compteId, compteSolde, onClose }: 
   );
 
   const getProgressionColor = useCallback((pourcentage: number) => {
-    if (pourcentage >= 100) return 'from-green-500 to-emerald-600';
-    if (pourcentage >= 75) return 'from-blue-500 to-cyan-600';
-    if (pourcentage >= 50) return 'from-cyan-500 to-emerald-600';
-    return 'from-blue-500 to-cyan-600';
+    if (pourcentage >= 100) return 'from-status-success to-status-success';
+    if (pourcentage >= 75) return 'from-status-info to-accent';
+    if (pourcentage >= 50) return 'from-accent to-status-success';
+    return 'from-status-info to-accent';
   }, []);
 
   const getStatusBadgeColor = useCallback((statut: string) => {
     switch (statut) {
       case 'Atteint':
-        return 'bg-green-500/20 text-green-400';
+        return 'bg-status-success-bg text-status-success';
       case 'Abandonné':
-        return 'bg-red-500/20 text-red-400';
+        return 'bg-status-danger-bg text-status-danger';
       default:
-        return 'bg-blue-500/20 text-blue-400';
+        return 'bg-status-info-bg text-status-info';
     }
   }, []);
 
@@ -208,17 +208,17 @@ export default function EpargneSavingsGoals({ compteId, compteSolde, onClose }: 
       aria-labelledby="goals-title"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-slate-800 rounded-xl border border-slate-700 w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-surface rounded-xl border border-edge w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="sticky top-0 bg-slate-800 border-b border-slate-700 p-6 flex justify-between items-center shrink-0">
+        <div className="sticky top-0 bg-surface border-b border-edge p-6 flex justify-between items-center shrink-0">
           <div className="flex items-center gap-3">
-            <Target className="text-green-400" size={24} aria-hidden="true" />
+            <Target className="text-status-success" size={24} aria-hidden="true" />
             <div>
-              <h2 id="goals-title" className="text-2xl font-bold text-white">
+              <h2 id="goals-title" className="text-2xl font-bold text-content-primary">
                 Objectifs d'Épargne
               </h2>
-              <p className="text-slate-400 text-sm">
-                Solde disponible: <span className="text-green-400 font-semibold">{formatMoney(compteSolde)}</span>
+              <p className="text-content-muted text-sm">
+                Solde disponible: <span className="text-status-success font-semibold">{formatMoney(compteSolde)}</span>
               </p>
             </div>
           </div>
@@ -230,17 +230,17 @@ export default function EpargneSavingsGoals({ compteId, compteSolde, onClose }: 
           {/* Stats */}
           {!loading && objectifs.length > 0 && (
             <div className="grid grid-cols-3 gap-3 text-center">
-              <div className="bg-slate-700/30 rounded-lg p-3">
-                <div className="text-2xl font-bold text-white">{stats.total}</div>
-                <div className="text-xs text-slate-400">Total</div>
+              <div className="bg-surface-elevated/30 rounded-lg p-3">
+                <div className="text-2xl font-bold text-content-primary">{stats.total}</div>
+                <div className="text-xs text-content-muted">Total</div>
               </div>
-              <div className="bg-green-500/10 rounded-lg p-3">
-                <div className="text-2xl font-bold text-green-400">{stats.atteints}</div>
-                <div className="text-xs text-slate-400">Atteints</div>
+              <div className="bg-status-success-bg rounded-lg p-3">
+                <div className="text-2xl font-bold text-status-success">{stats.atteints}</div>
+                <div className="text-xs text-content-muted">Atteints</div>
               </div>
-              <div className="bg-blue-500/10 rounded-lg p-3">
-                <div className="text-2xl font-bold text-blue-400">{stats.enCours}</div>
-                <div className="text-xs text-slate-400">En cours</div>
+              <div className="bg-status-info-bg rounded-lg p-3">
+                <div className="text-2xl font-bold text-status-info">{stats.enCours}</div>
+                <div className="text-xs text-content-muted">En cours</div>
               </div>
             </div>
           )}
@@ -254,17 +254,17 @@ export default function EpargneSavingsGoals({ compteId, compteSolde, onClose }: 
 
           {/* Form */}
           {showForm && (
-            <form onSubmit={handleSubmit} className="bg-slate-700/50 rounded-lg p-6 space-y-4">
-              <h3 className="text-lg font-bold text-white mb-4">Créer un Objectif</h3>
+            <form onSubmit={handleSubmit} className="bg-surface-elevated/50 rounded-lg p-6 space-y-4">
+              <h3 className="text-lg font-bold text-content-primary mb-4">Créer un Objectif</h3>
 
               {errors.general && (
-                <div className="p-3 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400 text-sm" role="alert">
+                <div className="p-3 bg-status-danger-bg border border-status-danger/50 rounded-lg text-status-danger text-sm" role="alert">
                   {errors.general}
                 </div>
               )}
 
               <div>
-                <label htmlFor="goal-name" className="block text-sm font-semibold text-slate-300 mb-2">
+                <label htmlFor="goal-name" className="block text-sm font-semibold text-content-secondary mb-2">
                   Nom de l'Objectif *
                 </label>
                 <input
@@ -275,8 +275,8 @@ export default function EpargneSavingsGoals({ compteId, compteSolde, onClose }: 
                     setFormData({ ...formData, nom: e.target.value });
                     if (errors.nom) setErrors({ ...errors, nom: undefined });
                   }}
-                  className={`w-full bg-slate-700 border rounded-lg px-4 py-2 text-white ${
-                    errors.nom ? 'border-red-500' : 'border-slate-600'
+                  className={`w-full bg-surface-elevated border rounded-lg px-4 py-2 text-content-primary ${
+                    errors.nom ? 'border-status-danger' : 'border-edge-strong'
                   }`}
                   placeholder="Ex: Voyage, Mariage, Achat maison..."
                   maxLength={100}
@@ -285,7 +285,7 @@ export default function EpargneSavingsGoals({ compteId, compteSolde, onClose }: 
                   aria-describedby={errors.nom ? 'name-error' : undefined}
                 />
                 {errors.nom && (
-                  <p id="name-error" className="text-red-400 text-xs mt-1" role="alert">
+                  <p id="name-error" className="text-status-danger text-xs mt-1" role="alert">
                     {errors.nom}
                   </p>
                 )}
@@ -293,7 +293,7 @@ export default function EpargneSavingsGoals({ compteId, compteSolde, onClose }: 
 
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="goal-amount" className="block text-sm font-semibold text-slate-300 mb-2">
+                  <label htmlFor="goal-amount" className="block text-sm font-semibold text-content-secondary mb-2">
                     <DollarSign size={16} className="inline mr-2" aria-hidden="true" />
                     Montant Cible (FCFA) *
                   </label>
@@ -307,22 +307,22 @@ export default function EpargneSavingsGoals({ compteId, compteSolde, onClose }: 
                       setFormData({ ...formData, montantCible: e.target.value });
                       if (errors.montantCible) setErrors({ ...errors, montantCible: undefined });
                     }}
-                    className={`w-full bg-slate-700 border rounded-lg px-4 py-2 text-white ${
-                      errors.montantCible ? 'border-red-500' : 'border-slate-600'
+                    className={`w-full bg-surface-elevated border rounded-lg px-4 py-2 text-content-primary ${
+                      errors.montantCible ? 'border-status-danger' : 'border-edge-strong'
                     }`}
                     required
                     aria-invalid={!!errors.montantCible}
                     aria-describedby={errors.montantCible ? 'amount-error' : undefined}
                   />
                   {errors.montantCible && (
-                    <p id="amount-error" className="text-red-400 text-xs mt-1" role="alert">
+                    <p id="amount-error" className="text-status-danger text-xs mt-1" role="alert">
                       {errors.montantCible}
                     </p>
                   )}
                 </div>
 
                 <div>
-                  <label htmlFor="goal-date" className="block text-sm font-semibold text-slate-300 mb-2">
+                  <label htmlFor="goal-date" className="block text-sm font-semibold text-content-secondary mb-2">
                     <Calendar size={16} className="inline mr-2" aria-hidden="true" />
                     Date Cible *
                   </label>
@@ -335,15 +335,15 @@ export default function EpargneSavingsGoals({ compteId, compteSolde, onClose }: 
                       if (errors.dateCible) setErrors({ ...errors, dateCible: undefined });
                     }}
                     min={new Date().toISOString().split('T')[0]}
-                    className={`w-full bg-slate-700 border rounded-lg px-4 py-2 text-white ${
-                      errors.dateCible ? 'border-red-500' : 'border-slate-600'
+                    className={`w-full bg-surface-elevated border rounded-lg px-4 py-2 text-content-primary ${
+                      errors.dateCible ? 'border-status-danger' : 'border-edge-strong'
                     }`}
                     required
                     aria-invalid={!!errors.dateCible}
                     aria-describedby={errors.dateCible ? 'date-error' : undefined}
                   />
                   {errors.dateCible && (
-                    <p id="date-error" className="text-red-400 text-xs mt-1" role="alert">
+                    <p id="date-error" className="text-status-danger text-xs mt-1" role="alert">
                       {errors.dateCible}
                     </p>
                   )}
@@ -351,14 +351,14 @@ export default function EpargneSavingsGoals({ compteId, compteSolde, onClose }: 
               </div>
 
               <div>
-                <label htmlFor="goal-description" className="block text-sm font-semibold text-slate-300 mb-2">
+                <label htmlFor="goal-description" className="block text-sm font-semibold text-content-secondary mb-2">
                   Description (optionnel)
                 </label>
                 <textarea
                   id="goal-description"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white resize-none"
+                  className="w-full bg-surface-elevated border border-edge-strong rounded-lg px-4 py-2 text-content-primary resize-none"
                   rows={2}
                   maxLength={500}
                   placeholder="Détails de votre objectif..."
@@ -384,7 +384,7 @@ export default function EpargneSavingsGoals({ compteId, compteSolde, onClose }: 
               ))}
             </div>
           ) : objectifs.length === 0 ? (
-            <div className="text-center py-12 text-slate-400" role="status">
+            <div className="text-center py-12 text-content-muted" role="status">
               <Target className="mx-auto mb-3" size={48} aria-hidden="true" />
               <p>Aucun objectif défini</p>
               <p className="text-sm mt-1">Créez votre premier objectif d'épargne</p>
@@ -398,24 +398,24 @@ export default function EpargneSavingsGoals({ compteId, compteSolde, onClose }: 
                 return (
                   <div
                     key={objectif.id}
-                    className="bg-slate-700/50 border border-slate-600 rounded-lg p-6 hover:border-green-500/50 transition"
+                    className="bg-surface-elevated/50 border border-edge-strong rounded-lg p-6 hover:border-status-success/50 transition"
                     role="listitem"
                   >
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2 flex-wrap">
-                          <h3 className="text-xl font-bold text-white">{escapeHtml(objectif.nom)}</h3>
+                          <h3 className="text-xl font-bold text-content-primary">{escapeHtml(objectif.nom)}</h3>
                           <span className={`px-3 py-1 rounded text-xs font-semibold ${getStatusBadgeColor(objectif.statut)}`}>
                             {ALL_STATUS_LABELS[objectif.statut] || objectif.statut}
                           </span>
                         </div>
                         {objectif.description && (
-                          <p className="text-slate-400 text-sm mb-3">{escapeHtml(objectif.description)}</p>
+                          <p className="text-content-muted text-sm mb-3">{escapeHtml(objectif.description)}</p>
                         )}
-                        <div className="flex items-center gap-4 text-sm text-slate-400 flex-wrap">
+                        <div className="flex items-center gap-4 text-sm text-content-muted flex-wrap">
                           <div className="flex items-center gap-1">
                             <Calendar size={14} aria-hidden="true" />
-                            <span className={isOverdue ? 'text-red-400' : ''}>{joursText}</span>
+                            <span className={isOverdue ? 'text-status-danger' : ''}>{joursText}</span>
                           </div>
                           <div>Cible: {formatDate(objectif.dateCible)}</div>
                         </div>
@@ -423,7 +423,7 @@ export default function EpargneSavingsGoals({ compteId, compteSolde, onClose }: 
 
                       <button
                         onClick={() => handleDelete(objectif)}
-                        className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg transition"
+                        className="p-2 text-status-danger hover:bg-status-danger-bg rounded-lg transition"
                         aria-label={`Supprimer l'objectif ${escapeHtml(objectif.nom)}`}
                         type="button"
                       >
@@ -434,14 +434,14 @@ export default function EpargneSavingsGoals({ compteId, compteSolde, onClose }: 
                     {/* Progress bar */}
                     <div className="mb-3">
                       <div className="flex justify-between items-center mb-2">
-                        <span className="text-slate-400 text-sm">Progression</span>
-                        <span className="text-white font-bold">
+                        <span className="text-content-muted text-sm">Progression</span>
+                        <span className="text-content-primary font-bold">
                           {formatMoney(objectif.montantActuel, { showCurrency: false })} /{' '}
                           {formatMoney(objectif.montantCible, { showCurrency: false })} FCFA
                         </span>
                       </div>
                       <div
-                        className="w-full bg-slate-600 rounded-full h-4"
+                        className="w-full bg-surface-subtle rounded-full h-4"
                         role="progressbar"
                         aria-valuenow={Math.min(pourcentage, 100)}
                         aria-valuemin={0}
@@ -453,7 +453,7 @@ export default function EpargneSavingsGoals({ compteId, compteSolde, onClose }: 
                           style={{ width: `${Math.min(pourcentage, 100)}%` }}
                         />
                       </div>
-                      <div className="text-right text-sm font-bold text-white mt-1">{pourcentage.toFixed(1)}%</div>
+                      <div className="text-right text-sm font-bold text-content-primary mt-1">{pourcentage.toFixed(1)}%</div>
                     </div>
 
                     {objectif.statut === StatutObjectif.IN_PROGRESS && (

@@ -14,6 +14,7 @@ import { agenceApi, employeApi, villeApi } from '../../lib/api-client';
 import { useEntityUpload } from '../../hooks/useEntityUpload';
 import { resolveStorageUrl } from '../../lib/format';
 import { StatutClient, StatutAgence, SegmentClient, SEGMENT_CLIENT_LABELS } from '@shared/enum/status-constants';
+import { useCurrency } from '../../contexts/CurrencyContext';
 
 interface ClientFormProps {
   client?: ClientWithIdentity | null;
@@ -97,6 +98,7 @@ const getMaxBirthDate = () => {
 };
 
 export default function ClientForm({ client, onClose, onSave }: ClientFormProps) {
+  const { label } = useCurrency();
   // Camera State
   const [isLivenessOpen, setIsLivenessOpen] = useState(false);
 
@@ -527,11 +529,11 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
             placeholder="email@example.com"
           />
           <div>
-            <label className="block text-[11px] font-semibold text-slate-400 mb-1">Téléphone * <span className="text-red-400">*</span></label>
+            <label className="block text-[11px] font-semibold text-content-muted mb-1">Téléphone * <span className="text-status-danger">*</span></label>
             <div className="flex gap-1">
-              <div className="px-2 py-1.5 bg-slate-800 border border-slate-600 rounded-lg text-xs font-semibold text-slate-300 flex items-center">+242</div>
+              <div className="px-2 py-1.5 bg-surface border border-edge-strong rounded-lg text-xs font-semibold text-content-secondary flex items-center">+242</div>
               <div className="relative flex-1">
-                <Phone className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-500" size={14} />
+                <Phone className="absolute left-2 top-1/2 -translate-y-1/2 text-content-muted" size={14} />
                 <input
                   type="tel"
                   name="telephone-input"
@@ -540,12 +542,12 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
                     const num = e.target.value.replace(/[^\d]/g, '');
                     handleChange('telephone', '+242' + num);
                   }}
-                  className="w-full pl-7 pr-2 py-1.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-cyan-500 transition-colors"
+                  className="w-full pl-7 pr-2 py-1.5 bg-surface-elevated border border-edge-strong rounded-lg text-content-primary text-sm placeholder:text-content-muted focus:outline-none focus:border-accent transition-colors"
                   maxLength={9}
                 />
               </div>
             </div>
-            {errors.telephone && <p className="mt-0.5 text-[10px] text-red-400">{errors.telephone}</p>}
+            {errors.telephone && <p className="mt-0.5 text-[10px] text-status-danger">{errors.telephone}</p>}
           </div>
         </div>
 
@@ -634,10 +636,10 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
         </div>
 
         {/* Section Profil Professionnel - Compact */}
-        <div className="pt-3 border-t border-slate-700/50">
+        <div className="pt-3 border-t border-edge-subtle">
           <div className="flex items-center gap-1.5 mb-2">
-            <Briefcase size={14} className="text-cyan-400" />
-            <h4 className="text-xs font-semibold text-white uppercase tracking-wide">Profil Professionnel</h4>
+            <Briefcase size={14} className="text-accent" />
+            <h4 className="text-xs font-semibold text-content-primary uppercase tracking-wide">Profil Professionnel</h4>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <FormField
@@ -658,22 +660,22 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
             />
             {/* Revenu Compact */}
             <div>
-              <label className="block text-[11px] font-semibold text-slate-400 mb-1">Revenu (FCFA)</label>
-              <div className="flex rounded-lg overflow-hidden border border-slate-600 mb-1">
+              <label className="block text-[11px] font-semibold text-content-muted mb-1">{label('Revenu')}</label>
+              <div className="flex rounded-lg overflow-hidden border border-edge-strong mb-1">
                 <button type="button" onClick={() => { handleChange('typeRevenu', 'Mensuel'); if (formData.revenuJournalier) { const d = parseFloat(formData.revenuJournalier); if (!isNaN(d) && d > 0) handleChange('revenuMensuel', Math.round(d * 26).toString()); }}}
-                  className={`flex-1 py-1 text-[10px] font-medium ${formData.typeRevenu !== 'Journalier' ? 'bg-cyan-500 text-white' : 'bg-slate-700 text-slate-400'}`}>Mensuel</button>
+                  className={`flex-1 py-1 text-[10px] font-medium ${formData.typeRevenu !== 'Journalier' ? 'bg-accent-secondary text-content-primary' : 'bg-surface-elevated text-content-muted'}`}>Mensuel</button>
                 <button type="button" onClick={() => { handleChange('typeRevenu', 'Journalier'); if (formData.revenuMensuel && !formData.revenuJournalier) { const m = parseFloat(formData.revenuMensuel); if (!isNaN(m) && m > 0) handleChange('revenuJournalier', Math.round(m / 26).toString()); }}}
-                  className={`flex-1 py-1 text-[10px] font-medium ${formData.typeRevenu === 'Journalier' ? 'bg-cyan-500 text-white' : 'bg-slate-700 text-slate-400'}`}>Journalier</button>
+                  className={`flex-1 py-1 text-[10px] font-medium ${formData.typeRevenu === 'Journalier' ? 'bg-accent-secondary text-content-primary' : 'bg-surface-elevated text-content-muted'}`}>Journalier</button>
               </div>
               <div className="relative">
-                <DollarSign className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-500" size={14} />
+                <DollarSign className="absolute left-2 top-1/2 -translate-y-1/2 text-content-muted" size={14} />
                 <input type="number" value={formData.typeRevenu === 'Journalier' ? formData.revenuJournalier || '' : formData.revenuMensuel || ''}
                   onChange={(e) => { if (formData.typeRevenu === 'Journalier') { handleChange('revenuJournalier', e.target.value); const p = parseFloat(e.target.value); handleChange('revenuMensuel', !isNaN(p) && p > 0 ? Math.round(p * 26).toString() : ''); } else { handleChange('revenuMensuel', e.target.value); }}}
                   placeholder={formData.typeRevenu === 'Journalier' ? '5000' : '150000'} min="0"
-                  className="w-full pl-7 pr-2 py-1.5 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-cyan-500" />
+                  className="w-full pl-7 pr-2 py-1.5 bg-surface-elevated border border-edge-strong rounded-lg text-content-primary text-sm placeholder:text-content-muted focus:outline-none focus:border-accent" />
               </div>
               {formData.typeRevenu === 'Journalier' && formData.revenuJournalier && parseFloat(formData.revenuJournalier) > 0 && (
-                <p className="text-[10px] text-slate-500 mt-0.5">{parseFloat(formData.revenuJournalier).toLocaleString()} × 26j = <span className="text-cyan-400">{Math.round(parseFloat(formData.revenuJournalier) * 26).toLocaleString()}</span> F/mois</p>
+                <p className="text-[10px] text-content-muted mt-0.5">{parseFloat(formData.revenuJournalier).toLocaleString()} × 26j = <span className="text-accent">{Math.round(parseFloat(formData.revenuJournalier) * 26).toLocaleString()}</span> F/mois</p>
               )}
             </div>
             <SelectField
@@ -687,66 +689,66 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
         </div>
 
         {/* Accès Portail Client - Compact */}
-        <div className="flex items-center justify-between p-2.5 bg-slate-800/50 rounded-lg border border-slate-700 opacity-60">
+        <div className="flex items-center justify-between p-2.5 bg-surface/50 rounded-lg border border-edge opacity-60">
           <div className="flex items-center gap-2">
-            <KeyRound size={16} className="text-slate-500" />
+            <KeyRound size={16} className="text-content-muted" />
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="text-xs font-medium text-slate-300">Accès Portail Client</span>
-                <span className="px-1.5 py-0.5 bg-amber-500/20 text-amber-500 text-[9px] font-bold rounded-full flex items-center gap-0.5"><Lock size={8} /> Bientôt</span>
+                <span className="text-xs font-medium text-content-secondary">Accès Portail Client</span>
+                <span className="px-1.5 py-0.5 bg-status-warning-bg text-status-warning text-[9px] font-bold rounded-full flex items-center gap-0.5"><Lock size={8} /> Bientôt</span>
               </div>
-              {formData.nom && formData.prenom && <p className="text-[10px] text-cyan-500 font-mono">@{generateClientUsername(formData.nom, formData.prenom)}</p>}
+              {formData.nom && formData.prenom && <p className="text-[10px] text-accent font-mono">@{generateClientUsername(formData.nom, formData.prenom)}</p>}
             </div>
           </div>
-          <div className="w-8 h-4 bg-slate-600 rounded-full relative"><div className="absolute left-0.5 top-0.5 w-3 h-3 bg-slate-500 rounded-full" /></div>
+          <div className="w-8 h-4 bg-surface-subtle rounded-full relative"><div className="absolute left-0.5 top-0.5 w-3 h-3 bg-surface-muted0 rounded-full" /></div>
         </div>
 
         {/* Photo & Documents Section - Compact Side by Side */}
-        <div className="pt-3 border-t border-slate-700/50">
+        <div className="pt-3 border-t border-edge-subtle">
           <div className="grid md:grid-cols-5 gap-4">
             {/* ========== AVATAR SECTION (Smaller) ========== */}
             <div className="md:col-span-2 flex flex-col">
               <div className="flex items-center gap-1.5 mb-2">
-                <User size={14} className="text-cyan-400" />
-                <h4 className="text-xs font-semibold text-white uppercase tracking-wide">Photo de Profil</h4>
+                <User size={14} className="text-accent" />
+                <h4 className="text-xs font-semibold text-content-primary uppercase tracking-wide">Photo de Profil</h4>
               </div>
               <div className="flex items-start gap-3">
                 <div className="relative">
                   {formData.photoProfile ? (
                     <div className="relative">
-                      <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-slate-600 shadow-lg">
+                      <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-edge-strong shadow-lg">
                         <img src={getFileDisplayUrl(formData.photoProfile)} className="w-full h-full object-cover" alt="Profil"
                           onError={(e) => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(`${formData.prenom || ''} ${formData.nom || ''}`.trim() || 'Client')}&size=80&background=1e293b&color=94a3b8`; }} />
                       </div>
                       <button type="button" onClick={() => { handleChange('photoProfile', ''); handleDocumentChange('AVATAR', null); }}
-                        className="absolute -top-1 -right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 shadow"><Trash2 size={10} /></button>
+                        className="absolute -top-1 -right-1 p-1 bg-status-danger text-white rounded-full hover:bg-status-danger shadow"><Trash2 size={10} /></button>
                       <button type="button" onClick={() => setIsLivenessOpen(true)}
-                        className="absolute bottom-0 right-0 p-1.5 bg-cyan-500 hover:bg-cyan-400 text-white rounded-full shadow"><Camera size={12} /></button>
+                        className="absolute bottom-0 right-0 p-1.5 bg-accent-secondary hover:bg-accent-secondary-hover text-content-primary rounded-full shadow"><Camera size={12} /></button>
                     </div>
                   ) : (
                     <div className="relative">
                       <SmartDocumentUpload label="" documentType="AVATAR" variant="avatar" isPrivate={false} fileType="profile" entityType="client" entityId={clientEntityId}
                         onUploadComplete={handleAvatarUpload} onRemove={() => { handleChange('photoProfile', ''); handleDocumentChange('AVATAR', null); }} />
-                      <button type="button" onClick={() => setIsLivenessOpen(true)} className="absolute -bottom-1 -left-1 p-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-full shadow border border-slate-600" title="Caméra"><Video size={12} /></button>
+                      <button type="button" onClick={() => setIsLivenessOpen(true)} className="absolute -bottom-1 -left-1 p-1.5 bg-surface-elevated hover:bg-surface-subtle text-content-secondary rounded-full shadow border border-edge-strong" title="Caméra"><Video size={12} /></button>
                     </div>
                   )}
                 </div>
-                <p className="text-[10px] text-slate-500 flex-1 leading-tight mt-1">Photo visible sur la fiche client et les documents imprimés</p>
+                <p className="text-[10px] text-content-muted flex-1 leading-tight mt-1">Photo visible sur la fiche client et les documents imprimés</p>
               </div>
             </div>
 
             {/* ========== IDENTITY DOCUMENTS - Compact ========== */}
             <div className="md:col-span-3">
               <div className="flex items-center gap-1.5 mb-2">
-                <FileText size={14} className="text-cyan-400" />
-                <h4 className="text-xs font-semibold text-white uppercase tracking-wide">Pièces d'identité</h4>
+                <FileText size={14} className="text-accent" />
+                <h4 className="text-xs font-semibold text-content-primary uppercase tracking-wide">Pièces d'identité</h4>
               </div>
 
               {/* ID Type Selector - Compact */}
               <div className="flex gap-1.5 mb-2">
                 {ID_TYPE_OPTIONS.map(({ value, label, icon: Icon }) => (
                   <button key={value} type="button" onClick={() => handleChange('typePiece', value)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all ${formData.typePiece === value ? 'bg-cyan-500 text-white shadow' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}>
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all ${formData.typePiece === value ? 'bg-accent-secondary text-content-primary shadow' : 'bg-surface text-content-muted hover:bg-surface-elevated'}`}>
                     <Icon size={14} />{label}
                   </button>
                 ))}
@@ -756,8 +758,8 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
               <div className="mb-2">
                 <input id="numeroPiece" type="text" value={formData.numeroPiece || ''} onChange={(e) => handleChange('numeroPiece', e.target.value)}
                   placeholder={formData.typePiece === 'CNI' ? 'N° CNI' : formData.typePiece === 'PASSPORT' ? 'N° Passeport' : 'Numéro de pièce'}
-                  className={`w-full px-3 py-1.5 bg-slate-800 border rounded-lg text-white text-sm placeholder:text-slate-500 focus:outline-none focus:border-cyan-500 ${errors.numeroPiece ? 'border-red-500' : 'border-slate-700'}`} />
-                {errors.numeroPiece && <p className="text-[10px] text-red-400 mt-0.5">{errors.numeroPiece}</p>}
+                  className={`w-full px-3 py-1.5 bg-surface border rounded-lg text-content-primary text-sm placeholder:text-content-muted focus:outline-none focus:border-accent ${errors.numeroPiece ? 'border-status-danger' : 'border-edge'}`} />
+                {errors.numeroPiece && <p className="text-[10px] text-status-danger mt-0.5">{errors.numeroPiece}</p>}
               </div>
 
               {/* Document Upload Grid - Compact */}
@@ -797,7 +799,7 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
         </div>
 
         {/* Footer Actions */}
-        <div className="flex justify-end gap-2 pt-4 border-t border-slate-700 mt-4">
+        <div className="flex justify-end gap-2 pt-4 border-t border-edge mt-4">
           <Button type="button" variant="ghost" onClick={onClose} disabled={isSubmitting} size="sm">Annuler</Button>
           <Button type="submit" variant="primary" icon={isSubmitting ? undefined : Save} disabled={isSubmitting} size="sm">
             {isSubmitting ? <span className="flex items-center gap-1.5"><span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Traitement...</span> : client ? 'Mettre à jour' : 'Enregistrer'}

@@ -24,7 +24,7 @@ export default function ComplianceReportCard({
   loading
 }: ComplianceReportCardProps) {
   // Parsing color to use it as gradient or text color is tricky if passed as full class string
-  // Assuming 'color' is a gradient string like "from-blue-600 to-cyan-600" as in original file
+  // Assuming 'color' is a gradient string like "from-status-info to-accent" as in original file
   
   return (
     <Card className="flex flex-col h-full overflow-hidden border-0 shadow-lg group hover:transform hover:scale-[1.02] transition-transform duration-300">
@@ -37,11 +37,11 @@ export default function ComplianceReportCard({
         <p className="text-white/90 text-sm relative z-10 line-clamp-2">{description}</p>
       </div>
 
-      <div className="p-6 flex flex-col flex-1 bg-slate-800">
+      <div className="p-6 flex flex-col flex-1 bg-surface">
         <ul className="space-y-3 mb-8 flex-1">
           {items.map((item, index) => (
-            <li key={index} className="flex items-start gap-3 text-slate-300">
-              <CheckCircle size={16} className="text-green-400 mt-1 flex-shrink-0" />
+            <li key={index} className="flex items-start gap-3 text-content-secondary">
+              <CheckCircle size={16} className="text-status-success mt-1 flex-shrink-0" />
               <span className="text-sm leading-snug">{item}</span>
             </li>
           ))}

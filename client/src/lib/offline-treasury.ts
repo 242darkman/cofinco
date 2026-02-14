@@ -28,6 +28,7 @@ import {
   type AppendEntryOptions,
 } from './journal-service';
 import { offlineBus } from './offline-bus';
+import { currencyCode } from '@shared/config/currency';
 
 // ========== CASH IMPACT CALCULATION ==========
 
@@ -229,7 +230,7 @@ export async function canExecuteOffline(
     return {
       allowed: false,
       reason: 'CAISSE_CEILING',
-      details: `Projected balance ${projectedBalance} exceeds max ${limits.maxCaisseBalance} XAF.`,
+      details: `Projected balance ${projectedBalance} exceeds max ${limits.maxCaisseBalance} ${currencyCode()}.`,
     };
   }
   if (projectedBalance < 0) {
@@ -245,7 +246,7 @@ export async function canExecuteOffline(
     return {
       allowed: false,
       reason: 'SINGLE_OP_LIMIT',
-      details: `Amount ${amount} exceeds max single operation ${limits.maxSingleOperation} XAF.`,
+      details: `Amount ${amount} exceeds max single operation ${limits.maxSingleOperation} ${currencyCode()}.`,
     };
   }
 
@@ -261,7 +262,7 @@ export async function canExecuteOffline(
     return {
       allowed: false,
       reason: 'DAILY_VOLUME_LIMIT',
-      details: `Daily volume limit (${limits.maxDailyVolume} XAF) would be exceeded.`,
+      details: `Daily volume limit (${limits.maxDailyVolume} ${currencyCode()}) would be exceeded.`,
     };
   }
 

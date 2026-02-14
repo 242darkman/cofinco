@@ -1,3 +1,5 @@
+import { currencySymbol } from '@shared/config/currency';
+
 interface SendSMSParams {
   phoneNumber: string;
   message: string;
@@ -43,9 +45,10 @@ export async function sendSMS(params: SendSMSParams): Promise<SendSMSResponse> {
 
 export async function sendOTPSMS(
   phoneNumber: string,
-  otpCode: string
+  otpCode: string,
+  appName: string = 'COFIN&CO-M'
 ): Promise<SendSMSResponse> {
-  const message = `COFIN&CO-M - Votre code de validation: ${otpCode}. Valide 5 min. Ne partagez pas ce code.`;
+  const message = `${appName} - Votre code de validation: ${otpCode}. Valide 5 min. Ne partagez pas ce code.`;
 
   const provider = getProviderForPhoneNumber(phoneNumber);
 
@@ -59,9 +62,10 @@ export async function sendOTPSMS(
 export async function sendTransactionConfirmationSMS(
   phoneNumber: string,
   transactionType: string,
-  montant: number
+  montant: number,
+  appName: string = 'COFIN&CO-M'
 ): Promise<SendSMSResponse> {
-  const message = `COFIN&CO-M - Transaction ${transactionType} de ${montant.toLocaleString()} FCFA confirmée. Merci de votre confiance.`;
+  const message = `${appName} - Transaction ${transactionType} de ${montant.toLocaleString()} ${currencySymbol()} confirmée. Merci de votre confiance.`;
 
   const provider = getProviderForPhoneNumber(phoneNumber);
 

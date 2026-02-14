@@ -129,7 +129,7 @@ export default function CreditEcheancier() {
     if (statut === StatutEcheanceCredit.PAID) {
       return (
         <span
-          className="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs font-semibold"
+          className="px-2 py-1 bg-status-success-bg text-status-success rounded text-xs font-semibold"
           role="status"
         >
           {STATUT_ECHEANCE_CREDIT_LABELS[StatutEcheanceCredit.PAID]}
@@ -139,7 +139,7 @@ export default function CreditEcheancier() {
     if (statut === StatutEcheanceCredit.LATE || joursRetard > 0) {
       return (
         <span
-          className="px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs font-semibold"
+          className="px-2 py-1 bg-status-danger-bg text-status-danger rounded text-xs font-semibold"
           role="status"
           aria-label={`${STATUT_ECHEANCE_CREDIT_LABELS[StatutEcheanceCredit.LATE]} de ${joursRetard} jours`}
         >
@@ -149,7 +149,7 @@ export default function CreditEcheancier() {
     }
     return (
       <span
-        className="px-2 py-1 bg-cyan-500/20 text-cyan-400 rounded text-xs font-semibold"
+        className="px-2 py-1 bg-accent/10 text-accent rounded text-xs font-semibold"
         role="status"
       >
         {STATUT_ECHEANCE_CREDIT_LABELS[StatutEcheanceCredit.UPCOMING]}
@@ -244,40 +244,40 @@ export default function CreditEcheancier() {
       {/* Cartes de statistiques */}
       <section aria-label="Statistiques des échéances">
         <div className="grid md:grid-cols-4 gap-4">
-          <div className="bg-gradient-to-br from-blue-500/20 to-cyan-600/20 border border-blue-500/50 rounded-lg p-4">
+          <div className="bg-gradient-to-br from-status-info/20 to-accent/20 border border-status-info/50 rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-blue-400 text-sm font-semibold">Total Échéances</span>
-              <Calendar className="text-blue-400" size={20} aria-hidden="true" />
+              <span className="text-status-info text-sm font-semibold">Total Échéances</span>
+              <Calendar className="text-status-info" size={20} aria-hidden="true" />
             </div>
-            <div className="text-2xl font-bold text-white break-words">{stats.total}</div>
-            <div className="text-xs text-blue-300 mt-1">Période sélectionnée</div>
+            <div className="text-2xl font-bold text-content-primary break-words">{stats.total}</div>
+            <div className="text-xs text-status-info mt-1">Période sélectionnée</div>
           </div>
 
-          <div className="bg-gradient-to-br from-cyan-500/20 to-cyan-600/20 border border-cyan-500/50 rounded-lg p-4">
+          <div className="bg-gradient-to-br from-accent/20 to-accent/20 border border-accent/50 rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-cyan-400 text-sm font-semibold">En Attente</span>
-              <Clock className="text-cyan-400" size={20} aria-hidden="true" />
+              <span className="text-accent text-sm font-semibold">En Attente</span>
+              <Clock className="text-accent" size={20} aria-hidden="true" />
             </div>
-            <div className="text-2xl font-bold text-white break-words">{stats.enAttente}</div>
-            <div className="text-xs text-cyan-300 mt-1">{formatMoney(stats.montantEnAttente)}</div>
+            <div className="text-2xl font-bold text-content-primary break-words">{stats.enAttente}</div>
+            <div className="text-xs text-accent mt-1">{formatMoney(stats.montantEnAttente)}</div>
           </div>
 
-          <div className="bg-gradient-to-br from-red-500/20 to-red-600/20 border border-red-500/50 rounded-lg p-4">
+          <div className="bg-gradient-to-br from-status-danger/20 to-status-danger/20 border border-status-danger/50 rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-red-400 text-sm font-semibold">En Retard</span>
-              <AlertTriangle className="text-red-400" size={20} aria-hidden="true" />
+              <span className="text-status-danger text-sm font-semibold">En Retard</span>
+              <AlertTriangle className="text-status-danger" size={20} aria-hidden="true" />
             </div>
-            <div className="text-2xl font-bold text-white break-words">{stats.enRetard}</div>
-            <div className="text-xs text-red-300 mt-1">{formatMoney(stats.montantRetard)}</div>
+            <div className="text-2xl font-bold text-content-primary break-words">{stats.enRetard}</div>
+            <div className="text-xs text-status-danger mt-1">{formatMoney(stats.montantRetard)}</div>
           </div>
 
-          <div className="bg-gradient-to-br from-green-500/20 to-green-600/20 border border-green-500/50 rounded-lg p-4">
+          <div className="bg-gradient-to-br from-status-success/20 to-status-success/20 border border-status-success/50 rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-green-400 text-sm font-semibold">Payé</span>
-              <CheckCircle className="text-green-400" size={20} aria-hidden="true" />
+              <span className="text-status-success text-sm font-semibold">Payé</span>
+              <CheckCircle className="text-status-success" size={20} aria-hidden="true" />
             </div>
-            <div className="text-2xl font-bold text-white break-words">{stats.paye}</div>
-            <div className="text-xs text-green-300 mt-1">Complétées</div>
+            <div className="text-2xl font-bold text-content-primary break-words">{stats.paye}</div>
+            <div className="text-xs text-status-success mt-1">Complétées</div>
           </div>
         </div>
       </section>
@@ -296,8 +296,8 @@ export default function CreditEcheancier() {
               onClick={() => handleFilterChange(value)}
               className={`px-4 py-2 rounded-lg font-semibold text-sm transition-colors ${
                 filter === value
-                  ? 'bg-cyan-600 text-white'
-                  : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                  ? 'bg-accent-secondary text-content-primary'
+                  : 'bg-surface-elevated text-content-muted hover:bg-surface-subtle'
               }`}
               aria-pressed={filter === value}
               aria-label={`Filtrer par ${label.toLowerCase()}`}
@@ -318,8 +318,8 @@ export default function CreditEcheancier() {
               onClick={() => handleDateFilterChange(value)}
               className={`px-3 py-2 rounded-lg text-sm transition-colors ${
                 dateFilter === value
-                  ? 'bg-slate-600 text-white'
-                  : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                  ? 'bg-surface-subtle text-content-primary'
+                  : 'bg-surface-elevated text-content-muted hover:bg-surface-subtle'
               }`}
               aria-pressed={dateFilter === value}
               aria-label={`Afficher ${label}`}
@@ -333,7 +333,7 @@ export default function CreditEcheancier() {
       {/* Liste des échéances */}
       {Object.keys(groupedEcheances).length === 0 ? (
         <div
-          className="text-center py-12 text-slate-400"
+          className="text-center py-12 text-content-muted"
           role="status"
           aria-label="Aucune échéance trouvée"
         >
@@ -344,22 +344,22 @@ export default function CreditEcheancier() {
           {Object.entries(groupedEcheances).map(([month, echs]) => (
             <section
               key={month}
-              className="bg-slate-800/50 border border-slate-700 rounded-lg overflow-hidden"
+              className="bg-surface/50 border border-edge rounded-lg overflow-hidden"
               aria-labelledby={`month-${month.replace(/\s+/g, '-')}`}
             >
-              <header className="bg-slate-700/50 px-6 py-3 border-b border-slate-700">
+              <header className="bg-surface-elevated/50 px-6 py-3 border-b border-edge">
                 <h3
                   id={`month-${month.replace(/\s+/g, '-')}`}
-                  className="text-lg font-bold text-white capitalize"
+                  className="text-lg font-bold text-content-primary capitalize"
                 >
                   {escapeHtml(month)}
                 </h3>
-                <div className="text-sm text-slate-400 mt-1">
+                <div className="text-sm text-content-muted mt-1">
                   {echs.length} échéance{echs.length > 1 ? 's' : ''} · {formatMoney(echs.reduce((sum, e) => sum + (e.montantTotal || 0), 0))}
                 </div>
               </header>
 
-              <ul className="divide-y divide-slate-700">
+              <ul className="divide-y divide-edge">
                 {echs.map(echeance => {
                   const daysUntil = getDaysUntil(echeance.dateEcheance);
                   const isUrgent = daysUntil && (daysUntil === "Aujourd'hui" || daysUntil === "Demain");
@@ -367,21 +367,21 @@ export default function CreditEcheancier() {
                   return (
                     <li
                       key={echeance.id}
-                      className={`p-4 hover:bg-slate-700/30 transition-colors ${isUrgent ? 'bg-cyan-500/5' : ''}`}
+                      className={`p-4 hover:bg-surface-elevated/30 transition-colors ${isUrgent ? 'bg-accent/5' : ''}`}
                     >
                       <div className="flex items-center justify-between flex-wrap gap-4">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-3 mb-2 flex-wrap">
-                            <span className="text-cyan-400 font-mono font-bold">
+                            <span className="text-accent font-mono font-bold">
                               {escapeHtml(echeance.credits.numeroCredit)}
                             </span>
-                            <span className="text-white font-semibold">
+                            <span className="text-content-primary font-semibold">
                               {escapeHtml(echeance.credits.clients.nom)}
                             </span>
                             {getStatutBadge(echeance.statut, echeance.joursRetard)}
                             {isUrgent && (
                               <span
-                                className="px-2 py-1 bg-emerald-500/20 text-emerald-400 rounded text-xs font-semibold"
+                                className="px-2 py-1 bg-status-success-bg text-status-success rounded text-xs font-semibold"
                                 role="status"
                               >
                                 Urgent
@@ -389,7 +389,7 @@ export default function CreditEcheancier() {
                             )}
                           </div>
 
-                          <div className="flex items-center gap-6 text-sm text-slate-400 flex-wrap">
+                          <div className="flex items-center gap-6 text-sm text-content-muted flex-wrap">
                             <div className="flex items-center gap-2">
                               <Calendar size={16} aria-hidden="true" />
                               <time dateTime={echeance.dateEcheance}>
@@ -400,7 +400,7 @@ export default function CreditEcheancier() {
                                   year: 'numeric'
                                 })}
                               </time>
-                              {daysUntil && <span className="text-cyan-400">({daysUntil})</span>}
+                              {daysUntil && <span className="text-accent">({daysUntil})</span>}
                             </div>
 
                             <div className="flex items-center gap-2">
@@ -409,7 +409,7 @@ export default function CreditEcheancier() {
                             </div>
 
                             {echeance.penalite > 0 && (
-                              <div className="flex items-center gap-2 text-red-400">
+                              <div className="flex items-center gap-2 text-status-danger">
                                 <AlertTriangle size={16} aria-hidden="true" />
                                 <span>Pénalité: {formatMoney(echeance.penalite)}</span>
                               </div>
@@ -418,10 +418,10 @@ export default function CreditEcheancier() {
                         </div>
 
                         <div className="text-right">
-                          <div className="text-2xl font-bold text-white">
+                          <div className="text-2xl font-bold text-content-primary">
                             {formatMoney(echeance.montantTotal)}
                           </div>
-                          <div className="text-xs text-slate-400 mt-1">
+                          <div className="text-xs text-content-muted mt-1">
                             Principal: {formatMoney(echeance.montantPrincipal)} ·
                             Intérêt: {formatMoney(echeance.montantInteret)}
                           </div>

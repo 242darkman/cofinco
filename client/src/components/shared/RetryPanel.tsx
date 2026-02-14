@@ -64,12 +64,12 @@ export default function RetryPanel({
       <div
         className={`
           flex items-center gap-3 p-3 rounded-lg
-          border border-red-500/30 bg-red-500/10
+          border border-status-danger/30 bg-status-danger-bg
           ${className}
         `}
       >
-        <Icon className="w-5 h-5 text-red-400 flex-shrink-0" />
-        <span className="text-sm text-red-300 flex-1 min-w-0 truncate">{message}</span>
+        <Icon className="w-5 h-5 text-status-danger flex-shrink-0" />
+        <span className="text-sm text-status-danger flex-1 min-w-0 truncate">{message}</span>
         <Button
           variant="ghost"
           size="xs"
@@ -88,26 +88,26 @@ export default function RetryPanel({
     <div
       className={`
         p-6 rounded-xl
-        border border-red-500/30 bg-red-500/10
+        border border-status-danger/30 bg-status-danger-bg
         ${className}
       `}
     >
       {/* Header */}
       <div className="flex items-start gap-4 mb-4">
-        <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-red-500/20">
-          <Icon className="w-6 h-6 text-red-400" />
+        <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-status-danger-bg">
+          <Icon className="w-6 h-6 text-status-danger" />
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="text-lg font-semibold text-red-300">{title}</h3>
-          <p className="text-sm text-slate-400 mt-1">{message}</p>
+          <h3 className="text-lg font-semibold text-status-danger">{title}</h3>
+          <p className="text-sm text-content-muted mt-1">{message}</p>
         </div>
       </div>
 
       {/* Additional info for specific states */}
       {isOffline && (
-        <div className="mb-4 p-3 rounded-lg bg-slate-800/50 border border-slate-700/50">
-          <div className="flex items-center gap-2 text-sm text-slate-300">
-            <AlertCircle className="w-4 h-4 text-amber-400" />
+        <div className="mb-4 p-3 rounded-lg bg-surface/50 border border-edge-subtle">
+          <div className="flex items-center gap-2 text-sm text-content-secondary">
+            <AlertCircle className="w-4 h-4 text-status-warning" />
             <span>
               Les données affichées peuvent être obsolètes. La synchronisation reprendra
               automatiquement une fois la connexion rétablie.
@@ -130,12 +130,12 @@ export default function RetryPanel({
 
         {/* Auto-retry countdown */}
         {nextRetryIn !== null && nextRetryIn > 0 && (
-          <span className="text-xs text-slate-500">
+          <span className="text-xs text-content-muted">
             Réessai automatique dans{' '}
             <CountdownTimer
               seconds={nextRetryIn}
               format="short"
-              className="font-mono text-slate-400"
+              className="font-mono text-content-muted"
             />
           </span>
         )}
@@ -161,14 +161,14 @@ export function InlineRetry({
 
   return (
     <div className="flex items-center gap-2 text-sm">
-      <AlertTriangle className="w-4 h-4 text-red-400" />
-      <span className="text-slate-400">
+      <AlertTriangle className="w-4 h-4 text-status-danger" />
+      <span className="text-content-muted">
         {isOffline ? 'Hors ligne' : 'Échec du chargement'}
       </span>
       <button
         onClick={onRetry}
         disabled={isOffline || isRetrying}
-        className="text-cyan-400 hover:text-cyan-300 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="text-accent hover:text-accent disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {isRetrying ? (
           <RefreshCw className="w-4 h-4 animate-spin" />
@@ -198,11 +198,11 @@ export function FailedLoadState({
 
   return (
     <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
-      <div className="w-16 h-16 rounded-2xl bg-red-500/20 flex items-center justify-center mb-4">
-        <AlertTriangle className="w-8 h-8 text-red-400" />
+      <div className="w-16 h-16 rounded-2xl bg-status-danger-bg flex items-center justify-center mb-4">
+        <AlertTriangle className="w-8 h-8 text-status-danger" />
       </div>
-      <h3 className="text-lg font-semibold text-slate-200 mb-2">{title}</h3>
-      <p className="text-sm text-slate-400 mb-6 max-w-md">{message}</p>
+      <h3 className="text-lg font-semibold text-content-secondary mb-2">{title}</h3>
+      <p className="text-sm text-content-muted mb-6 max-w-md">{message}</p>
       <Button
         variant="primary"
         icon={RefreshCw}

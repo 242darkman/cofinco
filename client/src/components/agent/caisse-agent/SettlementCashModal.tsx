@@ -150,13 +150,13 @@ export default function SettlementCashModal({
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Montant disponible */}
-        <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+        <div className="p-4 bg-status-success-bg border border-status-success/20 rounded-lg">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Wallet size={20} className="text-emerald-400" />
-              <span className="text-sm text-slate-300">Disponible pour remise</span>
+              <Wallet size={20} className="text-status-success" />
+              <span className="text-sm text-content-secondary">Disponible pour remise</span>
             </div>
-            <span className="text-xl font-bold text-emerald-400">
+            <span className="text-xl font-bold text-status-success">
               {formatMoney(maxAmount)} XOF
             </span>
           </div>
@@ -185,9 +185,9 @@ export default function SettlementCashModal({
             id="billetage"
             checked={useBilletage}
             onChange={(e) => setUseBilletage(e.target.checked)}
-            className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-cyan-500 focus:ring-cyan-500"
+            className="w-4 h-4 rounded border-edge-strong bg-surface-elevated text-accent focus:ring-accent"
           />
-          <label htmlFor="billetage" className="text-sm text-slate-300">
+          <label htmlFor="billetage" className="text-sm text-content-secondary">
             Détailler le billetage
           </label>
         </div>
@@ -195,13 +195,13 @@ export default function SettlementCashModal({
         {/* Billetage */}
         {useBilletage ? (
           <div className="space-y-3 p-4 bg-surface-elevated rounded-lg border border-edge">
-            <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">
+            <p className="text-xs font-medium text-content-muted uppercase tracking-wider">
               Billetage
             </p>
             <div className="grid grid-cols-2 gap-3">
               {DENOMINATIONS.map((denom) => (
                 <div key={denom} className="flex items-center gap-2">
-                  <span className="text-sm text-slate-300 w-20">
+                  <span className="text-sm text-content-secondary w-20">
                     {formatMoney(denom)}
                   </span>
                   <input
@@ -210,17 +210,17 @@ export default function SettlementCashModal({
                     value={billetage[denom.toString()] || ''}
                     onChange={(e) => handleBilletageChange(denom, e.target.value)}
                     placeholder="0"
-                    className="flex-1 px-3 py-2 bg-slate-800 border border-edge rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 text-center"
+                    className="flex-1 px-3 py-2 bg-surface border border-edge rounded-lg text-content-primary placeholder-content-muted focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent text-center"
                   />
-                  <span className="text-xs text-slate-500 w-20 text-right">
+                  <span className="text-xs text-content-muted w-20 text-right">
                     = {formatMoney((billetage[denom.toString()] || 0) * denom)}
                   </span>
                 </div>
               ))}
             </div>
             <div className="pt-3 border-t border-edge flex items-center justify-between">
-              <span className="text-sm font-medium text-slate-300">Total</span>
-              <span className="text-lg font-bold text-cyan-400">
+              <span className="text-sm font-medium text-content-secondary">Total</span>
+              <span className="text-lg font-bold text-accent">
                 {formatMoney(calculateBilletageTotal())} XOF
               </span>
             </div>
@@ -240,9 +240,9 @@ export default function SettlementCashModal({
 
         {/* Warning si montant dépasse */}
         {parseFloat(montant || '0') > maxAmount && (
-          <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2">
-            <AlertTriangle size={16} className="text-red-400" />
-            <p className="text-xs text-red-300">
+          <div className="p-3 bg-status-danger-bg border border-status-danger/20 rounded-lg flex items-center gap-2">
+            <AlertTriangle size={16} className="text-status-danger" />
+            <p className="text-xs text-status-danger">
               Le montant dépasse le disponible ({formatMoney(maxAmount)} XOF)
             </p>
           </div>
@@ -250,8 +250,8 @@ export default function SettlementCashModal({
 
         {/* Observations */}
         <div className="space-y-2">
-          <label className="text-sm font-medium text-slate-300 flex items-center gap-2">
-            <FileText size={16} className="text-slate-400" />
+          <label className="text-sm font-medium text-content-secondary flex items-center gap-2">
+            <FileText size={16} className="text-content-muted" />
             Observations
           </label>
           <textarea
@@ -259,13 +259,13 @@ export default function SettlementCashModal({
             onChange={(e) => setObservations(e.target.value)}
             placeholder="Notes ou commentaires..."
             rows={2}
-            className="w-full px-3 py-2 bg-surface-elevated border border-edge rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 resize-none"
+            className="w-full px-3 py-2 bg-surface-elevated border border-edge rounded-lg text-content-primary placeholder-content-muted focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
           />
         </div>
 
         {/* Info box */}
-        <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-          <p className="text-xs text-amber-300">
+        <div className="p-3 bg-status-warning-bg border border-status-warning/20 rounded-lg">
+          <p className="text-xs text-status-warning">
             Cette remise sera soumise pour validation par un superviseur.
             Le montant ne sera transféré qu'après approbation.
           </p>

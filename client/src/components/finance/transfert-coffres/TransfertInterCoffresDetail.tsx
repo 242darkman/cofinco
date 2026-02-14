@@ -186,15 +186,15 @@ export default function TransfertInterCoffresDetail({
   // Status configuration
   const getStatutConfig = (statut: string) => {
     const configs: Record<string, { color: string; bg: string; border: string; icon: React.ReactNode }> = {
-      'Brouillon': { color: 'text-slate-400', bg: 'bg-slate-500/10', border: 'border-slate-500/30', icon: <FileText size={18} /> },
-      'Soumis': { color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/30', icon: <Clock size={18} /> },
-      'Approuvé N1': { color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/30', icon: <Shield size={18} /> },
-      'Approuvé N2': { color: 'text-indigo-400', bg: 'bg-indigo-500/10', border: 'border-indigo-500/30', icon: <Shield size={18} /> },
-      'En transit': { color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/30', icon: <Truck size={18} /> },
-      'Reçu': { color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', icon: <CheckCircle size={18} /> },
-      'Reçu avec écart': { color: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/30', icon: <AlertTriangle size={18} /> },
-      'Rejeté': { color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/30', icon: <XCircle size={18} /> },
-      'Annulé': { color: 'text-slate-500', bg: 'bg-slate-600/10', border: 'border-slate-600/30', icon: <X size={18} /> },
+      'Brouillon': { color: 'text-content-muted', bg: 'bg-surface-subtle/30', border: 'border-edge-strong/30', icon: <FileText size={18} /> },
+      'Soumis': { color: 'text-status-warning', bg: 'bg-status-warning-bg', border: 'border-status-warning/30', icon: <Clock size={18} /> },
+      'Approuvé N1': { color: 'text-status-info', bg: 'bg-status-info-bg', border: 'border-status-info/30', icon: <Shield size={18} /> },
+      'Approuvé N2': { color: 'text-accent', bg: 'bg-accent/10', border: 'border-accent/30', icon: <Shield size={18} /> },
+      'En transit': { color: 'text-status-warning', bg: 'bg-status-warning-bg', border: 'border-status-warning/30', icon: <Truck size={18} /> },
+      'Reçu': { color: 'text-status-success', bg: 'bg-status-success-bg', border: 'border-status-success/30', icon: <CheckCircle size={18} /> },
+      'Reçu avec écart': { color: 'text-status-warning', bg: 'bg-status-warning-bg', border: 'border-status-warning/30', icon: <AlertTriangle size={18} /> },
+      'Rejeté': { color: 'text-status-danger', bg: 'bg-status-danger-bg', border: 'border-status-danger/30', icon: <XCircle size={18} /> },
+      'Annulé': { color: 'text-content-muted', bg: 'bg-surface-subtle/10', border: 'border-edge-strong/30', icon: <X size={18} /> },
     };
     return configs[statut] || configs['Brouillon'];
   };
@@ -293,7 +293,7 @@ export default function TransfertInterCoffresDetail({
         className="
           fixed inset-y-0 right-0 z-50
           w-full max-w-xl lg:max-w-2xl
-          bg-slate-900 border-l border-slate-700/50
+          bg-surface-base border-l border-edge-subtle
           shadow-2xl shadow-black/50
           flex flex-col
           animate-in slide-in-from-right duration-300
@@ -303,7 +303,7 @@ export default function TransfertInterCoffresDetail({
           {/* ═══════════════════════════════════════════════════════════════════
               HEADER - Reference & Status
           ═══════════════════════════════════════════════════════════════════ */}
-          <div className={`flex-shrink-0 p-4 sm:p-5 border-b border-slate-700/50 ${statutConfig.bg}`}>
+          <div className={`flex-shrink-0 p-4 sm:p-5 border-b border-edge-subtle ${statutConfig.bg}`}>
             <div className="flex items-start justify-between gap-3 mb-4">
               <div className="flex items-center gap-3">
                 <div className={`p-2.5 rounded-lg ${statutConfig.bg} ${statutConfig.border} border`}>
@@ -311,11 +311,11 @@ export default function TransfertInterCoffresDetail({
                   <span className={statutConfig.color} />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                  <h2 className="text-lg font-bold text-content-primary flex items-center gap-2">
                     {transfert.reference}
                     {transfert.verrouille && (
-                      <span title="Transfert verrouillé" className="p-0.5 rounded bg-amber-500/20">
-                        <Lock size={12} className="text-amber-400" />
+                      <span title="Transfert verrouillé" className="p-0.5 rounded bg-status-warning-bg">
+                        <Lock size={12} className="text-status-warning" />
                       </span>
                     )}
                   </h2>
@@ -328,14 +328,14 @@ export default function TransfertInterCoffresDetail({
               <div className="flex items-center gap-1.5">
                 <button
                   onClick={() => handlePrint()}
-                  className="p-2 rounded-lg bg-slate-800/80 hover:bg-cyan-600/20 text-slate-400 hover:text-cyan-400 transition-all border border-slate-700/50"
+                  className="p-2 rounded-lg bg-surface/80 hover:bg-accent-secondary-hover/20 text-content-muted hover:text-accent transition-all border border-edge-subtle"
                   title="Imprimer le reçu"
                 >
                   <Printer size={18} />
                 </button>
                 <button
                   onClick={onClose}
-                  className="p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white transition-all border border-slate-700/50"
+                  className="p-2 rounded-lg bg-surface/80 hover:bg-surface-elevated text-content-muted hover:text-content-primary transition-all border border-edge-subtle"
                 >
                   <X size={18} />
                 </button>
@@ -345,30 +345,30 @@ export default function TransfertInterCoffresDetail({
             {/* ─────────────────────────────────────────────────────────────────
                 HERO SECTION - Transfer Flow & Amount
             ───────────────────────────────────────────────────────────────── */}
-            <div className="bg-slate-950/40 rounded-xl p-4 border border-slate-800/50">
+            <div className="bg-surface-base/40 rounded-xl p-4 border border-edge/50">
               {/* Transfer Route - Horizontal */}
               <div className="flex items-center justify-center gap-3 sm:gap-6 mb-4">
                 {/* Source */}
                 <div className="text-center flex-shrink-0">
-                  <div className="w-12 h-12 mx-auto mb-1.5 rounded-lg bg-gradient-to-br from-slate-700 to-slate-800 border border-slate-600 flex items-center justify-center shadow-lg">
-                    <Building2 size={22} className="text-slate-300" />
+                  <div className="w-12 h-12 mx-auto mb-1.5 rounded-lg bg-gradient-to-br from-surface-elevated to-surface border border-edge-strong flex items-center justify-center shadow-lg">
+                    <Building2 size={22} className="text-content-secondary" />
                   </div>
-                  <p className="font-semibold text-white text-xs sm:text-sm max-w-[80px] sm:max-w-[120px] truncate">
+                  <p className="font-semibold text-content-primary text-xs sm:text-sm max-w-[80px] sm:max-w-[120px] truncate">
                     {transfert.coffreSource?.nom || 'Coffre Source'}
                   </p>
-                  <p className="text-[10px] text-slate-500">{transfert.coffreSource?.code}</p>
+                  <p className="text-[10px] text-content-muted">{transfert.coffreSource?.code}</p>
                 </div>
 
                 {/* Arrow with Type */}
                 <div className="flex-shrink-0 flex flex-col items-center">
-                  <div className="px-2 py-1 bg-slate-800/80 rounded-full text-[10px] text-slate-400 uppercase tracking-wide mb-1.5">
+                  <div className="px-2 py-1 bg-surface/80 rounded-full text-[10px] text-content-muted uppercase tracking-wide mb-1.5">
                     {transfert.typeTransfert.replace(/_/g, ' → ')}
                   </div>
                   <div className="relative">
-                    <div className="w-10 sm:w-16 h-0.5 bg-gradient-to-r from-cyan-500/50 via-cyan-400 to-cyan-500/50 rounded-full" />
+                    <div className="w-10 sm:w-16 h-0.5 bg-gradient-to-r from-accent/50 via-accent to-accent/50 rounded-full" />
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="p-1 rounded-full bg-cyan-500/20 border border-cyan-500/40">
-                        <ArrowRightLeft size={12} className="text-cyan-400" />
+                      <div className="p-1 rounded-full bg-accent/10 border border-accent/40">
+                        <ArrowRightLeft size={12} className="text-accent" />
                       </div>
                     </div>
                   </div>
@@ -376,22 +376,22 @@ export default function TransfertInterCoffresDetail({
 
                 {/* Destination */}
                 <div className="text-center flex-shrink-0">
-                  <div className="w-12 h-12 mx-auto mb-1.5 rounded-lg bg-gradient-to-br from-cyan-900/50 to-cyan-800/30 border border-cyan-600/50 flex items-center justify-center shadow-lg shadow-cyan-500/10">
-                    <Vault size={22} className="text-cyan-400" />
+                  <div className="w-12 h-12 mx-auto mb-1.5 rounded-lg bg-gradient-to-br from-accent/20 to-accent/10 border border-accent/50 flex items-center justify-center shadow-lg shadow-accent/10">
+                    <Vault size={22} className="text-accent" />
                   </div>
-                  <p className="font-semibold text-white text-xs sm:text-sm max-w-[80px] sm:max-w-[120px] truncate">
+                  <p className="font-semibold text-content-primary text-xs sm:text-sm max-w-[80px] sm:max-w-[120px] truncate">
                     {transfert.coffreDestination?.nom || 'Coffre Destination'}
                   </p>
-                  <p className="text-[10px] text-slate-500">{transfert.coffreDestination?.code}</p>
+                  <p className="text-[10px] text-content-muted">{transfert.coffreDestination?.code}</p>
                 </div>
               </div>
 
               {/* Amount - Centered */}
-              <div className="text-center py-3 bg-slate-900/60 rounded-lg border border-slate-800">
-                <p className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+              <div className="text-center py-3 bg-surface-base/60 rounded-lg border border-edge">
+                <p className="text-2xl sm:text-3xl font-bold text-content-primary tracking-tight">
                   {formatMoney(parseFloat(transfert.montant))}
                 </p>
-                <p className="text-xs text-slate-400 mt-0.5 font-medium uppercase tracking-wider">
+                <p className="text-xs text-content-muted mt-0.5 font-medium uppercase tracking-wider">
                   {transfert.devise}
                 </p>
               </div>
@@ -406,15 +406,15 @@ export default function TransfertInterCoffresDetail({
             {/* ─────────────────────────────────────────────────────────────────
                 PROGRESSION TIMELINE
             ───────────────────────────────────────────────────────────────── */}
-            <section className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-5">
-              <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-5 flex items-center gap-2">
+            <section className="bg-surface/30 border border-edge-subtle rounded-xl p-5">
+              <h3 className="text-sm font-semibold text-content-muted uppercase tracking-wider mb-5 flex items-center gap-2">
                 <History size={16} /> Progression
               </h3>
               <div className="relative">
                 {/* Progress line */}
-                <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-slate-700" />
+                <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-surface-elevated" />
                 <div
-                  className="absolute left-5 top-0 w-0.5 bg-gradient-to-b from-cyan-500 to-emerald-500 transition-all duration-500"
+                  className="absolute left-5 top-0 w-0.5 bg-gradient-to-b from-accent to-status-success transition-all duration-500"
                   style={{ height: `${(activeStep / (workflowSteps.length - 1)) * 100}%` }}
                 />
 
@@ -428,21 +428,21 @@ export default function TransfertInterCoffresDetail({
                         <div
                           className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 z-10 transition-all ${
                             isCompleted
-                              ? 'bg-gradient-to-br from-cyan-500/20 to-emerald-500/20 text-cyan-400 border border-cyan-500/30'
-                              : 'bg-slate-800 text-slate-600 border border-slate-700'
-                          } ${isCurrent ? 'ring-2 ring-cyan-500/50 ring-offset-2 ring-offset-slate-900' : ''}`}
+                              ? 'bg-gradient-to-br from-accent/20 to-status-success/20 text-accent border border-accent/30'
+                              : 'bg-surface text-content-muted border border-edge'
+                          } ${isCurrent ? 'ring-2 ring-accent/50 ring-offset-2 ring-offset-surface-base' : ''}`}
                         >
                           {step.icon}
                         </div>
                         <div className="flex-1 pt-0.5">
-                          <p className={`font-medium ${isCompleted ? 'text-white' : 'text-slate-500'}`}>
+                          <p className={`font-medium ${isCompleted ? 'text-content-primary' : 'text-content-muted'}`}>
                             {step.label}
                           </p>
                           {step.date && (
-                            <p className="text-xs text-slate-500 mt-1">
+                            <p className="text-xs text-content-muted mt-1">
                               {formatDate(step.date)}
                               {step.user && (
-                                <span className="text-slate-400 ml-2">
+                                <span className="text-content-muted ml-2">
                                   par {step.user.prenom} {step.user.nom}
                                 </span>
                               )}
@@ -461,13 +461,13 @@ export default function TransfertInterCoffresDetail({
             ───────────────────────────────────────────────────────────────── */}
             <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {/* Date de transfert */}
-              <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 flex items-start gap-3">
-                <div className="p-2 rounded-lg bg-slate-700/50">
-                  <Calendar size={18} className="text-slate-400" />
+              <div className="bg-surface/50 border border-edge-subtle rounded-xl p-4 flex items-start gap-3">
+                <div className="p-2 rounded-lg bg-surface-elevated/50">
+                  <Calendar size={18} className="text-content-muted" />
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Date de transfert</p>
-                  <p className="text-base text-white font-medium">
+                  <p className="text-xs text-content-muted uppercase tracking-wide mb-1">Date de transfert</p>
+                  <p className="text-base text-content-primary font-medium">
                     {new Date(transfert.dateTransfert).toLocaleDateString('fr-FR', {
                       day: '2-digit',
                       month: 'long',
@@ -478,70 +478,70 @@ export default function TransfertInterCoffresDetail({
               </div>
 
               {/* Conditionnement */}
-              <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 flex items-start gap-3">
-                <div className="p-2 rounded-lg bg-slate-700/50">
-                  <Package size={18} className="text-slate-400" />
+              <div className="bg-surface/50 border border-edge-subtle rounded-xl p-4 flex items-start gap-3">
+                <div className="p-2 rounded-lg bg-surface-elevated/50">
+                  <Package size={18} className="text-content-muted" />
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Conditionnement</p>
-                  <p className="text-base text-white font-medium">{transfert.typeConditionnement}</p>
+                  <p className="text-xs text-content-muted uppercase tracking-wide mb-1">Conditionnement</p>
+                  <p className="text-base text-content-primary font-medium">{transfert.typeConditionnement}</p>
                 </div>
               </div>
 
               {/* N° Scellé */}
               {transfert.numeroScelle && (
-                <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 flex items-start gap-3">
-                  <div className="p-2 rounded-lg bg-cyan-500/10">
-                    <Lock size={18} className="text-cyan-400" />
+                <div className="bg-surface/50 border border-edge-subtle rounded-xl p-4 flex items-start gap-3">
+                  <div className="p-2 rounded-lg bg-accent/10">
+                    <Lock size={18} className="text-accent" />
                   </div>
                   <div>
-                    <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">N° Scellé</p>
-                    <p className="text-base text-cyan-400 font-mono font-medium">{transfert.numeroScelle}</p>
+                    <p className="text-xs text-content-muted uppercase tracking-wide mb-1">N° Scellé</p>
+                    <p className="text-base text-accent font-mono font-medium">{transfert.numeroScelle}</p>
                   </div>
                 </div>
               )}
 
               {/* Date comptable */}
               {transfert.dateComptable && (
-                <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 flex items-start gap-3">
-                  <div className="p-2 rounded-lg bg-slate-700/50">
-                    <Clock size={18} className="text-slate-400" />
+                <div className="bg-surface/50 border border-edge-subtle rounded-xl p-4 flex items-start gap-3">
+                  <div className="p-2 rounded-lg bg-surface-elevated/50">
+                    <Clock size={18} className="text-content-muted" />
                   </div>
                   <div>
-                    <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Date comptable</p>
-                    <p className="text-base text-white font-medium">{transfert.dateComptable}</p>
+                    <p className="text-xs text-content-muted uppercase tracking-wide mb-1">Date comptable</p>
+                    <p className="text-base text-content-primary font-medium">{transfert.dateComptable}</p>
                   </div>
                 </div>
               )}
 
               {/* Type */}
-              <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 flex items-start gap-3">
-                <div className="p-2 rounded-lg bg-slate-700/50">
-                  <Tag size={18} className="text-slate-400" />
+              <div className="bg-surface/50 border border-edge-subtle rounded-xl p-4 flex items-start gap-3">
+                <div className="p-2 rounded-lg bg-surface-elevated/50">
+                  <Tag size={18} className="text-content-muted" />
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">Type</p>
-                  <p className="text-base text-white font-medium">{transfert.typeTransfert.replace(/_/g, ' → ')}</p>
+                  <p className="text-xs text-content-muted uppercase tracking-wide mb-1">Type</p>
+                  <p className="text-base text-content-primary font-medium">{transfert.typeTransfert.replace(/_/g, ' → ')}</p>
                 </div>
               </div>
             </section>
 
             {/* Transport Agents */}
             {transfert.agentsTransport && transfert.agentsTransport.length > 0 && (
-              <section className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
-                <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-2 mb-4">
-                  <Users size={16} className="text-slate-400" /> Agents de transport
+              <section className="bg-surface/50 border border-edge-subtle rounded-xl p-5">
+                <h4 className="text-sm font-semibold text-content-secondary flex items-center gap-2 mb-4">
+                  <Users size={16} className="text-content-muted" /> Agents de transport
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {transfert.agentsTransport.map((agent, idx) => (
-                    <div key={idx} className="flex items-center justify-between bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">
+                    <div key={idx} className="flex items-center justify-between bg-surface-base/50 p-3 rounded-lg border border-edge-subtle">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center">
-                          <User size={16} className="text-slate-400" />
+                        <div className="w-9 h-9 rounded-full bg-surface-elevated flex items-center justify-center">
+                          <User size={16} className="text-content-muted" />
                         </div>
-                        <span className="text-sm font-medium text-white">{agent.nom}</span>
+                        <span className="text-sm font-medium text-content-primary">{agent.nom}</span>
                       </div>
-                      <span className="text-xs text-slate-500 flex items-center gap-1.5">
+                      <span className="text-xs text-content-muted flex items-center gap-1.5">
                         <Phone size={12} /> {agent.contact}
                       </span>
                     </div>
@@ -552,30 +552,30 @@ export default function TransfertInterCoffresDetail({
 
             {/* Motif */}
             {transfert.motif && (
-              <section className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
-                <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-2 mb-3">
-                  <MessageSquare size={16} className="text-slate-400" /> Motif du transfert
+              <section className="bg-surface/50 border border-edge-subtle rounded-xl p-5">
+                <h4 className="text-sm font-semibold text-content-secondary flex items-center gap-2 mb-3">
+                  <MessageSquare size={16} className="text-content-muted" /> Motif du transfert
                 </h4>
-                <p className="text-sm text-slate-400">{transfert.motif}</p>
+                <p className="text-sm text-content-muted">{transfert.motif}</p>
               </section>
             )}
 
             {/* Reception Info (if received) */}
             {(transfert.statut === 'Reçu' || transfert.statut === 'Reçu avec écart') && (
-              <section className="bg-emerald-950/20 border border-emerald-700/30 rounded-xl p-5 space-y-4">
-                <h4 className="text-sm font-semibold text-emerald-300 flex items-center gap-2">
+              <section className="bg-status-success/10 border border-status-success/30 rounded-xl p-5 space-y-4">
+                <h4 className="text-sm font-semibold text-status-success flex items-center gap-2">
                   <Package size={16} /> Réception
                 </h4>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="bg-slate-900/50 rounded-lg p-4">
-                    <p className="text-xs text-slate-500 mb-1">Montant reçu</p>
-                    <p className="text-xl font-bold text-white">
+                  <div className="bg-surface-base/50 rounded-lg p-4">
+                    <p className="text-xs text-content-muted mb-1">Montant reçu</p>
+                    <p className="text-xl font-bold text-content-primary">
                       {formatMoney(parseFloat(transfert.montantRecu || transfert.montant))}
                     </p>
                   </div>
-                  <div className="bg-slate-900/50 rounded-lg p-4">
-                    <p className="text-xs text-slate-500 mb-1">Conformité</p>
+                  <div className="bg-surface-base/50 rounded-lg p-4">
+                    <p className="text-xs text-content-muted mb-1">Conformité</p>
                     <Badge
                       value={transfert.conforme ? 'Conforme' : 'Non conforme'}
                       variant={transfert.conforme ? 'success' : 'danger'}
@@ -585,24 +585,24 @@ export default function TransfertInterCoffresDetail({
 
                 {/* Ecart */}
                 {transfert.ecartMontant && parseFloat(transfert.ecartMontant) !== 0 && (
-                  <div className="bg-orange-950/30 border border-orange-700/30 rounded-xl p-4">
+                  <div className="bg-status-warning/10 border border-status-warning/30 rounded-xl p-4">
                     <div className="flex items-center gap-2 mb-2">
-                      <Scale size={16} className="text-orange-400" />
-                      <span className="text-sm font-semibold text-orange-400">Écart détecté</span>
+                      <Scale size={16} className="text-status-warning" />
+                      <span className="text-sm font-semibold text-status-warning">Écart détecté</span>
                     </div>
-                    <p className="text-xl font-bold text-orange-300">
+                    <p className="text-xl font-bold text-status-warning">
                       {formatMoney(Math.abs(parseFloat(transfert.ecartMontant)))}
                     </p>
                     {transfert.motifEcart && (
-                      <p className="text-xs text-slate-400 mt-2">Motif: {transfert.motifEcart}</p>
+                      <p className="text-xs text-content-muted mt-2">Motif: {transfert.motifEcart}</p>
                     )}
                   </div>
                 )}
 
                 {transfert.commentaireReception && (
-                  <div className="bg-slate-900/50 rounded-lg p-4">
-                    <p className="text-xs text-slate-500 mb-1">Commentaire</p>
-                    <p className="text-sm text-slate-400">{transfert.commentaireReception}</p>
+                  <div className="bg-surface-base/50 rounded-lg p-4">
+                    <p className="text-xs text-content-muted mb-1">Commentaire</p>
+                    <p className="text-sm text-content-muted">{transfert.commentaireReception}</p>
                   </div>
                 )}
               </section>
@@ -610,48 +610,48 @@ export default function TransfertInterCoffresDetail({
 
             {/* Rejection/Cancellation reason */}
             {transfert.motifRejet && (
-              <section className="bg-red-950/20 border border-red-700/30 rounded-xl p-5">
-                <h4 className="text-sm font-semibold text-red-300 flex items-center gap-2 mb-3">
+              <section className="bg-status-danger/10 border border-status-danger/30 rounded-xl p-5">
+                <h4 className="text-sm font-semibold text-status-danger flex items-center gap-2 mb-3">
                   <XCircle size={16} /> Motif de rejet
                 </h4>
-                <p className="text-sm text-red-200">{transfert.motifRejet}</p>
+                <p className="text-sm text-status-danger/80">{transfert.motifRejet}</p>
               </section>
             )}
 
             {transfert.motifAnnulation && (
-              <section className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-5">
-                <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-2 mb-3">
+              <section className="bg-surface/50 border border-edge-subtle rounded-xl p-5">
+                <h4 className="text-sm font-semibold text-content-secondary flex items-center gap-2 mb-3">
                   <X size={16} /> Motif d'annulation
                 </h4>
-                <p className="text-sm text-slate-400">{transfert.motifAnnulation}</p>
+                <p className="text-sm text-content-muted">{transfert.motifAnnulation}</p>
               </section>
             )}
 
             {/* Documents */}
             {documents.length > 0 && (
               <section>
-                <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-content-muted uppercase tracking-wider mb-4 flex items-center gap-2">
                   <FileText size={16} /> Documents ({documents.length})
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {documents.map((doc) => (
                     <div
                       key={doc.id}
-                      className="flex items-center justify-between p-4 bg-slate-800/50 border border-slate-700/50 rounded-xl hover:border-slate-600 transition-colors"
+                      className="flex items-center justify-between p-4 bg-surface/50 border border-edge-subtle rounded-xl hover:border-edge-strong transition-colors"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="p-2.5 rounded-lg bg-slate-700/50">
-                          <FileText size={18} className="text-cyan-400" />
+                        <div className="p-2.5 rounded-lg bg-surface-elevated/50">
+                          <FileText size={18} className="text-accent" />
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-white">{doc.type}</p>
-                          <p className="text-xs text-slate-500">{formatDate(doc.createdAt)}</p>
+                          <p className="text-sm font-medium text-content-primary">{doc.type}</p>
+                          <p className="text-xs text-content-muted">{formatDate(doc.createdAt)}</p>
                         </div>
                       </div>
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-9 w-9 p-0 text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/10"
+                        className="h-9 w-9 p-0 text-content-muted hover:text-accent hover:bg-accent/10"
                       >
                         <Download size={18} />
                       </Button>
@@ -663,13 +663,13 @@ export default function TransfertInterCoffresDetail({
 
             {/* Reconciliation */}
             {reconciliation && (
-              <section className="bg-indigo-950/20 border border-indigo-700/30 rounded-xl p-5">
-                <h4 className="text-sm font-semibold text-indigo-300 flex items-center gap-2 mb-4">
+              <section className="bg-accent/10 border border-accent/30 rounded-xl p-5">
+                <h4 className="text-sm font-semibold text-accent flex items-center gap-2 mb-4">
                   <Scale size={16} /> Réconciliation comptable
                 </h4>
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs text-slate-500 mb-1">Statut</p>
+                    <p className="text-xs text-content-muted mb-1">Statut</p>
                     <Badge
                       value={reconciliation.statut}
                       variant={reconciliation.statut === 'Rapproché' ? 'success' : 'warning'}
@@ -677,8 +677,8 @@ export default function TransfertInterCoffresDetail({
                   </div>
                   {reconciliation.dateRapprochement && (
                     <div className="text-right">
-                      <p className="text-xs text-slate-500 mb-1">Date de rapprochement</p>
-                      <p className="text-sm font-medium text-white">{formatDate(reconciliation.dateRapprochement)}</p>
+                      <p className="text-xs text-content-muted mb-1">Date de rapprochement</p>
+                      <p className="text-sm font-medium text-content-primary">{formatDate(reconciliation.dateRapprochement)}</p>
                     </div>
                   )}
                 </div>
@@ -688,22 +688,22 @@ export default function TransfertInterCoffresDetail({
             {/* Audit Trail */}
             {auditLogs.length > 0 && (
               <section>
-                <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-content-muted uppercase tracking-wider mb-4 flex items-center gap-2">
                   <History size={16} /> Historique d'audit ({auditLogs.length})
                 </h3>
                 <div className="space-y-2">
                   {auditLogs.slice(0, 5).map((log) => (
                     <div
                       key={log.id}
-                      className="flex items-start gap-3 p-3 bg-slate-800/30 border border-slate-700/50 rounded-xl text-sm"
+                      className="flex items-start gap-3 p-3 bg-surface/30 border border-edge-subtle rounded-xl text-sm"
                     >
-                      <div className="w-2 h-2 rounded-full bg-cyan-400 mt-2 flex-shrink-0" />
+                      <div className="w-2 h-2 rounded-full bg-accent mt-2 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="font-medium text-white">{formatAuditAction(log.action)}</span>
-                          <span className="text-xs text-slate-500">{formatDate(log.createdAt)}</span>
+                          <span className="font-medium text-content-primary">{formatAuditAction(log.action)}</span>
+                          <span className="text-xs text-content-muted">{formatDate(log.createdAt)}</span>
                         </div>
-                        <div className="flex items-center gap-2 text-xs text-slate-400 mt-1">
+                        <div className="flex items-center gap-2 text-xs text-content-muted mt-1">
                           {log.utilisateur && (
                             <span>
                               {log.utilisateur.prenom} {log.utilisateur.nom}
@@ -711,9 +711,9 @@ export default function TransfertInterCoffresDetail({
                           )}
                           {log.statutAvant && log.statutApres && (
                             <span className="flex items-center gap-1">
-                              <span className="text-slate-500">{log.statutAvant}</span>
+                              <span className="text-content-muted">{log.statutAvant}</span>
                               <ChevronRight size={12} />
-                              <span className="text-cyan-400">{log.statutApres}</span>
+                              <span className="text-accent">{log.statutApres}</span>
                             </span>
                           )}
                         </div>
@@ -721,7 +721,7 @@ export default function TransfertInterCoffresDetail({
                     </div>
                   ))}
                   {auditLogs.length > 5 && (
-                    <p className="text-xs text-slate-500 text-center py-2">
+                    <p className="text-xs text-content-muted text-center py-2">
                       + {auditLogs.length - 5} autres entrées
                     </p>
                   )}
@@ -734,7 +734,7 @@ export default function TransfertInterCoffresDetail({
               STICKY FOOTER - Action Buttons
           ═══════════════════════════════════════════════════════════════════ */}
           {availableActions.length > 0 && (
-            <div className="flex-shrink-0 p-4 sm:p-5 border-t border-slate-700/50 bg-slate-900/95 backdrop-blur">
+            <div className="flex-shrink-0 p-4 sm:p-5 border-t border-edge-subtle bg-surface-base/95 backdrop-blur">
               <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end">
                 <Button variant="ghost" onClick={onClose} className="sm:min-w-[100px]">
                   Fermer
@@ -746,12 +746,12 @@ export default function TransfertInterCoffresDetail({
                     variant={action.variant}
                     className={`sm:min-w-[140px] ${
                       action.variant === 'primary'
-                        ? 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 shadow-lg shadow-cyan-500/20'
+                        ? 'bg-gradient-to-r from-accent to-accent-secondary hover:from-accent/90 hover:to-accent-secondary/90 shadow-lg shadow-accent/20'
                         : action.variant === 'success'
-                        ? 'bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 shadow-lg shadow-emerald-500/20'
+                        ? 'bg-gradient-to-r from-status-success to-accent hover:from-status-success/90 hover:to-accent/90 shadow-lg shadow-status-success/20'
                         : action.variant === 'warning'
-                        ? 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 shadow-lg shadow-amber-500/20'
-                        : 'bg-red-600 hover:bg-red-500'
+                        ? 'bg-gradient-to-r from-status-warning to-status-warning/80 hover:from-status-warning/90 hover:to-status-warning/70 shadow-lg shadow-status-warning/20'
+                        : 'bg-status-danger hover:bg-status-danger'
                     }`}
                   >
                     {action.icon}
@@ -764,7 +764,7 @@ export default function TransfertInterCoffresDetail({
 
           {/* Close button only footer if no actions */}
           {availableActions.length === 0 && (
-            <div className="flex-shrink-0 p-4 sm:p-5 border-t border-slate-700/50 bg-slate-900/95 backdrop-blur">
+            <div className="flex-shrink-0 p-4 sm:p-5 border-t border-edge-subtle bg-surface-base/95 backdrop-blur">
               <div className="flex justify-end">
                 <Button variant="ghost" onClick={onClose} className="min-w-[100px]">
                   Fermer

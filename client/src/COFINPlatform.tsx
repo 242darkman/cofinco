@@ -505,7 +505,7 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
 
       {showCreditRequestForm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+          <div className="bg-surface-base border border-edge rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
             <Suspense fallback={<ModuleLoadingFallback moduleName="Formulaire Crédit" />}>
               <CreditRequestForm
                 onClose={() => setShowCreditRequestForm(false)}
@@ -522,13 +522,13 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
 
       {showReportGenerator && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800/50">
-               <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                 <FileText className="text-blue-400" size={24} />
+          <div className="bg-surface-base border border-edge rounded-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="p-4 border-b border-edge flex justify-between items-center bg-surface/50">
+               <h3 className="text-xl font-bold text-content-primary flex items-center gap-2">
+                 <FileText className="text-status-info" size={24} />
                  {t('generateurRapports') || 'Générateur de Rapports'}
                </h3>
-               <button onClick={() => setShowReportGenerator(false)} className="text-slate-400 hover:text-white transition-colors">
+               <button onClick={() => setShowReportGenerator(false)} className="text-content-muted hover:text-content-primary transition-colors">
                  <Zap size={24} className="rotate-45" />
                </button>
             </div>
@@ -544,8 +544,8 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
       {notification && (
         <div className={`fixed top-4 right-4 z-50 px-6 py-4 rounded-lg shadow-2xl border ${
           notification.type === 'success'
-            ? 'bg-green-500/90 border-green-400 text-white'
-            : 'bg-blue-500/90 border-blue-400 text-white'
+            ? 'bg-status-success border-status-success text-white'
+            : 'bg-status-info border-status-info text-white'
         } flex items-center gap-3 animate-fade-in`}>
           {notification.type === 'success' ? <CheckCircle size={20} /> : <AlertCircle size={20} />}
           <span className="font-semibold">{notification.message}</span>

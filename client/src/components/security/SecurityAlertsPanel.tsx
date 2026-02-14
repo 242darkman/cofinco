@@ -9,6 +9,7 @@ import { notificationApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
 import { ALL_STATUS_LABELS } from '../../lib/status-labels';
 import { addPdfLogoHeader } from '@/lib/pdf-logo';
+import { useBranding } from '@/contexts/BrandingContext';
 // P4.1: Lazy-load heavy export libraries
 import { loadPDFLibraries } from '@/lib/lazy-export';
 
@@ -27,6 +28,7 @@ interface SecurityAlert {
 }
 
 export default function SecurityAlertsPanel() {
+  const { branding } = useBranding();
   const [alerts, setAlerts] = useState<SecurityAlert[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedAlert, setSelectedAlert] = useState<SecurityAlert | null>(null);
@@ -107,7 +109,7 @@ export default function SecurityAlertsPanel() {
     const separator = ';';
     
     let csvContent = BOM;
-    csvContent += `RAPPORT D'ALERTES DE SÉCURITÉ - COFIN${separator}${separator}${separator}${separator}\n`;
+    csvContent += `RAPPORT D'ALERTES DE SÉCURITÉ - ${branding.appName}${separator}${separator}${separator}${separator}\n`;
     csvContent += `Date d'export: ${dateExport}${separator}${separator}${separator}${separator}\n`;
     csvContent += `Total alertes: ${alerts.length}${separator}${separator}${separator}${separator}\n`;
     csvContent += `${separator}${separator}${separator}${separator}\n`;
@@ -121,7 +123,7 @@ export default function SecurityAlertsPanel() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `COFIN_Alertes_Securite_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `${branding.appName}_Alertes_Securite_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
     URL.revokeObjectURL(url);
     setShowExportMenu(false);
@@ -139,6 +141,7 @@ export default function SecurityAlertsPanel() {
       title: "RAPPORT D'ALERTES DE SÉCURITÉ",
       subtitle: `Total: ${alerts.length} | Actives: ${activeCount} | Critiques: ${criticalCount}`,
       dateRight: `Date: ${dateExport}`,
+      appName: branding.appName,
     });
 
     const tableData = alerts.slice(0, 50).map((alert, idx) => [
@@ -159,13 +162,13 @@ export default function SecurityAlertsPanel() {
       alternateRowStyles: { fillColor: [240, 240, 240] }
     });
 
-    doc.save(`COFIN_Alertes_Securite_${new Date().toISOString().split('T')[0]}.pdf`);
+    doc.save(`${branding.appName}_Alertes_Securite_${new Date().toISOString().split('T')[0]}.pdf`);
     setShowExportMenu(false);
   };
 
   const exportToJSON = () => {
     const exportData = {
-      titre: "Rapport d'Alertes de Sécurité COFIN",
+      titre: `Rapport d'Alertes de Sécurité ${branding.appName}`,
       dateExport: new Date().toISOString(),
       statistiques: {
         total: alerts.length,
@@ -192,7 +195,7 @@ export default function SecurityAlertsPanel() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `COFIN_Alertes_Securite_${new Date().toISOString().split('T')[0]}.json`;
+    link.download = `${branding.appName}_Alertes_Securite_${new Date().toISOString().split('T')[0]}.json`;
     link.click();
     URL.revokeObjectURL(url);
     setShowExportMenu(false);
@@ -207,35 +210,35 @@ export default function SecurityAlertsPanel() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-gradient-to-br from-blue-600 to-cyan-600 rounded-2xl p-6 text-white shadow-lg">
+      <div className="bg-gradient-to-br from-status-info to-accent rounded-2xl p-6 text-white shadow-lg">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h2 className="text-2xl sm:text-3xl font-bold mb-1">Alertes de Sécurité</h2>
-            <p className="text-blue-100 text-sm sm:text-base">Détection et gestion des menaces en temps réel</p>
+            <p className="text-status-info-text text-sm sm:text-base">Détection et gestion des menaces en temps réel</p>
           </div>
           <div className="flex items-center gap-4 w-full sm:w-auto">
             <div className="relative w-full sm:w-auto">
               <Button 
                 onClick={() => setShowExportMenu(!showExportMenu)}
                 variant="ghost" 
-                className="bg-white/20 hover:bg-white/30 text-white w-full sm:w-auto"
+                className="bg-white/20 hover:bg-white/30 text-content-primary w-full sm:w-auto"
                 icon={Download}
               >
                 Export
               </Button>
               {showExportMenu && (
-                <div className="absolute right-0 top-full mt-2 bg-slate-800 rounded-xl shadow-xl border border-slate-700 overflow-hidden z-50 min-w-[200px]">
-                  <button onClick={exportToCSV} className="w-full px-4 py-3 text-left hover:bg-slate-700 transition flex items-center gap-3 text-white">
-                    <FileSpreadsheet size={18} className="text-green-400" />
-                    <div><div className="font-semibold">Excel (CSV)</div><div className="text-xs text-slate-400">Tableur compatible</div></div>
+                <div className="absolute right-0 top-full mt-2 bg-surface rounded-xl shadow-xl border border-edge overflow-hidden z-50 min-w-[200px]">
+                  <button onClick={exportToCSV} className="w-full px-4 py-3 text-left hover:bg-surface-elevated transition flex items-center gap-3 text-content-primary">
+                    <FileSpreadsheet size={18} className="text-status-success" />
+                    <div><div className="font-semibold">Excel (CSV)</div><div className="text-xs text-content-muted">Tableur compatible</div></div>
                   </button>
-                  <button onClick={exportToPDF} className="w-full px-4 py-3 text-left hover:bg-slate-700 transition flex items-center gap-3 text-white border-t border-slate-700">
-                    <FileText size={18} className="text-red-400" />
-                    <div><div className="font-semibold">PDF</div><div className="text-xs text-slate-400">Document formaté</div></div>
+                  <button onClick={exportToPDF} className="w-full px-4 py-3 text-left hover:bg-surface-elevated transition flex items-center gap-3 text-content-primary border-t border-edge">
+                    <FileText size={18} className="text-status-danger" />
+                    <div><div className="font-semibold">PDF</div><div className="text-xs text-content-muted">Document formaté</div></div>
                   </button>
-                  <button onClick={exportToJSON} className="w-full px-4 py-3 text-left hover:bg-slate-700 transition flex items-center gap-3 text-white border-t border-slate-700">
-                    <Shield size={18} className="text-blue-400" />
-                    <div><div className="font-semibold">JSON</div><div className="text-xs text-slate-400">Données structurées</div></div>
+                  <button onClick={exportToJSON} className="w-full px-4 py-3 text-left hover:bg-surface-elevated transition flex items-center gap-3 text-content-primary border-t border-edge">
+                    <Shield size={18} className="text-status-info" />
+                    <div><div className="font-semibold">JSON</div><div className="text-xs text-content-muted">Données structurées</div></div>
                   </button>
                 </div>
               )}
@@ -279,7 +282,7 @@ export default function SecurityAlertsPanel() {
                 <select
                     value={filterSeverity}
                     onChange={(e) => setFilterSeverity(e.target.value)}
-                    className="px-3 py-2 bg-slate-800 text-white rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+                    className="px-3 py-2 bg-surface text-content-primary rounded-lg border border-edge-strong focus:outline-none focus:ring-2 focus:ring-accent text-sm"
                 >
                     <option value="all">Sévérité (Toutes)</option>
                     <option value="critical">Critiques</option>
@@ -291,7 +294,7 @@ export default function SecurityAlertsPanel() {
                 <select
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value)}
-                    className="px-3 py-2 bg-slate-800 text-white rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500 text-sm"
+                    className="px-3 py-2 bg-surface text-content-primary rounded-lg border border-edge-strong focus:outline-none focus:ring-2 focus:ring-accent text-sm"
                 >
                     <option value="all">Statut (Tous)</option>
                     <option value="active">Actives</option>
@@ -309,15 +312,15 @@ export default function SecurityAlertsPanel() {
 
         {loading ? (
           <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-            <p className="text-slate-400 mt-4">Chargement des alertes...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-status-info mx-auto"></div>
+            <p className="text-content-muted mt-4">Chargement des alertes...</p>
           </div>
         ) : (
           <div className="space-y-3">
             {alerts.length === 0 ? (
               <div className="text-center py-12">
-                <CheckCircle size={48} className="text-green-400 mx-auto mb-4" />
-                <p className="text-slate-400">Aucune alerte trouvée</p>
+                <CheckCircle size={48} className="text-status-success mx-auto mb-4" />
+                <p className="text-content-muted">Aucune alerte trouvée</p>
               </div>
             ) : (
               alerts.map((alert) => (
@@ -325,11 +328,11 @@ export default function SecurityAlertsPanel() {
                   key={alert.id}
                   variant="glass"
                   className={`
-                    border-l-4 cursor-pointer hover:bg-slate-700/30 transition-colors
-                    ${alert.severity === 'critical' ? 'border-l-blue-500' :
-                      alert.severity === 'high' ? 'border-l-emerald-500' :
-                      alert.severity === 'medium' ? 'border-l-cyan-500' :
-                      'border-l-slate-500'}
+                    border-l-4 cursor-pointer hover:bg-surface-elevated/30 transition-colors
+                    ${alert.severity === 'critical' ? 'border-l-status-info' :
+                      alert.severity === 'high' ? 'border-l-status-success' :
+                      alert.severity === 'medium' ? 'border-l-accent' :
+                      'border-l-edge-strong'}
                   `}
                   onClick={() => setSelectedAlert(alert)}
                   padding="sm"
@@ -345,29 +348,29 @@ export default function SecurityAlertsPanel() {
                                 alert.severity === 'medium' ? 'info' : 'neutral'
                             }
                         />
-                        <span className="text-slate-400 text-xs">
+                        <span className="text-content-muted text-xs">
                           {new Date(alert.createdAt).toLocaleString('fr-FR')}
                         </span>
                         {alert.status === 'active' && (
                           <Badge value="ACTIVE" variant="primary" className="animate-pulse" />
                         )}
                       </div>
-                      <div className="text-white font-bold text-base mb-1">
+                      <div className="text-content-primary font-bold text-base mb-1">
                         {getTypeLabel(alert.alertType)}
                       </div>
-                      <div className="text-slate-300 text-sm mb-2">{alert.description}</div>
+                      <div className="text-content-secondary text-sm mb-2">{alert.description}</div>
                       {alert.userEmail && (
-                        <div className="text-xs text-slate-400">
-                          Utilisateur: <span className="text-cyan-400">{alert.userEmail}</span>
+                        <div className="text-xs text-content-muted">
+                          Utilisateur: <span className="text-accent">{alert.userEmail}</span>
                         </div>
                       )}
                       {alert.ipAddress && (
-                        <div className="text-xs text-slate-400">
-                          IP: <span className="text-cyan-400 font-mono">{alert.ipAddress}</span>
+                        <div className="text-xs text-content-muted">
+                          IP: <span className="text-accent font-mono">{alert.ipAddress}</span>
                         </div>
                       )}
                     </div>
-                    <Eye className="text-slate-400" size={18} />
+                    <Eye className="text-content-muted" size={18} />
                   </div>
                 </Card>
               ))
@@ -389,14 +392,14 @@ export default function SecurityAlertsPanel() {
       >
         {selectedAlert && (
           <div className="space-y-4">
-              <div className="bg-slate-800 rounded-xl p-4">
+              <div className="bg-surface rounded-xl p-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <div className="text-sm text-slate-400 mb-1">Type</div>
-                    <div className="text-white font-semibold">{getTypeLabel(selectedAlert.alertType)}</div>
+                    <div className="text-sm text-content-muted mb-1">Type</div>
+                    <div className="text-content-primary font-semibold">{getTypeLabel(selectedAlert.alertType)}</div>
                   </div>
                   <div>
-                    <div className="text-sm text-slate-400 mb-1">Sévérité</div>
+                    <div className="text-sm text-content-muted mb-1">Sévérité</div>
                     <Badge 
                         value={selectedAlert.severity.toUpperCase()} 
                         variant={
@@ -407,25 +410,25 @@ export default function SecurityAlertsPanel() {
                     />
                   </div>
                   <div>
-                    <div className="text-sm text-slate-400 mb-1">Date</div>
-                    <div className="text-white">{new Date(selectedAlert.createdAt).toLocaleString('fr-FR')}</div>
+                    <div className="text-sm text-content-muted mb-1">Date</div>
+                    <div className="text-content-primary">{new Date(selectedAlert.createdAt).toLocaleString('fr-FR')}</div>
                   </div>
                   <div>
-                    <div className="text-sm text-slate-400 mb-1">Statut</div>
-                    <div className="text-white capitalize">{ALL_STATUS_LABELS[selectedAlert.status] || selectedAlert.status}</div>
+                    <div className="text-sm text-content-muted mb-1">Statut</div>
+                    <div className="text-content-primary capitalize">{ALL_STATUS_LABELS[selectedAlert.status] || selectedAlert.status}</div>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-slate-800 rounded-xl p-4">
-                <div className="text-sm text-slate-400 mb-2">Description</div>
-                <div className="text-white">{selectedAlert.description}</div>
+              <div className="bg-surface rounded-xl p-4">
+                <div className="text-sm text-content-muted mb-2">Description</div>
+                <div className="text-content-primary">{selectedAlert.description}</div>
               </div>
 
               {selectedAlert.details && (
-                <div className="bg-slate-800 rounded-xl p-4">
-                  <div className="text-sm text-slate-400 mb-2">Détails Techniques</div>
-                  <pre className="text-cyan-400 text-xs sm:text-sm bg-slate-900 p-3 rounded overflow-x-auto">
+                <div className="bg-surface rounded-xl p-4">
+                  <div className="text-sm text-content-muted mb-2">Détails Techniques</div>
+                  <pre className="text-accent text-xs sm:text-sm bg-surface-base p-3 rounded overflow-x-auto">
                     {JSON.stringify(selectedAlert.details, null, 2)}
                   </pre>
                 </div>
@@ -451,12 +454,12 @@ export default function SecurityAlertsPanel() {
               )}
 
               {selectedAlert.status === 'active' && showResolutionModal && (
-                <div className="bg-slate-800 rounded-xl p-4 space-y-3">
-                  <label className="block text-sm font-semibold text-slate-300">Notes de résolution</label>
+                <div className="bg-surface rounded-xl p-4 space-y-3">
+                  <label className="block text-sm font-semibold text-content-secondary">Notes de résolution</label>
                   <textarea
                     value={resolutionNotes}
                     onChange={(e) => setResolutionNotes(e.target.value)}
-                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-400"
+                    className="w-full bg-surface-elevated border border-edge-strong rounded-lg px-4 py-3 text-content-primary placeholder-content-muted"
                     rows={3}
                     placeholder="Décrivez les actions entreprises pour résoudre cette alerte..."
                   />
@@ -488,10 +491,10 @@ export default function SecurityAlertsPanel() {
               )}
 
               {selectedAlert.resolutionNotes && (
-                <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
-                  <div className="text-sm text-green-400 mb-2">Notes de Résolution</div>
-                  <div className="text-white">{selectedAlert.resolutionNotes}</div>
-                  <div className="text-sm text-slate-400 mt-2">
+                <div className="bg-status-success-bg border border-status-success/30 rounded-xl p-4">
+                  <div className="text-sm text-status-success mb-2">Notes de Résolution</div>
+                  <div className="text-content-primary">{selectedAlert.resolutionNotes}</div>
+                  <div className="text-sm text-content-muted mt-2">
                     Résolu le: {new Date(selectedAlert.resolvedAt).toLocaleString('fr-FR')}
                   </div>
                 </div>

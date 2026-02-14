@@ -46,32 +46,32 @@ const StatCard: React.FC<StatCardProps> = ({
 }) => {
   // Accent colors for the left border indicator
   const accentColors = {
-    primary: 'border-l-blue-500',
-    success: 'border-l-emerald-500',
-    warning: 'border-l-amber-500',
-    danger: 'border-l-red-500',
-    neutral: 'border-l-slate-500',
+    primary: 'border-l-accent',
+    success: 'border-l-status-success',
+    warning: 'border-l-status-warning',
+    danger: 'border-l-status-danger',
+    neutral: 'border-l-content-muted',
   };
 
   const iconColors = {
-    primary: 'text-blue-400',
-    success: 'text-emerald-400',
-    warning: 'text-amber-400',
-    danger: 'text-red-400',
-    neutral: 'text-slate-400',
+    primary: 'text-accent',
+    success: 'text-status-success',
+    warning: 'text-status-warning',
+    danger: 'text-status-danger',
+    neutral: 'text-content-muted',
   };
 
   const trendColorClass = trendUp
-    ? 'text-emerald-400'
+    ? 'text-status-success'
     : trendUp === false
-      ? 'text-red-400'
-      : 'text-slate-500';
+      ? 'text-status-danger'
+      : 'text-content-muted';
 
   // Variant styles
   const variantStyles = {
     default: `
-      bg-slate-800/60 backdrop-blur-sm
-      border border-slate-700/50 border-l-[3px] ${accentColors[color]}
+      bg-surface/60 backdrop-blur-sm
+      border border-edge-subtle border-l-[3px] ${accentColors[color]}
       rounded-lg
     `,
     minimal: `
@@ -94,7 +94,7 @@ const StatCard: React.FC<StatCardProps> = ({
         p-3 sm:p-4
         transition-all duration-200
         min-w-0
-        ${onClick ? 'cursor-pointer hover:bg-slate-700/40 active:scale-[0.98]' : ''}
+        ${onClick ? 'cursor-pointer hover:bg-surface-elevated/40 active:scale-[0.98]' : ''}
         ${className}
       `}
     >
@@ -103,13 +103,13 @@ const StatCard: React.FC<StatCardProps> = ({
         {Icon && (
           <Icon size={14} className={`${iconColors[color]} opacity-70`} />
         )}
-        <p className="text-slate-400 text-[11px] sm:text-xs font-medium tracking-wide uppercase">
+        <p className="text-content-muted text-[11px] sm:text-xs font-medium tracking-wide uppercase">
           {title}
         </p>
       </div>
 
       {/* Value - Clean & Bold */}
-      <div className="text-white text-lg sm:text-xl font-semibold tracking-tight">
+      <div className="text-content-primary text-lg sm:text-xl font-semibold tracking-tight">
         {typeof value === 'number' ? value.toLocaleString('fr-FR') : value}
       </div>
 
@@ -117,7 +117,7 @@ const StatCard: React.FC<StatCardProps> = ({
       {(subtitle || trend) && (
         <div className="flex items-center justify-between mt-1.5 gap-2">
           {subtitle && (
-            <span className="text-[10px] sm:text-xs text-slate-500 truncate">
+            <span className="text-[10px] sm:text-xs text-content-muted truncate">
               {subtitle}
             </span>
           )}

@@ -37,30 +37,30 @@ interface MobileMoneyReconciliationPanelProps {
 }
 
 const providerLogos: Record<string, { bg: string; text: string; name: string }> = {
-  MTN: { bg: 'bg-yellow-500/20', text: 'text-yellow-500', name: 'MTN MoMo' },
-  AIRTEL: { bg: 'bg-red-500/20', text: 'text-red-500', name: 'Airtel Money' },
+  MTN: { bg: 'bg-status-warning-bg', text: 'text-status-warning', name: 'MTN MoMo' },
+  AIRTEL: { bg: 'bg-status-danger-bg', text: 'text-status-danger', name: 'Airtel Money' },
 };
 
 const statusConfig = {
   MATCHED: {
     icon: CheckCircle,
-    bg: 'bg-emerald-500/10',
-    border: 'border-emerald-500/30',
-    text: 'text-emerald-400',
+    bg: 'bg-status-success-bg',
+    border: 'border-status-success/30',
+    text: 'text-status-success',
     label: 'Réconcilié',
   },
   DISCREPANCY: {
     icon: AlertTriangle,
-    bg: 'bg-amber-500/10',
-    border: 'border-amber-500/30',
-    text: 'text-amber-400',
+    bg: 'bg-status-warning-bg',
+    border: 'border-status-warning/30',
+    text: 'text-status-warning',
     label: 'Écart détecté',
   },
   API_FAILED: {
     icon: XCircle,
-    bg: 'bg-red-500/10',
-    border: 'border-red-500/30',
-    text: 'text-red-400',
+    bg: 'bg-status-danger-bg',
+    border: 'border-status-danger/30',
+    text: 'text-status-danger',
     label: 'API indisponible',
   },
 };
@@ -76,7 +76,7 @@ export default function MobileMoneyReconciliationPanel({
   if (!providers.length) {
     return (
       <Card className="p-4">
-        <div className="flex items-center gap-3 text-slate-400">
+        <div className="flex items-center gap-3 text-content-muted">
           <Smartphone className="w-5 h-5" />
           <span>Aucune transaction Mobile Money sur cette session</span>
         </div>
@@ -89,16 +89,16 @@ export default function MobileMoneyReconciliationPanel({
       {/* En-tête */}
       <div className={`px-4 py-3 border-b flex items-center justify-between ${
         hasDiscrepancy
-          ? 'bg-amber-500/10 border-amber-500/20'
-          : 'bg-emerald-500/10 border-emerald-500/20'
+          ? 'bg-status-warning-bg border-status-warning/20'
+          : 'bg-status-success-bg border-status-success/20'
       }`}>
         <div className="flex items-center gap-2">
-          <Smartphone className={`w-5 h-5 ${hasDiscrepancy ? 'text-amber-500' : 'text-emerald-500'}`} />
-          <h3 className="font-semibold text-white">
+          <Smartphone className={`w-5 h-5 ${hasDiscrepancy ? 'text-status-warning' : 'text-status-success'}`} />
+          <h3 className="font-semibold text-content-primary">
             Réconciliation Mobile Money
           </h3>
           {hasDiscrepancy && (
-            <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-xs font-medium">
+            <span className="px-2 py-0.5 rounded-full bg-status-warning-bg text-status-warning text-xs font-medium">
               Écart détecté
             </span>
           )}
@@ -142,7 +142,7 @@ export default function MobileMoneyReconciliationPanel({
                     </span>
                   </div>
                   <div>
-                    <p className="font-medium text-white">{providerInfo.name}</p>
+                    <p className="font-medium text-content-primary">{providerInfo.name}</p>
                     <p className={`text-xs ${config.text}`}>{config.label}</p>
                   </div>
                 </div>
@@ -152,15 +152,15 @@ export default function MobileMoneyReconciliationPanel({
               {/* Balances */}
               {provider.status !== 'API_FAILED' ? (
                 <div className="grid grid-cols-3 gap-3">
-                  <div className="bg-slate-800/50 rounded-lg p-3">
-                    <p className="text-xs text-slate-400 mb-1">Solde attendu</p>
-                    <p className="text-lg font-semibold text-white">
+                  <div className="bg-surface/50 rounded-lg p-3">
+                    <p className="text-xs text-content-muted mb-1">Solde attendu</p>
+                    <p className="text-lg font-semibold text-content-primary">
                       {formatMoney(provider.expectedBalance)}
                     </p>
                   </div>
-                  <div className="bg-slate-800/50 rounded-lg p-3">
-                    <p className="text-xs text-slate-400 mb-1">Solde fournisseur</p>
-                    <p className="text-lg font-semibold text-white">
+                  <div className="bg-surface/50 rounded-lg p-3">
+                    <p className="text-xs text-content-muted mb-1">Solde fournisseur</p>
+                    <p className="text-lg font-semibold text-content-primary">
                       {provider.providerBalance !== null
                         ? formatMoney(provider.providerBalance)
                         : '-'}
@@ -168,20 +168,20 @@ export default function MobileMoneyReconciliationPanel({
                   </div>
                   <div className={`rounded-lg p-3 ${
                     provider.status === 'DISCREPANCY'
-                      ? isNegative ? 'bg-red-500/10' : 'bg-amber-500/10'
-                      : 'bg-emerald-500/10'
+                      ? isNegative ? 'bg-status-danger-bg' : 'bg-status-warning-bg'
+                      : 'bg-status-success-bg'
                   }`}>
-                    <p className="text-xs text-slate-400 mb-1">Écart</p>
+                    <p className="text-xs text-content-muted mb-1">Écart</p>
                     <div className="flex items-center gap-1">
                       {provider.status === 'DISCREPANCY' && (
                         isNegative
-                          ? <TrendingDown className="w-4 h-4 text-red-400" />
-                          : <TrendingUp className="w-4 h-4 text-amber-400" />
+                          ? <TrendingDown className="w-4 h-4 text-status-danger" />
+                          : <TrendingUp className="w-4 h-4 text-status-warning" />
                       )}
                       <p className={`text-lg font-bold ${
                         provider.status === 'MATCHED'
-                          ? 'text-emerald-400'
-                          : isNegative ? 'text-red-400' : 'text-amber-400'
+                          ? 'text-status-success'
+                          : isNegative ? 'text-status-danger' : 'text-status-warning'
                       }`}>
                         {provider.status === 'MATCHED'
                           ? '0'
@@ -191,12 +191,12 @@ export default function MobileMoneyReconciliationPanel({
                   </div>
                 </div>
               ) : (
-                <div className="bg-slate-800/50 rounded-lg p-4 text-center">
-                  <XCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-                  <p className="text-slate-300">
+                <div className="bg-surface/50 rounded-lg p-4 text-center">
+                  <XCircle className="w-8 h-8 text-status-danger mx-auto mb-2" />
+                  <p className="text-content-secondary">
                     Impossible de récupérer le solde du fournisseur
                   </p>
-                  <p className="text-xs text-slate-500 mt-1">
+                  <p className="text-xs text-content-muted mt-1">
                     Vérifiez la connexion API ou réessayez plus tard
                   </p>
                 </div>
@@ -204,8 +204,8 @@ export default function MobileMoneyReconciliationPanel({
 
               {/* Actions pour écart */}
               {showActions && provider.status === 'DISCREPANCY' && onOverride && (
-                <div className="mt-4 pt-3 border-t border-slate-700/50 flex items-center justify-between">
-                  <p className="text-xs text-slate-400">
+                <div className="mt-4 pt-3 border-t border-edge-subtle flex items-center justify-between">
+                  <p className="text-xs text-content-muted">
                     Un écart a été détecté. Vous pouvez continuer avec justification.
                   </p>
                   <Button
@@ -230,20 +230,20 @@ export default function MobileMoneyReconciliationPanel({
 
         {/* Résumé */}
         <div className={`p-3 rounded-lg ${
-          hasDiscrepancy ? 'bg-amber-500/5 border border-amber-500/20' : 'bg-emerald-500/5 border border-emerald-500/20'
+          hasDiscrepancy ? 'bg-status-warning/5 border border-status-warning/20' : 'bg-status-success/5 border border-status-success/20'
         }`}>
           <div className="flex items-center gap-2">
             {hasDiscrepancy ? (
               <>
-                <AlertTriangle className="w-4 h-4 text-amber-500" />
-                <span className="text-sm text-amber-300">
+                <AlertTriangle className="w-4 h-4 text-status-warning" />
+                <span className="text-sm text-status-warning">
                   Des écarts ont été détectés. Ils seront enregistrés dans l'audit de clôture.
                 </span>
               </>
             ) : (
               <>
-                <CheckCircle className="w-4 h-4 text-emerald-500" />
-                <span className="text-sm text-emerald-300">
+                <CheckCircle className="w-4 h-4 text-status-success" />
+                <span className="text-sm text-status-success">
                   Tous les soldes Mobile Money sont réconciliés.
                 </span>
               </>

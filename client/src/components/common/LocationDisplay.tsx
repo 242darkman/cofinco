@@ -33,18 +33,18 @@ export function LocationDisplay({
   }
 
   if (error) {
-    if (minimal) return <span className="text-red-500 text-xs">Adresse introuvable</span>;
+    if (minimal) return <span className="text-status-danger text-xs">Adresse introuvable</span>;
     
     return (
       <div className={`flex items-center gap-2 ${className}`}>
-        <div className="flex items-center gap-1 text-red-500 text-xs cursor-help" title={error}>
+        <div className="flex items-center gap-1 text-status-danger text-xs cursor-help" title={error}>
           <AlertCircle className="w-3 h-3" />
           <span>Erreur</span>
         </div>
         <Button 
           variant="ghost" 
           size="xs" 
-          className="text-white h-auto p-0 hover:underline" 
+          className="text-content-primary h-auto p-0 hover:underline" 
           onClick={() => refetch()}
         >
           Réessayer
@@ -55,7 +55,7 @@ export function LocationDisplay({
 
   return (
     <div className={`flex items-start gap-1.5 ${className}`}>
-       {showIcon && <MapPin className="w-3.5 h-3.5 text-cyan-500 mt-0.5 shrink-0" />}
+       {showIcon && <MapPin className="w-3.5 h-3.5 text-accent mt-0.5 shrink-0" />}
        <span className="break-words line-clamp-2 text-sm" title={displayName}>
          {displayName || `${latitude}, ${longitude}`}
        </span>

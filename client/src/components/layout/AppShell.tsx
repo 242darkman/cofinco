@@ -58,7 +58,7 @@ export default function AppShell({
     <div className="relative h-[100svh] w-full bg-surface-base text-content-primary overflow-hidden transition-colors duration-300">
       {/* Mobile overlay */}
       <div
-        className={`lg:hidden fixed inset-0 z-40 bg-black/50 dark:bg-black/60 backdrop-blur-[2px] transition-opacity duration-200 ${
+        className={`lg:hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-[2px] transition-opacity duration-200 ${
           sidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
         onClick={onCloseSidebar}

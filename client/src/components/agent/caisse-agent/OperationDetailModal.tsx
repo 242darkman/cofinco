@@ -43,35 +43,35 @@ const getStatutInfo = (statut: string) => {
         label: 'En attente',
         variant: 'warning' as const,
         icon: Clock,
-        color: 'text-amber-400'
+        color: 'text-status-warning'
       };
     case StatutOperationTerrain.APPROVED:
       return {
         label: 'Approuvée',
         variant: 'success' as const,
         icon: CheckCircle,
-        color: 'text-emerald-400'
+        color: 'text-status-success'
       };
     case StatutOperationTerrain.REJECTED:
       return {
         label: 'Rejetée',
         variant: 'danger' as const,
         icon: XCircle,
-        color: 'text-red-400'
+        color: 'text-status-danger'
       };
     case StatutOperationTerrain.CANCELLED:
       return {
         label: 'Annulée',
         variant: 'neutral' as const,
         icon: AlertTriangle,
-        color: 'text-slate-400'
+        color: 'text-content-muted'
       };
     default:
       return {
         label: statut,
         variant: 'neutral' as const,
         icon: Clock,
-        color: 'text-slate-400'
+        color: 'text-content-muted'
       };
   }
 };
@@ -100,15 +100,15 @@ export default function OperationDetailModal({
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
             <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-              isCollect ? 'bg-cyan-500/10 text-cyan-400' : 'bg-emerald-500/10 text-emerald-400'
+              isCollect ? 'bg-accent/10 text-accent' : 'bg-status-success-bg text-status-success'
             }`}>
               {isCollect ? <ArrowDownRight size={24} /> : <ArrowUpRight size={24} />}
             </div>
             <div>
-              <h3 className="text-lg font-bold text-white">
+              <h3 className="text-lg font-bold text-content-primary">
                 {isCollect ? 'Collecte Cash' : 'Remise Cash'}
               </h3>
-              <p className="text-sm text-slate-400">
+              <p className="text-sm text-content-muted">
                 Réf: {operation.reference}
               </p>
             </div>
@@ -118,8 +118,8 @@ export default function OperationDetailModal({
 
         {/* Montant */}
         <div className="p-4 bg-surface-elevated rounded-xl border border-edge">
-          <p className="text-xs text-slate-400 uppercase tracking-wider mb-1">Montant</p>
-          <p className={`text-3xl font-bold ${isCollect ? 'text-cyan-400' : 'text-emerald-400'}`}>
+          <p className="text-xs text-content-muted uppercase tracking-wider mb-1">Montant</p>
+          <p className={`text-3xl font-bold ${isCollect ? 'text-accent' : 'text-status-success'}`}>
             {isCollect ? '+' : '-'}{formatMoney(operation.montant as unknown as string)} {operation.devise}
           </p>
         </div>
@@ -130,10 +130,10 @@ export default function OperationDetailModal({
           {operation.client && (
             <div className="p-3 bg-surface-elevated rounded-lg border border-edge">
               <div className="flex items-center gap-2 mb-1">
-                <User size={14} className="text-slate-400" />
-                <p className="text-xs text-slate-400">Client</p>
+                <User size={14} className="text-content-muted" />
+                <p className="text-xs text-content-muted">Client</p>
               </div>
-              <p className="text-sm font-medium text-white">
+              <p className="text-sm font-medium text-content-primary">
                 {formatClientName(operation.client.nom, operation.client.prenom)}
               </p>
             </div>
@@ -143,10 +143,10 @@ export default function OperationDetailModal({
           {operation.destinationCaisse && (
             <div className="p-3 bg-surface-elevated rounded-lg border border-edge">
               <div className="flex items-center gap-2 mb-1">
-                <FileText size={14} className="text-slate-400" />
-                <p className="text-xs text-slate-400">Caisse destination</p>
+                <FileText size={14} className="text-content-muted" />
+                <p className="text-xs text-content-muted">Caisse destination</p>
               </div>
-              <p className="text-sm font-medium text-white">
+              <p className="text-sm font-medium text-content-primary">
                 {operation.destinationCaisse.nom}
               </p>
             </div>
@@ -156,10 +156,10 @@ export default function OperationDetailModal({
           {operation.agent && (
             <div className="p-3 bg-surface-elevated rounded-lg border border-edge">
               <div className="flex items-center gap-2 mb-1">
-                <User size={14} className="text-slate-400" />
-                <p className="text-xs text-slate-400">Agent</p>
+                <User size={14} className="text-content-muted" />
+                <p className="text-xs text-content-muted">Agent</p>
               </div>
-              <p className="text-sm font-medium text-white">
+              <p className="text-sm font-medium text-content-primary">
                 {operation.agent.nom} {operation.agent.prenom}
               </p>
             </div>
@@ -170,13 +170,13 @@ export default function OperationDetailModal({
             <div className="p-3 bg-surface-elevated rounded-lg border border-edge">
               <div className="flex items-center gap-2 mb-1">
                 {metadata.typePaiementClient.includes('Crédit') ? (
-                  <CreditCard size={14} className="text-amber-400" />
+                  <CreditCard size={14} className="text-status-warning" />
                 ) : (
-                  <PiggyBank size={14} className="text-emerald-400" />
+                  <PiggyBank size={14} className="text-status-success" />
                 )}
-                <p className="text-xs text-slate-400">Type de paiement</p>
+                <p className="text-xs text-content-muted">Type de paiement</p>
               </div>
-              <p className="text-sm font-medium text-white">
+              <p className="text-sm font-medium text-content-primary">
                 {metadata.typePaiementClient}
               </p>
             </div>
@@ -187,10 +187,10 @@ export default function OperationDetailModal({
         {metadata?.numeroRecu && (
           <div className="p-3 bg-surface-elevated rounded-lg border border-edge">
             <div className="flex items-center gap-2 mb-1">
-              <Hash size={14} className="text-slate-400" />
-              <p className="text-xs text-slate-400">Numéro de reçu</p>
+              <Hash size={14} className="text-content-muted" />
+              <p className="text-xs text-content-muted">Numéro de reçu</p>
             </div>
-            <p className="text-sm font-medium text-white font-mono">
+            <p className="text-sm font-medium text-content-primary font-mono">
               {metadata.numeroRecu}
             </p>
           </div>
@@ -200,10 +200,10 @@ export default function OperationDetailModal({
         {metadata?.latitude && metadata?.longitude && (
           <div className="p-3 bg-surface-elevated rounded-lg border border-edge">
             <div className="flex items-center gap-2 mb-1">
-              <MapPin size={14} className="text-cyan-400" />
-              <p className="text-xs text-slate-400">Position GPS</p>
+              <MapPin size={14} className="text-accent" />
+              <p className="text-xs text-content-muted">Position GPS</p>
             </div>
-            <p className="text-sm text-slate-300 font-mono">
+            <p className="text-sm text-content-secondary font-mono">
               {metadata.latitude.toFixed(6)}, {metadata.longitude.toFixed(6)}
             </p>
           </div>
@@ -213,10 +213,10 @@ export default function OperationDetailModal({
         {metadata?.observations && (
           <div className="p-3 bg-surface-elevated rounded-lg border border-edge">
             <div className="flex items-center gap-2 mb-1">
-              <FileText size={14} className="text-slate-400" />
-              <p className="text-xs text-slate-400">Observations</p>
+              <FileText size={14} className="text-content-muted" />
+              <p className="text-xs text-content-muted">Observations</p>
             </div>
-            <p className="text-sm text-slate-300">
+            <p className="text-sm text-content-secondary">
               {metadata.observations}
             </p>
           </div>
@@ -224,17 +224,17 @@ export default function OperationDetailModal({
 
         {/* Timeline */}
         <div className="space-y-3">
-          <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">Historique</p>
+          <p className="text-xs font-medium text-content-muted uppercase tracking-wider">Historique</p>
 
           <div className="space-y-2">
             {/* Soumission */}
             <div className="flex items-center gap-3 p-2 rounded-lg bg-surface-elevated/50">
-              <div className="w-8 h-8 rounded-full bg-cyan-500/10 flex items-center justify-center">
-                <Calendar size={14} className="text-cyan-400" />
+              <div className="w-8 h-8 rounded-full bg-accent/10 flex items-center justify-center">
+                <Calendar size={14} className="text-accent" />
               </div>
               <div className="flex-1">
-                <p className="text-sm text-white">Soumise</p>
-                <p className="text-xs text-slate-500">
+                <p className="text-sm text-content-primary">Soumise</p>
+                <p className="text-xs text-content-muted">
                   {formatDate(operation.submittedAt as unknown as string)}
                   {operation.submitter && ` par ${operation.submitter.nom} ${operation.submitter.prenom}`}
                 </p>
@@ -243,13 +243,13 @@ export default function OperationDetailModal({
 
             {/* Approbation */}
             {operation.approvedAt && (
-              <div className="flex items-center gap-3 p-2 rounded-lg bg-emerald-500/5">
-                <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center">
-                  <CheckCircle size={14} className="text-emerald-400" />
+              <div className="flex items-center gap-3 p-2 rounded-lg bg-status-success/5">
+                <div className="w-8 h-8 rounded-full bg-status-success-bg flex items-center justify-center">
+                  <CheckCircle size={14} className="text-status-success" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm text-emerald-400">Approuvée</p>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-sm text-status-success">Approuvée</p>
+                  <p className="text-xs text-content-muted">
                     {formatDate(operation.approvedAt as unknown as string)}
                     {operation.approver && ` par ${operation.approver.nom} ${operation.approver.prenom}`}
                   </p>
@@ -259,17 +259,17 @@ export default function OperationDetailModal({
 
             {/* Rejet */}
             {operation.rejectedAt && (
-              <div className="flex items-center gap-3 p-2 rounded-lg bg-red-500/5">
-                <div className="w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center">
-                  <XCircle size={14} className="text-red-400" />
+              <div className="flex items-center gap-3 p-2 rounded-lg bg-status-danger/5">
+                <div className="w-8 h-8 rounded-full bg-status-danger-bg flex items-center justify-center">
+                  <XCircle size={14} className="text-status-danger" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm text-red-400">Rejetée</p>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-sm text-status-danger">Rejetée</p>
+                  <p className="text-xs text-content-muted">
                     {formatDate(operation.rejectedAt as unknown as string)}
                   </p>
                   {operation.rejectionReason && (
-                    <p className="text-xs text-red-300 mt-1">
+                    <p className="text-xs text-status-danger mt-1">
                       Motif: {operation.rejectionReason}
                     </p>
                   )}
@@ -279,17 +279,17 @@ export default function OperationDetailModal({
 
             {/* Annulation */}
             {operation.cancelledAt && (
-              <div className="flex items-center gap-3 p-2 rounded-lg bg-slate-500/5">
-                <div className="w-8 h-8 rounded-full bg-slate-500/10 flex items-center justify-center">
-                  <AlertTriangle size={14} className="text-slate-400" />
+              <div className="flex items-center gap-3 p-2 rounded-lg bg-surface-muted0/5">
+                <div className="w-8 h-8 rounded-full bg-surface-subtle/30 flex items-center justify-center">
+                  <AlertTriangle size={14} className="text-content-muted" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm text-slate-400">Annulée</p>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-sm text-content-muted">Annulée</p>
+                  <p className="text-xs text-content-muted">
                     {formatDate(operation.cancelledAt as unknown as string)}
                   </p>
                   {operation.cancellationReason && (
-                    <p className="text-xs text-slate-400 mt-1">
+                    <p className="text-xs text-content-muted mt-1">
                       Motif: {operation.cancellationReason}
                     </p>
                   )}
@@ -320,7 +320,7 @@ export default function OperationDetailModal({
               size="sm"
               icon={XCircle}
               onClick={onReject}
-              className="border-red-500/50 text-red-400 hover:bg-red-500/10"
+              className="border-status-danger/50 text-status-danger hover:bg-status-danger-bg"
             >
               Rejeter
             </Button>

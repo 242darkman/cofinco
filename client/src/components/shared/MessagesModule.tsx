@@ -338,27 +338,27 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
   const isSearchMode = searchQuery.length >= 2;
 
   return (
-    <div className="flex flex-1 min-h-0 bg-slate-950 overflow-hidden text-white font-sans rounded-2xl border border-slate-800 shadow-2xl">
+    <div className="flex flex-1 min-h-0 bg-surface-base overflow-hidden text-content-primary font-sans rounded-2xl border border-edge shadow-2xl">
 
       {/* 1. SIDEBAR */}
       <div className={`
-        flex-col border-r border-slate-800 bg-slate-950 w-full md:w-80 lg:w-96
+        flex-col border-r border-edge bg-surface-base w-full md:w-80 lg:w-96
         ${selectedConversationId ? 'hidden md:flex' : 'flex'}
       `}>
         {/* Header */}
-        <div className="p-4 border-b border-slate-800 h-20 flex items-center gap-2">
+        <div className="p-4 border-b border-edge h-20 flex items-center gap-2">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" size={18} />
             <input
               placeholder="Rechercher..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-10 bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-4 text-sm focus:border-indigo-500 outline-none transition-all placeholder:text-slate-600"
+              className="w-full h-10 bg-surface-base border border-edge rounded-xl pl-10 pr-4 text-sm focus:border-accent outline-none transition-all placeholder:text-content-muted"
             />
           </div>
           <button
             onClick={() => setShowGroupModal(true)}
-            className="p-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-white transition-colors shrink-0"
+            className="p-2.5 bg-accent hover:bg-accent-primary-hover rounded-xl text-white transition-colors shrink-0"
             title="Nouveau groupe"
           >
             <Plus size={18} />
@@ -368,11 +368,11 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
         {/* List */}
         <div className="flex-1 overflow-y-auto sidebar-scrollbar">
           {loadingConversations && !searchQuery ? (
-            <div className="flex justify-center p-8 text-slate-500">
+            <div className="flex justify-center p-8 text-content-muted">
               <Loader2 className="animate-spin" />
             </div>
           ) : displayItems.length === 0 ? (
-            <div className="text-center p-8 text-slate-500 text-sm">
+            <div className="text-center p-8 text-content-muted text-sm">
               {searchQuery ? "Aucun utilisateur trouvé" : "Aucune conversation"}
             </div>
           ) : (
@@ -385,21 +385,21 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
                   <button
                     key={item.id}
                     onClick={() => handleSelectSearchUser(item.id)}
-                    className="w-full p-4 flex items-center gap-3 border-b border-slate-900 transition-colors hover:bg-slate-900 border-l-4 border-l-transparent"
+                    className="w-full p-4 flex items-center gap-3 border-b border-edge transition-colors hover:bg-surface-base border-l-4 border-l-transparent"
                   >
                     <div className="relative">
                       {item.photoProfile ? (
-                        <img src={resolveStorageUrl(item.photoProfile)} alt={name} className="w-12 h-12 rounded-full object-cover border border-slate-700" />
+                        <img src={resolveStorageUrl(item.photoProfile)} alt={name} className="w-12 h-12 rounded-full object-cover border border-edge" />
                       ) : (
-                        <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center font-bold text-slate-300 border border-slate-700">
+                        <div className="w-12 h-12 rounded-full bg-surface flex items-center justify-center font-bold text-content-secondary border border-edge">
                           {getInitials(name)}
                         </div>
                       )}
-                      {online && <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 rounded-full border-2 border-slate-950"></div>}
+                      {online && <div className="absolute bottom-0 right-0 w-3 h-3 bg-status-success rounded-full border-2 border-edge"></div>}
                     </div>
                     <div className="flex-1 min-w-0 text-left">
-                      <span className="font-bold text-sm text-slate-200">{name}</span>
-                      <p className="text-xs text-slate-500">{item.role || 'Utilisateur'} {item.agence ? `- ${item.agence}` : ''}</p>
+                      <span className="font-bold text-sm text-content-secondary">{name}</span>
+                      <p className="text-xs text-content-muted">{item.role || 'Utilisateur'} {item.agence ? `- ${item.agence}` : ''}</p>
                     </div>
                   </button>
                 );
@@ -416,35 +416,35 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
                 <button
                   key={conv.id}
                   onClick={() => handleSelectConversation(conv.id)}
-                  className={`w-full p-4 flex items-center gap-3 border-b border-slate-900 transition-colors hover:bg-slate-900
-                    ${selectedConversationId === conv.id ? 'bg-slate-900 border-l-4 border-l-indigo-500' : 'border-l-4 border-l-transparent'}
+                  className={`w-full p-4 flex items-center gap-3 border-b border-edge transition-colors hover:bg-surface-base
+                    ${selectedConversationId === conv.id ? 'bg-surface-base border-l-4 border-l-indigo-500' : 'border-l-4 border-l-transparent'}
                   `}
                 >
                   <div className="relative">
                     {isGroup ? (
-                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center border border-slate-700">
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-status-info to-accent flex items-center justify-center border border-edge">
                         <UsersRound size={20} className="text-white" />
                       </div>
                     ) : avatar ? (
-                      <img src={resolveStorageUrl(avatar)} alt={conv.displayTitle} className="w-12 h-12 rounded-full object-cover border border-slate-700" />
+                      <img src={resolveStorageUrl(avatar)} alt={conv.displayTitle} className="w-12 h-12 rounded-full object-cover border border-edge" />
                     ) : (
-                      <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center font-bold text-slate-300 border border-slate-700">
+                      <div className="w-12 h-12 rounded-full bg-surface flex items-center justify-center font-bold text-content-secondary border border-edge">
                         {getInitials(conv.displayTitle)}
                       </div>
                     )}
-                    {online && <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 rounded-full border-2 border-slate-950"></div>}
+                    {online && <div className="absolute bottom-0 right-0 w-3 h-3 bg-status-success rounded-full border-2 border-edge"></div>}
                   </div>
                   <div className="flex-1 min-w-0 text-left">
                     <div className="flex justify-between items-baseline mb-0.5">
-                      <span className="font-bold text-sm truncate text-slate-200">{conv.displayTitle}</span>
-                      {time && <span className="text-[10px] text-slate-500 shrink-0 ml-2">{time}</span>}
+                      <span className="font-bold text-sm truncate text-content-secondary">{conv.displayTitle}</span>
+                      {time && <span className="text-[10px] text-content-muted shrink-0 ml-2">{time}</span>}
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className={`text-xs truncate pr-2 ${conv.unreadCount > 0 ? 'text-slate-300 font-medium' : 'text-slate-500'}`}>
+                      <span className={`text-xs truncate pr-2 ${conv.unreadCount > 0 ? 'text-content-secondary font-medium' : 'text-content-muted'}`}>
                         {lastMsg || ''}
                       </span>
                       {conv.unreadCount > 0 && (
-                        <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-indigo-600 text-[10px] font-bold text-white flex items-center justify-center shrink-0">
+                        <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-accent text-[10px] font-bold text-white flex items-center justify-center shrink-0">
                           {conv.unreadCount}
                         </span>
                       )}
@@ -459,28 +459,28 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
 
       {/* 2. MAIN CHAT AREA */}
       <div className={`
-        flex-col flex-1 bg-slate-950 relative
+        flex-col flex-1 bg-surface-base relative
         ${!selectedConversationId ? 'hidden md:flex' : 'flex'}
       `}>
         {!selectedConversationId ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-slate-500 bg-slate-950/50">
-            <div className="w-24 h-24 bg-slate-900 rounded-full flex items-center justify-center mb-6 shadow-xl shadow-black/20">
-              <Send size={40} className="ml-2 opacity-50 text-indigo-500" />
+          <div className="flex-1 flex flex-col items-center justify-center text-content-muted bg-surface-base/50">
+            <div className="w-24 h-24 bg-surface-base rounded-full flex items-center justify-center mb-6 shadow-xl shadow-black/20">
+              <Send size={40} className="ml-2 opacity-50 text-accent" />
             </div>
-            <p className="text-lg font-medium text-slate-400">Sélectionnez une conversation</p>
-            <p className="text-sm text-slate-600 mt-2">pour commencer à discuter</p>
+            <p className="text-lg font-medium text-content-muted">Sélectionnez une conversation</p>
+            <p className="text-sm text-content-muted mt-2">pour commencer à discuter</p>
           </div>
         ) : (
           <>
             {/* CHAT HEADER */}
-            <header className="h-20 border-b border-slate-800 flex items-center justify-between px-4 bg-slate-950/80 backdrop-blur-md sticky top-0 z-10 w-full">
+            <header className="h-20 border-b border-edge flex items-center justify-between px-4 bg-surface-base/80 backdrop-blur-md sticky top-0 z-10 w-full">
               <div className="flex items-center gap-3">
-                <button onClick={() => setSelectedConversationId(null)} className="md:hidden p-2 -ml-2 text-slate-400 hover:text-white">
+                <button onClick={() => setSelectedConversationId(null)} className="md:hidden p-2 -ml-2 text-content-muted hover:text-content-primary">
                   <ChevronLeft size={24} />
                 </button>
                 <div className="relative">
                   {activeConv?.type === 'GROUP' ? (
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-status-info to-accent flex items-center justify-center">
                       <UsersRound size={18} className="text-white" />
                     </div>
                   ) : (() => {
@@ -488,23 +488,23 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
                     return avatar ? (
                       <img src={resolveStorageUrl(avatar)} alt="" className="w-10 h-10 rounded-full object-cover" />
                     ) : (
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center font-bold text-white text-sm">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-accent to-status-info flex items-center justify-center font-bold text-white text-sm">
                         {getInitials(activeConv?.displayTitle || '?')}
                       </div>
                     );
                   })()}
                   {activeConv && getConversationOnlineStatus(activeConv) && (
-                    <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-slate-950"></div>
+                    <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-status-success rounded-full border-2 border-edge"></div>
                   )}
                 </div>
                 <div>
-                  <div className="font-bold text-sm text-white">{activeConv?.displayTitle || 'Conversation'}</div>
-                  <div className="text-xs text-slate-400 flex items-center gap-1 h-4">
+                  <div className="font-bold text-sm text-content-primary">{activeConv?.displayTitle || 'Conversation'}</div>
+                  <div className="text-xs text-content-muted flex items-center gap-1 h-4">
                     {activeConv?.type === 'GROUP' ? (
                       <span>{activeConv.participants.length} participants</span>
                     ) : activeConv && getConversationOnlineStatus(activeConv) ? (
-                      <span className="text-emerald-400 flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> En ligne
+                      <span className="text-status-success flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-status-success"></span> En ligne
                       </span>
                     ) : (
                       <span>Hors ligne</span>
@@ -518,15 +518,15 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
             <div
               ref={messagesContainerRef}
               onScroll={handleScroll}
-              className="flex-1 overflow-y-auto px-4 py-3 space-y-2 scroll-smooth bg-gradient-to-b from-slate-950 to-slate-900 messages-scrollbar"
+              className="flex-1 overflow-y-auto px-4 py-3 space-y-2 scroll-smooth bg-gradient-to-b from-surface-base to-surface-base messages-scrollbar"
             >
               {isFetchingNextPage && (
                 <div className="flex justify-center py-2">
-                  <Loader2 size={16} className="animate-spin text-slate-500" />
+                  <Loader2 size={16} className="animate-spin text-content-muted" />
                 </div>
               )}
               {loadingMessages ? (
-                <div className="flex justify-center py-10"><Loader2 className="animate-spin text-indigo-500" /></div>
+                <div className="flex justify-center py-10"><Loader2 className="animate-spin text-accent" /></div>
               ) : (
                 allMessages.map((msg, index) => {
                   const isMe = msg.senderId === currentUserId;
@@ -541,7 +541,7 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
                     <div key={msg.id}>
                       {showDate && (
                         <div className="flex justify-center my-3">
-                          <span className="text-[11px] bg-slate-800/60 backdrop-blur-sm text-slate-400 px-4 py-1.5 rounded-full font-medium shadow-sm">
+                          <span className="text-[11px] bg-surface/60 backdrop-blur-sm text-content-muted px-4 py-1.5 rounded-full font-medium shadow-sm">
                             {new Date(msg.createdAt).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
                           </span>
                         </div>
@@ -549,14 +549,14 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
 
                       {isSystem ? (
                         <div className="flex justify-center my-2">
-                          <span className="text-[11px] text-slate-500 italic bg-slate-800/30 px-3 py-1 rounded-full">{msg.content || 'Action système'}</span>
+                          <span className="text-[11px] text-content-muted italic bg-surface/30 px-3 py-1 rounded-full">{msg.content || 'Action système'}</span>
                         </div>
                       ) : isDeleted ? (
                         <div className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                          <div className={`max-w-[75%] px-4 py-2.5 rounded-[20px] text-sm text-slate-500 italic ${
+                          <div className={`max-w-[75%] px-4 py-2.5 rounded-[20px] text-sm text-content-muted italic ${
                             isMe
-                              ? 'bg-slate-800/50 rounded-br-[4px]'
-                              : 'bg-slate-800/50 rounded-bl-[4px]'
+                              ? 'bg-surface/50 rounded-br-[4px]'
+                              : 'bg-surface/50 rounded-bl-[4px]'
                           }`}>
                             Ce message a été supprimé
                           </div>
@@ -572,16 +572,16 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
                             <div className={`
                               relative px-4 py-2.5 text-[15px] leading-relaxed
                               ${isMe
-                                ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-[20px] rounded-br-[4px]'
-                                : 'bg-slate-700/80 text-slate-100 rounded-[20px] rounded-bl-[4px]'
+                                ? 'bg-gradient-to-br from-status-info to-status-info text-white rounded-[20px] rounded-br-[4px]'
+                                : 'bg-surface-elevated/80 text-content-primary rounded-[20px] rounded-bl-[4px]'
                               }
                             `}>
                               {/* Bubble tail */}
                               <svg
                                 className={`absolute bottom-0 w-3 h-3 ${
                                   isMe
-                                    ? '-right-1.5 text-blue-600'
-                                    : '-left-1.5 text-slate-700/80 -scale-x-100'
+                                    ? '-right-1.5 text-status-info'
+                                    : '-left-1.5 text-content-secondary/80 -scale-x-100'
                                 }`}
                                 viewBox="0 0 12 12"
                                 fill="currentColor"
@@ -591,7 +591,7 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
 
                               {/* Sender name (groups only) */}
                               {!isMe && activeConv?.type === 'GROUP' && (
-                                <p className="text-xs font-semibold text-blue-400 mb-1">
+                                <p className="text-xs font-semibold text-status-info mb-1">
                                   {msg.sender.prenom ? `${msg.sender.prenom} ${msg.sender.nom}` : msg.sender.nom}
                                 </p>
                               )}
@@ -605,7 +605,7 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
                                     onClick={() => window.open(resolveStorageUrl((msg.metadata as any)?.url || msg.content || ''), '_blank')}
                                   />
                                   {(msg.metadata as any)?.filename && (
-                                    <p className={`text-xs ${isMe ? 'text-blue-100' : 'text-slate-400'}`}>{(msg.metadata as any).filename}</p>
+                                    <p className={`text-xs ${isMe ? 'text-status-info-text' : 'text-content-muted'}`}>{(msg.metadata as any).filename}</p>
                                   )}
                                 </div>
                               ) : msg.contentType === 'FILE' ? (
@@ -615,45 +615,45 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
                                   rel="noopener noreferrer"
                                   className={`flex items-center gap-3 p-2.5 rounded-xl ${
                                     isMe
-                                      ? 'bg-blue-400/20 hover:bg-blue-400/30'
-                                      : 'bg-slate-600/50 hover:bg-slate-600/70'
+                                      ? 'bg-status-info-bg hover:bg-status-info/30'
+                                      : 'bg-surface-subtle/50 hover:bg-surface-subtle/70'
                                   } transition-colors`}
                                 >
-                                  <div className={`p-2 rounded-lg ${isMe ? 'bg-blue-400/30' : 'bg-slate-500/50'}`}>
-                                    <FileText size={20} className={isMe ? 'text-white' : 'text-blue-400'} />
+                                  <div className={`p-2 rounded-lg ${isMe ? 'bg-status-info/30' : 'bg-surface-muted0/50'}`}>
+                                    <FileText size={20} className={isMe ? 'text-white' : 'text-status-info'} />
                                   </div>
                                   <div className="flex-1 min-w-0">
-                                    <p className={`text-sm font-medium truncate ${isMe ? 'text-white' : 'text-slate-200'}`}>
+                                    <p className={`text-sm font-medium truncate ${isMe ? 'text-white' : 'text-content-secondary'}`}>
                                       {(msg.metadata as any)?.filename || 'Fichier'}
                                     </p>
                                     {(msg.metadata as any)?.size && (
-                                      <p className={`text-xs ${isMe ? 'text-blue-100' : 'text-slate-400'}`}>
+                                      <p className={`text-xs ${isMe ? 'text-status-info-text' : 'text-content-muted'}`}>
                                         {((msg.metadata as any).size / 1024).toFixed(0)} Ko
                                       </p>
                                     )}
                                   </div>
-                                  <Download size={18} className={isMe ? 'text-blue-100' : 'text-slate-400'} />
+                                  <Download size={18} className={isMe ? 'text-status-info-text' : 'text-content-muted'} />
                                 </a>
                               ) : (
                                 <p className="whitespace-pre-wrap">{msg.content}</p>
                               )}
 
                               {/* Time and read status - iPhone style */}
-                              <div className={`flex items-center gap-1.5 justify-end mt-1 text-[11px] ${isMe ? 'text-blue-100/80' : 'text-slate-400'}`}>
+                              <div className={`flex items-center gap-1.5 justify-end mt-1 text-[11px] ${isMe ? 'text-status-info-text' : 'text-content-muted'}`}>
                                 {msg.editedAt && <span className="italic">modifié</span>}
                                 <span>{new Date(msg.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
                                 {isMe && (
                                   isMessageRead(msg) ? (
                                     <CheckCheck size={14} className="text-white" />
                                   ) : (
-                                    <Check size={14} className="text-blue-200/70" />
+                                    <Check size={14} className="text-status-info-text/70" />
                                   )
                                 )}
                               </div>
 
                               {/* Reactions display - positioned below bubble */}
                               {msg.reactions.length > 0 && (
-                                <div className={`absolute -bottom-4 ${isMe ? 'right-2' : 'left-2'} flex gap-0.5 bg-slate-800 rounded-full px-1.5 py-0.5 shadow-lg border border-slate-700`}>
+                                <div className={`absolute -bottom-4 ${isMe ? 'right-2' : 'left-2'} flex gap-0.5 bg-surface rounded-full px-1.5 py-0.5 shadow-lg border border-edge`}>
                                   {msg.reactions.map((r) => (
                                     <button
                                       key={r.emoji}
@@ -661,7 +661,7 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
                                       className={`text-sm transition-transform hover:scale-110 ${r.hasReacted ? 'opacity-100' : 'opacity-70'}`}
                                     >
                                       {r.emoji}
-                                      {r.count > 1 && <span className="text-[10px] text-slate-400 ml-0.5">{r.count}</span>}
+                                      {r.count > 1 && <span className="text-[10px] text-content-muted ml-0.5">{r.count}</span>}
                                     </button>
                                   ))}
                                 </div>
@@ -669,10 +669,10 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
                             </div>
 
                           {/* Hover actions - positioned close to the message bubble */}
-                          <div className={`absolute ${isMe ? '-left-1 -translate-x-full' : '-right-1 translate-x-full'} top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-0.5 bg-slate-900/90 backdrop-blur-sm rounded-lg px-1 py-0.5 shadow-lg border border-slate-700/50`}>
+                          <div className={`absolute ${isMe ? '-left-1 -translate-x-full' : '-right-1 translate-x-full'} top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-0.5 bg-surface-base/90 backdrop-blur-sm rounded-lg px-1 py-0.5 shadow-lg border border-edge-subtle`}>
                             <button
                               onClick={() => setShowReactionsFor(showReactionsFor === msg.id ? null : msg.id)}
-                              className="p-1.5 text-slate-400 hover:text-yellow-400 rounded transition-colors"
+                              className="p-1.5 text-content-muted hover:text-status-warning rounded transition-colors"
                               title="Réagir"
                             >
                               <Smile size={14} />
@@ -681,14 +681,14 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
                               <>
                                 <button
                                   onClick={() => handleEditMessage(msg)}
-                                  className="p-1.5 text-slate-400 hover:text-blue-400 rounded transition-colors"
+                                  className="p-1.5 text-content-muted hover:text-status-info rounded transition-colors"
                                   title="Modifier"
                                 >
                                   <Edit2 size={14} />
                                 </button>
                                 <button
                                   onClick={() => handleDeleteMessage(msg.id)}
-                                  className="p-1.5 text-slate-400 hover:text-red-400 rounded transition-colors"
+                                  className="p-1.5 text-content-muted hover:text-status-danger rounded transition-colors"
                                   title="Supprimer"
                                 >
                                   <Trash2 size={14} />
@@ -699,14 +699,14 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
 
                           {/* Reactions picker popup */}
                           {showReactionsFor === msg.id && (
-                            <div className={`absolute ${isMe ? 'right-0' : 'left-0'} -top-12 z-50 bg-slate-800 border border-slate-700 rounded-xl px-2 py-1.5 flex gap-1 shadow-xl`}>
+                            <div className={`absolute ${isMe ? 'right-0' : 'left-0'} -top-12 z-50 bg-surface border border-edge rounded-xl px-2 py-1.5 flex gap-1 shadow-xl`}>
                               {ALLOWED_REACTION_EMOJIS.map((emoji) => {
                                 const existing = msg.reactions.find((r) => r.emoji === emoji);
                                 return (
                                   <button
                                     key={emoji}
                                     onClick={() => handleToggleReaction(msg.id, emoji, existing?.hasReacted || false)}
-                                    className={`p-1 text-lg hover:scale-125 transition-transform rounded ${existing?.hasReacted ? 'bg-indigo-500/20' : ''}`}
+                                    className={`p-1 text-lg hover:scale-125 transition-transform rounded ${existing?.hasReacted ? 'bg-accent/10' : ''}`}
                                   >
                                     {emoji}
                                   </button>
@@ -725,12 +725,12 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
             </div>
 
             {/* INPUT AREA */}
-            <div className="p-4 bg-slate-900 border-t border-slate-800 w-full mb-0">
+            <div className="p-4 bg-surface-base border-t border-edge w-full mb-0">
               {editingMessage && (
-                <div className="flex items-center gap-2 mb-2 px-2 py-1.5 bg-slate-800 rounded-lg text-xs text-slate-400">
-                  <Edit2 size={12} className="text-indigo-400" />
+                <div className="flex items-center gap-2 mb-2 px-2 py-1.5 bg-surface rounded-lg text-xs text-content-muted">
+                  <Edit2 size={12} className="text-accent" />
                   <span className="flex-1 truncate">Modification du message</span>
-                  <button onClick={() => { setEditingMessage(null); setMessage(''); }} className="text-slate-500 hover:text-white">
+                  <button onClick={() => { setEditingMessage(null); setMessage(''); }} className="text-content-muted hover:text-content-primary">
                     <X size={14} />
                   </button>
                 </div>
@@ -746,7 +746,7 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploadingFile}
-                  className="h-11 w-11 sm:h-12 sm:w-12 flex items-center justify-center text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl transition-colors disabled:opacity-50 shrink-0"
+                  className="h-11 w-11 sm:h-12 sm:w-12 flex items-center justify-center text-content-muted hover:text-content-primary bg-surface hover:bg-surface-elevated rounded-xl transition-colors disabled:opacity-50 shrink-0"
                 >
                   {uploadingFile ? <Loader2 size={20} className="animate-spin" /> : <Paperclip size={20} />}
                 </button>
@@ -754,12 +754,12 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
                 <div className="flex-1 relative">
                   {/* Emoji Picker Panel */}
                   {showEmojiPicker && (
-                    <div className="absolute bottom-full mb-2 left-0 right-0 sm:left-auto sm:right-0 sm:w-80 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl p-3 z-50">
-                      <div className="flex items-center justify-between mb-2 pb-2 border-b border-slate-700">
-                        <span className="text-xs font-medium text-slate-400">Emojis</span>
+                    <div className="absolute bottom-full mb-2 left-0 right-0 sm:left-auto sm:right-0 sm:w-80 bg-surface-base border border-edge rounded-xl shadow-2xl p-3 z-50">
+                      <div className="flex items-center justify-between mb-2 pb-2 border-b border-edge">
+                        <span className="text-xs font-medium text-content-muted">Emojis</span>
                         <button
                           onClick={() => setShowEmojiPicker(false)}
-                          className="text-slate-500 hover:text-white"
+                          className="text-content-muted hover:text-content-primary"
                         >
                           <X size={16} />
                         </button>
@@ -772,7 +772,7 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
                               setMessage(prev => prev + emoji);
                               setShowEmojiPicker(false);
                             }}
-                            className="w-8 h-8 flex items-center justify-center text-lg hover:bg-slate-800 rounded transition-colors"
+                            className="w-8 h-8 flex items-center justify-center text-lg hover:bg-surface rounded transition-colors"
                           >
                             {emoji}
                           </button>
@@ -781,10 +781,10 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
                     </div>
                   )}
 
-                  <div className="bg-slate-950 border border-slate-700 rounded-xl flex items-center px-3 sm:px-4 h-11 sm:h-12 focus-within:border-indigo-500 transition-colors">
+                  <div className="bg-surface-base border border-edge rounded-xl flex items-center px-3 sm:px-4 h-11 sm:h-12 focus-within:border-accent transition-colors">
                     <textarea
                       placeholder="Écrire un message..."
-                      className="w-full bg-transparent border-none outline-none text-white text-sm resize-none py-2.5 max-h-32 placeholder:text-slate-600 custom-scrollbar leading-normal"
+                      className="w-full bg-transparent border-none outline-none text-content-primary text-sm resize-none py-2.5 max-h-32 placeholder:text-content-muted custom-scrollbar leading-normal"
                       rows={1}
                       value={message}
                       onChange={handleInputChange}
@@ -798,7 +798,7 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
                     />
                     <button
                       onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                      className={`ml-2 transition-colors shrink-0 ${showEmojiPicker ? 'text-yellow-400' : 'text-slate-500 hover:text-yellow-400'}`}
+                      className={`ml-2 transition-colors shrink-0 ${showEmojiPicker ? 'text-status-warning' : 'text-content-muted hover:text-status-warning'}`}
                     >
                       <Smile size={20} />
                     </button>
@@ -808,7 +808,7 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
                 <button
                   onClick={handleSendMessage}
                   disabled={!message.trim() || sending}
-                  className="h-11 w-11 sm:h-12 sm:w-12 flex items-center justify-center bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl shadow-lg shadow-indigo-900/20 transition-transform active:scale-95 shrink-0"
+                  className="h-11 w-11 sm:h-12 sm:w-12 flex items-center justify-center bg-accent hover:bg-accent-primary-hover disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl shadow-lg shadow-accent/20 transition-transform active:scale-95 shrink-0"
                 >
                   {sending ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
                 </button>
@@ -821,24 +821,24 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
       {/* GROUP CREATION MODAL */}
       {showGroupModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowGroupModal(false)}>
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-bold text-white mb-4">Nouveau groupe</h3>
+          <div className="bg-surface-base border border-edge rounded-2xl w-full max-w-md p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-content-primary mb-4">Nouveau groupe</h3>
 
             <input
               type="text"
               placeholder="Nom du groupe"
               value={groupTitle}
               onChange={(e) => setGroupTitle(e.target.value)}
-              className="w-full h-10 bg-slate-800 border border-slate-700 rounded-xl px-4 text-sm text-white focus:border-indigo-500 outline-none mb-4 placeholder:text-slate-600"
+              className="w-full h-10 bg-surface border border-edge rounded-xl px-4 text-sm text-content-primary focus:border-accent outline-none mb-4 placeholder:text-content-muted"
             />
 
             <div className="relative mb-3">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" size={16} />
               <input
                 placeholder="Ajouter des participants..."
                 value={groupSearchQuery}
                 onChange={(e) => setGroupSearchQuery(e.target.value)}
-                className="w-full h-10 bg-slate-800 border border-slate-700 rounded-xl pl-10 pr-4 text-sm text-white focus:border-indigo-500 outline-none placeholder:text-slate-600"
+                className="w-full h-10 bg-surface border border-edge rounded-xl pl-10 pr-4 text-sm text-content-primary focus:border-accent outline-none placeholder:text-content-muted"
               />
             </div>
 
@@ -850,9 +850,9 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
                     .flatMap((c) => c.participants)
                     .find((p) => p.id === pid);
                   return (
-                    <span key={pid} className="px-2 py-1 bg-indigo-600/30 text-indigo-300 rounded-lg text-xs flex items-center gap-1">
+                    <span key={pid} className="px-2 py-1 bg-accent/30 text-accent rounded-lg text-xs flex items-center gap-1">
                       {(user as any)?.nom || pid.slice(0, 8)}
-                      <button onClick={() => setGroupParticipants((prev) => prev.filter((id) => id !== pid))} className="hover:text-white">
+                      <button onClick={() => setGroupParticipants((prev) => prev.filter((id) => id !== pid))} className="hover:text-content-primary">
                         <X size={12} />
                       </button>
                     </span>
@@ -863,21 +863,21 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
 
             {/* Search results */}
             {groupSearchResults && groupSearchResults.length > 0 && (
-              <div className="max-h-40 overflow-y-auto mb-4 border border-slate-700 rounded-xl">
+              <div className="max-h-40 overflow-y-auto mb-4 border border-edge rounded-xl">
                 {groupSearchResults
                   .filter((u: any) => !groupParticipants.includes(u.id))
                   .map((user: any) => (
                     <button
                       key={user.id}
                       onClick={() => setGroupParticipants((prev) => [...prev, user.id])}
-                      className="w-full p-3 flex items-center gap-3 hover:bg-slate-800 transition-colors border-b border-slate-700/50 last:border-b-0 text-left"
+                      className="w-full p-3 flex items-center gap-3 hover:bg-surface transition-colors border-b border-edge-subtle last:border-b-0 text-left"
                     >
-                      <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-300">
+                      <div className="w-8 h-8 rounded-full bg-surface-elevated flex items-center justify-center text-xs font-bold text-content-secondary">
                         {getInitials(`${user.prenom || ''} ${user.nom || ''}`)}
                       </div>
                       <div>
-                        <p className="text-sm text-white">{user.prenom} {user.nom}</p>
-                        <p className="text-xs text-slate-500">{user.role || ''}</p>
+                        <p className="text-sm text-content-primary">{user.prenom} {user.nom}</p>
+                        <p className="text-xs text-content-muted">{user.role || ''}</p>
                       </div>
                     </button>
                   ))}
@@ -887,14 +887,14 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
             <div className="flex gap-3">
               <button
                 onClick={() => setShowGroupModal(false)}
-                className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-sm font-medium transition-colors"
+                className="flex-1 py-2.5 bg-surface hover:bg-surface-elevated text-content-primary rounded-xl text-sm font-medium transition-colors"
               >
                 Annuler
               </button>
               <button
                 onClick={handleCreateGroup}
                 disabled={!groupTitle.trim() || groupParticipants.length === 0}
-                className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl text-sm font-medium transition-colors"
+                className="flex-1 py-2.5 bg-accent hover:bg-accent-primary-hover disabled:opacity-50 text-white rounded-xl text-sm font-medium transition-colors"
               >
                 Créer
               </button>

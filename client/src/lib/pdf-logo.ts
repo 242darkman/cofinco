@@ -12,14 +12,15 @@ interface PdfHeaderOptions {
   subtitle?: string;
   dateRight?: string;
   headerHeight?: number;
+  appName?: string;
 }
 
 /**
- * Add a standardized PDF header with the COFIN&CO-M logo.
+ * Add a standardized PDF header with the company logo.
  * Returns the Y position where content should start.
  */
 export function addPdfLogoHeader(doc: jsPDF, options: PdfHeaderOptions): number {
-  const { title, subtitle, dateRight, headerHeight = 44 } = options;
+  const { title, subtitle, dateRight, headerHeight = 44, appName = 'COFIN&CO-M' } = options;
   const W = doc.internal.pageSize.getWidth();
 
   // Dark header bar
@@ -34,7 +35,7 @@ export function addPdfLogoHeader(doc: jsPDF, options: PdfHeaderOptions): number 
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
-    doc.text('COFIN&CO-M', 14, 16);
+    doc.text(appName, 14, 16);
   }
 
   // Title (next to logo)
@@ -69,13 +70,13 @@ export function addPdfLogoHeader(doc: jsPDF, options: PdfHeaderOptions): number 
 /**
  * Add a standardized PDF footer with page numbers.
  */
-export function addPdfLogoFooter(doc: jsPDF, title?: string): void {
+export function addPdfLogoFooter(doc: jsPDF, title?: string, appName: string = 'COFIN&CO-M'): void {
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
   const pages = doc.getNumberOfPages();
   const footerText = title
-    ? `COFIN&CO-M — ${title} — Document confidentiel`
-    : 'COFIN&CO-M — Document confidentiel';
+    ? `${appName} — ${title} — Document confidentiel`
+    : `${appName} — Document confidentiel`;
 
   for (let i = 1; i <= pages; i++) {
     doc.setPage(i);

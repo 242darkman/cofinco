@@ -280,15 +280,15 @@ export default function AdminVirementsProgrammes() {
       format: (_: unknown, item: ScheduledTransferType) => (
         <div className="flex items-center gap-4 group cursor-pointer">
            {/* Source Avatar Mock */}
-           <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-xs">
+           <div className="w-8 h-8 rounded-full bg-status-info-bg flex items-center justify-center text-status-info font-bold text-xs">
                {item.sourceClientPrenom?.[0] || 'S'}
            </div>
            
            <div className="flex flex-col">
-               <span className="text-sm font-medium text-slate-900 dark:text-white">
-                   {item.sourceClientPrenom || 'Source'} <span className="text-slate-400">➔</span> {item.destClientPrenom || 'Dest'}
+               <span className="text-sm font-medium text-content-primary">
+                   {item.sourceClientPrenom || 'Source'} <span className="text-content-muted">➔</span> {item.destClientPrenom || 'Dest'}
                </span>
-               <span className="text-xs text-slate-500 flex items-center gap-1">
+               <span className="text-xs text-content-muted flex items-center gap-1">
                    {item.sourceNumero} <ArrowRight size={10} /> {item.destNumero}
                </span>
            </div>
@@ -300,11 +300,11 @@ export default function AdminVirementsProgrammes() {
         label: 'Fréquence',
         format: (_: any, item: ScheduledTransferType) => (
             <div>
-                <div className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                <div className="text-sm font-medium text-content-secondary">
                     {frequencyLabels[item.frequence || 'once']}
                 </div>
                 {item.prochaineExecution && (
-                    <div className="text-xs text-slate-500">
+                    <div className="text-xs text-content-muted">
                         Prochaine: {formatDate(item.prochaineExecution)}
                     </div>
                 )}
@@ -315,7 +315,7 @@ export default function AdminVirementsProgrammes() {
         key: 'montant',
         label: 'Montant',
         align: 'right' as const,
-        format: (val: string) => <span className="font-bold text-slate-900 dark:text-white">{formatMoney(val)}</span>
+        format: (val: string) => <span className="font-bold text-content-primary">{formatMoney(val)}</span>
     },
     {
         key: 'status',
@@ -336,7 +336,7 @@ export default function AdminVirementsProgrammes() {
                     icon={Play} 
                     size="sm" 
                     variant="ghost" 
-                    className="text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                    className="text-status-success hover:bg-status-success-bg"
                     onClick={() => handleRunNow(item)}
                     aria-label="Exécuter maintenant"
                 />
@@ -344,7 +344,7 @@ export default function AdminVirementsProgrammes() {
                     icon={item.actif ? Pause : Play} 
                     size="sm" 
                     variant="ghost" 
-                    className={item.actif ? "text-amber-500" : "text-blue-500"}
+                    className={item.actif ? "text-status-warning" : "text-status-info"}
                     onClick={() => handleToggleActive(item, !item.actif)}
                     aria-label={item.actif ? "Mettre en pause" : "Réactiver"}
                 />
@@ -367,9 +367,9 @@ export default function AdminVirementsProgrammes() {
       return (
           <div className="p-8 flex justify-center">
               <div className="text-center">
-                  <Lock className="mx-auto h-12 w-12 text-slate-300" />
-                  <h3 className="mt-2 text-lg font-medium text-slate-900">Accès refusé</h3>
-                  <p className="text-slate-500">Vous n'avez pas les permissions nécessaires.</p>
+                  <Lock className="mx-auto h-12 w-12 text-content-secondary" />
+                  <h3 className="mt-2 text-lg font-medium text-content-primary">Accès refusé</h3>
+                  <p className="text-content-muted">Vous n'avez pas les permissions nécessaires.</p>
               </div>
           </div>
       );
@@ -411,7 +411,7 @@ export default function AdminVirementsProgrammes() {
       </div>
 
       {/* 2. Toolbar & Filters - Compact */}
-      <div className="shrink-0 bg-slate-800/50 p-1.5 rounded-xl border border-slate-700 flex flex-col sm:flex-row justify-between items-center gap-3 backdrop-blur-sm">
+      <div className="shrink-0 bg-surface/50 p-1.5 rounded-xl border border-edge flex flex-col sm:flex-row justify-between items-center gap-3 backdrop-blur-sm">
           <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto no-scrollbar">
               <TabGroup 
                  activeTab={statusFilter}
@@ -435,16 +435,16 @@ export default function AdminVirementsProgrammes() {
                   className="w-full sm:w-48 h-8 text-xs"
               />
               
-              <div className="flex bg-slate-700/50 p-0.5 rounded-lg border border-slate-600 shrink-0">
+              <div className="flex bg-surface-elevated/50 p-0.5 rounded-lg border border-edge-strong shrink-0">
                   <button 
                     onClick={() => setViewMode('list')}
-                    className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-slate-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-300'}`}
+                    className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-surface-subtle text-content-primary shadow-sm' : 'text-content-muted hover:text-content-secondary'}`}
                   >
                       <LayoutList size={14} />
                   </button>
                   <button 
                     onClick={() => setViewMode('calendar')}
-                    className={`p-1.5 rounded-md transition-all ${viewMode === 'calendar' ? 'bg-slate-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-300'}`}
+                    className={`p-1.5 rounded-md transition-all ${viewMode === 'calendar' ? 'bg-surface-subtle text-content-primary shadow-sm' : 'text-content-muted hover:text-content-secondary'}`}
                   >
                       <CalendarIcon size={14} />
                   </button>
@@ -453,11 +453,11 @@ export default function AdminVirementsProgrammes() {
               {/* Indicateur WebSocket temps réel */}
               <div className="flex items-center gap-1 px-2" title={wsConnected ? "Temps réel actif" : "Temps réel déconnecté"}>
                   {wsConnected ? (
-                    <Wifi size={14} className="text-emerald-500" />
+                    <Wifi size={14} className="text-status-success" />
                   ) : (
-                    <WifiOff size={14} className="text-red-500" />
+                    <WifiOff size={14} className="text-status-danger" />
                   )}
-                  <span className={`text-xs ${wsConnected ? 'text-emerald-500' : 'text-red-500'}`}>
+                  <span className={`text-xs ${wsConnected ? 'text-status-success' : 'text-status-danger'}`}>
                     {wsConnected ? 'Live' : 'Hors ligne'}
                   </span>
               </div>
@@ -466,7 +466,7 @@ export default function AdminVirementsProgrammes() {
                 variant="ghost"
                 size="sm"
                 onClick={() => loadData(false)}
-                className="text-slate-400 hover:text-slate-100 h-8 w-8 p-0"
+                className="text-content-muted hover:text-content-primary h-8 w-8 p-0"
                 aria-label="Rafraîchir"
               >
                   <RefreshCw size={16} />

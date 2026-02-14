@@ -71,22 +71,22 @@ interface AgentEnquetesProps {
 }
 
 const PRIORITY_CONFIG = {
-  LOW: { label: 'Basse', color: 'bg-slate-500/15 text-slate-400' },
-  MEDIUM: { label: 'Normale', color: 'bg-blue-500/15 text-blue-400' },
-  HIGH: { label: 'Haute', color: 'bg-amber-500/15 text-amber-400' },
-  URGENT: { label: 'Urgente', color: 'bg-red-500/15 text-red-400 animate-pulse' },
+  LOW: { label: 'Basse', color: 'bg-surface-subtle/35 text-content-muted' },
+  MEDIUM: { label: 'Normale', color: 'bg-status-info-bg text-status-info' },
+  HIGH: { label: 'Haute', color: 'bg-status-warning-bg text-status-warning' },
+  URGENT: { label: 'Urgente', color: 'bg-status-danger-bg text-status-danger animate-pulse' },
 };
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ElementType }> = {
-  PENDING_ASSIGNMENT: { label: 'En attente', color: 'bg-slate-500/15 text-slate-400', icon: Clock },
-  ASSIGNED: { label: 'Assignée', color: 'bg-blue-500/15 text-blue-400', icon: ClipboardCheck },
-  IN_PROGRESS: { label: 'En cours', color: 'bg-amber-500/15 text-amber-400', icon: RefreshCw },
-  SUBMITTED: { label: 'Soumise', color: 'bg-cyan-500/15 text-cyan-400', icon: CheckCircle },
-  REVIEWED: { label: 'Révisée', color: 'bg-emerald-500/15 text-emerald-400', icon: CheckCircle },
-  CLOSED: { label: 'Clôturée', color: 'bg-slate-500/15 text-slate-500', icon: XCircle },
-  APPROVED: { label: 'Approuvée', color: 'bg-emerald-500/15 text-emerald-400', icon: CheckCircle },
-  REJECTED: { label: 'Rejetée', color: 'bg-red-500/15 text-red-400', icon: XCircle },
-  REDUCED: { label: 'Réduite', color: 'bg-purple-500/15 text-purple-400', icon: Banknote },
+  PENDING_ASSIGNMENT: { label: 'En attente', color: 'bg-surface-subtle/35 text-content-muted', icon: Clock },
+  ASSIGNED: { label: 'Assignée', color: 'bg-status-info-bg text-status-info', icon: ClipboardCheck },
+  IN_PROGRESS: { label: 'En cours', color: 'bg-status-warning-bg text-status-warning', icon: RefreshCw },
+  SUBMITTED: { label: 'Soumise', color: 'bg-accent-secondary/15 text-accent', icon: CheckCircle },
+  REVIEWED: { label: 'Révisée', color: 'bg-status-success-bg text-status-success', icon: CheckCircle },
+  CLOSED: { label: 'Clôturée', color: 'bg-surface-subtle/35 text-content-muted', icon: XCircle },
+  APPROVED: { label: 'Approuvée', color: 'bg-status-success-bg text-status-success', icon: CheckCircle },
+  REJECTED: { label: 'Rejetée', color: 'bg-status-danger-bg text-status-danger', icon: XCircle },
+  REDUCED: { label: 'Réduite', color: 'bg-status-info/15 text-status-info', icon: Banknote },
 };
 
 const PENDING_STATUSES = ['ASSIGNED', 'IN_PROGRESS', 'PENDING_ASSIGNMENT'];
@@ -216,14 +216,14 @@ export default function AgentEnquetes({ agentId }: AgentEnquetesProps) {
   return (
     <div className="space-y-4">
       {/* Tabs */}
-      <div className="bg-slate-800/80 backdrop-blur border border-slate-700 rounded-xl p-1.5 flex gap-1">
+      <div className="bg-surface/80 backdrop-blur border border-edge rounded-xl p-1.5 flex gap-1">
         <button
           onClick={() => setTab('pending')}
           className={clsx(
             'flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all',
             tab === 'pending'
-              ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30 shadow-sm'
-              : 'text-slate-400 hover:bg-slate-700/50 hover:text-white'
+              ? 'bg-status-warning-bg text-status-warning border border-status-warning/30 shadow-sm'
+              : 'text-content-muted hover:bg-surface-elevated/50 hover:text-content-primary'
           )}
         >
           <ClipboardCheck size={16} />
@@ -231,7 +231,7 @@ export default function AgentEnquetes({ agentId }: AgentEnquetesProps) {
           {pendingInvestigations.length > 0 && (
             <span className={clsx(
               'text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center',
-              tab === 'pending' ? 'bg-amber-400/20 text-amber-300' : 'bg-amber-500 text-white'
+              tab === 'pending' ? 'bg-status-warning-bg text-status-warning' : 'bg-status-warning text-white'
             )}>
               {pendingInvestigations.length}
             </span>
@@ -242,14 +242,14 @@ export default function AgentEnquetes({ agentId }: AgentEnquetesProps) {
           className={clsx(
             'flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all',
             tab === 'history'
-              ? 'bg-slate-600/30 text-white border border-slate-600/50 shadow-sm'
-              : 'text-slate-400 hover:bg-slate-700/50 hover:text-white'
+              ? 'bg-surface-subtle/30 text-content-primary border border-edge-strong/50 shadow-sm'
+              : 'text-content-muted hover:bg-surface-elevated/50 hover:text-content-primary'
           )}
         >
           <History size={16} />
           <span>Historique</span>
           {historyInvestigations.length > 0 && (
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center bg-slate-600 text-slate-300">
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center bg-surface-subtle text-content-secondary">
               {historyInvestigations.length}
             </span>
           )}
@@ -258,30 +258,30 @@ export default function AgentEnquetes({ agentId }: AgentEnquetesProps) {
 
       {/* Search */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" size={16} />
         <input
           type="text"
           placeholder="Rechercher par client, objet..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-10 pr-4 py-2.5 bg-slate-800/60 border border-slate-700 rounded-xl text-sm text-white placeholder:text-slate-500 focus:border-cyan-500/50 focus:outline-none transition-colors"
+          className="w-full pl-10 pr-4 py-2.5 bg-surface/60 border border-edge rounded-xl text-sm text-content-primary placeholder:text-content-muted focus:border-accent/50 focus:outline-none transition-colors"
         />
       </div>
 
       {/* Content */}
       {loading ? (
         <div className="flex items-center justify-center py-16">
-          <Loader2 className="animate-spin text-cyan-400" size={32} />
+          <Loader2 className="animate-spin text-accent" size={32} />
         </div>
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mb-4 ring-1 ring-slate-700">
-            <FileSearch className="text-slate-600" size={28} />
+          <div className="w-16 h-16 bg-surface rounded-full flex items-center justify-center mb-4 ring-1 ring-edge">
+            <FileSearch className="text-content-muted" size={28} />
           </div>
-          <p className="text-slate-300 font-medium text-sm mb-1">
+          <p className="text-content-secondary font-medium text-sm mb-1">
             {tab === 'pending' ? 'Aucune enquete en attente' : 'Aucun historique'}
           </p>
-          <p className="text-slate-500 text-xs max-w-[250px]">
+          <p className="text-content-muted text-xs max-w-[250px]">
             {tab === 'pending'
               ? 'Les nouvelles enquetes assignees apparaitront ici.'
               : 'Les enquetes completees seront affichees ici.'}
@@ -299,26 +299,26 @@ export default function AgentEnquetes({ agentId }: AgentEnquetesProps) {
               <div
                 key={investigation.id}
                 className={clsx(
-                  'bg-slate-800/60 border rounded-xl p-3 sm:p-4 transition-all hover:bg-slate-800/80',
-                  overdue ? 'border-red-500/40' : 'border-slate-700/60'
+                  'bg-surface/60 border rounded-xl p-3 sm:p-4 transition-all hover:bg-surface/80',
+                  overdue ? 'border-status-danger/40' : 'border-edge/60'
                 )}
               >
                 {/* Header */}
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-indigo-600/20 flex items-center justify-center text-indigo-400 font-bold text-xs shrink-0">
+                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-accent/10 flex items-center justify-center text-accent font-bold text-xs shrink-0">
                       {investigation.client
                         ? `${(investigation.client.nom || '?')[0]}${(investigation.client.prenom || '')[0] || ''}`
                         : '?'}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-semibold text-white truncate">
+                      <p className="text-sm font-semibold text-content-primary truncate">
                         {investigation.client
                           ? `${investigation.client.nom || ''} ${investigation.client.prenom || ''}`.trim()
                           : 'Client inconnu'}
                       </p>
                       {investigation.objetCredit && (
-                        <p className="text-[11px] text-slate-500 truncate">{investigation.objetCredit}</p>
+                        <p className="text-[11px] text-content-muted truncate">{investigation.objetCredit}</p>
                       )}
                     </div>
                   </div>
@@ -337,22 +337,22 @@ export default function AgentEnquetes({ agentId }: AgentEnquetesProps) {
                 {/* Details Grid */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
                   {investigation.montantDemande && (
-                    <div className="flex items-center gap-1.5 text-slate-400">
-                      <Banknote size={12} className="text-emerald-500 shrink-0" />
+                    <div className="flex items-center gap-1.5 text-content-muted">
+                      <Banknote size={12} className="text-status-success shrink-0" />
                       <span className="truncate">{formatMoney(investigation.montantDemande)}</span>
                     </div>
                   )}
 
                   {investigation.client?.telephone && (
-                    <div className="flex items-center gap-1.5 text-slate-400">
-                      <User size={12} className="text-blue-400 shrink-0" />
+                    <div className="flex items-center gap-1.5 text-content-muted">
+                      <User size={12} className="text-status-info shrink-0" />
                       <span className="truncate">{investigation.client.telephone}</span>
                     </div>
                   )}
 
                   {investigation.client?.adresseDomicile && (
-                    <div className="flex items-center gap-1.5 text-slate-400">
-                      <MapPin size={12} className="text-purple-400 shrink-0" />
+                    <div className="flex items-center gap-1.5 text-content-muted">
+                      <MapPin size={12} className="text-status-info shrink-0" />
                       <span className="truncate">{investigation.client.adresseDomicile}</span>
                     </div>
                   )}
@@ -360,9 +360,9 @@ export default function AgentEnquetes({ agentId }: AgentEnquetesProps) {
                   {tab === 'pending' && investigation.dueDate && (
                     <div className={clsx(
                       'flex items-center gap-1.5',
-                      overdue ? 'text-red-400' : 'text-slate-400'
+                      overdue ? 'text-status-danger' : 'text-content-muted'
                     )}>
-                      <Calendar size={12} className={overdue ? 'text-red-400' : 'text-slate-500'} />
+                      <Calendar size={12} className={overdue ? 'text-status-danger' : 'text-content-muted'} />
                       <span className="truncate">
                         {overdue && <AlertTriangle size={10} className="inline mr-0.5" />}
                         Echéance: {formatDate(investigation.dueDate)}
@@ -371,15 +371,15 @@ export default function AgentEnquetes({ agentId }: AgentEnquetesProps) {
                   )}
 
                   {tab === 'history' && investigation.submittedAt && (
-                    <div className="flex items-center gap-1.5 text-slate-400">
-                      <Calendar size={12} className="text-slate-500 shrink-0" />
+                    <div className="flex items-center gap-1.5 text-content-muted">
+                      <Calendar size={12} className="text-content-muted shrink-0" />
                       <span className="truncate">Soumise: {formatDate(investigation.submittedAt)}</span>
                     </div>
                   )}
 
                   {investigation.assignedAt && (
-                    <div className="flex items-center gap-1.5 text-slate-400">
-                      <Clock size={12} className="text-slate-500 shrink-0" />
+                    <div className="flex items-center gap-1.5 text-content-muted">
+                      <Clock size={12} className="text-content-muted shrink-0" />
                       <span className="truncate">Assignée: {formatDate(investigation.assignedAt)}</span>
                     </div>
                   )}
@@ -387,7 +387,7 @@ export default function AgentEnquetes({ agentId }: AgentEnquetesProps) {
 
                 {/* Overdue warning */}
                 {overdue && (
-                  <div className="mt-2 flex items-center gap-1.5 text-[11px] text-red-400 bg-red-500/10 rounded-lg px-2.5 py-1.5">
+                  <div className="mt-2 flex items-center gap-1.5 text-[11px] text-status-danger bg-status-danger-bg rounded-lg px-2.5 py-1.5">
                     <AlertTriangle size={12} />
                     <span className="font-medium">Echéance dépassée</span>
                   </div>
@@ -395,11 +395,11 @@ export default function AgentEnquetes({ agentId }: AgentEnquetesProps) {
 
                 {/* Action buttons for pending investigations */}
                 {investigation.statut === 'ASSIGNED' && (
-                  <div className="mt-2 pt-2 border-t border-slate-700/50">
+                  <div className="mt-2 pt-2 border-t border-edge-subtle">
                     <button
                       onClick={() => handleStart(investigation.id)}
                       disabled={starting === investigation.id}
-                      className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold text-white bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-700 disabled:text-slate-500 rounded-lg transition-all"
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold text-content-primary bg-accent-secondary hover:bg-accent-secondary disabled:bg-surface-elevated disabled:text-content-muted rounded-lg transition-all"
                     >
                       {starting === investigation.id ? (
                         <Loader2 size={14} className="animate-spin" />
@@ -411,10 +411,10 @@ export default function AgentEnquetes({ agentId }: AgentEnquetesProps) {
                   </div>
                 )}
                 {investigation.statut === 'IN_PROGRESS' && (
-                  <div className="mt-2 pt-2 border-t border-slate-700/50">
+                  <div className="mt-2 pt-2 border-t border-edge-subtle">
                     <button
                       onClick={() => setEnqueteFormData(investigation)}
-                      className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-all"
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold text-white bg-status-info hover:bg-status-info rounded-lg transition-all"
                     >
                       <ClipboardCheck size={14} />
                       Remplir l'enquête
@@ -424,19 +424,19 @@ export default function AgentEnquetes({ agentId }: AgentEnquetesProps) {
 
                 {/* History: show score and recommendation */}
                 {tab === 'history' && (investigation.scoreGlobal || investigation.agentRecommendation) && (
-                  <div className="mt-2 pt-2 border-t border-slate-700/50 flex items-center gap-3 text-xs">
+                  <div className="mt-2 pt-2 border-t border-edge-subtle flex items-center gap-3 text-xs">
                     {investigation.scoreGlobal != null && (
-                      <span className="text-slate-400">
-                        Score: <span className="font-bold text-white">{investigation.scoreGlobal}/100</span>
+                      <span className="text-content-muted">
+                        Score: <span className="font-bold text-content-primary">{investigation.scoreGlobal}/100</span>
                       </span>
                     )}
                     {investigation.agentRecommendation && (
                       <span className={clsx(
                         'text-[10px] font-bold px-1.5 py-0.5 rounded',
-                        investigation.agentRecommendation === 'APPROVE' ? 'bg-emerald-500/15 text-emerald-400' :
-                        investigation.agentRecommendation === 'REJECT' ? 'bg-red-500/15 text-red-400' :
-                        investigation.agentRecommendation === 'REDUCE_AMOUNT' ? 'bg-purple-500/15 text-purple-400' :
-                        'bg-amber-500/15 text-amber-400'
+                        investigation.agentRecommendation === 'APPROVE' ? 'bg-status-success-bg text-status-success' :
+                        investigation.agentRecommendation === 'REJECT' ? 'bg-status-danger-bg text-status-danger' :
+                        investigation.agentRecommendation === 'REDUCE_AMOUNT' ? 'bg-status-info/15 text-status-info' :
+                        'bg-status-warning-bg text-status-warning'
                       )}>
                         {investigation.agentRecommendation === 'APPROVE' ? 'Approuver' :
                          investigation.agentRecommendation === 'REJECT' ? 'Rejeter' :
@@ -458,7 +458,7 @@ export default function AgentEnquetes({ agentId }: AgentEnquetesProps) {
         <button
           onClick={fetchInvestigations}
           disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white bg-slate-800/60 hover:bg-slate-700/60 border border-slate-700 rounded-lg transition-all disabled:opacity-50"
+          className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-content-muted hover:text-content-primary bg-surface/60 hover:bg-surface-elevated/60 border border-edge rounded-lg transition-all disabled:opacity-50"
         >
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           Actualiser

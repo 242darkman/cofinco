@@ -185,7 +185,7 @@ export default function SaisieEcriture({ onSuccess }: SaisieEcritureProps) {
   return (
     <div className="space-y-3">
       {/* Header compact - UNE SEULE LIGNE */}
-      <div className="bg-gradient-to-r from-blue-600 to-emerald-600 rounded-xl p-3">
+      <div className="bg-gradient-to-r from-status-info to-status-success rounded-xl p-3">
         <div className="flex items-center gap-3 overflow-x-auto">
           {/* Titre */}
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -203,7 +203,7 @@ export default function SaisieEcriture({ onSuccess }: SaisieEcritureProps) {
           <div className="flex items-center gap-2 flex-shrink-0">
             <div className="bg-white/15 rounded-lg px-3 py-1.5 flex items-center gap-2">
               <div>
-                <div className="text-base font-bold text-green-300 leading-none">
+                <div className="text-base font-bold text-white leading-none">
                   {formatCompact(totalDebit)}
                 </div>
                 <div className="text-[9px] text-white/70">Débit</div>
@@ -211,7 +211,7 @@ export default function SaisieEcriture({ onSuccess }: SaisieEcritureProps) {
             </div>
             <div className="bg-white/15 rounded-lg px-3 py-1.5 flex items-center gap-2">
               <div>
-                <div className="text-base font-bold text-cyan-300 leading-none">
+                <div className="text-base font-bold text-white leading-none">
                   {formatCompact(totalCredit)}
                 </div>
                 <div className="text-[9px] text-white/70">Crédit</div>
@@ -229,9 +229,9 @@ export default function SaisieEcriture({ onSuccess }: SaisieEcritureProps) {
 
           {/* Indicateur équilibre */}
           <div className={`px-2 py-1 rounded-full text-[10px] font-bold flex-shrink-0 flex items-center gap-1 ${
-            isEquilibre 
-              ? 'bg-green-400/30 text-green-200' 
-              : 'bg-amber-400/30 text-amber-200'
+            isEquilibre
+              ? 'bg-white/25 text-white'
+              : 'bg-white/25 text-white'
           }`}>
             {isEquilibre ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
             {isEquilibre ? 'Équilibrée' : 'Écart: ' + Math.abs(totalDebit - totalCredit).toFixed(2)}
@@ -255,7 +255,7 @@ export default function SaisieEcriture({ onSuccess }: SaisieEcritureProps) {
               <span>{submitting ? 'Enregistrement...' : 'Enregistrer & Poster'}</span>
             </button>
           ) : (
-            <div className="px-3 py-1.5 bg-amber-500/20 text-amber-300 rounded-lg text-xs flex items-center gap-1.5">
+            <div className="px-3 py-1.5 bg-status-warning-bg text-status-warning rounded-lg text-xs flex items-center gap-1.5">
               <AlertTriangle className="w-3.5 h-3.5" />
               Permission requise
             </div>
@@ -264,15 +264,15 @@ export default function SaisieEcriture({ onSuccess }: SaisieEcritureProps) {
       </div>
 
       {/* Formulaire compact */}
-      <div className="bg-slate-800 rounded-xl p-3">
+      <div className="bg-surface rounded-xl p-3">
         <div className="flex flex-wrap items-end gap-3">
           {/* Journal */}
           <div className="flex-1 min-w-[150px] max-w-[220px]">
-            <label className="block text-[10px] font-medium text-slate-400 mb-1">Journal *</label>
+            <label className="block text-[10px] font-medium text-content-muted mb-1">Journal *</label>
             <select
               value={form.journalCode}
               onChange={(e) => setForm({ ...form, journalCode: e.target.value })}
-              className="w-full bg-slate-700 text-white text-xs px-3 py-2 rounded-lg border border-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full bg-surface-elevated text-content-primary text-xs px-3 py-2 rounded-lg border border-edge-strong focus:outline-none focus:ring-1 focus:ring-status-info"
               required
             >
               <option value="">Sélectionner...</option>
@@ -284,24 +284,24 @@ export default function SaisieEcriture({ onSuccess }: SaisieEcritureProps) {
 
           {/* Date */}
           <div className="flex-1 min-w-[130px] max-w-[150px]">
-            <label className="block text-[10px] font-medium text-slate-400 mb-1">Date *</label>
+            <label className="block text-[10px] font-medium text-content-muted mb-1">Date *</label>
             <input
               type="date"
               value={form.date_ecriture}
               onChange={(e) => setForm({ ...form, date_ecriture: e.target.value })}
-              className="w-full bg-slate-700 text-white text-xs px-3 py-2 rounded-lg border border-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full bg-surface-elevated text-content-primary text-xs px-3 py-2 rounded-lg border border-edge-strong focus:outline-none focus:ring-1 focus:ring-status-info"
               required
             />
           </div>
 
           {/* Libellé - prend plus de place */}
           <div className="flex-[2] min-w-[200px]">
-            <label className="block text-[10px] font-medium text-slate-400 mb-1">Libellé *</label>
+            <label className="block text-[10px] font-medium text-content-muted mb-1">Libellé *</label>
             <input
               type="text"
               value={form.libelle}
               onChange={(e) => setForm({ ...form, libelle: e.target.value })}
-              className="w-full bg-slate-700 text-white text-xs px-3 py-2 rounded-lg border border-slate-600 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full bg-surface-elevated text-content-primary text-xs px-3 py-2 rounded-lg border border-edge-strong focus:outline-none focus:ring-1 focus:ring-status-info"
               placeholder="Description de l'opération"
               required
             />
@@ -310,16 +310,16 @@ export default function SaisieEcriture({ onSuccess }: SaisieEcritureProps) {
       </div>
 
       {/* Lignes d'écriture */}
-      <div className="bg-slate-800 rounded-xl overflow-hidden">
+      <div className="bg-surface rounded-xl overflow-hidden">
         {/* Header des lignes */}
-        <div className="flex items-center justify-between px-3 py-2 border-b border-slate-700">
-          <h3 className="text-xs font-bold text-white flex items-center gap-2">
-            <FileText className="w-4 h-4 text-blue-400" />
+        <div className="flex items-center justify-between px-3 py-2 border-b border-edge">
+          <h3 className="text-xs font-bold text-content-primary flex items-center gap-2">
+            <FileText className="w-4 h-4 text-status-info" />
             Lignes d'Écriture
           </h3>
           <button
             onClick={addLigne}
-            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors"
+            className="px-3 py-1.5 bg-status-info hover:bg-status-info text-white rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
             Ajouter
@@ -329,19 +329,19 @@ export default function SaisieEcriture({ onSuccess }: SaisieEcritureProps) {
         {/* Tableau des lignes */}
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-slate-700/50">
+            <thead className="bg-surface-elevated/50">
               <tr>
-                <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 w-36">N° Compte</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-slate-400">Intitulé</th>
-                <th className="px-3 py-2 text-left text-xs font-medium text-slate-400 hidden md:table-cell">Libellé</th>
-                <th className="px-3 py-2 text-right text-xs font-medium text-slate-400 w-28">Débit</th>
-                <th className="px-3 py-2 text-right text-xs font-medium text-slate-400 w-28">Crédit</th>
-                <th className="px-3 py-2 text-center text-xs font-medium text-slate-400 w-12"></th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-content-muted w-36">N° Compte</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-content-muted">Intitulé</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-content-muted hidden md:table-cell">Libellé</th>
+                <th className="px-3 py-2 text-right text-xs font-medium text-content-muted w-28">Débit</th>
+                <th className="px-3 py-2 text-right text-xs font-medium text-content-muted w-28">Crédit</th>
+                <th className="px-3 py-2 text-center text-xs font-medium text-content-muted w-12"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-700/50">
+            <tbody className="divide-y divide-edge/50">
               {lignes.map((ligne, index) => (
-                <tr key={index} className="hover:bg-slate-700/30 transition-colors">
+                <tr key={index} className="hover:bg-surface-elevated/30 transition-colors">
                   {/* N° Compte avec recherche */}
                   <td className="px-3 py-2 relative">
                     <div className="flex items-center gap-1">
@@ -353,40 +353,40 @@ export default function SaisieEcriture({ onSuccess }: SaisieEcritureProps) {
                           setSearchTerm(e.target.value);
                           setShowCompteSearch(index);
                         }}
-                        className="w-20 bg-slate-600 text-white text-xs px-2 py-1.5 rounded-lg"
+                        className="w-20 bg-surface-subtle text-content-primary text-xs px-2 py-1.5 rounded-lg"
                         placeholder="Compte"
                       />
                       <button
                         onClick={() => setShowCompteSearch(showCompteSearch === index ? null : index)}
-                        className="p-1.5 bg-slate-600 hover:bg-slate-500 rounded-lg transition-colors"
+                        className="p-1.5 bg-surface-subtle hover:bg-surface-muted0 rounded-lg transition-colors"
                       >
-                        <Search className="w-3 h-3 text-slate-300" />
+                        <Search className="w-3 h-3 text-content-secondary" />
                       </button>
                     </div>
                     
                     {/* Dropdown recherche compte */}
                     {showCompteSearch === index && (
-                      <div className="absolute z-20 left-0 mt-1 w-80 bg-slate-700 border border-slate-600 rounded-xl shadow-xl max-h-48 overflow-y-auto">
+                      <div className="absolute z-20 left-0 mt-1 w-80 bg-surface-elevated border border-edge-strong rounded-xl shadow-xl max-h-48 overflow-y-auto">
                         {filteredComptes.slice(0, 15).map(compte => (
                           <button
                             key={compte.id}
                             onClick={() => selectCompte(index, compte)}
-                            className="w-full px-3 py-2 text-left hover:bg-slate-600 flex items-center gap-2 text-xs transition-colors"
+                            className="w-full px-3 py-2 text-left hover:bg-surface-subtle flex items-center gap-2 text-xs transition-colors"
                           >
-                            <span className="text-cyan-400 font-mono font-bold">{compte.numeroCompte}</span>
-                            <span className="text-white truncate">{compte.intitule}</span>
+                            <span className="text-accent font-mono font-bold">{compte.numeroCompte}</span>
+                            <span className="text-content-primary truncate">{compte.intitule}</span>
                           </button>
                         ))}
                         {filteredComptes.length === 0 && (
-                          <div className="px-3 py-2 text-slate-400 text-xs">Aucun compte trouvé</div>
+                          <div className="px-3 py-2 text-content-muted text-xs">Aucun compte trouvé</div>
                         )}
                       </div>
                     )}
                   </td>
 
                   {/* Intitulé */}
-                  <td className="px-3 py-2 text-white text-xs truncate max-w-[150px]">
-                    {ligne.intitule || <span className="text-slate-500">-</span>}
+                  <td className="px-3 py-2 text-content-primary text-xs truncate max-w-[150px]">
+                    {ligne.intitule || <span className="text-content-muted">-</span>}
                   </td>
 
                   {/* Libellé spécifique */}
@@ -395,7 +395,7 @@ export default function SaisieEcriture({ onSuccess }: SaisieEcritureProps) {
                       type="text"
                       value={ligne.libelle}
                       onChange={(e) => updateLigne(index, 'libelle', e.target.value)}
-                      className="w-full bg-slate-600 text-white text-xs px-2 py-1.5 rounded-lg"
+                      className="w-full bg-surface-subtle text-content-primary text-xs px-2 py-1.5 rounded-lg"
                       placeholder="Libellé..."
                     />
                   </td>
@@ -406,7 +406,7 @@ export default function SaisieEcriture({ onSuccess }: SaisieEcritureProps) {
                       type="number"
                       value={ligne.debit || ''}
                       onChange={(e) => updateLigne(index, 'debit', e.target.value)}
-                      className="w-full bg-slate-600 text-white text-xs px-2 py-1.5 rounded-lg text-right font-mono"
+                      className="w-full bg-surface-subtle text-content-primary text-xs px-2 py-1.5 rounded-lg text-right font-mono"
                       placeholder="0.00"
                       step="0.01"
                     />
@@ -418,7 +418,7 @@ export default function SaisieEcriture({ onSuccess }: SaisieEcritureProps) {
                       type="number"
                       value={ligne.credit || ''}
                       onChange={(e) => updateLigne(index, 'credit', e.target.value)}
-                      className="w-full bg-slate-600 text-white text-xs px-2 py-1.5 rounded-lg text-right font-mono"
+                      className="w-full bg-surface-subtle text-content-primary text-xs px-2 py-1.5 rounded-lg text-right font-mono"
                       placeholder="0.00"
                       step="0.01"
                     />
@@ -429,7 +429,7 @@ export default function SaisieEcriture({ onSuccess }: SaisieEcritureProps) {
                     {lignes.length > 2 && (
                       <button
                         onClick={() => removeLigne(index)}
-                        className="p-1.5 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors"
+                        className="p-1.5 hover:bg-status-danger-bg text-status-danger rounded-lg transition-colors"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -440,25 +440,25 @@ export default function SaisieEcriture({ onSuccess }: SaisieEcritureProps) {
             </tbody>
 
             {/* Footer avec totaux */}
-            <tfoot className="bg-slate-700">
+            <tfoot className="bg-surface-elevated">
               <tr>
-                <td colSpan={3} className="px-3 py-2 text-right font-bold text-white text-xs hidden md:table-cell">
+                <td colSpan={3} className="px-3 py-2 text-right font-bold text-content-primary text-xs hidden md:table-cell">
                   TOTAUX
                 </td>
-                <td colSpan={2} className="px-3 py-2 text-right font-bold text-white text-xs md:hidden">
+                <td colSpan={2} className="px-3 py-2 text-right font-bold text-content-primary text-xs md:hidden">
                   TOTAUX
                 </td>
                 <td className="px-3 py-2 text-right">
-                  <span className="text-sm font-bold text-green-400 font-mono">{totalDebit.toFixed(2)}</span>
+                  <span className="text-sm font-bold text-status-success font-mono">{totalDebit.toFixed(2)}</span>
                 </td>
                 <td className="px-3 py-2 text-right">
-                  <span className="text-sm font-bold text-cyan-400 font-mono">{totalCredit.toFixed(2)}</span>
+                  <span className="text-sm font-bold text-accent font-mono">{totalCredit.toFixed(2)}</span>
                 </td>
                 <td className="px-3 py-2 text-center">
                   {isEquilibre ? (
-                    <Check className="w-4 h-4 text-green-400 mx-auto" />
+                    <Check className="w-4 h-4 text-status-success mx-auto" />
                   ) : (
-                    <X className="w-4 h-4 text-amber-400 mx-auto" />
+                    <X className="w-4 h-4 text-status-warning mx-auto" />
                   )}
                 </td>
               </tr>
@@ -469,18 +469,18 @@ export default function SaisieEcriture({ onSuccess }: SaisieEcritureProps) {
         {/* Barre d'état en bas */}
         <div className={`px-3 py-2 flex items-center justify-between border-t ${
           isEquilibre
-            ? 'bg-green-500/10 border-green-500/30'
-            : 'bg-amber-500/10 border-amber-500/30'
+            ? 'bg-status-success-bg border-status-success/30'
+            : 'bg-status-warning-bg border-status-warning/30'
         }`}>
           <div className="flex items-center gap-2">
-            <Calculator className={`w-4 h-4 ${isEquilibre ? 'text-green-400' : 'text-amber-400'}`} />
-            <span className={`text-xs font-medium ${isEquilibre ? 'text-green-400' : 'text-amber-400'}`}>
+            <Calculator className={`w-4 h-4 ${isEquilibre ? 'text-status-success' : 'text-status-warning'}`} />
+            <span className={`text-xs font-medium ${isEquilibre ? 'text-status-success' : 'text-status-warning'}`}>
               {isEquilibre ? 'Écriture Équilibrée ✓' : `Écart: ${Math.abs(totalDebit - totalCredit).toFixed(2)} FCFA`}
             </span>
           </div>
           <div className="text-right">
-            <span className="text-[10px] text-slate-400">Montant total</span>
-            <span className="text-sm font-bold text-white ml-2">{totalDebit.toFixed(2)} FCFA</span>
+            <span className="text-[10px] text-content-muted">Montant total</span>
+            <span className="text-sm font-bold text-content-primary ml-2">{totalDebit.toFixed(2)} FCFA</span>
           </div>
         </div>
       </div>
@@ -493,8 +493,8 @@ export default function SaisieEcriture({ onSuccess }: SaisieEcritureProps) {
             disabled={!isEquilibre || submitting}
             className={`w-full px-4 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors ${
               isEquilibre && !submitting
-                ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white'
-                : 'bg-slate-700 text-slate-400 cursor-not-allowed'
+                ? 'bg-gradient-to-r from-status-success to-status-success text-white'
+                : 'bg-surface-elevated text-content-muted cursor-not-allowed'
             }`}
           >
             <Save className="w-4 h-4" />

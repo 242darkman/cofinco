@@ -121,8 +121,8 @@ export default function ComptesBloquesSection() {
       primary: true,
       format: (value: any, row: CompteBloque) => (
         <div>
-          <div className="font-mono font-bold text-emerald-400">{value}</div>
-          <div className="text-xs text-slate-400">
+          <div className="font-mono font-bold text-status-success">{value}</div>
+          <div className="text-xs text-content-muted">
             {row.clients ? formatClientName(row.clients.nom, row.clients.prenom) : 'N/A'}
           </div>
         </div>
@@ -132,7 +132,7 @@ export default function ComptesBloquesSection() {
       label: 'Montant',
       key: 'montantInitial',
       format: (value: any) => (
-        <span className="font-bold text-white">{Number(value).toLocaleString()} FCFA</span>
+        <span className="font-bold text-content-primary">{Number(value).toLocaleString()} FCFA</span>
       )
     },
     {
@@ -140,8 +140,8 @@ export default function ComptesBloquesSection() {
       key: 'tauxInteret',
       format: (value: any, row: CompteBloque) => (
         <div className="flex flex-col text-xs">
-          <span className="text-emerald-300 font-semibold">{value}% / an</span>
-          <span className="text-slate-400">{row.dureeMois} mois</span>
+          <span className="text-status-success font-semibold">{value}% / an</span>
+          <span className="text-content-muted">{row.dureeMois} mois</span>
         </div>
       )
     },
@@ -152,11 +152,11 @@ export default function ComptesBloquesSection() {
         const jours = getJoursRestants(value);
         return (
           <div className="flex flex-col">
-            <span className="text-white text-xs">
+            <span className="text-content-primary text-xs">
               {value ? new Date(value).toLocaleDateString() : 'N/A'}
             </span>
             {row.statut === StatutCompte.ACTIVE && jours > 0 && (
-              <span className="text-[10px] text-amber-400">{jours}j restants</span>
+              <span className="text-[10px] text-status-warning">{jours}j restants</span>
             )}
           </div>
         );
@@ -182,7 +182,7 @@ export default function ComptesBloquesSection() {
       icon={Eye}
       variant="ghost" 
       size="sm"
-      className="text-slate-400 hover:text-white"
+      className="text-content-muted hover:text-content-primary"
       aria-label="Voir détails"
       onClick={(e) => { e.stopPropagation(); setSelectedCompteId(row.id); }}
     />
@@ -219,55 +219,55 @@ export default function ComptesBloquesSection() {
     <div className="space-y-4">
       {/* Stats - Compact Row */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-        <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 rounded-xl p-3 flex flex-col justify-between shadow-sm relative overflow-hidden group">
+        <div className="bg-gradient-to-br from-surface to-surface-base border border-edge rounded-xl p-3 flex flex-col justify-between shadow-sm relative overflow-hidden group">
            <div className="absolute right-0 top-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
             <Lock size={40} />
           </div>
           <div>
-            <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Total Comptes</p>
-            <h3 className="text-xl font-bold text-white mt-0.5">{stats.total}</h3>
+            <p className="text-[10px] font-medium text-content-muted uppercase tracking-wider">Total Comptes</p>
+            <h3 className="text-xl font-bold text-content-primary mt-0.5">{stats.total}</h3>
           </div>
           <div className="mt-2 flex items-center gap-1.5">
-             <div className="h-1.5 w-1.5 rounded-full bg-blue-500"></div>
-             <p className="text-[10px] text-blue-400 font-medium">{stats.actifs} actifs</p>
+             <div className="h-1.5 w-1.5 rounded-full bg-status-info"></div>
+             <p className="text-[10px] text-status-info font-medium">{stats.actifs} actifs</p>
           </div>
         </div>
 
         <div className="bg-surface-base border border-edge rounded-xl p-3 flex flex-col justify-between shadow-sm relative overflow-hidden">
-             <div className="absolute right-0 top-0 p-3 opacity-5 text-emerald-500">
+             <div className="absolute right-0 top-0 p-3 opacity-5 text-status-success">
                <Lock size={40} />
              </div>
              <div>
-                <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">Montant Bloqué</p>
-                <h3 className="text-xl font-bold text-emerald-500 mt-0.5">{stats.montantTotal.toLocaleString()} <span className="text-xs font-normal text-slate-400">FCFA</span></h3>
+                <p className="text-[10px] font-medium text-content-muted uppercase tracking-wider">Montant Bloqué</p>
+                <h3 className="text-xl font-bold text-status-success mt-0.5">{stats.montantTotal.toLocaleString()} <span className="text-xs font-normal text-content-muted">FCFA</span></h3>
              </div>
-             <div className="mt-2 text-[10px] text-emerald-600 dark:text-emerald-400 font-medium bg-emerald-500/10 px-2 py-0.5 rounded-full w-fit">
+             <div className="mt-2 text-[10px] text-status-success font-medium bg-status-success-bg px-2 py-0.5 rounded-full w-fit">
                Capital Actuel
              </div>
         </div>
 
         <div className="bg-surface-base border border-edge rounded-xl p-3 flex flex-col justify-between shadow-sm relative overflow-hidden">
-             <div className="absolute right-0 top-0 p-3 opacity-5 text-amber-500">
+             <div className="absolute right-0 top-0 p-3 opacity-5 text-status-warning">
                <TrendingUp size={40} />
              </div>
              <div>
-                <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">Intérêts Estimés</p>
-                <h3 className="text-xl font-bold text-amber-500 mt-0.5">{stats.interetsEstimes.toLocaleString()} <span className="text-xs font-normal text-slate-400">FCFA</span></h3>
+                <p className="text-[10px] font-medium text-content-muted uppercase tracking-wider">Intérêts Estimés</p>
+                <h3 className="text-xl font-bold text-status-warning mt-0.5">{stats.interetsEstimes.toLocaleString()} <span className="text-xs font-normal text-content-muted">FCFA</span></h3>
              </div>
-             <div className="mt-2 text-[10px] text-amber-600 dark:text-amber-400 font-medium bg-amber-500/10 px-2 py-0.5 rounded-full w-fit">
+             <div className="mt-2 text-[10px] text-status-warning font-medium bg-status-warning-bg px-2 py-0.5 rounded-full w-fit">
                À terme
              </div>
         </div>
         
         <div className="bg-surface-base border border-edge rounded-xl p-3 flex flex-col justify-between shadow-sm relative overflow-hidden">
-             <div className="absolute right-0 top-0 p-3 opacity-5 text-indigo-500">
+             <div className="absolute right-0 top-0 p-3 opacity-5 text-accent">
                <Calendar size={40} />
              </div>
              <div>
-                <p className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">Valeur Future</p>
-                <h3 className="text-xl font-bold text-indigo-500 mt-0.5">{(stats.montantTotal + stats.interetsEstimes).toLocaleString()} <span className="text-xs font-normal text-slate-400">FCFA</span></h3>
+                <p className="text-[10px] font-medium text-content-muted uppercase tracking-wider">Valeur Future</p>
+                <h3 className="text-xl font-bold text-accent mt-0.5">{(stats.montantTotal + stats.interetsEstimes).toLocaleString()} <span className="text-xs font-normal text-content-muted">FCFA</span></h3>
              </div>
-             <div className="mt-2 text-[10px] text-indigo-600 dark:text-indigo-400 font-medium bg-indigo-500/10 px-2 py-0.5 rounded-full w-fit">
+             <div className="mt-2 text-[10px] text-accent font-medium bg-accent/10 px-2 py-0.5 rounded-full w-fit">
                Capital + Intérêts
              </div>
         </div>
@@ -276,15 +276,15 @@ export default function ComptesBloquesSection() {
       {/* Toolbar & Table Container */}
       <div className="bg-surface-base rounded-lg border border-edge shadow-sm overflow-hidden flex flex-col">
         {/* Toolbar */}
-        <div className="flex flex-col sm:flex-row items-center justify-between p-2 gap-2 border-b border-edge bg-slate-50 dark:bg-slate-900/50">
+        <div className="flex flex-col sm:flex-row items-center justify-between p-2 gap-2 border-b border-edge bg-surface-muted/50">
            <div className="relative flex-1 w-full sm:max-w-xs">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-content-muted" size={14} />
               <input
                 type="text"
                 placeholder="Rechercher..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 pl-8 pr-3 py-1.5 text-xs transition-all"
+                className="w-full bg-surface border border-edge rounded-lg text-content-primary placeholder-content-muted focus:ring-2 focus:ring-status-info/20 focus:border-status-info pl-8 pr-3 py-1.5 text-xs transition-all"
               />
            </div>
            
@@ -292,7 +292,7 @@ export default function ComptesBloquesSection() {
              variant="primary"
              icon={Plus}
              onClick={() => setShowForm(true)}
-             className="w-full sm:w-auto h-8 text-xs px-3 shadow-none bg-emerald-600 hover:bg-emerald-500"
+             className="w-full sm:w-auto h-8 text-xs px-3 shadow-none bg-status-success hover:bg-status-success"
            >
              Nouveau Placement
            </Button>
@@ -311,9 +311,9 @@ export default function ComptesBloquesSection() {
 
       {/* Professional Pagination */}
       {filteredComptes.length > ITEMS_PER_PAGE && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-2 py-3 bg-slate-800/30 rounded-lg border border-slate-700/50">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-2 py-3 bg-surface/30 rounded-lg border border-edge-subtle">
           {/* Info */}
-          <div className="text-sm text-slate-400 order-2 sm:order-1">
+          <div className="text-sm text-content-muted order-2 sm:order-1">
             Affichage {((currentPage - 1) * ITEMS_PER_PAGE) + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, filteredComptes.length)} sur {filteredComptes.length} comptes
           </div>
           
@@ -323,7 +323,7 @@ export default function ComptesBloquesSection() {
             <button
               onClick={() => setCurrentPage(1)}
               disabled={currentPage === 1}
-              className="p-1.5 rounded hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-slate-400 hover:text-white transition"
+              className="p-1.5 rounded hover:bg-surface-elevated disabled:opacity-40 disabled:cursor-not-allowed text-content-muted hover:text-content-primary transition"
               title="Première page"
             >
               <ChevronsLeft size={18} />
@@ -333,7 +333,7 @@ export default function ComptesBloquesSection() {
             <button
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="p-1.5 rounded hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-slate-400 hover:text-white transition"
+              className="p-1.5 rounded hover:bg-surface-elevated disabled:opacity-40 disabled:cursor-not-allowed text-content-muted hover:text-content-primary transition"
               title="Page précédente"
             >
               <ChevronLeft size={18} />
@@ -343,15 +343,15 @@ export default function ComptesBloquesSection() {
             <div className="flex items-center gap-1 px-2">
               {getPageNumbers().map((page, idx) => (
                 page === '...' ? (
-                  <span key={`ellipsis-${idx}`} className="px-2 text-slate-500">...</span>
+                  <span key={`ellipsis-${idx}`} className="px-2 text-content-muted">...</span>
                 ) : (
                   <button
                     key={page}
                     onClick={() => setCurrentPage(page as number)}
                     className={`w-8 h-8 rounded text-sm font-medium transition ${
                       page === currentPage
-                        ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/25'
-                        : 'text-slate-400 hover:bg-slate-700 hover:text-white'
+                        ? 'bg-status-success text-white shadow-lg shadow-status-success/25'
+                        : 'text-content-muted hover:bg-surface-elevated hover:text-content-primary'
                     }`}
                   >
                     {page}
@@ -364,7 +364,7 @@ export default function ComptesBloquesSection() {
             <button
               onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
-              className="p-1.5 rounded hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-slate-400 hover:text-white transition"
+              className="p-1.5 rounded hover:bg-surface-elevated disabled:opacity-40 disabled:cursor-not-allowed text-content-muted hover:text-content-primary transition"
               title="Page suivante"
             >
               <ChevronRight size={18} />
@@ -374,7 +374,7 @@ export default function ComptesBloquesSection() {
             <button
               onClick={() => setCurrentPage(totalPages)}
               disabled={currentPage === totalPages}
-              className="p-1.5 rounded hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed text-slate-400 hover:text-white transition"
+              className="p-1.5 rounded hover:bg-surface-elevated disabled:opacity-40 disabled:cursor-not-allowed text-content-muted hover:text-content-primary transition"
               title="Dernière page"
             >
               <ChevronsRight size={18} />
@@ -385,7 +385,7 @@ export default function ComptesBloquesSection() {
 
       {/* Items per page info when pagination is not needed */}
       {filteredComptes.length > 0 && filteredComptes.length <= ITEMS_PER_PAGE && (
-        <div className="text-sm text-slate-500 text-center py-2">
+        <div className="text-sm text-content-muted text-center py-2">
           {filteredComptes.length} compte{filteredComptes.length > 1 ? 's' : ''} affiché{filteredComptes.length > 1 ? 's' : ''}
         </div>
       )}

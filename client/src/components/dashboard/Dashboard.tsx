@@ -169,66 +169,66 @@ export default function Dashboard({
       >
         <div className="flex flex-col gap-0.5">
           <div className="flex items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent leading-none">
+            <h1 className="text-xl sm:text-2xl font-bold text-content-primary leading-none">
               {encaisseLoading ? '...' : formatMoney(totalTreasury)}
             </h1>
             <div className={`px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${
-              totalTreasury > 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
+              totalTreasury > 0 ? 'bg-status-success-bg text-status-success' : 'bg-status-danger-bg text-status-danger'
             }`}>
               {t('encaisseDisponible')}
             </div>
             {/* Badge Source GL */}
             {treasurySource === 'GL' && (
               <div
-                className="group relative flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 text-[8px] font-medium cursor-help"
+                className="group relative flex items-center gap-1 px-1.5 py-0.5 rounded bg-status-info-bg text-status-info text-[8px] font-medium cursor-help"
                 title="Source: Grand Livre comptable"
               >
                 <Database size={8} />
                 <span className="hidden sm:inline">GL</span>
                 {/* Tooltip breakdown */}
-                <div className="absolute left-0 top-full mt-1 z-50 hidden group-hover:block w-48 p-2 bg-slate-800 border border-slate-700 rounded-lg shadow-xl text-[10px]">
-                  <div className="font-semibold text-slate-300 mb-1">Décomposition</div>
-                  <div className="space-y-0.5 text-slate-400">
+                <div className="absolute left-0 top-full mt-1 z-50 hidden group-hover:block w-48 p-2 bg-surface border border-edge rounded-lg shadow-xl text-[10px]">
+                  <div className="font-semibold text-content-secondary mb-1">Décomposition</div>
+                  <div className="space-y-0.5 text-content-muted">
                     <div className="flex justify-between">
                       <span>Coffre-Fort</span>
-                      <span className="text-white">{formatMoney(encaisse?.breakdown?.coffreCentral || 0)}</span>
+                      <span className="text-content-primary">{formatMoney(encaisse?.breakdown?.coffreCentral || 0)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Caisse Guichet</span>
-                      <span className="text-white">{formatMoney(encaisse?.breakdown?.caisseGuichet || 0)}</span>
+                      <span className="text-content-primary">{formatMoney(encaisse?.breakdown?.caisseGuichet || 0)}</span>
                     </div>
                     {(encaisse?.breakdown?.mobileMoney || 0) > 0 && (
                       <div className="flex justify-between">
                         <span>Mobile Money</span>
-                        <span className="text-white">{formatMoney(encaisse?.breakdown?.mobileMoney || 0)}</span>
+                        <span className="text-content-primary">{formatMoney(encaisse?.breakdown?.mobileMoney || 0)}</span>
                       </div>
                     )}
                     {(encaisse?.breakdown?.banque || 0) > 0 && (
                       <div className="flex justify-between">
                         <span>Banque</span>
-                        <span className="text-white">{formatMoney(encaisse?.breakdown?.banque || 0)}</span>
+                        <span className="text-content-primary">{formatMoney(encaisse?.breakdown?.banque || 0)}</span>
                       </div>
                     )}
                   </div>
-                  <div className="mt-1 pt-1 border-t border-slate-700 text-slate-500 text-[9px]">
+                  <div className="mt-1 pt-1 border-t border-edge text-content-muted text-[9px]">
                     Source: Grand Livre OHADA
                   </div>
                 </div>
               </div>
             )}
           </div>
-          <div className="flex items-center gap-2 text-[10px] text-slate-500" role="status" aria-live="polite">
-            <span className={isConnected ? "text-emerald-500" : "text-slate-500"} aria-hidden="true">
+          <div className="flex items-center gap-2 text-[10px] text-content-muted" role="status" aria-live="polite">
+            <span className={isConnected ? "text-status-success" : "text-content-muted"} aria-hidden="true">
               {isConnected ? <Wifi size={10} /> : <WifiOff size={10} />}
             </span>
             <span>{isConnected ? t('enLigne') : t('horsLigne')}</span>
-            <span className="w-0.5 h-0.5 bg-slate-700 rounded-full" aria-hidden="true" />
+            <span className="w-0.5 h-0.5 bg-surface-elevated rounded-full" aria-hidden="true" />
             <span className="capitalize">{userName}</span>
             {/* Timestamp mise à jour */}
             {treasuryUpdatedAt && (
               <>
-                <span className="w-0.5 h-0.5 bg-slate-700 rounded-full" aria-hidden="true" />
-                <span className="text-slate-600">
+                <span className="w-0.5 h-0.5 bg-surface-elevated rounded-full" aria-hidden="true" />
+                <span className="text-content-muted">
                   {new Date(treasuryUpdatedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                 </span>
               </>
@@ -250,17 +250,17 @@ export default function Dashboard({
       {(() => {
         const actions = [
           { key: 'new-client', module: 'clients', action: 'create', icon: UserPlus, label: t('nouveauClient'),
-            btnClass: 'bg-blue-600/10 hover:bg-blue-600/20 border-blue-600/20 text-blue-400',
-            iconClass: 'bg-blue-500', handler: () => onQuickAction?.('new-client') },
+            btnClass: 'bg-status-info-bg hover:bg-status-info-bg border-status-info/20 text-status-info',
+            iconClass: 'bg-status-info', handler: () => onQuickAction?.('new-client') },
           { key: 'new-payment', module: 'caisse', action: 'create', icon: Wallet, label: t('operationCaisse'),
-            btnClass: 'bg-emerald-600/10 hover:bg-emerald-600/20 border-emerald-600/20 text-emerald-400',
-            iconClass: 'bg-emerald-500', handler: () => onQuickAction?.('new-payment') },
+            btnClass: 'bg-status-success-bg hover:bg-status-success-bg border-status-success/20 text-status-success',
+            iconClass: 'bg-status-success', handler: () => onQuickAction?.('new-payment') },
           { key: 'new-credit', module: 'credits', action: 'create', icon: Banknote, label: t('creditRapide'),
-            btnClass: 'bg-indigo-600/10 hover:bg-indigo-600/20 border-indigo-600/20 text-indigo-400',
-            iconClass: 'bg-indigo-500', handler: () => onQuickAction?.('new-credit') },
+            btnClass: 'bg-accent/10 hover:bg-accent/10 border-accent/20 text-accent',
+            iconClass: 'bg-accent', handler: () => onQuickAction?.('new-credit') },
           { key: 'tontines', module: 'tontines', action: 'view', icon: Users, label: t('collecteTontine'),
-            btnClass: 'bg-purple-600/10 hover:bg-purple-600/20 border-purple-600/20 text-purple-400',
-            iconClass: 'bg-purple-500', handler: () => onModuleChange?.('tontines') },
+            btnClass: 'bg-status-info-bg hover:bg-status-info-bg border-status-info/20 text-status-info',
+            iconClass: 'bg-status-info', handler: () => onModuleChange?.('tontines') },
         ].filter(a => {
           const mapping = MODULE_ACTION_TO_CASL[`${a.module}.${a.action}`];
           if (!mapping) return false;
@@ -305,16 +305,16 @@ export default function Dashboard({
         
         {/* LEFT COLUMN: Analytics (66%) */}
         <div className="lg:col-span-2 space-y-2 flex flex-col">
-           <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-widest flex items-center gap-1.5 shrink-0">
+           <h3 className="text-xs font-semibold text-content-muted uppercase tracking-widest flex items-center gap-1.5 shrink-0">
             <Activity size={12} />
             {t('analytique')}
           </h3>
-          <div className="flex-1 min-h-0 bg-slate-900/30 rounded-xl p-2 border border-slate-800/50">
+          <div className="flex-1 min-h-0 bg-surface-base/30 rounded-xl p-2 border border-edge/50">
              <AnalyticsGrid stats={stats} />
           </div>
 
           {/* Comparative Analytics & Forecast */}
-          <Suspense fallback={<div className="py-4 text-center text-slate-500 text-xs">{t('chargementAnalytique')}</div>}>
+          <Suspense fallback={<div className="py-4 text-center text-content-muted text-xs">{t('chargementAnalytique')}</div>}>
             <ComparativeAnalytics />
           </Suspense>
         </div>
@@ -330,23 +330,23 @@ export default function Dashboard({
 
           {/* Section: À Traiter */}
           <section className="space-y-2" aria-labelledby="tasks-section-title">
-            <h3 id="tasks-section-title" className="text-xs font-semibold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+            <h3 id="tasks-section-title" className="text-xs font-semibold text-content-muted uppercase tracking-widest flex items-center gap-1.5">
               <Clock size={12} aria-hidden="true" />
               {t('aTraiter')}
             </h3>
 
             {pendingCredits > 0 ? (
-              <Card variant="default" className="border-l-4 border-l-amber-500 bg-slate-800/50" role="alert" aria-live="polite">
+              <Card variant="default" className="border-l-4 border-l-status-warning bg-surface/50" role="alert" aria-live="polite">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-amber-500/20 rounded-lg text-amber-500" aria-hidden="true">
+                    <div className="p-2 bg-status-warning-bg rounded-lg text-status-warning" aria-hidden="true">
                       <Clock size={16} />
                     </div>
                     <div>
-                      <h4 className="font-bold text-white text-xs">
+                      <h4 className="font-bold text-content-primary text-xs">
                         {pendingCredits} {t('demandesAttente')}
                       </h4>
-                      <p className="text-[10px] text-slate-400">{t('validationRequise')}</p>
+                      <p className="text-[10px] text-content-muted">{t('validationRequise')}</p>
                     </div>
                   </div>
                   <Button
@@ -363,17 +363,17 @@ export default function Dashboard({
             ) : null}
 
             {overdueInstallments > 0 ? (
-              <Card variant="default" className="border-l-4 border-l-rose-500 bg-slate-800/50" role="alert" aria-live="polite">
+              <Card variant="default" className="border-l-4 border-l-status-danger bg-surface/50" role="alert" aria-live="polite">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-rose-500/20 rounded-lg text-rose-500" aria-hidden="true">
+                    <div className="p-2 bg-status-danger-bg rounded-lg text-status-danger" aria-hidden="true">
                       <AlertTriangle size={16} />
                     </div>
                     <div>
-                      <h4 className="font-bold text-white text-xs">
+                      <h4 className="font-bold text-content-primary text-xs">
                         {overdueInstallments} {t('echeancesRetard')}
                       </h4>
-                      <p className="text-[10px] text-slate-400">{t('aRelancer')}</p>
+                      <p className="text-[10px] text-content-muted">{t('aRelancer')}</p>
                     </div>
                   </div>
                   <Button
@@ -390,13 +390,13 @@ export default function Dashboard({
             ) : null}
 
             {pendingCredits === 0 && overdueInstallments === 0 && (
-               <Card variant="default" className="bg-emerald-500/5 border-emerald-500/20 border-dashed py-2" role="status">
+               <Card variant="default" className="bg-status-success/5 border-status-success/20 border-dashed py-2" role="status">
                  <div className="flex flex-col items-center justify-center text-center">
                    <div className="flex items-center gap-1.5 mb-0.5">
-                     <div className="p-1 bg-emerald-500/20 rounded-full" aria-hidden="true">
-                       <CheckCircle2 size={10} className="text-emerald-400" />
+                     <div className="p-1 bg-status-success-bg rounded-full" aria-hidden="true">
+                       <CheckCircle2 size={10} className="text-status-success" />
                      </div>
-                     <h4 className="text-emerald-400 font-bold text-xs">{t('aucuneUrgence')}</h4>
+                     <h4 className="text-status-success font-bold text-xs">{t('aucuneUrgence')}</h4>
                    </div>
                  </div>
                </Card>
@@ -405,21 +405,21 @@ export default function Dashboard({
 
           {/* Section: Santé & Risque */}
           <section className="space-y-2" aria-labelledby="health-section-title">
-            <h3 id="health-section-title" className="text-xs font-semibold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+            <h3 id="health-section-title" className="text-xs font-semibold text-content-muted uppercase tracking-widest flex items-center gap-1.5">
               <Activity size={12} aria-hidden="true" />
               {t('santeFinanciere')}
             </h3>
 
             <div className="grid grid-cols-2 gap-2">
               {/* Jauge Risque PAR 30 */}
-              <Card variant="default" padding="sm" className="bg-slate-800/40 p-2">
+              <Card variant="default" padding="sm" className="bg-surface/40 p-2">
                  <div className="flex items-center justify-between mb-1">
-                   <span id="par30-label" className="text-[10px] text-slate-400">{t('risquePar30')}</span>
-                   <AlertTriangle size={12} className={par30 > 5 ? 'text-rose-500' : 'text-slate-600'} aria-hidden="true" />
+                   <span id="par30-label" className="text-[10px] text-content-muted">{t('risquePar30')}</span>
+                   <AlertTriangle size={12} className={par30 > 5 ? 'text-status-danger' : 'text-content-muted'} aria-hidden="true" />
                  </div>
-                 <div className="text-lg font-bold text-white mb-1.5" aria-live="polite">{par30.toFixed(1)}%</div>
+                 <div className="text-lg font-bold text-content-primary mb-1.5" aria-live="polite">{par30.toFixed(1)}%</div>
                  <div
-                   className="w-full h-1 bg-slate-700 rounded-full overflow-hidden"
+                   className="w-full h-1 bg-surface-elevated rounded-full overflow-hidden"
                    role="progressbar"
                    aria-labelledby="par30-label"
                    aria-valuenow={par30}
@@ -427,22 +427,22 @@ export default function Dashboard({
                    aria-valuemax={10}
                  >
                    <div
-                      className={`h-full rounded-full ${par30 > 5 ? 'bg-rose-500' : par30 > 3 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                      className={`h-full rounded-full ${par30 > 5 ? 'bg-status-danger' : par30 > 3 ? 'bg-status-warning' : 'bg-status-success'}`}
                       style={{ width: `${Math.min(par30 * 10, 100)}%` }}
                    />
                  </div>
-                 <p className="text-[9px] text-slate-500 mt-1">{t('ciblePar30')}</p>
+                 <p className="text-[9px] text-content-muted mt-1">{t('ciblePar30')}</p>
               </Card>
 
               {/* Jauge Liquidité */}
-              <Card variant="default" padding="sm" className="bg-slate-800/40 p-2">
+              <Card variant="default" padding="sm" className="bg-surface/40 p-2">
                  <div className="flex items-center justify-between mb-1">
-                   <span id="liquidity-label" className="text-[10px] text-slate-400">{t('liquidite')}</span>
-                   <TrendingUp size={12} className="text-blue-500" aria-hidden="true" />
+                   <span id="liquidity-label" className="text-[10px] text-content-muted">{t('liquidite')}</span>
+                   <TrendingUp size={12} className="text-status-info" aria-hidden="true" />
                  </div>
-                 <div className="text-lg font-bold text-white mb-1.5" aria-live="polite">{liquidityRatio}%</div>
+                 <div className="text-lg font-bold text-content-primary mb-1.5" aria-live="polite">{liquidityRatio}%</div>
                  <div
-                   className="w-full h-1 bg-slate-700 rounded-full overflow-hidden"
+                   className="w-full h-1 bg-surface-elevated rounded-full overflow-hidden"
                    role="progressbar"
                    aria-labelledby="liquidity-label"
                    aria-valuenow={liquidityRatio}
@@ -450,33 +450,33 @@ export default function Dashboard({
                    aria-valuemax={100}
                  >
                    <div
-                      className="h-full rounded-full bg-blue-500"
+                      className="h-full rounded-full bg-status-info"
                       style={{ width: `${liquidityRatio}%` }}
                    />
                  </div>
-                 <p className="text-[9px] text-slate-500 mt-1">{t('ratioLiquidite')}</p>
+                 <p className="text-[9px] text-content-muted mt-1">{t('ratioLiquidite')}</p>
               </Card>
             </div>
 
-             <Card variant="default" className="flex items-center justify-between p-2.5 bg-slate-800/40">
+             <Card variant="default" className="flex items-center justify-between p-2.5 bg-surface/40">
                <div className="flex items-center gap-2">
                  <div
-                   className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center font-bold text-xs text-slate-300 border-2 border-slate-600"
+                   className="w-8 h-8 rounded-full bg-surface-elevated flex items-center justify-center font-bold text-xs text-content-secondary border-2 border-edge-strong"
                    aria-label={`${stats?.global?.agentsActifs || 0} ${t('agentsActifs') || 'agents actifs'}`}
                  >
                    {stats?.global?.agentsActifs || 0}
                  </div>
                  <div>
-                   <div className="text-xs font-medium text-white">{t('activiteAgents')}</div>
-                   <div className="text-[9px] text-slate-500">
+                   <div className="text-xs font-medium text-content-primary">{t('activiteAgents')}</div>
+                   <div className="text-[9px] text-content-muted">
                      {stats?.global?.totalAgents ? `${stats.global.agentsActifs || 0} / ${stats.global.totalAgents} ${t('actifs')}` : '-'}
                    </div>
                  </div>
                </div>
-               <div className="h-6 w-[1px] bg-slate-700 mx-2" aria-hidden="true"></div>
+               <div className="h-6 w-[1px] bg-surface-elevated mx-2" aria-hidden="true"></div>
                <div>
-                 <div className="text-xs font-bold text-white text-right" aria-live="polite">{stats?.daily.nouveauxClients || 0}</div>
-                 <div className="text-[9px] text-slate-500 text-right">{t('nouveauxClients')}</div>
+                 <div className="text-xs font-bold text-content-primary text-right" aria-live="polite">{stats?.daily.nouveauxClients || 0}</div>
+                 <div className="text-[9px] text-content-muted text-right">{t('nouveauxClients')}</div>
                </div>
              </Card>
           </section>

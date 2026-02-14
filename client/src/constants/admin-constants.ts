@@ -16,14 +16,14 @@ export const ADMIN_ROLES = [
 export type AdminRole = typeof ADMIN_ROLES[number];
 
 export const ROLE_COLORS: Record<SystemRole, string> = {
-  [SystemRole.ADMIN]: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-  [SystemRole.CHEF_AGENCE]: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-  [SystemRole.CAISSIER]: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-  [SystemRole.AGENT_TERRAIN]: 'bg-green-500/20 text-green-400 border-green-500/30',
-  [SystemRole.COMPTABLE]: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
-  [SystemRole.GESTIONNAIRE_CREDIT]: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
-  [SystemRole.SUPERVISEUR]: 'bg-slate-500/20 text-slate-400 border-slate-500/30',
-  [SystemRole.CLIENT]: 'bg-slate-500/20 text-slate-400 border-slate-500/30',
+  [SystemRole.ADMIN]: 'bg-status-info-bg text-status-info border-status-info/30',
+  [SystemRole.CHEF_AGENCE]: 'bg-status-success-bg text-status-success border-status-success/30',
+  [SystemRole.CAISSIER]: 'bg-status-info-bg text-status-info border-status-info/30',
+  [SystemRole.AGENT_TERRAIN]: 'bg-status-success-bg text-status-success border-status-success/30',
+  [SystemRole.COMPTABLE]: 'bg-accent/10 text-accent border-accent/30',
+  [SystemRole.GESTIONNAIRE_CREDIT]: 'bg-accent/10 text-accent border-accent/30',
+  [SystemRole.SUPERVISEUR]: 'bg-surface-subtle/40 text-content-muted border-edge-strong/30',
+  [SystemRole.CLIENT]: 'bg-surface-subtle/40 text-content-muted border-edge-strong/30',
 };
 
 export const CATEGORY_LABELS: Record<string, string> = {
@@ -53,6 +53,7 @@ export const ADMIN_TABS = [
   { id: 'product-rates', label: 'Taux Produits', icon: 'Percent', permission: 'admin.manage' },
   { id: 'zones-commerciales', label: 'Arrondissements & Marchés', icon: 'MapPin', permission: 'zones.view' },
   { id: 'currency', label: 'Devise', icon: 'Coins', permission: 'admin.settings' },
+  { id: 'branding', label: 'Branding', icon: 'Palette', permission: 'admin.settings' },
 ] as const;
 
 export type AdminTabId = typeof ADMIN_TABS[number]['id'];

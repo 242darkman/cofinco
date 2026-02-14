@@ -7,6 +7,7 @@ import { toast } from '../../../lib/toast';
 import { SystemRole, normalizeRole } from '@shared/types/roles';
 import { StatutDemande, TypeCredit, TYPE_CREDIT_OPTIONS, normalizeDureeUnite, normalizeFrequenceRemboursement } from '@shared/enum/status-constants';
 import useSmartDuration from '../../../hooks/credits/useSmartDuration';
+import { useCurrency } from '../../../contexts/CurrencyContext';
 
 
 interface Client {
@@ -40,6 +41,7 @@ interface CreditRequestFormProps {
 }
 
 export default function CreditRequestForm({ onClose, onSuccess, clientId, userRole }: CreditRequestFormProps) {
+  const { currency, label } = useCurrency();
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -343,10 +345,10 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
       const max = selectedPlan.montantMax;
       
       if (min && montant < min) {
-        newErrors.montant_demande = `Le montant minimum pour ce plan est de ${min.toLocaleString()} FCFA`;
+        newErrors.montant_demande = `Le montant minimum pour ce plan est de ${min.toLocaleString()} ${currency.symbol}`;
       }
       if (max && montant > max) {
-        newErrors.montant_demande = `Le montant maximum pour ce plan est de ${max.toLocaleString()} FCFA`;
+        newErrors.montant_demande = `Le montant maximum pour ce plan est de ${max.toLocaleString()} ${currency.symbol}`;
       }
     }
     if (!formData.frequence_remboursement) {
@@ -556,14 +558,14 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
     return (
       <div className="flex items-center gap-2">
          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-            active ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30' : 'bg-slate-800 text-slate-500 border border-slate-700'
-         } ${isCurrent ? 'ring-2 ring-indigo-500/50 scale-110' : ''}`}>
+            active ? 'bg-accent text-white shadow-lg shadow-accent/30' : 'bg-surface text-content-muted border border-edge'
+         } ${isCurrent ? 'ring-2 ring-accent/50 scale-110' : ''}`}>
            {active && !isCurrent && stepNumber < current ? (
-               <TrendingUp size={14} className="text-white" /> 
+               <TrendingUp size={14} className="text-content-primary" /> 
            ) : stepNumber}
          </div>
          <span className={`text-xs font-bold uppercase tracking-wider hidden sm:block transition-colors ${
-            active ? 'text-white' : 'text-slate-600'
+            active ? 'text-content-primary' : 'text-content-muted'
          }`}>{label}</span>
       </div>
     );
@@ -572,18 +574,18 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
       
-      <div className="w-full max-w-2xl bg-slate-950 border border-slate-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+      <div className="w-full max-w-2xl bg-surface-base border border-edge rounded-2xl shadow-2xl flex flex-col overflow-hidden">
         
         {/* 1. HEADER (Stepper) */}
-        <div className="bg-slate-900/50 border-b border-slate-800 p-6">
+        <div className="bg-surface-base/50 border-b border-edge p-6">
            <div className="flex justify-between items-center mb-6">
               <div>
-                  <h2 className="text-xl font-bold text-white tracking-tight">Nouvelle Demande</h2>
-                  <p className="text-xs text-slate-500 mt-1">Créez un dossier de crédit en 3 étapes simples</p>
+                  <h2 className="text-xl font-bold text-content-primary tracking-tight">Nouvelle Demande</h2>
+                  <p className="text-xs text-content-muted mt-1">Créez un dossier de crédit en 3 étapes simples</p>
               </div>
               <button 
                 onClick={onClose} 
-                className="p-2 hover:bg-red-500/10 rounded-full text-slate-500 hover:text-red-500 transition-colors"
+                className="p-2 hover:bg-status-danger-bg rounded-full text-content-muted hover:text-status-danger transition-colors"
                 type="button"
               >
                   <span className="sr-only">Fermer</span>
@@ -594,12 +596,12 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
            {/* Progress Bar */}
            <div className="flex items-center gap-3">
               <StepIndicator stepNumber={1} current={step} label="Projet" />
-              <div className="h-1 flex-1 bg-slate-800 rounded-full overflow-hidden">
-                 <div className={`h-full bg-indigo-500 transition-all duration-500 ease-out ${step >= 2 ? 'w-full' : 'w-0'}`} />
+              <div className="h-1 flex-1 bg-surface rounded-full overflow-hidden">
+                 <div className={`h-full bg-accent transition-all duration-500 ease-out ${step >= 2 ? 'w-full' : 'w-0'}`} />
               </div>
               <StepIndicator stepNumber={2} current={step} label="Modalités" />
-              <div className="h-1 flex-1 bg-slate-800 rounded-full overflow-hidden">
-                 <div className={`h-full bg-indigo-500 transition-all duration-500 ease-out ${step >= 3 ? 'w-full' : 'w-0'}`} />
+              <div className="h-1 flex-1 bg-surface rounded-full overflow-hidden">
+                 <div className={`h-full bg-accent transition-all duration-500 ease-out ${step >= 3 ? 'w-full' : 'w-0'}`} />
               </div>
               <StepIndicator stepNumber={3} current={step} label="Analyse" />
            </div>
@@ -614,7 +616,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
                 
                 {/* Client Select */}
                 <div className="space-y-1.5">
-                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Client Principal</label>
+                   <label className="text-[10px] font-bold text-content-muted uppercase tracking-wider ml-1">Client Principal</label>
                    <div className="relative h-12 z-20">
                       <SearchableSelect
                         label=""
@@ -637,7 +639,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
                 {/* Plan & Objet Grid */}
                 <div className="grid grid-cols-2 gap-4">
                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Plan de Crédit</label>
+                      <label className="text-[10px] font-bold text-content-muted uppercase tracking-wider ml-1">Plan de Crédit</label>
                       <SelectField
                         label=""
                         name="creditPlanId"
@@ -647,13 +649,13 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
                             { value: '', label: 'Standard (Aucun plan)' },
                             ...creditPlans.map(p => ({ value: p.id, label: p.nom }))
                         ]}
-                        className="h-12 bg-slate-900 border-slate-700 text-white focus:border-indigo-500/50"
+                        className="h-12 bg-surface-base border-edge text-content-primary focus:border-accent/50"
                       />
                    </div>
                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Objet du financement</label>
+                      <label className="text-[10px] font-bold text-content-muted uppercase tracking-wider ml-1">Objet du financement</label>
                       <input 
-                        className={`w-full h-12 bg-slate-900 border ${errors.objet_credit ? 'border-red-500' : 'border-slate-700'} rounded-lg px-4 text-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 outline-none transition-all placeholder:text-slate-600`}
+                        className={`w-full h-12 bg-surface-base border ${errors.objet_credit ? 'border-status-danger' : 'border-edge'} rounded-lg px-4 text-content-primary focus:border-accent focus:ring-1 focus:ring-accent/50 outline-none transition-all placeholder:text-content-muted`}
                         placeholder="Ex: Achat Stock"
                         value={formData.objet_credit}
                         onChange={e => setFormData({...formData, objet_credit: e.target.value})}
@@ -663,17 +665,17 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
 
                 {/* Hero Amount */}
                 <div className="flex-1 flex flex-col justify-center pb-4">
-                   <label className="text-center text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Montant Demandé (FCFA)</label>
+                   <label className="text-center text-xs font-bold text-content-muted uppercase tracking-wider mb-4">{label('Montant Demandé')}</label>
                    <div className="relative max-w-sm mx-auto w-full">
                       <input 
                         type="number" 
                         value={formData.montant_demande}
                         onChange={e => setFormData({...formData, montant_demande: e.target.value})}
-                        className={`w-full h-24 bg-slate-900/50 border-2 ${errors.montant_demande ? 'border-red-500/50' : 'border-slate-800'} focus:border-indigo-500/50 rounded-2xl pl-8 pr-8 text-5xl font-black text-white text-center outline-none transition-all placeholder:text-slate-800`}
+                        className={`w-full h-24 bg-surface-base/50 border-2 ${errors.montant_demande ? 'border-status-danger/50' : 'border-edge'} focus:border-accent/50 rounded-2xl pl-8 pr-8 text-5xl font-black text-content-primary text-center outline-none transition-all placeholder:text-content-primary`}
                         placeholder="0"
                         autoFocus
                       />
-                      <DollarSign className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-700 opacity-20" size={40} />
+                      <DollarSign className="absolute left-6 top-1/2 -translate-y-1/2 text-content-secondary opacity-20" size={40} />
                    </div>
                 </div>
              </div>
@@ -684,38 +686,38 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
              <div className="space-y-8 animate-in slide-in-from-right-4 fade-in duration-300">
                 <div className="grid grid-cols-2 gap-6">
                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Type d'amortissement</label>
+                      <label className="text-[10px] font-bold text-content-muted uppercase tracking-wider ml-1">Type d'amortissement</label>
                       <SelectField
                          label=""
                          name="type_credit"
                          value={formData.type_credit}
                          onChange={(e) => setFormData({...formData, type_credit: e.target.value})}
                          options={typeCreditOptions}
-                         className="h-12 bg-slate-900 border-slate-700 text-white"
+                         className="h-12 bg-surface-base border-edge text-content-primary"
                       />
                    </div>
                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Fréquence remboursements</label>
+                      <label className="text-[10px] font-bold text-content-muted uppercase tracking-wider ml-1">Fréquence remboursements</label>
                       <SelectField
                          label=""
                          name="frequence_remboursement"
                          value={formData.frequence_remboursement}
                          onChange={(e) => setFormData({...formData, frequence_remboursement: e.target.value, duree_valeur: '', duree_unite: 'MONTH'})}
                          options={frequenceOptions}
-                         className="h-12 bg-slate-900 border-slate-700 text-white"
+                         className="h-12 bg-surface-base border-edge text-content-primary"
                          error={errors.frequence_remboursement}
                       />
                    </div>
                 </div>
 
                 <div className="space-y-2">
-                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Durée du crédit</label>
+                   <label className="text-[10px] font-bold text-content-muted uppercase tracking-wider ml-1">Durée du crédit</label>
                    {formData.frequence_remboursement ? (
                        <>
                         <div className="flex gap-2 h-14">
                             <input 
                                 type="number" 
-                                className="flex-1 h-full bg-slate-900 border border-slate-700 rounded-xl px-4 text-xl font-bold text-white focus:border-indigo-500 outline-none" 
+                                className="flex-1 h-full bg-surface-base border border-edge rounded-xl px-4 text-xl font-bold text-content-primary focus:border-accent outline-none" 
                                 value={formData.duree_valeur}
                                 onChange={e => setFormData({...formData, duree_valeur: e.target.value})}
                                 placeholder="0"
@@ -731,7 +733,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
                                         { value: 'WEEK', label: 'Semaines' },
                                         { value: 'MONTH', label: 'Mois' }
                                     ]}
-                                    className="!h-14 bg-slate-900 border-slate-700 text-white rounded-xl"
+                                    className="!h-14 bg-surface-base border-edge text-content-primary rounded-xl"
                                 />
                             </div>
                         </div>
@@ -743,15 +745,15 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
                                     key={d} 
                                     type="button"
                                     onClick={() => setFormData({...formData, duree_valeur: String(d), duree_unite: 'DAY'})}
-                                    className="px-4 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-all"
+                                    className="px-4 py-2 bg-surface-base hover:bg-surface border border-edge hover:border-edge rounded-lg text-xs font-medium text-content-muted hover:text-content-primary transition-all"
                                 >
                                     {d} jours
                                 </button>
                             ))}
-                            <div className="h-8 w-px bg-slate-800 mx-2"></div>
-                            <div className="text-xs text-slate-500 flex items-center italic">
+                            <div className="h-8 w-px bg-surface mx-2"></div>
+                            <div className="text-xs text-content-muted flex items-center italic">
                                 {durationValidation && (
-                                    <span className={durationValidation.type === 'error' ? 'text-red-500' : 'text-amber-500'}>
+                                    <span className={durationValidation.type === 'error' ? 'text-status-danger' : 'text-status-warning'}>
                                         {durationValidation.message}
                                     </span>
                                 )}
@@ -759,7 +761,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
                         </div>
                        </>
                    ) : (
-                       <div className="p-4 border border-dashed border-slate-700 rounded-xl text-center text-slate-500 text-sm">
+                       <div className="p-4 border border-dashed border-edge rounded-xl text-center text-content-muted text-sm">
                            Veuillez d'abord sélectionner une fréquence
                        </div>
                    )}
@@ -774,11 +776,11 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
                 {/* Financial Inputs Grid */}
                 <div className="grid grid-cols-2 gap-5">
                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Revenus {formData.type_revenu === 'DAILY' ? '(Journalier)' : '(Mensuel)'}</label>
+                      <label className="text-[10px] font-bold text-content-muted uppercase tracking-wider ml-1">Revenus {formData.type_revenu === 'DAILY' ? '(Journalier)' : '(Mensuel)'}</label>
                       <div className="relative h-12">
                           <input 
                             type="number" 
-                            className="w-full h-full bg-slate-900 border border-slate-700 rounded-lg pl-4 pr-36 text-white focus:border-indigo-500 outline-none" 
+                            className="w-full h-full bg-surface-base border border-edge rounded-lg pl-4 pr-36 text-content-primary focus:border-accent outline-none" 
                             placeholder="0" 
                             value={formData.type_revenu === 'DAILY' ? formData.revenu_journalier : formData.revenus_mensuels}
                             onChange={(e) => {
@@ -791,7 +793,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
                                 }
                             }}
                           />
-                          <div className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg bg-slate-800 p-0.5 flex">
+                          <div className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg bg-surface p-0.5 flex">
                               <button 
                                 type="button"
                                 onClick={() => {
@@ -801,8 +803,8 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
                                 }}
                                 className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all ${
                                     formData.type_revenu === 'MONTHLY' 
-                                    ? 'bg-indigo-600 text-white shadow-sm' 
-                                    : 'text-slate-400 hover:text-slate-300'
+                                    ? 'bg-accent text-white shadow-sm' 
+                                    : 'text-content-muted hover:text-content-secondary'
                                 }`}
                               >
                                 Mois
@@ -816,8 +818,8 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
                                 }}
                                 className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-md transition-all ${
                                     formData.type_revenu === 'DAILY' 
-                                    ? 'bg-indigo-600 text-white shadow-sm' 
-                                    : 'text-slate-400 hover:text-slate-300'
+                                    ? 'bg-accent text-white shadow-sm' 
+                                    : 'text-content-muted hover:text-content-secondary'
                                 }`}
                               >
                                 Jour
@@ -826,30 +828,30 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
                       </div>
                    </div>
                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Charges Mensuelles</label>
+                      <label className="text-[10px] font-bold text-content-muted uppercase tracking-wider ml-1">Charges Mensuelles</label>
                       <input 
                         type="number" 
-                        className="w-full h-12 bg-slate-900 border border-slate-700 rounded-lg px-4 text-white focus:border-indigo-500 outline-none" 
+                        className="w-full h-12 bg-surface-base border border-edge rounded-lg px-4 text-content-primary focus:border-accent outline-none" 
                         placeholder="0" 
                         value={formData.charges_mensuelles}
                         onChange={e => setFormData({...formData, charges_mensuelles: e.target.value})}
                       />
                    </div>
                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Taux d'intérêt (%)</label>
+                      <label className="text-[10px] font-bold text-content-muted uppercase tracking-wider ml-1">Taux d'intérêt (%)</label>
                       <input 
                         type="number" 
-                        className={`w-full h-12 bg-slate-900 border border-slate-700 rounded-lg px-4 text-white ${selectedPlan ? 'text-emerald-400 font-bold' : ''}`}
+                        className={`w-full h-12 bg-surface-base border border-edge rounded-lg px-4 text-content-primary ${selectedPlan ? 'text-status-success font-bold' : ''}`}
                         value={formData.taux_interet}
                         onChange={e => { setRateOverrideEnabled(true); setFormData({...formData, taux_interet: e.target.value}); }}
                         readOnly={!!selectedPlan && !rateOverrideEnabled}
                       />
                    </div>
                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Frais de dossier</label>
+                      <label className="text-[10px] font-bold text-content-muted uppercase tracking-wider ml-1">Frais de dossier</label>
                       <input 
                         type="text" 
-                        className="w-full h-12 bg-slate-900 border border-slate-700 rounded-lg px-4 text-white" 
+                        className="w-full h-12 bg-surface-base border border-edge rounded-lg px-4 text-content-primary" 
                         value={selectedPlan?.fraisDossier || '0'}
                         readOnly
                       />
@@ -857,34 +859,34 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
                 </div>
 
                 {/* Simulation Result Card (The "Wow" factor) */}
-                <div className="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 p-5 rounded-xl shadow-inner mt-auto">
+                <div className="bg-gradient-to-br from-surface-base to-surface-base border border-edge p-5 rounded-xl shadow-inner mt-auto">
                    <div className="flex justify-between items-end mb-4">
                       <div>
-                          <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-1">
+                          <div className="text-[10px] text-content-muted uppercase font-bold tracking-wider mb-1">
                              {formData.frequence_remboursement === 'DAILY' ? 'Échéance Journalière' :
                               formData.frequence_remboursement === 'WEEKLY' ? 'Échéance Hebdo.' :
                               formData.frequence_remboursement === 'BI_MONTHLY' ? 'Échéance Bimensuelle' :
                               formData.frequence_remboursement === 'QUARTERLY' ? 'Échéance Trimestrielle' :
                               'Mensualité'} Estimée
                           </div>
-                         <div className="text-3xl font-black text-emerald-400 tracking-tight">
-                            ~ {Math.round(calculatedData.montantEcheance).toLocaleString()} <span className="text-sm font-normal text-emerald-500/50">FCFA</span>
+                         <div className="text-3xl font-black text-status-success tracking-tight">
+                            ~ {Math.round(calculatedData.montantEcheance).toLocaleString()} <span className="text-sm font-normal text-status-success/50">{currency.symbol}</span>
                          </div>
                       </div>
                       <div className="text-right">
-                         <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mb-1">Coût Total</div>
-                         <div className="text-xl font-bold text-white">
-                             {Math.round(calculatedData.montantTotal).toLocaleString()} <span className="text-xs font-normal text-slate-600">FCFA</span>
+                         <div className="text-[10px] text-content-muted uppercase font-bold tracking-wider mb-1">Coût Total</div>
+                         <div className="text-xl font-bold text-content-primary">
+                             {Math.round(calculatedData.montantTotal).toLocaleString()} <span className="text-xs font-normal text-content-muted">{currency.symbol}</span>
                           </div>
                           
                           {/* Cost Breakdown */}
                           <div className="mt-1 flex flex-col items-end space-y-0.5">
-                             <div className="text-[10px] text-slate-500 font-medium">
-                                Intérêts: <span className="text-slate-300">{Math.round(calculatedData.montantTotal - (parseFloat(formData.montant_demande) || 0)).toLocaleString()}</span>
+                             <div className="text-[10px] text-content-muted font-medium">
+                                Intérêts: <span className="text-content-secondary">{Math.round(calculatedData.montantTotal - (parseFloat(formData.montant_demande) || 0)).toLocaleString()}</span>
                              </div>
                              {(selectedPlan?.fraisDossier) && (
-                                <div className="text-[10px] text-slate-500 font-medium">
-                                    Frais: <span className="text-slate-300">
+                                <div className="text-[10px] text-content-muted font-medium">
+                                    Frais: <span className="text-content-secondary">
                                         {(selectedPlan?.fraisDossier).toLocaleString()}
                                     </span>
                                 </div>
@@ -896,18 +898,18 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
                    {/* Debt Ratio Bar */}
                    <div>
                       <div className="flex justify-between text-xs mb-2">
-                         <span className="text-slate-400 font-medium">Taux d'endettement</span>
+                         <span className="text-content-muted font-medium">Taux d'endettement</span>
                          <span className={`font-bold ${
-                            calculatedData.tauxEndettement > 40 ? 'text-red-400' : 
-                            calculatedData.tauxEndettement > 30 ? 'text-amber-400' : 'text-emerald-400'
+                            calculatedData.tauxEndettement > 40 ? 'text-status-danger' : 
+                            calculatedData.tauxEndettement > 30 ? 'text-status-warning' : 'text-status-success'
                          }`}>{calculatedData.tauxEndettement.toFixed(1)}%</span>
                       </div>
-                      <div className="h-3 bg-slate-950 rounded-full overflow-hidden border border-slate-800/50">
+                      <div className="h-3 bg-surface-base rounded-full overflow-hidden border border-edge/50">
                          <div 
                            className={`h-full rounded-full transition-all duration-700 ease-out ${
-                               calculatedData.tauxEndettement > 50 ? 'bg-red-600' :
-                               calculatedData.tauxEndettement > 40 ? 'bg-red-500' :
-                               calculatedData.tauxEndettement > 30 ? 'bg-amber-500' : 'bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.4)]'
+                               calculatedData.tauxEndettement > 50 ? 'bg-status-danger' :
+                               calculatedData.tauxEndettement > 40 ? 'bg-status-danger' :
+                               calculatedData.tauxEndettement > 30 ? 'bg-status-warning' : 'bg-status-success shadow-[0_0_15px_rgba(16,185,129,0.4)]'
                            }`} 
                            style={{ width: `${Math.min(calculatedData.tauxEndettement, 100)}%` }} 
                          />
@@ -916,9 +918,9 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
                       {/* Pro Feedback Label */}
                       <div className="mt-2 text-right">
                          <span className={`text-[10px] uppercase font-bold tracking-wide ${
-                            calculatedData.tauxEndettement > 50 ? 'text-red-500' :
-                            calculatedData.tauxEndettement > 40 ? 'text-red-400' :
-                            calculatedData.tauxEndettement > 30 ? 'text-amber-500' : 'text-emerald-600'
+                            calculatedData.tauxEndettement > 50 ? 'text-status-danger' :
+                            calculatedData.tauxEndettement > 40 ? 'text-status-danger' :
+                            calculatedData.tauxEndettement > 30 ? 'text-status-warning' : 'text-status-success'
                          }`}>
                             {calculatedData.tauxEndettement > 50 ? "🚫 REFUS AUTOMATIQUE (SUR-ENDETTÉ)" :
                              calculatedData.tauxEndettement > 40 ? "⚠️ RISQUÉ (BESOIN VALIDATION)" :
@@ -933,12 +935,12 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
         </div>
 
         {/* 3. FOOTER (Navigation) */}
-        <div className="p-5 bg-slate-900/80 border-t border-slate-800 flex justify-between items-center backdrop-blur-sm">
+        <div className="p-5 bg-surface-base/80 border-t border-edge flex justify-between items-center backdrop-blur-sm">
            {step > 1 ? (
              <button 
                 type="button"
                 onClick={handleBack} 
-                className="px-6 py-3 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 transition-all flex items-center gap-2 font-medium"
+                className="px-6 py-3 rounded-xl border border-edge text-content-secondary hover:text-content-primary hover:bg-surface transition-all flex items-center gap-2 font-medium"
              >
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg> 
                 Précédent
@@ -951,7 +953,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
              <button 
                 type="button"
                 onClick={handleNext} 
-                className="px-8 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition-all flex items-center gap-2 shadow-lg shadow-indigo-900/20 hover:shadow-indigo-500/30 hover:translate-y-[-1px]"
+                className="px-8 py-3 rounded-xl bg-accent hover:bg-accent-primary-hover text-white font-bold transition-all flex items-center gap-2 shadow-lg shadow-accent/20 hover:shadow-accent/30 hover:translate-y-[-1px]"
              >
                 Suivant 
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
@@ -962,8 +964,8 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
                 disabled={loading || calculatedData.tauxEndettement > 50}
                 className={`px-8 py-3 rounded-xl font-bold transition-all flex items-center gap-2 shadow-lg ${
                     loading || calculatedData.tauxEndettement > 50
-                    ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
-                    : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/20 hover:shadow-emerald-500/30 hover:translate-y-[-1px]'
+                    ? 'bg-surface-elevated text-content-muted cursor-not-allowed'
+                    : 'bg-status-success hover:bg-status-success text-white shadow-status-success/20 hover:shadow-status-success/30 hover:translate-y-[-1px]'
                 }`}
              >
                 {loading ? (

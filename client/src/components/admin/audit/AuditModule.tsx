@@ -14,29 +14,29 @@ export default function AuditModule() {
   const [activeTab, setActiveTab] = useState<TabKey>('dashboard');
 
   const tabs = [
-    { key: 'dashboard', label: 'Tableau de Bord', icon: BarChart3, color: 'from-blue-500 to-emerald-500' },
-    { key: 'logs', label: 'Journal d\'Audit', icon: Shield, color: 'from-emerald-500 to-cyan-500' },
-    { key: 'transactions', label: 'Transactions', icon: TrendingUp, color: 'from-green-500 to-emerald-500' },
-    { key: 'activity', label: 'Activité', icon: Activity, color: 'from-cyan-500 to-blue-500' },
-    { key: 'changes', label: 'Modifications', icon: Database, color: 'from-emerald-500 to-blue-500' },
-    { key: 'alerts', label: 'Alertes Sécurité', icon: AlertTriangle, color: 'from-blue-500 to-cyan-500' },
-    { key: 'compliance', label: 'Compliance', icon: FileText, color: 'from-blue-600 to-cyan-600' }
+    { key: 'dashboard', label: 'Tableau de Bord', icon: BarChart3, color: 'from-status-info to-status-success' },
+    { key: 'logs', label: 'Journal d\'Audit', icon: Shield, color: 'from-status-success to-accent' },
+    { key: 'transactions', label: 'Transactions', icon: TrendingUp, color: 'from-status-success to-status-success' },
+    { key: 'activity', label: 'Activité', icon: Activity, color: 'from-accent to-status-info' },
+    { key: 'changes', label: 'Modifications', icon: Database, color: 'from-status-success to-status-info' },
+    { key: 'alerts', label: 'Alertes Sécurité', icon: AlertTriangle, color: 'from-status-info to-accent' },
+    { key: 'compliance', label: 'Compliance', icon: FileText, color: 'from-status-info to-accent' }
   ];
 
   return (
     <div className="space-y-6">
-      <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-6 border border-slate-700">
+      <div className="bg-gradient-to-br from-surface to-surface-base rounded-2xl p-6 border border-edge">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-4xl font-bold text-white mb-2">Module d'Audit & Logs</h1>
-            <p className="text-slate-400">Suivi et traçabilité complète du système</p>
+            <h1 className="text-4xl font-bold text-content-primary mb-2">Module d'Audit & Logs</h1>
+            <p className="text-content-muted">Suivi et traçabilité complète du système</p>
           </div>
           <div className="flex items-center gap-4">
             <div className="text-right">
-              <div className="text-sm text-slate-400">Logs Actifs</div>
-              <div className="text-2xl font-bold text-green-400">6 Tables</div>
+              <div className="text-sm text-content-muted">Logs Actifs</div>
+              <div className="text-2xl font-bold text-status-success">6 Tables</div>
             </div>
-            <Shield className="w-16 h-16 text-emerald-500" />
+            <Shield className="w-16 h-16 text-status-success" />
           </div>
         </div>
 
@@ -52,7 +52,7 @@ export default function AuditModule() {
                   px-3 py-2 rounded-xl font-medium transition-all flex items-center gap-1.5 text-sm
                   ${isActive
                     ? `bg-gradient-to-r ${tab.color} text-white shadow-lg`
-                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                    : 'bg-surface-elevated text-content-secondary hover:bg-surface-subtle'
                   }
                 `}
               >
@@ -75,7 +75,7 @@ export default function AuditModule() {
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">
-        <div className="bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl p-6 text-white">
+        <div className="bg-gradient-to-br from-status-info to-accent rounded-xl p-6 text-white">
           <div className="flex items-center justify-between mb-4">
             <div>
               <div className="text-sm opacity-90 mb-1">Sécurité</div>
@@ -88,7 +88,7 @@ export default function AuditModule() {
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl p-6 text-white">
+        <div className="bg-gradient-to-br from-status-success to-status-success rounded-xl p-6 text-white">
           <div className="flex items-center justify-between mb-4">
             <div>
               <div className="text-sm opacity-90 mb-1">Performance</div>
@@ -101,7 +101,7 @@ export default function AuditModule() {
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-emerald-500 to-cyan-500 rounded-xl p-6 text-white">
+        <div className="bg-gradient-to-br from-status-success to-accent rounded-xl p-6 text-white">
           <div className="flex items-center justify-between mb-4">
             <div>
               <div className="text-sm opacity-90 mb-1">Rétention</div>

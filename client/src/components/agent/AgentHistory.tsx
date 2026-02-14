@@ -129,8 +129,8 @@ export default function AgentHistory({ agentId }: AgentHistoryProps) {
 
   return (
     <div className="space-y-4">
-      <Card padding="none" className="overflow-hidden border-slate-700 bg-slate-800/30">
-        <div className="p-4 border-b border-slate-700 flex flex-col lg:flex-row gap-4 bg-slate-800/50">
+      <Card padding="none" className="overflow-hidden border-edge bg-surface/30">
+        <div className="p-4 border-b border-edge flex flex-col lg:flex-row gap-4 bg-surface/50">
           <div className="flex-1">
             <FormField 
               label="" 
@@ -140,7 +140,7 @@ export default function AgentHistory({ agentId }: AgentHistoryProps) {
               placeholder="Référence, client, caisse..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="bg-slate-900/50 border-slate-600 focus:border-cyan-500"
+              className="bg-surface-base/50 border-edge-strong focus:border-accent"
             />
           </div>
           <div className="flex flex-wrap gap-2">
@@ -156,7 +156,7 @@ export default function AgentHistory({ agentId }: AgentHistoryProps) {
                       { value: 'SETTLEMENT_CASH', label: 'Remises (Apurements)' }
                   ]}
                   containerClassName="mb-0"
-                  className="bg-slate-900/50 border-slate-600 text-xs"
+                  className="bg-surface-base/50 border-edge-strong text-xs"
                />
             </div>
             <div className="w-40">
@@ -173,13 +173,13 @@ export default function AgentHistory({ agentId }: AgentHistoryProps) {
                       { value: StatutOperationTerrain.REJECTED, label: 'Rejeté' }
                   ]}
                   containerClassName="mb-0"
-                  className="bg-slate-900/50 border-slate-600 text-xs"
+                  className="bg-surface-base/50 border-edge-strong text-xs"
                />
             </div>
             <button 
               onClick={loadOperations}
               disabled={loading}
-              className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-700 transition-colors"
+              className="p-2 text-content-muted hover:text-content-primary rounded-lg hover:bg-surface-elevated transition-colors"
             >
               <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
             </button>
@@ -196,7 +196,7 @@ export default function AgentHistory({ agentId }: AgentHistoryProps) {
               label: 'Date', 
               format: (val) => (
                 <div className="flex items-center gap-2">
-                  <Calendar size={12} className="text-slate-500" />
+                  <Calendar size={12} className="text-content-muted" />
                   <span className="text-xs">{new Date(val).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}</span>
                 </div>
               )
@@ -207,11 +207,11 @@ export default function AgentHistory({ agentId }: AgentHistoryProps) {
               format: (val) => (
                 <div className="flex items-center gap-2">
                   {val === 'COLLECT_CASH' ? (
-                    <div className="w-6 h-6 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+                    <div className="w-6 h-6 rounded-full bg-status-success-bg flex items-center justify-center text-status-success">
                       <ArrowDownLeft size={14} />
                     </div>
                   ) : (
-                    <div className="w-6 h-6 rounded-full bg-cyan-500/10 flex items-center justify-center text-cyan-500">
+                    <div className="w-6 h-6 rounded-full bg-accent/10 flex items-center justify-center text-accent">
                       <ArrowUpRight size={14} />
                     </div>
                   )}
@@ -224,7 +224,7 @@ export default function AgentHistory({ agentId }: AgentHistoryProps) {
               label: 'Montant', 
               align: 'right',
               format: (val, item) => (
-                <span className={`font-bold ${item.type === 'COLLECT_CASH' ? 'text-emerald-400' : 'text-cyan-400'}`}>
+                <span className={`font-bold ${item.type === 'COLLECT_CASH' ? 'text-status-success' : 'text-accent'}`}>
                   {Number(val).toLocaleString()} <span className="text-[10px] opacity-60">FCFA</span>
                 </span>
               )
@@ -235,9 +235,9 @@ export default function AgentHistory({ agentId }: AgentHistoryProps) {
               format: (_, item) => (
                 <div className="text-xs truncate max-w-[150px]">
                   {item.type === 'COLLECT_CASH' ? (
-                    <span className="text-slate-300">{item.client?.nom || 'Client'}</span>
+                    <span className="text-content-secondary">{item.client?.nom || 'Client'}</span>
                   ) : (
-                    <span className="text-slate-300">Caisse: {item.destinationCaisse?.nom || 'Agence'}</span>
+                    <span className="text-content-secondary">Caisse: {item.destinationCaisse?.nom || 'Agence'}</span>
                   )}
                 </div>
               )
@@ -250,7 +250,7 @@ export default function AgentHistory({ agentId }: AgentHistoryProps) {
           ]}
           actions={(item) => (
             <button 
-              className="p-1.5 text-slate-500 hover:text-cyan-400 transition-colors"
+              className="p-1.5 text-content-muted hover:text-accent transition-colors"
               title="Détails / Reçu"
               onClick={(e) => { e.stopPropagation(); handleShowReceipt(item); }}
             >

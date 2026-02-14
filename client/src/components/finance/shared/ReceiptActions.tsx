@@ -148,20 +148,20 @@ export const ReceiptActions: React.FC<ReceiptActionsProps> = ({
 
   // Light variant styles (for TransactionDetailDrawer with light theme)
   const lightStyles = {
-    container: 'bg-slate-50 dark:bg-slate-800/50',
-    tabContainer: 'bg-slate-100 dark:bg-slate-950',
-    tabActive: 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow',
-    tabInactive: 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300',
-    button: 'bg-slate-100 dark:bg-slate-800/60 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700/50',
+    container: 'bg-surface-muted/50',
+    tabContainer: 'bg-surface-muted',
+    tabActive: 'bg-surface text-content-primary shadow',
+    tabInactive: 'text-content-muted hover:text-content-secondary',
+    button: 'bg-surface-muted/60 hover:bg-surface-subtle text-content-secondary border-edge-subtle',
   };
 
   // Dark variant styles (for UniversalPaymentSuccessModal)
   const darkStyles = {
-    container: 'bg-slate-900',
-    tabContainer: 'bg-slate-950 border-slate-800',
-    tabActive: 'bg-slate-800 text-white shadow-lg',
-    tabInactive: 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/50',
-    button: 'bg-slate-800/60 hover:bg-slate-800 text-slate-300 border-slate-700/50',
+    container: 'bg-surface-base',
+    tabContainer: 'bg-surface-base border-edge',
+    tabActive: 'bg-surface text-content-primary shadow-lg',
+    tabInactive: 'text-content-muted hover:text-content-secondary hover:bg-surface/50',
+    button: 'bg-surface/60 hover:bg-surface text-content-secondary border-edge-subtle',
   };
 
   const styles = isDark ? darkStyles : lightStyles;
@@ -188,19 +188,19 @@ export const ReceiptActions: React.FC<ReceiptActionsProps> = ({
       {showReference && (
         <button
           onClick={handleCopyReference}
-          className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-800/50 border border-slate-700/50 active:scale-95 transition-all mx-auto"
+          className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-surface/50 border border-edge-subtle active:scale-95 transition-all mx-auto"
         >
           {copied ? (
             <>
-              <Check size={12} className="text-emerald-400" />
-              <span className="text-emerald-400 text-sm font-medium">Copié !</span>
+              <Check size={12} className="text-status-success" />
+              <span className="text-status-success text-sm font-medium">Copié !</span>
             </>
           ) : (
             <>
-              <span className="text-sm font-mono font-medium text-slate-300">
+              <span className="text-sm font-mono font-medium text-content-secondary">
                 {reference}
               </span>
-              <Copy size={12} className="text-slate-400" />
+              <Copy size={12} className="text-content-muted" />
             </>
           )}
         </button>
@@ -209,7 +209,7 @@ export const ReceiptActions: React.FC<ReceiptActionsProps> = ({
       {/* Print Options Section */}
       <div className="space-y-3">
         {!isCompact && (
-          <p className={`text-xs uppercase tracking-wider font-semibold px-1 ${isDark ? 'text-slate-500' : 'text-slate-400 dark:text-slate-500'}`}>
+          <p className={`text-xs uppercase tracking-wider font-semibold px-1 ${isDark ? 'text-content-muted' : 'text-content-muted'}`}>
             Imprimer / Exporter
           </p>
         )}
@@ -244,12 +244,12 @@ export const ReceiptActions: React.FC<ReceiptActionsProps> = ({
         <button
           onClick={handlePrint}
           className={`
-            w-full py-4 rounded-xl font-bold text-white
+            w-full py-4 rounded-xl font-bold text-content-primary
             flex items-center justify-center gap-3
             active:scale-[0.98] transition-all
             ${activeTab === 'ticket'
-              ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 shadow-lg shadow-emerald-500/25'
-              : 'bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 shadow-lg shadow-blue-500/25'
+              ? 'bg-gradient-to-r from-status-success to-status-success hover:from-status-success hover:to-status-success shadow-lg shadow-status-success/25'
+              : 'bg-gradient-to-r from-status-info to-status-info hover:from-status-info hover:to-status-info shadow-lg shadow-status-info/25'
             }
           `}
         >
@@ -287,8 +287,8 @@ export const ReceiptActions: React.FC<ReceiptActionsProps> = ({
 
       {/* Preview */}
       {showPreview && activeTab === 'ticket' && (
-        <div className={`rounded-xl border p-3 ${isDark ? 'border-slate-800 bg-slate-950/60' : 'border-slate-200 dark:border-slate-800 bg-slate-100/50 dark:bg-slate-950/60'}`}>
-          <p className={`text-[10px] uppercase tracking-wider mb-2 ${isDark ? 'text-slate-500' : 'text-slate-400 dark:text-slate-500'}`}>
+        <div className={`rounded-xl border p-3 ${isDark ? 'border-edge bg-surface-base/60' : 'border-edge bg-surface-muted/50/60'}`}>
+          <p className={`text-[10px] uppercase tracking-wider mb-2 ${isDark ? 'text-content-muted' : 'text-content-muted'}`}>
             Prévisualisation Ticket
           </p>
           <div className="bg-white rounded-lg p-2">
@@ -298,8 +298,8 @@ export const ReceiptActions: React.FC<ReceiptActionsProps> = ({
       )}
 
       {showPreview && activeTab === 'facture' && (
-        <div className={`rounded-xl border p-3 ${isDark ? 'border-slate-800 bg-slate-950/60' : 'border-slate-200 dark:border-slate-800 bg-slate-100/50 dark:bg-slate-950/60'}`}>
-          <p className={`text-[10px] uppercase tracking-wider mb-2 ${isDark ? 'text-slate-500' : 'text-slate-400 dark:text-slate-500'}`}>
+        <div className={`rounded-xl border p-3 ${isDark ? 'border-edge bg-surface-base/60' : 'border-edge bg-surface-muted/50/60'}`}>
+          <p className={`text-[10px] uppercase tracking-wider mb-2 ${isDark ? 'text-content-muted' : 'text-content-muted'}`}>
             Prévisualisation Facture
           </p>
           <div className="relative overflow-hidden rounded-lg bg-white" style={{ height: '400px' }}>

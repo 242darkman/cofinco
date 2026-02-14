@@ -131,12 +131,12 @@ const TabGroup: React.FC<TabGroupProps> = ({
         flex items-center ${sizeConfig.gap} whitespace-nowrap
         ${fullWidth ? 'flex-1 justify-center' : 'shrink-0'}
       `,
-      active: 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20',
-      inactive: 'text-slate-400 hover:bg-slate-700 hover:text-white',
+      active: 'bg-status-success text-white shadow-lg shadow-status-success/20',
+      inactive: 'text-content-muted hover:bg-surface-elevated hover:text-content-primary',
       disabled: 'opacity-50 cursor-not-allowed',
     },
     underline: {
-      container: `${scrollClass} border-b border-slate-700`,
+      container: `${scrollClass} border-b border-edge`,
       tab: `
         ${sizeConfig.padding} ${sizeConfig.text}
         font-medium transition-all duration-200
@@ -144,8 +144,8 @@ const TabGroup: React.FC<TabGroupProps> = ({
         border-b-2 -mb-px
         ${fullWidth ? 'flex-1 justify-center' : 'shrink-0'}
       `,
-      active: 'border-cyan-500 text-cyan-400',
-      inactive: 'border-transparent text-slate-400 hover:text-white hover:border-slate-600',
+      active: 'border-accent text-accent',
+      inactive: 'border-transparent text-content-muted hover:text-content-primary hover:border-edge-strong',
       disabled: 'opacity-50 cursor-not-allowed',
     },
     buttons: {
@@ -157,8 +157,8 @@ const TabGroup: React.FC<TabGroupProps> = ({
         border
         ${fullWidth ? 'flex-1 justify-center' : 'shrink-0'}
       `,
-      active: 'bg-gradient-to-r from-cyan-500/20 to-blue-500/20 text-cyan-400 border-cyan-500/50',
-      inactive: 'bg-slate-800/50 text-slate-400 border-slate-700 hover:bg-slate-700 hover:text-white hover:border-slate-600',
+      active: 'bg-gradient-to-r from-accent/20 to-status-info/20 text-accent border-accent/50',
+      inactive: 'bg-surface/50 text-content-muted border-edge hover:bg-surface-elevated hover:text-content-primary hover:border-edge-strong',
       disabled: 'opacity-50 cursor-not-allowed',
     },
   };
@@ -171,11 +171,11 @@ const TabGroup: React.FC<TabGroupProps> = ({
       {/* Left fade + arrow */}
       {showArrows && canScrollLeft && (
         <>
-          <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-[#020617] to-transparent z-10 pointer-events-none" />
+          <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-surface-base to-transparent z-10 pointer-events-none" />
           <button
             type="button"
             onClick={() => scroll('left')}
-            className="absolute left-0 top-1/2 -translate-y-1/2 z-20 w-6 h-6 rounded-full bg-slate-800/90 border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700 flex items-center justify-center transition-all shadow-lg"
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-20 w-6 h-6 rounded-full bg-surface/90 border border-edge text-content-secondary hover:text-content-primary hover:bg-surface-elevated flex items-center justify-center transition-all shadow-lg"
             aria-label="Défiler à gauche"
           >
             <ChevronLeft size={14} />
@@ -190,8 +190,8 @@ const TabGroup: React.FC<TabGroupProps> = ({
           const Icon = tab.icon;
 
           const defaultBadgeStyle = isActive
-               ? 'bg-white text-emerald-600 font-bold'
-               : 'bg-slate-600 text-slate-300';
+               ? 'bg-white text-status-success font-bold'
+               : 'bg-surface-subtle text-content-secondary';
 
           return (
             <button
@@ -228,11 +228,11 @@ const TabGroup: React.FC<TabGroupProps> = ({
       {/* Right fade + arrow */}
       {showArrows && canScrollRight && (
         <>
-          <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[#020617] to-transparent z-10 pointer-events-none" />
+          <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-surface-base to-transparent z-10 pointer-events-none" />
           <button
             type="button"
             onClick={() => scroll('right')}
-            className="absolute right-0 top-1/2 -translate-y-1/2 z-20 w-6 h-6 rounded-full bg-slate-800/90 border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700 flex items-center justify-center transition-all shadow-lg"
+            className="absolute right-0 top-1/2 -translate-y-1/2 z-20 w-6 h-6 rounded-full bg-surface/90 border border-edge text-content-secondary hover:text-content-primary hover:bg-surface-elevated flex items-center justify-center transition-all shadow-lg"
             aria-label="Défiler à droite"
           >
             <ChevronRight size={14} />

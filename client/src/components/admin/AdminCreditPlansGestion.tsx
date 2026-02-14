@@ -6,6 +6,7 @@ import { toast, handleApiError } from '../../lib/toast';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { TYPE_CREDIT_OPTIONS } from '@shared/enum/status-constants';
+import { useCurrency } from '../../contexts/CurrencyContext';
 
 interface CreditPlan {
   id: string;
@@ -36,6 +37,7 @@ export default function AdminCreditPlansGestion({
 }: AdminCreditPlansGestionProps) {
   // RBAC
   const { hasPermission } = usePermissions();
+  const { label } = useCurrency();
   const canManagePlans = hasPermission('admin', 'manage') || hasPermission('credits', 'manage');
 
   const { confirmState, openConfirm, closeConfirm, handleConfirm } = useConfirmDialog();
@@ -96,8 +98,8 @@ export default function AdminCreditPlansGestion({
       primary: true,
       format: (val, item) => (
         <div>
-          <div className="font-bold text-white">{val}</div>
-          <div className="text-xs text-slate-400">{item.description?.substring(0, 40)}{(item.description?.length || 0) > 40 ? '...' : ''}</div>
+          <div className="font-bold text-content-primary">{val}</div>
+          <div className="text-xs text-content-muted">{item.description?.substring(0, 40)}{(item.description?.length || 0) > 40 ? '...' : ''}</div>
         </div>
       )
     },
@@ -105,7 +107,7 @@ export default function AdminCreditPlansGestion({
       key: 'typeCredit',
       label: 'Type', 
       badge: true,
-      badgeClassName: 'bg-blue-500/10 text-blue-400 border-blue-500/20' 
+      badgeClassName: 'bg-status-info-bg text-status-info border-status-info/20' 
     },
     { 
       key: 'tauxInteret',
@@ -123,9 +125,9 @@ export default function AdminCreditPlansGestion({
     },
     { 
       key: 'montantMin',
-      label: 'Limites (FCFA)',
+      label: label('Limites'),
       format: (_, item) => (
-        <span className="text-emerald-400 text-xs font-medium">
+        <span className="text-status-success text-xs font-medium">
           {item.montantMin ? Number(item.montantMin).toLocaleString() : '0'}
           {' - '}
           {item.montantMax ? Number(item.montantMax).toLocaleString() : '∞'}
@@ -282,7 +284,7 @@ export default function AdminCreditPlansGestion({
       {/* Header if standalone */}
       {!onHideForm && (
         <div className="flex justify-between items-center">
-          <h2 className="text-base font-bold text-white">Plans de Crédit</h2>
+          <h2 className="text-base font-bold text-content-primary">Plans de Crédit</h2>
           <Button variant="primary" size="sm" icon={Plus} onClick={() => {
             resetForm();
             setEditMode(false);
@@ -309,46 +311,46 @@ export default function AdminCreditPlansGestion({
         />
       ) : (
         <div className="space-y-2">
-            <div className="bg-slate-800/40 border border-slate-700/50 rounded-lg overflow-hidden">
+            <div className="bg-surface/40 border border-edge-subtle rounded-lg overflow-hidden">
                 <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                    <thead className="bg-slate-900/50 border-b border-slate-700/50">
+                    <thead className="bg-surface-base/50 border-b border-edge-subtle">
                     <tr>
-                        <th className="px-3 py-2 text-left text-[10px] font-medium text-slate-400 uppercase tracking-wider">Plan</th>
-                        <th className="px-3 py-2 text-left text-[10px] font-medium text-slate-400 uppercase tracking-wider">Type</th>
-                        <th className="px-3 py-2 text-left text-[10px] font-medium text-slate-400 uppercase tracking-wider">Taux</th>
-                        <th className="px-3 py-2 text-left text-[10px] font-medium text-slate-400 uppercase tracking-wider">Durée</th>
-                        <th className="px-3 py-2 text-left text-[10px] font-medium text-slate-400 uppercase tracking-wider">Remboursement</th>
-                        <th className="px-3 py-2 text-left text-[10px] font-medium text-slate-400 uppercase tracking-wider">Limites (FCFA)</th>
-                        <th className="px-3 py-2 text-left text-[10px] font-medium text-slate-400 uppercase tracking-wider">Statut</th>
-                        <th className="px-3 py-2 text-right text-[10px] font-medium text-slate-400 uppercase tracking-wider w-20">Actions</th>
+                        <th className="px-3 py-2 text-left text-[10px] font-medium text-content-muted uppercase tracking-wider">Plan</th>
+                        <th className="px-3 py-2 text-left text-[10px] font-medium text-content-muted uppercase tracking-wider">Type</th>
+                        <th className="px-3 py-2 text-left text-[10px] font-medium text-content-muted uppercase tracking-wider">Taux</th>
+                        <th className="px-3 py-2 text-left text-[10px] font-medium text-content-muted uppercase tracking-wider">Durée</th>
+                        <th className="px-3 py-2 text-left text-[10px] font-medium text-content-muted uppercase tracking-wider">Remboursement</th>
+                        <th className="px-3 py-2 text-left text-[10px] font-medium text-content-muted uppercase tracking-wider">{label('Limites')}</th>
+                        <th className="px-3 py-2 text-left text-[10px] font-medium text-content-muted uppercase tracking-wider">Statut</th>
+                        <th className="px-3 py-2 text-right text-[10px] font-medium text-content-muted uppercase tracking-wider w-20">Actions</th>
                     </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-700/30">
+                    <tbody className="divide-y divide-edge/30">
                     {paginatedPlans.map((plan) => (
-                        <tr key={plan.id} className="hover:bg-slate-700/20 transition-colors cursor-pointer" onClick={() => handleEdit(plan)}>
+                        <tr key={plan.id} className="hover:bg-surface-elevated/20 transition-colors cursor-pointer" onClick={() => handleEdit(plan)}>
                         <td className="px-3 py-2">
                             <div>
-                                <div className="font-bold text-white text-xs">{plan.nom}</div>
-                                <div className="text-[10px] text-slate-400">{plan.description?.substring(0, 40)}{(plan.description?.length || 0) > 40 ? '...' : ''}</div>
+                                <div className="font-bold text-content-primary text-xs">{plan.nom}</div>
+                                <div className="text-[10px] text-content-muted">{plan.description?.substring(0, 40)}{(plan.description?.length || 0) > 40 ? '...' : ''}</div>
                             </div>
                         </td>
                         <td className="px-3 py-2">
-                            <span className="inline-flex items-center justify-center w-24 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                            <span className="inline-flex items-center justify-center w-24 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-status-info-bg text-status-info border border-status-info/20">
                             {plan.typeCredit}
                             </span>
                         </td>
-                        <td className="px-3 py-2 text-xs text-slate-300">
+                        <td className="px-3 py-2 text-xs text-content-secondary">
                             {plan.tauxInteret}%
                         </td>
-                        <td className="px-3 py-2 text-xs text-slate-300">
+                        <td className="px-3 py-2 text-xs text-content-secondary">
                             {formatDuration(plan.dureeValeur, plan.dureeUnite)}
                         </td>
-                        <td className="px-3 py-2 text-xs text-slate-300">
+                        <td className="px-3 py-2 text-xs text-content-secondary">
                             {plan.frequenceRemboursement}
                         </td>
                         <td className="px-3 py-2">
-                            <span className="text-emerald-400 text-[10px] font-medium">
+                            <span className="text-status-success text-[10px] font-medium">
                                 {plan.montantMin ? Number(plan.montantMin).toLocaleString() : '0'} 
                                 {' - '}
                                 {plan.montantMax ? Number(plan.montantMax).toLocaleString() : '∞'}
@@ -377,14 +379,14 @@ export default function AdminCreditPlansGestion({
                                 )}
                                 <button 
                                     onClick={(e) => { e.stopPropagation(); handleEdit(plan); }}
-                                    className="p-1 rounded hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+                                    className="p-1 rounded hover:bg-surface-elevated text-content-muted hover:text-content-primary transition-colors"
                                     title="Modifier"
                                 >
                                     <Edit size={14} />
                                 </button>
                                 <button 
                                     onClick={(e) => { e.stopPropagation(); handleDelete(plan.id, plan.nom); }}
-                                    className="p-1 rounded hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-colors"
+                                    className="p-1 rounded hover:bg-status-danger-bg text-content-muted hover:text-status-danger transition-colors"
                                     title="Supprimer"
                                 >
                                     <Trash2 size={14} />
@@ -399,8 +401,8 @@ export default function AdminCreditPlansGestion({
             </div>
 
             {/* Advanced Pagination Controls */}
-            <div className="p-2 border border-slate-700/50 bg-slate-800/40 rounded-lg flex flex-col sm:flex-row items-center justify-between gap-3">
-                <div className="flex items-center gap-3 text-xs text-slate-500">
+            <div className="p-2 border border-edge-subtle bg-surface/40 rounded-lg flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="flex items-center gap-3 text-xs text-content-muted">
                 <span className="hidden sm:inline">
                     {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, plans.length)} sur {plans.length}
                 </span>
@@ -413,7 +415,7 @@ export default function AdminCreditPlansGestion({
                     setPageSize(Number(e.target.value));
                     setCurrentPage(1);
                     }}
-                    className="px-2 py-1 bg-slate-900 border border-slate-700 rounded text-[10px] text-slate-300 focus:border-cyan-600 outline-none"
+                    className="px-2 py-1 bg-surface-base border border-edge rounded text-[10px] text-content-secondary focus:border-accent outline-none"
                 >
                     <option value={8}>8 / page</option>
                     <option value={10}>10 / page</option>
@@ -426,20 +428,20 @@ export default function AdminCreditPlansGestion({
                 <button
                     onClick={() => setCurrentPage(1)}
                     disabled={currentPage === 1}
-                    className="p-1 rounded hover:bg-slate-700 text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    className="p-1 rounded hover:bg-surface-elevated text-content-muted hover:text-content-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                 >
                     <ChevronsLeft size={14} />
                 </button>
                 <button
                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                     disabled={currentPage === 1}
-                    className="p-1 rounded hover:bg-slate-700 text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    className="p-1 rounded hover:bg-surface-elevated text-content-muted hover:text-content-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                 >
                     <ChevronLeft size={14} />
                 </button>
                 
                 <div className="flex items-center gap-1 mx-1">
-                    <span className="text-xs font-medium text-white px-2">
+                    <span className="text-xs font-medium text-content-primary px-2">
                     {currentPage} / {Math.max(1, totalPages)}
                     </span>
                 </div>
@@ -447,14 +449,14 @@ export default function AdminCreditPlansGestion({
                 <button
                     onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                     disabled={currentPage === totalPages || totalPages === 0}
-                    className="p-1 rounded hover:bg-slate-700 text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    className="p-1 rounded hover:bg-surface-elevated text-content-muted hover:text-content-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                 >
                     <ChevronRight size={14} />
                 </button>
                 <button
                     onClick={() => setCurrentPage(totalPages)}
                     disabled={currentPage === totalPages || totalPages === 0}
-                    className="p-1 rounded hover:bg-slate-700 text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    className="p-1 rounded hover:bg-surface-elevated text-content-muted hover:text-content-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                 >
                     <ChevronsRight size={14} />
                 </button>
@@ -495,8 +497,8 @@ export default function AdminCreditPlansGestion({
               containerClassName="md:col-span-2"
             />
             
-            <div className="md:col-span-2 border-t border-slate-700/50 my-2 pt-4">
-              <h4 className="text-sm font-semibold text-teal-400 mb-3 flex items-center gap-2">
+            <div className="md:col-span-2 border-t border-edge-subtle my-2 pt-4">
+              <h4 className="text-sm font-semibold text-accent mb-3 flex items-center gap-2">
                 <Percent size={14} /> Conditions Financières
               </h4>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -544,27 +546,27 @@ export default function AdminCreditPlansGestion({
               </div>
             </div>
 
-            <div className="md:col-span-2 border-t border-slate-700/50 my-2 pt-4">
-              <h4 className="text-sm font-semibold text-emerald-400 mb-3 flex items-center gap-2">
+            <div className="md:col-span-2 border-t border-edge-subtle my-2 pt-4">
+              <h4 className="text-sm font-semibold text-status-success mb-3 flex items-center gap-2">
                 <Wallet size={14} /> Limites & Frais
               </h4>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <FormField
-                  label="Montant Min (FCFA)"
+                  label={label('Montant Min')}
                   name="montant_min"
                   type="number"
                   value={formData.montant_min}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, montant_min: e.target.value})}
                 />
                 <FormField
-                  label="Montant Max (FCFA)"
+                  label={label('Montant Max')}
                   name="montant_max"
                   type="number"
                   value={formData.montant_max}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, montant_max: e.target.value})}
                 />
                 <FormField
-                  label="Frais Dossier (FCFA)"
+                  label={label('Frais Dossier')}
                   name="frais_dossier"
                   type="number"
                   value={formData.frais_dossier}
@@ -585,19 +587,19 @@ export default function AdminCreditPlansGestion({
             </div>
 
             <div className="md:col-span-2 pt-2">
-              <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
+              <label className="flex items-center gap-2 text-content-secondary cursor-pointer">
                 <input
                   type="checkbox"
                   checked={formData.actif}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, actif: e.target.checked})}
-                  className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-teal-500 focus:ring-teal-500"
+                  className="w-4 h-4 rounded border-edge bg-surface text-accent focus:ring-accent"
                 />
                 <span className="text-sm">Plan actif (visible pour les nouvelles demandes)</span>
               </label>
             </div>
           </div>
 
-          <div className="flex gap-3 pt-4 border-t border-slate-700">
+          <div className="flex gap-3 pt-4 border-t border-edge">
             <Button
               variant="primary"
               icon={Save}

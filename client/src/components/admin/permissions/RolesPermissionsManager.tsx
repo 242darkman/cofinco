@@ -51,19 +51,19 @@ const CATEGORY_ICONS = {
 
 const CATEGORY_STYLES = {
   consultation: {
-    bg: 'bg-sky-500/10',
-    border: 'border-sky-500/20',
-    text: 'text-sky-400',
+    bg: 'bg-status-info-bg',
+    border: 'border-status-info/20',
+    text: 'text-status-info',
   },
   gestion: {
-    bg: 'bg-emerald-500/10',
-    border: 'border-emerald-500/20',
-    text: 'text-emerald-400',
+    bg: 'bg-status-success-bg',
+    border: 'border-status-success/20',
+    text: 'text-status-success',
   },
   danger: {
-    bg: 'bg-rose-500/10',
-    border: 'border-rose-500/20',
-    text: 'text-rose-400',
+    bg: 'bg-status-danger/10',
+    border: 'border-status-danger/20',
+    text: 'text-status-danger',
   }
 };
 
@@ -76,17 +76,17 @@ const CATEGORY_LABELS_SEMANTIC = {
 // Status dot component for module sidebar - Compact
 function StatusDot({ active, total }: { active: number; total: number }) {
   const ratio = total > 0 ? active / total : 0;
-  let colorClass = 'bg-slate-500'; // None
+  let colorClass = 'bg-surface-muted0'; // None
 
   if (ratio === 1) {
-    colorClass = 'bg-emerald-500'; // All active
+    colorClass = 'bg-status-success'; // All active
   } else if (ratio > 0) {
-    colorClass = 'bg-amber-500'; // Partial
+    colorClass = 'bg-status-warning'; // Partial
   }
 
   return (
     <div className="flex items-center gap-1.5 shrink-0">
-      <span className="text-[10px] text-slate-400 font-medium">{active}/{total}</span>
+      <span className="text-[10px] text-content-muted font-medium">{active}/{total}</span>
       <div className={`w-2 h-2 rounded-full ${colorClass}`} />
     </div>
   );
@@ -273,9 +273,9 @@ export default function RolesPermissionsManager({
   return (
     <div className="flex flex-col h-full space-y-2 relative">
       {/* TOP BAR - Compact */}
-      <div className="flex items-center gap-3 bg-slate-900 px-3 py-2 rounded-lg border border-slate-800">
-        <div className="w-8 h-8 bg-indigo-500/10 rounded-lg flex items-center justify-center shrink-0 border border-indigo-500/20">
-          <Shield size={16} className="text-indigo-400" />
+      <div className="flex items-center gap-3 bg-surface-base px-3 py-2 rounded-lg border border-edge">
+        <div className="w-8 h-8 bg-accent/10 rounded-lg flex items-center justify-center shrink-0 border border-accent/20">
+          <Shield size={16} className="text-accent" />
         </div>
         <div className="min-w-[220px]">
           <SelectField
@@ -291,11 +291,11 @@ export default function RolesPermissionsManager({
               onRoleChange(e.target.value as SystemRole);
             }}
             options={roleOptions}
-            className="bg-slate-800 border-slate-700 text-white text-sm h-8 focus:border-indigo-500 focus:ring-indigo-500/20"
+            className="bg-surface border-edge text-content-primary text-sm h-8 focus:border-accent focus:ring-accent/20"
           />
         </div>
-        <div className="h-5 w-px bg-slate-700"></div>
-        <span className="text-slate-400 text-xs whitespace-nowrap">
+        <div className="h-5 w-px bg-surface-elevated"></div>
+        <span className="text-content-muted text-xs whitespace-nowrap">
           {activePermissionsCount} permissions actives
         </span>
         <div className="flex-1"></div>
@@ -305,16 +305,16 @@ export default function RolesPermissionsManager({
             onChange={(e) => setSearchQuery(e.target.value)}
             onClear={() => setSearchQuery('')}
             placeholder="Rechercher..."
-            className="bg-slate-800 border-slate-700 h-8 text-sm"
+            className="bg-surface border-edge h-8 text-sm"
           />
         </div>
       </div>
 
       {/* Special Banner for Admin - Compact */}
       {isSuperAdmin && (
-        <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg px-3 py-2 flex items-center gap-2">
-          <Shield size={14} className="text-purple-400 shrink-0" />
-          <p className="text-xs text-purple-300">
+        <div className="bg-status-info-bg border border-status-info/20 rounded-lg px-3 py-2 flex items-center gap-2">
+          <Shield size={14} className="text-status-info shrink-0" />
+          <p className="text-xs text-status-info">
             <strong>Compte Super-Administrateur :</strong> Ce rôle dispose d'un accès complet et illimité au système. Ces permissions ne sont pas modifiables.
           </p>
         </div>
@@ -322,9 +322,9 @@ export default function RolesPermissionsManager({
 
       {/* Confirm Message - Compact */}
       {confirmMessage && (
-        <div className="px-3 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg flex items-center gap-2 animate-in fade-in slide-in-from-top-1">
-          <CheckCircle size={14} className="text-emerald-400 shrink-0" />
-          <span className="text-xs font-medium text-emerald-400">{confirmMessage}</span>
+        <div className="px-3 py-2 bg-status-success-bg border border-status-success/20 rounded-lg flex items-center gap-2 animate-in fade-in slide-in-from-top-1">
+          <CheckCircle size={14} className="text-status-success shrink-0" />
+          <span className="text-xs font-medium text-status-success">{confirmMessage}</span>
         </div>
       )}
 
@@ -332,17 +332,17 @@ export default function RolesPermissionsManager({
       <div className="grid grid-cols-12 gap-3 flex-1 min-h-0">
 
         {/* SIDEBAR NAVIGATION - Compact */}
-        <div className="col-span-12 lg:col-span-3 bg-slate-900 rounded-lg border border-slate-800 overflow-hidden flex flex-col lg:h-full max-h-[40vh] lg:max-h-none">
-          <div className="px-3 py-2 bg-slate-800/50 border-b border-slate-700 flex items-center gap-2">
-            <Award size={14} className="text-slate-400" />
-            <span className="text-sm font-semibold text-slate-300">Modules</span>
-            <span className="ml-auto text-[10px] text-slate-500">{allModules.length}</span>
+        <div className="col-span-12 lg:col-span-3 bg-surface-base rounded-lg border border-edge overflow-hidden flex flex-col lg:h-full max-h-[40vh] lg:max-h-none">
+          <div className="px-3 py-2 bg-surface/50 border-b border-edge flex items-center gap-2">
+            <Award size={14} className="text-content-muted" />
+            <span className="text-sm font-semibold text-content-secondary">Modules</span>
+            <span className="ml-auto text-[10px] text-content-muted">{allModules.length}</span>
           </div>
-          <div className="divide-y divide-slate-800/50 flex-1 overflow-y-auto custom-scrollbar">
+          <div className="divide-y divide-edge/50 flex-1 overflow-y-auto custom-scrollbar">
             {Object.entries(groupedModules).map(([category, categoryModules]) => (
               <div key={category}>
-                <div className="px-3 py-1.5 bg-slate-800/30">
-                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                <div className="px-3 py-1.5 bg-surface/30">
+                  <span className="text-[9px] font-bold text-content-muted uppercase tracking-wider">
                     {CATEGORY_LABELS[category] || category}
                   </span>
                 </div>
@@ -358,11 +358,11 @@ export default function RolesPermissionsManager({
                         setSearchQuery('');
                       }}
                       className={`
-                        w-full flex justify-between items-center px-3 py-2 hover:bg-slate-800/70 transition-colors text-left
-                        ${isActive ? 'bg-slate-800 border-l-2 border-indigo-500' : 'border-l-2 border-transparent'}
+                        w-full flex justify-between items-center px-3 py-2 hover:bg-surface/70 transition-colors text-left
+                        ${isActive ? 'bg-surface border-l-2 border-accent' : 'border-l-2 border-transparent'}
                       `}
                     >
-                      <span className={`text-xs font-medium truncate ${isActive ? 'text-white' : 'text-slate-300'}`}>
+                      <span className={`text-xs font-medium truncate ${isActive ? 'text-content-primary' : 'text-content-secondary'}`}>
                         {module.name}
                       </span>
                       <StatusDot active={stats.active} total={stats.total} />
@@ -375,24 +375,24 @@ export default function RolesPermissionsManager({
         </div>
 
         {/* MAIN CONTENT (Permissions List) - Compact */}
-        <div className="col-span-12 lg:col-span-9 bg-slate-900 rounded-lg border border-slate-800 overflow-hidden flex flex-col h-full">
+        <div className="col-span-12 lg:col-span-9 bg-surface-base rounded-lg border border-edge overflow-hidden flex flex-col h-full">
           {/* Module Header - Compact */}
-          <div className="px-3 py-2 border-b border-slate-800 flex justify-between items-center gap-3 bg-slate-800/30 shrink-0">
+          <div className="px-3 py-2 border-b border-edge flex justify-between items-center gap-3 bg-surface/30 shrink-0">
             <div className="min-w-0">
-              <h2 className="text-sm font-bold text-white flex items-center gap-2">
+              <h2 className="text-sm font-bold text-content-primary flex items-center gap-2">
                 {globalSearchResults ? (
                   <>
-                    <Search size={14} className="text-indigo-400 shrink-0" />
+                    <Search size={14} className="text-accent shrink-0" />
                     <span className="truncate">Résultats de recherche</span>
                   </>
                 ) : (
                   <>
-                    <Shield size={14} className="text-indigo-400 shrink-0" />
+                    <Shield size={14} className="text-accent shrink-0" />
                     <span className="truncate">{activeModule?.name || 'Sélectionnez un module'}</span>
                   </>
                 )}
               </h2>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-content-muted">
                 {globalSearchResults
                   ? `${globalSearchResults.length} permission(s) trouvée(s)`
                   : `${activeModuleStats.active}/${activeModuleStats.total} permissions actives`
@@ -402,13 +402,13 @@ export default function RolesPermissionsManager({
             {!globalSearchResults && activeModuleId && !isSuperAdmin && (
               <div
                 onClick={handleToggleAll}
-                className="flex items-center gap-2 bg-slate-800 rounded px-2.5 py-1.5 cursor-pointer hover:bg-slate-700 transition-colors border border-slate-700 shrink-0"
+                className="flex items-center gap-2 bg-surface rounded px-2.5 py-1.5 cursor-pointer hover:bg-surface-elevated transition-colors border border-edge shrink-0"
               >
-                <span className="text-xs font-medium text-white">Tout activer</span>
+                <span className="text-xs font-medium text-content-primary">Tout activer</span>
                 <Switch
                   checked={isAllEnabled}
                   onChange={() => {}}
-                  className={isAllEnabled ? 'bg-indigo-600' : 'bg-slate-600'}
+                  className={isAllEnabled ? 'bg-accent' : 'bg-surface-subtle'}
                 />
               </div>
             )}
@@ -432,7 +432,7 @@ export default function RolesPermissionsManager({
                       <h3 className={`text-[11px] font-bold uppercase tracking-wide ${styles.text}`}>
                         {CATEGORY_LABELS_SEMANTIC[category]}
                       </h3>
-                      <span className="text-[10px] text-slate-500">({perms.length})</span>
+                      <span className="text-[10px] text-content-muted">({perms.length})</span>
                     </div>
 
                     {/* Permissions List - Compact */}
@@ -449,19 +449,19 @@ export default function RolesPermissionsManager({
                             className={`
                               flex items-center justify-between px-2.5 py-2 rounded border transition-all
                               ${isSuperAdmin
-                                ? 'cursor-not-allowed bg-purple-500/5 border-purple-500/10 opacity-75'
-                                : 'cursor-pointer hover:bg-slate-800/70'
+                                ? 'cursor-not-allowed bg-status-info/5 border-status-info/10 opacity-75'
+                                : 'cursor-pointer hover:bg-surface/70'
                               }
-                              ${hasPending ? 'ring-1 ring-amber-500/50' : ''}
+                              ${hasPending ? 'ring-1 ring-status-warning/50' : ''}
                               ${isGranted && !isSuperAdmin
                                 ? isDanger
-                                  ? 'bg-rose-500/5 border-rose-500/20 hover:bg-rose-500/10'
-                                  : 'bg-slate-800/50 border-slate-700 hover:border-slate-600'
-                                : !isSuperAdmin ? 'bg-transparent border-slate-800 hover:border-slate-700' : ''
+                                  ? 'bg-status-danger/5 border-status-danger/20 hover:bg-status-danger/10'
+                                  : 'bg-surface/50 border-edge hover:border-edge-strong'
+                                : !isSuperAdmin ? 'bg-transparent border-edge hover:border-edge' : ''
                               }
                             `}
                           >
-                            <span className={`text-xs font-medium truncate pr-2 ${isGranted ? 'text-slate-200' : 'text-slate-400'}`}>
+                            <span className={`text-xs font-medium truncate pr-2 ${isGranted ? 'text-content-secondary' : 'text-content-muted'}`}>
                               {perm.name}
                             </span>
 
@@ -470,11 +470,11 @@ export default function RolesPermissionsManager({
                               w-8 h-4 rounded-full relative transition-colors shrink-0
                               ${isGranted
                                 ? isSuperAdmin
-                                  ? 'bg-purple-500'
+                                  ? 'bg-status-info'
                                   : isDanger
-                                    ? 'bg-rose-500'
-                                    : 'bg-indigo-500'
-                                : 'bg-slate-600/50'
+                                    ? 'bg-status-danger'
+                                    : 'bg-accent'
+                                : 'bg-surface-subtle/50'
                               }
                             `}>
                               <div
@@ -492,7 +492,7 @@ export default function RolesPermissionsManager({
 
             {/* Empty State - Compact */}
             {Object.values(groupedPermissions).every(arr => arr.length === 0) && (
-              <div className="flex flex-col items-center justify-center py-8 text-slate-500">
+              <div className="flex flex-col items-center justify-center py-8 text-content-muted">
                 <Search size={28} className="mb-2 opacity-50" />
                 <p className="text-sm font-medium">Aucune permission trouvée</p>
                 <p className="text-xs mt-0.5">
@@ -506,12 +506,12 @@ export default function RolesPermissionsManager({
 
       {/* STICKY FOOTER - Pending Changes - Compact */}
       {hasPendingChanges && !isSuperAdmin && (
-        <div className="sticky bottom-0 left-0 right-0 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2 flex items-center justify-between gap-3 backdrop-blur-sm shadow-lg shadow-black/20 animate-in slide-in-from-bottom-2">
+        <div className="sticky bottom-0 left-0 right-0 bg-status-warning-bg border border-status-warning/30 rounded-lg px-3 py-2 flex items-center justify-between gap-3 backdrop-blur-sm shadow-lg shadow-black/20 animate-in slide-in-from-bottom-2">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-amber-500/20 rounded-full flex items-center justify-center shrink-0">
-              <AlertCircle size={14} className="text-amber-400" />
+            <div className="w-7 h-7 bg-status-warning-bg rounded-full flex items-center justify-center shrink-0">
+              <AlertCircle size={14} className="text-status-warning" />
             </div>
-            <p className="text-xs font-semibold text-amber-300">
+            <p className="text-xs font-semibold text-status-warning">
               {pendingChanges.size} modification{pendingChanges.size > 1 ? 's' : ''} non enregistrée{pendingChanges.size > 1 ? 's' : ''}
             </p>
           </div>
@@ -521,7 +521,7 @@ export default function RolesPermissionsManager({
               size="sm"
               onClick={handleCancel}
               disabled={isSaving}
-              className="text-slate-300 hover:text-white hover:bg-slate-700 h-7 px-2 text-xs"
+              className="text-content-secondary hover:text-content-primary hover:bg-surface-elevated h-7 px-2 text-xs"
             >
               <X size={12} className="mr-1" />
               Annuler
@@ -531,7 +531,7 @@ export default function RolesPermissionsManager({
               size="sm"
               onClick={handleSave}
               disabled={isSaving}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white h-7 px-2 text-xs"
+              className="bg-accent hover:bg-accent-primary-hover text-white h-7 px-2 text-xs"
             >
               {isSaving ? (
                 <Loader2 size={12} className="mr-1 animate-spin" />

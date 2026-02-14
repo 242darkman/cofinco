@@ -36,12 +36,12 @@ export default function DataChangesHeader({
 
   return (
     <div className="space-y-6">
-      <Card className="bg-gradient-to-br from-emerald-600 to-blue-600 border-0 p-6 text-white relative overflow-hidden">
+      <Card className="bg-gradient-to-br from-status-success to-status-info border-0 p-6 text-white relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-32 -mt-32 pointer-events-none" />
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 relative z-10">
           <div>
             <h2 className="text-2xl md:text-3xl font-bold mb-2">Historique des Modifications</h2>
-            <p className="text-emerald-100">Comparaison avant/après de toutes les modifications</p>
+            <p className="text-status-success-text">Comparaison avant/après de toutes les modifications</p>
           </div>
           <div className="flex items-center gap-4">
             <div className="relative">
@@ -53,18 +53,18 @@ export default function DataChangesHeader({
                 Export
               </Button>
               {showExportMenu && (
-                <div className="absolute right-0 top-full mt-2 bg-slate-800 rounded-xl shadow-xl border border-slate-700 overflow-hidden z-50 min-w-[200px] animate-in fade-in zoom-in-95 duration-200">
-                  <button onClick={() => { onExportCSV(); setShowExportMenu(false); }} className="w-full px-4 py-3 text-left hover:bg-slate-700 transition flex items-center gap-3 text-white">
-                    <FileSpreadsheet size={18} className="text-green-400" />
-                    <div><div className="font-semibold">Excel (CSV)</div><div className="text-xs text-slate-400">Tableur compatible</div></div>
+                <div className="absolute right-0 top-full mt-2 bg-surface rounded-xl shadow-xl border border-edge overflow-hidden z-50 min-w-[200px] animate-in fade-in zoom-in-95 duration-200">
+                  <button onClick={() => { onExportCSV(); setShowExportMenu(false); }} className="w-full px-4 py-3 text-left hover:bg-surface-elevated transition flex items-center gap-3 text-content-primary">
+                    <FileSpreadsheet size={18} className="text-status-success" />
+                    <div><div className="font-semibold">Excel (CSV)</div><div className="text-xs text-content-muted">Tableur compatible</div></div>
                   </button>
-                  <button onClick={() => { onExportPDF(); setShowExportMenu(false); }} className="w-full px-4 py-3 text-left hover:bg-slate-700 transition flex items-center gap-3 text-white border-t border-slate-700">
-                    <FileText size={18} className="text-red-400" />
-                    <div><div className="font-semibold">PDF</div><div className="text-xs text-slate-400">Document formaté</div></div>
+                  <button onClick={() => { onExportPDF(); setShowExportMenu(false); }} className="w-full px-4 py-3 text-left hover:bg-surface-elevated transition flex items-center gap-3 text-content-primary border-t border-edge">
+                    <FileText size={18} className="text-status-danger" />
+                    <div><div className="font-semibold">PDF</div><div className="text-xs text-content-muted">Document formaté</div></div>
                   </button>
-                  <button onClick={() => { onExportJSON(); setShowExportMenu(false); }} className="w-full px-4 py-3 text-left hover:bg-slate-700 transition flex items-center gap-3 text-white border-t border-slate-700">
-                    <Shield size={18} className="text-blue-400" />
-                    <div><div className="font-semibold">JSON</div><div className="text-xs text-slate-400">Données structurées</div></div>
+                  <button onClick={() => { onExportJSON(); setShowExportMenu(false); }} className="w-full px-4 py-3 text-left hover:bg-surface-elevated transition flex items-center gap-3 text-content-primary border-t border-edge">
+                    <Shield size={18} className="text-status-info" />
+                    <div><div className="font-semibold">JSON</div><div className="text-xs text-content-muted">Données structurées</div></div>
                   </button>
                 </div>
               )}
@@ -74,7 +74,7 @@ export default function DataChangesHeader({
         </div>
       </Card>
 
-      <Card className="bg-slate-800 border-slate-700 p-6">
+      <Card className="bg-surface border-edge p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="lg:col-span-1">
              <SearchInput

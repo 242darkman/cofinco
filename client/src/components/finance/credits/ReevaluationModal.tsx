@@ -217,28 +217,28 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-900 rounded-xl w-full max-w-xl max-h-[85vh] overflow-hidden flex flex-col">
+      <div className="bg-surface-base rounded-xl w-full max-w-xl max-h-[85vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="p-4 border-b border-slate-700">
+        <div className="p-4 border-b border-edge">
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-2">
-              <RefreshCw className="text-amber-400" size={18} />
-              <h2 className="text-base font-bold text-white">Réévaluation</h2>
-              <span className="text-slate-500 text-sm">• {demande.numeroDemande}</span>
+              <RefreshCw className="text-status-warning" size={18} />
+              <h2 className="text-base font-bold text-content-primary">Réévaluation</h2>
+              <span className="text-content-muted text-sm">• {demande.numeroDemande}</span>
             </div>
             <button
               onClick={onClose}
-              className="p-1.5 hover:bg-slate-800 rounded-lg transition-colors"
+              className="p-1.5 hover:bg-surface rounded-lg transition-colors"
             >
-              <X className="text-slate-400" size={18} />
+              <X className="text-content-muted" size={18} />
             </button>
           </div>
 
           {/* Info box + Stepper inline */}
           <div className="mt-3 flex items-center gap-3">
-            <div className="flex-1 p-2 bg-red-500/10 border border-red-500/30 rounded-lg">
-              <p className="text-white text-xs line-clamp-1">
-                <span className="text-red-400">Rejet: </span>
+            <div className="flex-1 p-2 bg-status-danger-bg border border-status-danger/30 rounded-lg">
+              <p className="text-content-primary text-xs line-clamp-1">
+                <span className="text-status-danger">Rejet: </span>
                 {demande.motifRejet || 'Non spécifié'}
               </p>
             </div>
@@ -249,16 +249,16 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
                 <div key={s} className="flex items-center">
                   <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium transition-colors ${
                     step === s
-                      ? 'bg-amber-500 text-black'
+                      ? 'bg-status-warning text-black'
                       : steps.indexOf(step) > i
-                        ? 'bg-emerald-500 text-white'
-                        : 'bg-slate-700 text-slate-400'
+                        ? 'bg-status-success text-white'
+                        : 'bg-surface-elevated text-content-muted'
                   }`}>
                     {i + 1}
                   </div>
                   {i < steps.length - 1 && (
                     <div className={`w-4 h-0.5 ${
-                      steps.indexOf(step) > i ? 'bg-emerald-500' : 'bg-slate-700'
+                      steps.indexOf(step) > i ? 'bg-status-success' : 'bg-surface-elevated'
                     }`} />
                   )}
                 </div>
@@ -271,7 +271,7 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
         <div className="flex-1 overflow-y-auto p-4">
           {step === 'elements' && (
             <div className="space-y-3">
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-content-muted">
                 Sélectionnez les éléments nouveaux justifiant la réévaluation
               </p>
 
@@ -285,12 +285,12 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
                       onClick={() => addElement(type.value)}
                       className={`p-2 rounded-lg border transition-all text-center ${
                         isSelected
-                          ? 'bg-amber-500/20 border-amber-500/50'
-                          : 'bg-slate-800/50 border-slate-700 hover:border-slate-600'
+                          ? 'bg-status-warning-bg border-status-warning/50'
+                          : 'bg-surface/50 border-edge hover:border-edge-strong'
                       }`}
                     >
-                      <Icon size={16} className={`mx-auto ${isSelected ? 'text-amber-400' : 'text-slate-400'}`} />
-                      <div className={`text-xs mt-1 leading-tight ${isSelected ? 'text-white' : 'text-slate-300'}`}>
+                      <Icon size={16} className={`mx-auto ${isSelected ? 'text-status-warning' : 'text-content-muted'}`} />
+                      <div className={`text-xs mt-1 leading-tight ${isSelected ? 'text-content-primary' : 'text-content-secondary'}`}>
                         {type.value}
                       </div>
                     </button>
@@ -300,10 +300,10 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
 
               {/* Selected elements with description */}
               {formData.elementsNouveaux.map((element, idx) => (
-                <div key={idx} className="p-2 bg-slate-800/50 rounded-lg">
+                <div key={idx} className="p-2 bg-surface/50 rounded-lg">
                   <div className="flex justify-between items-center mb-1">
-                    <span className="text-amber-400 text-xs font-medium">{element.type}</span>
-                    <button onClick={() => removeElement(idx)} className="text-red-400 hover:text-red-300">
+                    <span className="text-status-warning text-xs font-medium">{element.type}</span>
+                    <button onClick={() => removeElement(idx)} className="text-status-danger hover:text-status-danger">
                       <X size={14} />
                     </button>
                   </div>
@@ -327,19 +327,19 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
                             setFormData(prev => ({ ...prev, nouveauMontantDemande: nouveauMontant }));
                           }}
                           placeholder="Montant de la réduction"
-                          className="w-full bg-slate-900/50 rounded p-2 text-white text-sm border border-slate-700 focus:border-amber-500 focus:outline-none"
+                          className="w-full bg-surface-base/50 rounded p-2 text-content-primary text-sm border border-edge focus:border-status-warning focus:outline-none"
                         />
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 text-xs">FCFA</span>
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-content-muted text-xs">FCFA</span>
                       </div>
                       {element.valeurAjoutee && element.valeurAjoutee > 0 && (
-                        <div className="mt-1.5 p-1.5 bg-emerald-500/10 border border-emerald-500/30 rounded text-xs">
-                          <div className="flex items-center justify-between text-emerald-400">
+                        <div className="mt-1.5 p-1.5 bg-status-success-bg border border-status-success/30 rounded text-xs">
+                          <div className="flex items-center justify-between text-status-success">
                             <span>Nouveau montant:</span>
                             <span className="font-bold">
                               {formatMoney(Math.max(0, Number(demande.montantDemande) - element.valeurAjoutee))}
                             </span>
                           </div>
-                          <div className="flex items-center justify-between text-slate-400 mt-0.5">
+                          <div className="flex items-center justify-between text-content-muted mt-0.5">
                             <span>Réduction:</span>
                             <span>-{Math.round((element.valeurAjoutee / Number(demande.montantDemande)) * 100)}%</span>
                           </div>
@@ -352,7 +352,7 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
                     value={element.description}
                     onChange={(e) => updateElement(idx, 'description', e.target.value)}
                     placeholder="Description..."
-                    className="w-full bg-slate-900/50 rounded p-2 text-white text-xs border border-slate-700 focus:border-amber-500 focus:outline-none"
+                    className="w-full bg-surface-base/50 rounded p-2 text-content-primary text-xs border border-edge focus:border-status-warning focus:outline-none"
                     rows={1}
                   />
                 </div>
@@ -360,16 +360,16 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
 
               {/* Justification */}
               <div>
-                <label className="text-xs text-slate-400 mb-1 block">Justification *</label>
+                <label className="text-xs text-content-muted mb-1 block">Justification *</label>
                 <textarea
                   value={formData.justification}
                   onChange={(e) => setFormData(prev => ({ ...prev, justification: e.target.value }))}
                   placeholder="Pourquoi cette demande mérite une réévaluation..."
-                  className="w-full bg-slate-800/50 rounded-lg p-2 text-white text-sm border border-slate-700 focus:border-amber-500 focus:outline-none"
+                  className="w-full bg-surface/50 rounded-lg p-2 text-content-primary text-sm border border-edge focus:border-status-warning focus:outline-none"
                   rows={2}
                 />
                 <div className={`text-xs mt-0.5 ${
-                  formData.justification.length >= 10 ? 'text-emerald-400' : 'text-slate-500'
+                  formData.justification.length >= 10 ? 'text-status-success' : 'text-content-muted'
                 }`}>
                   {formData.justification.length}/10 min
                 </div>
@@ -381,19 +381,19 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
             <div className="space-y-3">
               {/* Montant */}
               <div>
-                <label className="text-xs text-slate-400 mb-1 block">Nouveau montant</label>
+                <label className="text-xs text-content-muted mb-1 block">Nouveau montant</label>
                 <div className="relative">
                   <input
                     type="number"
                     value={formData.nouveauMontantDemande}
                     onChange={(e) => handleNumberChange('nouveauMontantDemande', e.target.value)}
-                    className="w-full bg-slate-800/50 rounded-lg p-2.5 text-white text-lg font-bold border border-slate-700 focus:border-amber-500 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    className="w-full bg-surface/50 rounded-lg p-2.5 text-content-primary text-lg font-bold border border-edge focus:border-status-warning focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     placeholder="0"
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">FCFA</span>
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-content-muted text-sm">FCFA</span>
                 </div>
                 {Number(formData.nouveauMontantDemande) < Number(demande.montantDemande) && formData.nouveauMontantDemande !== '' && (
-                  <div className="mt-1 text-xs text-emerald-400 flex items-center gap-1">
+                  <div className="mt-1 text-xs text-status-success flex items-center gap-1">
                     <TrendingDown size={12} />
                     -{Math.round((1 - Number(formData.nouveauMontantDemande) / Number(demande.montantDemande)) * 100)}% ({formatMoney(Number(demande.montantDemande) - Number(formData.nouveauMontantDemande))})
                   </div>
@@ -403,7 +403,7 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
               {/* Durée */}
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-xs text-slate-400 mb-1 block">Durée</label>
+                  <label className="text-xs text-content-muted mb-1 block">Durée</label>
                   <input
                     type="number"
                     value={formData.nouvelleDureeValeur === undefined ? demande.dureeValeur : formData.nouvelleDureeValeur}
@@ -414,15 +414,15 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
                          nouvelleDureeValeur: val === '' ? '' : parseInt(val)
                        }));
                     }}
-                    className="w-full bg-slate-800/50 rounded-lg p-2.5 text-white border border-slate-700 focus:border-amber-500 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    className="w-full bg-surface/50 rounded-lg p-2.5 text-content-primary border border-edge focus:border-status-warning focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-slate-400 mb-1 block">Unité</label>
+                  <label className="text-xs text-content-muted mb-1 block">Unité</label>
                   <select
                     value={formData.nouvelleDureeUnite || demande.dureeUnite}
                     onChange={(e) => setFormData(prev => ({ ...prev, nouvelleDureeUnite: e.target.value }))}
-                    className="w-full bg-slate-800/50 rounded-lg p-2.5 text-white border border-slate-700 focus:border-amber-500 focus:outline-none"
+                    className="w-full bg-surface/50 rounded-lg p-2.5 text-content-primary border border-edge focus:border-status-warning focus:outline-none"
                   >
                     <option value="Jour">Jour(s)</option>
                     <option value="Semaine">Semaine(s)</option>
@@ -435,7 +435,7 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
 
           {step === 'garanties' && (
             <div className="space-y-3">
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-content-muted">
                 Garanties supplémentaires (optionnel)
               </p>
 
@@ -447,21 +447,21 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
                     { type: '', description: '', valeurEstimee: 0, documents: [] }
                   ]
                 }))}
-                className="w-full p-2 border border-dashed border-slate-600 rounded-lg text-slate-400 text-sm hover:border-amber-500 hover:text-amber-400 transition-colors"
+                className="w-full p-2 border border-dashed border-edge-strong rounded-lg text-content-muted text-sm hover:border-status-warning hover:text-status-warning transition-colors"
               >
                 + Ajouter une garantie
               </button>
 
               {formData.garantiesAdditionnelles.map((garantie, idx) => (
-                <div key={idx} className="p-2 bg-slate-800/50 rounded-lg space-y-2">
+                <div key={idx} className="p-2 bg-surface/50 rounded-lg space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="text-xs font-medium text-slate-300">Garantie #{idx + 1}</span>
+                    <span className="text-xs font-medium text-content-secondary">Garantie #{idx + 1}</span>
                     <button
                       onClick={() => setFormData(prev => ({
                         ...prev,
                         garantiesAdditionnelles: prev.garantiesAdditionnelles.filter((_, i) => i !== idx)
                       }))}
-                      className="text-red-400 hover:text-red-300"
+                      className="text-status-danger hover:text-status-danger"
                     >
                       <X size={14} />
                     </button>
@@ -476,7 +476,7 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
                         newGaranties[idx] = { ...garantie, type: e.target.value };
                         setFormData(prev => ({ ...prev, garantiesAdditionnelles: newGaranties }));
                       }}
-                      className="w-full bg-slate-900/50 rounded p-2 text-white text-xs border border-slate-700 focus:border-amber-500 focus:outline-none"
+                      className="w-full bg-surface-base/50 rounded p-2 text-content-primary text-xs border border-edge focus:border-status-warning focus:outline-none"
                     />
                     <input
                       type="number"
@@ -487,7 +487,7 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
                         newGaranties[idx] = { ...garantie, valeurEstimee: parseFloat(e.target.value) || 0 };
                         setFormData(prev => ({ ...prev, garantiesAdditionnelles: newGaranties }));
                       }}
-                      className="w-full bg-slate-900/50 rounded p-2 text-white text-xs border border-slate-700 focus:border-amber-500 focus:outline-none"
+                      className="w-full bg-surface-base/50 rounded p-2 text-content-primary text-xs border border-edge focus:border-status-warning focus:outline-none"
                     />
                   </div>
                   <textarea
@@ -498,7 +498,7 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
                       newGaranties[idx] = { ...garantie, description: e.target.value };
                       setFormData(prev => ({ ...prev, garantiesAdditionnelles: newGaranties }));
                     }}
-                    className="w-full bg-slate-900/50 rounded p-2 text-white text-xs border border-slate-700 focus:border-amber-500 focus:outline-none"
+                    className="w-full bg-surface-base/50 rounded p-2 text-content-primary text-xs border border-edge focus:border-status-warning focus:outline-none"
                     rows={1}
                   />
                 </div>
@@ -506,8 +506,8 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
 
               {/* Co-borrower section */}
               {formData.elementsNouveaux.some(e => e.type === 'Co-emprunteur') && (
-                <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg space-y-2">
-                  <h4 className="text-xs font-bold text-blue-400 flex items-center gap-1">
+                <div className="p-3 bg-status-info-bg border border-status-info/30 rounded-lg space-y-2">
+                  <h4 className="text-xs font-bold text-status-info flex items-center gap-1">
                     <Users size={14} /> Co-emprunteur
                   </h4>
 
@@ -526,7 +526,7 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
                           consentement: prev.coEmprunteur?.consentement || false
                         }
                       }))}
-                      className="w-full bg-slate-900/50 rounded p-2 text-white text-xs border border-slate-700 focus:border-blue-500 focus:outline-none"
+                      className="w-full bg-surface-base/50 rounded p-2 text-content-primary text-xs border border-edge focus:border-status-info focus:outline-none"
                     />
                     <select
                       value={formData.coEmprunteur?.relation || ''}
@@ -540,7 +540,7 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
                           consentement: prev.coEmprunteur?.consentement || false
                         }
                       }))}
-                      className="w-full bg-slate-900/50 rounded p-2 text-white text-xs border border-slate-700 focus:border-blue-500 focus:outline-none"
+                      className="w-full bg-surface-base/50 rounded p-2 text-content-primary text-xs border border-edge focus:border-status-info focus:outline-none"
                     >
                       <option value="">Relation...</option>
                       <option value="Conjoint(e)">Conjoint(e)</option>
@@ -566,7 +566,7 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
                         consentement: prev.coEmprunteur?.consentement || false
                       }
                     }))}
-                    className="w-full bg-slate-900/50 rounded p-2 text-white text-xs border border-slate-700 focus:border-blue-500 focus:outline-none"
+                    className="w-full bg-surface-base/50 rounded p-2 text-content-primary text-xs border border-edge focus:border-status-info focus:outline-none"
                   />
 
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -583,9 +583,9 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
                           consentement: e.target.checked
                         }
                       }))}
-                      className="w-4 h-4 rounded bg-slate-700 border-slate-600 text-blue-500 focus:ring-blue-500"
+                      className="w-4 h-4 rounded bg-surface-elevated border-edge-strong text-status-info focus:ring-status-info"
                     />
-                    <span className="text-xs text-slate-300">Consentement du co-emprunteur</span>
+                    <span className="text-xs text-content-secondary">Consentement du co-emprunteur</span>
                   </label>
                 </div>
               )}
@@ -596,32 +596,32 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
             <div className="space-y-3">
               {/* Comparatif avant/après */}
               <div className="grid grid-cols-2 gap-2">
-                <div className="p-2 bg-red-500/10 border border-red-500/30 rounded-lg">
-                  <div className="text-xs text-red-400">Initiale</div>
-                  <div className="text-lg font-bold text-white">{formatMoney(demande.montantDemande)}</div>
-                  <div className="text-xs text-slate-400">
+                <div className="p-2 bg-status-danger-bg border border-status-danger/30 rounded-lg">
+                  <div className="text-xs text-status-danger">Initiale</div>
+                  <div className="text-lg font-bold text-content-primary">{formatMoney(demande.montantDemande)}</div>
+                  <div className="text-xs text-content-muted">
                     {demande.dureeValeur} {formatDureeUnite(demande.dureeUnite, demande.dureeValeur)}
                   </div>
                 </div>
 
-                <div className="p-2 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-                  <div className="text-xs text-amber-400">Nouvelle</div>
-                  <div className="text-lg font-bold text-white">{formatMoney(formData.nouveauMontantDemande)}</div>
-                  <div className="text-xs text-slate-400">
+                <div className="p-2 bg-status-warning-bg border border-status-warning/30 rounded-lg">
+                  <div className="text-xs text-status-warning">Nouvelle</div>
+                  <div className="text-lg font-bold text-content-primary">{formatMoney(formData.nouveauMontantDemande)}</div>
+                  <div className="text-xs text-content-muted">
                     {formData.nouvelleDureeValeur || demande.dureeValeur} {formatDureeUnite(formData.nouvelleDureeUnite || demande.dureeUnite, Number(formData.nouvelleDureeValeur || demande.dureeValeur))}
                     {Number(formData.nouveauMontantDemande) < Number(demande.montantDemande) && formData.nouveauMontantDemande !== '' && (
-                      <span className="ml-2 text-emerald-400">-{Math.round((1 - Number(formData.nouveauMontantDemande) / Number(demande.montantDemande)) * 100)}%</span>
+                      <span className="ml-2 text-status-success">-{Math.round((1 - Number(formData.nouveauMontantDemande) / Number(demande.montantDemande)) * 100)}%</span>
                     )}
                   </div>
                 </div>
               </div>
 
               {/* Éléments nouveaux */}
-              <div className="p-2 bg-slate-800/50 rounded-lg">
-                <div className="text-xs text-slate-400 mb-1">Éléments ({formData.elementsNouveaux.length})</div>
+              <div className="p-2 bg-surface/50 rounded-lg">
+                <div className="text-xs text-content-muted mb-1">Éléments ({formData.elementsNouveaux.length})</div>
                 <div className="flex flex-wrap gap-1">
                   {formData.elementsNouveaux.map((el, i) => (
-                    <span key={i} className="px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded-full text-xs">
+                    <span key={i} className="px-2 py-0.5 bg-status-warning-bg text-status-warning rounded-full text-xs">
                       {el.type}
                     </span>
                   ))}
@@ -630,13 +630,13 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
 
               {/* Garanties */}
               {formData.garantiesAdditionnelles.length > 0 && (
-                <div className="p-2 bg-slate-800/50 rounded-lg">
-                  <div className="text-xs text-slate-400 mb-1">Garanties</div>
+                <div className="p-2 bg-surface/50 rounded-lg">
+                  <div className="text-xs text-content-muted mb-1">Garanties</div>
                   <div className="space-y-1">
                     {formData.garantiesAdditionnelles.map((g, i) => (
                       <div key={i} className="flex justify-between text-xs">
-                        <span className="text-white">{g.type || 'Non spécifié'}</span>
-                        <span className="text-emerald-400">{formatMoney(g.valeurEstimee)}</span>
+                        <span className="text-content-primary">{g.type || 'Non spécifié'}</span>
+                        <span className="text-status-success">{formatMoney(g.valeurEstimee)}</span>
                       </div>
                     ))}
                   </div>
@@ -644,20 +644,20 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
               )}
 
               {/* Justification */}
-              <div className="p-2 bg-slate-800/50 rounded-lg">
-                <div className="text-xs text-slate-400 mb-1">Justification</div>
-                <p className="text-white text-xs">{formData.justification}</p>
+              <div className="p-2 bg-surface/50 rounded-lg">
+                <div className="text-xs text-content-muted mb-1">Justification</div>
+                <p className="text-content-primary text-xs">{formData.justification}</p>
               </div>
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="p-3 border-t border-slate-700 flex justify-between">
+        <div className="p-3 border-t border-edge flex justify-between">
           {step !== 'elements' ? (
             <button
               onClick={() => goToStep('prev')}
-              className="px-4 py-2 bg-slate-700 text-white text-sm rounded-lg hover:bg-slate-600 transition-colors flex items-center gap-1"
+              className="px-4 py-2 bg-surface-elevated text-content-primary text-sm rounded-lg hover:bg-surface-subtle transition-colors flex items-center gap-1"
             >
               <ChevronLeft size={16} /> Précédent
             </button>
@@ -669,7 +669,7 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
             <button
               onClick={() => goToStep('next')}
               disabled={!canGoNext()}
-              className="px-4 py-2 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-700 disabled:text-slate-500 text-black text-sm font-bold rounded-lg transition-colors flex items-center gap-1"
+              className="px-4 py-2 bg-status-warning hover:bg-status-warning disabled:bg-surface-elevated disabled:text-content-muted text-black text-sm font-bold rounded-lg transition-colors flex items-center gap-1"
             >
               Suivant <ChevronRight size={16} />
             </button>
@@ -677,7 +677,7 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
             <button
               onClick={handleSubmit}
               disabled={submitting}
-              className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold rounded-lg transition-colors flex items-center gap-1"
+              className="px-4 py-2 bg-status-success hover:bg-status-success text-white text-sm font-bold rounded-lg transition-colors flex items-center gap-1"
             >
               {submitting ? <Loader2 className="animate-spin" size={16} /> : <Check size={16} />}
               Soumettre

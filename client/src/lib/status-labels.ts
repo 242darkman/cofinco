@@ -114,33 +114,33 @@ export const ACCOUNT_STATUS_LABELS: Record<StatutCompteType, string> = {
 };
 
 export const ACCOUNT_STATUS_COLORS: Record<StatutCompteType, string> = {
-  ACTIVE: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
-  PENDING_ACTIVATION: "bg-amber-500/10 text-amber-500 border-amber-500/20",
-  PENDING_VALIDATION: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-  PENDING_PAYMENT: "bg-amber-500/10 text-amber-500 border-amber-500/20",
-  PENDING_APPROVAL: "bg-blue-500/10 text-blue-400 border-blue-500/20",
-  PENDING_PAYMENT_AND_APPROVAL: "bg-orange-500/10 text-orange-400 border-orange-500/20",
-  SUSPENDED: "bg-orange-500/20 text-orange-400 border-orange-500/30",
-  CLOSED: "bg-slate-700 text-slate-400 border-transparent",
-  CANCELLED: "bg-red-500/20 text-red-400 border-red-500/30",
-  CLOSURE_PENDING: "bg-purple-500/20 text-purple-400 border-purple-500/30",
+  ACTIVE: "bg-status-success-bg text-status-success border-status-success/20",
+  PENDING_ACTIVATION: "bg-status-warning-bg text-status-warning border-status-warning/20",
+  PENDING_VALIDATION: "bg-status-info-bg text-status-info border-status-info/20",
+  PENDING_PAYMENT: "bg-status-warning-bg text-status-warning border-status-warning/20",
+  PENDING_APPROVAL: "bg-status-info-bg text-status-info border-status-info/20",
+  PENDING_PAYMENT_AND_APPROVAL: "bg-status-warning-bg text-status-warning border-status-warning/20",
+  SUSPENDED: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  CLOSED: "bg-surface-elevated text-content-muted border-transparent",
+  CANCELLED: "bg-status-danger-bg text-status-danger border-status-danger/30",
+  CLOSURE_PENDING: "bg-status-info-bg text-status-info border-status-info/30",
 };
 
 // --- Statut Client ---
 export const CLIENT_STATUS_COLORS: Record<string, string> = {
-  ACTIVE: "bg-green-500/20 text-green-400 border-green-500/30",
-  INACTIVE: "bg-gray-500/20 text-gray-400 border-gray-500/30",
-  SUSPENDED: "bg-orange-500/20 text-orange-400 border-orange-500/30",
-  DELETED: "bg-red-500/20 text-red-400 border-red-500/30",
+  ACTIVE: "bg-status-success-bg text-status-success border-status-success/30",
+  INACTIVE: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
+  SUSPENDED: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  DELETED: "bg-status-danger-bg text-status-danger border-status-danger/30",
 };
 
 // --- Statut Prospection ---
 export const PROSPECTION_STATUS_COLORS: Record<string, string> = {
-  REGISTERED: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-  INTERESTED: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-  REFUSED: 'bg-red-500/20 text-red-400 border-red-500/30',
-  TO_FOLLOW_UP: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-  CONVERTED_TO_CLIENT: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+  REGISTERED: 'bg-status-info-bg text-status-info border-status-info/30',
+  INTERESTED: 'bg-status-success-bg text-status-success border-status-success/30',
+  REFUSED: 'bg-status-danger-bg text-status-danger border-status-danger/30',
+  TO_FOLLOW_UP: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+  CONVERTED_TO_CLIENT: 'bg-status-info-bg text-status-info border-status-info/30',
 };
 
 // --- Segment Client ---
@@ -157,15 +157,15 @@ export const CLIENT_SEGMENT_LABELS: Record<string, string> = {
 };
 
 export const CLIENT_SEGMENT_COLORS: Record<string, string> = {
-  Standard: "bg-slate-500/10 text-slate-500 border-slate-500/20",
-  Premium: "bg-purple-500/20 text-purple-400 border-purple-500/30",
-  VIP: "bg-amber-500/20 text-amber-400 border-amber-500/30",
-  Risque: "bg-red-500/20 text-red-400 border-red-500/30",
+  Standard: "bg-surface-subtle/30 text-content-muted border-edge-strong/20",
+  Premium: "bg-status-info-bg text-status-info border-status-info/30",
+  VIP: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  Risque: "bg-status-danger-bg text-status-danger border-status-danger/30",
   // Legacy uppercase fallbacks
-  STANDARD: "bg-slate-500/10 text-slate-500 border-slate-500/20",
-  PREMIUM: "bg-purple-500/20 text-purple-400 border-purple-500/30",
-  RISQUE: "bg-red-500/20 text-red-400 border-red-500/30",
-  RISKY: "bg-red-500/20 text-red-400 border-red-500/30",
+  STANDARD: "bg-surface-subtle/30 text-content-muted border-edge-strong/20",
+  PREMIUM: "bg-status-info-bg text-status-info border-status-info/30",
+  RISQUE: "bg-status-danger-bg text-status-danger border-status-danger/30",
+  RISKY: "bg-status-danger-bg text-status-danger border-status-danger/30",
 };
 
 // --- Statut Crédit ---
@@ -180,31 +180,31 @@ export const CREDIT_STATUS_LABELS: Record<StatutCreditType, string> = {
 };
 
 export const CREDIT_STATUS_COLORS: Record<StatutCreditType, string> = {
-  PENDING: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  ACTIVE: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  LATE: "bg-red-500/20 text-red-400 border-red-500/30",
-  PAID: "bg-green-500/20 text-green-400 border-green-500/30",
-  CLOSED: "bg-gray-500/20 text-gray-400 border-gray-500/30",
-  CANCELLED: "bg-gray-500/20 text-gray-400 border-gray-500/30",
-  WAITING_DISBURSEMENT: "bg-orange-500/20 text-orange-400 border-orange-500/30",
+  PENDING: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  ACTIVE: "bg-status-info-bg text-status-info border-status-info/30",
+  LATE: "bg-status-danger-bg text-status-danger border-status-danger/30",
+  PAID: "bg-status-success-bg text-status-success border-status-success/30",
+  CLOSED: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
+  CANCELLED: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
+  WAITING_DISBURSEMENT: "bg-status-warning-bg text-status-warning border-status-warning/30",
 };
 
 // --- Statut Demande Crédit ---
 export const CREDIT_REQUEST_STATUS_COLORS: Record<string, string> = {
-  PENDING_FEES: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  READY_FOR_INVESTIGATION: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  UNDER_INVESTIGATION: "bg-purple-500/20 text-purple-400 border-purple-500/30",
-  INVESTIGATION_COMPLETE: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
-  PENDING_APPROVAL: "bg-orange-500/20 text-orange-400 border-orange-500/30",
-  APPROVED: "bg-green-500/20 text-green-400 border-green-500/30",
-  REJECTED: "bg-red-500/20 text-red-400 border-red-500/30",
-  CANCELLED: "bg-gray-500/20 text-gray-400 border-gray-500/30",
-  DISBURSED: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-  CLOSED: "bg-gray-500/20 text-gray-400 border-gray-500/30",
-  REEVALUATION_IN_PROGRESS: "bg-orange-500/20 text-orange-400 border-orange-500/30",
-  APPROVED_AFTER_REEVALUATION: "bg-green-500/20 text-green-400 border-green-500/30",
-  DEFINITIVELY_REJECTED: "bg-red-600/20 text-red-500 border-red-600/30",
-  DELETED: "bg-red-500/10 text-red-500 border-red-500/20",
+  PENDING_FEES: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  READY_FOR_INVESTIGATION: "bg-status-info-bg text-status-info border-status-info/30",
+  UNDER_INVESTIGATION: "bg-status-info-bg text-status-info border-status-info/30",
+  INVESTIGATION_COMPLETE: "bg-accent/10 text-accent border-accent/30",
+  PENDING_APPROVAL: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  APPROVED: "bg-status-success-bg text-status-success border-status-success/30",
+  REJECTED: "bg-status-danger-bg text-status-danger border-status-danger/30",
+  CANCELLED: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
+  DISBURSED: "bg-status-success-bg text-status-success border-status-success/30",
+  CLOSED: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
+  REEVALUATION_IN_PROGRESS: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  APPROVED_AFTER_REEVALUATION: "bg-status-success-bg text-status-success border-status-success/30",
+  DEFINITIVELY_REJECTED: "bg-status-danger-bg text-status-danger border-status-danger/30",
+  DELETED: "bg-status-danger-bg text-status-danger border-status-danger/20",
 };
 
 // --- Statut Transaction ---
@@ -217,11 +217,11 @@ export const TRANSACTION_STATUS_LABELS: Record<StatutTransactionType, string> = 
 };
 
 export const TRANSACTION_STATUS_COLORS: Record<StatutTransactionType, string> = {
-  PENDING: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  PENDING_SETTLEMENT: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  POSTED: "bg-green-500/20 text-green-400 border-green-500/30",
-  CANCELLED: "bg-red-500/20 text-red-400 border-red-500/30",
-  REVERSED: "bg-orange-500/20 text-orange-400 border-orange-500/30",
+  PENDING: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  PENDING_SETTLEMENT: "bg-status-info-bg text-status-info border-status-info/30",
+  POSTED: "bg-status-success-bg text-status-success border-status-success/30",
+  CANCELLED: "bg-status-danger-bg text-status-danger border-status-danger/30",
+  REVERSED: "bg-status-warning-bg text-status-warning border-status-warning/30",
 };
 
 // --- Statut Transfert Caisse ---
@@ -234,11 +234,11 @@ export const TRANSFER_CAISSE_STATUS_LABELS: Record<StatutTransfertCaisseType, st
 };
 
 export const TRANSFER_CAISSE_STATUS_COLORS: Record<StatutTransfertCaisseType, string> = {
-  PENDING: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  VALIDATED: "bg-green-500/20 text-green-400 border-green-500/30",
-  REJECTED: "bg-red-500/20 text-red-400 border-red-500/30",
-  CANCELLED: "bg-gray-500/20 text-gray-400 border-gray-500/30",
-  RECEIVED: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+  PENDING: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  VALIDATED: "bg-status-success-bg text-status-success border-status-success/30",
+  REJECTED: "bg-status-danger-bg text-status-danger border-status-danger/30",
+  CANCELLED: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
+  RECEIVED: "bg-status-info-bg text-status-info border-status-info/30",
 };
 
 // --- Statut Transfert Coffre ---
@@ -251,11 +251,11 @@ export const TRANSFER_COFFRE_STATUS_LABELS: Record<StatutTransfertCoffreType, st
 };
 
 export const TRANSFER_COFFRE_STATUS_COLORS: Record<StatutTransfertCoffreType, string> = {
-  REQUESTED: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  VALIDATED: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  EXECUTED: "bg-green-500/20 text-green-400 border-green-500/30",
-  REJECTED: "bg-red-500/20 text-red-400 border-red-500/30",
-  CANCELLED: "bg-gray-500/20 text-gray-400 border-gray-500/30",
+  REQUESTED: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  VALIDATED: "bg-status-info-bg text-status-info border-status-info/30",
+  EXECUTED: "bg-status-success-bg text-status-success border-status-success/30",
+  REJECTED: "bg-status-danger-bg text-status-danger border-status-danger/30",
+  CANCELLED: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
 };
 
 // --- Statut Transfert Inter-Coffre ---
@@ -272,15 +272,15 @@ export const TRANSFER_INTER_COFFRE_STATUS_LABELS: Record<StatutTransfertInterCof
 };
 
 export const TRANSFER_INTER_COFFRE_STATUS_COLORS: Record<StatutTransfertInterCoffreType, string> = {
-  DRAFT: "bg-gray-500/20 text-gray-400 border-gray-500/30",
-  SUBMITTED: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  APPROVED_L1: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
-  APPROVED_L2: "bg-teal-500/20 text-teal-400 border-teal-500/30",
-  IN_TRANSIT: "bg-purple-500/20 text-purple-400 border-purple-500/30",
-  RECEIVED: "bg-green-500/20 text-green-400 border-green-500/30",
-  RECEIVED_WITH_DISCREPANCY: "bg-orange-500/20 text-orange-400 border-orange-500/30",
-  REJECTED: "bg-red-500/20 text-red-400 border-red-500/30",
-  CANCELLED: "bg-gray-500/20 text-gray-400 border-gray-500/30",
+  DRAFT: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
+  SUBMITTED: "bg-status-info-bg text-status-info border-status-info/30",
+  APPROVED_L1: "bg-accent/10 text-accent border-accent/30",
+  APPROVED_L2: "bg-accent/10 text-accent border-accent/30",
+  IN_TRANSIT: "bg-status-info-bg text-status-info border-status-info/30",
+  RECEIVED: "bg-status-success-bg text-status-success border-status-success/30",
+  RECEIVED_WITH_DISCREPANCY: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  REJECTED: "bg-status-danger-bg text-status-danger border-status-danger/30",
+  CANCELLED: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
 };
 
 // --- Statut Coffre ---
@@ -291,9 +291,9 @@ export const COFFRE_STATUS_LABELS: Record<StatutCoffreType, string> = {
 };
 
 export const COFFRE_STATUS_COLORS: Record<StatutCoffreType, string> = {
-  ACTIVE: "bg-green-500/20 text-green-400 border-green-500/30",
-  SUSPENDED: "bg-orange-500/20 text-orange-400 border-orange-500/30",
-  CLOSED: "bg-gray-500/20 text-gray-400 border-gray-500/30",
+  ACTIVE: "bg-status-success-bg text-status-success border-status-success/30",
+  SUSPENDED: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  CLOSED: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
 };
 
 // --- Statut User ---
@@ -304,17 +304,17 @@ export const USER_STATUS_LABELS: Record<StatutUserType, string> = {
 };
 
 export const USER_STATUS_COLORS: Record<StatutUserType, string> = {
-  ACTIVE: "bg-green-500/20 text-green-400 border-green-500/30",
-  INACTIVE: "bg-gray-500/20 text-gray-400 border-gray-500/30",
-  SUSPENDED: "bg-orange-500/20 text-orange-400 border-orange-500/30",
+  ACTIVE: "bg-status-success-bg text-status-success border-status-success/30",
+  INACTIVE: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
+  SUSPENDED: "bg-status-warning-bg text-status-warning border-status-warning/30",
 };
 
 // --- Priorité ---
 export const PRIORITY_COLORS: Record<string, string> = {
-  LOW: "bg-gray-500/20 text-gray-400 border-gray-500/30",
-  NORMAL: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  HIGH: "bg-orange-500/20 text-orange-400 border-orange-500/30",
-  CRITICAL: "bg-red-500/20 text-red-400 border-red-500/30",
+  LOW: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
+  NORMAL: "bg-status-info-bg text-status-info border-status-info/30",
+  HIGH: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  CRITICAL: "bg-status-danger-bg text-status-danger border-status-danger/30",
 };
 
 // --- Statut Opération (success/fail générique) ---
@@ -328,10 +328,10 @@ export const OPERATION_STATUS_LABELS: Record<OperationStatusType, string> = {
 };
 
 export const OPERATION_STATUS_COLORS: Record<OperationStatusType, string> = {
-  SUCCESS: "bg-green-500/20 text-green-400 border-green-500/30",
-  FAILED: "bg-red-500/20 text-red-400 border-red-500/30",
-  PENDING: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  CANCELLED: "bg-gray-500/20 text-gray-400 border-gray-500/30",
+  SUCCESS: "bg-status-success-bg text-status-success border-status-success/30",
+  FAILED: "bg-status-danger-bg text-status-danger border-status-danger/30",
+  PENDING: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  CANCELLED: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
 };
 
 // --- Sens Mouvement ---
@@ -343,8 +343,8 @@ export const SENS_MOUVEMENT_LABELS: Record<SensMouvementType, string> = {
 };
 
 export const SENS_MOUVEMENT_COLORS: Record<SensMouvementType, string> = {
-  DEBIT: "bg-red-500/20 text-red-400 border-red-500/30",
-  CREDIT: "bg-green-500/20 text-green-400 border-green-500/30",
+  DEBIT: "bg-status-danger-bg text-status-danger border-status-danger/30",
+  CREDIT: "bg-status-success-bg text-status-success border-status-success/30",
 };
 
 // --- Méthode de Paiement (étendu par rapport à status-constants) ---
@@ -360,12 +360,12 @@ export const METHODE_PAIEMENT_LABELS: Record<MethodePaiementExtendedType, string
 };
 
 export const METHODE_PAIEMENT_COLORS: Record<MethodePaiementExtendedType, string> = {
-  CASH: "bg-green-500/20 text-green-400 border-green-500/30",
-  MOBILE_MONEY: "bg-purple-500/20 text-purple-400 border-purple-500/30",
-  TRANSFER: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  CARD: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
-  CHECK: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  OTHER: "bg-gray-500/20 text-gray-400 border-gray-500/30",
+  CASH: "bg-status-success-bg text-status-success border-status-success/30",
+  MOBILE_MONEY: "bg-status-info-bg text-status-info border-status-info/30",
+  TRANSFER: "bg-status-info-bg text-status-info border-status-info/30",
+  CARD: "bg-accent/10 text-accent border-accent/30",
+  CHECK: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  OTHER: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
 };
 
 // --- Type Transaction Épargne ---
@@ -380,11 +380,11 @@ export const TYPE_TRANSACTION_EPARGNE_LABELS: Record<TypeTransactionEpargneType,
 };
 
 export const TYPE_TRANSACTION_EPARGNE_COLORS: Record<TypeTransactionEpargneType, string> = {
-  DEPOSIT: "bg-green-500/20 text-green-400 border-green-500/30",
-  WITHDRAWAL: "bg-red-500/20 text-red-400 border-red-500/30",
-  INTEREST: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  FEE: "bg-orange-500/20 text-orange-400 border-orange-500/30",
-  ADJUSTMENT: "bg-gray-500/20 text-gray-400 border-gray-500/30",
+  DEPOSIT: "bg-status-success-bg text-status-success border-status-success/30",
+  WITHDRAWAL: "bg-status-danger-bg text-status-danger border-status-danger/30",
+  INTEREST: "bg-status-info-bg text-status-info border-status-info/30",
+  FEE: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  ADJUSTMENT: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
 };
 
 // --- Type Opération Caisse ---
@@ -428,30 +428,30 @@ export const TYPE_OPERATION_CAISSE_LABELS: Record<TypeOperationCaisseType, strin
 };
 
 export const TYPE_OPERATION_CAISSE_COLORS: Record<TypeOperationCaisseType, string> = {
-  SAVINGS_DEPOSIT: "bg-green-500/20 text-green-400 border-green-500/30",
-  SAVINGS_WITHDRAWAL: "bg-red-500/20 text-red-400 border-red-500/30",
-  CREDIT_DISBURSEMENT: "bg-purple-500/20 text-purple-400 border-purple-500/30",
-  CREDIT_REPAYMENT: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  ENGAGEMENT_FEE: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  FEE: "bg-orange-500/20 text-orange-400 border-orange-500/30",
-  ADJUSTMENT: "bg-gray-500/20 text-gray-400 border-gray-500/30",
-  CASH_TRANSFER: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
-  SAFE_SUPPLY: "bg-indigo-500/20 text-indigo-400 border-indigo-500/30",
-  SAFE_DEPOSIT: "bg-indigo-500/20 text-indigo-400 border-indigo-500/30",
-  DEPOSIT_SAVINGS: "bg-green-500/20 text-green-400 border-green-500/30",
-  DEPOSIT_CURRENT: "bg-green-500/20 text-green-400 border-green-500/30",
-  WITHDRAWAL_CURRENT: "bg-red-500/20 text-red-400 border-red-500/30",
-  DEPOSIT_BLOCKED: "bg-teal-500/20 text-teal-400 border-teal-500/30",
-  WITHDRAWAL_BLOCKED: "bg-amber-500/20 text-amber-400 border-amber-500/30",
-  MISC_COLLECTION: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-  MISC_DISBURSEMENT: "bg-rose-500/20 text-rose-400 border-rose-500/30",
-  BANK_FEE: "bg-orange-500/20 text-orange-400 border-orange-500/30",
-  TONTINE_CONTRIBUTION: "bg-violet-500/20 text-violet-400 border-violet-500/30",
-  TONTINE_WITHDRAWAL: "bg-fuchsia-500/20 text-fuchsia-400 border-fuchsia-500/30",
-  LOAN_REPAYMENT: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  LOAN_DISBURSEMENT: "bg-purple-500/20 text-purple-400 border-purple-500/30",
-  WITHDRAWAL_SAVINGS: "bg-red-500/20 text-red-400 border-red-500/30",
-  INITIAL_DEPOSIT: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+  SAVINGS_DEPOSIT: "bg-status-success-bg text-status-success border-status-success/30",
+  SAVINGS_WITHDRAWAL: "bg-status-danger-bg text-status-danger border-status-danger/30",
+  CREDIT_DISBURSEMENT: "bg-status-info-bg text-status-info border-status-info/30",
+  CREDIT_REPAYMENT: "bg-status-info-bg text-status-info border-status-info/30",
+  ENGAGEMENT_FEE: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  FEE: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  ADJUSTMENT: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
+  CASH_TRANSFER: "bg-accent/10 text-accent border-accent/30",
+  SAFE_SUPPLY: "bg-accent/10 text-accent border-accent/30",
+  SAFE_DEPOSIT: "bg-accent/10 text-accent border-accent/30",
+  DEPOSIT_SAVINGS: "bg-status-success-bg text-status-success border-status-success/30",
+  DEPOSIT_CURRENT: "bg-status-success-bg text-status-success border-status-success/30",
+  WITHDRAWAL_CURRENT: "bg-status-danger-bg text-status-danger border-status-danger/30",
+  DEPOSIT_BLOCKED: "bg-accent/10 text-accent border-accent/30",
+  WITHDRAWAL_BLOCKED: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  MISC_COLLECTION: "bg-status-success-bg text-status-success border-status-success/30",
+  MISC_DISBURSEMENT: "bg-status-danger-bg text-status-danger border-status-danger/30",
+  BANK_FEE: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  TONTINE_CONTRIBUTION: "bg-accent/10 text-accent border-accent/30",
+  TONTINE_WITHDRAWAL: "bg-accent/10 text-accent border-accent/30",
+  LOAN_REPAYMENT: "bg-status-info-bg text-status-info border-status-info/30",
+  LOAN_DISBURSEMENT: "bg-status-info-bg text-status-info border-status-info/30",
+  WITHDRAWAL_SAVINGS: "bg-status-danger-bg text-status-danger border-status-danger/30",
+  INITIAL_DEPOSIT: "bg-status-success-bg text-status-success border-status-success/30",
 };
 
 // --- Type Paiement Terrain ---
@@ -484,23 +484,23 @@ export const TYPE_PAIEMENT_TERRAIN_LABELS: Record<TypePaiementTerrainType, strin
 };
 
 export const TYPE_PAIEMENT_TERRAIN_COLORS: Record<TypePaiementTerrainType, string> = {
-  DEPOSIT_SAVINGS: "bg-green-500/20 text-green-400 border-green-500/30",
-  DEPOSIT_CURRENT: "bg-green-500/20 text-green-400 border-green-500/30",
-  DEPOSIT_BLOCKED: "bg-teal-500/20 text-teal-400 border-teal-500/30",
-  WITHDRAWAL_SAVINGS: "bg-red-500/20 text-red-400 border-red-500/30",
-  WITHDRAWAL_CURRENT: "bg-red-500/20 text-red-400 border-red-500/30",
-  WITHDRAWAL_BLOCKED: "bg-amber-500/20 text-amber-400 border-amber-500/30",
-  CREDIT_REPAYMENT: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  ENGAGEMENT_FEE: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  CREDIT_DISBURSEMENT: "bg-purple-500/20 text-purple-400 border-purple-500/30",
-  TONTINE_CONTRIBUTION: "bg-violet-500/20 text-violet-400 border-violet-500/30",
-  TONTINE_WITHDRAWAL: "bg-fuchsia-500/20 text-fuchsia-400 border-fuchsia-500/30",
-  SAFE_SUPPLY: "bg-indigo-500/20 text-indigo-400 border-indigo-500/30",
-  SAFE_DEPOSIT: "bg-indigo-500/20 text-indigo-400 border-indigo-500/30",
-  TRANSFER_IN: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
-  TRANSFER_OUT: "bg-orange-500/20 text-orange-400 border-orange-500/30",
-  INITIAL_DEPOSIT: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-  INTERNAL_TRANSFER: "bg-sky-500/20 text-sky-400 border-sky-500/30",
+  DEPOSIT_SAVINGS: "bg-status-success-bg text-status-success border-status-success/30",
+  DEPOSIT_CURRENT: "bg-status-success-bg text-status-success border-status-success/30",
+  DEPOSIT_BLOCKED: "bg-accent/10 text-accent border-accent/30",
+  WITHDRAWAL_SAVINGS: "bg-status-danger-bg text-status-danger border-status-danger/30",
+  WITHDRAWAL_CURRENT: "bg-status-danger-bg text-status-danger border-status-danger/30",
+  WITHDRAWAL_BLOCKED: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  CREDIT_REPAYMENT: "bg-status-info-bg text-status-info border-status-info/30",
+  ENGAGEMENT_FEE: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  CREDIT_DISBURSEMENT: "bg-status-info-bg text-status-info border-status-info/30",
+  TONTINE_CONTRIBUTION: "bg-accent/10 text-accent border-accent/30",
+  TONTINE_WITHDRAWAL: "bg-accent/10 text-accent border-accent/30",
+  SAFE_SUPPLY: "bg-accent/10 text-accent border-accent/30",
+  SAFE_DEPOSIT: "bg-accent/10 text-accent border-accent/30",
+  TRANSFER_IN: "bg-accent/10 text-accent border-accent/30",
+  TRANSFER_OUT: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  INITIAL_DEPOSIT: "bg-status-success-bg text-status-success border-status-success/30",
+  INTERNAL_TRANSFER: "bg-status-info-bg text-status-info border-status-info/30",
 };
 
 // --- Type Agence ---
@@ -511,16 +511,16 @@ export const AGENCY_TYPE_LABELS: Record<TypeAgenceType, string> = {
 };
 
 export const AGENCY_TYPE_COLORS: Record<TypeAgenceType, string> = {
-  MAIN: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  SECONDARY: "bg-slate-500/20 text-slate-400 border-slate-500/30",
-  KIOSK: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+  MAIN: "bg-status-info-bg text-status-info border-status-info/30",
+  SECONDARY: "bg-surface-subtle/40 text-content-muted border-edge-strong/30",
+  KIOSK: "bg-status-warning-bg text-status-warning border-status-warning/30",
 };
 
 // --- Statut Agence (couleurs) ---
 export const AGENCY_STATUS_COLORS: Record<string, string> = {
-  ACTIVE: "bg-green-500/20 text-green-400 border-green-500/30",
-  INACTIVE: "bg-gray-500/20 text-gray-400 border-gray-500/30",
-  CLOSED: "bg-red-500/20 text-red-400 border-red-500/30",
+  ACTIVE: "bg-status-success-bg text-status-success border-status-success/30",
+  INACTIVE: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
+  CLOSED: "bg-status-danger-bg text-status-danger border-status-danger/30",
 };
 
 // --- Type Compte ---
@@ -531,9 +531,9 @@ export const ACCOUNT_TYPE_LABELS: Record<string, string> = {
 };
 
 export const ACCOUNT_TYPE_COLORS: Record<string, string> = {
-  CURRENT: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
-  SAVINGS: "bg-amber-500/15 text-amber-300 border-amber-500/30",
-  BLOCKED: "bg-red-500/15 text-red-300 border-red-500/30",
+  CURRENT: "bg-status-success-bg text-status-success border-status-success/30",
+  SAVINGS: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  BLOCKED: "bg-status-danger-bg text-status-danger border-status-danger/30",
 };
 
 // ============================================
@@ -541,229 +541,229 @@ export const ACCOUNT_TYPE_COLORS: Record<string, string> = {
 // ============================================
 
 export const SESSION_CAISSE_STATUS_COLORS: Record<string, string> = {
-  REQUESTING_FUNDS: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  FUNDS_DISPATCHED: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
-  OPEN: "bg-green-500/20 text-green-400 border-green-500/30",
-  CLOSING_COUNT: "bg-amber-500/20 text-amber-400 border-amber-500/30",
-  CLOSING_VALIDATION: "bg-orange-500/20 text-orange-400 border-orange-500/30",
-  CLOSED: "bg-gray-500/20 text-gray-400 border-gray-500/30",
+  REQUESTING_FUNDS: "bg-status-info-bg text-status-info border-status-info/30",
+  FUNDS_DISPATCHED: "bg-accent/10 text-accent border-accent/30",
+  OPEN: "bg-status-success-bg text-status-success border-status-success/30",
+  CLOSING_COUNT: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  CLOSING_VALIDATION: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  CLOSED: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
 };
 
 export const ENQUETE_CREDIT_STATUS_COLORS: Record<string, string> = {
-  ASSIGNED: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  IN_PROGRESS: "bg-purple-500/20 text-purple-400 border-purple-500/30",
-  COMPLETED: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
-  APPROVED: "bg-green-500/20 text-green-400 border-green-500/30",
-  REJECTED: "bg-red-500/20 text-red-400 border-red-500/30",
-  REDUCED: "bg-orange-500/20 text-orange-400 border-orange-500/30",
+  ASSIGNED: "bg-status-info-bg text-status-info border-status-info/30",
+  IN_PROGRESS: "bg-status-info-bg text-status-info border-status-info/30",
+  COMPLETED: "bg-accent/10 text-accent border-accent/30",
+  APPROVED: "bg-status-success-bg text-status-success border-status-success/30",
+  REJECTED: "bg-status-danger-bg text-status-danger border-status-danger/30",
+  REDUCED: "bg-status-warning-bg text-status-warning border-status-warning/30",
 };
 
 export const OPERATION_TERRAIN_STATUS_COLORS: Record<string, string> = {
-  PENDING: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  SUBMITTED: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  APPROVED: "bg-green-500/20 text-green-400 border-green-500/30",
-  PENDING_SETTLEMENT: "bg-amber-500/20 text-amber-400 border-amber-500/30",
-  REJECTED: "bg-red-500/20 text-red-400 border-red-500/30",
-  SETTLED: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-  CANCELLED: "bg-gray-500/20 text-gray-400 border-gray-500/30",
+  PENDING: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  SUBMITTED: "bg-status-info-bg text-status-info border-status-info/30",
+  APPROVED: "bg-status-success-bg text-status-success border-status-success/30",
+  PENDING_SETTLEMENT: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  REJECTED: "bg-status-danger-bg text-status-danger border-status-danger/30",
+  SETTLED: "bg-status-success-bg text-status-success border-status-success/30",
+  CANCELLED: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
 };
 
 export const OBJECTIF_STATUS_COLORS: Record<string, string> = {
-  IN_PROGRESS: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  ACHIEVED: "bg-green-500/20 text-green-400 border-green-500/30",
-  ABANDONED: "bg-gray-500/20 text-gray-400 border-gray-500/30",
+  IN_PROGRESS: "bg-status-info-bg text-status-info border-status-info/30",
+  ACHIEVED: "bg-status-success-bg text-status-success border-status-success/30",
+  ABANDONED: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
 };
 
 export const RUN_VIREMENT_STATUS_COLORS: Record<string, string> = {
-  PENDING: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  RUNNING: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  SUCCESS: "bg-green-500/20 text-green-400 border-green-500/30",
-  FAILED: "bg-red-500/20 text-red-400 border-red-500/30",
-  SKIPPED: "bg-gray-500/20 text-gray-400 border-gray-500/30",
+  PENDING: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  RUNNING: "bg-status-info-bg text-status-info border-status-info/30",
+  SUCCESS: "bg-status-success-bg text-status-success border-status-success/30",
+  FAILED: "bg-status-danger-bg text-status-danger border-status-danger/30",
+  SKIPPED: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
 };
 
 export const TACHE_REGULARISATION_STATUS_COLORS: Record<string, string> = {
-  OPEN: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  IN_PROGRESS: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  RESOLVED: "bg-green-500/20 text-green-400 border-green-500/30",
-  ESCALATED: "bg-red-500/20 text-red-400 border-red-500/30",
+  OPEN: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  IN_PROGRESS: "bg-status-info-bg text-status-info border-status-info/30",
+  RESOLVED: "bg-status-success-bg text-status-success border-status-success/30",
+  ESCALATED: "bg-status-danger-bg text-status-danger border-status-danger/30",
 };
 
 export const ECHEANCE_CREDIT_STATUS_COLORS: Record<string, string> = {
-  UPCOMING: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  PAID: "bg-green-500/20 text-green-400 border-green-500/30",
-  LATE: "bg-red-500/20 text-red-400 border-red-500/30",
-  SETTLED: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+  UPCOMING: "bg-status-info-bg text-status-info border-status-info/30",
+  PAID: "bg-status-success-bg text-status-success border-status-success/30",
+  LATE: "bg-status-danger-bg text-status-danger border-status-danger/30",
+  SETTLED: "bg-status-success-bg text-status-success border-status-success/30",
 };
 
 export const DOSSIER_CREDIT_STATUS_COLORS: Record<string, string> = {
-  DRAFT: "bg-gray-500/20 text-gray-400 border-gray-500/30",
-  SUBMITTED: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  PENDING_FEES: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  READY_FOR_INVESTIGATION: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
-  UNDER_INVESTIGATION: "bg-purple-500/20 text-purple-400 border-purple-500/30",
-  INVESTIGATION_COMPLETE: "bg-teal-500/20 text-teal-400 border-teal-500/30",
-  IN_COMMITTEE: "bg-orange-500/20 text-orange-400 border-orange-500/30",
-  APPROVED: "bg-green-500/20 text-green-400 border-green-500/30",
-  REJECTED: "bg-red-500/20 text-red-400 border-red-500/30",
-  CANCELLED: "bg-gray-500/20 text-gray-400 border-gray-500/30",
+  DRAFT: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
+  SUBMITTED: "bg-status-info-bg text-status-info border-status-info/30",
+  PENDING_FEES: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  READY_FOR_INVESTIGATION: "bg-accent/10 text-accent border-accent/30",
+  UNDER_INVESTIGATION: "bg-status-info-bg text-status-info border-status-info/30",
+  INVESTIGATION_COMPLETE: "bg-accent/10 text-accent border-accent/30",
+  IN_COMMITTEE: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  APPROVED: "bg-status-success-bg text-status-success border-status-success/30",
+  REJECTED: "bg-status-danger-bg text-status-danger border-status-danger/30",
+  CANCELLED: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
 };
 
 export const REMISE_TERRAIN_STATUS_COLORS: Record<string, string> = {
-  DRAFT: "bg-gray-500/20 text-gray-400 border-gray-500/30",
-  PENDING: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  VALIDATED: "bg-green-500/20 text-green-400 border-green-500/30",
-  SETTLED: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-  REJECTED: "bg-red-500/20 text-red-400 border-red-500/30",
-  CANCELLED: "bg-gray-500/20 text-gray-400 border-gray-500/30",
+  DRAFT: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
+  PENDING: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  VALIDATED: "bg-status-success-bg text-status-success border-status-success/30",
+  SETTLED: "bg-status-success-bg text-status-success border-status-success/30",
+  REJECTED: "bg-status-danger-bg text-status-danger border-status-danger/30",
+  CANCELLED: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
 };
 
 export const REEVALUATION_STATUS_COLORS: Record<string, string> = {
-  REQUESTED: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  ELIGIBILITY_CHECK: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  AUTHORIZED: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
-  REFUSED: "bg-red-500/20 text-red-400 border-red-500/30",
-  ADDITIONAL_INVESTIGATION: "bg-purple-500/20 text-purple-400 border-purple-500/30",
-  INVESTIGATION_COMPLETE: "bg-teal-500/20 text-teal-400 border-teal-500/30",
-  IN_COMMITTEE: "bg-orange-500/20 text-orange-400 border-orange-500/30",
-  APPROVED: "bg-green-500/20 text-green-400 border-green-500/30",
-  DEFINITIVELY_REJECTED: "bg-red-600/20 text-red-500 border-red-600/30",
-  CANCELLED: "bg-gray-500/20 text-gray-400 border-gray-500/30",
+  REQUESTED: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  ELIGIBILITY_CHECK: "bg-status-info-bg text-status-info border-status-info/30",
+  AUTHORIZED: "bg-accent/10 text-accent border-accent/30",
+  REFUSED: "bg-status-danger-bg text-status-danger border-status-danger/30",
+  ADDITIONAL_INVESTIGATION: "bg-status-info-bg text-status-info border-status-info/30",
+  INVESTIGATION_COMPLETE: "bg-accent/10 text-accent border-accent/30",
+  IN_COMMITTEE: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  APPROVED: "bg-status-success-bg text-status-success border-status-success/30",
+  DEFINITIVELY_REJECTED: "bg-status-danger-bg text-status-danger border-status-danger/30",
+  CANCELLED: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
 };
 
 export const CONGE_STATUS_COLORS: Record<string, string> = {
-  PENDING: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  APPROVED: "bg-green-500/20 text-green-400 border-green-500/30",
-  REJECTED: "bg-red-500/20 text-red-400 border-red-500/30",
-  CANCELLED: "bg-gray-500/20 text-gray-400 border-gray-500/30",
+  PENDING: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  APPROVED: "bg-status-success-bg text-status-success border-status-success/30",
+  REJECTED: "bg-status-danger-bg text-status-danger border-status-danger/30",
+  CANCELLED: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
 };
 
 export const CANDIDATURE_STATUS_COLORS: Record<string, string> = {
-  PENDING: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  INTERVIEW: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  ACCEPTED: "bg-green-500/20 text-green-400 border-green-500/30",
-  REJECTED: "bg-red-500/20 text-red-400 border-red-500/30",
+  PENDING: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  INTERVIEW: "bg-status-info-bg text-status-info border-status-info/30",
+  ACCEPTED: "bg-status-success-bg text-status-success border-status-success/30",
+  REJECTED: "bg-status-danger-bg text-status-danger border-status-danger/30",
 };
 
 export const CONTRIBUTION_TONTINE_STATUS_COLORS: Record<string, string> = {
-  VALIDATED: "bg-green-500/20 text-green-400 border-green-500/30",
-  PENDING: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  REJECTED: "bg-red-500/20 text-red-400 border-red-500/30",
-  LATE: "bg-orange-500/20 text-orange-400 border-orange-500/30",
+  VALIDATED: "bg-status-success-bg text-status-success border-status-success/30",
+  PENDING: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  REJECTED: "bg-status-danger-bg text-status-danger border-status-danger/30",
+  LATE: "bg-status-warning-bg text-status-warning border-status-warning/30",
 };
 
 export const TONTINE_STATUS_COLORS: Record<string, string> = {
-  ACTIVE: "bg-green-500/20 text-green-400 border-green-500/30",
-  COMPLETED: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  SUSPENDED: "bg-orange-500/20 text-orange-400 border-orange-500/30",
+  ACTIVE: "bg-status-success-bg text-status-success border-status-success/30",
+  COMPLETED: "bg-status-info-bg text-status-info border-status-info/30",
+  SUSPENDED: "bg-status-warning-bg text-status-warning border-status-warning/30",
 };
 
 export const MEMBRE_TONTINE_STATUS_COLORS: Record<string, string> = {
-  ACTIVE: "bg-green-500/20 text-green-400 border-green-500/30",
-  INACTIVE: "bg-gray-500/20 text-gray-400 border-gray-500/30",
-  EXCLUDED: "bg-red-500/20 text-red-400 border-red-500/30",
+  ACTIVE: "bg-status-success-bg text-status-success border-status-success/30",
+  INACTIVE: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
+  EXCLUDED: "bg-status-danger-bg text-status-danger border-status-danger/30",
 };
 
 export const ALERTE_TONTINE_STATUS_COLORS: Record<string, string> = {
-  ACTIVE: "bg-red-500/20 text-red-400 border-red-500/30",
-  RESOLVED: "bg-green-500/20 text-green-400 border-green-500/30",
-  IGNORED: "bg-gray-500/20 text-gray-400 border-gray-500/30",
+  ACTIVE: "bg-status-danger-bg text-status-danger border-status-danger/30",
+  RESOLVED: "bg-status-success-bg text-status-success border-status-success/30",
+  IGNORED: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
 };
 
 export const PENALITE_TONTINE_STATUS_COLORS: Record<string, string> = {
-  PENDING: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  PAID: "bg-green-500/20 text-green-400 border-green-500/30",
-  CANCELLED: "bg-gray-500/20 text-gray-400 border-gray-500/30",
-  WAIVED: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+  PENDING: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  PAID: "bg-status-success-bg text-status-success border-status-success/30",
+  CANCELLED: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
+  WAIVED: "bg-status-info-bg text-status-info border-status-info/30",
 };
 
 export const ECHEANCE_TONTINE_STATUS_COLORS: Record<string, string> = {
-  COMPLETED: "bg-green-500/20 text-green-400 border-green-500/30",
-  IN_PROGRESS: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  UPCOMING: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+  COMPLETED: "bg-status-success-bg text-status-success border-status-success/30",
+  IN_PROGRESS: "bg-status-info-bg text-status-info border-status-info/30",
+  UPCOMING: "bg-status-warning-bg text-status-warning border-status-warning/30",
 };
 
 export const VISITE_TERRAIN_STATUS_COLORS: Record<string, string> = {
-  PLANNED: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  IN_PROGRESS: "bg-purple-500/20 text-purple-400 border-purple-500/30",
-  COMPLETED: "bg-green-500/20 text-green-400 border-green-500/30",
-  CANCELLED: "bg-gray-500/20 text-gray-400 border-gray-500/30",
+  PLANNED: "bg-status-info-bg text-status-info border-status-info/30",
+  IN_PROGRESS: "bg-status-info-bg text-status-info border-status-info/30",
+  COMPLETED: "bg-status-success-bg text-status-success border-status-success/30",
+  CANCELLED: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
 };
 
 export const PAIEMENT_TERRAIN_STATUS_COLORS: Record<string, string> = {
-  PENDING: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  POSTED: "bg-green-500/20 text-green-400 border-green-500/30",
-  CANCELLED: "bg-gray-500/20 text-gray-400 border-gray-500/30",
+  PENDING: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  POSTED: "bg-status-success-bg text-status-success border-status-success/30",
+  CANCELLED: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
 };
 
 export const FACTURE_STATUS_COLORS: Record<string, string> = {
-  DRAFT: "bg-gray-500/20 text-gray-400 border-gray-500/30",
-  PENDING: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  PAID: "bg-green-500/20 text-green-400 border-green-500/30",
-  CANCELLED: "bg-red-500/20 text-red-400 border-red-500/30",
+  DRAFT: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
+  PENDING: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  PAID: "bg-status-success-bg text-status-success border-status-success/30",
+  CANCELLED: "bg-status-danger-bg text-status-danger border-status-danger/30",
 };
 
 export const PRESENCE_STATUS_COLORS: Record<string, string> = {
-  PRESENT: "bg-green-500/20 text-green-400 border-green-500/30",
-  LATE: "bg-orange-500/20 text-orange-400 border-orange-500/30",
-  ABSENT: "bg-red-500/20 text-red-400 border-red-500/30",
-  ON_LEAVE: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+  PRESENT: "bg-status-success-bg text-status-success border-status-success/30",
+  LATE: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  ABSENT: "bg-status-danger-bg text-status-danger border-status-danger/30",
+  ON_LEAVE: "bg-status-info-bg text-status-info border-status-info/30",
 };
 
 export const BULLETIN_STATUS_COLORS: Record<string, string> = {
-  DRAFT: "bg-gray-500/20 text-gray-400 border-gray-500/30",
-  VALIDATED: "bg-green-500/20 text-green-400 border-green-500/30",
-  PAID: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-  CANCELLED: "bg-red-500/20 text-red-400 border-red-500/30",
+  DRAFT: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
+  VALIDATED: "bg-status-success-bg text-status-success border-status-success/30",
+  PAID: "bg-status-success-bg text-status-success border-status-success/30",
+  CANCELLED: "bg-status-danger-bg text-status-danger border-status-danger/30",
 };
 
 export const PAIEMENT_COMMISSION_STATUS_COLORS: Record<string, string> = {
-  PENDING: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  PAID: "bg-green-500/20 text-green-400 border-green-500/30",
-  PROCESSING: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+  PENDING: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  PAID: "bg-status-success-bg text-status-success border-status-success/30",
+  PROCESSING: "bg-status-info-bg text-status-info border-status-info/30",
 };
 
 export const SUIVI_FORMATION_STATUS_COLORS: Record<string, string> = {
-  PENDING: "bg-gray-500/20 text-gray-400 border-gray-500/30",
-  IN_PROGRESS: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  COMPLETED: "bg-green-500/20 text-green-400 border-green-500/30",
+  PENDING: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
+  IN_PROGRESS: "bg-status-info-bg text-status-info border-status-info/30",
+  COMPLETED: "bg-status-success-bg text-status-success border-status-success/30",
 };
 
 export const PLANNING_STATUS_COLORS: Record<string, string> = {
-  PLANNED: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  IN_PROGRESS: "bg-purple-500/20 text-purple-400 border-purple-500/30",
-  COMPLETED: "bg-green-500/20 text-green-400 border-green-500/30",
-  CANCELLED: "bg-gray-500/20 text-gray-400 border-gray-500/30",
+  PLANNED: "bg-status-info-bg text-status-info border-status-info/30",
+  IN_PROGRESS: "bg-status-info-bg text-status-info border-status-info/30",
+  COMPLETED: "bg-status-success-bg text-status-success border-status-success/30",
+  CANCELLED: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
 };
 
 export const VALIDATION_DEPENSE_STATUS_COLORS: Record<string, string> = {
-  PENDING: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  VALIDATED: "bg-green-500/20 text-green-400 border-green-500/30",
-  REJECTED: "bg-red-500/20 text-red-400 border-red-500/30",
+  PENDING: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  VALIDATED: "bg-status-success-bg text-status-success border-status-success/30",
+  REJECTED: "bg-status-danger-bg text-status-danger border-status-danger/30",
 };
 
 export const DECLARATION_TVA_STATUS_COLORS: Record<string, string> = {
-  DRAFT: "bg-gray-500/20 text-gray-400 border-gray-500/30",
-  VALIDATED: "bg-green-500/20 text-green-400 border-green-500/30",
-  PAID: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
-  LATE: "bg-red-500/20 text-red-400 border-red-500/30",
+  DRAFT: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
+  VALIDATED: "bg-status-success-bg text-status-success border-status-success/30",
+  PAID: "bg-status-success-bg text-status-success border-status-success/30",
+  LATE: "bg-status-danger-bg text-status-danger border-status-danger/30",
 };
 
 export const ARCHIVE_STATUS_COLORS: Record<string, string> = {
-  PENDING: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  VALIDATED: "bg-green-500/20 text-green-400 border-green-500/30",
+  PENDING: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  VALIDATED: "bg-status-success-bg text-status-success border-status-success/30",
 };
 
 export const OTP_STATUS_COLORS: Record<string, string> = {
-  PENDING: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  VALIDATED: "bg-green-500/20 text-green-400 border-green-500/30",
-  EXPIRED: "bg-gray-500/20 text-gray-400 border-gray-500/30",
-  FAILED: "bg-red-500/20 text-red-400 border-red-500/30",
+  PENDING: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  VALIDATED: "bg-status-success-bg text-status-success border-status-success/30",
+  EXPIRED: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
+  FAILED: "bg-status-danger-bg text-status-danger border-status-danger/30",
 };
 
 export const AUDIT_VIREMENT_STATUS_COLORS: Record<string, string> = {
-  SUCCESS: "bg-green-500/20 text-green-400 border-green-500/30",
-  FAILED: "bg-red-500/20 text-red-400 border-red-500/30",
+  SUCCESS: "bg-status-success-bg text-status-success border-status-success/30",
+  FAILED: "bg-status-danger-bg text-status-danger border-status-danger/30",
 };
 
 // ============================================
@@ -794,7 +794,7 @@ export function getStatusLabel(
 export function getStatusColor(
   status: string | null | undefined,
   colors: Record<string, string>,
-  fallback = "bg-gray-500/20 text-gray-400 border-gray-500/30"
+  fallback = "bg-surface-subtle/40 text-content-muted border-edge-subtle"
 ): string {
   if (!status) return fallback;
   return colors[status] || fallback;
@@ -964,14 +964,14 @@ export const ALL_STATUS_COLORS: Record<string, string> = {
   ...PROSPECTION_STATUS_COLORS,
 
   // --- Couleurs lowercase (alertes sécurité, audit, etc.) ---
-  active: "bg-green-500/20 text-green-400 border-green-500/30",
-  resolved: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  success: "bg-green-500/20 text-green-400 border-green-500/30",
-  failure: "bg-red-500/20 text-red-400 border-red-500/30",
-  pending: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  cancelled: "bg-gray-500/20 text-gray-400 border-gray-500/30",
-  critical: "bg-red-600/20 text-red-500 border-red-600/30",
-  high: "bg-orange-500/20 text-orange-400 border-orange-500/30",
-  medium: "bg-amber-500/20 text-amber-400 border-amber-500/30",
-  low: "bg-gray-500/20 text-gray-400 border-gray-500/30",
+  active: "bg-status-success-bg text-status-success border-status-success/30",
+  resolved: "bg-status-info-bg text-status-info border-status-info/30",
+  success: "bg-status-success-bg text-status-success border-status-success/30",
+  failure: "bg-status-danger-bg text-status-danger border-status-danger/30",
+  pending: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  cancelled: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
+  critical: "bg-status-danger-bg text-status-danger border-status-danger/30",
+  high: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  medium: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  low: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
 };

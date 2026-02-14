@@ -139,17 +139,17 @@ export function FeatureHeader({
                     role="dialog"
                     aria-modal="true"
                     aria-labelledby={`${tooltipId}-title`}
-                    className="absolute left-0 top-full mt-2 w-80 sm:w-96 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 duration-200"
+                    className="absolute left-0 top-full mt-2 w-80 sm:w-96 bg-surface-base border border-edge rounded-xl shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 duration-200"
                   >
                     {/* Header */}
-                    <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-slate-700 bg-slate-800/50 rounded-t-xl">
+                    <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-edge bg-surface/50 rounded-t-xl">
                       <div className="flex items-center gap-2">
                         <div className="p-1.5 bg-primary/20 rounded-lg">
                           <HelpCircle size={16} className="text-primary" aria-hidden="true" />
                         </div>
                         <h2
                           id={`${tooltipId}-title`}
-                          className="font-semibold text-base text-white"
+                          className="font-semibold text-base text-content-primary"
                         >
                           Comment ça marche ?
                         </h2>
@@ -157,7 +157,7 @@ export function FeatureHeader({
                       <button
                         data-close-btn
                         onClick={closeTooltip}
-                        className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        className="p-2 text-content-muted hover:text-content-primary hover:bg-surface-elevated rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                         aria-label="Fermer"
                       >
                         <X size={18} aria-hidden="true" />
@@ -166,16 +166,16 @@ export function FeatureHeader({
 
                     {/* Content - improved readability */}
                     <div className="p-4">
-                      <p className="text-sm text-slate-200 leading-relaxed">
+                      <p className="text-sm text-content-secondary leading-relaxed">
                         {helpText}
                       </p>
 
                       {/* Dismiss option */}
                       {!dismissed && (
-                        <div className="mt-4 pt-3 border-t border-slate-700">
+                        <div className="mt-4 pt-3 border-t border-edge">
                           <button
                             onClick={handleDismiss}
-                            className="text-xs text-slate-400 hover:text-primary transition-colors focus:outline-none focus-visible:underline"
+                            className="text-xs text-content-muted hover:text-primary transition-colors focus:outline-none focus-visible:underline"
                           >
                             Ne plus afficher cette aide
                           </button>

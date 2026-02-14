@@ -30,14 +30,14 @@ export default function DataChangesList({ changes, loading, onSelect, formatTime
         <div className="flex justify-center mb-4">
           <LoadingSpinner size="lg" />
         </div>
-        <p className="text-slate-400">Chargement des modifications...</p>
+        <p className="text-content-muted">Chargement des modifications...</p>
       </div>
     );
   }
 
   if (changes.length === 0) {
     return (
-      <div className="text-center py-12 text-slate-400">
+      <div className="text-center py-12 text-content-muted">
         Aucune modification trouvée
       </div>
     );
@@ -49,7 +49,7 @@ export default function DataChangesList({ changes, loading, onSelect, formatTime
         <Card
           key={change.id}
           onClick={() => onSelect(change)}
-          className="bg-slate-800 hover:bg-slate-700 border-slate-700 cursor-pointer transition-colors"
+          className="bg-surface hover:bg-surface-elevated border-edge cursor-pointer transition-colors"
         >
           <div className="p-4 flex items-center justify-between">
             <div className="flex-1 min-w-0">
@@ -58,19 +58,19 @@ export default function DataChangesList({ changes, loading, onSelect, formatTime
                   value={change.operation} 
                   variant={getOperationVariant(change.operation)}
                 />
-                <span className="text-cyan-400 font-semibold truncate">{change.tableName}</span>
-                <span className="text-slate-400 text-sm whitespace-nowrap">
+                <span className="text-accent font-semibold truncate">{change.tableName}</span>
+                <span className="text-content-muted text-sm whitespace-nowrap">
                   {formatTimestamp(change.timestamp)}
                 </span>
               </div>
-              <div className="text-slate-300 text-sm truncate">
-                Par: <span className="text-white font-semibold">{change.userEmail || 'Système'}</span>
+              <div className="text-content-secondary text-sm truncate">
+                Par: <span className="text-content-primary font-semibold">{change.userEmail || 'Système'}</span>
               </div>
-              <div className="text-slate-500 text-xs font-mono truncate">
+              <div className="text-content-muted text-xs font-mono truncate">
                 ID: {change.recordId || '—'}
               </div>
             </div>
-            <GitCompare className="text-slate-500 ml-4 flex-shrink-0" size={20} />
+            <GitCompare className="text-content-muted ml-4 flex-shrink-0" size={20} />
           </div>
         </Card>
       ))}

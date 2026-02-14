@@ -11,6 +11,7 @@ import {
   STATUT_VISITE_TERRAIN_OPTIONS,
   TYPE_VISITE_TERRAIN_OPTIONS
 } from '@shared/enum/status-constants';
+import { useCurrency } from '../../contexts/CurrencyContext';
 
 interface VisiteTerrainFormProps {
   onClose: () => void;
@@ -20,6 +21,7 @@ interface VisiteTerrainFormProps {
 }
 
 export default function VisiteTerrainForm({ onClose, onSuccess, agentId, clientId }: VisiteTerrainFormProps) {
+  const { label } = useCurrency();
   // RBAC permissions
   const { hasPermission } = usePermissions();
   const canCreateVisites = hasPermission('agent_terrain', 'create') || hasPermission('visites', 'create');
@@ -150,7 +152,7 @@ export default function VisiteTerrainForm({ onClose, onSuccess, agentId, clientI
               Créer la Visite
             </Button>
           ) : (
-            <div className="flex-1 sm:flex-none px-4 py-2 bg-amber-500/20 text-amber-400 rounded-lg font-medium flex items-center justify-center gap-2">
+            <div className="flex-1 sm:flex-none px-4 py-2 bg-status-warning-bg text-status-warning rounded-lg font-medium flex items-center justify-center gap-2">
               <AlertTriangle size={16} />
               Permission requise
             </div>
@@ -160,7 +162,7 @@ export default function VisiteTerrainForm({ onClose, onSuccess, agentId, clientI
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         {errors.submit && (
-          <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-lg text-sm">
+          <div className="bg-status-danger-bg border border-status-danger/20 text-status-danger px-4 py-3 rounded-lg text-sm">
             {errors.submit}
           </div>
         )}
@@ -225,7 +227,7 @@ export default function VisiteTerrainForm({ onClose, onSuccess, agentId, clientI
           />
 
           <FormField
-            label="Montant Collecté (FCFA)"
+            label={label('Montant Collecté')}
             name="montant_collecte"
             type="number"
             value={formData.montant_collecte}
@@ -247,8 +249,8 @@ export default function VisiteTerrainForm({ onClose, onSuccess, agentId, clientI
           rows={3}
         />
 
-        <div className="bg-blue-500/5 border border-blue-500/20 rounded-lg p-3 text-xs text-slate-400">
-          <div className="flex items-center gap-2 mb-2 text-blue-400 font-medium">
+        <div className="bg-status-info/5 border border-status-info/20 rounded-lg p-3 text-xs text-content-muted">
+          <div className="flex items-center gap-2 mb-2 text-status-info font-medium">
             <Info size={14} />
             <span>Guide des Opérations</span>
           </div>

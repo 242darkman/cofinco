@@ -60,14 +60,14 @@ export function useCredits() {
 
   const getStatutColor = (statut: string) => {
     const colors: Record<string, string> = {
-      [StatutCredit.ACTIVE]: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-      [StatutCredit.CLOSED]: 'bg-slate-500/20 text-slate-400 border-slate-500/30',
-      [StatutCredit.LATE]: 'bg-red-500/20 text-red-400 border-red-500/30',
-      [StatutCredit.PENDING]: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-      [StatutCredit.PAID]: 'bg-green-500/20 text-green-400 border-green-500/30',
-      [StatutCredit.CANCELLED]: 'bg-slate-500/20 text-slate-400 border-slate-500/30'
+      [StatutCredit.ACTIVE]: 'bg-status-success-bg text-status-success border-status-success/30',
+      [StatutCredit.CLOSED]: 'bg-surface-subtle/40 text-content-muted border-edge-strong/30',
+      [StatutCredit.LATE]: 'bg-status-danger-bg text-status-danger border-status-danger/30',
+      [StatutCredit.PENDING]: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+      [StatutCredit.PAID]: 'bg-status-success-bg text-status-success border-status-success/30',
+      [StatutCredit.CANCELLED]: 'bg-surface-subtle/40 text-content-muted border-edge-strong/30'
     };
-    return colors[statut] || 'bg-slate-500/20 text-slate-400 border-slate-500/30';
+    return colors[statut] || 'bg-surface-subtle/40 text-content-muted border-edge-strong/30';
   };
 
   const getActiveCredits = () => credits.filter(c => c.statut === StatutCredit.ACTIVE);

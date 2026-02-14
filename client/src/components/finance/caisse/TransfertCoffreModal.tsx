@@ -109,8 +109,8 @@ export function TransfertCoffreModal({
                 className={`
                   p-3 rounded-lg border cursor-pointer transition-all flex flex-col items-center gap-2 text-center
                   ${type === 'COFFRE_VERS_CAISSE' 
-                    ? 'border-blue-500 bg-blue-500/10 text-blue-400' 
-                    : 'border-slate-700 bg-slate-800/50 text-slate-400 hover:border-slate-600'
+                    ? 'border-status-info bg-status-info-bg text-status-info' 
+                    : 'border-edge bg-surface/50 text-content-muted hover:border-edge-strong'
                   }
                 `}
                 onClick={() => setValue('typeTransfert', 'COFFRE_VERS_CAISSE')}
@@ -124,8 +124,8 @@ export function TransfertCoffreModal({
                 className={`
                   p-3 rounded-lg border cursor-pointer transition-all flex flex-col items-center gap-2 text-center
                   ${type === 'CAISSE_VERS_COFFRE' 
-                    ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400' 
-                    : 'border-slate-700 bg-slate-800/50 text-slate-400 hover:border-slate-600'
+                    ? 'border-status-success bg-status-success-bg text-status-success' 
+                    : 'border-edge bg-surface/50 text-content-muted hover:border-edge-strong'
                   }
                 `}
                 onClick={() => setValue('typeTransfert', 'CAISSE_VERS_COFFRE')}
@@ -161,34 +161,34 @@ export function TransfertCoffreModal({
           </form>
         ) : (
           <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
-            <div className="rounded-lg bg-slate-800/50 border border-slate-700 p-4 space-y-3">
-              <h4 className="font-medium text-slate-200 border-b border-slate-700 pb-2">Récapitulatif</h4>
+            <div className="rounded-lg bg-surface/50 border border-edge p-4 space-y-3">
+              <h4 className="font-medium text-content-secondary border-b border-edge pb-2">Récapitulatif</h4>
               
               <div className="flex justify-between items-center py-1">
-                <span className="text-slate-400">Type</span>
-                <span className={type === "COFFRE_VERS_CAISSE" ? "text-blue-400 font-medium" : "text-emerald-400 font-medium"}>
+                <span className="text-content-muted">Type</span>
+                <span className={type === "COFFRE_VERS_CAISSE" ? "text-status-info font-medium" : "text-status-success font-medium"}>
                   {type === "COFFRE_VERS_CAISSE" ? "Approvisionnement (Entrée)" : "Versement (Sortie)"}
                 </span>
               </div>
 
               <div className="flex justify-between items-center py-1">
-                <span className="text-slate-400">Montant</span>
-                <span className="text-white text-lg font-bold">{Number(montant).toLocaleString()} FCFA</span>
+                <span className="text-content-muted">Montant</span>
+                <span className="text-content-primary text-lg font-bold">{Number(montant).toLocaleString()} FCFA</span>
               </div>
 
               <div className="space-y-1 pt-1">
-                <span className="text-slate-400 text-xs uppercase block">Motif</span>
-                <span className="text-white">{getValues("motif")}</span>
+                <span className="text-content-muted text-xs uppercase block">Motif</span>
+                <span className="text-content-primary">{getValues("motif")}</span>
               </div>
             </div>
             
-            <p className="text-sm text-slate-400 text-center italic">
+            <p className="text-sm text-content-muted text-center italic">
               Une demande sera envoyée au gestionnaire de coffre pour validation.
             </p>
           </div>
         )}
 
-        <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
+        <div className="flex justify-end gap-3 pt-4 border-t border-edge">
           {step === "form" ? (
             <>
               <Button variant="outline" onClick={handleClose}>

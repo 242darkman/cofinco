@@ -13,6 +13,7 @@ import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import { UniversalPaymentSuccessModal } from './shared/UniversalPaymentSuccessModal';
 import { ReceiptData } from '../../ui/printable/ReceiptTemplate';
 import { currencySymbol } from '@shared/config/currency';
+import { useBranding } from '@/contexts/BrandingContext';
 import { v4 as uuidv4 } from 'uuid';
 import {
   StatutCompte,
@@ -84,6 +85,7 @@ export default function CaissePaiementModal({
 }: CaissePaiementModalProps) {
   // RBAC permissions
   const { hasPermission } = usePermissions();
+  const { branding } = useBranding();
   const canCreatePayments = hasPermission('caisse', 'create') || hasPermission('paiements', 'create');
 
   const [loading, setLoading] = useState(false);
@@ -347,7 +349,7 @@ export default function CaissePaiementModal({
           </style>
         </head>
         <body>
-          <div class="header"><h1>COFINCO</h1><p>Reçu de Transaction</p></div>
+          <div class="header"><h1>${branding.appName}</h1><p>Reçu de Transaction</p></div>
           <div class="row"><span>Réf:</span><strong>${safeReference}</strong></div>
           <div class="row"><span>Date:</span><strong>${now.toLocaleString()}</strong></div>
           <div class="row"><span>Client:</span><strong>${safeClientName}</strong></div>
@@ -473,33 +475,33 @@ export default function CaissePaiementModal({
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4 animate-in fade-in duration-200">
-      <div className="bg-slate-950 rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-3xl overflow-hidden border border-slate-800 flex flex-col max-h-[95vh] sm:max-h-[90vh]">
+      <div className="bg-surface-base rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-3xl overflow-hidden border border-edge flex flex-col max-h-[95vh] sm:max-h-[90vh]">
         
         {/* HEADER FIXE */}
-        <header className="px-4 sm:px-6 py-3 sm:py-4 bg-slate-900/80 border-b border-slate-800 backdrop-blur flex justify-between items-center">
+        <header className="px-4 sm:px-6 py-3 sm:py-4 bg-surface-base/80 border-b border-edge backdrop-blur flex justify-between items-center">
            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-              <div className={`p-1.5 sm:p-2 rounded-lg shrink-0 ${isOperationEntree(formData.type_operation) ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
+              <div className={`p-1.5 sm:p-2 rounded-lg shrink-0 ${isOperationEntree(formData.type_operation) ? 'bg-status-success-bg text-status-success' : 'bg-status-danger/10 text-status-danger'}`}>
                  {isOperationEntree(formData.type_operation) ? <ArrowDownLeft size={18} /> : <ArrowUpRight size={18} />}
               </div>
               <div className="min-w-0">
-                 <h2 className="text-base sm:text-lg font-bold text-white truncate">Nouvelle Transaction</h2>
-                 <p className="text-[10px] sm:text-xs text-slate-400 hidden sm:block">Opération rapide et sécurisée</p>
+                 <h2 className="text-base sm:text-lg font-bold text-content-primary truncate">Nouvelle Transaction</h2>
+                 <p className="text-[10px] sm:text-xs text-content-muted hidden sm:block">Opération rapide et sécurisée</p>
               </div>
            </div>
            <button
              onClick={onClose}
-             className="p-1.5 sm:p-2 bg-slate-800 hover:bg-slate-700 rounded-full text-slate-400 hover:text-white transition-colors shrink-0"
+             className="p-1.5 sm:p-2 bg-surface hover:bg-surface-elevated rounded-full text-content-muted hover:text-content-primary transition-colors shrink-0"
            >
               <X size={18} />
            </button>
         </header>
   
         {/* BODY SCROLLABLE */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6 scrollbar-thin scrollbar-thumb-edge scrollbar-track-transparent">
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 items-start">
              <div className="space-y-1.5">
-                <label className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider ml-1 flex items-center gap-1.5">
+                <label className="text-[10px] sm:text-xs font-bold text-content-muted uppercase tracking-wider ml-1 flex items-center gap-1.5">
                    <User size={11}/> Client / Membre
                 </label>
                 <SearchableSelect
@@ -522,24 +524,24 @@ export default function CaissePaiementModal({
              </div>
 
              <div className="space-y-1.5">
-                <label className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider ml-1 flex items-center gap-1.5">
+                <label className="text-[10px] sm:text-xs font-bold text-content-muted uppercase tracking-wider ml-1 flex items-center gap-1.5">
                    <FileText size={11}/> Nature Opération
                 </label>
                 <div className="relative h-11 sm:h-12">
                    <select 
-                      className="h-full w-full bg-slate-900 border border-slate-700 rounded-xl px-4 text-white appearance-none focus:border-indigo-500 outline-none transition-all"
+                      className="h-full w-full bg-surface-base border border-edge rounded-xl px-4 text-content-primary appearance-none focus:border-accent outline-none transition-all"
                       value={formData.type_operation}
                       onChange={(e) => setFormData(prev => ({ ...prev, type_operation: e.target.value }))}
                    >
-                      <optgroup label="Tontines" className="bg-slate-900">
+                      <optgroup label="Tontines" className="bg-surface-base">
                         <option value={TypeOperationCaisse.TONTINE_CONTRIBUTION}>Cotisation Tontine</option>
                         <option value={TypeOperationCaisse.TONTINE_WITHDRAWAL}>Retrait Tontine</option>
                       </optgroup>
-                      <optgroup label="Crédits" className="bg-slate-900">
+                      <optgroup label="Crédits" className="bg-surface-base">
                         <option value={TypeOperationCaisse.LOAN_REPAYMENT}>Remboursement Prêt</option>
                         <option value={TypeOperationCaisse.CREDIT_DISBURSEMENT}>Décaissement Prêt</option>
                       </optgroup>
-                      <optgroup label="Comptes" className="bg-slate-900">
+                      <optgroup label="Comptes" className="bg-surface-base">
                         <option value={TypeOperationCaisse.DEPOSIT_SAVINGS}>Versement Épargne</option>
                         <option value={TypeOperationCaisse.WITHDRAWAL_SAVINGS}>Retrait Épargne</option>
                         <option value={TypeOperationCaisse.DEPOSIT_CURRENT}>Versement Courant</option>
@@ -547,36 +549,36 @@ export default function CaissePaiementModal({
                         <option value={TypeOperationCaisse.DEPOSIT_BLOCKED}>Versement Compte Bloqué</option>
                         <option value={TypeOperationCaisse.WITHDRAWAL_BLOCKED}>Retrait Compte Bloqué</option>
                       </optgroup>
-                      <optgroup label="Divers" className="bg-slate-900">
+                      <optgroup label="Divers" className="bg-surface-base">
                         <option value={TypeOperationCaisse.MISC_COLLECTION}>Encaissement Divers</option>
                         <option value={TypeOperationCaisse.MISC_DISBURSEMENT}>Décaissement Divers</option>
                       </optgroup>
                    </select>
-                   <ArrowDownLeft size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none rotate-[-45deg]" />
+                   <ArrowDownLeft size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-content-muted pointer-events-none rotate-[-45deg]" />
                 </div>
              </div>
           </div>
   
           {formData.client_id && (
-             <div className="bg-slate-900/50 border border-slate-800 rounded-xl sm:rounded-2xl p-3 sm:p-4 flex items-center gap-3 sm:gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-indigo-600 flex items-center justify-center font-bold text-white text-base sm:text-lg border-2 border-slate-800 shrink-0">
+             <div className="bg-surface-base/50 border border-edge rounded-xl sm:rounded-2xl p-3 sm:p-4 flex items-center gap-3 sm:gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-accent flex items-center justify-center font-bold text-white text-base sm:text-lg border-2 border-edge shrink-0">
                    {selectedClient?.nom?.charAt(0) || 'C'}
                 </div>
-                <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 border-l border-slate-800 pl-3 sm:pl-4">
+                <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 border-l border-edge pl-3 sm:pl-4">
                    <div className="min-w-0 flex-1">
-                      <div className="text-[9px] sm:text-[10px] font-black text-slate-500 uppercase tracking-widest">Client</div>
-                      <div className="text-xs sm:text-sm font-bold text-white">
+                      <div className="text-[9px] sm:text-[10px] font-black text-content-muted uppercase tracking-widest">Client</div>
+                      <div className="text-xs sm:text-sm font-bold text-content-primary">
                          {selectedClient?.nom || 'Client'} {selectedClient?.prenom || ''}
                       </div>
                    </div>
                    <div className="flex gap-4 shrink-0">
                       <div>
-                        <div className="text-[9px] sm:text-[10px] font-black text-slate-500 uppercase tracking-widest">Crédits</div>
-                        <div className="text-xs sm:text-sm font-bold text-amber-500 flex items-center gap-1"><CreditCard size={11}/> {clientCredits.length}</div>
+                        <div className="text-[9px] sm:text-[10px] font-black text-content-muted uppercase tracking-widest">Crédits</div>
+                        <div className="text-xs sm:text-sm font-bold text-status-warning flex items-center gap-1"><CreditCard size={11}/> {clientCredits.length}</div>
                       </div>
                       <div>
-                        <div className="text-[9px] sm:text-[10px] font-black text-slate-500 uppercase tracking-widest">Tontines</div>
-                        <div className="text-xs sm:text-sm font-bold text-emerald-500 flex items-center gap-1"><Users size={11}/> {activeTontinesCount}</div>
+                        <div className="text-[9px] sm:text-[10px] font-black text-content-muted uppercase tracking-widest">Tontines</div>
+                        <div className="text-xs sm:text-sm font-bold text-status-success flex items-center gap-1"><Users size={11}/> {activeTontinesCount}</div>
                       </div>
                    </div>
                 </div>
@@ -585,7 +587,7 @@ export default function CaissePaiementModal({
   
           {(isTontineOperation || isAccountOperation) && (
              <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                <label className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider ml-1 mb-1.5 block">
+                <label className="text-[10px] sm:text-xs font-bold text-content-muted uppercase tracking-wider ml-1 mb-1.5 block">
                    {isTontineOperation ? 'Sélection Tontine' : 'Sélection Compte'}
                 </label>
                 <div className="h-11 sm:h-12">
@@ -605,12 +607,12 @@ export default function CaissePaiementModal({
                         }))}
                         placeholder="Sélectionner une tontine..."
                         error={errors.tontine}
-                        className="h-full w-full bg-slate-900 border-slate-700 rounded-xl"
+                        className="h-full w-full bg-surface-base border-edge rounded-xl"
                       />
                     ) : (
                       <div className="relative h-full">
                         <select 
-                            className="w-full h-full bg-slate-900 border border-slate-700 rounded-xl px-4 text-white appearance-none focus:border-indigo-500 outline-none transition-all"
+                            className="w-full h-full bg-surface-base border border-edge rounded-xl px-4 text-content-primary appearance-none focus:border-accent outline-none transition-all"
                             value={selectedAccountId}
                             onChange={(e) => {
                                 setSelectedAccountId(e.target.value);
@@ -624,16 +626,16 @@ export default function CaissePaiementModal({
                                 </option>
                             ))}
                         </select>
-                        <ArrowDownLeft size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none rotate-[-45deg]" />
+                        <ArrowDownLeft size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-content-muted pointer-events-none rotate-[-45deg]" />
                       </div>
                     )}
                 </div>
-                {errors.account && <p className="text-red-500 text-xs mt-1">{errors.account}</p>}
+                {errors.account && <p className="text-status-danger text-xs mt-1">{errors.account}</p>}
              </div>
           )}
   
           <div className="space-y-2">
-             <label className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Mode de paiement</label>
+             <label className="text-[10px] sm:text-xs font-bold text-content-muted uppercase tracking-wider ml-1">Mode de paiement</label>
              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
                 {[
                    { id: MethodePaiement.CASH, label: 'Espèces', icon: Banknote, color: 'emerald' },
@@ -652,11 +654,11 @@ export default function CaissePaiementModal({
                         className={`h-14 sm:h-16 rounded-xl sm:rounded-2xl border flex flex-col items-center justify-center gap-1 sm:gap-1.5 transition-all relative ${
                            isSelected
                            ? `border-${m.color}-500/50 bg-${m.color}-500/10 shadow-lg`
-                           : 'border-slate-800 bg-slate-900 text-slate-500 hover:border-slate-600'
+                           : 'border-edge bg-surface-base text-content-muted hover:border-edge-strong'
                         }`}
                      >
                         {m.img ? <img src={m.img} alt={m.label} className="h-5 sm:h-6 object-contain" /> : (Icon && <Icon size={20} className="sm:w-6 sm:h-6" />)}
-                        <span className={`text-[8px] sm:text-[9px] font-black uppercase tracking-wider ${isSelected ? 'text-white' : 'text-slate-500'}`}>{m.label}</span>
+                        <span className={`text-[8px] sm:text-[9px] font-black uppercase tracking-wider ${isSelected ? 'text-content-primary' : 'text-content-muted'}`}>{m.label}</span>
                      </button>
                    )
                 })}
@@ -666,47 +668,47 @@ export default function CaissePaiementModal({
           {(formData.mode_paiement === MethodePaiement.MOBILE_MONEY || formData.mode_paiement === MethodePaiement.TRANSFER) && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 animate-in slide-in-from-top-2">
               <div className="space-y-1">
-                <label className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                  {formData.mode_paiement === MethodePaiement.MOBILE_MONEY ? 'Téléphone' : 'Banque'} <span className="text-rose-500">*</span>
+                <label className="text-[9px] sm:text-[10px] font-bold text-content-muted uppercase tracking-widest">
+                  {formData.mode_paiement === MethodePaiement.MOBILE_MONEY ? 'Téléphone' : 'Banque'} <span className="text-status-danger">*</span>
                 </label>
                 <input
                   type="text"
-                  className={`w-full h-10 sm:h-11 bg-slate-900 border rounded-lg sm:rounded-xl px-3 sm:px-4 text-sm text-white focus:border-indigo-500 outline-none ${
-                    (errors.numero_telephone || errors.banque_origine) ? 'border-rose-500' : 'border-slate-700'
+                  className={`w-full h-10 sm:h-11 bg-surface-base border rounded-lg sm:rounded-xl px-3 sm:px-4 text-sm text-content-primary focus:border-accent outline-none ${
+                    (errors.numero_telephone || errors.banque_origine) ? 'border-status-danger' : 'border-edge'
                   }`}
                   value={formData.mode_paiement === MethodePaiement.MOBILE_MONEY ? formData.numero_telephone : formData.banque_origine}
                   onChange={(e) => setFormData(p => ({ ...p, [formData.mode_paiement === MethodePaiement.MOBILE_MONEY ? 'numero_telephone' : 'banque_origine']: e.target.value }))}
                 />
-                {errors.numero_telephone && <p className="text-rose-500 text-xs">{errors.numero_telephone}</p>}
-                {errors.banque_origine && <p className="text-rose-500 text-xs">{errors.banque_origine}</p>}
+                {errors.numero_telephone && <p className="text-status-danger text-xs">{errors.numero_telephone}</p>}
+                {errors.banque_origine && <p className="text-status-danger text-xs">{errors.banque_origine}</p>}
               </div>
               <div className="space-y-1">
-                <label className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                  Référence / ID <span className="text-rose-500">*</span>
+                <label className="text-[9px] sm:text-[10px] font-bold text-content-muted uppercase tracking-widest">
+                  Référence / ID <span className="text-status-danger">*</span>
                 </label>
                 <input
                   type="text"
-                  className={`w-full h-10 sm:h-11 bg-slate-900 border rounded-lg sm:rounded-xl px-3 sm:px-4 text-sm text-white focus:border-indigo-500 outline-none ${
-                    (errors.numero_transaction || errors.reference_virement) ? 'border-rose-500' : 'border-slate-700'
+                  className={`w-full h-10 sm:h-11 bg-surface-base border rounded-lg sm:rounded-xl px-3 sm:px-4 text-sm text-content-primary focus:border-accent outline-none ${
+                    (errors.numero_transaction || errors.reference_virement) ? 'border-status-danger' : 'border-edge'
                   }`}
                   value={formData.mode_paiement === MethodePaiement.MOBILE_MONEY ? formData.numero_transaction : formData.reference_virement}
                   onChange={(e) => setFormData(p => ({ ...p, [formData.mode_paiement === MethodePaiement.MOBILE_MONEY ? 'numero_transaction' : 'reference_virement']: e.target.value }))}
                 />
-                {errors.numero_transaction && <p className="text-rose-500 text-xs">{errors.numero_transaction}</p>}
-                {errors.reference_virement && <p className="text-rose-500 text-xs">{errors.reference_virement}</p>}
+                {errors.numero_transaction && <p className="text-status-danger text-xs">{errors.numero_transaction}</p>}
+                {errors.reference_virement && <p className="text-status-danger text-xs">{errors.reference_virement}</p>}
               </div>
             </div>
           )}
   
           <div className="space-y-2">
-            <label className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Montant <span className="text-rose-500">*</span></label>
+            <label className="text-[10px] sm:text-xs font-bold text-content-muted uppercase tracking-wider ml-1">Montant <span className="text-status-danger">*</span></label>
             <div className="relative group">
-               <span className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-indigo-500 transition-colors">
+               <span className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-content-muted group-focus-within:text-accent transition-colors">
                   <Banknote size={22} className="sm:w-7 sm:h-7" />
                </span>
                <input
                   type="number"
-                  className={`w-full h-14 sm:h-16 bg-slate-900 border-2 rounded-xl sm:rounded-2xl pl-12 sm:pl-14 pr-14 sm:pr-16 text-2xl sm:text-3xl font-black text-white outline-none focus:border-indigo-500 transition-all font-mono ${errors.montant ? 'border-rose-500' : 'border-slate-800'}`}
+                  className={`w-full h-14 sm:h-16 bg-surface-base border-2 rounded-xl sm:rounded-2xl pl-12 sm:pl-14 pr-14 sm:pr-16 text-2xl sm:text-3xl font-black text-content-primary outline-none focus:border-accent transition-all font-mono ${errors.montant ? 'border-status-danger' : 'border-edge'}`}
                   placeholder="0"
                   value={formData.montant}
                   onChange={(e) => {
@@ -714,17 +716,17 @@ export default function CaissePaiementModal({
                     if (errors.montant) setErrors(prev => { const { montant, ...rest } = prev; return rest; });
                   }}
                />
-               <span className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 text-slate-600 font-bold text-xs sm:text-sm">FCFA</span>
+               <span className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 text-content-muted font-bold text-xs sm:text-sm">FCFA</span>
             </div>
-            {errors.montant && <p className="text-rose-500 text-xs mt-1">{errors.montant}</p>}
+            {errors.montant && <p className="text-status-danger text-xs mt-1">{errors.montant}</p>}
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">
-              Note <span className="text-rose-500">*</span>
+            <label className="text-[10px] sm:text-xs font-bold text-content-muted uppercase tracking-wider ml-1">
+              Note <span className="text-status-danger">*</span>
             </label>
             <textarea
-              className={`w-full min-h-[60px] sm:min-h-[70px] bg-slate-900 border rounded-lg sm:rounded-xl p-3 text-sm text-white focus:border-indigo-500 outline-none resize-none transition-all ${errors.description ? 'border-rose-500' : 'border-slate-700'}`}
+              className={`w-full min-h-[60px] sm:min-h-[70px] bg-surface-base border rounded-lg sm:rounded-xl p-3 text-sm text-content-primary focus:border-accent outline-none resize-none transition-all ${errors.description ? 'border-status-danger' : 'border-edge'}`}
               placeholder="Commentaire..."
               value={formData.description}
               onChange={(e) => {
@@ -732,24 +734,24 @@ export default function CaissePaiementModal({
                 if (errors.description) setErrors(prev => { const { description, ...rest } = prev; return rest; });
               }}
             />
-            {errors.description && <p className="text-rose-500 text-xs mt-1">{errors.description}</p>}
+            {errors.description && <p className="text-status-danger text-xs mt-1">{errors.description}</p>}
           </div>
         </div>
 
-        <div className="p-4 sm:p-5 bg-slate-900 border-t border-slate-800 flex flex-col gap-3">
+        <div className="p-4 sm:p-5 bg-surface-base border-t border-edge flex flex-col gap-3">
            {formattedMontant && (
-             <div className="text-center text-xs sm:text-sm font-medium text-slate-500">
-                Confirmation: <span className="text-white font-bold">{formattedMontant}</span>
+             <div className="text-center text-xs sm:text-sm font-medium text-content-muted">
+                Confirmation: <span className="text-content-primary font-bold">{formattedMontant}</span>
              </div>
            )}
            <button
              onClick={handleSubmit}
              disabled={loading}
-             className="w-full h-11 sm:h-12 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl sm:rounded-2xl font-bold text-sm sm:text-base flex items-center justify-center gap-2 transition-all"
+             className="w-full h-11 sm:h-12 bg-accent hover:bg-accent-primary-hover disabled:opacity-50 text-white rounded-xl sm:rounded-2xl font-bold text-sm sm:text-base flex items-center justify-center gap-2 transition-all"
            >
               {loading ? <Loader2 size={20} className="animate-spin" /> : <><CheckCircle size={18} /> Valider la Transaction</>}
            </button>
-           <button onClick={onClose} className="text-[10px] sm:text-xs font-bold text-slate-500 hover:text-slate-300 transition-colors uppercase tracking-widest">
+           <button onClick={onClose} className="text-[10px] sm:text-xs font-bold text-content-muted hover:text-content-secondary transition-colors uppercase tracking-widest">
              Annuler
            </button>
         </div>

@@ -20,8 +20,8 @@ export default function ReportTypeSelector({ selectedType, onSelect }: ReportTyp
             onClick={() => onSelect(type.id)}
             className={`group relative flex flex-col items-center justify-center p-3 rounded-xl border transition-all duration-200 ${
               isSelected 
-                ? 'bg-indigo-600/10 border-indigo-500/50 shadow-lg shadow-indigo-900/20' 
-                : 'bg-slate-900/50 border-slate-800 hover:bg-slate-800 hover:border-slate-700'
+                ? 'bg-accent/10 border-accent/50 shadow-lg shadow-accent/20' 
+                : 'bg-surface-base/50 border-edge hover:bg-surface hover:border-edge'
             }`}
           >
             {/* Active Indicator Line */}
@@ -31,15 +31,15 @@ export default function ReportTypeSelector({ selectedType, onSelect }: ReportTyp
 
             <div className={`mb-2 p-2 rounded-lg transition-colors ${
               isSelected 
-                ? 'bg-indigo-500 text-white shadow-inner' 
-                : 'bg-slate-950 text-slate-400 group-hover:text-slate-200 group-hover:bg-slate-900 border border-slate-800'
+                ? 'bg-accent text-white shadow-inner'
+                : 'bg-surface-base text-content-muted group-hover:text-content-secondary group-hover:bg-surface-base border border-edge'
             }`}>
               <IconComponent size={18} />
             </div>
             
             <div className="text-center">
               <h3 className={`text-xs font-bold transition-colors ${
-                isSelected ? 'text-indigo-300' : 'text-slate-300 group-hover:text-white'
+                isSelected ? 'text-accent' : 'text-content-secondary group-hover:text-content-primary'
               }`}>
                 {type.label}
               </h3>

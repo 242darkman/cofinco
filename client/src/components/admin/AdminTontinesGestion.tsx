@@ -334,12 +334,12 @@ export default function AdminTontinesGestion() {
       {/* Header - Compact mobile */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="p-2 sm:p-3 bg-teal-500/20 rounded-xl">
-            <Users className="text-teal-400" size={22} />
+          <div className="p-2 sm:p-3 bg-accent/10 rounded-xl">
+            <Users className="text-accent" size={22} />
           </div>
           <div>
-            <h2 className="text-lg sm:text-2xl font-bold text-white">Gestion des Tontines</h2>
-            <p className="text-xs sm:text-sm text-slate-400">Gérer les groupes d'épargne rotative</p>
+            <h2 className="text-lg sm:text-2xl font-bold text-content-primary">Gestion des Tontines</h2>
+            <p className="text-xs sm:text-sm text-content-muted">Gérer les groupes d'épargne rotative</p>
           </div>
         </div>
 {canCreateTontines ? (
@@ -362,7 +362,7 @@ export default function AdminTontinesGestion() {
             {activeTab === 'groupes' ? 'Nouvelle Tontine' : 'Nouveau Modèle'}
           </Button>
         ) : (
-          <div className="px-4 py-2 bg-amber-500/20 text-amber-400 rounded-lg text-sm flex items-center gap-2">
+          <div className="px-4 py-2 bg-status-warning-bg text-status-warning rounded-lg text-sm flex items-center gap-2">
             <AlertTriangle size={16} />
             Permission requise
           </div>
@@ -370,13 +370,13 @@ export default function AdminTontinesGestion() {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-slate-800 mb-6">
+      <div className="flex border-b border-edge mb-6">
         <button
           onClick={() => setActiveTab('groupes')}
           className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
             activeTab === 'groupes' 
-            ? 'text-teal-400 border-teal-500' 
-            : 'text-slate-400 border-transparent hover:text-slate-200'
+            ? 'text-accent border-accent' 
+            : 'text-content-muted border-transparent hover:text-content-secondary'
           }`}
         >
           Groupes de Tontine
@@ -385,8 +385,8 @@ export default function AdminTontinesGestion() {
           onClick={() => setActiveTab('plans')}
           className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
             activeTab === 'plans' 
-            ? 'text-teal-400 border-teal-500' 
-            : 'text-slate-400 border-transparent hover:text-slate-200'
+            ? 'text-accent border-accent' 
+            : 'text-content-muted border-transparent hover:text-content-secondary'
           }`}
         >
           Modèles & Plans
@@ -416,25 +416,25 @@ export default function AdminTontinesGestion() {
             primary: true,
             format: (val, item) => (
               <div>
-                <div className="font-bold text-white">{val}</div>
-                <div className="text-xs text-slate-400">{item.frequence}</div>
+                <div className="font-bold text-content-primary">{val}</div>
+                <div className="text-xs text-content-muted">{item.frequence}</div>
               </div>
             )
           },
           { 
             key: 'montantCotisation',
             label: 'Cotisation (FCFA)', 
-            format: (val) => <span className="font-bold text-teal-400">{val?.toLocaleString()}</span> 
+            format: (val) => <span className="font-bold text-accent">{val?.toLocaleString()}</span> 
           },
           { 
             key: 'membresActuels',
             label: 'Membres',
-            format: (val, item) => <span className="text-slate-200">{val || 0}/{item.nombreMembres || 0}</span>
+            format: (val, item) => <span className="text-content-secondary">{val || 0}/{item.nombreMembres || 0}</span>
           },
           { 
             key: 'regles.frais_sortie_pourcentage', 
             label: 'Frais', 
-            format: (val, item) => <span className="text-emerald-400 font-medium">{item.regles?.frais_sortie_pourcentage || 0}%</span>
+            format: (val, item) => <span className="text-status-success font-medium">{item.regles?.frais_sortie_pourcentage || 0}%</span>
           },
            { 
             key: 'statut', 
@@ -444,7 +444,7 @@ export default function AdminTontinesGestion() {
         ];
 
         return (
-          <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+          <div className="bg-surface-base border border-edge rounded-xl overflow-hidden">
              <ResponsiveTable
               data={paginatedTontines}
               columns={columns}
@@ -456,7 +456,7 @@ export default function AdminTontinesGestion() {
                   {canEditTontines && (
                     <button 
                       onClick={(e) => { e.stopPropagation(); handleEditTontine(tontine); }}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+                      className="p-1.5 rounded-lg text-content-muted hover:text-content-primary hover:bg-surface-elevated transition-colors"
                       title="Modifier"
                     >
                       <Edit size={16} />
@@ -465,7 +465,7 @@ export default function AdminTontinesGestion() {
                   {canDeleteTontines && (
                     <button 
                       onClick={(e) => { e.stopPropagation(); handleDeleteTontine(tontine.id); }}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+                      className="p-1.5 rounded-lg text-content-muted hover:text-status-danger hover:bg-status-danger-bg transition-colors"
                       title="Supprimer"
                     >
                       <Trash2 size={16} />
@@ -485,9 +485,9 @@ export default function AdminTontinesGestion() {
 
       {/* Selected Tontine Members */}
       {selectedTontine && (
-        <Card className="bg-slate-900 border-slate-800 p-4 sm:p-5">
+        <Card className="bg-surface-base border-edge p-4 sm:p-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-            <h3 className="font-bold text-white text-sm sm:text-lg">
+            <h3 className="font-bold text-content-primary text-sm sm:text-lg">
               Membres de {selectedTontine.nom}
             </h3>
 {canManageMembres && (
@@ -504,7 +504,7 @@ export default function AdminTontinesGestion() {
 
           {/* Add Member Form */}
           {showMembreForm && (
-            <Card className="bg-slate-800 border-slate-700 p-4 mb-4">
+            <Card className="bg-surface border-edge p-4 mb-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="sm:col-span-2">
                   <SelectField
@@ -527,7 +527,7 @@ export default function AdminTontinesGestion() {
                   placeholder="1"
                 />
                 <div className="flex items-center gap-4 pt-6">
-                  <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
+                  <label className="flex items-center gap-2 text-content-secondary cursor-pointer">
                     <input
                       type="checkbox"
                       checked={membreForm.est_president}
@@ -536,7 +536,7 @@ export default function AdminTontinesGestion() {
                     />
                     <span className="text-xs sm:text-sm">Président</span>
                   </label>
-                  <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
+                  <label className="flex items-center gap-2 text-content-secondary cursor-pointer">
                     <input
                       type="checkbox"
                       checked={membreForm.est_tresorier}
@@ -561,7 +561,7 @@ export default function AdminTontinesGestion() {
           {/* Members List */}
           <div className="space-y-2">
             {membres.length === 0 ? (
-              <div className="text-center py-6 text-slate-500 text-sm">
+              <div className="text-center py-6 text-content-muted text-sm">
                 Aucun membre dans cette tontine
               </div>
             ) : (
@@ -571,34 +571,34 @@ export default function AdminTontinesGestion() {
                   .map((membre) => (
                     <div
                       key={membre.id}
-                      className="bg-slate-800 rounded-lg p-3 sm:p-4 flex items-center justify-between gap-3"
+                      className="bg-surface rounded-lg p-3 sm:p-4 flex items-center justify-between gap-3"
                     >
                       <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <span className="w-8 h-8 sm:w-10 sm:h-10 bg-teal-500 text-white rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0">
+                        <span className="w-8 h-8 sm:w-10 sm:h-10 bg-accent text-white rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0">
                           {membre.position}
                         </span>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <h4 className="font-semibold text-white text-sm truncate">
+                            <h4 className="font-semibold text-content-primary text-sm truncate">
                               {membre.client?.nom} {membre.client?.prenom}
                             </h4>
                             {membre.estPresident && <Badge value="Président" variant="success" size="sm" />}
                             {membre.estTresorier && <Badge value="Trésorier" variant="info" size="sm" />}
                           </div>
-                          <p className="text-xs text-slate-400 truncate">{membre.client?.numeroCompte}</p>
+                          <p className="text-xs text-content-muted truncate">{membre.client?.numeroCompte}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-3 flex-shrink-0">
                         <div className="text-right hidden sm:block">
-                          <p className="text-[10px] text-slate-500">Contribué</p>
-                          <p className="font-bold text-teal-400 text-sm">{membre.totalCotisations?.toLocaleString() || 0} FCFA</p>
+                          <p className="text-[10px] text-content-muted">Contribué</p>
+                          <p className="font-bold text-accent text-sm">{membre.totalCotisations?.toLocaleString() || 0} FCFA</p>
                         </div>
                         {canManageMembres && (
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDeleteMembre(membre.id)}
-                            className="p-2 text-red-400 hover:text-red-300"
+                            className="p-2 text-status-danger hover:text-status-danger"
                           >
                             <Trash2 size={16} />
                           </Button>
@@ -641,7 +641,7 @@ export default function AdminTontinesGestion() {
       >
         <div className="space-y-4">
           {!editMode && tontinePlans.length > 0 && (
-            <div className="bg-teal-500/10 p-4 rounded-xl border border-teal-500/20 mb-4">
+            <div className="bg-accent/10 p-4 rounded-xl border border-accent/20 mb-4">
               <SelectField
                 label="Utiliser un modèle (Optionnel)"
                 name="plan_selection"

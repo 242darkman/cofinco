@@ -11,6 +11,7 @@ import { db } from "../db";
 import { pool } from "../db";
 import { logger } from "../lib/logger";
 import { assessDiscrepancy, THRESHOLDS, type ReconciliationIssue } from "../services/treasury/gl-sync-guard";
+import { currencySymbol } from "@shared/config/currency";
 
 interface ReconciliationResult {
   timestamp: Date;
@@ -148,7 +149,7 @@ export async function runGlReconciliationCheck(): Promise<ReconciliationResult> 
         operationalBalance: 0,
         glBalance: transit581Balance,
         discrepancy: Math.abs(transit581Balance),
-        message: `Compte de transit 581 non soldé : ${transit581Balance.toLocaleString()} FCFA (doit être 0 — SYSCOHADA)`,
+        message: `Compte de transit 581 non soldé : ${transit581Balance.toLocaleString()} ${currencySymbol()} (doit être 0 — SYSCOHADA)`,
       });
     }
 

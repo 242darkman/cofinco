@@ -63,7 +63,7 @@ export default function AdminGestionZonesMap({
   if (!isClient) {
     return (
       <div className="h-full flex items-center justify-center">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-500"></div>
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-status-info"></div>
       </div>
     );
   }
@@ -107,7 +107,7 @@ export default function AdminGestionZonesMap({
                         <div className="text-center">
                         <strong>{agent.prenom} {agent.nom}</strong>
                         <br />
-                        <span className="text-gray-600">{agent.zoneAffectation}</span>
+                        <span className="text-content-muted">{agent.zoneAffectation}</span>
                         <br />
                         <span className="text-sm">Rayon: {agent.zoneRayon || '2'} km</span>
                         </div>

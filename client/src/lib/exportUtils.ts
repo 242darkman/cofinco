@@ -6,6 +6,7 @@ export interface ExportOptions {
   logeReferenceType?: string;
   logeReferenceId?: string;
   logeTags?: string[];
+  appName?: string;
 }
 
 export const exportToCSV = async (data: any[], filename: string, options?: ExportOptions) => {
@@ -164,7 +165,7 @@ export const exportToPDF = async (data: any[], filename: string, title: string, 
         </tbody>
       </table>
       <div class="footer">
-        Généré par COFIN Platform - République du Congo<br>
+        Généré par ${options?.appName || 'COFIN'} Platform - République du Congo<br>
         Document confidentiel - Ne pas diffuser
       </div>
     </body>

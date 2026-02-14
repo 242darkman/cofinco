@@ -47,11 +47,11 @@ const ProgressBar: React.FC<ProgressBarProps> = ({
 
   // Color classes (mobile-first)
   const colorClasses = {
-    primary: 'bg-gradient-to-r from-cyan-500 to-blue-600',
-    success: 'bg-gradient-to-r from-green-500 to-emerald-600',
-    warning: 'bg-gradient-to-r from-amber-500 to-orange-600',
-    danger: 'bg-gradient-to-r from-red-500 to-rose-600',
-    neutral: 'bg-gradient-to-r from-slate-500 to-slate-600',
+    primary: 'bg-gradient-to-r from-accent to-status-info',
+    success: 'bg-gradient-to-r from-status-success to-status-success',
+    warning: 'bg-gradient-to-r from-status-warning to-status-warning',
+    danger: 'bg-gradient-to-r from-status-danger to-status-danger',
+    neutral: 'bg-gradient-to-r from-surface-subtle to-surface-subtle',
   };
 
   // Size classes (mobile-first)
@@ -73,12 +73,12 @@ const ProgressBar: React.FC<ProgressBarProps> = ({
       {(label || showPercentage || showValue) && (
         <div className="flex items-center justify-between mb-1.5 sm:mb-2">
           {label && (
-            <span className={`text-slate-400 font-medium ${textSizeClasses[size]}`}>
+            <span className={`text-content-muted font-medium ${textSizeClasses[size]}`}>
               {label}
             </span>
           )}
           {(showPercentage || showValue) && (
-            <span className={`text-white font-semibold ${textSizeClasses[size]}`}>
+            <span className={`text-content-primary font-semibold ${textSizeClasses[size]}`}>
               {showPercentage && `${percentage.toFixed(0)}%`}
               {showPercentage && showValue && ' • '}
               {showValue && `${value}/${max}`}
@@ -90,7 +90,7 @@ const ProgressBar: React.FC<ProgressBarProps> = ({
       {/* Progress bar */}
       <div
         className={`
-          w-full bg-slate-700 rounded-full overflow-hidden
+          w-full bg-surface-elevated rounded-full overflow-hidden
           ${sizeClasses[size]}
         `}
         role="progressbar"

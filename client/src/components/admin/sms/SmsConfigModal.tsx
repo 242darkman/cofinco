@@ -40,16 +40,16 @@ export default function SmsConfigModal({ isOpen, onClose, provider, providerLabe
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <Card className="w-full max-w-lg shadow-2xl">
-        <Card.Header className="flex justify-between items-center bg-slate-800 border-b border-slate-700">
+        <Card.Header className="flex justify-between items-center bg-surface border-b border-edge">
           <h3 className="text-xl font-bold flex items-center gap-2">
-             <Settings className="w-5 h-5 text-blue-400"/> 
+             <Settings className="w-5 h-5 text-status-info"/> 
              Configurer {providerLabel}
           </h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-white"><X size={24}/></button>
+          <button onClick={onClose} className="text-content-muted hover:text-content-primary"><X size={24}/></button>
         </Card.Header>
         <Card.Content className="space-y-4 max-h-[80vh] overflow-y-auto">
-          {error && <div className="p-3 bg-red-900/50 text-red-200 rounded-lg flex items-center gap-2"><AlertTriangle size={16}/> {error}</div>}
-          {success && <div className="p-3 bg-green-900/50 text-green-200 rounded-lg flex items-center gap-2"><CheckCircle size={16}/> {success}</div>}
+          {error && <div className="p-3 bg-status-danger-bg text-status-danger-text rounded-lg flex items-center gap-2"><AlertTriangle size={16}/> {error}</div>}
+          {success && <div className="p-3 bg-status-success-bg text-status-success-text rounded-lg flex items-center gap-2"><CheckCircle size={16}/> {success}</div>}
           
           <form id="configForm" onSubmit={handleSubmit} className="space-y-4">
             {fields?.map(field => (
@@ -67,7 +67,7 @@ export default function SmsConfigModal({ isOpen, onClose, provider, providerLabe
             ))}
           </form>
         </Card.Content>
-        <div className="p-4 border-t border-slate-700 flex justify-end gap-3 bg-slate-800/50">
+        <div className="p-4 border-t border-edge flex justify-end gap-3 bg-surface/50">
           <Button variant="ghost" onClick={onClose}>Annuler</Button>
           <Button variant="primary" type="submit" form="configForm" disabled={saving}>
             {saving ? 'Enregistrement...' : 'Sauvegarder'}

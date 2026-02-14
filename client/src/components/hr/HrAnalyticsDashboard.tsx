@@ -8,8 +8,8 @@ const PIE_COLORS = ['#10b981', '#f59e0b', '#ef4444'];
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 shadow-xl">
-      <p className="text-xs text-slate-400 mb-1">{label}</p>
+    <div className="bg-surface border border-edge rounded-lg px-3 py-2 shadow-xl">
+      <p className="text-xs text-content-muted mb-1">{label}</p>
       {payload.map((entry: any, i: number) => (
         <p key={i} className="text-xs font-semibold" style={{ color: entry.color }}>
           {entry.name}: {typeof entry.value === 'number' ? entry.value.toLocaleString('fr-FR') : entry.value}
@@ -25,14 +25,14 @@ export default function HrAnalyticsDashboard() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <div className="w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   if (error || !data) {
     return (
-      <div className="text-center py-12 text-slate-500 text-sm">
+      <div className="text-center py-12 text-content-muted text-sm">
         Erreur lors du chargement des données analytiques.
       </div>
     );
@@ -54,31 +54,31 @@ export default function HrAnalyticsDashboard() {
     <div className="flex flex-col h-full space-y-3 overflow-y-auto no-scrollbar">
       {/* KPI Cards */}
       <div className="grid grid-cols-3 gap-3 shrink-0">
-        <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-3 flex items-center gap-3">
-          <div className="p-2 bg-cyan-500/10 rounded-lg">
-            <Users size={18} className="text-cyan-400" />
+        <div className="bg-surface/60 border border-edge-subtle rounded-xl p-3 flex items-center gap-3">
+          <div className="p-2 bg-accent/10 rounded-lg">
+            <Users size={18} className="text-accent" />
           </div>
           <div>
-            <p className="text-lg font-bold text-white">{data.kpis.totalEmployes}</p>
-            <p className="text-[10px] text-slate-400">Employés actifs</p>
+            <p className="text-lg font-bold text-content-primary">{data.kpis.totalEmployes}</p>
+            <p className="text-[10px] text-content-muted">Employés actifs</p>
           </div>
         </div>
-        <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-3 flex items-center gap-3">
-          <div className="p-2 bg-amber-500/10 rounded-lg">
-            <TrendingDown size={18} className="text-amber-400" />
+        <div className="bg-surface/60 border border-edge-subtle rounded-xl p-3 flex items-center gap-3">
+          <div className="p-2 bg-status-warning-bg rounded-lg">
+            <TrendingDown size={18} className="text-status-warning" />
           </div>
           <div>
-            <p className="text-lg font-bold text-white">{data.kpis.tauxRotation}%</p>
-            <p className="text-[10px] text-slate-400">Taux de rotation</p>
+            <p className="text-lg font-bold text-content-primary">{data.kpis.tauxRotation}%</p>
+            <p className="text-[10px] text-content-muted">Taux de rotation</p>
           </div>
         </div>
-        <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-3 flex items-center gap-3">
-          <div className="p-2 bg-purple-500/10 rounded-lg">
-            <Briefcase size={18} className="text-purple-400" />
+        <div className="bg-surface/60 border border-edge-subtle rounded-xl p-3 flex items-center gap-3">
+          <div className="p-2 bg-status-info-bg rounded-lg">
+            <Briefcase size={18} className="text-status-info" />
           </div>
           <div>
-            <p className="text-lg font-bold text-white">{data.kpis.postesOuverts}</p>
-            <p className="text-[10px] text-slate-400">Candidatures ouvertes</p>
+            <p className="text-lg font-bold text-content-primary">{data.kpis.postesOuverts}</p>
+            <p className="text-[10px] text-content-muted">Candidatures ouvertes</p>
           </div>
         </div>
       </div>
@@ -86,24 +86,24 @@ export default function HrAnalyticsDashboard() {
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 flex-1 min-h-0">
         {/* Effectifs par département */}
-        <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-3">
-          <h4 className="text-xs font-semibold text-slate-400 mb-3">Effectifs par département</h4>
+        <div className="bg-surface/40 border border-edge-subtle rounded-xl p-3">
+          <h4 className="text-xs font-semibold text-content-muted mb-3">Effectifs par département</h4>
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={data.effectifsParDepartement} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                <XAxis dataKey="departement" tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} allowDecimals={false} />
-                <Tooltip content={<CustomTooltip />} cursor={{ fill: '#334155', opacity: 0.2 }} />
-                <Bar dataKey="total" name="Employés" fill="#06b6d4" radius={[4, 4, 0, 0]} barSize={24} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" vertical={false} />
+                <XAxis dataKey="departement" tick={{ fontSize: 9, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 9, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'var(--bg-elevated)', opacity: 0.2 }} />
+                <Bar dataKey="total" name="Employés" fill="var(--accent-primary)" radius={[4, 4, 0, 0]} barSize={24} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
         {/* Tendances congés */}
-        <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-3">
-          <h4 className="text-xs font-semibold text-slate-400 mb-3">Congés mensuels par type</h4>
+        <div className="bg-surface/40 border border-edge-subtle rounded-xl p-3">
+          <h4 className="text-xs font-semibold text-content-muted mb-3">Congés mensuels par type</h4>
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={congesData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
@@ -115,9 +115,9 @@ export default function HrAnalyticsDashboard() {
                     </linearGradient>
                   ))}
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                <XAxis dataKey="mois" tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" vertical={false} />
+                <XAxis dataKey="mois" tick={{ fontSize: 9, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 9, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} allowDecimals={false} />
                 <Tooltip content={<CustomTooltip />} />
                 {congesTypes.map((type, i) => (
                   <Area
@@ -136,21 +136,21 @@ export default function HrAnalyticsDashboard() {
         </div>
 
         {/* Masse salariale */}
-        <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-3">
-          <h4 className="text-xs font-semibold text-slate-400 mb-3">Masse salariale mensuelle</h4>
+        <div className="bg-surface/40 border border-edge-subtle rounded-xl p-3">
+          <h4 className="text-xs font-semibold text-content-muted mb-3">Masse salariale mensuelle</h4>
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data.masseSalariale.map(m => ({ ...m, mois: m.mois.slice(5) }))} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
                 <defs>
                   <linearGradient id="gradSalaire" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                    <stop offset="5%" stopColor="var(--color-success)" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="var(--color-success)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                <XAxis dataKey="mois" tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" vertical={false} />
+                <XAxis dataKey="mois" tick={{ fontSize: 9, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} />
                 <YAxis
-                  tick={{ fontSize: 9, fill: '#64748b' }}
+                  tick={{ fontSize: 9, fill: 'var(--text-muted)' }}
                   axisLine={false}
                   tickLine={false}
                   tickFormatter={(v) => `${(v / 1000000).toFixed(1)}M`}
@@ -159,24 +159,24 @@ export default function HrAnalyticsDashboard() {
                   content={({ active, payload, label }) => {
                     if (!active || !payload?.length) return null;
                     return (
-                      <div className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 shadow-xl">
-                        <p className="text-xs text-slate-400 mb-1">{label}</p>
-                        <p className="text-xs font-semibold text-emerald-400">
+                      <div className="bg-surface border border-edge rounded-lg px-3 py-2 shadow-xl">
+                        <p className="text-xs text-content-muted mb-1">{label}</p>
+                        <p className="text-xs font-semibold text-status-success">
                           {new Intl.NumberFormat('fr-FR').format(payload[0].value as number)} FC
                         </p>
                       </div>
                     );
                   }}
                 />
-                <Area type="monotone" dataKey="total" name="Net à payer" stroke="#10b981" fill="url(#gradSalaire)" strokeWidth={2} />
+                <Area type="monotone" dataKey="total" name="Net à payer" stroke="var(--color-success)" fill="url(#gradSalaire)" strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
 
         {/* Distribution sanctions */}
-        <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-3">
-          <h4 className="text-xs font-semibold text-slate-400 mb-3">Sanctions par gravité</h4>
+        <div className="bg-surface/40 border border-edge-subtle rounded-xl p-3">
+          <h4 className="text-xs font-semibold text-content-muted mb-3">Sanctions par gravité</h4>
           <div className="h-48 flex items-center justify-center">
             {data.sanctionsDistribution.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
@@ -200,7 +200,7 @@ export default function HrAnalyticsDashboard() {
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <p className="text-xs text-slate-500">Aucune sanction enregistrée</p>
+              <p className="text-xs text-content-muted">Aucune sanction enregistrée</p>
             )}
           </div>
         </div>

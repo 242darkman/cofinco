@@ -42,10 +42,10 @@ const CHANNEL_ICONS = {
 };
 
 const CHANNEL_COLORS = {
-  SMS: 'text-cyan-400 bg-cyan-500/20',
-  EMAIL: 'text-blue-400 bg-blue-500/20',
-  PUSH: 'text-purple-400 bg-purple-500/20',
-  IN_APP: 'text-emerald-400 bg-emerald-500/20',
+  SMS: 'text-accent bg-accent/10',
+  EMAIL: 'text-status-info bg-status-info-bg',
+  PUSH: 'text-status-info bg-status-info-bg',
+  IN_APP: 'text-status-success bg-status-success-bg',
 };
 
 export default function NotificationPreview({
@@ -96,16 +96,16 @@ export default function NotificationPreview({
   const charInfo = getCharacterInfo();
 
   return (
-    <div className="bg-slate-800 rounded-2xl border border-slate-700 overflow-hidden max-w-2xl w-full">
+    <div className="bg-surface rounded-2xl border border-edge overflow-hidden max-w-2xl w-full">
       {/* Header */}
-      <div className="p-4 border-b border-slate-700 flex items-center justify-between">
+      <div className="p-4 border-b border-edge flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className={`p-2 rounded-lg ${CHANNEL_COLORS[template.channel]}`}>
             <Icon size={20} />
           </div>
           <div>
-            <h3 className="font-semibold text-white">{template.name}</h3>
-            <p className="text-sm text-slate-400">Code: {template.code}</p>
+            <h3 className="font-semibold text-content-primary">{template.name}</h3>
+            <p className="text-sm text-content-muted">Code: {template.code}</p>
           </div>
         </div>
 
@@ -116,21 +116,21 @@ export default function NotificationPreview({
 
       {/* Variables Input */}
       {template.placeholders.length > 0 && (
-        <div className="p-4 border-b border-slate-700 bg-slate-900/50">
-          <h4 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
-            <AlertTriangle size={14} className="text-amber-400" />
+        <div className="p-4 border-b border-edge bg-surface-base/50">
+          <h4 className="text-sm font-medium text-content-primary mb-3 flex items-center gap-2">
+            <AlertTriangle size={14} className="text-status-warning" />
             Variables de test
           </h4>
           <div className="grid grid-cols-2 gap-3">
             {template.placeholders.map((placeholder) => (
               <div key={placeholder}>
-                <label className="block text-xs text-slate-400 mb-1">{placeholder}</label>
+                <label className="block text-xs text-content-muted mb-1">{placeholder}</label>
                 <input
                   type="text"
                   value={data[placeholder] || ''}
                   onChange={(e) => setData({ ...data, [placeholder]: e.target.value })}
                   placeholder={`Valeur pour ${placeholder}`}
-                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3 py-2 bg-surface-elevated border border-edge-strong rounded-lg text-content-primary text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                 />
               </div>
             ))}
@@ -141,15 +141,15 @@ export default function NotificationPreview({
       {/* Preview */}
       <div className="p-4">
         <div className="flex items-center justify-between mb-3">
-          <h4 className="text-sm font-medium text-white flex items-center gap-2">
+          <h4 className="text-sm font-medium text-content-primary flex items-center gap-2">
             <Eye size={14} />
             Aperçu du message
           </h4>
           <button
             onClick={handleCopy}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-content-muted hover:text-content-primary hover:bg-surface-elevated rounded-lg transition"
           >
-            {copied ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+            {copied ? <Check size={14} className="text-status-success" /> : <Copy size={14} />}
             {copied ? 'Copié!' : 'Copier'}
           </button>
         </div>
@@ -157,8 +157,8 @@ export default function NotificationPreview({
         {/* Email Preview */}
         {template.channel === 'EMAIL' && template.subject && (
           <div className="mb-3">
-            <label className="block text-xs text-slate-400 mb-1">Sujet</label>
-            <div className="p-3 bg-slate-900 rounded-lg text-white">
+            <label className="block text-xs text-content-muted mb-1">Sujet</label>
+            <div className="p-3 bg-surface-base rounded-lg text-content-primary">
               {renderContent(template.subject)}
             </div>
           </div>
@@ -168,8 +168,8 @@ export default function NotificationPreview({
         <div
           className={`p-4 rounded-lg ${
             template.channel === 'EMAIL'
-              ? 'bg-white text-slate-800'
-              : 'bg-slate-900 text-white'
+              ? 'bg-surface text-content-primary'
+              : 'bg-surface-base text-content-primary'
           }`}
         >
           {template.channel === 'EMAIL' ? (
@@ -186,10 +186,10 @@ export default function NotificationPreview({
 
         {/* SMS Character Count */}
         {template.channel === 'SMS' && (
-          <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
+          <div className="mt-3 flex items-center justify-between text-xs text-content-muted">
             <span>{charInfo.length} caractères</span>
             <span
-              className={charInfo.smsCount > 1 ? 'text-amber-400' : 'text-emerald-400'}
+              className={charInfo.smsCount > 1 ? 'text-status-warning' : 'text-status-success'}
             >
               {charInfo.smsCount} SMS
             </span>
@@ -199,10 +199,10 @@ export default function NotificationPreview({
 
       {/* Actions */}
       {onClose && (
-        <div className="p-4 border-t border-slate-700 flex justify-end">
+        <div className="p-4 border-t border-edge flex justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-slate-400 hover:text-white transition"
+            className="px-4 py-2 text-content-muted hover:text-content-primary transition"
           >
             Fermer
           </button>

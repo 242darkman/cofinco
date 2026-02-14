@@ -48,7 +48,7 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
     return (
       <div className={`relative ${containerClassName}`}>
         <Search
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted pointer-events-none"
           size={18}
         />
 
@@ -63,7 +63,7 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
             w-full h-10 sm:h-11 pl-10 pr-${hasValue && showClearButton ? '12' : '4'}
             bg-input-bg border border-input-border rounded-lg
             text-input-text text-sm sm:text-base
-            placeholder:text-slate-500
+            placeholder:text-input-placeholder
             transition-colors duration-200
             focus:outline-none focus:ring-2 focus:border-input-focus focus:ring-input-focus/30
             disabled:opacity-50 disabled:cursor-not-allowed

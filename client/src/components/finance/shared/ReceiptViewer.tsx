@@ -81,7 +81,7 @@ export const ReceiptViewer: React.FC<ReceiptViewerProps> = ({
           <>
             <Button
               onClick={handleDownload}
-              className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+              className="flex-1 bg-status-success hover:bg-status-success"
             >
               <Download size={16} className="mr-2" />
               Télécharger PDF
@@ -119,13 +119,13 @@ export const ReceiptViewer: React.FC<ReceiptViewerProps> = ({
       {/* Content */}
       {isLoading && (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="animate-spin text-emerald-400" size={32} />
+          <Loader2 className="animate-spin text-status-success" size={32} />
         </div>
       )}
 
       {error && (
         <div className="text-center py-12">
-          <p className="text-red-400">Erreur lors du chargement du reçu</p>
+          <p className="text-status-danger">Erreur lors du chargement du reçu</p>
         </div>
       )}
 

@@ -116,7 +116,7 @@ export function DiscrepancyReport({
     return discrepancies.slice(0, 10).map((d) => ({
       date: d.date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }),
       ecart: d.ecart,
-      color: d.ecart > 0 ? '#10b981' : d.ecart < 0 ? '#f43f5e' : '#6366f1',
+      color: d.ecart > 0 ? 'var(--color-success)' : d.ecart < 0 ? 'var(--color-danger)' : '#6366f1',
     }));
   }, [discrepancies]);
 
@@ -129,10 +129,10 @@ export function DiscrepancyReport({
 
   if (loading) {
     return (
-      <Card className="bg-slate-900/80 border-slate-800 p-8">
+      <Card className="bg-surface-base/80 border-edge p-8">
         <div className="flex items-center justify-center gap-3">
-          <div className="animate-spin w-5 h-5 border-2 border-cyan-500 border-t-transparent rounded-full" />
-          <span className="text-slate-400">Analyse des écarts en cours...</span>
+          <div className="animate-spin w-5 h-5 border-2 border-accent border-t-transparent rounded-full" />
+          <span className="text-content-muted">Analyse des écarts en cours...</span>
         </div>
       </Card>
     );
@@ -140,12 +140,12 @@ export function DiscrepancyReport({
 
   if (discrepancies.length === 0) {
     return (
-      <Card className="bg-slate-900/80 border-slate-800 p-12 text-center">
-        <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
-          <CheckCircle size={32} className="text-emerald-400" />
+      <Card className="bg-surface-base/80 border-edge p-12 text-center">
+        <div className="w-16 h-16 bg-status-success-bg rounded-full flex items-center justify-center mx-auto mb-4">
+          <CheckCircle size={32} className="text-status-success" />
         </div>
-        <h3 className="text-lg font-semibold text-white mb-1">Aucune session à analyser</h3>
-        <p className="text-slate-500 text-sm">
+        <h3 className="text-lg font-semibold text-content-primary mb-1">Aucune session à analyser</h3>
+        <p className="text-content-muted text-sm">
           Aucune session fermée trouvée pour cette période.
         </p>
       </Card>
@@ -159,89 +159,89 @@ export function DiscrepancyReport({
         <Card
           className={`p-4 ${
             stats.tauxConformite >= 95
-              ? 'bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20'
+              ? 'bg-gradient-to-br from-status-success/10 to-status-success/5 border-status-success/20'
               : stats.tauxConformite >= 80
-                ? 'bg-gradient-to-br from-amber-500/10 to-amber-500/5 border-amber-500/20'
-                : 'bg-gradient-to-br from-rose-500/10 to-rose-500/5 border-rose-500/20'
+                ? 'bg-gradient-to-br from-status-warning/10 to-status-warning/5 border-status-warning/20'
+                : 'bg-gradient-to-br from-status-danger/10 to-status-danger/5 border-status-danger/20'
           }`}
         >
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-xs text-slate-400 font-medium uppercase tracking-wide">
+              <p className="text-xs text-content-muted font-medium uppercase tracking-wide">
                 Taux Conformité
               </p>
               <p
                 className={`text-2xl font-bold mt-1 ${
                   stats.tauxConformite >= 95
-                    ? 'text-emerald-400'
+                    ? 'text-status-success'
                     : stats.tauxConformite >= 80
-                      ? 'text-amber-400'
-                      : 'text-rose-400'
+                      ? 'text-status-warning'
+                      : 'text-status-danger'
                 }`}
               >
                 {stats.tauxConformite.toFixed(1)}%
               </p>
-              <p className="text-[10px] text-slate-500 mt-1">
+              <p className="text-[10px] text-content-muted mt-1">
                 {stats.total - stats.withDiscrepancy}/{stats.total} sessions OK
               </p>
             </div>
             <div
               className={`p-2 rounded-lg ${
                 stats.tauxConformite >= 95
-                  ? 'bg-emerald-500/20'
+                  ? 'bg-status-success-bg'
                   : stats.tauxConformite >= 80
-                    ? 'bg-amber-500/20'
-                    : 'bg-rose-500/20'
+                    ? 'bg-status-warning-bg'
+                    : 'bg-status-danger-bg'
               }`}
             >
               <Target
                 size={20}
                 className={
                   stats.tauxConformite >= 95
-                    ? 'text-emerald-400'
+                    ? 'text-status-success'
                     : stats.tauxConformite >= 80
-                      ? 'text-amber-400'
-                      : 'text-rose-400'
+                      ? 'text-status-warning'
+                      : 'text-status-danger'
                 }
               />
             </div>
           </div>
         </Card>
 
-        <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20 p-4">
+        <Card className="bg-gradient-to-br from-status-success/10 to-status-success/5 border-status-success/20 p-4">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-xs text-emerald-400/70 font-medium uppercase tracking-wide">
+              <p className="text-xs text-status-success/70 font-medium uppercase tracking-wide">
                 Excédents
               </p>
-              <p className="text-2xl font-bold text-emerald-400 mt-1">
+              <p className="text-2xl font-bold text-status-success mt-1">
                 +{stats.totalEcartPositif.toLocaleString('fr-FR')}
               </p>
-              <p className="text-[10px] text-emerald-400/50 mt-1">
+              <p className="text-[10px] text-status-success/50 mt-1">
                 {stats.positiveCount} session{stats.positiveCount > 1 ? 's' : ''}
               </p>
             </div>
-            <div className="p-2 bg-emerald-500/20 rounded-lg">
-              <TrendingUp size={20} className="text-emerald-400" />
+            <div className="p-2 bg-status-success-bg rounded-lg">
+              <TrendingUp size={20} className="text-status-success" />
             </div>
           </div>
         </Card>
 
-        <Card className="bg-gradient-to-br from-rose-500/10 to-rose-500/5 border-rose-500/20 p-4">
+        <Card className="bg-gradient-to-br from-status-danger/10 to-status-danger/5 border-status-danger/20 p-4">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-xs text-rose-400/70 font-medium uppercase tracking-wide">
+              <p className="text-xs text-status-danger/70 font-medium uppercase tracking-wide">
                 Manquants
               </p>
-              <p className="text-2xl font-bold text-rose-400 mt-1">
+              <p className="text-2xl font-bold text-status-danger mt-1">
                 -{stats.totalEcartNegatif.toLocaleString('fr-FR')}
               </p>
-              <p className="text-[10px] text-rose-400/50 mt-1">
+              <p className="text-[10px] text-status-danger/50 mt-1">
                 {stats.negativeCount} session{stats.negativeCount > 1 ? 's' : ''}
               </p>
             </div>
-            <div className="p-2 bg-rose-500/20 rounded-lg">
-              <TrendingDown size={20} className="text-rose-400" />
+            <div className="p-2 bg-status-danger-bg rounded-lg">
+              <TrendingDown size={20} className="text-status-danger" />
             </div>
           </div>
         </Card>
@@ -249,50 +249,50 @@ export function DiscrepancyReport({
         <Card
           className={`p-4 ${
             stats.totalEcartNet === 0
-              ? 'bg-gradient-to-br from-slate-500/10 to-slate-500/5 border-slate-500/20'
+              ? 'bg-gradient-to-br from-surface-subtle/10 to-surface-subtle/5 border-edge-strong/20'
               : stats.totalEcartNet > 0
-                ? 'bg-gradient-to-br from-cyan-500/10 to-cyan-500/5 border-cyan-500/20'
-                : 'bg-gradient-to-br from-amber-500/10 to-amber-500/5 border-amber-500/20'
+                ? 'bg-gradient-to-br from-accent/10 to-accent/5 border-accent/20'
+                : 'bg-gradient-to-br from-status-warning/10 to-status-warning/5 border-status-warning/20'
           }`}
         >
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-xs text-slate-400 font-medium uppercase tracking-wide">
+              <p className="text-xs text-content-muted font-medium uppercase tracking-wide">
                 Balance Nette
               </p>
               <p
                 className={`text-2xl font-bold mt-1 ${
                   stats.totalEcartNet === 0
-                    ? 'text-slate-400'
+                    ? 'text-content-muted'
                     : stats.totalEcartNet > 0
-                      ? 'text-cyan-400'
-                      : 'text-amber-400'
+                      ? 'text-accent'
+                      : 'text-status-warning'
                 }`}
               >
                 {stats.totalEcartNet > 0 ? '+' : ''}
                 {stats.totalEcartNet.toLocaleString('fr-FR')}
               </p>
-              <p className="text-[10px] text-slate-500 mt-1">
+              <p className="text-[10px] text-content-muted mt-1">
                 Moy: {stats.ecartMoyen.toLocaleString('fr-FR', { maximumFractionDigits: 0 })}
               </p>
             </div>
             <div
               className={`p-2 rounded-lg ${
                 stats.totalEcartNet === 0
-                  ? 'bg-slate-500/20'
+                  ? 'bg-surface-subtle/40'
                   : stats.totalEcartNet > 0
-                    ? 'bg-cyan-500/20'
-                    : 'bg-amber-500/20'
+                    ? 'bg-accent/10'
+                    : 'bg-status-warning-bg'
               }`}
             >
               <Scale
                 size={20}
                 className={
                   stats.totalEcartNet === 0
-                    ? 'text-slate-400'
+                    ? 'text-content-muted'
                     : stats.totalEcartNet > 0
-                      ? 'text-cyan-400'
-                      : 'text-amber-400'
+                      ? 'text-accent'
+                      : 'text-status-warning'
                 }
               />
             </div>
@@ -302,33 +302,33 @@ export function DiscrepancyReport({
 
       {/* Graphique des écarts */}
       {chartData.length > 0 && (
-        <Card className="bg-slate-900/80 border-slate-800 p-6">
-          <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
-            <AlertTriangle size={16} className="text-amber-400" />
+        <Card className="bg-surface-base/80 border-edge p-6">
+          <h3 className="text-sm font-bold text-content-primary mb-4 flex items-center gap-2">
+            <AlertTriangle size={16} className="text-status-warning" />
             Distribution des Écarts (Top 10)
           </h3>
           <div className="h-[200px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-default)" />
                 <XAxis
                   dataKey="date"
-                  tick={{ fill: '#94a3b8', fontSize: 10 }}
-                  tickLine={{ stroke: '#475569' }}
-                  axisLine={{ stroke: '#475569' }}
+                  tick={{ fill: 'var(--text-muted)', fontSize: 10 }}
+                  tickLine={{ stroke: 'var(--border-default)' }}
+                  axisLine={{ stroke: 'var(--border-default)' }}
                 />
                 <YAxis
-                  tick={{ fill: '#94a3b8', fontSize: 10 }}
-                  tickLine={{ stroke: '#475569' }}
-                  axisLine={{ stroke: '#475569' }}
+                  tick={{ fill: 'var(--text-muted)', fontSize: 10 }}
+                  tickLine={{ stroke: 'var(--border-default)' }}
+                  axisLine={{ stroke: 'var(--border-default)' }}
                   tickFormatter={(value) => `${value > 0 ? '+' : ''}${(value / 1000).toFixed(0)}k`}
                 />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: '#1e293b',
-                    border: '1px solid #334155',
+                    backgroundColor: 'var(--bg-elevated)',
+                    border: '1px solid var(--border-default)',
                     borderRadius: '8px',
-                    color: '#f8fafc',
+                    color: 'var(--text-primary)',
                   }}
                   formatter={(value: number) => [
                     `${value > 0 ? '+' : ''}${value.toLocaleString('fr-FR')} FCFA`,
@@ -347,16 +347,16 @@ export function DiscrepancyReport({
       )}
 
       {/* Tableau détaillé */}
-      <Card className="bg-slate-900/80 border-slate-800 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-800 bg-slate-950/30">
-          <h3 className="text-sm font-bold text-white flex items-center gap-2">
-            <FileText size={16} className="text-slate-400" />
+      <Card className="bg-surface-base/80 border-edge overflow-hidden">
+        <div className="px-6 py-4 border-b border-edge bg-surface-base/30">
+          <h3 className="text-sm font-bold text-content-primary flex items-center gap-2">
+            <FileText size={16} className="text-content-muted" />
             Détail des Sessions
           </h3>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-slate-950/50 text-slate-400 uppercase text-[10px] font-bold tracking-wider">
+            <thead className="bg-surface-base/50 text-content-muted uppercase text-[10px] font-bold tracking-wider">
               <tr>
                 <th className="px-4 py-3 text-left">Date</th>
                 <th className="px-4 py-3 text-left">Caissier</th>
@@ -368,17 +368,17 @@ export function DiscrepancyReport({
                 <th className="px-4 py-3 text-left">Justification</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/50">
+            <tbody className="divide-y divide-edge/50">
               {paginatedDiscrepancies.map((entry) => (
-                <tr key={entry.session.id} className="hover:bg-slate-800/20 transition-colors">
+                <tr key={entry.session.id} className="hover:bg-surface/20 transition-colors">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
-                      <Calendar size={12} className="text-slate-500" />
+                      <Calendar size={12} className="text-content-muted" />
                       <div>
-                        <p className="text-slate-300 font-medium text-xs">
+                        <p className="text-content-secondary font-medium text-xs">
                           {entry.date.toLocaleDateString('fr-FR')}
                         </p>
-                        <p className="text-slate-500 text-[10px]">
+                        <p className="text-content-muted text-[10px]">
                           {entry.date.toLocaleTimeString('fr-FR', {
                             hour: '2-digit',
                             minute: '2-digit',
@@ -390,20 +390,20 @@ export function DiscrepancyReport({
                   <td className="px-4 py-3">
                     {entry.caissier ? (
                       <div className="flex items-center gap-2">
-                        <User size={12} className="text-slate-500" />
-                        <span className="text-slate-300 text-xs">{entry.caissier}</span>
+                        <User size={12} className="text-content-muted" />
+                        <span className="text-content-secondary text-xs">{entry.caissier}</span>
                       </div>
                     ) : (
-                      <span className="text-slate-600 text-xs">—</span>
+                      <span className="text-content-muted text-xs">—</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <span className="text-slate-400 font-mono text-xs">
+                    <span className="text-content-muted font-mono text-xs">
                       {entry.soldeTheorique.toLocaleString('fr-FR')}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <span className="text-white font-mono font-medium text-xs">
+                    <span className="text-content-primary font-mono font-medium text-xs">
                       {entry.soldeReel.toLocaleString('fr-FR')}
                     </span>
                   </td>
@@ -411,10 +411,10 @@ export function DiscrepancyReport({
                     <span
                       className={`font-mono font-bold text-xs ${
                         entry.ecart > 0
-                          ? 'text-emerald-400'
+                          ? 'text-status-success'
                           : entry.ecart < 0
-                            ? 'text-rose-400'
-                            : 'text-slate-400'
+                            ? 'text-status-danger'
+                            : 'text-content-muted'
                       }`}
                     >
                       {entry.ecart > 0 ? '+' : ''}
@@ -425,10 +425,10 @@ export function DiscrepancyReport({
                     <span
                       className={`font-mono text-[10px] ${
                         Math.abs(entry.ecartPercent) <= 0.5
-                          ? 'text-slate-500'
+                          ? 'text-content-muted'
                           : entry.ecartPercent > 0
-                            ? 'text-emerald-400'
-                            : 'text-rose-400'
+                            ? 'text-status-success'
+                            : 'text-status-danger'
                       }`}
                     >
                       {entry.ecartPercent > 0 ? '+' : ''}
@@ -437,19 +437,19 @@ export function DiscrepancyReport({
                   </td>
                   <td className="px-4 py-3 text-center">
                     {entry.status === 'ok' && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-500/10 text-emerald-400 text-[10px] font-bold rounded-full">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-status-success-bg text-status-success text-[10px] font-bold rounded-full">
                         <CheckCircle size={10} />
                         OK
                       </span>
                     )}
                     {entry.status === 'warning' && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-500/10 text-amber-400 text-[10px] font-bold rounded-full">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-status-warning-bg text-status-warning text-[10px] font-bold rounded-full">
                         <AlertTriangle size={10} />
                         Mineur
                       </span>
                     )}
                     {entry.status === 'critical' && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-rose-500/10 text-rose-400 text-[10px] font-bold rounded-full">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-status-danger/10 text-status-danger text-[10px] font-bold rounded-full">
                         <AlertTriangle size={10} />
                         Critique
                       </span>
@@ -457,13 +457,13 @@ export function DiscrepancyReport({
                   </td>
                   <td className="px-4 py-3">
                     {entry.justification ? (
-                      <span className="text-slate-400 text-xs truncate block max-w-[200px]">
+                      <span className="text-content-muted text-xs truncate block max-w-[200px]">
                         {entry.justification}
                       </span>
                     ) : entry.ecart !== 0 ? (
-                      <span className="text-amber-400/50 text-xs italic">Non justifié</span>
+                      <span className="text-status-warning/50 text-xs italic">Non justifié</span>
                     ) : (
-                      <span className="text-slate-600 text-xs">—</span>
+                      <span className="text-content-muted text-xs">—</span>
                     )}
                   </td>
                 </tr>
@@ -474,7 +474,7 @@ export function DiscrepancyReport({
 
         {/* Pagination */}
         {discrepancies.length > itemsPerPage && (
-          <div className="p-4 border-t border-slate-800 bg-slate-950/30">
+          <div className="p-4 border-t border-edge bg-surface-base/30">
             <Pagination
               currentPage={currentPage}
               totalPages={totalPages}

@@ -122,18 +122,18 @@ export default function AgentSelector({
         onKeyDown={handleKeyDown}
         className={`
           w-full flex items-center justify-between gap-2 px-4 py-3
-          bg-slate-800/50 border border-slate-700 rounded-xl
-          text-left text-white cursor-pointer
-          hover:bg-slate-700/50 transition-colors
+          bg-surface/50 border border-edge rounded-xl
+          text-left text-content-primary cursor-pointer
+          hover:bg-surface-elevated/50 transition-colors
           ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
-          ${isOpen ? 'ring-2 ring-cyan-500/50 border-cyan-500/50' : ''}
+          ${isOpen ? 'ring-2 ring-accent/50 border-accent/50' : ''}
         `}
       >
         <div className="flex items-center gap-3 flex-1 min-w-0">
           {selectedAgent ? (
             <>
               {/* Avatar avec photo ou initiales */}
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-500/20 to-emerald-500/20 border-2 border-cyan-500/40 flex items-center justify-center flex-shrink-0 overflow-hidden">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-accent/20 to-status-success/20 border-2 border-accent/40 flex items-center justify-center flex-shrink-0 overflow-hidden">
                 {getPhotoUrl(selectedAgent) ? (
                   <img
                     src={getPhotoUrl(selectedAgent)}
@@ -141,25 +141,25 @@ export default function AgentSelector({
                     className="w-full h-full rounded-full object-cover"
                   />
                 ) : (
-                  <span className="text-sm font-bold text-cyan-400">{getInitials(selectedAgent)}</span>
+                  <span className="text-sm font-bold text-accent">{getInitials(selectedAgent)}</span>
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-white truncate">
+                <p className="text-sm font-semibold text-content-primary truncate">
                   {selectedAgent.prenom} {selectedAgent.nom}
                 </p>
-                <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
-                  <MapPin size={10} className="text-cyan-500/70 flex-shrink-0" />
+                <div className="flex items-center gap-1.5 text-[11px] text-content-muted">
+                  <MapPin size={10} className="text-accent/70 flex-shrink-0" />
                   <span className="truncate">{getZone(selectedAgent) || 'Zone non assignée'}</span>
                 </div>
               </div>
             </>
           ) : (
             <>
-              <div className="w-10 h-10 rounded-full bg-slate-700/50 border border-slate-600 flex items-center justify-center flex-shrink-0">
-                <User size={18} className="text-slate-500" />
+              <div className="w-10 h-10 rounded-full bg-surface-elevated/50 border border-edge-strong flex items-center justify-center flex-shrink-0">
+                <User size={18} className="text-content-muted" />
               </div>
-              <span className="text-slate-400 text-sm">{placeholder}</span>
+              <span className="text-content-muted text-sm">{placeholder}</span>
             </>
           )}
         </div>
@@ -168,33 +168,33 @@ export default function AgentSelector({
             <button
               type="button"
               onClick={handleClear}
-              className="p-1 rounded hover:bg-slate-600/50 transition-colors"
+              className="p-1 rounded hover:bg-surface-subtle/50 transition-colors"
               aria-label="Effacer la sélection"
             >
-              <X size={14} className="text-slate-400" />
+              <X size={14} className="text-content-muted" />
             </button>
           )}
           <ChevronDown
             size={16}
-            className={`text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+            className={`text-content-muted transition-transform ${isOpen ? 'rotate-180' : ''}`}
           />
         </div>
       </div>
 
       {/* Dropdown */}
       {isOpen && (
-        <div className="absolute z-50 top-full left-0 right-0 mt-2 bg-slate-900 border border-slate-700 rounded-xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="absolute z-50 top-full left-0 right-0 mt-2 bg-surface-base border border-edge rounded-xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
           {/* Search Input */}
-          <div className="p-2 border-b border-slate-700/50">
+          <div className="p-2 border-b border-edge-subtle">
             <div className="relative">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" />
               <input
                 ref={inputRef}
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Rechercher un agent..."
-                className="w-full pl-9 pr-3 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white text-sm placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+                className="w-full pl-9 pr-3 py-2 bg-surface/50 border border-edge rounded-lg text-content-primary text-sm placeholder:text-content-muted focus:outline-none focus:ring-2 focus:ring-accent/50"
               />
             </div>
           </div>
@@ -203,13 +203,13 @@ export default function AgentSelector({
           <div className="max-h-72 overflow-y-auto">
             {filteredAgents.length === 0 ? (
               <div className="p-6 text-center">
-                <User size={32} className="mx-auto mb-2 text-slate-600" />
-                <p className="text-sm text-slate-500">Aucun agent trouvé</p>
-                <p className="text-xs text-slate-600 mt-1">Essayez un autre terme de recherche</p>
+                <User size={32} className="mx-auto mb-2 text-content-muted" />
+                <p className="text-sm text-content-muted">Aucun agent trouvé</p>
+                <p className="text-xs text-content-muted mt-1">Essayez un autre terme de recherche</p>
               </div>
             ) : (
               <>
-                <div className="px-3 py-2 text-[10px] text-slate-500 uppercase tracking-wider font-semibold bg-slate-800/30">
+                <div className="px-3 py-2 text-[10px] text-content-muted uppercase tracking-wider font-semibold bg-surface/30">
                   {filteredAgents.length} agent{filteredAgents.length > 1 ? 's' : ''} disponible{filteredAgents.length > 1 ? 's' : ''}
                 </div>
                 {filteredAgents.map((agent) => (
@@ -219,12 +219,12 @@ export default function AgentSelector({
                     onClick={() => handleSelect(agent)}
                     className={`
                       w-full flex items-center gap-3 px-4 py-3
-                      hover:bg-slate-800/50 transition-colors border-b border-slate-800/50 last:border-b-0
-                      ${agent.id === selectedAgentId ? 'bg-cyan-500/10 border-l-2 border-l-cyan-500' : ''}
+                      hover:bg-surface/50 transition-colors border-b border-edge/50 last:border-b-0
+                      ${agent.id === selectedAgentId ? 'bg-accent/10 border-l-2 border-l-accent' : ''}
                     `}
                   >
                     {/* Avatar avec photo ou initiales */}
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-cyan-500/20 to-emerald-500/20 border-2 border-cyan-500/30 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-accent/20 to-status-success/20 border-2 border-accent/30 flex items-center justify-center flex-shrink-0 overflow-hidden">
                       {getPhotoUrl(agent) ? (
                         <img
                           src={getPhotoUrl(agent)}
@@ -232,32 +232,32 @@ export default function AgentSelector({
                           className="w-full h-full rounded-full object-cover"
                         />
                       ) : (
-                        <span className="text-base font-bold text-cyan-400">{getInitials(agent)}</span>
+                        <span className="text-base font-bold text-accent">{getInitials(agent)}</span>
                       )}
                     </div>
                     <div className="flex-1 min-w-0 text-left">
                       {/* Nom complet */}
-                      <p className="text-sm font-semibold text-white truncate">
+                      <p className="text-sm font-semibold text-content-primary truncate">
                         {agent.prenom} {agent.nom}
                       </p>
                       {/* Zone d'affectation */}
                       <div className="flex items-center gap-1.5 mt-0.5">
-                        <MapPin size={11} className="text-cyan-500/70 flex-shrink-0" />
-                        <span className="text-xs text-slate-400 truncate">
+                        <MapPin size={11} className="text-accent/70 flex-shrink-0" />
+                        <span className="text-xs text-content-muted truncate">
                           {getZone(agent) || 'Zone non assignée'}
                         </span>
                       </div>
                       {/* Téléphone si disponible */}
                       {agent.telephone && (
                         <div className="flex items-center gap-1.5 mt-0.5">
-                          <Phone size={10} className="text-slate-500 flex-shrink-0" />
-                          <span className="text-[10px] text-slate-500">{agent.telephone}</span>
+                          <Phone size={10} className="text-content-muted flex-shrink-0" />
+                          <span className="text-[10px] text-content-muted">{agent.telephone}</span>
                         </div>
                       )}
                     </div>
                     {agent.id === selectedAgentId && (
-                      <div className="w-6 h-6 rounded-full bg-cyan-500/20 flex items-center justify-center flex-shrink-0">
-                        <Check size={14} className="text-cyan-400" />
+                      <div className="w-6 h-6 rounded-full bg-accent/10 flex items-center justify-center flex-shrink-0">
+                        <Check size={14} className="text-accent" />
                       </div>
                     )}
                   </button>

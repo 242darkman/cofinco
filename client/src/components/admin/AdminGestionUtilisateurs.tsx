@@ -149,8 +149,8 @@ export default function AdminGestionUtilisateurs() {
         <div className="p-2 border-b border-edge bg-surface-muted/30 shrink-0">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="flex items-center gap-2 shrink-0">
-              <div className="w-8 h-8 bg-blue-500/10 rounded-lg flex items-center justify-center shrink-0">
-                <Users className="w-4 h-4 text-blue-400" />
+              <div className="w-8 h-8 bg-status-info-bg rounded-lg flex items-center justify-center shrink-0">
+                <Users className="w-4 h-4 text-status-info" />
               </div>
               <div>
                 <h2 className="text-sm sm:text-base font-bold text-content-primary">Utilisateurs</h2>
@@ -349,7 +349,7 @@ export default function AdminGestionUtilisateurs() {
                         onClick={() => setCurrentPage(pageNum)}
                         className={`w-7 h-7 rounded-lg text-xs font-medium transition-colors ${
                           currentPage === pageNum
-                            ? 'bg-primary text-white'
+                            ? 'bg-primary text-content-primary'
                             : 'text-content-muted hover:bg-surface-muted'
                         }`}
                       >

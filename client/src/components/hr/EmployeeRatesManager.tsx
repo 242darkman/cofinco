@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { DollarSign, Users, Save, History, Calendar, ArrowRight } from 'lucide-react';
 import { Card, Button, FormField, SelectField, TabGroup } from '../ui';
 import { toast } from '../../lib/toast';
+import { useCurrency } from '../../contexts/CurrencyContext';
 
 interface RateHistoryEntry {
   id: string;
@@ -21,6 +22,7 @@ interface EmployeeRatesManagerProps {
 }
 
 export default function EmployeeRatesManager({ employeId }: EmployeeRatesManagerProps) {
+  const { currency, label } = useCurrency();
   const [employees, setEmployees] = useState<any[]>([]);
   const [selectedMode, setSelectedMode] = useState('Mensuel');
   const [tauxHoraire, setTauxHoraire] = useState('');
@@ -196,14 +198,14 @@ export default function EmployeeRatesManager({ employeId }: EmployeeRatesManager
 
   const formatAmount = (amount: string | null) => {
     if (!amount) return '-';
-    return parseInt(amount).toLocaleString('fr-FR') + ' FCFA';
+    return parseInt(amount).toLocaleString('fr-FR') + ' ' + currency.symbol;
   };
 
   return (
     <div className="space-y-4 sm:space-y-6">
       <div className="flex items-center gap-3">
-        <DollarSign className="w-6 h-6 text-emerald-400" />
-        <h3 className="text-base sm:text-lg font-bold text-white">
+        <DollarSign className="w-6 h-6 text-status-success" />
+        <h3 className="text-base sm:text-lg font-bold text-content-primary">
           Gestion des Taux {bulkMode && '(Tous les employés)'}
         </h3>
       </div>
@@ -223,14 +225,14 @@ export default function EmployeeRatesManager({ employeId }: EmployeeRatesManager
       {/* History Tab */}
       {employeId && activeTab === 'history' && (
         <Card className="p-4 sm:p-6">
-          <h4 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
-            <History size={16} className="text-blue-400" />
+          <h4 className="text-sm font-bold text-content-primary mb-4 flex items-center gap-2">
+            <History size={16} className="text-status-info" />
             Historique des modifications de taux
           </h4>
           {loadingHistory ? (
-            <div className="text-center text-slate-400 py-8">Chargement...</div>
+            <div className="text-center text-content-muted py-8">Chargement...</div>
           ) : rateHistory.length === 0 ? (
-            <div className="text-center text-slate-400 py-8">Aucun historique disponible</div>
+            <div className="text-center text-content-muted py-8">Aucun historique disponible</div>
           ) : (
             <div className="space-y-3">
               {rateHistory.map((entry, index) => (
@@ -238,24 +240,24 @@ export default function EmployeeRatesManager({ employeId }: EmployeeRatesManager
                   key={entry.id}
                   className={`p-3 rounded-lg border ${
                     !entry.effectiveTo
-                      ? 'bg-emerald-900/20 border-emerald-500/30'
-                      : 'bg-slate-800 border-slate-700'
+                      ? 'bg-status-success-bg border-status-success/30'
+                      : 'bg-surface border-edge'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <Calendar size={14} className="text-slate-400" />
-                      <span className="text-sm text-white font-medium">
+                      <Calendar size={14} className="text-content-muted" />
+                      <span className="text-sm text-content-primary font-medium">
                         {formatDate(entry.effectiveFrom)}
                         {entry.effectiveTo && (
                           <>
-                            <ArrowRight size={12} className="inline mx-2 text-slate-500" />
+                            <ArrowRight size={12} className="inline mx-2 text-content-muted" />
                             {formatDate(entry.effectiveTo)}
                           </>
                         )}
                       </span>
                       {!entry.effectiveTo && (
-                        <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded">
+                        <span className="text-xs bg-status-success-bg text-status-success px-2 py-0.5 rounded">
                           Actuel
                         </span>
                       )}
@@ -263,37 +265,37 @@ export default function EmployeeRatesManager({ employeId }: EmployeeRatesManager
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div>
-                      <span className="text-slate-400">Mode: </span>
-                      <span className="text-white">
+                      <span className="text-content-muted">Mode: </span>
+                      <span className="text-content-primary">
                         {entry.modeCalcul === 'MONTHLY' ? 'Mensuel' : entry.modeCalcul === 'HOURLY' ? 'Horaire' : 'Journalier'}
                       </span>
                     </div>
                     {entry.modeCalcul === 'MONTHLY' && (
                       <div>
-                        <span className="text-slate-400">Salaire: </span>
-                        <span className="text-emerald-400 font-medium">{formatAmount(entry.salaireBase)}</span>
+                        <span className="text-content-muted">Salaire: </span>
+                        <span className="text-status-success font-medium">{formatAmount(entry.salaireBase)}</span>
                       </div>
                     )}
                     {entry.modeCalcul === 'HOURLY' && entry.tauxHoraire && (
                       <div>
-                        <span className="text-slate-400">Taux horaire: </span>
-                        <span className="text-emerald-400 font-medium">{formatAmount(entry.tauxHoraire)}</span>
+                        <span className="text-content-muted">Taux horaire: </span>
+                        <span className="text-status-success font-medium">{formatAmount(entry.tauxHoraire)}</span>
                       </div>
                     )}
                     {entry.modeCalcul === 'DAILY' && entry.tauxJournalier && (
                       <div>
-                        <span className="text-slate-400">Taux journalier: </span>
-                        <span className="text-emerald-400 font-medium">{formatAmount(entry.tauxJournalier)}</span>
+                        <span className="text-content-muted">Taux journalier: </span>
+                        <span className="text-status-success font-medium">{formatAmount(entry.tauxJournalier)}</span>
                       </div>
                     )}
                   </div>
                   {entry.motifChangement && (
-                    <div className="mt-2 text-xs text-slate-400 italic">
+                    <div className="mt-2 text-xs text-content-muted italic">
                       Motif: {entry.motifChangement}
                     </div>
                   )}
                   {entry.createdByName && (
-                    <div className="mt-1 text-xs text-slate-500">
+                    <div className="mt-1 text-xs text-content-muted">
                       Par: {entry.createdByName}
                     </div>
                   )}
@@ -315,7 +317,7 @@ export default function EmployeeRatesManager({ employeId }: EmployeeRatesManager
                 onChange={(e) => setBulkMode(e.target.checked)}
                 className="w-4 h-4"
               />
-              <label className="text-sm text-slate-300">
+              <label className="text-sm text-content-secondary">
                 Appliquer à tous les employés ({employees.length})
               </label>
             </div>
@@ -337,48 +339,48 @@ export default function EmployeeRatesManager({ employeId }: EmployeeRatesManager
           {selectedMode === 'Horaire' && (
             <div>
               <FormField
-                label="Taux Horaire (FCFA)"
+                label={label('Taux Horaire')}
                 name="tauxHoraire"
                 type="number"
                 value={tauxHoraire}
                 onChange={(e) => { setTauxHoraire(e.target.value); setErrors(prev => ({ ...prev, tauxHoraire: '' })); }}
                 placeholder="Ex: 2500"
               />
-              {errors.tauxHoraire && <p className="text-xs text-red-400 mt-1">{errors.tauxHoraire}</p>}
+              {errors.tauxHoraire && <p className="text-xs text-status-danger mt-1">{errors.tauxHoraire}</p>}
             </div>
           )}
 
           {selectedMode === 'Journalier' && (
             <div>
               <FormField
-                label="Taux Journalier (FCFA)"
+                label={label('Taux Journalier')}
                 name="tauxJournalier"
                 type="number"
                 value={tauxJournalier}
                 onChange={(e) => { setTauxJournalier(e.target.value); setErrors(prev => ({ ...prev, tauxJournalier: '' })); }}
                 placeholder="Ex: 15000"
               />
-              {errors.tauxJournalier && <p className="text-xs text-red-400 mt-1">{errors.tauxJournalier}</p>}
+              {errors.tauxJournalier && <p className="text-xs text-status-danger mt-1">{errors.tauxJournalier}</p>}
             </div>
           )}
 
           {selectedMode === 'Mensuel' && (
             <div>
               <FormField
-                label="Salaire de Base (FCFA)"
+                label={label('Salaire de Base')}
                 name="salaireBase"
                 type="number"
                 value={salaireBase}
                 onChange={(e) => { setSalaireBase(e.target.value); setErrors(prev => ({ ...prev, salaireBase: '' })); }}
                 placeholder="Ex: 350000"
               />
-              {errors.salaireBase && <p className="text-xs text-red-400 mt-1">{errors.salaireBase}</p>}
+              {errors.salaireBase && <p className="text-xs text-status-danger mt-1">{errors.salaireBase}</p>}
             </div>
           )}
 
           {/* Date d'effet et motif pour mode employé unique */}
           {employeId && !bulkMode && (
-            <div className="border-t border-slate-700 pt-4 mt-4 space-y-4">
+            <div className="border-t border-edge pt-4 mt-4 space-y-4">
               <FormField
                 label="Date d'effet"
                 name="effectiveFrom"

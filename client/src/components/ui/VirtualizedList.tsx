@@ -50,10 +50,10 @@ const DefaultLoadingSkeleton = () => (
   <div className="space-y-3 p-4">
     {[1, 2, 3, 4, 5].map((i) => (
       <div key={i} className="animate-pulse flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-slate-700" />
+        <div className="w-10 h-10 rounded-full bg-surface-elevated" />
         <div className="flex-1 space-y-2">
-          <div className="h-4 bg-slate-700 rounded w-3/4" />
-          <div className="h-3 bg-slate-700/50 rounded w-1/2" />
+          <div className="h-4 bg-surface-elevated rounded w-3/4" />
+          <div className="h-3 bg-surface-elevated/50 rounded w-1/2" />
         </div>
       </div>
     ))}
@@ -64,9 +64,9 @@ const DefaultLoadingSkeleton = () => (
 
 const DefaultEmptyState = () => (
   <div className="flex flex-col items-center justify-center h-full py-12 text-center">
-    <div className="w-16 h-16 mb-4 rounded-2xl bg-slate-800/50 flex items-center justify-center">
+    <div className="w-16 h-16 mb-4 rounded-2xl bg-surface/50 flex items-center justify-center">
       <svg
-        className="w-8 h-8 text-slate-500"
+        className="w-8 h-8 text-content-muted"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
@@ -79,7 +79,7 @@ const DefaultEmptyState = () => (
         />
       </svg>
     </div>
-    <p className="text-slate-400 text-sm">Aucun élément à afficher</p>
+    <p className="text-content-muted text-sm">Aucun élément à afficher</p>
   </div>
 );
 
@@ -207,7 +207,7 @@ export function SimpleVirtualizedList<T>({
       className={className}
       emptyState={
         <div className="flex items-center justify-center h-full">
-          <p className="text-slate-400 text-sm">{emptyMessage}</p>
+          <p className="text-content-muted text-sm">{emptyMessage}</p>
         </div>
       }
       renderItem={(item, index, style) => (

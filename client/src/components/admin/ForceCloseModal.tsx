@@ -63,20 +63,20 @@ export function ForceCloseModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full">
+      <div className="bg-surface rounded-lg shadow-xl max-w-md w-full">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between p-6 border-b border-edge">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-red-100 dark:bg-red-900/20 rounded-lg">
-              <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400" />
+            <div className="p-2 bg-status-danger-bg rounded-lg">
+              <AlertTriangle className="w-6 h-6 text-status-danger" />
             </div>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+            <h2 className="text-xl font-semibold text-content-primary">
               Fermeture Forcée
             </h2>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            className="text-content-muted hover:text-content-muted"
           >
             <X className="w-5 h-5" />
           </button>
@@ -85,8 +85,8 @@ export function ForceCloseModal({
         {/* Content */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {/* Warning Message */}
-          <div className="p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
-            <p className="text-sm text-orange-800 dark:text-orange-200">
+          <div className="p-4 bg-status-warning-bg border border-status-warning/30 rounded-lg">
+            <p className="text-sm text-status-warning-text">
               ⚠️ Vous allez fermer la session de <strong>{agentName}</strong> de force.
               Les fonds resteront dans la caisse.
             </p>
@@ -94,19 +94,19 @@ export function ForceCloseModal({
 
           {/* Motif Field */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Motif de la fermeture <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium text-content-secondary mb-2">
+              Motif de la fermeture <span className="text-status-danger">*</span>
             </label>
             <textarea
               value={motif}
               onChange={(e) => setMotif(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+              className="w-full px-3 py-2 border border-edge-strong rounded-lg focus:ring-2 focus:ring-status-danger focus:border-transparent-elevated"
               rows={4}
               placeholder="Ex: Agent absent - urgence familiale"
               required
               minLength={10}
             />
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            <p className="mt-1 text-xs text-content-muted">
               Minimum 10 caractères ({motif.length}/10)
             </p>
           </div>
@@ -118,17 +118,17 @@ export function ForceCloseModal({
               id="keepFunds"
               checked={keepFunds}
               onChange={(e) => setKeepFunds(e.target.checked)}
-              className="mt-1 w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+              className="mt-1 w-4 h-4 text-status-danger border-edge rounded focus:ring-status-danger"
             />
-            <label htmlFor="keepFunds" className="text-sm text-gray-700 dark:text-gray-300">
+            <label htmlFor="keepFunds" className="text-sm text-content-secondary">
               Garder les fonds en caisse (fond de caisse pour la prochaine session)
             </label>
           </div>
 
           {/* Error Message */}
           {error && (
-            <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-              <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+            <div className="p-3 bg-status-danger-bg border border-status-danger/30 rounded-lg">
+              <p className="text-sm text-status-danger-text">{error}</p>
             </div>
           )}
 
@@ -137,14 +137,14 @@ export function ForceCloseModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              className="flex-1 px-4 py-2 border border-edge-strong text-content-secondary rounded-lg hover:bg-surface-muted-elevated transition-colors"
               disabled={isSubmitting}
             >
               Annuler
             </button>
             <button
               type="submit"
-              className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 px-4 py-2 bg-status-danger text-white rounded-lg hover:bg-status-danger transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={isSubmitting || motif.length < 10}
             >
               {isSubmitting ? 'Fermeture...' : 'Forcer la Fermeture'}

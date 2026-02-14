@@ -72,7 +72,7 @@ function CircularProgress({ progress, size = 48 }: { progress: number; size?: nu
         fill="none"
         stroke="currentColor"
         strokeWidth={strokeWidth}
-        className="text-slate-700"
+        className="text-content-secondary"
       />
       {/* Progress ring */}
       <circle
@@ -85,7 +85,7 @@ function CircularProgress({ progress, size = 48 }: { progress: number; size?: nu
         strokeLinecap="round"
         strokeDasharray={circumference}
         strokeDashoffset={strokeDashoffset}
-        className="text-cyan-400 transition-all duration-300 ease-out"
+        className="text-accent transition-all duration-300 ease-out"
       />
     </svg>
   );
@@ -433,15 +433,15 @@ export function SmartDocumentUpload({
           onClick={handleCardClick}
           className={`
             relative w-32 h-32 rounded-full overflow-hidden
-            border-4 border-slate-700 bg-slate-800
+            border-4 border-edge bg-surface
             ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}
-            transition-all duration-200 hover:border-cyan-500
+            transition-all duration-200 hover:border-accent
           `}
         >
           {/* Empty State - User Icon */}
           {uploadState === 'empty' && (
             <div className="flex items-center justify-center w-full h-full">
-              <User className="w-16 h-16 text-slate-600" />
+              <User className="w-16 h-16 text-content-muted" />
             </div>
           )}
 
@@ -455,7 +455,7 @@ export function SmartDocumentUpload({
                   className="w-full h-full object-cover blur-sm opacity-40"
                 />
               )}
-              <div className="absolute inset-0 flex items-center justify-center bg-slate-900/60">
+              <div className="absolute inset-0 flex items-center justify-center bg-surface-base/60">
                 <CircularProgress progress={progress} size={56} />
               </div>
             </div>
@@ -481,9 +481,9 @@ export function SmartDocumentUpload({
 
           {/* Error State */}
           {uploadState === 'error' && (
-            <div className="flex flex-col items-center justify-center w-full h-full bg-red-900/20">
-              <AlertCircle className="w-10 h-10 text-red-400 mb-1" />
-              <span className="text-xs text-red-400 text-center px-2">{errorMessage || 'Erreur'}</span>
+            <div className="flex flex-col items-center justify-center w-full h-full bg-status-danger-bg">
+              <AlertCircle className="w-10 h-10 text-status-danger mb-1" />
+              <span className="text-xs text-status-danger text-center px-2">{errorMessage || 'Erreur'}</span>
             </div>
           )}
         </div>
@@ -498,7 +498,7 @@ export function SmartDocumentUpload({
           disabled={disabled || isUploading || isCompressing}
           className={`
             absolute bottom-0 right-0 p-3 rounded-full
-            bg-cyan-500 hover:bg-cyan-400 text-white shadow-lg
+            bg-accent hover:bg-accent text-white shadow-lg
             transition-all duration-200 hover:scale-110
             ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
           `}
@@ -511,7 +511,7 @@ export function SmartDocumentUpload({
           <button
             type="button"
             onClick={handleRemove}
-            className="absolute top-0 right-0 p-1.5 rounded-full bg-red-500 hover:bg-red-400 text-white shadow-lg transition-all duration-200 hover:scale-110"
+            className="absolute top-0 right-0 p-1.5 rounded-full bg-status-danger hover:bg-status-danger text-white shadow-lg transition-all duration-200 hover:scale-110"
           >
             <X className="w-3 h-3" />
           </button>
@@ -539,10 +539,10 @@ export function SmartDocumentUpload({
           relative overflow-hidden rounded-xl border-2 transition-all duration-200
           ${getAspectRatioClass()}
           ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}
-          ${uploadState === 'empty' ? 'border-dashed border-slate-600 hover:border-cyan-500 hover:bg-slate-800/30' : ''}
-          ${uploadState === 'loading' ? 'border-cyan-500/50 bg-cyan-500/5' : ''}
-          ${uploadState === 'success' ? 'border-slate-700 bg-slate-800/50' : ''}
-          ${uploadState === 'error' ? 'border-red-500/50 bg-red-500/5' : ''}
+          ${uploadState === 'empty' ? 'border-dashed border-edge-strong hover:border-accent hover:bg-surface/30' : ''}
+          ${uploadState === 'loading' ? 'border-accent/50 bg-accent/5' : ''}
+          ${uploadState === 'success' ? 'border-edge bg-surface/50' : ''}
+          ${uploadState === 'error' ? 'border-status-danger/50 bg-status-danger/5' : ''}
         `}
         style={{ minHeight: aspectRatio === 'auto' ? '100px' : undefined }}
       >
@@ -553,16 +553,16 @@ export function SmartDocumentUpload({
             {watermarkIcon !== 'none' && (
               <WatermarkIcon
                 icon={watermarkIcon}
-                className="absolute inset-0 w-full h-full p-6 text-slate-700 opacity-20 pointer-events-none"
+                className="absolute inset-0 w-full h-full p-6 text-content-secondary opacity-20 pointer-events-none"
               />
             )}
             {/* Content on top */}
             <div className="relative z-10 flex flex-col items-center">
-              <div className="p-3 bg-slate-700/50 rounded-full mb-2 group-hover:bg-cyan-900/30 transition-colors">
-                <Camera className="w-6 h-6 text-slate-400" />
+              <div className="p-3 bg-surface-elevated/50 rounded-full mb-2 group-hover:bg-accent/10 transition-colors">
+                <Camera className="w-6 h-6 text-content-muted" />
               </div>
-              <span className="text-sm font-medium text-slate-300">{label}</span>
-              <span className="text-xs text-slate-500 mt-1">{getCtaText()}</span>
+              <span className="text-sm font-medium text-content-secondary">{label}</span>
+              <span className="text-xs text-content-muted mt-1">{getCtaText()}</span>
             </div>
           </div>
         )}
@@ -580,14 +580,14 @@ export function SmartDocumentUpload({
             )}
 
             {/* Progress overlay */}
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/60">
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-surface-base/60">
               <div className="relative">
                 <CircularProgress progress={progress} size={56} />
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-xs font-bold text-cyan-300">{progress}%</span>
+                  <span className="text-xs font-bold text-accent">{progress}%</span>
                 </div>
               </div>
-              <span className="text-xs text-cyan-300 font-medium mt-2">
+              <span className="text-xs text-accent font-medium mt-2">
                 {isCompressing ? 'Compression...' : 'Upload...'}
               </span>
             </div>
@@ -599,19 +599,19 @@ export function SmartDocumentUpload({
           <div className="relative group h-full min-h-[100px]">
             {/* Document thumbnail - Full cover for images, icon for PDFs */}
             {isLoadingDisplay && !isPdfFile ? (
-              <div className="flex items-center justify-center h-full min-h-[100px] bg-slate-800">
-                <Loader2 className="w-6 h-6 text-slate-400 animate-spin" />
+              <div className="flex items-center justify-center h-full min-h-[100px] bg-surface">
+                <Loader2 className="w-6 h-6 text-content-muted animate-spin" />
               </div>
             ) : isPdfFile ? (
               // PDF placeholder - show icon and filename
-              <div className="flex flex-col items-center justify-center h-full min-h-[100px] bg-gradient-to-br from-red-900/30 to-red-950/50 p-4">
-                <div className="p-3 bg-red-500/20 rounded-xl mb-2">
-                  <FileText className="w-8 h-8 text-red-400" />
+              <div className="flex flex-col items-center justify-center h-full min-h-[100px] bg-gradient-to-br from-status-danger/10 to-status-danger/20 p-4">
+                <div className="p-3 bg-status-danger-bg rounded-xl mb-2">
+                  <FileText className="w-8 h-8 text-status-danger" />
                 </div>
-                <span className="text-xs font-medium text-slate-300 text-center truncate max-w-full">
+                <span className="text-xs font-medium text-content-secondary text-center truncate max-w-full">
                   {currentDocument?.documentName || 'Document.pdf'}
                 </span>
-                <span className="text-[10px] text-red-400/80 mt-1">PDF</span>
+                <span className="text-[10px] text-status-danger/80 mt-1">PDF</span>
               </div>
             ) : (
               <img
@@ -631,7 +631,7 @@ export function SmartDocumentUpload({
             )}
 
             {/* Success indicator */}
-            <div className="absolute top-2 left-2 p-1.5 bg-green-500 rounded-full shadow-lg">
+            <div className="absolute top-2 left-2 p-1.5 bg-status-success rounded-full shadow-lg">
               <Check className="w-3 h-3 text-white" />
             </div>
 
@@ -640,7 +640,7 @@ export function SmartDocumentUpload({
               <button
                 type="button"
                 onClick={handleCardClick}
-                className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-xs font-medium rounded-lg transition-colors"
+                className="px-3 py-1.5 bg-surface-elevated hover:bg-surface-subtle text-content-primary text-xs font-medium rounded-lg transition-colors"
               >
                 Changer
               </button>
@@ -651,7 +651,7 @@ export function SmartDocumentUpload({
               <button
                 type="button"
                 onClick={handleRemove}
-                className="absolute top-2 right-2 p-1.5 bg-black/40 hover:bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all shadow-lg backdrop-blur-sm"
+                className="absolute top-2 right-2 p-1.5 bg-black/40 hover:bg-status-danger text-white rounded-full opacity-0 group-hover:opacity-100 transition-all shadow-lg backdrop-blur-sm"
               >
                 <X className="w-3 h-3" />
               </button>
@@ -662,15 +662,15 @@ export function SmartDocumentUpload({
         {/* Error State */}
         {uploadState === 'error' && (
           <div className="flex flex-col items-center justify-center h-full min-h-[100px] p-4">
-            <div className="p-3 bg-red-500/20 rounded-full mb-2">
-              <AlertCircle className="w-6 h-6 text-red-400" />
+            <div className="p-3 bg-status-danger-bg rounded-full mb-2">
+              <AlertCircle className="w-6 h-6 text-status-danger" />
             </div>
-            <span className="text-sm font-medium text-red-400">{label}</span>
-            <span className="text-xs text-red-400/70 mt-1 text-center">{errorMessage || 'Erreur'}</span>
+            <span className="text-sm font-medium text-status-danger">{label}</span>
+            <span className="text-xs text-status-danger/70 mt-1 text-center">{errorMessage || 'Erreur'}</span>
             <button
               type="button"
               onClick={handleRetry}
-              className="mt-2 px-3 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 text-xs font-medium rounded-lg flex items-center gap-1 transition-colors"
+              className="mt-2 px-3 py-1 bg-status-danger-bg hover:bg-status-danger/30 text-status-danger text-xs font-medium rounded-lg flex items-center gap-1 transition-colors"
             >
               <RefreshCw className="w-3 h-3" />
               Réessayer
@@ -681,7 +681,7 @@ export function SmartDocumentUpload({
 
       {/* Document label below */}
       {uploadState === 'success' && (
-        <p className="text-xs text-slate-400 mt-1 truncate text-center">{label}</p>
+        <p className="text-xs text-content-muted mt-1 truncate text-center">{label}</p>
       )}
     </div>
   );

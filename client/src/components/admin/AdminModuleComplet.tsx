@@ -47,6 +47,7 @@ import AdminClientCredentials from './AdminClientCredentials';
 import AdminProductRates from './AdminProductRates';
 import ZoneManagement from './ZoneManagement';
 import AdminCurrencySettings from './AdminCurrencySettings';
+import AdminBrandingSettings from './AdminBrandingSettings';
 
 
 interface AdminModuleCompletProps {
@@ -262,17 +263,17 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
   const activeRolePermissionsCount = (permissions || []).filter(p => singleRoleHasPermission(p.code)).length;
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto overflow-x-hidden bg-slate-900">
+    <div className="flex flex-col h-full overflow-y-auto overflow-x-hidden bg-surface-base">
       {/* TOP NAVIGATION BAR */}
-      <header className="shrink-0 bg-slate-950 border-b border-slate-800 flex items-center h-14 px-4 gap-4 sticky top-0 z-20">
+      <header className="shrink-0 bg-surface-base border-b border-edge flex items-center h-14 px-4 gap-4 sticky top-0 z-20">
         {/* Title / Brand */}
-        <div className="flex items-center gap-2 shrink-0 pr-4 border-r border-slate-800">
-           <div className="w-8 h-8 bg-indigo-600/20 rounded-lg flex items-center justify-center">
-              <Shield className="w-4 h-4 text-indigo-500" />
+        <div className="flex items-center gap-2 shrink-0 pr-4 border-r border-edge">
+           <div className="w-8 h-8 bg-accent/10 rounded-lg flex items-center justify-center">
+              <Shield className="w-4 h-4 text-accent" />
            </div>
            <div className="hidden md:block">
-             <h2 className="text-sm font-bold text-slate-100 leading-none">Admin</h2>
-             <p className="text-[9px] text-slate-500 uppercase tracking-wider leading-none mt-0.5">Système</p>
+             <h2 className="text-sm font-bold text-content-primary leading-none">Admin</h2>
+             <p className="text-[9px] text-content-muted uppercase tracking-wider leading-none mt-0.5">Système</p>
            </div>
         </div>
 
@@ -280,11 +281,11 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
         <div className="flex-1 relative overflow-hidden flex items-center group/nav">
            
            {/* Left Shadow / Button */}
-           <div className={`absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-slate-950 to-transparent z-10 pointer-events-none transition-opacity duration-300 ${showLeftShadow ? 'opacity-100' : 'opacity-0'}`} />
+           <div className={`absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-surface-base to-transparent z-10 pointer-events-none transition-opacity duration-300 ${showLeftShadow ? 'opacity-100' : 'opacity-0'}`} />
             {showLeftShadow && (
                 <button 
                   onClick={() => scroll('left')}
-                  className="absolute left-0 top-1/2 -translate-y-1/2 z-20 bg-slate-800/80 hover:bg-slate-700 text-slate-300 p-1 rounded-full shadow-lg backdrop-blur-sm transition-all animate-in fade-in zoom-in-50"
+                  className="absolute left-0 top-1/2 -translate-y-1/2 z-20 bg-surface/80 hover:bg-surface-elevated text-content-secondary p-1 rounded-full shadow-lg backdrop-blur-sm transition-all animate-in fade-in zoom-in-50"
                 >
                     <ChevronLeft size={16} />
                 </button>
@@ -316,14 +317,14 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
                       className={`
                         flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap shrink-0 border border-transparent
                         ${isActive 
-                          ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/20 border-indigo-500/50' 
+                          ? 'bg-accent text-white shadow-sm shadow-accent/20 border-accent/50' 
                           : isDisabled 
-                            ? 'opacity-40 cursor-not-allowed text-slate-600' 
-                            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800 hover:border-slate-700'
+                            ? 'opacity-40 cursor-not-allowed text-content-muted' 
+                            : 'text-content-muted hover:text-content-secondary hover:bg-surface hover:border-edge'
                         }
                       `}
                     >
-                      <Icon size={14} className={isActive ? "text-indigo-100" : "text-slate-500"} />
+                      <Icon size={14} className={isActive ? "text-white" : "text-content-muted"} />
                       <span>{tab.label}</span>
                       {isDisabled && <Lock size={10} className="ml-1" />}
                     </button>
@@ -332,11 +333,11 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
             </nav>
 
             {/* Right Shadow / Button */}
-            <div className={`absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-slate-950 to-transparent z-10 pointer-events-none transition-opacity duration-300 ${showRightShadow ? 'opacity-100' : 'opacity-0'}`} />
+            <div className={`absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-surface-base to-transparent z-10 pointer-events-none transition-opacity duration-300 ${showRightShadow ? 'opacity-100' : 'opacity-0'}`} />
             {showRightShadow && (
                 <button 
                   onClick={() => scroll('right')}
-                  className="absolute right-0 top-1/2 -translate-y-1/2 z-20 bg-slate-800/80 hover:bg-slate-700 text-slate-300 p-1 rounded-full shadow-lg backdrop-blur-sm transition-all animate-in fade-in zoom-in-50"
+                  className="absolute right-0 top-1/2 -translate-y-1/2 z-20 bg-surface/80 hover:bg-surface-elevated text-content-secondary p-1 rounded-full shadow-lg backdrop-blur-sm transition-all animate-in fade-in zoom-in-50"
                 >
                     <ChevronRight size={16} />
                 </button>
@@ -345,17 +346,17 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
       </header>
 
       {/* MAIN CONTENT AREA */}
-      <main className="flex-1 overflow-y-auto overflow-x-hidden relative bg-slate-900">
+      <main className="flex-1 overflow-y-auto overflow-x-hidden relative bg-surface-base">
         <div className="h-full p-2 md:p-3 flex flex-col">
            <div className="w-full h-full flex flex-col">
               
               {/* Optional Section Header if needed, or streamlined */}
               {activeTab !== 'dashboard' && (
                 <div className="mb-3 shrink-0">
-                    <h1 className="text-base font-bold text-white flex items-center gap-2">
+                    <h1 className="text-base font-bold text-content-primary flex items-center gap-2">
                       {iconMap[ADMIN_TABS.find(t => t.id === activeTab)?.icon || 'Shield'] 
-                         ? React.createElement(iconMap[ADMIN_TABS.find(t => t.id === activeTab)?.icon || 'Shield'], { size: 18, className: "text-indigo-500" })
-                         : <Shield className="text-indigo-500" size={18} />
+                         ? React.createElement(iconMap[ADMIN_TABS.find(t => t.id === activeTab)?.icon || 'Shield'], { size: 18, className: "text-accent" })
+                         : <Shield className="text-accent" size={18} />
                       }
                       {ADMIN_TABS.find(t => t.id === activeTab)?.label}
                     </h1>
@@ -385,10 +386,11 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
                   {activeTab === 'product-rates' && <AdminProductRates />}
                   {activeTab === 'zones-commerciales' && <ZoneManagement />}
                   {activeTab === 'currency' && <AdminCurrencySettings />}
+                  {activeTab === 'branding' && <AdminBrandingSettings />}
 
                   {activeTab === 'roles' && (
                     <div className="flex flex-col h-full overflow-hidden space-y-2">
-                      <div className="border-b border-slate-800 pb-2 shrink-0">
+                      <div className="border-b border-edge pb-2 shrink-0">
                         {(() => {
                         const viewTabs = [
                           {
@@ -427,8 +429,8 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
                         return (
                           <div className="space-y-2">
                             <div className="flex items-center gap-4">
-                              <span className="text-sm text-slate-400 font-medium">Vue :</span>
-                              <div className="flex bg-slate-950 rounded-lg p-1 border border-slate-800">
+                              <span className="text-sm text-content-muted font-medium">Vue :</span>
+                              <div className="flex bg-surface-base rounded-lg p-1 border border-edge">
                                 {viewTabs.map((tab) => {
                                   const isActive = accessViewMode === tab.id;
                                   return (
@@ -438,8 +440,8 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
                                       className={`
                                         flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all
                                         ${isActive
-                                          ? 'bg-slate-800 text-white shadow-sm border border-slate-700'
-                                          : 'text-slate-500 hover:text-slate-300'
+                                          ? 'bg-surface text-content-primary shadow-sm border border-edge'
+                                          : 'text-content-muted hover:text-content-secondary'
                                         }
                                       `}
                                     >
@@ -451,7 +453,7 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
                               </div>
                             </div>
                             {activeTab && (
-                              <p className="text-xs text-slate-500 pl-12 max-w-2xl">
+                              <p className="text-xs text-content-muted pl-12 max-w-2xl">
                                 {activeTab.description}
                               </p>
                             )}
@@ -540,15 +542,15 @@ function NotificationsSection() {
   return (
     <div className="flex flex-col h-full space-y-4">
       {/* Sub-tabs for notifications */}
-      <div className="flex items-center gap-4 border-b border-slate-800 pb-2 shrink-0">
-        <span className="text-sm text-slate-400 font-medium">Vue :</span>
-        <div className="flex bg-slate-950 rounded-lg p-1 border border-slate-800">
+      <div className="flex items-center gap-4 border-b border-edge pb-2 shrink-0">
+        <span className="text-sm text-content-muted font-medium">Vue :</span>
+        <div className="flex bg-surface-base rounded-lg p-1 border border-edge">
           <button
             onClick={() => setNotifView('monitor')}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
               notifView === 'monitor'
-                ? 'bg-slate-800 text-white'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-surface text-content-primary'
+                : 'text-content-muted hover:text-content-primary'
             }`}
           >
             <Activity size={14} />
@@ -558,8 +560,8 @@ function NotificationsSection() {
             onClick={() => setNotifView('templates')}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
               notifView === 'templates'
-                ? 'bg-slate-800 text-white'
-                : 'text-slate-400 hover:text-white'
+                ? 'bg-surface text-content-primary'
+                : 'text-content-muted hover:text-content-primary'
             }`}
           >
             <MessageSquare size={14} />

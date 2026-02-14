@@ -187,10 +187,10 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#020617]">
+      <div className="min-h-screen flex items-center justify-center bg-surface-base">
         <div className="flex flex-col items-center gap-4">
-          <RefreshCw className="w-8 h-8 text-cyan-500 animate-spin" />
-          <p className="text-slate-400 text-sm">Chargement de votre caisse...</p>
+          <RefreshCw className="w-8 h-8 text-accent animate-spin" />
+          <p className="text-content-muted text-sm">Chargement de votre caisse...</p>
         </div>
       </div>
     );
@@ -225,15 +225,15 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
       </div>
 
       {/* Disponible pour remise */}
-      <Card variant="default" padding="md" className="border-emerald-500/20 bg-emerald-500/5">
+      <Card variant="default" padding="md" className="border-status-success/20 bg-status-success/5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-emerald-500/10">
-              <TrendingUp className="w-5 h-5 text-emerald-400" />
+            <div className="p-2 rounded-lg bg-status-success-bg">
+              <TrendingUp className="w-5 h-5 text-status-success" />
             </div>
             <div>
-              <p className="text-xs text-slate-400 uppercase tracking-wider">Disponible pour remise</p>
-              <p className="text-2xl font-bold text-emerald-400">
+              <p className="text-xs text-content-muted uppercase tracking-wider">Disponible pour remise</p>
+              <p className="text-2xl font-bold text-status-success">
                 {formatMoney(caisseSummary?.disponible || '0')} {caisseSummary?.devise || 'XOF'}
               </p>
             </div>
@@ -252,7 +252,7 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
 
       {/* Quick Actions */}
       <div>
-        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 px-1">
+        <h3 className="text-xs font-bold text-content-muted uppercase tracking-widest mb-3 px-1">
           Actions Rapides
         </h3>
         <div className="grid grid-cols-2 gap-3">
@@ -261,16 +261,16 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
             padding="sm"
             className={`cursor-pointer transition-all group ${
               caisseSummary?.statut === StatutCaisseAgent.ACTIVE
-                ? 'hover:border-cyan-500/50 hover:bg-cyan-500/5'
+                ? 'hover:border-accent/50 hover:bg-accent/5'
                 : 'opacity-50 cursor-not-allowed'
             }`}
             onClick={() => caisseSummary?.statut === StatutCaisseAgent.ACTIVE && setShowCollectModal(true)}
           >
             <div className="flex flex-col items-center gap-3 py-4">
-              <div className="p-3 rounded-xl bg-cyan-500/10 text-cyan-400 group-hover:scale-110 transition-transform">
+              <div className="p-3 rounded-xl bg-accent/10 text-accent group-hover:scale-110 transition-transform">
                 <Plus size={24} />
               </div>
-              <span className="text-sm font-medium text-slate-300 group-hover:text-white">
+              <span className="text-sm font-medium text-content-secondary group-hover:text-content-primary">
                 Nouvelle Collecte
               </span>
             </div>
@@ -281,7 +281,7 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
             padding="sm"
             className={`cursor-pointer transition-all group ${
               caisseSummary?.statut === StatutCaisseAgent.ACTIVE && parseFloat(caisseSummary?.disponible || '0') > 0
-                ? 'hover:border-emerald-500/50 hover:bg-emerald-500/5'
+                ? 'hover:border-status-success/50 hover:bg-status-success/5'
                 : 'opacity-50 cursor-not-allowed'
             }`}
             onClick={() => {
@@ -291,10 +291,10 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
             }}
           >
             <div className="flex flex-col items-center gap-3 py-4">
-              <div className="p-3 rounded-xl bg-emerald-500/10 text-emerald-400 group-hover:scale-110 transition-transform">
+              <div className="p-3 rounded-xl bg-status-success-bg text-status-success group-hover:scale-110 transition-transform">
                 <Send size={24} />
               </div>
-              <span className="text-sm font-medium text-slate-300 group-hover:text-white">
+              <span className="text-sm font-medium text-content-secondary group-hover:text-content-primary">
                 Remettre Cash
               </span>
             </div>
@@ -304,12 +304,12 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
 
       {/* Caisse Status Alert */}
       {caisseSummary?.statut === StatutCaisseAgent.SUSPENDED && (
-        <Card variant="default" padding="md" className="border-red-500/20 bg-red-500/5">
+        <Card variant="default" padding="md" className="border-status-danger/20 bg-status-danger/5">
           <div className="flex items-center gap-3">
-            <AlertTriangle className="w-5 h-5 text-red-400" />
+            <AlertTriangle className="w-5 h-5 text-status-danger" />
             <div>
-              <p className="text-sm font-medium text-red-400">Caisse Suspendue</p>
-              <p className="text-xs text-slate-400">
+              <p className="text-sm font-medium text-status-danger">Caisse Suspendue</p>
+              <p className="text-xs text-content-muted">
                 Votre caisse est temporairement suspendue. Contactez votre superviseur.
               </p>
             </div>
@@ -321,12 +321,12 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
       <Card variant="default" padding="none" className="overflow-hidden">
         <div className="p-4 border-b border-edge flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Clock size={16} className="text-cyan-400" />
-            <h3 className="text-sm font-bold text-white">Opérations Récentes</h3>
+            <Clock size={16} className="text-accent" />
+            <h3 className="text-sm font-bold text-content-primary">Opérations Récentes</h3>
           </div>
           <button
             onClick={() => setActiveTab('historique')}
-            className="text-xs font-medium text-cyan-400 hover:text-cyan-300 transition-colors"
+            className="text-xs font-medium text-accent hover:text-accent transition-colors"
           >
             Voir tout
           </button>
@@ -335,7 +335,7 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
         <div className="divide-y divide-edge">
           {operations.length === 0 ? (
             <div className="p-8 text-center">
-              <p className="text-xs text-slate-500">Aucune opération</p>
+              <p className="text-xs text-content-muted">Aucune opération</p>
             </div>
           ) : (
             operations.slice(0, 5).map((op) => (
@@ -347,17 +347,17 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
                 <div className="flex items-center gap-3">
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
                     op.type === 'COLLECT_CASH'
-                      ? 'bg-cyan-500/10 text-cyan-400'
-                      : 'bg-emerald-500/10 text-emerald-400'
+                      ? 'bg-accent/10 text-accent'
+                      : 'bg-status-success-bg text-status-success'
                   }`}>
                     {op.type === 'COLLECT_CASH' ? <ArrowDownRight size={14} /> : <ArrowUpRight size={14} />}
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-white group-hover:text-cyan-400 transition-colors line-clamp-1">
+                    <p className="text-sm font-medium text-content-primary group-hover:text-accent transition-colors line-clamp-1">
                       {getTypeLabel(op.type)}
                       {op.client && ` - ${formatClientName(op.client.nom, op.client.prenom)}`}
                     </p>
-                    <div className="flex items-center gap-2 text-[10px] text-slate-500">
+                    <div className="flex items-center gap-2 text-[10px] text-content-muted">
                       <span>{formatDate(op.submittedAt as unknown as string)}</span>
                       <span>•</span>
                       {getStatutBadge(op.statut)}
@@ -365,7 +365,7 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
                   </div>
                 </div>
                 <span className={`text-sm font-bold whitespace-nowrap ${
-                  op.type === 'COLLECT_CASH' ? 'text-cyan-400' : 'text-emerald-400'
+                  op.type === 'COLLECT_CASH' ? 'text-accent' : 'text-status-success'
                 }`}>
                   {op.type === 'COLLECT_CASH' ? '+' : '-'}{formatMoney(op.montant as unknown as string)}
                 </span>
@@ -380,7 +380,7 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
   const renderPending = () => (
     <div className="space-y-4 animate-in fade-in duration-300">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-bold text-white">Opérations en attente</h3>
+        <h3 className="text-lg font-bold text-content-primary">Opérations en attente</h3>
         <Badge variant="warning" size="md" value={pendingOperations.length} />
       </div>
 
@@ -397,35 +397,35 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
               key={op.id}
               variant="default"
               padding="md"
-              className="hover:border-cyan-500/30 transition-colors cursor-pointer"
+              className="hover:border-accent/30 transition-colors cursor-pointer"
               onClick={() => setSelectedOperation(op)}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
                     op.type === 'COLLECT_CASH'
-                      ? 'bg-cyan-500/10 text-cyan-400'
-                      : 'bg-emerald-500/10 text-emerald-400'
+                      ? 'bg-accent/10 text-accent'
+                      : 'bg-status-success-bg text-status-success'
                   }`}>
                     {op.type === 'COLLECT_CASH' ? <ArrowDownRight size={20} /> : <ArrowUpRight size={20} />}
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-white">
+                    <p className="text-sm font-medium text-content-primary">
                       {getTypeLabel(op.type)}
                     </p>
                     {op.client && (
-                      <p className="text-xs text-slate-400">
+                      <p className="text-xs text-content-muted">
                         Client: {formatClientName(op.client.nom, op.client.prenom)}
                       </p>
                     )}
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-content-muted">
                       Soumise le {formatDate(op.submittedAt as unknown as string)}
                     </p>
                   </div>
                 </div>
                 <div className="text-right">
                   <p className={`text-lg font-bold ${
-                    op.type === 'COLLECT_CASH' ? 'text-cyan-400' : 'text-emerald-400'
+                    op.type === 'COLLECT_CASH' ? 'text-accent' : 'text-status-success'
                   }`}>
                     {op.type === 'COLLECT_CASH' ? '+' : '-'}{formatMoney(op.montant as unknown as string)}
                   </p>
@@ -466,7 +466,7 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
   const renderHistorique = () => (
     <div className="space-y-4 animate-in fade-in duration-300">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-bold text-white">Historique des opérations</h3>
+        <h3 className="text-lg font-bold text-content-primary">Historique des opérations</h3>
         <Button
           variant="ghost"
           size="sm"
@@ -491,24 +491,24 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
               key={op.id}
               variant="default"
               padding="sm"
-              className="hover:border-cyan-500/20 transition-colors cursor-pointer"
+              className="hover:border-accent/20 transition-colors cursor-pointer"
               onClick={() => setSelectedOperation(op)}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
                     op.type === 'COLLECT_CASH'
-                      ? 'bg-cyan-500/10 text-cyan-400'
-                      : 'bg-emerald-500/10 text-emerald-400'
+                      ? 'bg-accent/10 text-accent'
+                      : 'bg-status-success-bg text-status-success'
                   }`}>
                     {op.type === 'COLLECT_CASH' ? <ArrowDownRight size={16} /> : <ArrowUpRight size={16} />}
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-white">
+                    <p className="text-sm font-medium text-content-primary">
                       {getTypeLabel(op.type)}
                       {op.client && ` - ${formatClientName(op.client.nom, op.client.prenom)}`}
                     </p>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-content-muted">
                       {formatDate(op.submittedAt as unknown as string)}
                     </p>
                   </div>
@@ -516,7 +516,7 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
                 <div className="flex items-center gap-3">
                   {getStatutBadge(op.statut)}
                   <span className={`text-sm font-bold ${
-                    op.type === 'COLLECT_CASH' ? 'text-cyan-400' : 'text-emerald-400'
+                    op.type === 'COLLECT_CASH' ? 'text-accent' : 'text-status-success'
                   }`}>
                     {op.type === 'COLLECT_CASH' ? '+' : '-'}{formatMoney(op.montant as unknown as string)}
                   </span>
@@ -541,28 +541,28 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
   };
 
   return (
-    <div className="min-h-screen bg-[#020617] text-slate-100 font-sans">
+    <div className="min-h-screen bg-surface-base text-content-primary font-sans">
       <div className="w-full min-h-screen flex flex-col p-4 md:p-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-4 pt-2">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 to-blue-600 shadow-lg shadow-cyan-500/20 flex items-center justify-center text-white">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-accent to-status-info shadow-lg shadow-accent/20 flex items-center justify-center text-white">
               <Wallet size={20} strokeWidth={2.5} />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold text-white leading-none mb-0.5">Ma Caisse</h1>
+                <h1 className="text-xl font-bold text-content-primary leading-none mb-0.5">Ma Caisse</h1>
                 {caisseSummary?.statut === StatutCaisseAgent.ACTIVE ? (
-                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-bold uppercase tracking-wider border border-emerald-500/20">
+                  <span className="px-2 py-0.5 rounded-full bg-status-success-bg text-status-success text-[10px] font-bold uppercase tracking-wider border border-status-success/20">
                     Active
                   </span>
                 ) : (
-                  <span className="px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 text-[10px] font-bold uppercase tracking-wider border border-red-500/20">
+                  <span className="px-2 py-0.5 rounded-full bg-status-danger-bg text-status-danger text-[10px] font-bold uppercase tracking-wider border border-status-danger/20">
                     {caisseSummary?.statut === StatutCaisseAgent.SUSPENDED ? 'Suspendue' : caisseSummary?.statut || 'Inactive'}
                   </span>
                 )}
               </div>
-              <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">
+              <p className="text-[10px] font-medium text-content-muted uppercase tracking-wider">
                 Agent: {agentInfo?.nom || ''} {agentInfo?.prenom || ''}
               </p>
             </div>
@@ -581,7 +581,7 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
         </div>
 
         {/* Tab Navigation */}
-        <div className="bg-[#020617]/90 backdrop-blur-xl -mx-4 px-4 py-2 mb-4 border-b border-[#1e293b]/50 sticky top-0 z-20">
+        <div className="bg-surface-base/90 backdrop-blur-xl -mx-4 px-4 py-2 mb-4 border-b border-edge/50 sticky top-0 z-20">
           <TabGroup
             activeTab={activeTab}
             onTabChange={(tab) => setActiveTab(tab as TabKey)}
@@ -668,7 +668,7 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-400 mb-2">Raison de l'annulation</label>
+            <label className="block text-sm font-medium text-content-muted mb-2">Raison de l'annulation</label>
             <Input
               placeholder="Ex: Erreur de saisie du montant..."
               value={cancelReason}
@@ -676,7 +676,7 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
               required
             />
           </div>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-content-muted">
             Cette action est irréversible. L'opération sera marquée comme annulée.
           </p>
         </div>

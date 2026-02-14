@@ -9,6 +9,7 @@ import {
 import { Button, Card, Badge, TabGroup, StatCard, Modal, ResponsiveTable, FormField, SelectField } from '../../ui';
 import TransactionFlow from './TransactionFlow';
 import { currencyCode } from '@shared/config/currency';
+import { useBranding } from '../../../contexts/BrandingContext';
 
 import airtelMoneyLogo from '../../../assets/logos/airtel-logo.png';
 import mtnMomoLogo from '../../../assets/logos/mtn-logo.png';
@@ -119,16 +120,16 @@ function TransferCalculator({ onClose }: { onClose: () => void }) {
     >
       <div className="space-y-4 pt-1">
         {/* Toggle Type */}
-        <div className="bg-slate-900/50 p-1 rounded-lg flex text-xs font-medium">
+        <div className="bg-surface-base/50 p-1 rounded-lg flex text-xs font-medium">
           <button
             onClick={() => setTransferType('local')}
-            className={`flex-1 py-1.5 rounded-md transition-all flex items-center justify-center gap-1.5 ${transferType === 'local' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
+            className={`flex-1 py-1.5 rounded-md transition-all flex items-center justify-center gap-1.5 ${transferType === 'local' ? 'bg-surface-elevated text-content-primary shadow-sm' : 'text-content-muted hover:text-content-secondary'}`}
           >
             <MapPin size={12} /> Local
           </button>
           <button
             onClick={() => setTransferType('international')}
-            className={`flex-1 py-1.5 rounded-md transition-all flex items-center justify-center gap-1.5 ${transferType === 'international' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
+            className={`flex-1 py-1.5 rounded-md transition-all flex items-center justify-center gap-1.5 ${transferType === 'international' ? 'bg-status-info text-white shadow-sm' : 'text-content-muted hover:text-content-secondary'}`}
           >
             <Globe size={12} /> International
           </button>
@@ -136,17 +137,17 @@ function TransferCalculator({ onClose }: { onClose: () => void }) {
 
         {/* Amount Input */}
         <div>
-          <label className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-1 block">Montant à envoyer</label>
-          <div className="flex bg-slate-800 border border-slate-700 rounded-lg overflow-hidden focus-within:ring-1 focus-within:ring-emerald-500/50 transition-all">
+          <label className="text-[10px] uppercase tracking-wider text-content-muted font-semibold mb-1 block">Montant à envoyer</label>
+          <div className="flex bg-surface border border-edge rounded-lg overflow-hidden focus-within:ring-1 focus-within:ring-status-success/50 transition-all">
             <input
               type="number"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              className="flex-1 bg-transparent px-3 py-2 text-white font-bold text-lg outline-none placeholder:text-slate-600"
+              className="flex-1 bg-transparent px-3 py-2 text-content-primary font-bold text-lg outline-none placeholder:text-content-muted"
               placeholder="0"
             />
-            <div className="bg-slate-700 px-3 py-2 flex items-center justify-center border-l border-slate-600">
-              <span className="text-xs font-bold text-white">{fromCurrency}</span>
+            <div className="bg-surface-elevated px-3 py-2 flex items-center justify-center border-l border-edge-strong">
+              <span className="text-xs font-bold text-content-primary">{fromCurrency}</span>
             </div>
           </div>
         </div>
@@ -154,12 +155,12 @@ function TransferCalculator({ onClose }: { onClose: () => void }) {
         {/* Destination (Conditional) */}
         {transferType === 'international' && (
           <div className="animate-in fade-in zoom-in-95 duration-200">
-             <label className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-1 block">Pays de réception</label>
+             <label className="text-[10px] uppercase tracking-wider text-content-muted font-semibold mb-1 block">Pays de réception</label>
             <div className="relative">
               <select
                 value={toCurrency}
                 onChange={(e) => setToCurrency(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-9 pr-8 py-2 text-white text-sm outline-none focus:border-blue-500 appearance-none transition-colors cursor-pointer hover:bg-slate-700/80"
+                className="w-full bg-surface border border-edge rounded-lg pl-9 pr-8 py-2 text-content-primary text-sm outline-none focus:border-status-info appearance-none transition-colors cursor-pointer hover:bg-surface-elevated/80"
               >
                 {countries.map(c => (
                   <option key={c.code} value={c.currency}>{c.name} ({c.currency})</option>
@@ -168,41 +169,41 @@ function TransferCalculator({ onClose }: { onClose: () => void }) {
               <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
                  {countries.find(c => c.currency === toCurrency)?.flag}
               </div>
-               <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 rotate-90" size={14} />
+               <ChevronRight className="absolute right-3 top-1/2 -translate-y-1/2 text-content-muted rotate-90" size={14} />
             </div>
           </div>
         )}
 
         {/* Summary Card */}
-        <div className="bg-slate-900/80 rounded-xl p-3 border border-slate-800 space-y-2">
+        <div className="bg-surface-base/80 rounded-xl p-3 border border-edge space-y-2">
           <div className="flex justify-between items-center text-xs">
-            <span className="text-slate-400">Montant envoyé</span>
-            <span className="text-white font-medium">{amountToSend.toLocaleString()} {fromCurrency}</span>
+            <span className="text-content-muted">Montant envoyé</span>
+            <span className="text-content-primary font-medium">{amountToSend.toLocaleString()} {fromCurrency}</span>
           </div>
           <div className="flex justify-between items-center text-xs">
-            <span className="text-slate-400">Frais estimés</span>
-            <span className="text-amber-400 font-medium">- {fees.toLocaleString()} {fromCurrency}</span>
+            <span className="text-content-muted">Frais estimés</span>
+            <span className="text-status-warning font-medium">- {fees.toLocaleString()} {fromCurrency}</span>
           </div>
           {transferType === 'international' && (
              <div className="flex justify-between items-center text-xs">
-              <span className="text-slate-400">Taux</span>
-              <span className="text-cyan-400 font-medium">1 {fromCurrency} = {rate.toFixed(4)} {toCurrency}</span>
+              <span className="text-content-muted">Taux</span>
+              <span className="text-accent font-medium">1 {fromCurrency} = {rate.toFixed(4)} {toCurrency}</span>
             </div>
           )}
           
-          <div className="border-t border-slate-800/50 pt-2 mt-1">
+          <div className="border-t border-edge/50 pt-2 mt-1">
              <div className="flex justify-between items-end">
-              <span className="text-slate-400 text-[10px] pb-0.5">Le bénéficiaire reçoit</span>
-              <span className="text-emerald-400 text-lg font-bold tracking-tight">
+              <span className="text-content-muted text-[10px] pb-0.5">Le bénéficiaire reçoit</span>
+              <span className="text-status-success text-lg font-bold tracking-tight">
                 {receivedAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-xs font-normal opacity-80">{transferType === 'local' ? fromCurrency : toCurrency}</span>
               </span>
             </div>
           </div>
         </div>
 
-        <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-lg p-2 flex items-center gap-2 justify-center">
-             <TrendingDown size={12} className="text-emerald-500" />
-             <span className="text-[10px] text-emerald-400/90">
+        <div className="bg-status-success/5 border border-status-success/10 rounded-lg p-2 flex items-center gap-2 justify-center">
+             <TrendingDown size={12} className="text-status-success" />
+             <span className="text-[10px] text-status-success/90">
                Économie estimée: <strong>~{Math.round(fees * 0.4).toLocaleString()} {fromCurrency}</strong>
              </span>
         </div>
@@ -212,6 +213,7 @@ function TransferCalculator({ onClose }: { onClose: () => void }) {
 }
 
 function NewTransferModal({ onClose, type }: { onClose: () => void; type: 'local' | 'international' }) {
+  const { branding } = useBranding();
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState<TransferFormData>({
     type,
@@ -266,29 +268,29 @@ function NewTransferModal({ onClose, type }: { onClose: () => void; type: 'local
     if (success) {
       return (
         <div className="p-4 sm:p-8 text-center flex flex-col items-center justify-center h-full">
-            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mb-4">
-              <CheckCircle2 className="text-emerald-400" size={32} />
+            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-status-success-bg rounded-full flex items-center justify-center mb-4">
+              <CheckCircle2 className="text-status-success" size={32} />
             </div>
-            <h3 className="text-xl sm:text-2xl font-bold text-white mb-2">Transfert Initié!</h3>
-            <p className="text-slate-400 mb-6 text-sm">Votre transfert a été enregistré avec succès.</p>
+            <h3 className="text-xl sm:text-2xl font-bold text-content-primary mb-2">Transfert Initié!</h3>
+            <p className="text-content-muted mb-6 text-sm">Votre transfert a été enregistré avec succès.</p>
             
-            <div className="bg-slate-800 rounded-xl p-4 w-full max-w-xs mx-auto mb-6 border border-slate-700">
-              <p className="text-slate-500 text-xs">Code de transaction</p>
-              <p className="text-xl sm:text-2xl font-mono font-bold text-emerald-400 tracking-wider">{transactionCode}</p>
+            <div className="bg-surface rounded-xl p-4 w-full max-w-xs mx-auto mb-6 border border-edge">
+              <p className="text-content-muted text-xs">Code de transaction</p>
+              <p className="text-xl sm:text-2xl font-mono font-bold text-status-success tracking-wider">{transactionCode}</p>
             </div>
 
-            <div className="w-full space-y-2 text-xs sm:text-sm text-slate-400 mb-8 bg-slate-900/50 p-4 rounded-lg">
-                <div className="flex justify-between border-b border-slate-800 pb-2">
+            <div className="w-full space-y-2 text-xs sm:text-sm text-content-muted mb-8 bg-surface-base/50 p-4 rounded-lg">
+                <div className="flex justify-between border-b border-edge pb-2">
                     <span>Bénéficiaire</span>
-                    <strong className="text-white">{formData.recipientName}</strong>
+                    <strong className="text-content-primary">{formData.recipientName}</strong>
                 </div>
-                <div className="flex justify-between border-b border-slate-800 pb-2">
+                <div className="flex justify-between border-b border-edge pb-2">
                     <span>Montant Reçu</span>
-                    <strong className="text-white">{receivedAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })} {selectedCountry?.currency || currencyCode()}</strong>
+                    <strong className="text-content-primary">{receivedAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })} {selectedCountry?.currency || currencyCode()}</strong>
                 </div>
                 <div className="flex justify-between">
                     <span>Mode</span>
-                    <strong className="text-white">{formData.deliveryMethod === 'mobile_money' ? 'Mobile Money' : 'Espèces'}</strong>
+                    <strong className="text-content-primary">{formData.deliveryMethod === 'mobile_money' ? 'Mobile Money' : 'Espèces'}</strong>
                 </div>
             </div>
         </div>
@@ -300,7 +302,7 @@ function NewTransferModal({ onClose, type }: { onClose: () => void; type: 'local
             {/* Stepper */}
             <div className="flex items-center gap-2 mb-4">
               {[1, 2, 3].map(s => (
-                <div key={s} className={`flex-1 h-1.5 rounded-full ${step >= s ? 'bg-emerald-500' : 'bg-slate-800'}`} />
+                <div key={s} className={`flex-1 h-1.5 rounded-full ${step >= s ? 'bg-status-success' : 'bg-surface'}`} />
               ))}
             </div>
 
@@ -312,7 +314,7 @@ function NewTransferModal({ onClose, type }: { onClose: () => void; type: 'local
                     label="Nom complet de l'expéditeur" 
                     required
                     type="text"
-                    className="bg-slate-900 border-slate-700 text-white focus:ring-emerald-500/50 placeholder:text-slate-600"
+                    className="bg-surface-base border-edge text-content-primary focus:ring-status-success/50 placeholder:text-content-muted"
                     value={formData.senderName}
                     onChange={(e) => setFormData({ ...formData, senderName: e.target.value })}
                     placeholder="Jean Makaya"
@@ -322,7 +324,7 @@ function NewTransferModal({ onClose, type }: { onClose: () => void; type: 'local
                     label="Téléphone" 
                     required
                     type="tel"
-                    className="bg-slate-900 border-slate-700 text-white focus:ring-emerald-500/50 placeholder:text-slate-600"
+                    className="bg-surface-base border-edge text-content-primary focus:ring-status-success/50 placeholder:text-content-muted"
                     value={formData.senderPhone}
                     onChange={(e) => setFormData({ ...formData, senderPhone: e.target.value })}
                     placeholder="+242 06..."
@@ -332,7 +334,7 @@ function NewTransferModal({ onClose, type }: { onClose: () => void; type: 'local
                      label="Numéro de pièce d'identité" 
                      required
                      type="text"
-                     className="bg-slate-900 border-slate-700 text-white focus:ring-emerald-500/50 placeholder:text-slate-600"
+                     className="bg-surface-base border-edge text-content-primary focus:ring-status-success/50 placeholder:text-content-muted"
                      value={formData.senderIdNumber}
                      onChange={(e) => setFormData({ ...formData, senderIdNumber: e.target.value })}
                      placeholder="CNI..."
@@ -349,7 +351,7 @@ function NewTransferModal({ onClose, type }: { onClose: () => void; type: 'local
                     label="Nom complet du bénéficiaire" 
                     required
                     type="text"
-                    className="bg-slate-900 border-slate-700 text-white focus:ring-emerald-500/50 placeholder:text-slate-600"
+                    className="bg-surface-base border-edge text-content-primary focus:ring-status-success/50 placeholder:text-content-muted"
                     value={formData.recipientName}
                     onChange={(e) => setFormData({ ...formData, recipientName: e.target.value })}
                     placeholder="Marie Ngouabi"
@@ -370,7 +372,7 @@ function NewTransferModal({ onClose, type }: { onClose: () => void; type: 'local
                     label="Téléphone du bénéficiaire" 
                     required
                     type="tel"
-                    className="bg-slate-900 border-slate-700 text-white focus:ring-emerald-500/50 placeholder:text-slate-600"
+                    className="bg-surface-base border-edge text-content-primary focus:ring-status-success/50 placeholder:text-content-muted"
                     value={formData.recipientPhone}
                     onChange={(e) => setFormData({ ...formData, recipientPhone: e.target.value })}
                     placeholder="+243..."
@@ -394,31 +396,31 @@ function NewTransferModal({ onClose, type }: { onClose: () => void; type: 'local
             {step === 3 && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
                     <div>
-                        <label className="text-slate-400 text-xs font-semibold uppercase tracking-wider block mb-2">Montant à envoyer ({currencyCode()})</label>
+                        <label className="text-content-muted text-xs font-semibold uppercase tracking-wider block mb-2">Montant à envoyer ({currencyCode()})</label>
                         <input 
                             type="number"
                             value={formData.amount}
                             onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                            className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-4 text-3xl font-bold text-white text-center focus:ring-2 focus:ring-emerald-500/50 outline-none transition-all placeholder:text-slate-800"
+                            className="w-full bg-surface-base border border-edge rounded-xl px-4 py-4 text-3xl font-bold text-content-primary text-center focus:ring-2 focus:ring-status-success/50 outline-none transition-all placeholder:text-content-primary"
                             placeholder="0"
                             autoFocus
                         />
                     </div>
 
-                    <div className="bg-slate-800 rounded-xl p-4 space-y-3 border border-slate-700/50">
+                    <div className="bg-surface rounded-xl p-4 space-y-3 border border-edge-subtle">
                         <div className="flex justify-between text-xs">
-                        <span className="text-slate-400">Frais COFIN</span>
-                        <span className="text-amber-400 font-bold">- {fees.toLocaleString()} {currencyCode()}</span>
+                        <span className="text-content-muted">Frais {branding.appName}</span>
+                        <span className="text-status-warning font-bold">- {fees.toLocaleString()} {currencyCode()}</span>
                         </div>
                         {type === 'international' && (
                         <div className="flex justify-between text-xs">
-                            <span className="text-slate-400">Taux</span>
-                            <span className="text-cyan-400 font-bold">1 {currencyCode()} = {rate.toFixed(4)} {selectedCountry?.currency}</span>
+                            <span className="text-content-muted">Taux</span>
+                            <span className="text-accent font-bold">1 {currencyCode()} = {rate.toFixed(4)} {selectedCountry?.currency}</span>
                         </div>
                         )}
-                        <div className="border-t border-slate-700 pt-3 flex justify-between items-end">
-                            <span className="text-slate-300 text-xs font-medium">Bénéficiaire reçoit</span>
-                            <span className="text-emerald-400 text-lg font-bold">
+                        <div className="border-t border-edge pt-3 flex justify-between items-end">
+                            <span className="text-content-secondary text-xs font-medium">Bénéficiaire reçoit</span>
+                            <span className="text-status-success text-lg font-bold">
                                 {receivedAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })} {selectedCountry?.currency || currencyCode()}
                             </span>
                         </div>
@@ -489,11 +491,11 @@ export default function TransfertArgent() {
     <div className="flex flex-col h-full space-y-2 relative" data-testid="module-transfert">
       <div className="shrink-0 flex items-center justify-between p-1">
         <div>
-          <h1 className="text-base font-bold text-white flex items-center gap-2">
-            <Send className="text-emerald-400" size={20} />
+          <h1 className="text-base font-bold text-content-primary flex items-center gap-2">
+            <Send className="text-status-success" size={20} />
             Virements
           </h1>
-          <p className="text-slate-400 text-[10px] mt-0.5">Transferts internes et vers bénéficiaires</p>
+          <p className="text-content-muted text-[10px] mt-0.5">Transferts internes et vers bénéficiaires</p>
         </div>
           <Button
             size="sm"
@@ -523,13 +525,13 @@ export default function TransfertArgent() {
         {activeTab === 'send' && <TransactionFlow />}
 
         {activeTab === 'history' && (
-          <Card padding="none" className="flex-1 overflow-hidden bg-transparent sm:bg-slate-800 border-none sm:border border-slate-700">
+          <Card padding="none" className="flex-1 overflow-hidden bg-transparent sm:bg-surface border-none sm:border border-edge">
              <div className="h-full overflow-y-auto custom-scrollbar">
               <ResponsiveTable
                 columns={[
                   { key: 'id', label: 'Code', primary: true, format: (v) => <span className="font-mono text-xs">{v}</span> },
                   { key: 'recipient', label: 'Bénéficiaire', hideOnMobile: true },
-                  { key: 'amount', label: 'Envoyé', format: (v) => <span className="font-bold text-white">{v.toLocaleString()} {currencyCode()}</span> },
+                  { key: 'amount', label: 'Envoyé', format: (v) => <span className="font-bold text-content-primary">{v.toLocaleString()} {currencyCode()}</span> },
                   { key: 'status', label: 'Statut', format: (v) => <Badge value={v === 'completed' ? 'Terminé' : 'En cours'} variant={v === 'completed' ? 'success' : 'warning'} /> },
                   { key: 'date', label: 'Date', hideOnMobile: true }
                 ]}

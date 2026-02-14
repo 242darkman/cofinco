@@ -30,10 +30,10 @@ export const TransactionRowActions: React.FC<TransactionRowActionsProps> = ({
            e.stopPropagation();
            setShowMenu(!showMenu);
         }}
-        className={`hover:bg-slate-700 rounded-lg transition ${compact ? 'p-1' : 'p-2'}`}
+        className={`hover:bg-surface-elevated rounded-lg transition ${compact ? 'p-1' : 'p-2'}`}
         aria-label="Actions sur le reçu"
       >
-        <FileText size={compact ? 14 : 16} className="text-slate-400 hover:text-emerald-400" />
+        <FileText size={compact ? 14 : 16} className="text-content-muted hover:text-status-success" />
       </button>
 
       {showMenu && (
@@ -45,13 +45,13 @@ export const TransactionRowActions: React.FC<TransactionRowActionsProps> = ({
           />
 
           {/* Menu */}
-          <div className="absolute right-0 top-full mt-1 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-20 py-1">
+          <div className="absolute right-0 top-full mt-1 w-48 bg-surface border border-edge rounded-lg shadow-xl z-20 py-1">
             <button
               onClick={() => {
                 onView?.(factureId);
                 setShowMenu(false);
               }}
-              className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white flex items-center gap-2"
+              className="w-full px-4 py-2 text-left text-sm text-content-secondary hover:bg-surface-elevated hover:text-content-primary flex items-center gap-2"
             >
               <Eye size={14} />
               Voir le reçu
@@ -61,7 +61,7 @@ export const TransactionRowActions: React.FC<TransactionRowActionsProps> = ({
                 onDownload?.(factureId);
                 setShowMenu(false);
               }}
-              className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white flex items-center gap-2"
+              className="w-full px-4 py-2 text-left text-sm text-content-secondary hover:bg-surface-elevated hover:text-content-primary flex items-center gap-2"
             >
               <Download size={14} />
               Télécharger PDF
@@ -71,7 +71,7 @@ export const TransactionRowActions: React.FC<TransactionRowActionsProps> = ({
                 onShare?.(factureId);
                 setShowMenu(false);
               }}
-              className="w-full px-4 py-2 text-left text-sm text-slate-300 hover:bg-slate-700 hover:text-white flex items-center gap-2"
+              className="w-full px-4 py-2 text-left text-sm text-content-secondary hover:bg-surface-elevated hover:text-content-primary flex items-center gap-2"
             >
               <Share2 size={14} />
               Partager

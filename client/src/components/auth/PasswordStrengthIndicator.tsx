@@ -97,10 +97,10 @@ export default function PasswordStrengthIndicator({ password, requirements, onCh
 
   const getStrengthColor = () => {
     switch (validation.strength) {
-      case 'strong': return 'bg-green-500';
-      case 'medium': return 'bg-cyan-500';
-      case 'weak': return 'bg-blue-500';
-      default: return 'bg-gray-500';
+      case 'strong': return 'bg-status-success';
+      case 'medium': return 'bg-accent-secondary';
+      case 'weak': return 'bg-status-info';
+      default: return 'bg-surface-muted0';
     }
   };
 
@@ -118,16 +118,16 @@ export default function PasswordStrengthIndicator({ password, requirements, onCh
       {/* Barre de force */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <span className="text-sm text-slate-400">Force du mot de passe</span>
+          <span className="text-sm text-content-muted">Force du mot de passe</span>
           <span className={`text-sm font-semibold ${
-            validation.strength === 'strong' ? 'text-green-400' :
-            validation.strength === 'medium' ? 'text-cyan-400' :
-            'text-blue-400'
+            validation.strength === 'strong' ? 'text-status-success' :
+            validation.strength === 'medium' ? 'text-accent' :
+            'text-status-info'
           }`}>
             {getStrengthText()} ({validation.score}%)
           </span>
         </div>
-        <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+        <div className="h-2 bg-surface-elevated rounded-full overflow-hidden">
           <div
             className={`h-full transition-all duration-300 ${getStrengthColor()}`}
             style={{ width: `${validation.score}%` }}
@@ -137,16 +137,16 @@ export default function PasswordStrengthIndicator({ password, requirements, onCh
 
       {/* Exigences */}
       {validation.requirements && (
-        <div className="bg-slate-700/50 rounded-lg p-4 space-y-2">
-          <div className="text-sm font-semibold text-white mb-2">Exigences :</div>
+        <div className="bg-surface-elevated/50 rounded-lg p-4 space-y-2">
+          <div className="text-sm font-semibold text-content-primary mb-2">Exigences :</div>
 
           <div className="flex items-center gap-2 text-sm">
             {password.length >= validation.requirements.min_length ? (
-              <Check size={16} className="text-green-400" />
+              <Check size={16} className="text-status-success" />
             ) : (
-              <X size={16} className="text-blue-400" />
+              <X size={16} className="text-status-info" />
             )}
-            <span className={password.length >= validation.requirements.min_length ? 'text-green-400' : 'text-slate-400'}>
+            <span className={password.length >= validation.requirements.min_length ? 'text-status-success' : 'text-content-muted'}>
               Minimum {validation.requirements.min_length} caractères
             </span>
           </div>
@@ -154,11 +154,11 @@ export default function PasswordStrengthIndicator({ password, requirements, onCh
           {validation.requirements.require_uppercase && (
             <div className="flex items-center gap-2 text-sm">
               {/[A-Z]/.test(password) ? (
-                <Check size={16} className="text-green-400" />
+                <Check size={16} className="text-status-success" />
               ) : (
-                <X size={16} className="text-blue-400" />
+                <X size={16} className="text-status-info" />
               )}
-              <span className={/[A-Z]/.test(password) ? 'text-green-400' : 'text-slate-400'}>
+              <span className={/[A-Z]/.test(password) ? 'text-status-success' : 'text-content-muted'}>
                 Au moins une majuscule
               </span>
             </div>
@@ -167,11 +167,11 @@ export default function PasswordStrengthIndicator({ password, requirements, onCh
           {validation.requirements.require_lowercase && (
             <div className="flex items-center gap-2 text-sm">
               {/[a-z]/.test(password) ? (
-                <Check size={16} className="text-green-400" />
+                <Check size={16} className="text-status-success" />
               ) : (
-                <X size={16} className="text-blue-400" />
+                <X size={16} className="text-status-info" />
               )}
-              <span className={/[a-z]/.test(password) ? 'text-green-400' : 'text-slate-400'}>
+              <span className={/[a-z]/.test(password) ? 'text-status-success' : 'text-content-muted'}>
                 Au moins une minuscule
               </span>
             </div>
@@ -180,11 +180,11 @@ export default function PasswordStrengthIndicator({ password, requirements, onCh
           {validation.requirements.require_numbers && (
             <div className="flex items-center gap-2 text-sm">
               {/[0-9]/.test(password) ? (
-                <Check size={16} className="text-green-400" />
+                <Check size={16} className="text-status-success" />
               ) : (
-                <X size={16} className="text-blue-400" />
+                <X size={16} className="text-status-info" />
               )}
-              <span className={/[0-9]/.test(password) ? 'text-green-400' : 'text-slate-400'}>
+              <span className={/[0-9]/.test(password) ? 'text-status-success' : 'text-content-muted'}>
                 Au moins un chiffre
               </span>
             </div>
@@ -193,11 +193,11 @@ export default function PasswordStrengthIndicator({ password, requirements, onCh
           {validation.requirements.require_special_chars && (
             <div className="flex items-center gap-2 text-sm">
               {/[^A-Za-z0-9]/.test(password) ? (
-                <Check size={16} className="text-green-400" />
+                <Check size={16} className="text-status-success" />
               ) : (
-                <X size={16} className="text-blue-400" />
+                <X size={16} className="text-status-info" />
               )}
-              <span className={/[^A-Za-z0-9]/.test(password) ? 'text-green-400' : 'text-slate-400'}>
+              <span className={/[^A-Za-z0-9]/.test(password) ? 'text-status-success' : 'text-content-muted'}>
                 Au moins un caractère spécial
               </span>
             </div>
@@ -207,14 +207,14 @@ export default function PasswordStrengthIndicator({ password, requirements, onCh
 
       {/* Erreurs */}
       {validation.errors && validation.errors.length > 0 && (
-        <div className="bg-blue-500/20 border border-blue-500 rounded-lg p-4">
-          <div className="flex items-center gap-2 text-blue-400 mb-2">
+        <div className="bg-status-info-bg border border-status-info rounded-lg p-4">
+          <div className="flex items-center gap-2 text-status-info mb-2">
             <AlertCircle size={16} />
             <span className="text-sm font-semibold">Problèmes détectés :</span>
           </div>
           <ul className="space-y-1">
             {validation.errors.map((error: string, index: number) => (
-              <li key={index} className="text-sm text-blue-400">
+              <li key={index} className="text-sm text-status-info">
                 • {error}
               </li>
             ))}
@@ -224,7 +224,7 @@ export default function PasswordStrengthIndicator({ password, requirements, onCh
 
       {/* Message succès */}
       {validation.valid && validation.strength === 'strong' && (
-        <div className="bg-green-500/20 border border-green-500 rounded-lg p-3 flex items-center gap-2 text-green-400">
+        <div className="bg-status-success-bg border border-status-success rounded-lg p-3 flex items-center gap-2 text-status-success">
           <Check size={16} />
           <span className="text-sm">Excellent mot de passe ! 🎉</span>
         </div>

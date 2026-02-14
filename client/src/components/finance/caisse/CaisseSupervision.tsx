@@ -435,13 +435,13 @@ export default function CaisseSupervision({
       
       {/* Sélecteur d'agence pour Admin */}
       {permissions.isAdmin && agences.length > 1 && (
-        <div className="flex items-center gap-3 p-3 bg-slate-900/50 backdrop-blur-md border border-slate-800/60 rounded-xl">
-          <Building2 size={18} className="text-cyan-400" />
-          <span className="text-sm text-slate-400">Supervision :</span>
+        <div className="flex items-center gap-3 p-3 bg-surface-base/50 backdrop-blur-md border border-edge/60 rounded-xl">
+          <Building2 size={18} className="text-accent" />
+          <span className="text-sm text-content-muted">Supervision :</span>
           <select
             value={selectedAgence?.id || 'all'}
             onChange={(e) => selectAgence(e.target.value)}
-            className="flex-1 max-w-xs bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+            className="flex-1 max-w-xs bg-surface border border-edge rounded-lg px-3 py-1.5 text-sm text-content-primary focus:outline-none focus:ring-2 focus:ring-accent/50"
           >
             {agences.map(ua => (
               <option key={ua.agence.id} value={ua.agence.id}>
@@ -455,25 +455,25 @@ export default function CaisseSupervision({
       {/* KPI Supervision - Compact */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 shrink-0">
         {/* KPI Principal - Fonds */}
-        <div className="col-span-2 sm:col-span-1 p-2 rounded-lg bg-gradient-to-br from-emerald-500/10 to-cyan-500/10
-                      border border-emerald-500/20 backdrop-blur-sm shadow-sm">
+        <div className="col-span-2 sm:col-span-1 p-2 rounded-lg bg-gradient-to-br from-status-success-bg to-accent/10
+                      border border-status-success/20 backdrop-blur-sm shadow-sm">
           <div className="flex items-center justify-between sm:flex-col sm:items-start sm:gap-0.5">
             <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-md bg-emerald-500/20">
-                <Wallet size={14} className="text-emerald-400" />
+              <div className="p-1.5 rounded-md bg-status-success-bg">
+                <Wallet size={14} className="text-status-success" />
               </div>
-              <span className="text-[10px] text-slate-400 uppercase font-semibold tracking-wider sm:hidden">
+              <span className="text-[10px] text-content-muted uppercase font-semibold tracking-wider sm:hidden">
                 Fonds
               </span>
             </div>
             <div className="text-right sm:text-left sm:w-full">
-              <div className="hidden sm:block text-[10px] text-slate-400 uppercase font-semibold tracking-wider mb-0.5">
+              <div className="hidden sm:block text-[10px] text-content-muted uppercase font-semibold tracking-wider mb-0.5">
                 Fonds en Caisse
               </div>
-              <div className="text-base sm:text-lg font-bold text-white font-mono leading-tight">
+              <div className="text-base sm:text-lg font-bold text-content-primary font-mono leading-tight">
                 {formatMoney(totalEspeces)}
               </div>
-              <div className="text-[9px] text-slate-500">
+              <div className="text-[9px] text-content-muted">
                 {uniqueActiveCaisseCount} caisse{uniqueActiveCaisseCount > 1 ? 's' : ''}
               </div>
             </div>
@@ -481,39 +481,39 @@ export default function CaisseSupervision({
         </div>
 
         {/* KPI Caissiers Actifs */}
-        <div className="p-2 rounded-lg bg-slate-800/40 border border-slate-700/50 backdrop-blur-sm shadow-sm">
+        <div className="p-2 rounded-lg bg-surface/40 border border-edge-subtle backdrop-blur-sm shadow-sm">
           <div className="flex flex-col items-center sm:items-start gap-0.5">
             <div className="flex items-center gap-1.5">
-              <User size={12} className="text-cyan-400" />
-              <span className="text-[9px] text-slate-500 uppercase font-semibold hidden sm:inline">Actifs</span>
+              <User size={12} className="text-status-info" />
+              <span className="text-[9px] text-content-muted uppercase font-semibold hidden sm:inline">Actifs</span>
             </div>
-            <div className="text-lg sm:text-xl font-bold text-white leading-tight">{uniqueActiveCaisseCount}</div>
-            <div className="text-[9px] text-emerald-400 flex items-center gap-1">
-              <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
+            <div className="text-lg sm:text-xl font-bold text-content-primary leading-tight">{uniqueActiveCaisseCount}</div>
+            <div className="text-[9px] text-status-success flex items-center gap-1">
+              <span className="w-1 h-1 rounded-full bg-accent animate-pulse" />
               En ligne
             </div>
           </div>
         </div>
 
         {/* KPI Fermées */}
-        <div className="p-2 rounded-lg bg-slate-800/40 border border-slate-700/50 backdrop-blur-sm shadow-sm">
+        <div className="p-2 rounded-lg bg-surface/40 border border-edge-subtle backdrop-blur-sm shadow-sm">
           <div className="flex flex-col items-center sm:items-start gap-0.5">
             <div className="flex items-center gap-1.5">
-              <Lock size={12} className="text-slate-400" />
-              <span className="text-[9px] text-slate-500 uppercase font-semibold hidden sm:inline">Fermées</span>
+              <Lock size={12} className="text-content-muted" />
+              <span className="text-[9px] text-content-muted uppercase font-semibold hidden sm:inline">Fermées</span>
             </div>
-            <div className="text-lg sm:text-xl font-bold text-white leading-tight">
+            <div className="text-lg sm:text-xl font-bold text-content-primary leading-tight">
               {uniqueClosedTodayCaisseCount}
             </div>
-            <div className="text-[9px] text-slate-500">Aujourd'hui</div>
+            <div className="text-[9px] text-content-muted">Aujourd'hui</div>
           </div>
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-xl shadow-xl overflow-hidden flex flex-col">
+      <div className="flex-1 min-h-0 bg-surface-base/80 backdrop-blur-xl border border-edge rounded-xl shadow-xl overflow-hidden flex flex-col">
 
         {/* Navigation Tabs - sticky sur mobile */}
-        <div className="sticky top-0 z-20 bg-slate-950/95 backdrop-blur-lg border-b border-slate-800/50 shrink-0">
+        <div className="sticky top-0 z-20 bg-surface-base/95 backdrop-blur-lg border-b border-edge/50 shrink-0">
           <div className="flex">
             {tabs.map((tab) => {
               const isActive = activeTab === tab.key;
@@ -526,8 +526,8 @@ export default function CaisseSupervision({
                     flex-1 flex items-center justify-center gap-2 py-2 px-4
                     text-xs font-medium transition-all relative
                     ${isActive
-                      ? 'text-emerald-400'
-                      : 'text-slate-400 hover:text-white'
+                      ? 'text-status-success'
+                      : 'text-content-muted hover:text-content-primary'
                     }
                   `}
                 >
@@ -538,8 +538,8 @@ export default function CaisseSupervision({
                       min-w-[16px] h-[16px] px-1 rounded-full text-[9px] font-bold
                       flex items-center justify-center
                       ${isActive
-                        ? 'bg-emerald-500/20 text-emerald-400'
-                        : 'bg-slate-700 text-slate-300'
+                        ? 'bg-status-success-bg text-status-success'
+                        : 'bg-surface-elevated text-content-secondary'
                       }
                     `}>
                       {tab.badge}
@@ -547,7 +547,7 @@ export default function CaisseSupervision({
                   )}
                   {/* Active indicator */}
                   {isActive && (
-                    <div className="absolute bottom-0 left-4 right-4 h-0.5 bg-emerald-500 rounded-full" />
+                    <div className="absolute bottom-0 left-4 right-4 h-0.5 bg-accent rounded-full" />
                   )}
                 </button>
               );
@@ -562,13 +562,13 @@ export default function CaisseSupervision({
             <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
               {/* Header mobile-friendly */}
               <div className="flex justify-between items-center">
-                <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
-                  <Wallet size={18} className="text-emerald-400 sm:size-5" />
+                <h3 className="text-base sm:text-lg font-bold text-content-primary flex items-center gap-2">
+                  <Wallet size={18} className="text-status-success sm:size-5" />
                   Caisses en cours
                 </h3>
                 <button
                   onClick={fetchData}
-                  className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 active:scale-95 transition-all"
+                  className="p-2 rounded-lg text-content-muted hover:text-content-primary hover:bg-surface active:scale-95 transition-all"
                   aria-label="Actualiser"
                 >
                    <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
@@ -576,8 +576,8 @@ export default function CaisseSupervision({
               </div>
 
               {activeSessions.length === 0 ? (
-                <div className="text-center py-8 text-slate-500">
-                   <div className="bg-slate-800/50 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-3">
+                <div className="text-center py-8 text-content-muted">
+                   <div className="bg-surface/50 rounded-full w-12 h-12 flex items-center justify-center mx-auto mb-3">
                      <Lock size={24} className="opacity-50" />
                    </div>
                    <p className="text-xs">Aucune caisse ouverte actuellement.</p>
@@ -592,16 +592,16 @@ export default function CaisseSupervision({
                     return (
                     <div
                       key={session.id}
-                      className="group relative bg-slate-800/40 backdrop-blur-sm border border-slate-700/50 rounded-lg overflow-hidden
-                                 active:scale-[0.98] transition-transform touch-manipulation hover:bg-slate-800/60"
+                      className="group relative bg-surface/40 backdrop-blur-sm border border-edge-subtle rounded-lg overflow-hidden
+                                 active:scale-[0.98] transition-transform touch-manipulation hover:bg-surface/60"
                     >
                       {/* Indicateur de statut actif - barre gauche */}
-                      <div className={`absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b ${isOwnSession ? 'from-cyan-400 to-cyan-600' : 'from-emerald-400 to-emerald-600'}`} />
+                      <div className={`absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b ${isOwnSession ? 'from-accent to-accent-secondary' : 'from-status-success to-status-success'}`} />
 
                       {/* Badge Agence - positionné en haut à droite */}
                       {session.agenceNom && (
                         <div className="absolute top-2 right-2 z-10">
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-status-info-bg text-status-info border border-status-info/20">
                             {session.agenceCode || session.agenceNom.substring(0, 4).toUpperCase()}
                           </span>
                         </div>
@@ -610,14 +610,14 @@ export default function CaisseSupervision({
                       <div className="p-3 pl-4">
                         {/* En-tête: Nom de la Caisse */}
                         {session.caisseNom && (
-                          <div className="mb-2 pb-1.5 border-b border-slate-700/30">
+                          <div className="mb-2 pb-1.5 border-b border-edge-subtle">
                             <div className="flex items-center gap-1.5">
-                              <Wallet size={12} className="text-amber-400" />
-                              <span className="text-xs font-bold text-white truncate max-w-[140px]">
+                              <Wallet size={12} className="text-status-warning" />
+                              <span className="text-xs font-bold text-content-primary truncate max-w-[140px]">
                                 {session.caisseNom}
                               </span>
                               {isOwnSession && (
-                                <span className="px-1 py-0.5 rounded text-[8px] font-bold bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
+                                <span className="px-1 py-0.5 rounded text-[8px] font-bold bg-accent/20 text-accent border border-accent/30">
                                   MOI
                                 </span>
                               )}
@@ -631,30 +631,30 @@ export default function CaisseSupervision({
                           <div className={`w-8 h-8 rounded-full bg-gradient-to-br
                                         flex items-center justify-center border font-bold text-xs shrink-0
                                         ${isOwnSession
-                                          ? 'from-cyan-700 to-cyan-800 border-cyan-600 text-cyan-200'
-                                          : 'from-slate-700 to-slate-800 border-slate-600 text-slate-200'
+                                          ? 'from-accent/70 to-accent/80 border-accent/60 text-accent'
+                                          : 'from-surface-elevated to-surface border-edge-strong text-content-secondary'
                                         }`}>
                             {session.caissierNom?.[0] || 'C'}
                           </div>
 
                           {/* Info caissier */}
                           <div className="flex-1 min-w-0">
-                            <h4 className="font-semibold text-white text-sm truncate pr-8">
+                            <h4 className="font-semibold text-content-primary text-sm truncate pr-8">
                               {session.caissierNom || 'Caissier Inconnu'}
                             </h4>
-                            <div className="flex items-center gap-1 text-[10px] text-emerald-400">
-                              <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                            <div className="flex items-center gap-1 text-[10px] text-status-success">
+                              <span className="w-1 h-1 rounded-full bg-accent animate-pulse shrink-0" />
                               <span>{formatTimeAgo(resolveOpenedAt(session))}</span>
                             </div>
                           </div>
                         </div>
 
                         {/* Solde - Compact */}
-                        <div className="mt-2 p-2 rounded bg-slate-900/50 border border-slate-700/30 flex items-center justify-between">
-                          <span className="text-[9px] text-slate-500 uppercase font-semibold tracking-wider">
+                        <div className="mt-2 p-2 rounded bg-surface-base/50 border border-edge-subtle flex items-center justify-between">
+                          <span className="text-[9px] text-content-muted uppercase font-semibold tracking-wider">
                             Solde
                           </span>
-                          <span className="text-sm font-mono font-bold text-white">
+                          <span className="text-sm font-mono font-bold text-content-primary">
                             {formatMoney(getSoldeTheorique(session))}
                           </span>
                         </div>
@@ -664,8 +664,8 @@ export default function CaisseSupervision({
                           <button
                             onClick={() => handleViewDetails(session)}
                             className="flex-1 py-1.5 px-2 rounded text-xs font-medium
-                                     bg-slate-700/50 text-slate-300 border border-slate-600/50
-                                     hover:bg-slate-700 hover:text-white active:scale-[0.97]
+                                     bg-surface-elevated/50 text-content-secondary border border-edge-strong/50
+                                     hover:bg-surface-elevated hover:text-content-primary active:scale-[0.97]
                                      transition-all"
                           >
                             Détails
@@ -677,7 +677,7 @@ export default function CaisseSupervision({
                               <button
                                 disabled
                                 className="flex-1 py-1.5 px-2 rounded text-xs font-medium
-                                         bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700"
+                                         bg-surface text-content-muted cursor-not-allowed border border-edge"
                               >
                                 Votre Session
                               </button>
@@ -688,10 +688,10 @@ export default function CaisseSupervision({
                                 className={`flex-1 py-1.5 px-2 rounded text-xs font-medium
                                          transition-all
                                          ${activeSupervision && activeSupervision.sessionId !== session.id
-                                           ? 'bg-slate-700 text-slate-400 cursor-not-allowed opacity-60'
+                                           ? 'bg-surface-elevated text-content-muted cursor-not-allowed opacity-60'
                                            : activeSupervision?.sessionId === session.id
-                                             ? 'bg-amber-500 text-white hover:bg-amber-600'
-                                             : 'bg-emerald-500 text-white hover:bg-emerald-600'
+                                             ? 'bg-accent-secondary text-content-primary hover:bg-accent-secondary-hover'
+                                             : 'bg-accent text-white hover:bg-accent-primary-hover'
                                          }`}
                               >
                                 {activeSupervision?.sessionId === session.id ? 'En cours' : 'Superviser'}
@@ -713,32 +713,32 @@ export default function CaisseSupervision({
                 {/* Header avec recherche */}
                 <div className="flex flex-col gap-3">
                   <div className="flex justify-between items-center">
-                    <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
-                        <User size={18} className="text-cyan-400 sm:size-5" />
+                    <h3 className="text-base sm:text-lg font-bold text-content-primary flex items-center gap-2">
+                        <User size={18} className="text-status-info sm:size-5" />
                         Gestion des Caissiers
                     </h3>
-                    <span className="text-xs text-slate-500">
+                    <span className="text-xs text-content-muted">
                       {filteredCaissiers.length} / {allCaissiers.length}
                     </span>
                   </div>
 
                   {/* Barre de recherche */}
                   <div className="relative">
-                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" />
                     <input
                       type="text"
                       placeholder="Rechercher un caissier..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-9 pr-9 py-2.5 rounded-lg bg-slate-800/60 border border-slate-700/50
-                               text-sm text-white placeholder-slate-500
-                               focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50
+                      className="w-full pl-9 pr-9 py-2.5 rounded-lg bg-surface/60 border border-edge-subtle
+                               text-sm text-content-primary placeholder-content-muted
+                               focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent/50
                                transition-all"
                     />
                     {searchQuery && (
                       <button
                         onClick={() => setSearchQuery('')}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-content-muted hover:text-content-primary"
                       >
                         <X size={14} />
                       </button>
@@ -760,8 +760,8 @@ export default function CaisseSupervision({
                           flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap
                           transition-all touch-manipulation shrink-0
                           ${statusFilter === filter.key
-                            ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
-                            : 'bg-slate-800/40 text-slate-400 border border-slate-700/50 hover:bg-slate-800'
+                            ? 'bg-accent/20 text-accent border border-accent/30'
+                            : 'bg-surface/40 text-content-muted border border-edge-subtle hover:bg-surface'
                           }
                         `}
                       >
@@ -770,7 +770,7 @@ export default function CaisseSupervision({
                         <span className={`
                           min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold
                           flex items-center justify-center
-                          ${statusFilter === filter.key ? 'bg-cyan-500/30' : 'bg-slate-700'}
+                          ${statusFilter === filter.key ? 'bg-accent/30' : 'bg-surface-elevated'}
                         `}>
                           {filterCounts[filter.key as keyof typeof filterCounts]}
                         </span>
@@ -781,15 +781,15 @@ export default function CaisseSupervision({
 
                 {/* Liste des caissiers */}
                 {filteredCaissiers.length === 0 ? (
-                  <div className="text-center py-12 text-slate-500">
-                    <div className="bg-slate-800/50 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                  <div className="text-center py-12 text-content-muted">
+                    <div className="bg-surface/50 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
                       <Search size={32} className="opacity-50" />
                     </div>
                     <p className="text-sm">Aucun caissier trouvé.</p>
                     {(searchQuery || statusFilter !== 'all') && (
                       <button
                         onClick={() => { setSearchQuery(''); setStatusFilter('all'); }}
-                        className="mt-2 text-xs text-cyan-400 hover:underline"
+                        className="mt-2 text-xs text-accent hover:underline"
                       >
                         Réinitialiser les filtres
                       </button>
@@ -811,10 +811,10 @@ export default function CaisseSupervision({
                               relative p-3 rounded-xl border cursor-pointer
                               active:scale-[0.98] transition-all touch-manipulation
                               ${enCaisse
-                                ? 'bg-emerald-500/5 border-emerald-500/30 hover:bg-emerald-500/10'
+                                ? 'bg-status-success-bg/50 border-status-success/30 hover:bg-status-success-bg'
                                 : (user.statut !== StatutUser.ACTIVE)
-                                  ? 'bg-red-500/5 border-red-500/20 hover:bg-red-500/10'
-                                  : 'bg-slate-800/40 border-slate-700/50 hover:bg-slate-800/60'
+                                  ? 'bg-status-danger-bg/50 border-status-danger/20 hover:bg-status-danger-bg'
+                                  : 'bg-surface/40 border-edge-subtle hover:bg-surface/60'
                               }
                             `}
                           >
@@ -822,9 +822,9 @@ export default function CaisseSupervision({
                             {enCaisse && (
                               <div className="absolute -top-1.5 -right-1.5">
                                 <span className="flex h-4 w-4">
-                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                                  <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500 items-center justify-center">
-                                    <Wallet size={10} className="text-white" />
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-status-success opacity-75" />
+                                  <span className="relative inline-flex rounded-full h-4 w-4 bg-accent items-center justify-center">
+                                    <Wallet size={10} className="text-content-primary" />
                                   </span>
                                 </span>
                               </div>
@@ -835,10 +835,10 @@ export default function CaisseSupervision({
                               <div className={`
                                 w-10 h-10 rounded-full flex items-center justify-center shrink-0 font-bold text-sm
                                 ${enCaisse
-                                  ? 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-400'
+                                  ? 'bg-status-success-bg border border-status-success/30 text-status-success'
                                   : (user.statut !== StatutUser.ACTIVE)
-                                    ? 'bg-red-500/20 border border-red-500/30 text-red-400'
-                                    : 'bg-cyan-500/20 border border-cyan-500/30 text-cyan-400'
+                                    ? 'bg-status-danger-bg border border-status-danger/30 text-status-danger'
+                                    : 'bg-accent/20 border border-accent/30 text-accent'
                                 }
                               `}>
                                 {user.nom?.[0]}{user.prenom?.[0]}
@@ -846,25 +846,25 @@ export default function CaisseSupervision({
 
                               {/* Info */}
                               <div className="flex-1 min-w-0">
-                                <div className="font-medium text-white text-sm truncate">
+                                <div className="font-medium text-content-primary text-sm truncate">
                                   {user.nom} {user.prenom}
                                 </div>
-                                <div className="text-xs text-slate-500 truncate">{user.email}</div>
+                                <div className="text-xs text-content-muted truncate">{user.email}</div>
 
                                 {/* Info contextuelle */}
                                 <div className="mt-2 flex items-center gap-2">
                                   {enCaisse && activeSession ? (
-                                    <span className="text-[10px] text-emerald-400 flex items-center gap-1">
-                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                    <span className="text-[10px] text-status-success flex items-center gap-1">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
                                       En caisse • {formatMoney(getSoldeTheorique(activeSession))}
                                     </span>
                                   ) : (user.statut !== StatutUser.ACTIVE) ? (
-                                    <span className="text-[10px] text-red-400 flex items-center gap-1">
+                                    <span className="text-[10px] text-status-danger flex items-center gap-1">
                                       <UserX size={10} />
                                       Compte désactivé
                                     </span>
                                   ) : (
-                                    <span className="text-[10px] text-slate-500 flex items-center gap-1">
+                                    <span className="text-[10px] text-content-muted flex items-center gap-1">
                                       <Clock size={10} />
                                       Disponible
                                     </span>
@@ -873,7 +873,7 @@ export default function CaisseSupervision({
                               </div>
 
                               {/* Chevron */}
-                              <ChevronRight size={16} className="text-slate-600 shrink-0 mt-1" />
+                              <ChevronRight size={16} className="text-content-muted shrink-0 mt-1" />
                             </div>
                           </div>
                         );
@@ -882,16 +882,16 @@ export default function CaisseSupervision({
 
                     {/* Pagination */}
                     {totalPages > 1 && (
-                      <div className="flex items-center justify-between pt-4 border-t border-slate-800/50">
-                        <span className="text-xs text-slate-500">
+                      <div className="flex items-center justify-between pt-4 border-t border-edge/50">
+                        <span className="text-xs text-content-muted">
                           Page {currentPage} sur {totalPages}
                         </span>
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                             disabled={currentPage === 1}
-                            className="p-2 rounded-lg bg-slate-800/40 border border-slate-700/50
-                                     text-slate-400 hover:text-white hover:bg-slate-800
+                            className="p-2 rounded-lg bg-surface/40 border border-edge-subtle
+                                     text-content-muted hover:text-content-primary hover:bg-surface
                                      disabled:opacity-50 disabled:cursor-not-allowed
                                      transition-all"
                           >
@@ -918,8 +918,8 @@ export default function CaisseSupervision({
                                   className={`
                                     w-8 h-8 rounded-lg text-xs font-medium transition-all
                                     ${currentPage === pageNum
-                                      ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
-                                      : 'bg-slate-800/40 text-slate-400 border border-slate-700/50 hover:bg-slate-800'
+                                      ? 'bg-accent/20 text-accent border border-accent/30'
+                                      : 'bg-surface/40 text-content-muted border border-edge-subtle hover:bg-surface'
                                     }
                                   `}
                                 >
@@ -932,8 +932,8 @@ export default function CaisseSupervision({
                           <button
                             onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                             disabled={currentPage === totalPages}
-                            className="p-2 rounded-lg bg-slate-800/40 border border-slate-700/50
-                                     text-slate-400 hover:text-white hover:bg-slate-800
+                            className="p-2 rounded-lg bg-surface/40 border border-edge-subtle
+                                     text-content-muted hover:text-content-primary hover:bg-surface
                                      disabled:opacity-50 disabled:cursor-not-allowed
                                      transition-all"
                           >
@@ -952,12 +952,12 @@ export default function CaisseSupervision({
             <div className="space-y-4 p-2">
               {/* Sessions à risque (inactivité) */}
               <div>
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
-                  <Clock size={14} className="text-orange-400" />
+                <h4 className="text-xs font-bold text-content-muted uppercase tracking-wider mb-2 flex items-center gap-2">
+                  <Clock size={14} className="text-status-warning" />
                   Sessions inactives ({riskAlerts.length})
                 </h4>
                 {riskAlerts.length === 0 ? (
-                  <div className="text-center py-6 text-slate-500 text-sm">Aucune session à risque</div>
+                  <div className="text-center py-6 text-content-muted text-sm">Aucune session à risque</div>
                 ) : (
                   <div className="space-y-2">
                     {riskAlerts.map((alert: any) => (
@@ -965,34 +965,34 @@ export default function CaisseSupervision({
                         key={alert.sessionId}
                         className={`p-3 rounded-lg border ${
                           alert.riskLevel === 'CRITICAL'
-                            ? 'bg-red-950/30 border-red-800/50'
-                            : 'bg-amber-950/20 border-amber-800/40'
+                            ? 'bg-status-danger-bg border-status-danger/50'
+                            : 'bg-status-warning-bg border-status-warning/40'
                         }`}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <AlertTriangle
                               size={16}
-                              className={alert.riskLevel === 'CRITICAL' ? 'text-red-400' : 'text-amber-400'}
+                              className={alert.riskLevel === 'CRITICAL' ? 'text-status-danger' : 'text-status-warning'}
                             />
                             <div>
-                              <div className="text-sm font-medium text-white">{alert.caisseNom}</div>
-                              <div className="text-[10px] text-slate-400">{alert.caissierNom}</div>
+                              <div className="text-sm font-medium text-content-primary">{alert.caisseNom}</div>
+                              <div className="text-[10px] text-content-muted">{alert.caissierNom}</div>
                             </div>
                           </div>
                           <div className="text-right">
                             <div className={`text-xs font-bold ${
-                              alert.riskLevel === 'CRITICAL' ? 'text-red-400' : 'text-amber-400'
+                              alert.riskLevel === 'CRITICAL' ? 'text-status-danger' : 'text-status-warning'
                             }`}>
                               {alert.riskLevel}
                             </div>
-                            <div className="text-[10px] text-slate-500">
+                            <div className="text-[10px] text-content-muted">
                               {Math.round(alert.hoursInactive)}h inactive
                             </div>
                           </div>
                         </div>
                         {alert.soldeCurrent != null && (
-                          <div className="mt-1 text-[10px] text-slate-500">
+                          <div className="mt-1 text-[10px] text-content-muted">
                             Solde: {Number(alert.soldeCurrent).toLocaleString('fr-FR')} FCFA
                           </div>
                         )}
@@ -1004,12 +1004,12 @@ export default function CaisseSupervision({
 
               {/* Écarts significatifs */}
               <div>
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2">
-                  <TrendingUp size={14} className="text-red-400" />
+                <h4 className="text-xs font-bold text-content-muted uppercase tracking-wider mb-2 flex items-center gap-2">
+                  <TrendingUp size={14} className="text-status-danger" />
                   Écarts significatifs ({ecartAlerts.length})
                 </h4>
                 {ecartAlerts.length === 0 ? (
-                  <div className="text-center py-6 text-slate-500 text-sm">Aucun écart significatif</div>
+                  <div className="text-center py-6 text-content-muted text-sm">Aucun écart significatif</div>
                 ) : (
                   <div className="space-y-2">
                     {ecartAlerts.map((alert: any) => (
@@ -1017,30 +1017,30 @@ export default function CaisseSupervision({
                         key={alert.sessionId}
                         className={`p-3 rounded-lg border ${
                           alert.severity === 'HIGH'
-                            ? 'bg-red-950/30 border-red-800/50'
-                            : 'bg-amber-950/20 border-amber-800/40'
+                            ? 'bg-status-danger-bg border-status-danger/50'
+                            : 'bg-status-warning-bg border-status-warning/40'
                         }`}
                       >
                         <div className="flex items-center justify-between">
                           <div>
-                            <div className="text-sm font-medium text-white">{alert.caisseNom}</div>
-                            <div className="text-[10px] text-slate-400">{alert.caissierNom}</div>
+                            <div className="text-sm font-medium text-content-primary">{alert.caisseNom}</div>
+                            <div className="text-[10px] text-content-muted">{alert.caissierNom}</div>
                           </div>
                           <div className="text-right">
                             <div className={`text-sm font-bold ${
-                              Number(alert.ecart) < 0 ? 'text-red-400' : 'text-amber-400'
+                              Number(alert.ecart) < 0 ? 'text-status-danger' : 'text-status-warning'
                             }`}>
                               {Number(alert.ecart) > 0 ? '+' : ''}{Number(alert.ecart).toLocaleString('fr-FR')} FCFA
                             </div>
                             <div className={`text-[10px] font-medium ${
-                              alert.severity === 'HIGH' ? 'text-red-400' : 'text-amber-400'
+                              alert.severity === 'HIGH' ? 'text-status-danger' : 'text-status-warning'
                             }`}>
                               {alert.severity}
                             </div>
                           </div>
                         </div>
                         {alert.closedAt && (
-                          <div className="mt-1 text-[10px] text-slate-500">
+                          <div className="mt-1 text-[10px] text-content-muted">
                             Fermé le {new Date(alert.closedAt).toLocaleDateString('fr-FR')} à {new Date(alert.closedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                           </div>
                         )}
@@ -1056,11 +1056,11 @@ export default function CaisseSupervision({
           {activeTab === 'cloture' && (
             <div className="space-y-3 p-2 animate-in slide-in-from-right-4 duration-300">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  <Calendar size={16} className="text-blue-400" />
+                <h3 className="text-sm font-bold text-content-primary flex items-center gap-2">
+                  <Calendar size={16} className="text-status-info" />
                   Clôture Journalière
                 </h3>
-                <span className="text-[11px] text-slate-500">
+                <span className="text-[11px] text-content-muted">
                   {new Date().toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })}
                 </span>
               </div>
@@ -1081,7 +1081,7 @@ export default function CaisseSupervision({
                   />
                 </>
               ) : (
-                <div className="text-center py-12 text-slate-500">
+                <div className="text-center py-12 text-content-muted">
                   <Building2 size={32} className="mx-auto opacity-50 mb-3" />
                   <p className="text-sm">Sélectionnez une agence pour gérer la clôture</p>
                 </div>
@@ -1110,60 +1110,60 @@ export default function CaisseSupervision({
         {selectedSession && (
           <div className="flex flex-col h-[70vh] sm:h-[500px] -m-2">
             {/* KPI grid - Fixed height part */}
-            <div className="p-2 border-b border-slate-800/50 mb-4 bg-surface-base z-10">
+            <div className="p-2 border-b border-edge/50 mb-4 bg-surface-base z-10">
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
-                <div className="p-2 sm:p-3 rounded-xl bg-slate-800/40 border border-slate-700/50">
-                  <div className="text-[10px] sm:text-xs text-slate-500 uppercase font-bold mb-1">Ouverture</div>
-                  <div className="text-white text-xs sm:text-sm font-medium">
+                <div className="p-2 sm:p-3 rounded-xl bg-surface/40 border border-edge-subtle">
+                  <div className="text-[10px] sm:text-xs text-content-muted uppercase font-bold mb-1">Ouverture</div>
+                  <div className="text-content-primary text-xs sm:text-sm font-medium">
                     {resolveOpenedAt(selectedSession) ? new Date(resolveOpenedAt(selectedSession)).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
                   </div>
                 </div>
-                <div className="p-2 sm:p-3 rounded-xl bg-slate-800/40 border border-slate-700/50">
-                  <div className="text-[10px] sm:text-xs text-slate-500 uppercase font-bold mb-1">Solde Initial</div>
-                  <div className="text-white text-xs sm:text-sm font-mono font-bold">{formatMoney(Number(selectedSession.soldeInitial || 0))}</div>
+                <div className="p-2 sm:p-3 rounded-xl bg-surface/40 border border-edge-subtle">
+                  <div className="text-[10px] sm:text-xs text-content-muted uppercase font-bold mb-1">Solde Initial</div>
+                  <div className="text-content-primary text-xs sm:text-sm font-mono font-bold">{formatMoney(Number(selectedSession.soldeInitial || 0))}</div>
                 </div>
-                <div className="p-2 sm:p-3 rounded-xl bg-slate-800/40 border border-slate-700/50 col-span-2 sm:col-span-1">
-                  <div className="text-[10px] sm:text-xs text-slate-500 uppercase font-bold mb-1">Solde Actuel</div>
-                  <div className="text-emerald-400 text-xs sm:text-sm font-mono font-bold">{formatMoney(getSoldeTheorique(selectedSession))}</div>
+                <div className="p-2 sm:p-3 rounded-xl bg-surface/40 border border-edge-subtle col-span-2 sm:col-span-1">
+                  <div className="text-[10px] sm:text-xs text-content-muted uppercase font-bold mb-1">Solde Actuel</div>
+                  <div className="text-status-success text-xs sm:text-sm font-mono font-bold">{formatMoney(getSoldeTheorique(selectedSession))}</div>
                 </div>
               </div>
             </div>
 
             {/* Operations - Scrollable part */}
             <div className="flex-1 flex flex-col min-h-0 px-2 space-y-3">
-              <h4 className="text-xs sm:text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+              <h4 className="text-xs sm:text-sm font-bold text-content-muted uppercase tracking-wider flex items-center gap-2">
                 <TrendingUp size={14} className="sm:size-4" />
                 Dernières Opérations
               </h4>
-              <div className="flex-1 overflow-auto rounded-xl border border-slate-800 bg-slate-900/50 custom-scrollbar">
+              <div className="flex-1 overflow-auto rounded-xl border border-edge bg-surface-base/50 custom-scrollbar">
                 {selectedSession.operations?.length === 0 ? (
-                  <div className="p-8 sm:p-12 text-center text-slate-500 italic">Aucune opération enregistrée</div>
+                  <div className="p-8 sm:p-12 text-center text-content-muted italic">Aucune opération enregistrée</div>
                 ) : (
                   <div className="min-w-full inline-block align-middle">
                     <table className="w-full text-xs sm:text-sm text-left border-collapse">
-                      <thead className="sticky top-0 bg-slate-950 z-10 text-[10px] sm:text-xs font-bold uppercase text-slate-500 tracking-wider">
+                      <thead className="sticky top-0 bg-surface-base z-10 text-[10px] sm:text-xs font-bold uppercase text-content-muted tracking-wider">
                         <tr>
-                          <th className="p-2 sm:p-3 border-b border-slate-800">Date & Heure</th>
-                          <th className="p-2 sm:p-3 border-b border-slate-800">Type</th>
-                          <th className="p-2 sm:p-3 border-b border-slate-800 text-right">Montant</th>
+                          <th className="p-2 sm:p-3 border-b border-edge">Date & Heure</th>
+                          <th className="p-2 sm:p-3 border-b border-edge">Type</th>
+                          <th className="p-2 sm:p-3 border-b border-edge text-right">Montant</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-800">
+                      <tbody className="divide-y divide-edge">
                         {selectedSession.operations?.map((op: any) => (
-                          <tr key={op.id} className="hover:bg-slate-800/20 active:bg-slate-800/30 transition-colors">
-                            <td className="p-2 sm:p-3 text-slate-400 font-mono text-[10px] sm:text-xs whitespace-nowrap">
+                          <tr key={op.id} className="hover:bg-surface/20 active:bg-surface/30 transition-colors">
+                            <td className="p-2 sm:p-3 text-content-muted font-mono text-[10px] sm:text-xs whitespace-nowrap">
                               {op.createdAt ? new Date(op.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'N/A'}
                             </td>
                             <td className="p-2 sm:p-3">
                               <span className={`px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold uppercase whitespace-nowrap ${
                                 (op.typeOperation || '').toLowerCase().includes('retrait') || (op.typeOperation || '').toLowerCase().includes('disbursement') || (op.typeOperation || '').toLowerCase().includes('distribution')
-                                  ? 'bg-red-500/10 text-red-400' : 'bg-emerald-500/10 text-emerald-400'
+                                  ? 'bg-status-danger-bg text-status-danger' : 'bg-status-success-bg text-status-success'
                               }`}>
                                 {translateOperationType(op.typeOperation)}
                               </span>
                             </td>
                             <td className={`p-2 sm:p-3 text-right font-mono font-bold whitespace-nowrap text-[10px] sm:text-xs ${
-                              (op.typeOperation || '').toLowerCase().includes('retrait') ? 'text-red-400' : 'text-emerald-400'
+                              (op.typeOperation || '').toLowerCase().includes('retrait') ? 'text-status-danger' : 'text-status-success'
                             }`}>
                               {(op.typeOperation || '').toLowerCase().includes('retrait') ? '-' : '+'}{formatMoney(Number(op.montant || 0))}
                             </td>
@@ -1210,7 +1210,7 @@ export default function CaisseSupervision({
         }
       >
         <div className="space-y-4">
-          <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex gap-3 text-red-500">
+          <div className="p-4 bg-status-danger-bg border border-status-danger/20 rounded-xl flex gap-3 text-status-danger">
             <AlertTriangle className="shrink-0" size={24} />
             <div>
               <p className="font-bold">Action irréversible</p>
@@ -1220,12 +1220,12 @@ export default function CaisseSupervision({
             </div>
           </div>
           
-          <div className="p-4 bg-slate-800/50 rounded-xl space-y-3">
+          <div className="p-4 bg-surface/50 rounded-xl space-y-3">
              <div className="flex justify-between items-center text-sm">
-                <span className="text-slate-400">Solde théorique final :</span>
-                <span className="text-white font-mono font-bold">{formatMoney(getSoldeTheorique(selectedSession))}</span>
+                <span className="text-content-muted">Solde théorique final :</span>
+                <span className="text-content-primary font-mono font-bold">{formatMoney(getSoldeTheorique(selectedSession))}</span>
              </div>
-             <p className="text-xs text-slate-500 leading-relaxed italic border-t border-slate-700/50 pt-2">
+             <p className="text-xs text-content-muted leading-relaxed italic border-t border-edge-subtle pt-2">
                Note: La session sera fermée avec le solde théorique actuel comme solde réel. Un écart de 0 sera enregistré.
              </p>
           </div>
@@ -1243,63 +1243,63 @@ export default function CaisseSupervision({
         {selectedUser && (
           <div className="space-y-5 -mx-2 sm:mx-0">
             {/* Header avec avatar et statut */}
-            <div className="flex items-start gap-4 p-4 bg-gradient-to-r from-slate-800/50 to-slate-800/30 rounded-xl border border-slate-700/30">
+            <div className="flex items-start gap-4 p-4 bg-gradient-to-r from-surface/50 to-surface/30 rounded-xl border border-edge-subtle">
               <div className={`
                 w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center shrink-0
                 font-bold text-lg sm:text-xl
                 ${isUserEnCaisse(selectedUser.id)
-                  ? 'bg-emerald-500/20 border-2 border-emerald-500/50 text-emerald-400'
+                  ? 'bg-status-success-bg border-2 border-status-success/50 text-status-success'
                   : (selectedUser.statut !== StatutUser.ACTIVE && selectedUser.statut !== 'Actif')
-                    ? 'bg-red-500/20 border-2 border-red-500/50 text-red-400'
-                    : 'bg-cyan-500/20 border-2 border-cyan-500/50 text-cyan-400'
+                    ? 'bg-status-danger-bg border-2 border-status-danger/50 text-status-danger'
+                    : 'bg-accent/20 border-2 border-accent/50 text-accent'
                 }
               `}>
                 {selectedUser.nom?.[0]}{selectedUser.prenom?.[0]}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="text-lg font-bold text-white">{selectedUser.nom} {selectedUser.prenom}</h3>
+                  <h3 className="text-lg font-bold text-content-primary">{selectedUser.nom} {selectedUser.prenom}</h3>
                   {isUserEnCaisse(selectedUser.id) && (
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-status-success-bg text-status-success border border-status-success/30 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
                       En caisse
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-slate-400 truncate">{selectedUser.email}</p>
-                <p className="text-xs text-slate-500 mt-1">{selectedUser.role}</p>
+                <p className="text-sm text-content-muted truncate">{selectedUser.email}</p>
+                <p className="text-xs text-content-muted mt-1">{selectedUser.role}</p>
               </div>
             </div>
 
             {/* KPIs Performance */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-              <div className="p-3 rounded-xl bg-slate-800/40 border border-slate-700/30 text-center">
-                <BarChart3 size={16} className="mx-auto text-cyan-400 mb-1" />
-                <div className="text-lg sm:text-xl font-bold text-white">
+              <div className="p-3 rounded-xl bg-surface/40 border border-edge-subtle text-center">
+                <BarChart3 size={16} className="mx-auto text-status-info mb-1" />
+                <div className="text-lg sm:text-xl font-bold text-content-primary">
                   {loadingHistory ? '...' : userStats?.totalSessions || 0}
                 </div>
-                <div className="text-[10px] text-slate-500 uppercase">Sessions totales</div>
+                <div className="text-[10px] text-content-muted uppercase">Sessions totales</div>
               </div>
-              <div className="p-3 rounded-xl bg-slate-800/40 border border-slate-700/30 text-center">
-                <TrendingUp size={16} className="mx-auto text-emerald-400 mb-1" />
-                <div className="text-lg sm:text-xl font-bold text-white">
+              <div className="p-3 rounded-xl bg-surface/40 border border-edge-subtle text-center">
+                <TrendingUp size={16} className="mx-auto text-status-success mb-1" />
+                <div className="text-lg sm:text-xl font-bold text-content-primary">
                   {loadingHistory ? '...' : userStats?.sessionsThisMonth || 0}
                 </div>
-                <div className="text-[10px] text-slate-500 uppercase">Ce mois</div>
+                <div className="text-[10px] text-content-muted uppercase">Ce mois</div>
               </div>
-              <div className="p-3 rounded-xl bg-slate-800/40 border border-slate-700/30 text-center">
-                <Wallet size={16} className="mx-auto text-amber-400 mb-1" />
-                <div className="text-sm sm:text-base font-bold text-white font-mono">
+              <div className="p-3 rounded-xl bg-surface/40 border border-edge-subtle text-center">
+                <Wallet size={16} className="mx-auto text-status-warning mb-1" />
+                <div className="text-sm sm:text-base font-bold text-content-primary font-mono">
                   {loadingHistory ? '...' : formatMoney(userStats?.totalEncaisse || 0)}
                 </div>
-                <div className="text-[10px] text-slate-500 uppercase">Total encaissé</div>
+                <div className="text-[10px] text-content-muted uppercase">Total encaissé</div>
               </div>
-              <div className="p-3 rounded-xl bg-slate-800/40 border border-slate-700/30 text-center">
-                <AlertTriangle size={16} className={`mx-auto mb-1 ${(userStats?.ecartMoyen || 0) > 1000 ? 'text-red-400' : 'text-slate-400'}`} />
-                <div className={`text-sm sm:text-base font-bold font-mono ${(userStats?.ecartMoyen || 0) > 1000 ? 'text-red-400' : 'text-white'}`}>
+              <div className="p-3 rounded-xl bg-surface/40 border border-edge-subtle text-center">
+                <AlertTriangle size={16} className={`mx-auto mb-1 ${(userStats?.ecartMoyen || 0) > 1000 ? 'text-status-danger' : 'text-content-muted'}`} />
+                <div className={`text-sm sm:text-base font-bold font-mono ${(userStats?.ecartMoyen || 0) > 1000 ? 'text-status-danger' : 'text-content-primary'}`}>
                   {loadingHistory ? '...' : formatMoney(userStats?.ecartMoyen || 0)}
                 </div>
-                <div className="text-[10px] text-slate-500 uppercase">Ecart moyen</div>
+                <div className="text-[10px] text-content-muted uppercase">Ecart moyen</div>
               </div>
             </div>
 
@@ -1315,19 +1315,19 @@ export default function CaisseSupervision({
                       handleViewDetails(session);
                     }
                   }}
-                  className="flex items-center gap-3 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30
-                           hover:bg-emerald-500/20 transition-all group"
+                  className="flex items-center gap-3 p-4 rounded-xl bg-status-success-bg border border-status-success/30
+                           hover:bg-status-success-bg transition-all group"
                 >
-                  <div className="p-2 rounded-lg bg-emerald-500/20">
-                    <Eye size={18} className="text-emerald-400" />
+                  <div className="p-2 rounded-lg bg-status-success-bg">
+                    <Eye size={18} className="text-status-success" />
                   </div>
                   <div className="text-left">
-                    <div className="text-sm font-medium text-white">Voir la caisse active</div>
-                    <div className="text-xs text-emerald-400">
+                    <div className="text-sm font-medium text-content-primary">Voir la caisse active</div>
+                    <div className="text-xs text-status-success">
                       {formatMoney(getSoldeTheorique(getActiveSessionForUser(selectedUser.id) || {}))}
                     </div>
                   </div>
-                  <ChevronRight size={16} className="ml-auto text-emerald-400 opacity-50 group-hover:opacity-100" />
+                  <ChevronRight size={16} className="ml-auto text-status-success opacity-50 group-hover:opacity-100" />
                 </button>
               )}
 
@@ -1339,37 +1339,37 @@ export default function CaisseSupervision({
                   className={`
                     flex items-center gap-3 p-4 rounded-xl border transition-all group
                     ${selectedUser.statut === StatutUser.ACTIVE
-                      ? 'bg-red-500/10 border-red-500/30 hover:bg-red-500/20'
-                      : 'bg-emerald-500/10 border-emerald-500/30 hover:bg-emerald-500/20'
+                      ? 'bg-status-danger-bg border-status-danger/30 hover:bg-status-danger-bg'
+                      : 'bg-status-success-bg border-status-success/30 hover:bg-status-success-bg'
                     }
                     ${submitting ? 'opacity-50 cursor-wait' : ''}
                   `}
                 >
-                  <div className={`p-2 rounded-lg ${selectedUser.statut === StatutUser.ACTIVE ? 'bg-red-500/20' : 'bg-emerald-500/20'}`}>
+                  <div className={`p-2 rounded-lg ${selectedUser.statut === StatutUser.ACTIVE ? 'bg-status-danger-bg' : 'bg-status-success-bg'}`}>
                     {selectedUser.statut === StatutUser.ACTIVE
-                      ? <UserX size={18} className="text-red-400" />
-                      : <UserCheck size={18} className="text-emerald-400" />
+                      ? <UserX size={18} className="text-status-danger" />
+                      : <UserCheck size={18} className="text-status-success" />
                     }
                   </div>
                   <div className="text-left">
-                    <div className="text-sm font-medium text-white">
+                    <div className="text-sm font-medium text-content-primary">
                       {selectedUser.statut === StatutUser.ACTIVE ? 'Désactiver le compte' : 'Activer le compte'}
                     </div>
-                    <div className={`text-xs ${selectedUser.statut === StatutUser.ACTIVE ? 'text-red-400' : 'text-emerald-400'}`}>
+                    <div className={`text-xs ${selectedUser.statut === StatutUser.ACTIVE ? 'text-status-danger' : 'text-status-success'}`}>
                       {selectedUser.statut === StatutUser.ACTIVE ? 'Bloquer l\'accès' : 'Autoriser l\'accès'}
                     </div>
                   </div>
-                  {submitting && <RefreshCw size={16} className="ml-auto animate-spin text-slate-400" />}
+                  {submitting && <RefreshCw size={16} className="ml-auto animate-spin text-content-muted" />}
                 </button>
               ) : (
                 /* Indicateur de permission manquante - informatif */
-                <div className="flex items-center gap-3 p-4 rounded-xl bg-slate-800/20 border border-slate-700/30 opacity-50">
-                  <div className="p-2 rounded-lg bg-slate-700/30">
-                    <ShieldAlert size={18} className="text-slate-500" />
+                <div className="flex items-center gap-3 p-4 rounded-xl bg-surface/20 border border-edge-subtle opacity-50">
+                  <div className="p-2 rounded-lg bg-surface-elevated/30">
+                    <ShieldAlert size={18} className="text-content-muted" />
                   </div>
                   <div className="text-left">
-                    <div className="text-sm font-medium text-slate-400">Gestion du compte</div>
-                    <div className="text-xs text-slate-500">Permission requise</div>
+                    <div className="text-sm font-medium text-content-muted">Gestion du compte</div>
+                    <div className="text-xs text-content-muted">Permission requise</div>
                   </div>
                 </div>
               )}
@@ -1385,17 +1385,17 @@ export default function CaisseSupervision({
                       setIsClosingOpen(true);
                     }
                   }}
-                  className="flex items-center gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/30
-                           hover:bg-red-500/20 transition-all group sm:col-span-2"
+                  className="flex items-center gap-3 p-4 rounded-xl bg-status-danger-bg border border-status-danger/30
+                           hover:bg-status-danger-bg transition-all group sm:col-span-2"
                 >
-                  <div className="p-2 rounded-lg bg-red-500/20">
-                    <Lock size={18} className="text-red-400" />
+                  <div className="p-2 rounded-lg bg-status-danger-bg">
+                    <Lock size={18} className="text-status-danger" />
                   </div>
                   <div className="text-left">
-                    <div className="text-sm font-medium text-white">Forcer la fermeture de caisse</div>
-                    <div className="text-xs text-red-400">Clôturer immédiatement la session</div>
+                    <div className="text-sm font-medium text-content-primary">Forcer la fermeture de caisse</div>
+                    <div className="text-xs text-status-danger">Clôturer immédiatement la session</div>
                   </div>
-                  <ChevronRight size={16} className="ml-auto text-red-400 opacity-50 group-hover:opacity-100" />
+                  <ChevronRight size={16} className="ml-auto text-status-danger opacity-50 group-hover:opacity-100" />
                 </button>
               )}
             </div>
@@ -1403,22 +1403,22 @@ export default function CaisseSupervision({
             {/* Historique compact */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                <h4 className="text-sm font-bold text-content-muted uppercase tracking-wider flex items-center gap-2">
                   <Clock size={14} />
                   Dernières Sessions
                 </h4>
                 {userHistory.length > 5 && (
-                  <span className="text-xs text-slate-500">{userHistory.length} au total</span>
+                  <span className="text-xs text-content-muted">{userHistory.length} au total</span>
                 )}
               </div>
 
               {loadingHistory ? (
-                <div className="flex items-center justify-center py-8 text-slate-500">
+                <div className="flex items-center justify-center py-8 text-content-muted">
                   <RefreshCw size={20} className="animate-spin mr-2" />
                   Chargement...
                 </div>
               ) : userHistory.length === 0 ? (
-                <div className="text-center py-8 text-slate-500">
+                <div className="text-center py-8 text-content-muted">
                   <Clock size={24} className="mx-auto opacity-50 mb-2" />
                   <p className="text-sm">Aucune session enregistrée</p>
                 </div>
@@ -1427,25 +1427,25 @@ export default function CaisseSupervision({
                   {userHistory.slice(0, 10).map((session: any) => (
                     <div
                       key={session.id}
-                      className="flex items-center justify-between p-3 rounded-lg bg-slate-800/30 border border-slate-700/30"
+                      className="flex items-center justify-between p-3 rounded-lg bg-surface/30 border border-edge-subtle"
                     >
                       <div className="flex items-center gap-3">
                         <div className={`w-2 h-2 rounded-full ${
                           resolveSessionStatus(session) === 'OPEN'
-                            ? 'bg-emerald-500'
+                            ? 'bg-accent'
                             : resolveSessionStatus(session) === 'TIMED_OUT'
-                              ? 'bg-amber-500'
-                              : 'bg-slate-500'
+                              ? 'bg-status-warning'
+                              : 'bg-surface-muted0'
                         }`} />
                         <div>
-                          <div className="text-xs font-medium text-white">
+                          <div className="text-xs font-medium text-content-primary">
                             {new Date(session.openedAt).toLocaleDateString('fr-FR', {
                               day: '2-digit',
                               month: 'short',
                               year: 'numeric'
                             })}
                           </div>
-                          <div className="text-[10px] text-slate-500">
+                          <div className="text-[10px] text-content-muted">
                             {session.closedAt
                               ? `Fermée à ${new Date(session.closedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
                               : resolveSessionStatus(session) === 'TIMED_OUT'
@@ -1456,11 +1456,11 @@ export default function CaisseSupervision({
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-xs font-mono font-bold text-white">
+                        <div className="text-xs font-mono font-bold text-content-primary">
                           {formatMoney(Number(session.soldeReel || session.montantFermetureDeclare || 0) || getSoldeTheorique(session))}
                         </div>
                         {session.ecart && Number(session.ecart) !== 0 && (
-                          <div className={`text-[10px] font-mono ${Number(session.ecart) > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                          <div className={`text-[10px] font-mono ${Number(session.ecart) > 0 ? 'text-status-success' : 'text-status-danger'}`}>
                             {Number(session.ecart) > 0 ? '+' : ''}{formatMoney(Number(session.ecart))}
                           </div>
                         )}
@@ -1472,7 +1472,7 @@ export default function CaisseSupervision({
             </div>
 
             {/* Footer */}
-            <div className="flex justify-end pt-4 border-t border-slate-700/50">
+            <div className="flex justify-end pt-4 border-t border-edge-subtle">
               <Button variant="outline" onClick={() => setIsUserManagementOpen(false)}>Fermer</Button>
             </div>
           </div>

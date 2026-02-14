@@ -156,22 +156,22 @@ export default function TransferTemplates({ onUseTemplate }: TransferTemplatesPr
   };
 
   return (
-    <div className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
+    <div className="bg-surface/50 rounded-xl border border-edge overflow-hidden">
       {/* Header */}
-      <div className="p-4 border-b border-slate-700 flex items-center justify-between">
+      <div className="p-4 border-b border-edge flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-indigo-500/20 rounded-lg">
-            <FileText className="text-indigo-400" size={20} />
+          <div className="p-2 bg-accent/10 rounded-lg">
+            <FileText className="text-accent" size={20} />
           </div>
           <div>
-            <h3 className="font-semibold text-white">Templates de virement</h3>
-            <p className="text-sm text-slate-400">{templates.length} template(s) configuré(s)</p>
+            <h3 className="font-semibold text-content-primary">Templates de virement</h3>
+            <p className="text-sm text-content-muted">{templates.length} template(s) configuré(s)</p>
           </div>
         </div>
 
         <button
           onClick={() => setShowForm(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition"
+          className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-primary-hover text-white rounded-lg transition"
         >
           <Plus size={18} />
           Nouveau template
@@ -180,62 +180,62 @@ export default function TransferTemplates({ onUseTemplate }: TransferTemplatesPr
 
       {/* Form */}
       {showForm && (
-        <form onSubmit={handleSubmit} className="p-4 border-b border-slate-700 bg-slate-900/50">
-          <h4 className="font-medium text-white mb-4">
+        <form onSubmit={handleSubmit} className="p-4 border-b border-edge bg-surface-base/50">
+          <h4 className="font-medium text-content-primary mb-4">
             {editingTemplate ? 'Modifier le template' : 'Nouveau template'}
           </h4>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
-              <label className="block text-sm text-slate-400 mb-1">Nom du template *</label>
+              <label className="block text-sm text-content-muted mb-1">Nom du template *</label>
               <input
                 type="text"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-4 py-2.5 bg-surface-elevated border border-edge-strong rounded-lg text-content-primary focus:outline-none focus:ring-2 focus:ring-accent"
                 placeholder="Ex: Virement mensuel agence"
               />
             </div>
 
             <div className="col-span-2">
-              <label className="block text-sm text-slate-400 mb-1">Description</label>
+              <label className="block text-sm text-content-muted mb-1">Description</label>
               <textarea
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 rows={2}
-                className="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                className="w-full px-4 py-2.5 bg-surface-elevated border border-edge-strong rounded-lg text-content-primary focus:outline-none focus:ring-2 focus:ring-accent resize-none"
                 placeholder="Description optionnelle"
               />
             </div>
 
             <div>
-              <label className="block text-sm text-slate-400 mb-1">Compte source (pattern)</label>
+              <label className="block text-sm text-content-muted mb-1">Compte source (pattern)</label>
               <input
                 type="text"
                 value={formData.sourceAccountPattern}
                 onChange={(e) => setFormData({ ...formData, sourceAccountPattern: e.target.value })}
-                className="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-4 py-2.5 bg-surface-elevated border border-edge-strong rounded-lg text-content-primary focus:outline-none focus:ring-2 focus:ring-accent"
                 placeholder="Ex: COFFRE_*"
               />
             </div>
 
             <div>
-              <label className="block text-sm text-slate-400 mb-1">Compte destination (pattern)</label>
+              <label className="block text-sm text-content-muted mb-1">Compte destination (pattern)</label>
               <input
                 type="text"
                 value={formData.destinationAccountPattern}
                 onChange={(e) => setFormData({ ...formData, destinationAccountPattern: e.target.value })}
-                className="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-4 py-2.5 bg-surface-elevated border border-edge-strong rounded-lg text-content-primary focus:outline-none focus:ring-2 focus:ring-accent"
                 placeholder="Ex: CAISSE_*"
               />
             </div>
 
             <div>
-              <label className="block text-sm text-slate-400 mb-1">Fréquence</label>
+              <label className="block text-sm text-content-muted mb-1">Fréquence</label>
               <select
                 value={formData.frequency}
                 onChange={(e) => setFormData({ ...formData, frequency: e.target.value as any })}
-                className="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-4 py-2.5 bg-surface-elevated border border-edge-strong rounded-lg text-content-primary focus:outline-none focus:ring-2 focus:ring-accent"
               >
                 <option value="once">Unique</option>
                 <option value="daily">Quotidien</option>
@@ -245,12 +245,12 @@ export default function TransferTemplates({ onUseTemplate }: TransferTemplatesPr
             </div>
 
             <div>
-              <label className="block text-sm text-slate-400 mb-1">Montant par défaut (FCFA)</label>
+              <label className="block text-sm text-content-muted mb-1">Montant par défaut (FCFA)</label>
               <input
                 type="number"
                 value={formData.defaultAmount}
                 onChange={(e) => setFormData({ ...formData, defaultAmount: e.target.value })}
-                className="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-4 py-2.5 bg-surface-elevated border border-edge-strong rounded-lg text-content-primary focus:outline-none focus:ring-2 focus:ring-accent"
                 placeholder="Optionnel"
               />
             </div>
@@ -261,9 +261,9 @@ export default function TransferTemplates({ onUseTemplate }: TransferTemplatesPr
                   type="checkbox"
                   checked={formData.isActive}
                   onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                  className="w-4 h-4 rounded border-slate-600 text-indigo-600 focus:ring-indigo-500"
+                  className="w-4 h-4 rounded border-edge-strong text-accent focus:ring-accent"
                 />
-                <span className="text-sm text-slate-300">Template actif</span>
+                <span className="text-sm text-content-secondary">Template actif</span>
               </label>
             </div>
           </div>
@@ -272,14 +272,14 @@ export default function TransferTemplates({ onUseTemplate }: TransferTemplatesPr
             <button
               type="button"
               onClick={resetForm}
-              className="px-4 py-2 text-slate-400 hover:text-white transition"
+              className="px-4 py-2 text-content-muted hover:text-content-primary transition"
             >
               Annuler
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-primary-hover text-white rounded-lg transition disabled:opacity-50"
             >
               {saving && <Loader2 className="animate-spin" size={16} />}
               {editingTemplate ? 'Mettre à jour' : 'Créer'}
@@ -292,42 +292,42 @@ export default function TransferTemplates({ onUseTemplate }: TransferTemplatesPr
       <div className="max-h-[400px] overflow-auto">
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="animate-spin text-indigo-400" size={32} />
+            <Loader2 className="animate-spin text-accent" size={32} />
           </div>
         ) : templates.length === 0 ? (
           <div className="text-center py-12">
-            <FileText size={48} className="mx-auto mb-4 text-slate-500 opacity-50" />
-            <p className="text-slate-400">Aucun template configuré</p>
+            <FileText size={48} className="mx-auto mb-4 text-content-muted opacity-50" />
+            <p className="text-content-muted">Aucun template configuré</p>
             <button
               onClick={() => setShowForm(true)}
-              className="mt-4 text-indigo-400 hover:text-indigo-300 text-sm"
+              className="mt-4 text-accent hover:text-accent text-sm"
             >
               Créer votre premier template
             </button>
           </div>
         ) : (
-          <div className="divide-y divide-slate-700/50">
+          <div className="divide-y divide-edge/50">
             {templates.map((template) => (
               <div
                 key={template.id}
-                className="p-4 hover:bg-slate-700/30 transition"
+                className="p-4 hover:bg-surface-elevated/30 transition"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <h4 className="font-medium text-white">{template.name}</h4>
+                      <h4 className="font-medium text-content-primary">{template.name}</h4>
                       {template.isActive ? (
-                        <CheckCircle size={14} className="text-emerald-400" />
+                        <CheckCircle size={14} className="text-status-success" />
                       ) : (
-                        <XCircle size={14} className="text-slate-500" />
+                        <XCircle size={14} className="text-content-muted" />
                       )}
                     </div>
 
                     {template.description && (
-                      <p className="text-sm text-slate-400 mb-2">{template.description}</p>
+                      <p className="text-sm text-content-muted mb-2">{template.description}</p>
                     )}
 
-                    <div className="flex flex-wrap items-center gap-4 text-xs text-slate-400">
+                    <div className="flex flex-wrap items-center gap-4 text-xs text-content-muted">
                       {template.sourceAccountPattern && (
                         <span className="flex items-center gap-1">
                           <Building2 size={12} />
@@ -355,7 +355,7 @@ export default function TransferTemplates({ onUseTemplate }: TransferTemplatesPr
                     {onUseTemplate && (
                       <button
                         onClick={() => onUseTemplate(template)}
-                        className="p-2 text-indigo-400 hover:bg-indigo-500/20 rounded-lg transition"
+                        className="p-2 text-accent hover:bg-accent/10 rounded-lg transition"
                         title="Utiliser ce template"
                       >
                         <Copy size={16} />
@@ -363,13 +363,13 @@ export default function TransferTemplates({ onUseTemplate }: TransferTemplatesPr
                     )}
                     <button
                       onClick={() => handleEdit(template)}
-                      className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition"
+                      className="p-2 text-content-muted hover:text-content-primary hover:bg-surface-elevated rounded-lg transition"
                     >
                       <Edit2 size={16} />
                     </button>
                     <button
                       onClick={() => handleDelete(template.id)}
-                      className="p-2 text-red-400 hover:bg-red-500/20 rounded-lg transition"
+                      className="p-2 text-status-danger hover:bg-status-danger-bg rounded-lg transition"
                     >
                       <Trash2 size={16} />
                     </button>

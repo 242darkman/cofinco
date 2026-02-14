@@ -58,40 +58,40 @@ export function getSignalQualityInfo(quality: GpsSignalQuality): {
     case 'excellent':
       return {
         label: 'Excellent',
-        color: 'text-green-400',
-        bgColor: 'bg-green-500/20',
+        color: 'text-status-success',
+        bgColor: 'bg-status-success-bg',
         description: 'Position très précise (< 10m)',
         icon: 'excellent',
       };
     case 'good':
       return {
         label: 'Bon',
-        color: 'text-emerald-400',
-        bgColor: 'bg-emerald-500/20',
+        color: 'text-status-success',
+        bgColor: 'bg-status-success-bg',
         description: 'Position fiable (10-30m)',
         icon: 'good',
       };
     case 'fair':
       return {
         label: 'Acceptable',
-        color: 'text-amber-400',
-        bgColor: 'bg-amber-500/20',
+        color: 'text-status-warning',
+        bgColor: 'bg-status-warning-bg',
         description: 'Position approximative (30-100m)',
         icon: 'fair',
       };
     case 'poor':
       return {
         label: 'Faible',
-        color: 'text-red-400',
-        bgColor: 'bg-red-500/20',
+        color: 'text-status-danger',
+        bgColor: 'bg-status-danger-bg',
         description: 'Signal GPS faible (> 100m)',
         icon: 'poor',
       };
     default:
       return {
         label: 'Inconnu',
-        color: 'text-slate-400',
-        bgColor: 'bg-slate-500/20',
+        color: 'text-content-muted',
+        bgColor: 'bg-surface-subtle/40',
         description: 'En attente du signal...',
         icon: 'unknown',
       };

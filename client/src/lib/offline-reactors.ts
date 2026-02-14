@@ -12,6 +12,7 @@
 
 import { offlineBus } from './offline-bus';
 import type { JournalEntry, JournalEventType } from './offline-db';
+import { currencySymbol } from '@shared/config/currency';
 
 // ========== TYPES ==========
 
@@ -128,7 +129,7 @@ function registerUIReactor(): UnsubscribeFn {
         ? JSON.parse(entry.payload)
         : null;
       if (payload?.amount) {
-        description = `${Number(payload.amount).toLocaleString('fr-FR')} XAF — ${description}`;
+        description = `${Number(payload.amount).toLocaleString('fr-FR')} ${currencySymbol()} — ${description}`;
       }
     } catch {
       // payload may be encrypted

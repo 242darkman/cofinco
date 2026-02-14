@@ -45,8 +45,8 @@ export default function Switch({
       disabled={disabled}
       onClick={() => !disabled && onChange(!checked)}
       className={`
-        relative inline-flex ${currentSize.button} items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
-        ${checked ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-600'}
+        relative inline-flex ${currentSize.button} items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2
+        ${checked ? 'bg-accent' : 'bg-edge-strong'}
         ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
         ${className}
       `}
@@ -54,7 +54,7 @@ export default function Switch({
     >
       <span
         className={`
-          inline-block ${currentSize.span} transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out
+          inline-block ${currentSize.span} transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out
           ${checked ? currentSize.translate : currentSize.translateOff}
         `}
       />

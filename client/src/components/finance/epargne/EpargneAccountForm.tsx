@@ -15,8 +15,8 @@ import { Button } from '../../ui';
 import { StatutClient, StatutCompte, TypeCompte as TypeCompteEnum, FrequenceVirement, FREQUENCE_VIREMENT_LABELS, type FrequenceVirementType } from '@shared/enum/status-constants';
 
 const MOBILE_OPERATORS = [
-  { id: 'mtn', name: 'MTN Mobile Money', color: 'bg-yellow-500', textColor: 'text-yellow-500', prefix: '+242 05/06' },
-  { id: 'airtel', name: 'Airtel Money', color: 'bg-red-500', textColor: 'text-red-500', prefix: '+242 04' }
+  { id: 'mtn', name: 'MTN Mobile Money', color: 'bg-status-warning-bg0', textColor: 'text-status-warning', prefix: '+242 05/06' },
+  { id: 'airtel', name: 'Airtel Money', color: 'bg-status-danger', textColor: 'text-status-danger', prefix: '+242 04' }
 ] as const;
 
 const BILLETS_FCFA = [10000, 5000, 2000, 1000, 500] as const;
@@ -387,13 +387,13 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
     return (
       <div className="flex items-center gap-2">
          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-colors duration-300 ${
-           active ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30' : 'bg-slate-800 text-slate-500'
+           active ? 'bg-accent text-white shadow-lg shadow-accent/30' : 'bg-surface text-content-muted'
          }`}>
            {s}
          </div>
          <span className={`text-xs font-medium hidden sm:block transition-colors duration-300 ${
-           active ? 'text-white' : 'text-slate-600'
-         } ${current ? 'text-indigo-400' : ''}`}>{label}</span>
+           active ? 'text-content-primary' : 'text-content-muted'
+         } ${current ? 'text-accent' : ''}`}>{label}</span>
       </div>
     );
   };
@@ -409,18 +409,18 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
         disabled={existing}
         className={`relative h-24 rounded-xl border-2 flex flex-col items-center justify-center gap-1 transition-all w-full
           ${existing 
-             ? 'border-slate-800 bg-slate-900/50 opacity-50 cursor-not-allowed' 
+             ? 'border-edge bg-surface-base/50 opacity-50 cursor-not-allowed' 
              : isSelected 
-                ? 'border-indigo-500 bg-indigo-500/10 shadow-lg shadow-indigo-500/10' 
-                : 'border-slate-800 bg-slate-900 hover:border-slate-600 hover:bg-slate-800'
+                ? 'border-accent bg-accent/10 shadow-lg shadow-accent/10' 
+                : 'border-edge bg-surface-base hover:border-edge-strong hover:bg-surface'
           }
         `}
       >
-        <Icon size={24} className={isSelected ? 'text-indigo-400' : 'text-slate-400'} />
-        <span className={`text-sm font-bold ${isSelected ? 'text-white' : 'text-slate-500'}`}>{label}</span>
-        <span className="text-[10px] text-slate-500">{desc}</span>
+        <Icon size={24} className={isSelected ? 'text-accent' : 'text-content-muted'} />
+        <span className={`text-sm font-bold ${isSelected ? 'text-content-primary' : 'text-content-muted'}`}>{label}</span>
+        <span className="text-[10px] text-content-muted">{desc}</span>
         {existing && (
-          <span className="absolute top-2 right-2 flex items-center gap-1 bg-amber-500/20 px-1.5 py-0.5 rounded text-[9px] font-bold text-amber-500 uppercase">
+          <span className="absolute top-2 right-2 flex items-center gap-1 bg-status-warning-bg px-1.5 py-0.5 rounded text-[9px] font-bold text-status-warning uppercase">
              Existant
           </span>
         )}
@@ -431,10 +431,10 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
   const PaymentCard = ({ id, label, icon: Icon, color = 'emerald' }: any) => {
     const isSelected = formData.mode_ouverture === id;
     const colors: any = {
-      emerald: 'border-emerald-500 bg-emerald-500/10 text-emerald-500',
-      yellow: 'border-yellow-500 bg-yellow-500/10 text-yellow-500',
-      red: 'border-red-500 bg-red-500/10 text-red-500',
-      blue: 'border-blue-500 bg-blue-500/10 text-blue-500',
+      emerald: 'border-status-success bg-status-success-bg text-status-success',
+      yellow: 'border-status-warning bg-status-warning-bg text-status-warning',
+      red: 'border-status-danger bg-status-danger-bg text-status-danger',
+      blue: 'border-status-info bg-status-info-bg text-status-info',
     };
     
     // Disable if transfer not eligible or MM not enabled
@@ -447,14 +447,14 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
         onClick={() => handleInputChange('mode_ouverture', id)}
         disabled={disabled}
         className={`h-20 rounded-xl border-2 flex flex-col items-center justify-center gap-1 transition-all w-full
-          ${disabled ? 'opacity-40 grayscale cursor-not-allowed border-slate-800 bg-slate-900' :
-            isSelected ? colors[color] : 'border-slate-800 bg-slate-900 text-slate-500 hover:border-slate-600'
+          ${disabled ? 'opacity-40 grayscale cursor-not-allowed border-edge bg-surface-base' :
+            isSelected ? colors[color] : 'border-edge bg-surface-base text-content-muted hover:border-edge-strong'
           }
         `}
       >
          <Icon size={20} />
          <span className="text-xs font-bold">{label}</span>
-         {isMM && !mobileMoneyEnabled && <span className="text-[8px] text-slate-600">Bientôt</span>}
+         {isMM && !mobileMoneyEnabled && <span className="text-[8px] text-content-muted">Bientôt</span>}
       </button>
     );
   };
@@ -462,24 +462,24 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
       
-      <div className="w-full max-w-3xl bg-slate-950 border border-slate-800 rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[90vh]">
+      <div className="w-full max-w-3xl bg-surface-base border border-edge rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[90vh]">
         
         {/* 1. HEADER */}
-        <div className="bg-slate-900 border-b border-slate-800 px-6 py-4 shrink-0">
+        <div className="bg-surface-base border-b border-edge px-6 py-4 shrink-0">
            <div className="flex justify-between items-center mb-4">
               <div>
-                 <h2 className="text-xl font-bold text-white">Ouvrir un Compte</h2>
-                 <p className="text-xs text-slate-400">Assistant de création de compte</p>
+                 <h2 className="text-xl font-bold text-content-primary">Ouvrir un Compte</h2>
+                 <p className="text-xs text-content-muted">Assistant de création de compte</p>
               </div>
-              <button onClick={onClose}><X className="text-slate-500 hover:text-white" /></button>
+              <button onClick={onClose}><X className="text-content-muted hover:text-content-primary" /></button>
            </div>
            
            {/* Stepper */}
            <div className="flex items-center justify-between px-4 max-w-2xl mx-auto w-full">
               <StepIndicator s={1} label="Type de Compte" />
-              <div className={`h-0.5 flex-1 mx-4 transition-colors duration-500 ${step >= 2 ? 'bg-indigo-500' : 'bg-slate-800'}`} />
+              <div className={`h-0.5 flex-1 mx-4 transition-colors duration-500 ${step >= 2 ? 'bg-accent' : 'bg-surface'}`} />
               <StepIndicator s={2} label="Approvisionnement" />
-              <div className={`h-0.5 flex-1 mx-4 transition-colors duration-500 ${step >= 3 ? 'bg-indigo-500' : 'bg-slate-800'}`} />
+              <div className={`h-0.5 flex-1 mx-4 transition-colors duration-500 ${step >= 3 ? 'bg-accent' : 'bg-surface'}`} />
               <StepIndicator s={3} label="Termes & Validation" />
            </div>
         </div>
@@ -493,69 +493,69 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                 
                 {/* Client Select */}
                 <div className="space-y-2">
-                   <label className="text-xs font-bold text-slate-500 uppercase ml-1">Client Titulaire</label>
+                   <label className="text-xs font-bold text-content-muted uppercase ml-1">Client Titulaire</label>
                    {!selectedClient ? (
                       <div className="relative">
                          <div className="relative h-12">
-                            <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                            <User className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" size={18} />
                             <input 
                               type="text"
                               value={searchQuery}
                               onChange={(e) => handleSearchChange(e.target.value)}
                               placeholder="Rechercher par nom ou téléphone..."
-                              className="w-full h-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-4 text-white focus:border-indigo-500 outline-none placeholder-slate-600 transition-colors"
+                              className="w-full h-full bg-surface-base border border-edge rounded-xl pl-10 pr-4 text-content-primary focus:border-accent outline-none placeholder-content-muted transition-colors"
                               autoFocus
                             />
                          </div>
                          {/* Dropdown Results */}
                          {searchQuery && (
-                           <div className="absolute z-10 w-full mt-2 bg-slate-900 border border-slate-700 rounded-xl shadow-xl max-h-60 overflow-y-auto">
+                           <div className="absolute z-10 w-full mt-2 bg-surface-base border border-edge rounded-xl shadow-xl max-h-60 overflow-y-auto">
                               {loadingClients ? (
-                                <div className="p-4 text-center text-slate-500 text-sm">Chargement...</div> 
+                                <div className="p-4 text-center text-content-muted text-sm">Chargement...</div> 
                               ) : filteredClients.length > 0 ? (
                                 filteredClients.map(c => (
                                   <button 
                                     key={c.id} 
                                     onClick={() => handleClientSelect(c)}
-                                    className="w-full text-left px-4 py-3 hover:bg-slate-800 flex items-center justify-between group"
+                                    className="w-full text-left px-4 py-3 hover:bg-surface flex items-center justify-between group"
                                   >
                                     <div>
-                                      <div className="text-sm font-bold text-slate-200 group-hover:text-white">{c.nom} {c.prenom}</div>
-                                      <div className="text-xs text-slate-500">{c.telephone}</div>
+                                      <div className="text-sm font-bold text-content-secondary group-hover:text-content-primary">{c.nom} {c.prenom}</div>
+                                      <div className="text-xs text-content-muted">{c.telephone}</div>
                                     </div>
-                                    <ChevronRight size={16} className="text-slate-600 group-hover:text-white" />
+                                    <ChevronRight size={16} className="text-content-muted group-hover:text-content-primary" />
                                   </button>
                                 ))
                               ) : (
-                                <div className="p-4 text-center text-slate-500 text-sm">Aucun client trouvé</div>
+                                <div className="p-4 text-center text-content-muted text-sm">Aucun client trouvé</div>
                               )}
                            </div>
                          )}
                       </div>
                    ) : (
-                      <div className="h-12 bg-indigo-500/10 border border-indigo-500/30 rounded-xl px-4 flex items-center justify-between">
+                      <div className="h-12 bg-accent/10 border border-accent/30 rounded-xl px-4 flex items-center justify-between">
                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-xs font-bold text-white">
+                            <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center text-xs font-bold text-white">
                                {selectedClient.nom.substring(0,2).toUpperCase()}
                             </div>
                             <div>
-                               <div className="text-sm font-bold text-white">{selectedClient.nom} {selectedClient.prenom}</div>
-                               <div className="text-[10px] text-indigo-300">
+                               <div className="text-sm font-bold text-content-primary">{selectedClient.nom} {selectedClient.prenom}</div>
+                               <div className="text-[10px] text-accent">
                                   {comptesExistants.length} compte(s) existant(s)
                                </div>
                             </div>
                          </div>
-                         <button onClick={() => setFormData(prev => ({...prev, client_id: ''}))} className="text-xs text-slate-400 hover:text-white hover:underline">
+                         <button onClick={() => setFormData(prev => ({...prev, client_id: ''}))} className="text-xs text-content-muted hover:text-content-primary hover:underline">
                             Changer
                          </button>
                       </div>
                    )}
-                   {errors.client_id && <p className="text-xs text-red-400 ml-1">{errors.client_id}</p>}
+                   {errors.client_id && <p className="text-xs text-status-danger ml-1">{errors.client_id}</p>}
                 </div>
 
                 {/* Type de Compte (Tuiles) */}
                 <div className="space-y-2">
-                   <label className="text-xs font-bold text-slate-500 uppercase ml-1">Type de Compte</label>
+                   <label className="text-xs font-bold text-content-muted uppercase ml-1">Type de Compte</label>
                    <div className="grid grid-cols-3 gap-4">
                       <AccountTypeCard 
                         id="CURRENT" 
@@ -580,12 +580,12 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
 
                 {/* Produit Select */}
                 <div className="space-y-2">
-                   <label className="text-xs font-bold text-slate-500 uppercase ml-1">Produit Associé</label>
+                   <label className="text-xs font-bold text-content-muted uppercase ml-1">Produit Associé</label>
                    <div className="relative">
                       <select 
                         value={formData.produit_id}
                         onChange={(e) => handleInputChange('produit_id', e.target.value)}
-                        className="w-full h-12 bg-slate-900 border border-slate-700 rounded-xl px-4 text-white outline-none appearance-none focus:border-indigo-500 transition-colors"
+                        className="w-full h-12 bg-surface-base border border-edge rounded-xl px-4 text-content-primary outline-none appearance-none focus:border-accent transition-colors"
                         disabled={loadingProduits}
                       >
                          {loadingProduits ? (
@@ -598,11 +598,11 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                              ))
                          )}
                       </select>
-                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-content-muted">
                          <ChevronRight size={16} className="rotate-90" />
                       </div>
                    </div>
-                   {errors.produit_id && <p className="text-xs text-red-400 ml-1">{errors.produit_id}</p>}
+                   {errors.produit_id && <p className="text-xs text-status-danger ml-1">{errors.produit_id}</p>}
                 </div>
              </div>
            )}
@@ -613,13 +613,13 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                 
                 {/* Info Banner */}
                 {formData.mode_ouverture === 'CASH' && (
-                  <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start gap-3 text-amber-400 text-xs">
+                  <div className="p-3 bg-status-warning-bg border border-status-warning/20 rounded-xl flex items-start gap-3 text-status-warning text-xs">
                      <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
                      <p>Le compte sera créé avec le statut <strong>"En attente"</strong> jusqu'à validation du dépôt initial en caisse.</p>
                   </div>
                 )}
                 {(formData.mode_ouverture === 'MTN' || formData.mode_ouverture === 'AIRTEL') && (
-                  <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl flex items-start gap-3 text-blue-400 text-xs">
+                  <div className="p-3 bg-status-info-bg border border-status-info/20 rounded-xl flex items-start gap-3 text-status-info text-xs">
                      <Smartphone size={16} className="mt-0.5 flex-shrink-0" />
                      <p>Le paiement sera validé par <strong>{formData.mode_ouverture === 'MTN' ? 'MTN Mobile Money' : 'Airtel Money'}</strong>. Vous devrez fournir le numéro et la référence de transaction.</p>
                   </div>
@@ -627,7 +627,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
 
                 {/* Mode de Paiement (Grid 4) */}
                 <div className="space-y-2">
-                   <label className="text-xs font-bold text-slate-500 uppercase ml-1">Mode de Dépôt</label>
+                   <label className="text-xs font-bold text-content-muted uppercase ml-1">Mode de Dépôt</label>
                    <div className="grid grid-cols-4 gap-3">
                       <PaymentCard id="CASH" label="Espèces" icon={Banknote} />
                       <PaymentCard id="MTN" label="MTN MoMo" icon={Smartphone} color="yellow" />
@@ -641,60 +641,60 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                           <select 
                              value={formData.compte_source_id}
                              onChange={(e) => handleInputChange('compte_source_id', e.target.value)}
-                             className="w-full h-10 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white px-3 focus:border-indigo-500 outline-none"
+                             className="w-full h-10 bg-surface-base border border-edge rounded-lg text-sm text-content-primary px-3 focus:border-accent outline-none"
                           >
                              <option value="">Sélectionner le compte source</option>
                              {comptesExistants.filter(c => normalizeTypeCompte(c.typeCompte || '') === 'CURRENT').map(c => (
                                 <option key={c.id} value={c.id}>{c.numeroCompte} ({formatMoney(parseFloat(String(c.solde)))})</option>
                              ))}
                           </select>
-                          {errors.compte_source_id && <p className="text-xs text-red-400 ml-1 mt-1">{errors.compte_source_id}</p>}
+                          {errors.compte_source_id && <p className="text-xs text-status-danger ml-1 mt-1">{errors.compte_source_id}</p>}
                       </div>
                    )}
                 </div>
 
                 {/* Montant Hero */}
                 <div className="space-y-2">
-                   <label className="text-xs font-bold text-slate-500 uppercase ml-1">Montant Initial (FCFA)</label>
+                   <label className="text-xs font-bold text-content-muted uppercase ml-1">Montant Initial (FCFA)</label>
                    <div className="relative group">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold text-xl">$</span>
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-content-muted font-bold text-xl">$</span>
                       <input
                         type="number"
                         value={formData.solde_initial}
                         onChange={(e) => handleInputChange('solde_initial', e.target.value)}
-                        className="w-full h-20 bg-slate-900 border-2 border-slate-700 rounded-xl pl-10 pr-4 text-4xl font-bold text-white placeholder-slate-800 outline-none focus:border-indigo-500 transition-all"
+                        className="w-full h-20 bg-surface-base border-2 border-edge rounded-xl pl-10 pr-4 text-4xl font-bold text-content-primary placeholder-content-primary outline-none focus:border-accent transition-all"
                         placeholder="0"
                         min="0"
                       />
                    </div>
-                   {errors.solde_initial && <p className="text-xs text-red-400 ml-1">{errors.solde_initial}</p>}
+                   {errors.solde_initial && <p className="text-xs text-status-danger ml-1">{errors.solde_initial}</p>}
 
                    {/* Fee breakdown */}
                    {(openingFee > 0 || depotMinimum > 0) && (
-                     <div className="bg-slate-900/80 border border-slate-700/50 rounded-xl p-3 space-y-2">
-                       <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Ventilation du montant</p>
+                     <div className="bg-surface-base/80 border border-edge-subtle rounded-xl p-3 space-y-2">
+                       <p className="text-[10px] font-bold text-content-muted uppercase tracking-wide">Ventilation du montant</p>
                        <div className="space-y-1.5">
                          {openingFee > 0 ? (
                            <div className="flex justify-between text-xs">
-                             <span className="text-slate-400">Frais d'ouverture</span>
-                             <span className="text-red-400 font-medium">{formatMoney(openingFee)} F</span>
+                             <span className="text-content-muted">Frais d'ouverture</span>
+                             <span className="text-status-danger font-medium">{formatMoney(openingFee)} F</span>
                            </div>
                          ) : (
                            <div className="flex justify-between text-xs">
-                             <span className="text-slate-400">Frais d'ouverture</span>
-                             <span className="text-emerald-400 font-medium">Offerts</span>
+                             <span className="text-content-muted">Frais d'ouverture</span>
+                             <span className="text-status-success font-medium">Offerts</span>
                            </div>
                          )}
                          <div className="flex justify-between text-xs">
-                           <span className="text-slate-400">Dépôt initial minimum</span>
-                           <span className="text-slate-300 font-medium">{formatMoney(depotMinimum)} F</span>
+                           <span className="text-content-muted">Dépôt initial minimum</span>
+                           <span className="text-content-secondary font-medium">{formatMoney(depotMinimum)} F</span>
                          </div>
-                         <div className="border-t border-slate-700/50 pt-1.5 flex justify-between text-xs">
-                           <span className="text-white font-semibold">Minimum à verser</span>
-                           <span className="text-white font-bold">{formatMoney(openingFee + depotMinimum)} F</span>
+                         <div className="border-t border-edge-subtle pt-1.5 flex justify-between text-xs">
+                           <span className="text-content-primary font-semibold">Minimum à verser</span>
+                           <span className="text-content-primary font-bold">{formatMoney(openingFee + depotMinimum)} F</span>
                          </div>
                          {parseFloat(formData.solde_initial) > openingFee + depotMinimum && (
-                           <div className="flex justify-between text-xs text-emerald-400">
+                           <div className="flex justify-between text-xs text-status-success">
                              <span>Solde effectif du compte</span>
                              <span className="font-medium">{formatMoney(parseFloat(formData.solde_initial) - openingFee)} F</span>
                            </div>
@@ -705,9 +705,9 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
 
                    {/* Validation notice */}
                    {validationRequise && (
-                     <div className="flex items-start gap-2 px-3 py-2 bg-amber-500/5 border border-amber-500/15 rounded-lg">
-                       <ShieldCheck size={14} className="text-amber-400 mt-0.5 shrink-0" />
-                       <p className="text-xs text-amber-400/90">
+                     <div className="flex items-start gap-2 px-3 py-2 bg-status-warning/5 border border-status-warning/15 rounded-lg">
+                       <ShieldCheck size={14} className="text-status-warning mt-0.5 shrink-0" />
+                       <p className="text-xs text-status-warning/90">
                          Ce produit nécessite une validation du chef d'agence avant activation. Le compte sera en attente de validation après création.
                        </p>
                      </div>
@@ -722,42 +722,42 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                 
                 {/* Champs Spécifiques Compte Bloqué */}
                 {formData.type_compte === 'BLOCKED' && (
-                   <div className="grid grid-cols-2 gap-4 p-4 bg-slate-900 rounded-xl border border-slate-800">
+                   <div className="grid grid-cols-2 gap-4 p-4 bg-surface-base rounded-xl border border-edge">
                       <div className="space-y-1">
-                         <label className="text-[10px] font-bold text-slate-500 uppercase">Date Échéance</label>
+                         <label className="text-[10px] font-bold text-content-muted uppercase">Date Échéance</label>
                          <input 
                            type="date" 
                            value={formData.date_echeance}
                            onChange={(e) => handleInputChange('date_echeance', e.target.value)}
-                           className="w-full h-10 bg-slate-950 border border-slate-700 rounded-lg px-3 text-white text-sm focus:border-indigo-500 outline-none" 
+                           className="w-full h-10 bg-surface-base border border-edge rounded-lg px-3 text-content-primary text-sm focus:border-accent outline-none" 
                            min={new Date().toISOString().split('T')[0]}
                          />
-                         {errors.date_echeance && <p className="text-xs text-red-400">{errors.date_echeance}</p>}
+                         {errors.date_echeance && <p className="text-xs text-status-danger">{errors.date_echeance}</p>}
                       </div>
                       <div className="space-y-1">
-                         <label className="text-[10px] font-bold text-slate-500 uppercase">Motif Blocage</label>
+                         <label className="text-[10px] font-bold text-content-muted uppercase">Motif Blocage</label>
                          <input 
                            type="text" 
                            value={formData.motif_blocage}
                            onChange={(e) => handleInputChange('motif_blocage', e.target.value)}
                            placeholder="Ex: Projet Immo" 
-                           className="w-full h-10 bg-slate-950 border border-slate-700 rounded-lg px-3 text-white text-sm focus:border-indigo-500 outline-none" 
+                           className="w-full h-10 bg-surface-base border border-edge rounded-lg px-3 text-content-primary text-sm focus:border-accent outline-none" 
                          />
-                         {errors.motif_blocage && <p className="text-xs text-red-400">{errors.motif_blocage}</p>}
+                         {errors.motif_blocage && <p className="text-xs text-status-danger">{errors.motif_blocage}</p>}
                       </div>
                       
                       {/* Auto Transfer Option */}
                       {eligibleForTransfer && (
-                         <div className="col-span-2 pt-2 border-t border-slate-800">
+                         <div className="col-span-2 pt-2 border-t border-edge">
                            <div className="flex items-center gap-2">
                              <input 
                                type="checkbox" 
                                id="auto" 
                                checked={formData.versement_auto_active}
                                onChange={(e) => handleInputChange('versement_auto_active', e.target.checked)}
-                               className="rounded bg-slate-800 border-slate-600 text-indigo-600 focus:ring-offset-slate-900" 
+                               className="rounded bg-surface border-edge-strong text-accent focus:ring-offset-surface-base" 
                              />
-                             <label htmlFor="auto" className="text-sm text-slate-300">Activer les versements automatiques mensuels</label>
+                             <label htmlFor="auto" className="text-sm text-content-secondary">Activer les versements automatiques mensuels</label>
                            </div>
                            
                            {/* Expanded Auto Transfer Fields */}
@@ -768,12 +768,12 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                                   placeholder="Montant (ex: 50000)"
                                   value={formData.versement_auto_montant}
                                   onChange={(e) => handleInputChange('versement_auto_montant', e.target.value)}
-                                  className="h-9 bg-slate-950 border border-slate-700 rounded-md px-2 text-white text-xs"
+                                  className="h-9 bg-surface-base border border-edge rounded-md px-2 text-content-primary text-xs"
                                 />
                                 <select
                                   value={formData.versement_auto_frequence}
                                   onChange={(e) => handleInputChange('versement_auto_frequence', e.target.value)}
-                                  className="h-9 bg-slate-950 border border-slate-700 rounded-md px-2 text-white text-xs appearance-none"
+                                  className="h-9 bg-surface-base border border-edge rounded-md px-2 text-content-primary text-xs appearance-none"
                                 >
                                   {([FrequenceVirement.WEEKLY, FrequenceVirement.BI_MONTHLY, FrequenceVirement.MONTHLY, FrequenceVirement.QUARTERLY] as FrequenceVirementType[]).map(freq => (
                                     <option key={freq} value={freq}>{FREQUENCE_VIREMENT_LABELS[freq]}</option>
@@ -781,19 +781,19 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                                 </select>
                                 {/* Day selector: hidden for BI_MONTHLY (uses 1st/15th automatically) */}
                                 {formData.versement_auto_frequence !== FrequenceVirement.BI_MONTHLY && (
-                                  <div className="flex items-center gap-2 bg-slate-950 border border-slate-700 rounded-md px-2 col-span-2">
-                                     <span className="text-[10px] text-slate-500 uppercase whitespace-nowrap">Jour du mois:</span>
+                                  <div className="flex items-center gap-2 bg-surface-base border border-edge rounded-md px-2 col-span-2">
+                                     <span className="text-[10px] text-content-muted uppercase whitespace-nowrap">Jour du mois:</span>
                                      <input
                                         type="number"
                                         min="1" max="28"
                                         value={formData.versement_auto_jour}
                                         onChange={(e) => handleInputChange('versement_auto_jour', e.target.value)}
-                                        className="h-9 bg-transparent border-none text-white text-xs w-full focus:ring-0"
+                                        className="h-9 bg-transparent border-none text-content-primary text-xs w-full focus:ring-0"
                                      />
                                   </div>
                                 )}
                                 {formData.versement_auto_frequence === FrequenceVirement.BI_MONTHLY && (
-                                  <p className="text-[10px] text-slate-500 col-span-2">Exécution automatique le 1er et le 15 de chaque mois</p>
+                                  <p className="text-[10px] text-content-muted col-span-2">Exécution automatique le 1er et le 15 de chaque mois</p>
                                 )}
                              </div>
                            )}
@@ -804,20 +804,20 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
 
                 {/* Notes */}
                 <div className="space-y-2">
-                   <label className="text-xs font-bold text-slate-500 uppercase ml-1">Notes / Commentaires</label>
+                   <label className="text-xs font-bold text-content-muted uppercase ml-1">Notes / Commentaires</label>
                    <textarea 
                      value={formData.notes}
                      onChange={(e) => handleInputChange('notes', e.target.value)}
-                     className="w-full h-24 bg-slate-900 border border-slate-700 rounded-xl p-4 text-white text-sm focus:border-indigo-500 outline-none resize-none" 
+                     className="w-full h-24 bg-surface-base border border-edge rounded-xl p-4 text-content-primary text-sm focus:border-accent outline-none resize-none" 
                      placeholder="Informations complémentaires sur le compte..." 
                    />
                 </div>
 
                 {/* Validation Info (driven by product config) */}
-                <div className="flex items-center justify-between p-4 bg-slate-900 border border-slate-800 rounded-xl">
+                <div className="flex items-center justify-between p-4 bg-surface-base border border-edge rounded-xl">
                    <div>
-                      <div className="text-sm font-bold text-white">Validation Chef d'Agence</div>
-                      <div className="text-xs text-slate-500">
+                      <div className="text-sm font-bold text-content-primary">Validation Chef d'Agence</div>
+                      <div className="text-xs text-content-muted">
                         {validationRequise
                           ? 'Requise par la politique du produit sélectionné'
                           : 'Non requise pour ce produit'}
@@ -825,8 +825,8 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                    </div>
                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${
                      validationRequise
-                       ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
-                       : 'bg-slate-700/50 text-slate-500'
+                       ? 'bg-status-warning-bg text-status-warning border border-status-warning/30'
+                       : 'bg-surface-elevated/50 text-content-muted'
                    }`}>
                      {validationRequise ? 'Requise' : 'Non'}
                    </span>
@@ -837,7 +837,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
         </div>
 
         {/* 3. FOOTER (Navigation) */}
-        <div className="p-6 bg-slate-900 border-t border-slate-800 flex justify-between items-center shrink-0">
+        <div className="p-6 bg-surface-base border-t border-edge flex justify-between items-center shrink-0">
            <div className={step === 1 ? 'invisible' : ''}>
              <Button 
                onClick={prevStep}
@@ -883,28 +883,28 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
             />
             <motion.div 
                initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
-               className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-lg z-10 relative shadow-2xl"
+               className="bg-surface-base border border-edge rounded-2xl p-6 w-full max-w-lg z-10 relative shadow-2xl"
             >
-               <h3 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
-                  <Banknote className="text-emerald-500" /> Validation Caisse
+               <h3 className="text-xl font-bold text-content-primary mb-2 flex items-center gap-2">
+                  <Banknote className="text-status-success" /> Validation Caisse
                </h3>
-               <p className="text-slate-400 mb-6">Confirmez le comptage physique des espèces pour le dépôt initial.</p>
+               <p className="text-content-muted mb-6">Confirmez le comptage physique des espèces pour le dépôt initial.</p>
 
                {/* Summary */}
-               <div className="bg-slate-800 p-4 rounded-xl mb-6 space-y-2">
+               <div className="bg-surface p-4 rounded-xl mb-6 space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="text-slate-400">Montant Total Attendu</span>
-                    <span className="text-2xl font-bold text-white">{formatMoney(parseFloat(formData.solde_initial))}</span>
+                    <span className="text-content-muted">Montant Total Attendu</span>
+                    <span className="text-2xl font-bold text-content-primary">{formatMoney(parseFloat(formData.solde_initial))}</span>
                   </div>
                   {openingFee > 0 && (
-                    <div className="border-t border-slate-700 pt-2 space-y-1">
+                    <div className="border-t border-edge pt-2 space-y-1">
                       <div className="flex justify-between text-xs">
-                        <span className="text-slate-500">Dont frais d'ouverture</span>
-                        <span className="text-red-400">{formatMoney(openingFee)} F</span>
+                        <span className="text-content-muted">Dont frais d'ouverture</span>
+                        <span className="text-status-danger">{formatMoney(openingFee)} F</span>
                       </div>
                       <div className="flex justify-between text-xs">
-                        <span className="text-slate-500">Dont dépôt sur compte</span>
-                        <span className="text-emerald-400">{formatMoney(parseFloat(formData.solde_initial) - openingFee)} F</span>
+                        <span className="text-content-muted">Dont dépôt sur compte</span>
+                        <span className="text-status-success">{formatMoney(parseFloat(formData.solde_initial) - openingFee)} F</span>
                       </div>
                     </div>
                   )}
@@ -914,7 +914,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                <div className="space-y-2 mb-6 max-h-60 overflow-y-auto pr-2">
                   {BILLETS_FCFA.map(billet => (
                      <div key={billet} className="flex items-center gap-4">
-                        <span className="w-16 text-right font-mono text-slate-400">{billet}</span>
+                        <span className="w-16 text-right font-mono text-content-muted">{billet}</span>
                         <input 
                            type="number" 
                            placeholder="0"
@@ -923,19 +923,19 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                               ...p, 
                               billets: { ...p.billets, [billet]: parseInt(e.target.value) || 0}
                            }))}
-                           className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white text-right focus:border-emerald-500 outline-none"
+                           className="flex-1 bg-surface-base border border-edge rounded-lg px-3 py-2 text-content-primary text-right focus:border-status-success outline-none"
                         />
                      </div>
                   ))}
                </div>
                
                {/* Computed Total */}
-               <div className="flex justify-between items-center py-4 border-t border-slate-800 mb-6">
-                  <span className="font-bold text-slate-300">Total Compté</span>
+               <div className="flex justify-between items-center py-4 border-t border-edge mb-6">
+                  <span className="font-bold text-content-secondary">Total Compté</span>
                   <span className={`text-xl font-bold ${
                      Object.entries(caisseData.billets).reduce((s, [b, c]) => s + (parseInt(b) * c), 0) === parseFloat(formData.solde_initial)
-                        ? 'text-emerald-400' 
-                        : 'text-red-400'
+                        ? 'text-status-success' 
+                        : 'text-status-danger'
                   }`}>
                      {formatMoney(Object.entries(caisseData.billets).reduce((s, [b, c]) => s + (parseInt(b) * c), 0))}
                   </span>
@@ -967,45 +967,45 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
             />
             <motion.div
                initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
-               className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-lg z-10 relative shadow-2xl"
+               className="bg-surface-base border border-edge rounded-2xl p-6 w-full max-w-lg z-10 relative shadow-2xl"
             >
-               <h3 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
-                  <Smartphone className={selectedOperator === 'MTN' ? 'text-yellow-500' : 'text-red-500'} />
+               <h3 className="text-xl font-bold text-content-primary mb-2 flex items-center gap-2">
+                  <Smartphone className={selectedOperator === 'MTN' ? 'text-status-warning' : 'text-status-danger'} />
                   Paiement {selectedOperator === 'MTN' ? 'MTN Mobile Money' : 'Airtel Money'}
                </h3>
-               <p className="text-slate-400 mb-6">Confirmez les informations de paiement mobile.</p>
+               <p className="text-content-muted mb-6">Confirmez les informations de paiement mobile.</p>
 
                {/* Summary */}
-               <div className="bg-slate-800 p-4 rounded-xl mb-6 flex justify-between items-center">
-                  <span className="text-slate-400">Montant</span>
-                  <span className="text-2xl font-bold text-white">{formatMoney(parseFloat(formData.solde_initial))}</span>
+               <div className="bg-surface p-4 rounded-xl mb-6 flex justify-between items-center">
+                  <span className="text-content-muted">Montant</span>
+                  <span className="text-2xl font-bold text-content-primary">{formatMoney(parseFloat(formData.solde_initial))}</span>
                </div>
 
                {/* MM Fields */}
                <div className="space-y-4 mb-6">
                   <div className="space-y-1">
-                     <label className="text-[10px] font-bold text-slate-500 uppercase">Numéro de Téléphone</label>
+                     <label className="text-[10px] font-bold text-content-muted uppercase">Numéro de Téléphone</label>
                      <div className="relative">
-                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" size={16} />
                         <input
                            type="tel"
                            placeholder={selectedOperator === 'MTN' ? '+242 05/06 XX XX XX' : '+242 04 XX XX XX'}
                            value={mobileMoneyData.numero_telephone}
                            onChange={(e) => setMobileMoneyData(p => ({ ...p, numero_telephone: e.target.value }))}
-                           className="w-full h-10 bg-slate-950 border border-slate-700 rounded-lg pl-10 pr-4 text-white text-sm focus:border-indigo-500 outline-none"
+                           className="w-full h-10 bg-surface-base border border-edge rounded-lg pl-10 pr-4 text-content-primary text-sm focus:border-accent outline-none"
                         />
                      </div>
                   </div>
                   <div className="space-y-1">
-                     <label className="text-[10px] font-bold text-slate-500 uppercase">Référence Transaction</label>
+                     <label className="text-[10px] font-bold text-content-muted uppercase">Référence Transaction</label>
                      <div className="relative">
-                        <Hash className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
+                        <Hash className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" size={16} />
                         <input
                            type="text"
                            placeholder="Ex: TXN-123456789"
                            value={mobileMoneyData.numero_transaction}
                            onChange={(e) => setMobileMoneyData(p => ({ ...p, numero_transaction: e.target.value }))}
-                           className="w-full h-10 bg-slate-950 border border-slate-700 rounded-lg pl-10 pr-4 text-white text-sm focus:border-indigo-500 outline-none"
+                           className="w-full h-10 bg-surface-base border border-edge rounded-lg pl-10 pr-4 text-content-primary text-sm focus:border-accent outline-none"
                         />
                      </div>
                   </div>

@@ -49,7 +49,7 @@ const AgentAvatar = ({ photoUrl, nom, prenom }: { photoUrl?: string | null; nom:
 
   if (!resolvedUrl || hasError) {
     return (
-      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-bold text-sm sm:text-base shrink-0">
+      <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-status-success to-accent flex items-center justify-center text-white font-bold text-sm sm:text-base shrink-0">
         {initials}
       </div>
     );
@@ -59,7 +59,7 @@ const AgentAvatar = ({ photoUrl, nom, prenom }: { photoUrl?: string | null; nom:
     <img
       src={resolvedUrl}
       alt={`${nom} ${prenom || ''}`}
-      className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover shrink-0 border-2 border-emerald-500"
+      className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover shrink-0 border-2 border-status-success"
       onError={() => setHasError(true)}
     />
   );
@@ -70,10 +70,10 @@ const Modal = ({ isOpen, onClose, title, children, footer, size = 'md' }: any) =
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-2 sm:p-4">
-      <div className={`bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-h-[95vh] overflow-hidden flex flex-col ${size === 'lg' ? 'max-w-4xl' : 'max-w-md'}`}>
-        <div className="p-3 sm:p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
-          <h3 className="font-semibold text-base sm:text-lg text-slate-900 dark:text-white">{title}</h3>
-          <button onClick={onClose} className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 p-1">
+      <div className={`bg-surface rounded-xl shadow-2xl w-full max-h-[95vh] overflow-hidden flex flex-col ${size === 'lg' ? 'max-w-4xl' : 'max-w-md'}`}>
+        <div className="p-3 sm:p-4 border-b border-edge flex justify-between items-center bg-surface-muted/50">
+          <h3 className="font-semibold text-base sm:text-lg text-content-primary">{title}</h3>
+          <button onClick={onClose} className="text-content-muted hover:text-content-secondary p-1">
             <XCircle size={20} />
           </button>
         </div>
@@ -81,7 +81,7 @@ const Modal = ({ isOpen, onClose, title, children, footer, size = 'md' }: any) =
           {children}
         </div>
         {footer && (
-          <div className="p-3 sm:p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+          <div className="p-3 sm:p-4 border-t border-edge bg-surface-muted/50">
             {footer}
           </div>
         )}
@@ -126,10 +126,10 @@ function AgentGroupCard({
   const operationIds = group.operations.map(op => op.id);
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+    <div className="bg-surface rounded-xl border border-edge overflow-hidden shadow-sm hover:shadow-md transition-shadow">
       {/* Agent Header - Always visible */}
       <div
-        className="p-3 sm:p-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+        className="p-3 sm:p-4 cursor-pointer hover:bg-surface-muted/50 transition-colors"
         onClick={onToggleExpand}
       >
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
@@ -141,10 +141,10 @@ function AgentGroupCard({
               prenom={group.agentPrenom}
             />
             <div className="min-w-0 flex-1">
-              <h3 className="font-semibold text-slate-900 dark:text-white text-sm sm:text-base truncate">
+              <h3 className="font-semibold text-content-primary text-sm sm:text-base truncate">
                 {group.agentName} {group.agentPrenom}
               </h3>
-              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-content-muted">
                 <span className="flex items-center gap-1">
                   <Wallet size={12} />
                   {formatMoney(group.totalAmount)} FCFA
@@ -178,16 +178,16 @@ function AgentGroupCard({
             </Button>
 
             <button
-              className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              className="p-2 rounded-lg hover:bg-surface-muted transition-colors"
               onClick={(e) => {
                 e.stopPropagation();
                 onToggleExpand();
               }}
             >
               {isExpanded ? (
-                <ChevronUp size={20} className="text-slate-500" />
+                <ChevronUp size={20} className="text-content-muted" />
               ) : (
-                <ChevronDown size={20} className="text-slate-500" />
+                <ChevronDown size={20} className="text-content-muted" />
               )}
             </button>
           </div>
@@ -196,12 +196,12 @@ function AgentGroupCard({
 
       {/* Operations List - Expandable */}
       {isExpanded && (
-        <div className="border-t border-slate-200 dark:border-slate-700">
-          <div className="divide-y divide-slate-100 dark:divide-slate-800">
+        <div className="border-t border-edge">
+          <div className="divide-y divide-edge-subtle">
             {group.operations.map((op) => (
               <div
                 key={op.id}
-                className="p-3 sm:p-4 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors"
+                className="p-3 sm:p-4 hover:bg-surface-muted/30 transition-colors"
               >
                 <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                   {/* Operation Info */}
@@ -210,7 +210,7 @@ function AgentGroupCard({
                     onClick={() => onViewDetails(op)}
                   >
                     <div className="flex flex-wrap items-center gap-2 mb-1">
-                      <span className="font-mono text-xs text-cyan-600 dark:text-cyan-400 font-medium">
+                      <span className="font-mono text-xs text-accent font-medium">
                         {op.reference}
                       </span>
                       <Badge
@@ -218,7 +218,7 @@ function AgentGroupCard({
                         className="text-[10px]"
                       />
                     </div>
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-content-muted">
                       <span className="flex items-center gap-1">
                         <Calendar size={11} />
                         {format(new Date(op.submittedAt), 'dd/MM/yy HH:mm')}
@@ -234,9 +234,9 @@ function AgentGroupCard({
 
                   {/* Amount & Actions */}
                   <div className="flex items-center justify-between sm:justify-end gap-3">
-                    <span className="font-bold text-slate-900 dark:text-white text-sm sm:text-base">
+                    <span className="font-bold text-content-primary text-sm sm:text-base">
                       {formatMoney(parseFloat(op.montant))}
-                      <span className="text-[10px] font-normal text-slate-500 ml-1">FCFA</span>
+                      <span className="text-[10px] font-normal text-content-muted ml-1">FCFA</span>
                     </span>
 
                     <div className="flex items-center gap-1">
@@ -246,7 +246,7 @@ function AgentGroupCard({
                           onApproveOne(op);
                         }}
                         disabled={isProcessing}
-                        className="p-2 rounded-lg text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors disabled:opacity-50"
+                        className="p-2 rounded-lg text-status-success hover:bg-status-success-bg transition-colors disabled:opacity-50"
                         title="Valider"
                       >
                         <CheckCircle size={18} />
@@ -257,7 +257,7 @@ function AgentGroupCard({
                           onRejectOne(op.id);
                         }}
                         disabled={isProcessing}
-                        className="p-2 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
+                        className="p-2 rounded-lg text-status-danger hover:bg-status-danger-bg transition-colors disabled:opacity-50"
                         title="Rejeter"
                       >
                         <XCircle size={18} />
@@ -541,26 +541,26 @@ export default function AgentCollecteValidations() {
     <div className="space-y-4 sm:space-y-6">
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Card className="p-3 sm:p-4 bg-gradient-to-br from-cyan-500/10 to-cyan-600/5 border-cyan-200 dark:border-cyan-800">
+        <Card className="p-3 sm:p-4 bg-gradient-to-br from-accent/10 to-accent/5 border-accent/30">
           <div className="flex items-center gap-3">
-            <div className="p-2 sm:p-2.5 bg-cyan-500/20 rounded-lg">
-              <Clock size={18} className="text-cyan-600 dark:text-cyan-400" />
+            <div className="p-2 sm:p-2.5 bg-accent/10 rounded-lg">
+              <Clock size={18} className="text-accent" />
             </div>
             <div>
-              <p className="text-[10px] sm:text-xs text-slate-500 uppercase font-semibold">En attente</p>
-              <p className="text-lg sm:text-2xl font-bold text-cyan-600 dark:text-cyan-400">{totalPending}</p>
+              <p className="text-[10px] sm:text-xs text-content-muted uppercase font-semibold">En attente</p>
+              <p className="text-lg sm:text-2xl font-bold text-accent">{totalPending}</p>
             </div>
           </div>
         </Card>
 
-        <Card className="p-3 sm:p-4 bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 border-emerald-200 dark:border-emerald-800">
+        <Card className="p-3 sm:p-4 bg-gradient-to-br from-status-success/10 to-status-success/5 border-status-success/30">
           <div className="flex items-center gap-3">
-            <div className="p-2 sm:p-2.5 bg-emerald-500/20 rounded-lg">
-              <Wallet size={18} className="text-emerald-600 dark:text-emerald-400" />
+            <div className="p-2 sm:p-2.5 bg-status-success-bg rounded-lg">
+              <Wallet size={18} className="text-status-success" />
             </div>
             <div>
-              <p className="text-[10px] sm:text-xs text-slate-500 uppercase font-semibold">Montant total</p>
-              <p className="text-base sm:text-xl font-bold text-emerald-600 dark:text-emerald-400">
+              <p className="text-[10px] sm:text-xs text-content-muted uppercase font-semibold">Montant total</p>
+              <p className="text-base sm:text-xl font-bold text-status-success">
                 {formatMoney(totalAmount)}
                 <span className="text-[10px] font-normal ml-1">FCFA</span>
               </p>
@@ -568,26 +568,26 @@ export default function AgentCollecteValidations() {
           </div>
         </Card>
 
-        <Card className="p-3 sm:p-4 bg-gradient-to-br from-purple-500/10 to-purple-600/5 border-purple-200 dark:border-purple-800">
+        <Card className="p-3 sm:p-4 bg-gradient-to-br from-status-info/10 to-status-info/5 border-status-info/30">
           <div className="flex items-center gap-3">
-            <div className="p-2 sm:p-2.5 bg-purple-500/20 rounded-lg">
-              <Users size={18} className="text-purple-600 dark:text-purple-400" />
+            <div className="p-2 sm:p-2.5 bg-status-info-bg rounded-lg">
+              <Users size={18} className="text-status-info" />
             </div>
             <div>
-              <p className="text-[10px] sm:text-xs text-slate-500 uppercase font-semibold">Agents</p>
-              <p className="text-lg sm:text-2xl font-bold text-purple-600 dark:text-purple-400">{groupedOperations.length}</p>
+              <p className="text-[10px] sm:text-xs text-content-muted uppercase font-semibold">Agents</p>
+              <p className="text-lg sm:text-2xl font-bold text-status-info">{groupedOperations.length}</p>
             </div>
           </div>
         </Card>
 
-        <Card className="p-3 sm:p-4 bg-gradient-to-br from-amber-500/10 to-amber-600/5 border-amber-200 dark:border-amber-800 col-span-2 lg:col-span-1">
+        <Card className="p-3 sm:p-4 bg-gradient-to-br from-status-warning/10 to-status-warning/5 border-status-warning/30 col-span-2 lg:col-span-1">
           <div className="flex items-center gap-3">
-            <div className="p-2 sm:p-2.5 bg-amber-500/20 rounded-lg">
-              <CreditCard size={18} className="text-amber-600 dark:text-amber-400" />
+            <div className="p-2 sm:p-2.5 bg-status-warning-bg rounded-lg">
+              <CreditCard size={18} className="text-status-warning" />
             </div>
             <div>
-              <p className="text-[10px] sm:text-xs text-slate-500 uppercase font-semibold">Moy. / Opération</p>
-              <p className="text-base sm:text-xl font-bold text-amber-600 dark:text-amber-400">
+              <p className="text-[10px] sm:text-xs text-content-muted uppercase font-semibold">Moy. / Opération</p>
+              <p className="text-base sm:text-xl font-bold text-status-warning">
                 {formatMoney(totalPending > 0 ? totalAmount / totalPending : 0)}
                 <span className="text-[10px] font-normal ml-1">FCFA</span>
               </p>
@@ -600,11 +600,11 @@ export default function AgentCollecteValidations() {
       <div className="flex flex-col sm:flex-row gap-3">
         {isAdmin && agences.length > 0 && (
           <div className="relative w-full sm:w-64">
-            <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+            <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted pointer-events-none" size={16} />
             <select
               value={selectedAgenceId}
               onChange={(e) => setSelectedAgenceId(e.target.value)}
-              className="w-full h-10 pl-9 pr-4 text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary/50 outline-none appearance-none"
+              className="w-full h-10 pl-9 pr-4 text-sm bg-surface border border-edge rounded-lg focus:ring-2 focus:ring-primary/50 outline-none appearance-none"
             >
               <option value="all">Toutes les agences</option>
               {agences.map(a => (
@@ -615,13 +615,13 @@ export default function AgentCollecteValidations() {
         )}
 
         <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted pointer-events-none" size={16} />
           <input
             type="text"
             placeholder="Rechercher par référence, agent ou client..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full h-10 pl-9 pr-4 text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-primary/50 outline-none"
+            className="w-full h-10 pl-9 pr-4 text-sm bg-surface border border-edge rounded-lg focus:ring-2 focus:ring-primary/50 outline-none"
           />
         </div>
       </div>
@@ -629,15 +629,15 @@ export default function AgentCollecteValidations() {
       {/* Content */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <Loader2 className="w-10 h-10 text-cyan-500 animate-spin" />
+          <Loader2 className="w-10 h-10 text-accent animate-spin" />
         </div>
       ) : groupedOperations.length === 0 ? (
         <Card className="py-16 sm:py-20 text-center">
-          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-slate-100 dark:bg-slate-800/50 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6">
-            <CheckCircle className="text-emerald-500 w-8 h-8 sm:w-10 sm:h-10" />
+          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-surface-muted/50 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6">
+            <CheckCircle className="text-status-success w-8 h-8 sm:w-10 sm:h-10" />
           </div>
-          <h3 className="text-lg sm:text-xl font-bold text-slate-800 dark:text-white mb-2">Tout est en ordre !</h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
+          <h3 className="text-lg sm:text-xl font-bold text-content-primary mb-2">Tout est en ordre !</h3>
+          <p className="text-sm text-content-muted">
             Aucune opération en attente de validation.
           </p>
         </Card>
@@ -700,11 +700,11 @@ export default function AgentCollecteValidations() {
         {selectedOperation && (
           <div className="space-y-4 sm:space-y-6">
             {/* Amount Hero */}
-            <div className="bg-slate-50 dark:bg-slate-800/50 p-4 sm:p-6 rounded-xl border border-slate-100 dark:border-slate-700 text-center">
-              <span className="text-slate-500 text-xs sm:text-sm font-medium">Montant</span>
-              <div className="text-2xl sm:text-4xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">
+            <div className="bg-surface-muted/50 p-4 sm:p-6 rounded-xl border border-edge-subtle text-center">
+              <span className="text-content-muted text-xs sm:text-sm font-medium">Montant</span>
+              <div className="text-2xl sm:text-4xl font-bold text-status-success mt-1">
                 {formatMoney(parseFloat(selectedOperation.montant))}
-                <span className="text-sm sm:text-xl text-emerald-600/60 ml-1">FCFA</span>
+                <span className="text-sm sm:text-xl text-status-success/60 ml-1">FCFA</span>
               </div>
               <Badge value={selectedOperation.statut} className="mt-3" />
             </div>
@@ -712,14 +712,14 @@ export default function AgentCollecteValidations() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
               {/* Client Info */}
               <div className="space-y-3">
-                <h4 className="font-semibold text-slate-800 dark:text-slate-200 border-b pb-2 flex items-center gap-2 text-sm">
+                <h4 className="font-semibold text-content-primary border-b pb-2 flex items-center gap-2 text-sm">
                   <User size={16} className="text-primary" />
                   Client
                 </h4>
                 <div className="space-y-2 text-sm">
                   <div>
-                    <label className="text-[10px] text-slate-500 uppercase font-semibold">Nom</label>
-                    <p className="font-medium text-slate-800 dark:text-slate-200">
+                    <label className="text-[10px] text-content-muted uppercase font-semibold">Nom</label>
+                    <p className="font-medium text-content-primary">
                       {selectedOperation.client ? `${selectedOperation.client.nom} ${selectedOperation.client.prenom}` : 'Non spécifié'}
                     </p>
                   </div>
@@ -728,27 +728,27 @@ export default function AgentCollecteValidations() {
 
               {/* Transaction Info */}
               <div className="space-y-3">
-                <h4 className="font-semibold text-slate-800 dark:text-slate-200 border-b pb-2 flex items-center gap-2 text-sm">
+                <h4 className="font-semibold text-content-primary border-b pb-2 flex items-center gap-2 text-sm">
                   <CreditCard size={16} className="text-primary" />
                   Transaction
                 </h4>
                 <div className="space-y-2 text-sm">
                   <div>
-                    <label className="text-[10px] text-slate-500 uppercase font-semibold">Référence</label>
+                    <label className="text-[10px] text-content-muted uppercase font-semibold">Référence</label>
                     <p className="flex items-center gap-2 font-mono text-xs">
                       <Hash size={12} />
                       {selectedOperation.reference}
                     </p>
                   </div>
                   <div>
-                    <label className="text-[10px] text-slate-500 uppercase font-semibold">Date</label>
+                    <label className="text-[10px] text-content-muted uppercase font-semibold">Date</label>
                     <p className="text-xs">
                       {format(new Date(selectedOperation.submittedAt), 'dd MMMM yyyy à HH:mm', { locale: fr })}
                     </p>
                   </div>
                   {(selectedOperation.metadata as OperationTerrainMetadata)?.latitude && (
                     <div>
-                      <label className="text-[10px] text-slate-500 uppercase font-semibold">GPS</label>
+                      <label className="text-[10px] text-content-muted uppercase font-semibold">GPS</label>
                       <a
                         href={`https://www.google.com/maps?q=${(selectedOperation.metadata as OperationTerrainMetadata).latitude},${(selectedOperation.metadata as OperationTerrainMetadata).longitude}`}
                         target="_blank"
@@ -788,7 +788,7 @@ export default function AgentCollecteValidations() {
         }
       >
         <div className="space-y-4">
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 text-red-700 dark:text-red-400 p-3 sm:p-4 rounded-lg flex items-start gap-3">
+          <div className="bg-status-danger-bg border border-status-danger/30 text-status-danger p-3 sm:p-4 rounded-lg flex items-start gap-3">
             <AlertCircle className="shrink-0 mt-0.5" size={18} />
             <div className="text-xs sm:text-sm">
               <p className="font-bold">Action irréversible</p>

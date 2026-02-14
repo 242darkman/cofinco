@@ -74,6 +74,7 @@ import { isIncomingOperation, isOutgoingOperation, getOperationDelta, CAISSE_IN_
 import { paymentService } from "../services/mobile-money/payment-service";
 import { MethodePaiement } from "@shared/enum/status-constants";
 import { D, roundMoney, splitEvenly } from "../lib/money";
+import { currencySymbol } from "@shared/config/currency";
 
 /**
  * Génère l'échéancier d'un crédit actif (si pas encore généré).
@@ -415,14 +416,14 @@ export function registerFinanceRoutes(app: Express) {
               }
             });
           }
-          message = `Ordre de paiement envoyé à la caisse. Le client ${clientName} doit se présenter au guichet pour récupérer ${montantDecaissement.toLocaleString()} FCFA.`;
+          message = `Ordre de paiement envoyé à la caisse. Le client ${clientName} doit se présenter au guichet pour récupérer ${montantDecaissement.toLocaleString()} ${currencySymbol()}.`;
           break;
 
         case 'MOBILE_MONEY':
           // ===== CANAL MOBILE MONEY =====
           // TODO: Intégrer avec le Payment Gateway (Orange Money, MTN MoMo, etc.)
           // Pour l'instant, on simule un succès
-          message = `Paiement Mobile Money initié pour ${montantDecaissement.toLocaleString()} FCFA. Le client recevra une notification SMS.`;
+          message = `Paiement Mobile Money initié pour ${montantDecaissement.toLocaleString()} ${currencySymbol()}. Le client recevra une notification SMS.`;
           // Note: Dans une implémentation réelle, on appellerait PaymentGateway.disburse()
           // et le statut passerait à ACTIVE après le callback de confirmation
           break;
@@ -481,7 +482,7 @@ export function registerFinanceRoutes(app: Express) {
           }
           message = estProgramme
             ? `Décaissement programmé pour le ${new Date(dateDecaissement).toLocaleDateString('fr-FR')}. Crédit ${numeroCredit} créé en attente.`
-            : `Crédit ${numeroCredit} décaissé. ${montantDecaissement.toLocaleString()} FCFA crédités sur le compte ${compteCourant.numeroCompte}`;
+            : `Crédit ${numeroCredit} décaissé. ${montantDecaissement.toLocaleString()} ${currencySymbol()} crédités sur le compte ${compteCourant.numeroCompte}`;
           break;
       }
 
@@ -532,10 +533,10 @@ export function registerFinanceRoutes(app: Express) {
           type: "LIVE_ACTIVITY",
           payload: {
             action: disbursementChannel === 'CASH'
-              ? `Décaissement en attente ${channelLabel}: ${montantDecaissement.toLocaleString()} FCFA pour ${clientName}`
+              ? `Décaissement en attente ${channelLabel}: ${montantDecaissement.toLocaleString()} ${currencySymbol()} pour ${clientName}`
               : estProgramme
-                ? `Décaissement programmé: ${montantDecaissement.toLocaleString()} FCFA → ${compteCourant.numeroCompte} (${dateDecaissement})`
-                : `Décaissement ${channelLabel}: ${montantDecaissement.toLocaleString()} FCFA → ${compteCourant.numeroCompte}`,
+                ? `Décaissement programmé: ${montantDecaissement.toLocaleString()} ${currencySymbol()} → ${compteCourant.numeroCompte} (${dateDecaissement})`
+                : `Décaissement ${channelLabel}: ${montantDecaissement.toLocaleString()} ${currencySymbol()} → ${compteCourant.numeroCompte}`,
             user: user?.nom || 'Système',
             type: 'credit',
             timestamp: new Date().toISOString()
@@ -721,7 +722,7 @@ export function registerFinanceRoutes(app: Express) {
           wsInstance.broadcastToAgency(userAgence, {
             type: "LIVE_ACTIVITY",
             payload: {
-              action: `Décaissement espèces effectué: ${parseFloat(result.credit.montant).toLocaleString()} FCFA - Crédit ${result.credit.numeroCredit} activé`,
+              action: `Décaissement espèces effectué: ${parseFloat(result.credit.montant).toLocaleString()} ${currencySymbol()} - Crédit ${result.credit.numeroCredit} activé`,
               user: user?.nom || 'Caissier',
               type: 'credit',
               timestamp: new Date().toISOString()
@@ -1235,7 +1236,7 @@ export function registerFinanceRoutes(app: Express) {
          wsInstance.broadcastToAgency(userAgence, {
            type: "LIVE_ACTIVITY",
            payload: {
-             action: `Nouveau crédit: ${Number(parsed.montantDemande || 0).toLocaleString()} FCFA`,
+             action: `Nouveau crédit: ${Number(parsed.montantDemande || 0).toLocaleString()} ${currencySymbol()}`,
              user: req.session.user?.nom || 'Système',
              type: 'credit',
              timestamp: new Date().toISOString()
@@ -1327,7 +1328,7 @@ export function registerFinanceRoutes(app: Express) {
             // 3. Update Demande Status (State Machine guard in storage layer)
             // Motif Rejet Update
             if (updateData.motifRejet) {
-                 updateData.motifRejet += ` (Remboursement de ${refundAmount} FCFA en attente)`;
+                 updateData.motifRejet += ` (Remboursement de ${refundAmount} ${currencySymbol()} en attente)`;
             }
 
             return await storage.updateDemandeCredit(id, updateData, tx);
@@ -1824,7 +1825,7 @@ export function registerFinanceRoutes(app: Express) {
               return res.json({
                   paymentPending: true,
                   paymentIntent: paymentIntent,
-                  message: `Veuillez confirmer le paiement de ${data.montant} FCFA sur votre téléphone ${provider}`
+                  message: `Veuillez confirmer le paiement de ${data.montant} ${currencySymbol()} sur votre téléphone ${provider}`
               });
           }
 
@@ -1953,7 +1954,7 @@ export function registerFinanceRoutes(app: Express) {
         clientId: client.id,
         montant,
         label: `Frais d'engagement - ${demande.numeroDemande}`,
-        description: `Frais de dossier crédit ${montant.toLocaleString('fr-FR')} FCFA pour ${client.nom} ${client.prenom || ''}`.trim(),
+        description: `Frais de dossier crédit ${montant.toLocaleString('fr-FR')} ${currencySymbol()} pour ${client.nom} ${client.prenom || ''}`.trim(),
         metadata: {
           numeroDemande: demande.numeroDemande,
           montantCredit: demande.montantDemande,
@@ -2093,7 +2094,7 @@ export function registerFinanceRoutes(app: Express) {
           wsInstance.broadcastToAgency(user.agence, {
             type: "LIVE_ACTIVITY",
             payload: {
-              action: `Demande remboursement créée: ${refundAmount.toLocaleString('fr-FR')} FCFA`,
+              action: `Demande remboursement créée: ${refundAmount.toLocaleString('fr-FR')} ${currencySymbol()}`,
               user: user.nom || 'Système',
               type: 'finance',
               timestamp: new Date().toISOString()
@@ -3532,7 +3533,7 @@ export function registerFinanceRoutes(app: Express) {
                         parsed.clientId,
                         points,
                         'EPARGNE',
-                        `Versement de ${parsed.montant} FCFA`,
+                        `Versement de ${parsed.montant} ${currencySymbol()}`,
                         Number(parsed.montant)
                     );
                     await storage.calculateEngagementScore(parsed.clientId);
@@ -4095,7 +4096,7 @@ export function registerFinanceRoutes(app: Express) {
               montant: Number(refundData.montantRemboursable),
               label: `Restitution frais dossier`,
               description: clientInfo
-                ? `Remboursement ${Number(refundData.montantRemboursable).toLocaleString('fr-FR')} FCFA à ${clientInfo.nom} ${clientInfo.prenom || ''}`.trim()
+                ? `Remboursement ${Number(refundData.montantRemboursable).toLocaleString('fr-FR')} ${currencySymbol()} à ${clientInfo.nom} ${clientInfo.prenom || ''}`.trim()
                 : undefined,
               metadata: {
                 demandeId: refundData.demandeId,

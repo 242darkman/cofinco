@@ -12,11 +12,11 @@ interface ProspectionListProps {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  REGISTERED: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-  INTERESTED: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-  REFUSED: 'bg-red-500/20 text-red-400 border-red-500/30',
-  TO_FOLLOW_UP: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-  CONVERTED_TO_CLIENT: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+  REGISTERED: 'bg-status-info-bg text-status-info border-status-info/30',
+  INTERESTED: 'bg-status-success-bg text-status-success border-status-success/30',
+  REFUSED: 'bg-status-danger-bg text-status-danger border-status-danger/30',
+  TO_FOLLOW_UP: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+  CONVERTED_TO_CLIENT: 'bg-status-info-bg text-status-info border-status-info/30',
 };
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50];
@@ -86,7 +86,7 @@ export default function ProspectionList({ agentId, onCreateNew }: ProspectionLis
   }, [loadProspects]);
 
   const getStatusBadge = (statut: string) => {
-    const colorClass = STATUS_COLORS[statut] || 'bg-slate-500/20 text-slate-400 border-slate-500/30';
+    const colorClass = STATUS_COLORS[statut] || 'bg-surface-subtle/40 text-content-muted border-edge-strong/30';
     const label = STATUT_PROSPECTION_LABELS[statut as StatutProspectionType] || statut;
     return (
       <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium border ${colorClass} uppercase tracking-wide`}>
@@ -116,15 +116,15 @@ export default function ProspectionList({ agentId, onCreateNew }: ProspectionLis
       {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h3 className="text-sm font-bold text-white flex items-center gap-2">
+          <h3 className="text-sm font-bold text-content-primary flex items-center gap-2">
             Prospects
-            <span className="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] font-normal text-slate-400 border border-slate-700">{total}</span>
+            <span className="px-1.5 py-0.5 rounded bg-surface text-[10px] font-normal text-content-muted border border-edge">{total}</span>
           </h3>
         </div>
         <div className="flex items-center gap-1.5">
           <button
             onClick={loadProspects}
-            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition"
+            className="p-1.5 text-content-muted hover:text-content-primary hover:bg-surface rounded-lg transition"
             title="Rafraîchir"
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
@@ -132,7 +132,7 @@ export default function ProspectionList({ agentId, onCreateNew }: ProspectionLis
           {onCreateNew && (
             <button
               onClick={onCreateNew}
-              className="flex items-center gap-1 px-2.5 py-1.5 bg-violet-600 hover:bg-violet-500 text-white rounded-lg text-xs font-bold uppercase tracking-wide transition shadow-sm hover:shadow"
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-accent hover:bg-accent text-white rounded-lg text-xs font-bold uppercase tracking-wide transition shadow-sm hover:shadow"
             >
               <UserPlus size={12} />
               <span className="hidden sm:inline">Nouveau</span>
@@ -144,18 +144,18 @@ export default function ProspectionList({ agentId, onCreateNew }: ProspectionLis
       {/* Search & Filters */}
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
-          <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+          <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-content-muted" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Rechercher par nom, prénom ou téléphone..."
-            className="w-full pl-8 pr-3 py-1.5 bg-slate-800/50 border border-slate-700/50 rounded-lg text-xs text-white placeholder:text-slate-500 focus:border-cyan-500/50 focus:bg-slate-800 focus:outline-none transition-all"
+            className="w-full pl-8 pr-3 py-1.5 bg-surface/50 border border-edge-subtle rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:border-accent/50 focus:bg-surface focus:outline-none transition-all"
           />
         </div>
         <button
           onClick={() => setShowFilters(!showFilters)}
-          className={`p-1.5 rounded-lg border transition ${showFilters ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400' : 'bg-slate-800/50 border-slate-700/50 text-slate-400 hover:text-white'}`}
+          className={`p-1.5 rounded-lg border transition ${showFilters ? 'bg-accent/10 border-accent/30 text-accent' : 'bg-surface/50 border-edge-subtle text-content-muted hover:text-content-primary'}`}
         >
           <Filter size={14} />
         </button>
@@ -163,13 +163,13 @@ export default function ProspectionList({ agentId, onCreateNew }: ProspectionLis
 
       {/* Filter Panel */}
       {showFilters && (
-        <div className="grid grid-cols-2 gap-2 p-2 bg-slate-800/50 rounded-lg border border-slate-700/50 animate-in slide-in-from-top-2 duration-200">
+        <div className="grid grid-cols-2 gap-2 p-2 bg-surface/50 rounded-lg border border-edge-subtle animate-in slide-in-from-top-2 duration-200">
           <div>
-            <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Statut</label>
+            <label className="block text-[9px] font-bold text-content-muted uppercase mb-1">Statut</label>
             <select
               value={filterStatut}
               onChange={(e) => { setFilterStatut(e.target.value); setPage(1); }}
-              className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded text-xs text-white focus:border-cyan-500 focus:outline-none"
+              className="w-full px-2 py-1.5 bg-surface-base border border-edge rounded text-xs text-content-primary focus:border-accent focus:outline-none"
             >
               <option value="">Tous</option>
               {STATUT_PROSPECTION_OPTIONS.map(opt => (
@@ -178,11 +178,11 @@ export default function ProspectionList({ agentId, onCreateNew }: ProspectionLis
             </select>
           </div>
           <div>
-            <label className="block text-[9px] font-bold text-slate-500 uppercase mb-1">Arrondissement</label>
+            <label className="block text-[9px] font-bold text-content-muted uppercase mb-1">Arrondissement</label>
             <select
               value={filterArrondissement}
               onChange={(e) => { setFilterArrondissement(e.target.value); setPage(1); }}
-              className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded text-xs text-white focus:border-cyan-500 focus:outline-none"
+              className="w-full px-2 py-1.5 bg-surface-base border border-edge rounded text-xs text-content-primary focus:border-accent focus:outline-none"
             >
               <option value="">Tous</option>
               {arrondissements.map((a: any) => (
@@ -196,11 +196,11 @@ export default function ProspectionList({ agentId, onCreateNew }: ProspectionLis
       {/* List */}
       {loading ? (
         <div className="flex items-center justify-center py-8">
-          <Loader2 size={20} className="animate-spin text-cyan-500" />
+          <Loader2 size={20} className="animate-spin text-accent" />
         </div>
       ) : prospects.length === 0 ? (
-        <div className="text-center py-8 bg-slate-800/30 rounded-lg border border-slate-800 border-dashed">
-            <p className="text-xs text-slate-500">
+        <div className="text-center py-8 bg-surface/30 rounded-lg border border-edge border-dashed">
+            <p className="text-xs text-content-muted">
               {debouncedSearch ? `Aucun résultat pour "${debouncedSearch}"` : 'Aucun prospect trouvé'}
             </p>
         </div>
@@ -210,21 +210,21 @@ export default function ProspectionList({ agentId, onCreateNew }: ProspectionLis
             <div
               key={prospect.id}
               onClick={() => setSelectedProspectId(prospect.id)}
-              className="p-2.5 bg-slate-800/40 border border-slate-700/30 rounded-lg hover:bg-slate-800 hover:border-slate-600 cursor-pointer transition-all group"
+              className="p-2.5 bg-surface/40 border border-edge-subtle rounded-lg hover:bg-surface hover:border-edge-strong cursor-pointer transition-all group"
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-sm font-semibold text-slate-200 truncate group-hover:text-white transition-colors">
+                    <span className="text-sm font-semibold text-content-secondary truncate group-hover:text-content-primary transition-colors">
                       {[prospect.nom_prospect || prospect.nomProspect, prospect.prenom_prospect || prospect.prenomProspect].filter(Boolean).join(' ')}
                     </span>
                     {getStatusBadge(prospect.statut)}
                   </div>
-                  <div className="flex items-center gap-2 text-[10px] text-slate-500">
+                  <div className="flex items-center gap-2 text-[10px] text-content-muted">
                     <span className="font-mono">{prospect.telephoneProspect}</span>
                     {(prospect.arrondissementNom || prospect.marcheNom) && (
                         <>
-                            <span className="w-0.5 h-0.5 rounded-full bg-slate-600" />
+                            <span className="w-0.5 h-0.5 rounded-full bg-surface-subtle" />
                             <span className="truncate max-w-[150px]">
                                 {[prospect.arrondissementNom, prospect.marcheNom].filter(Boolean).join(' - ')}
                             </span>
@@ -232,7 +232,7 @@ export default function ProspectionList({ agentId, onCreateNew }: ProspectionLis
                     )}
                   </div>
                 </div>
-                <Eye size={14} className="text-slate-600 group-hover:text-cyan-400 transition-colors flex-shrink-0" />
+                <Eye size={14} className="text-content-muted group-hover:text-accent transition-colors flex-shrink-0" />
               </div>
             </div>
           ))}
@@ -241,9 +241,9 @@ export default function ProspectionList({ agentId, onCreateNew }: ProspectionLis
 
       {/* Pagination */}
       {total > 0 && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-2 border-t border-slate-800/50">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-2 border-t border-edge/50">
           {/* Left: Info + Per Page */}
-          <div className="flex items-center gap-3 text-[11px] text-slate-500 w-full sm:w-auto justify-between sm:justify-start">
+          <div className="flex items-center gap-3 text-[11px] text-content-muted w-full sm:w-auto justify-between sm:justify-start">
             <span>
               {rangeStart}-{rangeEnd} sur {total}
             </span>
@@ -252,7 +252,7 @@ export default function ProspectionList({ agentId, onCreateNew }: ProspectionLis
               <select
                 value={perPage}
                 onChange={(e) => { setPerPage(Number(e.target.value)); setPage(1); }}
-                className="bg-slate-800 border border-slate-700 rounded px-1.5 py-0.5 text-[11px] text-white focus:border-cyan-500 focus:outline-none"
+                className="bg-surface border border-edge rounded px-1.5 py-0.5 text-[11px] text-content-primary focus:border-accent focus:outline-none"
               >
                 {PAGE_SIZE_OPTIONS.map(n => (
                   <option key={n} value={n}>{n}</option>
@@ -267,7 +267,7 @@ export default function ProspectionList({ agentId, onCreateNew }: ProspectionLis
               <button
                 onClick={() => setPage(1)}
                 disabled={page === 1}
-                className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:pointer-events-none transition"
+                className="p-1 rounded text-content-muted hover:text-content-primary hover:bg-surface disabled:opacity-30 disabled:pointer-events-none transition"
                 title="Première page"
               >
                 <ChevronsLeft size={14} />
@@ -275,7 +275,7 @@ export default function ProspectionList({ agentId, onCreateNew }: ProspectionLis
               <button
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page === 1}
-                className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:pointer-events-none transition"
+                className="p-1 rounded text-content-muted hover:text-content-primary hover:bg-surface disabled:opacity-30 disabled:pointer-events-none transition"
                 title="Page précédente"
               >
                 <ChevronLeft size={14} />
@@ -285,15 +285,15 @@ export default function ProspectionList({ agentId, onCreateNew }: ProspectionLis
               <div className="hidden sm:flex items-center gap-0.5 mx-1">
                 {getPageNumbers().map((p, i) =>
                   p === 'ellipsis' ? (
-                    <span key={`e-${i}`} className="w-7 text-center text-[11px] text-slate-600">...</span>
+                    <span key={`e-${i}`} className="w-7 text-center text-[11px] text-content-muted">...</span>
                   ) : (
                     <button
                       key={p}
                       onClick={() => setPage(p)}
                       className={`w-7 h-7 rounded text-[11px] font-bold transition ${
                         p === page
-                          ? 'bg-cyan-600 text-white shadow-sm'
-                          : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                          ? 'bg-accent-secondary text-content-primary shadow-sm'
+                          : 'text-content-muted hover:bg-surface hover:text-content-primary'
                       }`}
                     >
                       {p}
@@ -303,14 +303,14 @@ export default function ProspectionList({ agentId, onCreateNew }: ProspectionLis
               </div>
 
               {/* Mobile: simple page indicator */}
-              <span className="sm:hidden text-[11px] text-slate-400 mx-2 font-medium">
+              <span className="sm:hidden text-[11px] text-content-muted mx-2 font-medium">
                 {page}/{totalPages}
               </span>
 
               <button
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
-                className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:pointer-events-none transition"
+                className="p-1 rounded text-content-muted hover:text-content-primary hover:bg-surface disabled:opacity-30 disabled:pointer-events-none transition"
                 title="Page suivante"
               >
                 <ChevronRight size={14} />
@@ -318,7 +318,7 @@ export default function ProspectionList({ agentId, onCreateNew }: ProspectionLis
               <button
                 onClick={() => setPage(totalPages)}
                 disabled={page === totalPages}
-                className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 disabled:opacity-30 disabled:pointer-events-none transition"
+                className="p-1 rounded text-content-muted hover:text-content-primary hover:bg-surface disabled:opacity-30 disabled:pointer-events-none transition"
                 title="Dernière page"
               >
                 <ChevronsRight size={14} />

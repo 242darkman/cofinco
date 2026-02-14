@@ -102,21 +102,21 @@ export default function CaisseOperatingHoursModal({ isOpen, onClose, caisse }: C
       <div className="p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-blue-500/20 rounded-xl">
-            <Clock className="w-5 h-5 text-blue-400" />
+          <div className="p-2.5 bg-status-info-bg rounded-xl">
+            <Clock className="w-5 h-5 text-status-info" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-white">Horaires d'accès</h2>
-            <p className="text-sm text-slate-400">{caisse.nom}</p>
+            <h2 className="text-lg font-semibold text-content-primary">Horaires d'accès</h2>
+            <p className="text-sm text-content-muted">{caisse.nom}</p>
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Enable/Disable Toggle */}
-          <div className="flex items-center justify-between p-4 bg-slate-800/50 rounded-xl border border-slate-700/50">
+          <div className="flex items-center justify-between p-4 bg-surface/50 rounded-xl border border-edge-subtle">
             <div>
-              <div className="text-sm font-medium text-white">Contrôle des horaires</div>
-              <div className="text-xs text-slate-400 mt-0.5">
+              <div className="text-sm font-medium text-content-primary">Contrôle des horaires</div>
+              <div className="text-xs text-content-muted mt-0.5">
                 {enabled
                   ? 'Les utilisateurs doivent se connecter pendant les heures autorisées'
                   : 'La caisse est accessible à tout moment'
@@ -127,7 +127,7 @@ export default function CaisseOperatingHoursModal({ isOpen, onClose, caisse }: C
               type="button"
               onClick={() => setEnabled(!enabled)}
               className={`relative w-12 h-6 rounded-full transition-colors ${
-                enabled ? 'bg-blue-500' : 'bg-slate-600'
+                enabled ? 'bg-status-info' : 'bg-surface-subtle'
               }`}
             >
               <span
@@ -143,32 +143,32 @@ export default function CaisseOperatingHoursModal({ isOpen, onClose, caisse }: C
               {/* Time Range */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-slate-400 uppercase tracking-wide">
+                  <label className="text-xs font-medium text-content-muted uppercase tracking-wide">
                     Heure d'ouverture
                   </label>
                   <input
                     type="time"
                     value={startTime}
                     onChange={(e) => setStartTime(e.target.value)}
-                    className="w-full px-3 py-2.5 bg-slate-800/50 border border-slate-700/50 rounded-xl text-white text-sm focus:outline-none focus:border-blue-500"
+                    className="w-full px-3 py-2.5 bg-surface/50 border border-edge-subtle rounded-xl text-content-primary text-sm focus:outline-none focus:border-status-info"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-slate-400 uppercase tracking-wide">
+                  <label className="text-xs font-medium text-content-muted uppercase tracking-wide">
                     Heure de fermeture
                   </label>
                   <input
                     type="time"
                     value={endTime}
                     onChange={(e) => setEndTime(e.target.value)}
-                    className="w-full px-3 py-2.5 bg-slate-800/50 border border-slate-700/50 rounded-xl text-white text-sm focus:outline-none focus:border-blue-500"
+                    className="w-full px-3 py-2.5 bg-surface/50 border border-edge-subtle rounded-xl text-content-primary text-sm focus:outline-none focus:border-status-info"
                   />
                 </div>
               </div>
 
               {/* Days of Week */}
               <div className="space-y-2">
-                <label className="flex items-center gap-2 text-xs font-medium text-slate-400 uppercase tracking-wide">
+                <label className="flex items-center gap-2 text-xs font-medium text-content-muted uppercase tracking-wide">
                   <Calendar className="w-3.5 h-3.5" />
                   Jours d'ouverture
                 </label>
@@ -180,15 +180,15 @@ export default function CaisseOperatingHoursModal({ isOpen, onClose, caisse }: C
                       onClick={() => handleDayToggle(day.value)}
                       className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
                         selectedDays.includes(day.value)
-                          ? 'bg-blue-500 text-white shadow-sm shadow-blue-500/30'
-                          : 'bg-slate-800/50 text-slate-400 border border-slate-700/50 hover:border-slate-600'
+                          ? 'bg-status-info text-white shadow-sm shadow-status-info/30'
+                          : 'bg-surface/50 text-content-muted border border-edge-subtle hover:border-edge-strong'
                       }`}
                     >
                       {day.short}
                     </button>
                   ))}
                 </div>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-content-muted">
                   {selectedDays.length === 0
                     ? 'Aucun jour sélectionné'
                     : `${selectedDays.length} jour${selectedDays.length > 1 ? 's' : ''} sélectionné${selectedDays.length > 1 ? 's' : ''}`
@@ -197,11 +197,11 @@ export default function CaisseOperatingHoursModal({ isOpen, onClose, caisse }: C
               </div>
 
               {/* Info Banner */}
-              <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4">
+              <div className="bg-status-warning-bg border border-status-warning/30 rounded-xl p-4">
                 <div className="flex gap-3">
-                  <Clock className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                  <div className="text-sm text-amber-200/80">
-                    <p className="font-medium text-amber-300">Important</p>
+                  <Clock className="w-4 h-4 text-status-warning shrink-0 mt-0.5" />
+                  <div className="text-sm text-status-warning-text/80">
+                    <p className="font-medium text-status-warning">Important</p>
                     <p className="mt-1">
                       Hors des heures autorisées, les utilisateurs devront entrer un code de sécurité
                       pour accéder à la caisse. Les codes sont générés par les administrateurs ou chefs d'agence.
@@ -213,12 +213,12 @@ export default function CaisseOperatingHoursModal({ isOpen, onClose, caisse }: C
           )}
 
           {/* Actions */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-700/50">
+          <div className="flex justify-end gap-3 pt-4 border-t border-edge-subtle">
             <Button
               type="button"
               variant="ghost"
               onClick={onClose}
-              className="text-slate-400"
+              className="text-content-muted"
             >
               <X className="w-4 h-4 mr-1.5" />
               Annuler
@@ -226,7 +226,7 @@ export default function CaisseOperatingHoursModal({ isOpen, onClose, caisse }: C
             <Button
               type="submit"
               isLoading={updateMutation.isPending}
-              className="bg-blue-500 hover:bg-blue-600"
+              className="bg-status-info hover:bg-status-info"
             >
               <Save className="w-4 h-4 mr-1.5" />
               Enregistrer

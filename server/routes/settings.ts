@@ -51,7 +51,7 @@ export function registerSettingsRoutes(app: Express) {
       if (!result) {
         // Return defaults if no settings exist
         return res.json({
-          agence_name: 'COFIN&CO-M',
+          app_name: 'COFIN&CO-M',
           agence_code: 'COF001',
           devise: getActiveCurrency().code,
           pays: 'République du Congo',
@@ -72,7 +72,7 @@ export function registerSettingsRoutes(app: Express) {
       }
 
       res.json({
-        agence_name: result.agenceName,
+        app_name: result.appName,
         agence_code: result.agenceCode,
         devise: result.devise,
         pays: result.pays,

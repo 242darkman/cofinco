@@ -154,14 +154,14 @@ export default function CreateEvacuationDialog({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <div className="bg-surface-base border border-edge rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-800">
+        <div className="flex items-center justify-between p-4 border-b border-edge">
           <div className="flex items-center gap-2">
-            <Vault size={16} className="text-blue-400" />
-            <h2 className="text-sm font-semibold text-white">Nouvelle évacuation de coffre</h2>
+            <Vault size={16} className="text-status-info" />
+            <h2 className="text-sm font-semibold text-content-primary">Nouvelle évacuation de coffre</h2>
           </div>
-          <button onClick={onClose} className="p-1 text-slate-400 hover:text-white transition">
+          <button onClick={onClose} className="p-1 text-content-muted hover:text-content-primary transition">
             <X size={16} />
           </button>
         </div>
@@ -169,13 +169,13 @@ export default function CreateEvacuationDialog({
         <div className="p-4 space-y-4">
           {/* Coffre source */}
           <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">
+            <label className="block text-[10px] font-bold text-content-muted uppercase tracking-widest mb-1.5">
               Coffre source
             </label>
             <select
               value={coffreSourceId}
               onChange={(e) => setCoffreSourceId(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-blue-500/50"
+              className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-xs text-content-primary focus:outline-none focus:border-status-info/50"
             >
               <option value="">Sélectionner un coffre...</option>
               {activeCoffres.map(c => (
@@ -184,12 +184,12 @@ export default function CreateEvacuationDialog({
                 </option>
               ))}
             </select>
-            {errors.coffreSourceId && <p className="text-[10px] text-red-400 mt-1">{errors.coffreSourceId}</p>}
+            {errors.coffreSourceId && <p className="text-[10px] text-status-danger mt-1">{errors.coffreSourceId}</p>}
           </div>
 
           {/* Montant */}
           <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">
+            <label className="block text-[10px] font-bold text-content-muted uppercase tracking-widest mb-1.5">
               Montant (FCFA)
             </label>
             <input
@@ -198,22 +198,22 @@ export default function CreateEvacuationDialog({
               onChange={(e) => setMontant(e.target.value)}
               placeholder="0"
               min={1}
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500/50"
+              className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-status-info/50"
             />
             {coffreSource && montant && (
-              <p className="text-[10px] text-slate-500 mt-1">
+              <p className="text-[10px] text-content-muted mt-1">
                 Solde disponible: {formatMoney(coffreSource.solde)}
                 {Number(montant) > Number(coffreSource.solde) && (
-                  <span className="text-red-400 ml-1">— Insuffisant</span>
+                  <span className="text-status-danger ml-1">— Insuffisant</span>
                 )}
               </p>
             )}
-            {errors.montant && <p className="text-[10px] text-red-400 mt-1">{errors.montant}</p>}
+            {errors.montant && <p className="text-[10px] text-status-danger mt-1">{errors.montant}</p>}
           </div>
 
           {/* Type destination */}
           <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">
+            <label className="block text-[10px] font-bold text-content-muted uppercase tracking-widest mb-1.5">
               Type de destination
             </label>
             <div className="grid grid-cols-3 gap-2">
@@ -228,8 +228,8 @@ export default function CreateEvacuationDialog({
                   onClick={() => setTypeDestination(opt.value)}
                   className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border text-xs transition ${
                     typeDestination === opt.value
-                      ? 'border-blue-500/50 bg-blue-500/10 text-blue-400'
-                      : 'border-slate-700 bg-slate-800/50 text-slate-400 hover:border-slate-600'
+                      ? 'border-status-info/50 bg-status-info-bg text-status-info'
+                      : 'border-edge bg-surface/50 text-content-muted hover:border-edge-strong'
                   }`}
                 >
                   <opt.icon size={16} />
@@ -241,49 +241,49 @@ export default function CreateEvacuationDialog({
 
           {/* Destination-specific fields */}
           {typeDestination === TypeDestinationEvacuation.BANQUE && (
-            <div className="space-y-3 p-3 bg-slate-800/30 border border-slate-700/40 rounded-lg">
+            <div className="space-y-3 p-3 bg-surface/30 border border-edge/40 rounded-lg">
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 mb-1">Nom de la banque</label>
+                <label className="block text-[10px] font-bold text-content-muted mb-1">Nom de la banque</label>
                 <input
                   type="text"
                   value={banqueNom}
                   onChange={(e) => setBanqueNom(e.target.value)}
                   placeholder="Ex: BGFI Bank, Afriland First Bank..."
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500/50"
+                  className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-status-info/50"
                 />
-                {errors.banqueNom && <p className="text-[10px] text-red-400 mt-1">{errors.banqueNom}</p>}
+                {errors.banqueNom && <p className="text-[10px] text-status-danger mt-1">{errors.banqueNom}</p>}
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 mb-1">Numéro de compte</label>
+                <label className="block text-[10px] font-bold text-content-muted mb-1">Numéro de compte</label>
                 <input
                   type="text"
                   value={banqueCompte}
                   onChange={(e) => setBanqueCompte(e.target.value)}
                   placeholder="Numéro de compte bancaire"
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500/50"
+                  className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-status-info/50"
                 />
-                {errors.banqueCompte && <p className="text-[10px] text-red-400 mt-1">{errors.banqueCompte}</p>}
+                {errors.banqueCompte && <p className="text-[10px] text-status-danger mt-1">{errors.banqueCompte}</p>}
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 mb-1">N° comptable (GL)</label>
+                <label className="block text-[10px] font-bold text-content-muted mb-1">N° comptable (GL)</label>
                 <input
                   type="text"
                   value={banqueNumeroComptable}
                   onChange={(e) => setBanqueNumeroComptable(e.target.value)}
                   placeholder="512"
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500/50"
+                  className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-status-info/50"
                 />
               </div>
             </div>
           )}
 
           {typeDestination === TypeDestinationEvacuation.COFFRE_CENTRAL && (
-            <div className="p-3 bg-slate-800/30 border border-slate-700/40 rounded-lg">
-              <label className="block text-[10px] font-bold text-slate-500 mb-1">Coffre destination</label>
+            <div className="p-3 bg-surface/30 border border-edge/40 rounded-lg">
+              <label className="block text-[10px] font-bold text-content-muted mb-1">Coffre destination</label>
               <select
                 value={coffreDestinationId}
                 onChange={(e) => setCoffreDestinationId(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-blue-500/50"
+                className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-xs text-content-primary focus:outline-none focus:border-status-info/50"
               >
                 <option value="">Sélectionner un coffre...</option>
                 {destinationCoffres.map(c => (
@@ -292,42 +292,42 @@ export default function CreateEvacuationDialog({
                   </option>
                 ))}
               </select>
-              {errors.coffreDestinationId && <p className="text-[10px] text-red-400 mt-1">{errors.coffreDestinationId}</p>}
+              {errors.coffreDestinationId && <p className="text-[10px] text-status-danger mt-1">{errors.coffreDestinationId}</p>}
             </div>
           )}
 
           {typeDestination === TypeDestinationEvacuation.TRANSPORTEUR && (
-            <div className="space-y-3 p-3 bg-slate-800/30 border border-slate-700/40 rounded-lg">
+            <div className="space-y-3 p-3 bg-surface/30 border border-edge/40 rounded-lg">
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 mb-1">Nom du transporteur</label>
+                <label className="block text-[10px] font-bold text-content-muted mb-1">Nom du transporteur</label>
                 <input
                   type="text"
                   value={transporteurNom}
                   onChange={(e) => setTransporteurNom(e.target.value)}
                   placeholder="Ex: Brinks, Prosegur..."
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500/50"
+                  className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-status-info/50"
                 />
-                {errors.transporteurNom && <p className="text-[10px] text-red-400 mt-1">{errors.transporteurNom}</p>}
+                {errors.transporteurNom && <p className="text-[10px] text-status-danger mt-1">{errors.transporteurNom}</p>}
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 mb-1">Contact</label>
+                <label className="block text-[10px] font-bold text-content-muted mb-1">Contact</label>
                 <input
                   type="text"
                   value={transporteurContact}
                   onChange={(e) => setTransporteurContact(e.target.value)}
                   placeholder="Numéro ou email"
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500/50"
+                  className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-status-info/50"
                 />
-                {errors.transporteurContact && <p className="text-[10px] text-red-400 mt-1">{errors.transporteurContact}</p>}
+                {errors.transporteurContact && <p className="text-[10px] text-status-danger mt-1">{errors.transporteurContact}</p>}
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-slate-500 mb-1">Référence contrat (optionnel)</label>
+                <label className="block text-[10px] font-bold text-content-muted mb-1">Référence contrat (optionnel)</label>
                 <input
                   type="text"
                   value={transporteurReference}
                   onChange={(e) => setTransporteurReference(e.target.value)}
                   placeholder="N° contrat ou référence"
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500/50"
+                  className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-status-info/50"
                 />
               </div>
             </div>
@@ -335,13 +335,13 @@ export default function CreateEvacuationDialog({
 
           {/* Motif */}
           <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">
+            <label className="block text-[10px] font-bold text-content-muted uppercase tracking-widest mb-1.5">
               Motif d'évacuation
             </label>
             <select
               value={motifEvacuation}
               onChange={(e) => setMotifEvacuation(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-blue-500/50"
+              className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-xs text-content-primary focus:outline-none focus:border-status-info/50"
             >
               {Object.entries(MOTIF_EVACUATION_LABELS).map(([key, label]) => (
                 <option key={key} value={key}>{label}</option>
@@ -351,7 +351,7 @@ export default function CreateEvacuationDialog({
 
           {/* Motif detail */}
           <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1.5">
+            <label className="block text-[10px] font-bold text-content-muted uppercase tracking-widest mb-1.5">
               Détails / Justification
             </label>
             <textarea
@@ -359,15 +359,15 @@ export default function CreateEvacuationDialog({
               onChange={(e) => setMotifDetail(e.target.value)}
               placeholder="Décrivez la raison de cette évacuation (min 10 caractères)..."
               rows={3}
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-blue-500/50 resize-none"
+              className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-status-info/50 resize-none"
             />
-            <p className="text-[10px] text-slate-600 mt-1">{motifDetail.length}/10 caractères minimum</p>
-            {errors.motifDetail && <p className="text-[10px] text-red-400 mt-1">{errors.motifDetail}</p>}
+            <p className="text-[10px] text-content-muted mt-1">{motifDetail.length}/10 caractères minimum</p>
+            {errors.motifDetail && <p className="text-[10px] text-status-danger mt-1">{errors.motifDetail}</p>}
           </div>
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between gap-2 p-4 border-t border-slate-800">
+        <div className="flex items-center justify-between gap-2 p-4 border-t border-edge">
           <Button variant="ghost" size="sm" onClick={onClose} disabled={loading}>
             Annuler
           </Button>

@@ -278,44 +278,44 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
 
   const typeColor = (type: string) => {
     switch (type) {
-      case 'Visite': return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
-      case 'Collecte': return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
-      case 'Formation': return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
-      case 'Prospection': return 'bg-violet-500/20 text-violet-400 border-violet-500/30';
-      case 'Reunion': return 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30';
-      case 'Conge': return 'bg-slate-500/20 text-slate-400 border-slate-500/30';
-      default: return 'bg-slate-500/20 text-slate-400 border-slate-500/30';
+      case 'Visite': return 'bg-status-info-bg text-status-info border-status-info/30';
+      case 'Collecte': return 'bg-status-success-bg text-status-success border-status-success/30';
+      case 'Formation': return 'bg-status-warning-bg text-status-warning border-status-warning/30';
+      case 'Prospection': return 'bg-accent/10 text-accent border-accent/30';
+      case 'Reunion': return 'bg-accent/10 text-accent border-accent/30';
+      case 'Conge': return 'bg-surface-subtle/40 text-content-muted border-edge-strong/30';
+      default: return 'bg-surface-subtle/40 text-content-muted border-edge-strong/30';
     }
   };
 
   const typeDot = (type: string) => {
     switch (type) {
-      case 'Visite': return 'bg-blue-500';
-      case 'Collecte': return 'bg-emerald-500';
-      case 'Formation': return 'bg-amber-500';
-      case 'Prospection': return 'bg-violet-500';
-      case 'Reunion': return 'bg-cyan-500';
-      default: return 'bg-slate-500';
+      case 'Visite': return 'bg-status-info';
+      case 'Collecte': return 'bg-status-success';
+      case 'Formation': return 'bg-status-warning';
+      case 'Prospection': return 'bg-accent';
+      case 'Reunion': return 'bg-accent';
+      default: return 'bg-surface-muted0';
     }
   };
 
   return (
     <div className="space-y-3">
       {/* TOOLBAR COMPACT */}
-      <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center justify-between bg-slate-900/50 p-2 rounded-xl border border-slate-800">
+      <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center justify-between bg-surface-base/50 p-2 rounded-xl border border-edge">
         <div className="flex items-center gap-2 w-full sm:w-auto">
           {/* View toggle */}
-          <div className="flex bg-slate-800 rounded-lg p-0.5 border border-slate-700 shrink-0">
+          <div className="flex bg-surface rounded-lg p-0.5 border border-edge shrink-0">
             <button
               onClick={() => setViewMode('list')}
-              className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-cyan-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+              className={`p-1.5 rounded-md transition-all ${viewMode === 'list' ? 'bg-accent-secondary text-content-primary shadow' : 'text-content-muted hover:text-content-primary'}`}
               title="Vue liste"
             >
               <List size={14} />
             </button>
             <button
               onClick={() => setViewMode('calendar')}
-              className={`p-1.5 rounded-md transition-all ${viewMode === 'calendar' ? 'bg-cyan-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+              className={`p-1.5 rounded-md transition-all ${viewMode === 'calendar' ? 'bg-accent-secondary text-content-primary shadow' : 'text-content-muted hover:text-content-primary'}`}
               title="Vue calendrier"
             >
               <Grid3X3 size={14} />
@@ -327,7 +327,7 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="px-2 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs focus:outline-none focus:ring-1 focus:ring-cyan-500 w-full sm:w-auto"
+              className="px-2 py-1.5 bg-surface border border-edge rounded-lg text-content-primary text-xs focus:outline-none focus:ring-1 focus:ring-accent w-full sm:w-auto"
             />
           )}
 
@@ -335,19 +335,19 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
             <div className="flex items-center gap-1 w-full sm:w-auto justify-center sm:justify-start">
               <button
                 onClick={() => setWeekOffset(prev => prev - 1)}
-                className="p-1.5 bg-slate-800 border border-slate-700 rounded-lg text-slate-400 hover:text-white transition"
+                className="p-1.5 bg-surface border border-edge rounded-lg text-content-muted hover:text-content-primary transition"
               >
                 <ChevronLeft size={14} />
               </button>
               <button
                 onClick={() => setWeekOffset(0)}
-                className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-[10px] font-bold text-slate-300 hover:text-white transition uppercase tracking-wider"
+                className="px-3 py-1.5 bg-surface border border-edge rounded-lg text-[10px] font-bold text-content-secondary hover:text-content-primary transition uppercase tracking-wider"
               >
                 Aujourd'hui
               </button>
               <button
                 onClick={() => setWeekOffset(prev => prev + 1)}
-                className="p-1.5 bg-slate-800 border border-slate-700 rounded-lg text-slate-400 hover:text-white transition"
+                className="p-1.5 bg-surface border border-edge rounded-lg text-content-muted hover:text-content-primary transition"
               >
                 <ChevronRight size={14} />
               </button>
@@ -357,7 +357,7 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
 
         <button
           onClick={() => setShowForm(!showForm)}
-          className="w-full sm:w-auto px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg flex items-center justify-center gap-1.5 text-xs font-bold transition shadow-lg shadow-cyan-900/20"
+          className="w-full sm:w-auto px-3 py-1.5 bg-accent-secondary hover:bg-accent-secondary-hover text-content-primary rounded-lg flex items-center justify-center gap-1.5 text-xs font-bold transition shadow-lg shadow-accent/20"
         >
           <Plus size={14} />
           Nouveau
@@ -366,9 +366,9 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
 
       {/* CREATION FORM COMPACT */}
       {showForm && (
-        <div className="bg-slate-800/80 rounded-xl p-4 border border-slate-700 animate-in slide-in-from-top-2 backdrop-blur-sm">
-          <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
-            <Clock size={16} className="text-cyan-400" />
+        <div className="bg-surface/80 rounded-xl p-4 border border-edge animate-in slide-in-from-top-2 backdrop-blur-sm">
+          <h3 className="text-sm font-bold text-content-primary mb-3 flex items-center gap-2">
+            <Clock size={16} className="text-accent" />
             Nouveau Planning
           </h3>
           <form onSubmit={handleSubmit} className="space-y-3">
@@ -376,11 +376,11 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
                <FormInput label="Date" type="date" value={formData.date_planning} onChange={v => setFormData({...formData, date_planning: v})} required />
                
                <div>
-                <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Type</label>
+                <label className="block text-[10px] uppercase font-bold text-content-muted mb-1">Type</label>
                 <select
                   value={formData.type_activite}
                   onChange={(e) => setFormData({ ...formData, type_activite: e.target.value })}
-                  className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white text-xs"
+                  className="w-full px-2 py-1.5 bg-surface-base border border-edge rounded-lg text-content-primary text-xs"
                 >
                   {['Visite', 'Collecte', 'Formation', 'Conge', 'Reunion', 'Prospection'].map(t => (
                       <option key={t} value={t}>{t}</option>
@@ -396,22 +396,22 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
                </div>
                
                <div className="col-span-2">
-                   <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">Notes</label>
-                   <input type="text" value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white text-xs" />
+                   <label className="block text-[10px] uppercase font-bold text-content-muted mb-1">Notes</label>
+                   <input type="text" value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} className="w-full px-2 py-1.5 bg-surface-base border border-edge rounded-lg text-content-primary text-xs" />
                </div>
             </div>
 
              {/* Recurrence Compact */}
-             <div className="bg-slate-900/50 border border-slate-800 rounded-lg p-3">
+             <div className="bg-surface-base/50 border border-edge rounded-lg p-3">
                 <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-400">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-content-muted">
                         <Repeat size={14} />
                         Répétition
                     </div>
                     <select
                         value={recurrence.type}
                         onChange={(e) => setRecurrence({ ...recurrence, type: e.target.value as any })}
-                        className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-white text-xs"
+                        className="px-2 py-1 bg-surface border border-edge rounded text-content-primary text-xs"
                     >
                         <option value="none">Aucune</option>
                         <option value="daily">Quotidien</option>
@@ -424,7 +424,7 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
                         type="date"
                         value={recurrence.endDate}
                         onChange={(e) => setRecurrence({ ...recurrence, endDate: e.target.value })}
-                        className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-white text-xs"
+                        className="px-2 py-1 bg-surface border border-edge rounded text-content-primary text-xs"
                         required
                         />
                     )}
@@ -433,13 +433,13 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
 
             {/* Conflict Warning */}
             {conflicts.length > 0 && (
-              <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 flex items-start justify-between gap-3">
+              <div className="bg-status-warning-bg border border-status-warning/30 rounded-lg p-3 flex items-start justify-between gap-3">
                 <div>
-                    <div className="flex items-center gap-2 text-amber-400 font-bold text-xs mb-1">
+                    <div className="flex items-center gap-2 text-status-warning font-bold text-xs mb-1">
                         <AlertTriangle size={14} />
                         {conflicts.length} conflit(s) détecté(s)
                     </div>
-                    <div className="text-[10px] text-slate-400">
+                    <div className="text-[10px] text-content-muted">
                         {conflicts.slice(0, 2).map((c, i) => (
                              <span key={i} className="block">{c.date} - {c.conflicts.length} activités</span>
                         ))}
@@ -448,16 +448,16 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
                 <button
                   type="button"
                   onClick={(e) => { setForceCreate(true); handleSubmit(e as any, true); }}
-                  className="px-2 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded text-[10px] font-bold transition"
+                  className="px-2 py-1 bg-status-warning hover:bg-status-warning text-white rounded text-[10px] font-bold transition"
                 >
                   Forcer
                 </button>
               </div>
             )}
 
-            <div className="flex gap-2 justify-end pt-2 border-t border-slate-700/50">
-              <button type="button" onClick={() => setShowForm(false)} className="px-3 py-1.5 text-slate-400 hover:text-white text-xs font-medium">Annuler</button>
-              <button type="submit" disabled={loading} className="px-4 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-bold text-xs transition shadow-lg shadow-cyan-900/20">Enregistrer</button>
+            <div className="flex gap-2 justify-end pt-2 border-t border-edge-subtle">
+              <button type="button" onClick={() => setShowForm(false)} className="px-3 py-1.5 text-content-muted hover:text-content-primary text-xs font-medium">Annuler</button>
+              <button type="submit" disabled={loading} className="px-4 py-1.5 bg-accent-secondary hover:bg-accent-secondary-hover text-content-primary rounded-lg font-bold text-xs transition shadow-lg shadow-accent/20">Enregistrer</button>
             </div>
           </form>
         </div>
@@ -465,32 +465,32 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
 
       {/* ═══ LIST VIEW ═══ */}
       {viewMode === 'list' && (
-        <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden min-h-[300px]">
-          <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between bg-slate-900/30">
+        <div className="bg-surface rounded-xl border border-edge overflow-hidden min-h-[300px]">
+          <div className="px-4 py-3 border-b border-edge flex items-center justify-between bg-surface-base/30">
              <div className="flex items-center gap-2">
-                <Calendar size={16} className="text-cyan-400" />
-                <h3 className="text-sm font-bold text-white capitalize">
+                <Calendar size={16} className="text-accent" />
+                <h3 className="text-sm font-bold text-content-primary capitalize">
                 {new Date(selectedDate).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
                 </h3>
              </div>
-             <span className="text-xs text-slate-500 font-medium">
+             <span className="text-xs text-content-muted font-medium">
                {allListItems.length} activité{allListItems.length > 1 ? 's' : ''}
              </span>
           </div>
           <div className="p-3 space-y-3">
             {loading ? (
-              <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-cyan-500" /></div>
+              <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent" /></div>
             ) : allListItems.length === 0 ? (
               <div className="text-center py-12 opacity-50">
-                <Calendar size={32} className="mx-auto mb-2 text-slate-500" />
-                <p className="text-sm text-slate-400">Aucune activité planifiée</p>
+                <Calendar size={32} className="mx-auto mb-2 text-content-muted" />
+                <p className="text-sm text-content-muted">Aucune activité planifiée</p>
               </div>
             ) : (
               <>
                 {/* Enquêtes on current page */}
                 {pageEnquetes.length > 0 && (
                   <div className="space-y-2">
-                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-amber-400 uppercase tracking-wider px-1">
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-status-warning uppercase tracking-wider px-1">
                       <ClipboardCheck size={11} />
                       Enquêtes crédit ({activeEnquetes.length})
                     </div>
@@ -511,7 +511,7 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
                 {pagePlannings.length > 0 && (
                   <div className="space-y-2">
                     {pageEnquetes.length > 0 && (
-                      <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1">
+                      <div className="flex items-center gap-1.5 text-[10px] font-bold text-content-muted uppercase tracking-wider px-1">
                         <Calendar size={11} />
                         Planning ({plannings.length})
                       </div>
@@ -534,21 +534,21 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
 
           {/* Pagination controls */}
           {totalListPages > 1 && (
-            <div className="px-4 py-2 border-t border-slate-700 flex items-center justify-between bg-slate-900/30">
+            <div className="px-4 py-2 border-t border-edge flex items-center justify-between bg-surface-base/30">
               <button
                 onClick={() => setListPage(p => Math.max(0, p - 1))}
                 disabled={safeListPage === 0}
-                className="p-1.5 rounded-lg disabled:opacity-20 text-slate-400 hover:text-white hover:bg-slate-700 active:bg-slate-600 transition-colors min-w-[36px] min-h-[36px] flex items-center justify-center"
+                className="p-1.5 rounded-lg disabled:opacity-20 text-content-muted hover:text-content-primary hover:bg-surface-elevated active:bg-surface-subtle transition-colors min-w-[36px] min-h-[36px] flex items-center justify-center"
               >
                 <ChevronLeft size={16} />
               </button>
-              <span className="text-xs text-slate-500 font-medium tabular-nums">
+              <span className="text-xs text-content-muted font-medium tabular-nums">
                 {safeListPage + 1} / {totalListPages}
               </span>
               <button
                 onClick={() => setListPage(p => Math.min(totalListPages - 1, p + 1))}
                 disabled={safeListPage >= totalListPages - 1}
-                className="p-1.5 rounded-lg disabled:opacity-20 text-slate-400 hover:text-white hover:bg-slate-700 active:bg-slate-600 transition-colors min-w-[36px] min-h-[36px] flex items-center justify-center"
+                className="p-1.5 rounded-lg disabled:opacity-20 text-content-muted hover:text-content-primary hover:bg-surface-elevated active:bg-surface-subtle transition-colors min-w-[36px] min-h-[36px] flex items-center justify-center"
               >
                 <ChevronRight size={16} />
               </button>
@@ -559,12 +559,12 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
 
       {/* ═══ CALENDAR VIEW ═══ */}
       {viewMode === 'calendar' && (
-        <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+        <div className="bg-surface rounded-xl border border-edge overflow-hidden">
           {loading ? (
-            <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500" /></div>
+            <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" /></div>
           ) : calendarCompact ? (
             /* ── COMPACT: vertical day list (POS / mobile) ── */
-            <div className="divide-y divide-slate-700/50">
+            <div className="divide-y divide-edge/50">
               {weekDays.map(day => {
                 const dayPlannings = planningsByDate[day.date] || [];
                 const dayEnquetes = enquetesByDate[day.date] || [];
@@ -577,8 +577,8 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
                 return (
                   <div
                     key={day.date}
-                    className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors hover:bg-slate-700/30 active:bg-slate-700/50 ${
-                      day.isToday ? 'bg-cyan-500/5' : ''
+                    className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors hover:bg-surface-elevated/30 active:bg-surface-elevated/50 ${
+                      day.isToday ? 'bg-accent/5' : ''
                     }`}
                     onClick={() => { setSelectedDate(day.date); setViewMode('list'); }}
                   >
@@ -586,8 +586,8 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
                     <div
                       className={`w-10 h-10 rounded-lg flex flex-col items-center justify-center shrink-0 ${
                         day.isToday
-                          ? 'bg-cyan-600 text-white'
-                          : 'bg-slate-900 text-slate-400 border border-slate-700'
+                          ? 'bg-accent-secondary text-content-primary'
+                          : 'bg-surface-base text-content-muted border border-edge'
                       }`}
                     >
                       <div className="text-[8px] font-bold uppercase leading-none">{day.dayName}</div>
@@ -597,7 +597,7 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
                     {/* Events */}
                     <div className="flex-1 min-w-0">
                       {allDayItems.length === 0 ? (
-                        <p className="text-[11px] text-slate-600 italic">Aucune activité</p>
+                        <p className="text-[11px] text-content-muted italic">Aucune activité</p>
                       ) : (
                         <div className="flex gap-1.5 flex-wrap">
                           {allDayItems.slice(0, MAX_PILLS).map((item) => {
@@ -612,8 +612,8 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
                                   key={`enq-${enq.id}`}
                                   className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded text-[9px] font-bold border ${
                                     isOverdue
-                                      ? 'bg-red-500/20 text-red-300 border-red-500/30'
-                                      : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                                      ? 'bg-status-danger-bg text-status-danger border-status-danger/30'
+                                      : 'bg-status-warning-bg text-status-warning border-status-warning/30'
                                   }`}
                                 >
                                   <ClipboardCheck size={8} />
@@ -634,7 +634,7 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
                             }
                           })}
                           {allDayItems.length > MAX_PILLS && (
-                            <span className="text-[9px] font-bold text-cyan-400 self-center">
+                            <span className="text-[9px] font-bold text-accent self-center">
                               +{allDayItems.length - MAX_PILLS}
                             </span>
                           )}
@@ -643,7 +643,7 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
                     </div>
 
                     {/* Arrow indicator */}
-                    <ChevronRight size={14} className="text-slate-600 shrink-0" />
+                    <ChevronRight size={14} className="text-content-muted shrink-0" />
                   </div>
                 );
               })}
@@ -652,14 +652,14 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
             /* ── FULL: 7-column grid (tablet / desktop) ── */
             <>
               {/* Week header */}
-              <div className="grid grid-cols-7 border-b border-slate-700 bg-slate-900/30">
+              <div className="grid grid-cols-7 border-b border-edge bg-surface-base/30">
                 {weekDays.map(day => (
                   <div
                     key={day.date}
-                    className={`text-center py-2 border-r border-slate-700/50 last:border-r-0 ${day.isToday ? 'bg-cyan-500/10' : ''}`}
+                    className={`text-center py-2 border-r border-edge-subtle last:border-r-0 ${day.isToday ? 'bg-accent/10' : ''}`}
                   >
-                    <div className="text-[10px] font-bold text-slate-500 uppercase">{day.dayName}</div>
-                    <div className={`text-xs font-bold ${day.isToday ? 'text-cyan-400' : 'text-white'}`}>
+                    <div className="text-[10px] font-bold text-content-muted uppercase">{day.dayName}</div>
+                    <div className={`text-xs font-bold ${day.isToday ? 'text-accent' : 'text-content-primary'}`}>
                       {day.dayNum}
                     </div>
                   </div>
@@ -679,14 +679,14 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
                   return (
                     <div
                       key={day.date}
-                      className={`border-r border-slate-700/50 last:border-r-0 p-1 min-h-[150px] relative group cursor-pointer ${
-                        day.isToday ? 'bg-cyan-500/5' : ''
+                      className={`border-r border-edge-subtle last:border-r-0 p-1 min-h-[150px] relative group cursor-pointer ${
+                        day.isToday ? 'bg-accent/5' : ''
                       }`}
                       onClick={() => { setSelectedDate(day.date); setViewMode('list'); }}
                     >
                       {!hasItems ? (
                          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Plus size={16} className="text-slate-600" />
+                              <Plus size={16} className="text-content-muted" />
                          </div>
                       ) : (
                         <div className="space-y-1">
@@ -702,8 +702,8 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
                                   key={`enq-${enq.id}`}
                                   className={`w-full text-left px-1.5 py-1 rounded border text-[9px] leading-tight shadow-sm ${
                                     isOverdue
-                                      ? 'bg-red-500/20 text-red-300 border-red-500/30'
-                                      : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                                      ? 'bg-status-danger-bg text-status-danger border-status-danger/30'
+                                      : 'bg-status-warning-bg text-status-warning border-status-warning/30'
                                   }`}
                                 >
                                   <div className="font-bold truncate flex items-center gap-0.5">
@@ -733,7 +733,7 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
                             }
                           })}
                           {overflowCount > 0 && (
-                            <div className="text-[9px] font-bold text-cyan-400 text-center py-0.5 bg-cyan-500/10 rounded border border-cyan-500/20">
+                            <div className="text-[9px] font-bold text-accent text-center py-0.5 bg-accent/10 rounded border border-accent/20">
                               +{overflowCount} autre{overflowCount > 1 ? 's' : ''}
                             </div>
                           )}
@@ -750,42 +750,42 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
 
       {/* DETAIL SHEET */}
       <Sheet open={!!selectedPlanning} onOpenChange={(open) => !open && setSelectedPlanning(null)}>
-        <SheetContent className="w-full sm:max-w-md bg-slate-950 border-l-slate-800 p-0 overflow-y-auto">
+        <SheetContent className="w-full sm:max-w-md bg-surface-base border-l-edge p-0 overflow-y-auto">
             {selectedPlanning && (
                 <>
-                <SheetHeader className="px-6 py-4 border-b border-slate-800 bg-slate-950/50 backdrop-blur sticky top-0 z-10">
-                    <SheetTitle className="text-white flex items-center gap-2">
+                <SheetHeader className="px-6 py-4 border-b border-edge bg-surface-base/50 backdrop-blur sticky top-0 z-10">
+                    <SheetTitle className="text-content-primary flex items-center gap-2">
                         <span className={`w-2 h-2 rounded-full ${typeDot(selectedPlanning.typeActivite)}`} />
                         Détail Activité
                     </SheetTitle>
-                    <SheetDescription className="text-slate-400">
+                    <SheetDescription className="text-content-muted">
                         {new Date(selectedPlanning.datePlanning).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
                     </SheetDescription>
                 </SheetHeader>
                 
                 <div className="p-6 space-y-6">
                     {/* Main Info */}
-                    <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 space-y-4">
+                    <div className="bg-surface-base/50 border border-edge rounded-xl p-4 space-y-4">
                         <div className="flex justify-between items-start">
                              <div>
-                                <h3 className="text-lg font-bold text-white">{selectedPlanning.typeActivite}</h3>
-                                <div className="flex items-center gap-2 text-slate-400 text-sm mt-1">
-                                    <Clock size={14} className="text-cyan-500" />
+                                <h3 className="text-lg font-bold text-content-primary">{selectedPlanning.typeActivite}</h3>
+                                <div className="flex items-center gap-2 text-content-muted text-sm mt-1">
+                                    <Clock size={14} className="text-accent" />
                                     {selectedPlanning.heureDebut} - {selectedPlanning.heureFin}
                                 </div>
                              </div>
                              <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase border ${
-                                selectedPlanning.statut === 'COMPLETED' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' :
-                                selectedPlanning.statut === 'CANCELLED' ? 'bg-red-500/20 text-red-400 border-red-500/30' :
-                                'bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
+                                selectedPlanning.statut === 'COMPLETED' ? 'bg-status-success-bg text-status-success border-status-success/30' :
+                                selectedPlanning.statut === 'CANCELLED' ? 'bg-status-danger-bg text-status-danger border-status-danger/30' :
+                                'bg-accent/10 text-accent border-accent/30'
                              }`}>
                                  {STATUT_PLANNING_LABELS[selectedPlanning.statut as keyof typeof STATUT_PLANNING_LABELS] || selectedPlanning.statut}
                              </span>
                         </div>
                         
                         {selectedPlanning.zone && (
-                             <div className="flex items-center gap-2 p-2 bg-slate-950 rounded-lg border border-slate-800/50 text-sm text-slate-300">
-                                 <MapPin size={14} className="text-purple-500" />
+                             <div className="flex items-center gap-2 p-2 bg-surface-base rounded-lg border border-edge/50 text-sm text-content-secondary">
+                                 <MapPin size={14} className="text-status-info" />
                                  {selectedPlanning.zone}
                              </div>
                         )}
@@ -794,28 +794,28 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
                     {/* Notes */}
                     {selectedPlanning.notes && (
                          <div className="space-y-2">
-                             <h4 className="text-xs font-bold text-slate-500 uppercase">Notes</h4>
-                             <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg text-sm text-slate-300 italic">
+                             <h4 className="text-xs font-bold text-content-muted uppercase">Notes</h4>
+                             <div className="p-3 bg-surface-base border border-edge rounded-lg text-sm text-content-secondary italic">
                                  "{selectedPlanning.notes}"
                              </div>
                          </div>
                     )}
 
                     {/* Actions */}
-                    <div className="pt-4 border-t border-slate-800 space-y-3">
-                         <h4 className="text-xs font-bold text-slate-500 uppercase">Actions</h4>
+                    <div className="pt-4 border-t border-edge space-y-3">
+                         <h4 className="text-xs font-bold text-content-muted uppercase">Actions</h4>
                          {(selectedPlanning.statut === 'PLANNED' || selectedPlanning.statut === 'Planifie') && (
                              <div className="grid grid-cols-2 gap-3">
                                  <button
                                     onClick={() => updateStatut(selectedPlanning.id, 'COMPLETED')}
-                                    className="py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition"
+                                    className="py-3 bg-status-success hover:bg-status-success text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition"
                                  >
                                      <Check size={16} />
                                      Terminer
                                  </button>
                                  <button
                                     onClick={() => updateStatut(selectedPlanning.id, 'CANCELLED')}
-                                    className="py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition"
+                                    className="py-3 bg-surface hover:bg-surface-elevated text-content-primary rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition"
                                  >
                                      <X size={16} />
                                      Annuler
@@ -827,7 +827,7 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
                                 // Logic to delete or edit could go here
                                 updateStatut(selectedPlanning.id, 'CANCELLED'); // Keeping it simple for now as per instructions
                             }}
-                            className="w-full py-3 border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-white rounded-xl font-medium text-sm transition flex items-center justify-center gap-2"
+                            className="w-full py-3 border border-edge hover:bg-surface text-content-muted hover:text-content-primary rounded-xl font-medium text-sm transition flex items-center justify-center gap-2"
                          >
                              <Trash2 size={14} />
                              Supprimer cette activité
@@ -856,7 +856,7 @@ function PlanningCard({ planning, typeColor, onClick }: PlanningCardProps) {
   return (
     <div 
         onClick={onClick}
-        className="bg-slate-900/50 rounded-xl p-3 border border-slate-700/50 hover:border-cyan-500/50 hover:bg-slate-800 transition-all cursor-pointer group"
+        className="bg-surface-base/50 rounded-xl p-3 border border-edge-subtle hover:border-accent/50 hover:bg-surface transition-all cursor-pointer group"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
@@ -864,21 +864,21 @@ function PlanningCard({ planning, typeColor, onClick }: PlanningCardProps) {
             <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold border ${typeColor(planning.typeActivite)}`}>
               {planning.typeActivite}
             </span>
-            <span className="text-slate-300 font-mono text-xs flex items-center gap-1">
+            <span className="text-content-secondary font-mono text-xs flex items-center gap-1">
               {planning.heureDebut}
             </span>
           </div>
           {planning.zone && (
-            <p className="text-slate-400 text-xs flex items-center gap-1 truncate">
+            <p className="text-content-muted text-xs flex items-center gap-1 truncate">
               <MapPin size={10} />
               {planning.zone}
             </p>
           )}
         </div>
         <div className={`w-2 h-2 rounded-full mt-1.5 ${
-            planning.statut === 'COMPLETED' ? 'bg-emerald-500' :
-            planning.statut === 'CANCELLED' ? 'bg-red-500' :
-            'bg-cyan-500'
+            planning.statut === 'COMPLETED' ? 'bg-status-success' :
+            planning.statut === 'CANCELLED' ? 'bg-status-danger' :
+            'bg-accent'
         }`} />
       </div>
     </div>
@@ -890,37 +890,37 @@ function EnqueteCard({ enquete, onStart, starting }: { enquete: any; onStart?: (
   const isOverdue = enquete.dueDate && new Date(enquete.dueDate) < new Date();
   const isAssigned = enquete.statut === 'ASSIGNED';
   const priorityConf: Record<string, { label: string; color: string }> = {
-    LOW: { label: 'Basse', color: 'bg-slate-500/15 text-slate-400 border-slate-500/30' },
-    MEDIUM: { label: 'Normale', color: 'bg-blue-500/15 text-blue-400 border-blue-500/30' },
-    HIGH: { label: 'Haute', color: 'bg-amber-500/15 text-amber-400 border-amber-500/30' },
-    URGENT: { label: 'Urgente', color: 'bg-red-500/15 text-red-400 border-red-500/30' },
+    LOW: { label: 'Basse', color: 'bg-surface-subtle/35 text-content-muted border-edge-strong/30' },
+    MEDIUM: { label: 'Normale', color: 'bg-status-info-bg text-status-info border-status-info/30' },
+    HIGH: { label: 'Haute', color: 'bg-status-warning-bg text-status-warning border-status-warning/30' },
+    URGENT: { label: 'Urgente', color: 'bg-status-danger-bg text-status-danger border-status-danger/30' },
   };
   const pConf = priorityConf[enquete.priority || 'MEDIUM'] || priorityConf.MEDIUM;
 
   return (
-    <div className={`bg-slate-900/50 rounded-xl p-3 border ${isOverdue ? 'border-red-500/40' : 'border-amber-500/30'} space-y-2`}>
+    <div className={`bg-surface-base/50 rounded-xl p-3 border ${isOverdue ? 'border-status-danger/40' : 'border-status-warning/30'} space-y-2`}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-1">
-            <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold border bg-amber-500/20 text-amber-400 border-amber-500/30`}>
+            <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold border bg-status-warning-bg text-status-warning border-status-warning/30`}>
               Enquête
             </span>
             <span className={`px-1.5 py-0.5 rounded text-[9px] uppercase font-bold border ${pConf.color}`}>
               {pConf.label}
             </span>
           </div>
-          <p className="text-xs font-semibold text-white truncate">
+          <p className="text-xs font-semibold text-content-primary truncate">
             {enquete.client ? `${enquete.client.nom || ''} ${enquete.client.prenom || ''}`.trim() : 'Client'}
           </p>
           {enquete.objetCredit && (
-            <p className="text-[10px] text-slate-500 truncate">{enquete.objetCredit}</p>
+            <p className="text-[10px] text-content-muted truncate">{enquete.objetCredit}</p>
           )}
         </div>
       </div>
 
       <div className="flex items-center gap-3 text-[11px]">
         {enquete.montantDemande && (
-          <span className="flex items-center gap-1 text-emerald-400 font-medium">
+          <span className="flex items-center gap-1 text-status-success font-medium">
             <Banknote size={11} />
             {Number(enquete.montantDemande).toLocaleString('fr-FR')} F
           </span>
@@ -928,8 +928,8 @@ function EnqueteCard({ enquete, onStart, starting }: { enquete: any; onStart?: (
         {enquete.dueDate && (
           <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded ${
             isOverdue
-              ? 'text-red-400 font-bold bg-red-500/10'
-              : 'text-amber-400 font-medium bg-amber-500/10'
+              ? 'text-status-danger font-bold bg-status-danger-bg'
+              : 'text-status-warning font-medium bg-status-warning-bg'
           }`}>
             {isOverdue ? <AlertTriangle size={10} /> : <Calendar size={10} />}
             Échéance : {new Date(enquete.dueDate).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
@@ -943,14 +943,14 @@ function EnqueteCard({ enquete, onStart, starting }: { enquete: any; onStart?: (
         <button
           onClick={() => onStart(enquete.id)}
           disabled={starting}
-          className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-700 text-white text-xs font-bold rounded-lg transition-colors"
+          className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 bg-accent-secondary hover:bg-accent-secondary-hover disabled:bg-surface-elevated text-content-primary text-xs font-bold rounded-lg transition-colors"
         >
           {starting ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
           Démarrer l'enquête
         </button>
       ) : (
         <div className="text-center">
-          <span className="text-[10px] font-bold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded">En cours</span>
+          <span className="text-[10px] font-bold text-status-info bg-status-info-bg px-2 py-0.5 rounded">En cours</span>
         </div>
       )}
     </div>
@@ -969,14 +969,14 @@ interface FormInputProps {
 function FormInput({ label, type, value, onChange, required, placeholder }: FormInputProps) {
     return (
         <div>
-            <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1">{label}</label>
+            <label className="block text-[10px] uppercase font-bold text-content-muted mb-1">{label}</label>
             <input
                 type={type}
                 value={value}
                 onChange={e => onChange(e.target.value)}
                 required={required}
                 placeholder={placeholder}
-                className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white text-xs focus:ring-1 focus:ring-cyan-500"
+                className="w-full px-2 py-1.5 bg-surface-base border border-edge rounded-lg text-content-primary text-xs focus:ring-1 focus:ring-accent"
             />
         </div>
     );

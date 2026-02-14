@@ -115,9 +115,9 @@ export default function AgencySelector({
   // If not admin, just show the read-only badge
   if (!isAdmin) {
     return (
-      <div className="flex items-center gap-2 px-3 py-2 bg-slate-800/50 rounded-lg border border-slate-700/50">
-        <Building size={18} className="text-slate-400" />
-        <span className="font-medium text-sm text-slate-400">
+      <div className="flex items-center gap-2 px-3 py-2 bg-surface/50 rounded-lg border border-edge-subtle">
+        <Building size={18} className="text-content-muted" />
+        <span className="font-medium text-sm text-content-muted">
           {selectedAgence?.nom || t('agencePrincipale')}
         </span>
       </div>
@@ -134,33 +134,33 @@ export default function AgencySelector({
         className={`
           flex items-center gap-2 px-3 py-2 rounded-lg border transition-all duration-200
           ${isOpen
-            ? 'bg-slate-800 border-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.15)]'
-            : 'bg-slate-800 border-slate-700 hover:bg-slate-700 hover:border-slate-600'}
+            ? 'bg-surface border-status-info/50 shadow-[0_0_15px_rgba(59,130,246,0.15)]'
+            : 'bg-surface border-edge hover:bg-surface-elevated hover:border-edge-strong'}
         `}
       >
-        <div className={`p-1 rounded-md ${isOpen ? 'bg-blue-500/20 text-blue-400' : 'bg-slate-700/50 text-blue-400'}`}>
+        <div className={`p-1 rounded-md ${isOpen ? 'bg-status-info-bg text-status-info' : 'bg-surface-elevated/50 text-status-info'}`}>
           {loading ? <Loader2 size={16} className="animate-spin" /> : <Building size={16} />}
         </div>
-        <span className="font-medium text-sm text-slate-200">
+        <span className="font-medium text-sm text-content-secondary">
           {loading ? t('chargementAgences') : (selectedAgence?.nom || t('toutesAgences'))}
         </span>
         <ChevronDown
           size={16}
-          className={`text-slate-500 transition-transform duration-300 ${isOpen ? 'rotate-180 text-blue-400' : ''}`}
+          className={`text-content-muted transition-transform duration-300 ${isOpen ? 'rotate-180 text-status-info' : ''}`}
         />
       </button>
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-72 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="absolute right-0 top-full mt-2 w-72 bg-surface-base border border-edge rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
 
           {/* Header Section with Search */}
-          <div className="px-3 py-2.5 bg-slate-950/30 border-b border-slate-800 space-y-2">
-            <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+          <div className="px-3 py-2.5 bg-surface-base/30 border-b border-edge space-y-2">
+            <h4 className="text-[10px] font-bold text-content-muted uppercase tracking-wider">
               {t('selectionnerAgence') || 'SÉLECTIONNER UNE AGENCE'}
             </h4>
             <div className="relative">
-              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-content-muted" />
               <input
                 ref={searchInputRef}
                 type="text"
@@ -170,7 +170,7 @@ export default function AgencySelector({
                   setFocusedIndex(-1);
                 }}
                 placeholder={t('rechercherAgence')}
-                className="w-full pl-8 pr-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-blue-500/50"
+                className="w-full pl-8 pr-3 py-1.5 bg-input-bg border border-input-border rounded-lg text-xs text-content-secondary placeholder:text-content-muted focus:outline-none focus:border-status-info/50"
                 aria-label={t('rechercherAgence')}
               />
             </div>
@@ -184,12 +184,12 @@ export default function AgencySelector({
             className="max-h-80 overflow-y-auto py-1"
           >
             {loading ? (
-              <div className="flex items-center justify-center gap-2 py-6 text-slate-500 text-xs">
+              <div className="flex items-center justify-center gap-2 py-6 text-content-muted text-xs">
                 <Loader2 size={14} className="animate-spin" />
                 {t('chargementAgences')}
               </div>
             ) : filteredAgences.length === 0 ? (
-              <div className="py-6 text-center text-slate-500 text-xs">
+              <div className="py-6 text-center text-content-muted text-xs">
                 {t('aucuneAgenceTrouvee')}
               </div>
             ) : (
@@ -209,24 +209,24 @@ export default function AgencySelector({
                     onMouseEnter={() => setFocusedIndex(index)}
                     className={`
                       w-full px-4 py-3 text-left transition-colors flex items-center justify-between group
-                      ${isActive ? 'bg-blue-500/10' : isFocused ? 'bg-slate-800' : 'hover:bg-slate-800'}
-                      ${isFocused ? 'ring-1 ring-inset ring-blue-500/30' : ''}
+                      ${isActive ? 'bg-status-info-bg' : isFocused ? 'bg-surface' : 'hover:bg-surface'}
+                      ${isFocused ? 'ring-1 ring-inset ring-status-info/30' : ''}
                     `}
                   >
                     <div className="flex items-center gap-3">
                       <div className={`
                         p-2 rounded-full flex items-center justify-center transition-colors
-                        ${isActive ? 'bg-blue-500 text-white' : 'bg-slate-800 text-slate-400 group-hover:bg-slate-700 group-hover:text-slate-300'}
+                        ${isActive ? 'bg-status-info text-white' : 'bg-surface text-content-muted group-hover:bg-surface-elevated group-hover:text-content-secondary'}
                       `}>
                         <Building size={16} />
                       </div>
-                      <span className={`text-sm font-medium ${isActive ? 'text-white' : 'text-slate-300 group-hover:text-white'}`}>
+                      <span className={`text-sm font-medium ${isActive ? 'text-content-primary' : 'text-content-secondary group-hover:text-content-primary'}`}>
                         {ua.agence.nom}
                       </span>
                     </div>
 
                     {isActive && (
-                      <Check size={16} className="text-blue-400" />
+                      <Check size={16} className="text-status-info" />
                     )}
                   </button>
                 );
@@ -235,8 +235,8 @@ export default function AgencySelector({
           </div>
 
           {/* Footer / Status */}
-          <div className="px-4 py-2 bg-slate-950/30 border-t border-slate-800 flex justify-between items-center bg-dots-pattern">
-              <span className="text-[10px] text-slate-600">
+          <div className="px-4 py-2 bg-surface-base/30 border-t border-edge flex justify-between items-center bg-dots-pattern">
+              <span className="text-[10px] text-content-muted">
                 {agences.filter(a => a.agence.id !== 'all').length} {t('agencesDisponibles') || 'agences disponibles'}
               </span>
           </div>

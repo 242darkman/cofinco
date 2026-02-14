@@ -214,14 +214,14 @@ export default function TransactionFlow() {
   };
 
   return (
-    <Card className="flex flex-col h-full bg-slate-900 border-slate-800 p-0 overflow-hidden">
+    <Card className="flex flex-col h-full bg-surface-base border-edge p-0 overflow-hidden">
       {/* Header */}
-      <div className="shrink-0 p-4 border-b border-slate-800 bg-slate-900/50">
-          <h2 className="text-base font-bold text-white flex items-center gap-2">
-            <ArrowLeftRight size={18} className="text-cyan-400" />
+      <div className="shrink-0 p-4 border-b border-edge bg-surface-base/50">
+          <h2 className="text-base font-bold text-content-primary flex items-center gap-2">
+            <ArrowLeftRight size={18} className="text-accent" />
             Moteur de Transaction Unifié
           </h2>
-          <p className="text-xs text-slate-400">Virements internes et bénéficiaires.</p>
+          <p className="text-xs text-content-muted">Virements internes et bénéficiaires.</p>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
@@ -239,7 +239,7 @@ export default function TransactionFlow() {
               />
 
               {sourceAccount && sourceConfig && !sourceConfig.canTransferOut && (
-                <div className="rounded border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-200 flex items-start gap-2">
+                <div className="rounded border border-status-warning/30 bg-status-warning-bg p-2 text-xs text-status-warning-text flex items-start gap-2">
                   <AlertCircle size={14} className="mt-0.5 shrink-0" />
                   <div>
                     <p className="font-semibold">Fonds bloqués.</p>
@@ -248,7 +248,7 @@ export default function TransactionFlow() {
                         type="button"
                         onClick={handleUnlock}
                         disabled={unlocking}
-                        className="mt-1 inline-flex items-center gap-1 font-semibold text-amber-100 hover:text-white underline"
+                        className="mt-1 inline-flex items-center gap-1 font-semibold text-status-warning-text hover:text-content-primary underline"
                       >
                         <Lock size={12} />
                         {unlocking ? '...' : 'Débloquer'}
@@ -293,16 +293,16 @@ export default function TransactionFlow() {
 
                     <div className="h-5">
                       {beneficiaryStatus === 'loading' && (
-                        <p className="text-xs text-slate-400">Vérification...</p>
+                        <p className="text-xs text-content-muted">Vérification...</p>
                       )}
                       {beneficiaryStatus === 'found' && (
-                        <div className="flex items-center gap-2 text-xs text-emerald-300 font-medium">
+                        <div className="flex items-center gap-2 text-xs text-status-success font-medium">
                           <CheckCircle2 size={14} />
                           <span>{beneficiaryName}</span>
                         </div>
                       )}
                       {beneficiaryStatus === 'not_found' && (
-                        <div className="flex items-center gap-2 text-xs text-red-400">
+                        <div className="flex items-center gap-2 text-xs text-status-danger">
                           <AlertCircle size={14} />
                           <span>Introuvable</span>
                         </div>
@@ -336,10 +336,10 @@ export default function TransactionFlow() {
                   />
                </div>
 
-               <div className="flex items-center justify-between rounded border border-slate-700 bg-slate-800/30 px-3 py-2">
+               <div className="flex items-center justify-between rounded border border-edge bg-surface/30 px-3 py-2">
                  <div>
-                   <p className="text-sm font-medium text-white">Virement programmé</p>
-                   <p className="text-[10px] text-slate-400">Planifier une récurrence</p>
+                   <p className="text-sm font-medium text-content-primary">Virement programmé</p>
+                   <p className="text-[10px] text-content-muted">Planifier une récurrence</p>
                  </div>
                  <Switch checked={scheduled} onChange={setScheduled} ariaLabel="Programmer" />
                </div>

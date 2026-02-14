@@ -18,9 +18,9 @@ interface AnalyticsGridProps {
 function ChartErrorFallback() {
   const { t } = useLanguage();
   return (
-    <Card variant="default" className="h-full flex flex-col items-center justify-center bg-slate-900 border-slate-800 gap-2 p-4">
-      <AlertCircle size={24} className="text-red-400" />
-      <p className="text-xs text-slate-400">{t('erreurChargementGraphiques')}</p>
+    <Card variant="default" className="h-full flex flex-col items-center justify-center bg-surface-base border-edge gap-2 p-4">
+      <AlertCircle size={24} className="text-status-danger" />
+      <p className="text-xs text-content-muted">{t('erreurChargementGraphiques')}</p>
       <Button
         size="sm"
         variant="outline"
@@ -54,8 +54,8 @@ export default function AnalyticsGrid({ stats, chartHeight = 250 }: AnalyticsGri
        >
          <ErrorBoundary fallback={<ChartErrorFallback />}>
            <Suspense fallback={
-             <Card variant="default" className="flex items-center justify-center bg-slate-900 border-slate-800" style={{ height: chartHeight }}>
-               <div className="animate-spin w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full" aria-label={t('chargement')} />
+             <Card variant="default" className="flex items-center justify-center bg-surface-base border-edge" style={{ height: chartHeight }}>
+               <div className="animate-spin w-8 h-8 border-2 border-status-success border-t-transparent rounded-full" aria-label={t('chargement')} />
              </Card>
            }>
              <BalanceHistoryChart height={chartHeight} />
@@ -71,8 +71,8 @@ export default function AnalyticsGrid({ stats, chartHeight = 250 }: AnalyticsGri
        >
          <ErrorBoundary fallback={<ChartErrorFallback />}>
            <Suspense fallback={
-             <Card variant="default" className="flex items-center justify-center bg-slate-900 border-slate-800" style={{ height: chartHeight }}>
-               <div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full" aria-label={t('chargement')} />
+             <Card variant="default" className="flex items-center justify-center bg-surface-base border-edge" style={{ height: chartHeight }}>
+               <div className="animate-spin w-8 h-8 border-2 border-status-info border-t-transparent rounded-full" aria-label={t('chargement')} />
              </Card>
            }>
              <PortfolioDistributionChart

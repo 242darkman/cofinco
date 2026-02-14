@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Shield, Clock, AlertCircle, CheckCircle } from 'lucide-react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
+import { useCurrency } from '../../contexts/CurrencyContext';
 
 interface SMSVerificationModalProps {
   onClose: () => void;
@@ -20,6 +21,7 @@ export default function SMSVerificationModal({
   montant,
   transactionType
 }: SMSVerificationModalProps) {
+  const { currency } = useCurrency();
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -128,7 +130,7 @@ export default function SMSVerificationModal({
       isOpen={true}
       onClose={onClose}
       title="Vérification SMS"
-      subtitle={`${transactionType === 'encaissement' ? 'Encaissement' : 'Retrait'} de ${montant.toLocaleString()} FCFA`}
+      subtitle={`${transactionType === 'encaissement' ? 'Encaissement' : 'Retrait'} de ${montant.toLocaleString()} ${currency.symbol}`}
       size="md"
       variant="default"
       showCloseButton={true}
@@ -155,13 +157,13 @@ export default function SMSVerificationModal({
     >
       <div className="space-y-6">
         {/* Info */}
-        <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+        <div className="bg-status-info-bg border border-status-info/30 rounded-lg p-4">
           <div className="flex items-start gap-3">
-            <AlertCircle className="text-blue-400 flex-shrink-0 mt-0.5" size={20} />
-            <div className="text-sm text-blue-300">
+            <AlertCircle className="text-status-info flex-shrink-0 mt-0.5" size={20} />
+            <div className="text-sm text-status-info">
               <p className="font-semibold mb-1">Un code de vérification a été envoyé</p>
-              <p className="text-blue-400">au numéro {clientPhone}</p>
-              <p className="text-blue-400 mt-2">
+              <p className="text-status-info">au numéro {clientPhone}</p>
+              <p className="text-status-info mt-2">
                 Demandez au client de vous communiquer le code reçu par SMS.
               </p>
             </div>
@@ -169,17 +171,17 @@ export default function SMSVerificationModal({
         </div>
 
         {/* Timer */}
-        <div className="flex items-center justify-center gap-2 text-slate-300">
+        <div className="flex items-center justify-center gap-2 text-content-secondary">
           <Clock size={18} />
           <span className="text-lg font-mono font-semibold">
             {formatTime(timeLeft)}
           </span>
-          <span className="text-sm text-slate-400">restantes</span>
+          <span className="text-sm text-content-muted">restantes</span>
         </div>
 
         {/* Code Input */}
         <div>
-          <label className="block text-sm font-semibold text-slate-300 mb-2">
+          <label className="block text-sm font-semibold text-content-secondary mb-2">
             Code de vérification (6 chiffres)
           </label>
           <input
@@ -194,7 +196,7 @@ export default function SMSVerificationModal({
               setError('');
             }}
             onKeyPress={handleKeyPress}
-            className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white text-center text-2xl font-mono tracking-widest focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-4 py-3 bg-surface-elevated/50 border border-edge-strong rounded-lg text-content-primary text-center text-2xl font-mono tracking-widest focus:ring-2 focus:ring-status-info focus:border-transparent"
             placeholder="000000"
             disabled={loading || timeLeft === 0 || attempts >= maxAttempts}
           />
@@ -202,8 +204,8 @@ export default function SMSVerificationModal({
 
         {/* Error Message */}
         {error && (
-          <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
-            <p className="text-blue-400 text-sm flex items-center gap-2">
+          <div className="bg-status-info-bg border border-status-info/30 rounded-lg p-3">
+            <p className="text-status-info text-sm flex items-center gap-2">
               <AlertCircle size={16} />
               {error}
             </p>
@@ -211,7 +213,7 @@ export default function SMSVerificationModal({
         )}
 
         {/* Attempts Counter */}
-        <div className="flex justify-between text-sm text-slate-400">
+        <div className="flex justify-between text-sm text-content-muted">
           <span>Tentatives: {attempts}/{maxAttempts}</span>
           <span>Code à 6 chiffres</span>
         </div>

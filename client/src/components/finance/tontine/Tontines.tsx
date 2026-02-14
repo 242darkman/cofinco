@@ -158,8 +158,8 @@ export default function Tontines() {
       primary: true,
       format: (value: any, row: Tontine) => (
         <div>
-          <div className="font-bold text-white">{value}</div>
-          <div className="text-xs text-slate-400 line-clamp-1">{row.description}</div>
+          <div className="font-bold text-content-primary">{value}</div>
+          <div className="text-xs text-content-muted line-clamp-1">{row.description}</div>
         </div>
       )
     },
@@ -170,12 +170,12 @@ export default function Tontines() {
         <div className="flex items-center gap-2">
           <div className="flex -space-x-2">
             {(row.tontineMembers || []).slice(0, 3).map((m, i) => (
-              <div key={i} className="w-5 h-5 rounded-full bg-slate-600 border border-slate-800 overflow-hidden">
+              <div key={i} className="w-5 h-5 rounded-full bg-surface-subtle border border-edge overflow-hidden">
                  {m.clients?.photoUrl && <img src={m.clients.photoUrl} className="w-full h-full object-cover" />}
               </div>
             ))}
           </div>
-          <span className="text-xs text-slate-300">{value}/{row.nombreMembresMax || row.nombreMembres}</span>
+          <span className="text-xs text-content-secondary">{value}/{row.nombreMembresMax || row.nombreMembres}</span>
         </div>
       )
     },
@@ -183,14 +183,14 @@ export default function Tontines() {
       label: 'Cotisation',
       key: 'montantCotisation',
       format: (value: any) => (
-        <span className="font-bold text-cyan-400">{Number(value).toLocaleString()} FCFA</span>
+        <span className="font-bold text-accent">{Number(value).toLocaleString()} FCFA</span>
       )
     },
     {
       label: 'Fréquence',
       key: 'frequence',
       format: (value: any) => (
-        <span className="text-xs text-slate-300">{value}</span>
+        <span className="text-xs text-content-secondary">{value}</span>
       )
     },
     {
@@ -264,7 +264,7 @@ export default function Tontines() {
                   onClick={() => setSelectedTontine(null)}
                   icon={ArrowLeft}
                   size="sm"
-                  className="text-slate-400 hover:text-white h-8 text-xs"
+                  className="text-content-muted hover:text-content-primary h-8 text-xs"
                 >
                   Retour
                 </Button>
@@ -294,11 +294,11 @@ export default function Tontines() {
               { key: 'regles', label: 'Règles' },
             ]}
             variant="underline"
-            className="mb-0 border-b border-slate-700"
+            className="mb-0 border-b border-edge"
           />
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto bg-slate-900/50 border border-slate-800 rounded-lg p-3 custom-scrollbar">
+        <div className="flex-1 min-h-0 overflow-y-auto bg-surface-base/50 border border-edge rounded-lg p-3 custom-scrollbar">
              {activeTab === 'dashboard' && (
                 <TontineDashboard
                   tontineId={selectedTontine.id}
@@ -310,29 +310,29 @@ export default function Tontines() {
               {activeTab === 'details' && (
                  <Card>
                     <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                       <div className="p-3 bg-slate-800/40 rounded-lg border border-slate-700/50">
-                          <div className="flex items-center gap-1.5 text-slate-500 mb-1">
+                       <div className="p-3 bg-surface/40 rounded-lg border border-edge-subtle">
+                          <div className="flex items-center gap-1.5 text-content-muted mb-1">
                              <Clock size={14} />
                              <span className="text-[10px] uppercase tracking-wider font-bold">Fréquence</span>
                           </div>
-                          <div className="text-white font-medium text-sm pl-0.5">{selectedTontine.frequence}</div>
+                          <div className="text-content-primary font-medium text-sm pl-0.5">{selectedTontine.frequence}</div>
                        </div>
-                       <div className="p-3 bg-slate-800/40 rounded-lg border border-slate-700/50">
-                          <div className="flex items-center gap-1.5 text-slate-500 mb-1">
+                       <div className="p-3 bg-surface/40 rounded-lg border border-edge-subtle">
+                          <div className="flex items-center gap-1.5 text-content-muted mb-1">
                              <Calendar size={14} />
                              <span className="text-[10px] uppercase tracking-wider font-bold">Date Début</span>
                           </div>
-                          <div className="text-white font-medium text-sm pl-0.5">{new Date(selectedTontine.dateDebut).toLocaleDateString()}</div>
+                          <div className="text-content-primary font-medium text-sm pl-0.5">{new Date(selectedTontine.dateDebut).toLocaleDateString()}</div>
                        </div>
-                       <div className="p-3 bg-slate-800/40 rounded-lg border border-slate-700/50">
-                          <div className="flex items-center gap-1.5 text-slate-500 mb-1">
+                       <div className="p-3 bg-surface/40 rounded-lg border border-edge-subtle">
+                          <div className="flex items-center gap-1.5 text-content-muted mb-1">
                              <Calendar size={14} />
                              <span className="text-[10px] uppercase tracking-wider font-bold">Créé le</span>
                           </div>
-                          <div className="text-white font-medium text-sm pl-0.5">{new Date(selectedTontine.createdAt).toLocaleDateString()}</div>
+                          <div className="text-content-primary font-medium text-sm pl-0.5">{new Date(selectedTontine.createdAt).toLocaleDateString()}</div>
                        </div>
-                       <div className="p-3 bg-slate-800/40 rounded-lg border border-slate-700/50">
-                          <div className="flex items-center gap-1.5 text-slate-500 mb-1">
+                       <div className="p-3 bg-surface/40 rounded-lg border border-edge-subtle">
+                          <div className="flex items-center gap-1.5 text-content-muted mb-1">
                              <Activity size={14} />
                              <span className="text-[10px] uppercase tracking-wider font-bold">Statut</span>
                           </div>
@@ -393,7 +393,7 @@ export default function Tontines() {
                   Nouvelle Tontine
                 </Button>
               ) : (
-                <div className="px-3 py-1 bg-amber-500/20 text-amber-400 rounded-lg text-xs flex items-center gap-1.5 border border-amber-500/30">
+                <div className="px-3 py-1 bg-status-warning-bg text-status-warning rounded-lg text-xs flex items-center gap-1.5 border border-status-warning/30">
                   <AlertTriangle size={14} />
                   Permission requise
                 </div>
@@ -438,7 +438,7 @@ export default function Tontines() {
           </div>
       </div>
 
-      <div className="flex-1 min-h-0 bg-slate-900 border border-slate-800 rounded-lg flex flex-col">
+      <div className="flex-1 min-h-0 bg-surface-base border border-edge rounded-lg flex flex-col">
           <div className="flex-1 overflow-hidden">
               <ResponsiveTable
                 data={tontines}
@@ -450,7 +450,7 @@ export default function Tontines() {
                 density="compact"
                 maxHeight="100%"
                 className="border-0 rounded-none h-full"
-                headerClassName="bg-slate-900 sticky top-0"
+                headerClassName="bg-surface-base sticky top-0"
               />
           </div>
       </div>

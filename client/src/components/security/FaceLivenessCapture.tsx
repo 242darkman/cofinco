@@ -231,10 +231,10 @@ export default function FaceLivenessCapture({
   return (
     <div className="fixed inset-0 bg-black flex flex-col items-center justify-center z-[70]">
       <div className="relative w-full max-w-md mx-4">
-        <div className="bg-slate-900 rounded-t-xl p-4 flex items-center justify-between">
+        <div className="bg-surface-base rounded-t-xl p-4 flex items-center justify-between">
           <div>
-            <h3 className="text-white font-bold text-lg">{title}</h3>
-            <p className={`text-sm font-medium ${faceDetected ? 'text-green-400' : 'text-cyan-400'}`}>
+            <h3 className="text-content-primary font-bold text-lg">{title}</h3>
+            <p className={`text-sm font-medium ${faceDetected ? 'text-status-success' : 'text-accent'}`}>
               {captureComplete 
                 ? 'Photo capturée !' 
                 : countdown 
@@ -246,7 +246,7 @@ export default function FaceLivenessCapture({
           </div>
           <button
             onClick={handleClose}
-            className="p-2 hover:bg-slate-700 rounded-lg transition text-slate-400 hover:text-white"
+            className="p-2 hover:bg-surface-elevated rounded-lg transition text-content-muted hover:text-content-primary"
             data-testid="button-close-liveness"
           >
             <X size={24} />
@@ -280,7 +280,7 @@ export default function FaceLivenessCapture({
             <ellipse 
               cx="200" cy="180" rx="110" ry="140" 
               fill="none" 
-              stroke={faceDetected ? '#22c55e' : 'rgba(255,255,255,0.5)'}
+              stroke={faceDetected ? 'var(--color-success)' : 'rgba(255,255,255,0.5)'}
               strokeWidth={faceDetected ? '4' : '3'}
               strokeDasharray={faceDetected ? 'none' : '8 4'}
               className="transition-all duration-300"
@@ -289,28 +289,28 @@ export default function FaceLivenessCapture({
 
           {countdown && (
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-24 h-24 rounded-full bg-cyan-500/30 flex items-center justify-center animate-pulse">
-                <span className="text-5xl font-bold text-white">{countdown}</span>
+              <div className="w-24 h-24 rounded-full bg-accent/30 flex items-center justify-center animate-pulse">
+                <span className="text-5xl font-bold text-content-primary">{countdown}</span>
               </div>
             </div>
           )}
 
           {captureComplete && (
-            <div className="absolute inset-0 bg-green-500/20 flex items-center justify-center">
-              <div className="bg-green-500 rounded-full p-4 animate-pulse">
-                <CheckCircle size={48} className="text-white" />
+            <div className="absolute inset-0 bg-status-success/20 flex items-center justify-center">
+              <div className="bg-status-success rounded-full p-4 animate-pulse">
+                <CheckCircle size={48} className="text-content-primary" />
               </div>
             </div>
           )}
         </div>
 
-        <div className="bg-slate-900 rounded-b-xl p-4">
+        <div className="bg-surface-base rounded-b-xl p-4">
           {error ? (
             <div className="text-center">
-              <div className="text-red-400 mb-4 text-sm">{error}</div>
+              <div className="text-status-danger mb-4 text-sm">{error}</div>
               <button
                 onClick={startCamera}
-                className="px-6 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition"
+                className="px-6 py-2 bg-accent hover:bg-accent/80 text-white rounded-lg transition"
               >
                 Réessayer
               </button>
@@ -319,14 +319,14 @@ export default function FaceLivenessCapture({
             <div className="flex gap-3">
               <button
                 onClick={handleClose}
-                className="flex-1 px-4 py-3 bg-slate-700 hover:bg-slate-600 text-white font-medium rounded-lg transition"
+                className="flex-1 px-4 py-3 bg-surface-elevated hover:bg-surface-subtle text-content-primary font-medium rounded-lg transition"
                 data-testid="button-cancel-liveness"
               >
                 Annuler
               </button>
               <button
                 onClick={capturePhoto}
-                className="flex-1 px-4 py-3 bg-cyan-500 hover:bg-cyan-600 text-white font-medium rounded-lg transition flex items-center justify-center gap-2"
+                className="flex-1 px-4 py-3 bg-accent hover:bg-accent/80 text-white font-medium rounded-lg transition flex items-center justify-center gap-2"
                 data-testid="button-capture-manual"
               >
                 <Camera size={18} />

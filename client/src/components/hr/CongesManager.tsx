@@ -258,8 +258,8 @@ export default function CongesManager({
       primary: true,
       format: (val: string, item: DemandeConge) => (
           <div className="flex flex-col">
-              <span className="font-semibold text-white">{val}</span>
-              <span className="text-[10px] text-slate-400">{item.type}</span>
+              <span className="font-semibold text-content-primary">{val}</span>
+              <span className="text-[10px] text-content-muted">{item.type}</span>
           </div>
       )
     },
@@ -267,8 +267,8 @@ export default function CongesManager({
         label: 'Période',
         key: 'dateDebut',
         format: (_: string, item: DemandeConge) => (
-            <div className="flex items-center gap-1 text-xs text-slate-300">
-                <Calendar size={12} className="text-slate-500" />
+            <div className="flex items-center gap-1 text-xs text-content-secondary">
+                <Calendar size={12} className="text-content-muted" />
                 <span>{new Date(item.dateDebut).toLocaleDateString()} - {new Date(item.dateFin).toLocaleDateString()}</span>
             </div>
         )
@@ -312,14 +312,14 @@ export default function CongesManager({
           <div className="flex gap-2 justify-end">
             <button
               onClick={(e) => { e.stopPropagation(); onApprove(item.id); }}
-              className="p-1.5 hover:bg-green-500/20 text-green-400 rounded-lg transition"
+              className="p-1.5 hover:bg-status-success-bg text-status-success rounded-lg transition"
               title="Approuver"
             >
               <CheckCircle size={16} />
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); setShowRejectModal(item.id); }}
-              className="p-1.5 hover:bg-red-500/20 text-red-400 rounded-lg transition"
+              className="p-1.5 hover:bg-status-danger-bg text-status-danger rounded-lg transition"
               title="Refuser"
             >
               <XCircle size={16} />
@@ -333,58 +333,58 @@ export default function CongesManager({
   return (
     <div className="flex flex-col h-full space-y-2">
       {/* Sync Status Bar */}
-      <div className="shrink-0 flex items-center justify-between px-2 py-1 bg-slate-800/50 rounded text-xs">
+      <div className="shrink-0 flex items-center justify-between px-2 py-1 bg-surface/50 rounded text-xs">
         <div className="flex items-center gap-2">
           {isConnected ? (
-            <Wifi size={12} className="text-green-500" />
+            <Wifi size={12} className="text-status-success" />
           ) : (
-            <WifiOff size={12} className="text-red-500" />
+            <WifiOff size={12} className="text-status-danger" />
           )}
           <span className={statusColor}>{statusText}</span>
           {lastUpdateTime && (
-            <span className="text-slate-500">· {lastUpdateTime}</span>
+            <span className="text-content-muted">· {lastUpdateTime}</span>
           )}
         </div>
         <button
           onClick={() => refresh('conge')}
-          className={`p-1 hover:bg-slate-700 rounded transition ${syncStatus === 'syncing' ? 'animate-spin' : ''}`}
+          className={`p-1 hover:bg-surface-elevated rounded transition ${syncStatus === 'syncing' ? 'animate-spin' : ''}`}
           title="Rafraîchir"
         >
-          <RefreshCw size={12} className="text-slate-400" />
+          <RefreshCw size={12} className="text-content-muted" />
         </button>
       </div>
 
       {/* Leave Balance Card (if available) */}
       {leaveBalance?.data && (
-        <div className="shrink-0 bg-gradient-to-r from-cyan-900/30 to-blue-900/30 border border-cyan-800/50 rounded-lg p-3">
+        <div className="shrink-0 bg-gradient-to-r from-accent/10 to-status-info/10 border border-accent/30 rounded-lg p-3">
           <div className="flex items-center justify-between">
             <div>
-              <h4 className="text-xs font-medium text-slate-400">Votre solde congés {new Date().getFullYear()}</h4>
+              <h4 className="text-xs font-medium text-content-muted">Votre solde congés {new Date().getFullYear()}</h4>
               <div className="flex items-baseline gap-2 mt-1">
-                <span className="text-2xl font-bold text-cyan-400">{leaveBalance.data.available}</span>
-                <span className="text-xs text-slate-500">jours disponibles</span>
+                <span className="text-2xl font-bold text-accent">{leaveBalance.data.available}</span>
+                <span className="text-xs text-content-muted">jours disponibles</span>
               </div>
             </div>
             {leaveBalance.data.balance && (
-              <div className="text-right text-xs text-slate-400 space-y-0.5">
-                <div>Acquis: <span className="text-white">{leaveBalance.data.balance.acquired}j</span></div>
-                <div>Utilisés: <span className="text-orange-400">{leaveBalance.data.balance.used}j</span></div>
-                <div>En attente: <span className="text-yellow-400">{leaveBalance.data.balance.pending}j</span></div>
+              <div className="text-right text-xs text-content-muted space-y-0.5">
+                <div>Acquis: <span className="text-content-primary">{leaveBalance.data.balance.acquired}j</span></div>
+                <div>Utilisés: <span className="text-status-warning">{leaveBalance.data.balance.used}j</span></div>
+                <div>En attente: <span className="text-status-warning">{leaveBalance.data.balance.pending}j</span></div>
               </div>
             )}
           </div>
           {/* Per-type breakdown */}
           {leaveBalance.data.byType && leaveBalance.data.byType.length > 0 && (
-            <div className="mt-3 pt-3 border-t border-cyan-800/30">
-              <h5 className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-2">Répartition par type</h5>
+            <div className="mt-3 pt-3 border-t border-accent/20">
+              <h5 className="text-[10px] font-medium text-content-muted uppercase tracking-wider mb-2">Répartition par type</h5>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
                 {leaveBalance.data.byType.map((bt) => (
-                  <div key={bt.type} className="bg-slate-800/60 rounded-md px-2.5 py-1.5">
-                    <div className="text-[10px] text-slate-400 truncate" title={bt.type}>{bt.type}</div>
+                  <div key={bt.type} className="bg-surface/60 rounded-md px-2.5 py-1.5">
+                    <div className="text-[10px] text-content-muted truncate" title={bt.type}>{bt.type}</div>
                     <div className="flex items-baseline gap-1.5 mt-0.5">
-                      <span className="text-sm font-bold text-white">{bt.joursApproved}j</span>
+                      <span className="text-sm font-bold text-content-primary">{bt.joursApproved}j</span>
                       {bt.joursPending > 0 && (
-                        <span className="text-[10px] text-yellow-400">+{bt.joursPending}j en att.</span>
+                        <span className="text-[10px] text-status-warning">+{bt.joursPending}j en att.</span>
                       )}
                     </div>
                   </div>
@@ -428,26 +428,26 @@ export default function CongesManager({
       </div>
 
       {/* Main Content - Flex Grow */}
-      <div className="flex-1 min-h-0 bg-slate-900 border border-slate-800 rounded-lg flex flex-col">
+      <div className="flex-1 min-h-0 bg-surface-base border border-edge rounded-lg flex flex-col">
         {/* Compact Header Toolbar */}
-        <div className="shrink-0 p-2 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
-           <h3 className="text-xs font-bold text-white flex items-center gap-2">
-              <Calendar size={14} className="text-cyan-400" />
+        <div className="shrink-0 p-2 border-b border-edge flex justify-between items-center bg-surface-base/50">
+           <h3 className="text-xs font-bold text-content-primary flex items-center gap-2">
+              <Calendar size={14} className="text-accent" />
               Demandes de Congés
            </h3>
            <div className="flex items-center gap-2">
              {/* View Mode Toggle */}
-             <div className="flex items-center bg-slate-800 rounded-lg p-0.5">
+             <div className="flex items-center bg-surface rounded-lg p-0.5">
                <button
                  onClick={() => setViewMode('list')}
-                 className={`p-1 rounded transition ${viewMode === 'list' ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                 className={`p-1 rounded transition ${viewMode === 'list' ? 'bg-surface-elevated text-content-primary' : 'text-content-muted hover:text-content-secondary'}`}
                  title="Vue liste"
                >
                  <List size={14} />
                </button>
                <button
                  onClick={() => setViewMode('calendar')}
-                 className={`p-1 rounded transition ${viewMode === 'calendar' ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                 className={`p-1 rounded transition ${viewMode === 'calendar' ? 'bg-surface-elevated text-content-primary' : 'text-content-muted hover:text-content-secondary'}`}
                  title="Vue calendrier"
                >
                  <CalendarDays size={14} />
@@ -478,7 +478,7 @@ export default function CongesManager({
               }}
               density="compact"
               className="border-0 rounded-none h-full"
-              headerClassName="bg-slate-900 sticky top-0"
+              headerClassName="bg-surface-base sticky top-0"
             />
           ) : (
             <LeaveCalendar demandes={demandes} />
@@ -495,7 +495,7 @@ export default function CongesManager({
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           {formError && (
-            <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+            <div className="flex items-center gap-2 p-3 bg-status-danger-bg border border-status-danger/30 rounded-lg text-status-danger text-sm">
               <AlertCircle size={16} />
               {formError}
             </div>
@@ -505,11 +505,11 @@ export default function CongesManager({
           {isAdmin ? (
             /* Admin: searchable employee select */
             <div ref={searchRef} className="relative">
-              <label className="block text-sm font-medium text-slate-300 mb-1">
-                Employé <span className="text-red-400">*</span>
+              <label className="block text-sm font-medium text-content-secondary mb-1">
+                Employé <span className="text-status-danger">*</span>
               </label>
               <div className="relative">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" />
                 <input
                   type="text"
                   value={employeSearch}
@@ -523,35 +523,35 @@ export default function CongesManager({
                   }}
                   onFocus={() => setShowEmployeDropdown(true)}
                   placeholder="Rechercher par nom, matricule..."
-                  className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none text-sm"
+                  className="w-full pl-9 pr-3 py-2 bg-surface border border-edge rounded-lg text-content-primary placeholder-content-muted focus:border-accent focus:outline-none text-sm"
                 />
               </div>
               {/* Selected badge */}
               {formData.employeId && (
-                <div className="mt-1.5 flex items-center gap-2 px-2 py-1 bg-cyan-900/30 border border-cyan-800/50 rounded text-xs text-cyan-300">
+                <div className="mt-1.5 flex items-center gap-2 px-2 py-1 bg-accent/10 border border-accent/30 rounded text-xs text-accent">
                   <CheckCircle size={12} />
                   <span className="font-medium">{formData.employeNom}</span>
-                  <span className="text-slate-500">({employes.find(e => e.id === formData.employeId)?.matricule})</span>
+                  <span className="text-content-muted">({employes.find(e => e.id === formData.employeId)?.matricule})</span>
                 </div>
               )}
               {/* Dropdown */}
               {showEmployeDropdown && !formData.employeId && (
-                <div className="absolute z-50 mt-1 w-full max-h-48 overflow-y-auto bg-slate-800 border border-slate-700 rounded-lg shadow-xl">
+                <div className="absolute z-50 mt-1 w-full max-h-48 overflow-y-auto bg-surface border border-edge rounded-lg shadow-xl">
                   {filteredEmployes.length === 0 ? (
-                    <div className="px-3 py-2 text-xs text-slate-500">Aucun employé trouvé</div>
+                    <div className="px-3 py-2 text-xs text-content-muted">Aucun employé trouvé</div>
                   ) : (
                     filteredEmployes.map(emp => (
                       <button
                         key={emp.id}
                         type="button"
                         onClick={() => selectEmploye(emp)}
-                        className="w-full text-left px-3 py-2 hover:bg-slate-700 transition flex items-center justify-between"
+                        className="w-full text-left px-3 py-2 hover:bg-surface-elevated transition flex items-center justify-between"
                       >
                         <div>
-                          <div className="text-sm text-white">{emp.nom} {emp.prenom}</div>
-                          <div className="text-[10px] text-slate-400">{emp.poste || 'N/A'}</div>
+                          <div className="text-sm text-content-primary">{emp.nom} {emp.prenom}</div>
+                          <div className="text-[10px] text-content-muted">{emp.poste || 'N/A'}</div>
                         </div>
-                        <span className="text-[10px] font-mono text-slate-500">{emp.matricule}</span>
+                        <span className="text-[10px] font-mono text-content-muted">{emp.matricule}</span>
                       </button>
                     ))
                   )}
@@ -561,14 +561,14 @@ export default function CongesManager({
           ) : (
             /* Non-admin: auto-populated, read-only display */
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Employé</label>
-              <div className="flex items-center gap-2 px-3 py-2 bg-slate-800/60 border border-slate-700 rounded-lg">
-                <div className="w-7 h-7 rounded-full bg-cyan-900/50 flex items-center justify-center text-cyan-400 text-xs font-bold">
+              <label className="block text-sm font-medium text-content-secondary mb-1">Employé</label>
+              <div className="flex items-center gap-2 px-3 py-2 bg-surface/60 border border-edge rounded-lg">
+                <div className="w-7 h-7 rounded-full bg-accent/10 flex items-center justify-center text-accent text-xs font-bold">
                   {user?.prenom?.charAt(0)}{user?.nom?.charAt(0)}
                 </div>
                 <div>
-                  <div className="text-sm text-white font-medium">{getFullName()}</div>
-                  {user?.matricule && <div className="text-[10px] text-slate-400">{user.matricule}</div>}
+                  <div className="text-sm text-content-primary font-medium">{getFullName()}</div>
+                  {user?.matricule && <div className="text-[10px] text-content-muted">{user.matricule}</div>}
                 </div>
               </div>
             </div>
@@ -622,7 +622,7 @@ export default function CongesManager({
           {/* Half-day option on last day */}
           {formData.dateDebut && formData.dateFin && (
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">
+              <label className="block text-sm font-medium text-content-secondary mb-1">
                 {formData.dateDebut === formData.dateFin
                   ? 'Durée de la journée'
                   : `Dernier jour (${new Date(formData.dateFin).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })})`
@@ -640,8 +640,8 @@ export default function CongesManager({
                     onClick={() => setFormData(prev => ({ ...prev, demiJournee: opt.value }))}
                     className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition flex items-center justify-center gap-1.5 ${
                       formData.demiJournee === opt.value
-                        ? 'bg-cyan-600 text-white ring-1 ring-cyan-400'
-                        : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                        ? 'bg-accent-secondary text-content-primary ring-1 ring-accent'
+                        : 'bg-surface text-content-muted hover:bg-surface-elevated'
                     }`}
                   >
                     <span>{opt.icon}</span>
@@ -650,7 +650,7 @@ export default function CongesManager({
                 ))}
               </div>
               {formData.demiJournee && formData.dateDebut !== formData.dateFin && (
-                <p className="mt-1 text-[10px] text-slate-500">
+                <p className="mt-1 text-[10px] text-content-muted">
                   Les jours précédents comptent comme journées entières, le dernier jour en demi-journée ({formData.demiJournee === 'AM' ? 'matin' : 'après-midi'}).
                 </p>
               )}
@@ -659,12 +659,12 @@ export default function CongesManager({
 
           {/* Days Preview */}
           {requestedDays > 0 && (
-            <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
-              <span className="text-sm text-slate-400">Jours ouvrés demandés:</span>
+            <div className="flex items-center justify-between p-3 bg-surface rounded-lg">
+              <span className="text-sm text-content-muted">Jours ouvrés demandés:</span>
               <span className={`text-lg font-bold ${
                 leaveBalance?.data && requestedDays > leaveBalance.data.available
-                  ? 'text-red-400'
-                  : 'text-cyan-400'
+                  ? 'text-status-danger'
+                  : 'text-accent'
               }`}>
                 {requestedDays % 1 !== 0
                   ? `${requestedDays.toFixed(1).replace('.', ',')} jour(s)`
@@ -683,7 +683,7 @@ export default function CongesManager({
             placeholder="Raison de la demande..."
           />
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
+          <div className="flex justify-end gap-3 pt-4 border-t border-edge">
             <Button
               type="button"
               variant="secondary"
@@ -706,14 +706,14 @@ export default function CongesManager({
         size="sm"
       >
         <div className="space-y-4">
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-content-muted">
             Veuillez indiquer le motif du refus. Ce commentaire sera visible par l'employé.
           </p>
           <textarea
             value={rejectComment}
             onChange={(e) => setRejectComment(e.target.value)}
             placeholder="Motif du refus..."
-            className="w-full p-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-red-500 focus:outline-none resize-none"
+            className="w-full p-3 bg-surface border border-edge rounded-lg text-content-primary placeholder-content-muted focus:border-status-danger focus:outline-none resize-none"
             rows={3}
             required
           />

@@ -53,11 +53,11 @@ export const designTokens = {
     neutral: {
       100: '#f1f5f9',
       300: '#cbd5e1',
-      400: '#94a3b8',  // text-slate-400
+      400: '#94a3b8',  // text-content-muted
       600: '#475569',
-      700: '#334155',  // border-slate-700
-      800: '#1e293b',  // bg-slate-800
-      900: '#0f172a',  // bg-slate-900
+      700: '#334155',  // border-edge
+      800: '#1e293b',  // bg-surface
+      900: '#0f172a',  // bg-surface-base
     },
   },
 

@@ -124,32 +124,32 @@ export function PendingActivationDrawer({ open, onClose, onActivate }: PendingAc
 
   return (
     <Sheet open={open} onOpenChange={onClose}>
-      <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col bg-slate-950 border-slate-800">
-        <div className="p-6 border-b border-slate-800 bg-slate-900/50">
+      <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col bg-surface-base border-edge">
+        <div className="p-6 border-b border-edge bg-surface-base/50">
           <SheetHeader>
-            <SheetTitle className="text-white flex items-center gap-2">
-              <UserCheck className="text-orange-500" />
+            <SheetTitle className="text-content-primary flex items-center gap-2">
+              <UserCheck className="text-status-warning" />
               Activations Requises
               {accounts.length > 0 && (
                 <Badge
                   variant="warning"
-                  className="ml-2 bg-orange-500 text-white border-none"
+                  className="ml-2 bg-status-warning text-white border-none"
                   value={accounts.length}
                 />
               )}
             </SheetTitle>
-            <SheetDescription className="text-slate-400">
+            <SheetDescription className="text-content-muted">
               Encaissez les dépôts initiaux pour activer les comptes.
             </SheetDescription>
           </SheetHeader>
 
           <div className="mt-4 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted w-4 h-4" />
             <Input
               placeholder="Rechercher nom ou numéro..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 bg-slate-950 border-slate-800 text-white placeholder:text-slate-600"
+              className="pl-9 bg-surface-base border-edge text-content-primary placeholder:text-content-muted"
             />
           </div>
 
@@ -158,10 +158,10 @@ export function PendingActivationDrawer({ open, onClose, onActivate }: PendingAc
             <div className="mt-4 flex items-center justify-between gap-2">
               <button
                 onClick={toggleSelectAll}
-                className="flex items-center gap-2 text-xs text-slate-400 hover:text-white transition"
+                className="flex items-center gap-2 text-xs text-content-muted hover:text-content-primary transition"
               >
                 {allSelected ? (
-                  <CheckSquare size={16} className="text-orange-500" />
+                  <CheckSquare size={16} className="text-status-warning" />
                 ) : (
                   <Square size={16} />
                 )}
@@ -174,7 +174,7 @@ export function PendingActivationDrawer({ open, onClose, onActivate }: PendingAc
                   variant="primary"
                   onClick={handleBatchActivate}
                   disabled={batchActivating}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-xs"
+                  className="bg-status-success hover:bg-status-success text-xs"
                 >
                   {batchActivating ? (
                     <Loader2 size={14} className="animate-spin mr-1" />
@@ -190,10 +190,10 @@ export function PendingActivationDrawer({ open, onClose, onActivate }: PendingAc
 
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {isLoading ? (
-             <div className="flex justify-center py-8 text-slate-500">Chargement...</div>
+             <div className="flex justify-center py-8 text-content-muted">Chargement...</div>
           ) : filteredAccounts.length === 0 ? (
-             <div className="flex flex-col items-center justify-center h-full text-slate-500 space-y-4 opacity-60">
-                <CheckCircle2 size={48} className="text-emerald-500" />
+             <div className="flex flex-col items-center justify-center h-full text-content-muted space-y-4 opacity-60">
+                <CheckCircle2 size={48} className="text-status-success" />
                 <p>Aucune activation en attente</p>
              </div>
           ) : (
@@ -202,10 +202,10 @@ export function PendingActivationDrawer({ open, onClose, onActivate }: PendingAc
                 return (
                   <div
                     key={account.id}
-                    className={`bg-slate-900 border rounded-xl p-4 flex flex-col gap-3 group transition-all ${
+                    className={`bg-surface-base border rounded-xl p-4 flex flex-col gap-3 group transition-all ${
                       isSelected
-                        ? 'border-orange-500/50 bg-orange-500/5'
-                        : 'border-slate-800 hover:border-orange-500/30'
+                        ? 'border-status-warning/50 bg-status-warning/5'
+                        : 'border-edge hover:border-status-warning/30'
                     }`}
                   >
                      <div className="flex justify-between items-start">
@@ -216,13 +216,13 @@ export function PendingActivationDrawer({ open, onClose, onActivate }: PendingAc
                              className="flex-shrink-0 self-center"
                            >
                              {isSelected ? (
-                               <CheckSquare size={20} className="text-orange-500" />
+                               <CheckSquare size={20} className="text-status-warning" />
                              ) : (
-                               <Square size={20} className="text-slate-600 hover:text-slate-400" />
+                               <Square size={20} className="text-content-muted hover:text-content-muted" />
                              )}
                            </button>
 
-                           <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center overflow-hidden border border-slate-700">
+                           <div className="w-10 h-10 rounded-full bg-surface flex items-center justify-center overflow-hidden border border-edge">
                               {resolveClientPhotoUrl(account.client.photoUrl) && !imageErrors[account.id] ? (
                                  <img
                                    src={resolveClientPhotoUrl(account.client.photoUrl)}
@@ -231,17 +231,17 @@ export function PendingActivationDrawer({ open, onClose, onActivate }: PendingAc
                                    onError={() => handleImageError(account.id)}
                                  />
                               ) : (
-                                 <UserCheck size={20} className="text-slate-400" />
+                                 <UserCheck size={20} className="text-content-muted" />
                               )}
                            </div>
                            <div>
-                              <h4 className="font-medium text-slate-200">
+                              <h4 className="font-medium text-content-secondary">
                                  {account.client.nom} {account.client.prenom}
                               </h4>
-                              <div className="flex items-center gap-2 text-xs text-slate-500">
+                              <div className="flex items-center gap-2 text-xs text-content-muted">
                                  <Badge
                                     variant="outline"
-                                    className="text-[10px] px-1 py-0 h-4 border-slate-700 text-slate-400"
+                                    className="text-[10px] px-1 py-0 h-4 border-edge text-content-muted"
                                     value={getStatusLabel(account.typeCompte, ACCOUNT_TYPE_LABELS)}
                                  />
                                  <span className="flex items-center gap-1">
@@ -252,15 +252,15 @@ export function PendingActivationDrawer({ open, onClose, onActivate }: PendingAc
                            </div>
                         </div>
                         <div className="text-right">
-                           <p className="text-lg font-bold text-white">
+                           <p className="text-lg font-bold text-content-primary">
                               {formattedMoney(account.montantInitial)}
                            </p>
-                           <p className="text-xs text-slate-500 font-mono">{account.numeroCompte}</p>
+                           <p className="text-xs text-content-muted font-mono">{account.numeroCompte}</p>
                         </div>
                      </div>
 
                      <Button
-                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white h-11 font-medium shadow-lg shadow-emerald-500/10 active:scale-[0.98] transition-all"
+                        className="w-full bg-status-success hover:bg-status-success text-white h-11 font-medium shadow-lg shadow-status-success/10 active:scale-[0.98] transition-all"
                         onClick={() => onActivate(account)}
                      >
                         Encaisser maintenant

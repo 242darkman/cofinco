@@ -163,7 +163,7 @@ export default function PayrollConfigPanel() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12 text-slate-500">
+      <div className="flex items-center justify-center py-12 text-content-muted">
         <RefreshCw className="animate-spin mr-2" size={16} />
         Chargement configuration...
       </div>
@@ -177,8 +177,8 @@ export default function PayrollConfigPanel() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Settings size={16} className="text-amber-400" />
-          <h3 className="font-bold text-white text-sm">Configuration Paie</h3>
+          <Settings size={16} className="text-status-warning" />
+          <h3 className="font-bold text-content-primary text-sm">Configuration Paie</h3>
           {config && (
             <Badge variant="info" size="sm" value={`Depuis ${new Date(config.effectiveFrom).toLocaleDateString('fr-FR')}`} />
           )}
@@ -197,14 +197,14 @@ export default function PayrollConfigPanel() {
 
       <div className="grid lg:grid-cols-2 gap-4">
         {/* CNSS Rates */}
-        <Card padding="sm" className="bg-slate-800/80 border-slate-700">
-          <h4 className="text-xs font-bold text-blue-400 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+        <Card padding="sm" className="bg-surface/80 border-edge">
+          <h4 className="text-xs font-bold text-status-info uppercase tracking-wide mb-3 flex items-center gap-1.5">
             <Percent size={13} />
             Cotisations CNSS
           </h4>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[10px] text-slate-400 mb-1">Part employé (%)</label>
+              <label className="block text-[10px] text-content-muted mb-1">Part employé (%)</label>
               <input
                 type="number"
                 step="0.01"
@@ -212,11 +212,11 @@ export default function PayrollConfigPanel() {
                 max="100"
                 value={cnssEmployee}
                 onChange={(e) => setCnssEmployee(e.target.value)}
-                className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded text-sm text-white font-mono focus:ring-1 focus:ring-blue-500/50 outline-none"
+                className="w-full px-2 py-1.5 bg-surface-base border border-edge rounded text-sm text-content-primary font-mono focus:ring-1 focus:ring-status-info/50 outline-none"
               />
             </div>
             <div>
-              <label className="block text-[10px] text-slate-400 mb-1">Part employeur (%)</label>
+              <label className="block text-[10px] text-content-muted mb-1">Part employeur (%)</label>
               <input
                 type="number"
                 step="0.01"
@@ -224,114 +224,114 @@ export default function PayrollConfigPanel() {
                 max="100"
                 value={cnssEmployer}
                 onChange={(e) => setCnssEmployer(e.target.value)}
-                className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded text-sm text-white font-mono focus:ring-1 focus:ring-blue-500/50 outline-none"
+                className="w-full px-2 py-1.5 bg-surface-base border border-edge rounded text-sm text-content-primary font-mono focus:ring-1 focus:ring-status-info/50 outline-none"
               />
             </div>
           </div>
-          <p className="text-[10px] text-slate-500 mt-2">
+          <p className="text-[10px] text-content-muted mt-2">
             Total charges sociales : {(parseFloat(cnssEmployee || '0') + parseFloat(cnssEmployer || '0')).toFixed(2)}%
           </p>
         </Card>
 
         {/* Allowances */}
-        <Card padding="sm" className="bg-slate-800/80 border-slate-700">
-          <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+        <Card padding="sm" className="bg-surface/80 border-edge">
+          <h4 className="text-xs font-bold text-status-success uppercase tracking-wide mb-3 flex items-center gap-1.5">
             <DollarSign size={13} />
             Primes & Indemnités
           </h4>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[10px] text-slate-400 mb-1">Transport (CDF)</label>
+              <label className="block text-[10px] text-content-muted mb-1">Transport (CDF)</label>
               <input
                 type="number"
                 min="0"
                 step="1000"
                 value={transportAllowance}
                 onChange={(e) => setTransportAllowance(e.target.value)}
-                className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded text-sm text-white font-mono focus:ring-1 focus:ring-emerald-500/50 outline-none"
+                className="w-full px-2 py-1.5 bg-surface-base border border-edge rounded text-sm text-content-primary font-mono focus:ring-1 focus:ring-status-success/50 outline-none"
               />
             </div>
             <div>
-              <label className="block text-[10px] text-slate-400 mb-1">Logement (CDF)</label>
+              <label className="block text-[10px] text-content-muted mb-1">Logement (CDF)</label>
               <input
                 type="number"
                 min="0"
                 step="1000"
                 value={housingAllowance}
                 onChange={(e) => setHousingAllowance(e.target.value)}
-                className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded text-sm text-white font-mono focus:ring-1 focus:ring-emerald-500/50 outline-none"
+                className="w-full px-2 py-1.5 bg-surface-base border border-edge rounded text-sm text-content-primary font-mono focus:ring-1 focus:ring-status-success/50 outline-none"
               />
             </div>
           </div>
         </Card>
 
         {/* Overtime Rates */}
-        <Card padding="sm" className="bg-slate-800/80 border-slate-700">
-          <h4 className="text-xs font-bold text-purple-400 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+        <Card padding="sm" className="bg-surface/80 border-edge">
+          <h4 className="text-xs font-bold text-status-info uppercase tracking-wide mb-3 flex items-center gap-1.5">
             <Clock size={13} />
             Taux Heures Supplémentaires
           </h4>
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-[10px] text-slate-400 mb-1">Heures sup. (x)</label>
+              <label className="block text-[10px] text-content-muted mb-1">Heures sup. (x)</label>
               <input
                 type="number"
                 step="0.05"
                 min="1"
                 value={overtimeRate}
                 onChange={(e) => setOvertimeRate(e.target.value)}
-                className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded text-sm text-white font-mono focus:ring-1 focus:ring-purple-500/50 outline-none"
+                className="w-full px-2 py-1.5 bg-surface-base border border-edge rounded text-sm text-content-primary font-mono focus:ring-1 focus:ring-status-info/50 outline-none"
               />
             </div>
             <div>
-              <label className="block text-[10px] text-slate-400 mb-1">Nuit (x)</label>
+              <label className="block text-[10px] text-content-muted mb-1">Nuit (x)</label>
               <input
                 type="number"
                 step="0.05"
                 min="1"
                 value={nightShiftRate}
                 onChange={(e) => setNightShiftRate(e.target.value)}
-                className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded text-sm text-white font-mono focus:ring-1 focus:ring-purple-500/50 outline-none"
+                className="w-full px-2 py-1.5 bg-surface-base border border-edge rounded text-sm text-content-primary font-mono focus:ring-1 focus:ring-status-info/50 outline-none"
               />
             </div>
             <div>
-              <label className="block text-[10px] text-slate-400 mb-1">Jours fériés (x)</label>
+              <label className="block text-[10px] text-content-muted mb-1">Jours fériés (x)</label>
               <input
                 type="number"
                 step="0.05"
                 min="1"
                 value={holidayRate}
                 onChange={(e) => setHolidayRate(e.target.value)}
-                className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded text-sm text-white font-mono focus:ring-1 focus:ring-purple-500/50 outline-none"
+                className="w-full px-2 py-1.5 bg-surface-base border border-edge rounded text-sm text-content-primary font-mono focus:ring-1 focus:ring-status-info/50 outline-none"
               />
             </div>
           </div>
-          <p className="text-[10px] text-slate-500 mt-2">
+          <p className="text-[10px] text-content-muted mt-2">
             Multiplicateurs appliqués au taux horaire de base
           </p>
         </Card>
       </div>
 
       {/* IPR Brackets - Full Width */}
-      <Card padding="sm" className="bg-slate-800/80 border-slate-700">
+      <Card padding="sm" className="bg-surface/80 border-edge">
         <div className="flex items-center justify-between mb-3">
-          <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wide flex items-center gap-1.5">
+          <h4 className="text-xs font-bold text-status-warning uppercase tracking-wide flex items-center gap-1.5">
             <AlertTriangle size={13} />
             Barème IPR (Impôt Progressif sur le Revenu)
           </h4>
-          <Button variant="ghost" size="sm" icon={Plus} onClick={addBracket} className="h-6 text-[10px] text-amber-400 hover:text-amber-300">
+          <Button variant="ghost" size="sm" icon={Plus} onClick={addBracket} className="h-6 text-[10px] text-status-warning hover:text-status-warning">
             Ajouter tranche
           </Button>
         </div>
 
         {sortedBrackets.length === 0 ? (
-          <div className="text-center py-6 text-slate-500 text-xs">
+          <div className="text-center py-6 text-content-muted text-xs">
             Aucune tranche configurée. Cliquez sur "Ajouter tranche" pour commencer.
           </div>
         ) : (
           <div className="space-y-1">
             {/* Header */}
-            <div className="grid grid-cols-[1fr_1fr_100px_40px] gap-2 text-[10px] text-slate-500 uppercase tracking-wide px-1 pb-1 border-b border-slate-700">
+            <div className="grid grid-cols-[1fr_1fr_100px_40px] gap-2 text-[10px] text-content-muted uppercase tracking-wide px-1 pb-1 border-b border-edge">
               <span>Minimum (CDF)</span>
               <span>Maximum (CDF)</span>
               <span>Taux (%)</span>
@@ -345,7 +345,7 @@ export default function PayrollConfigPanel() {
                   min="0"
                   value={bracket.min}
                   onChange={(e) => updateBracket(index, 'min', e.target.value)}
-                  className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded text-xs text-white font-mono focus:ring-1 focus:ring-amber-500/50 outline-none"
+                  className="w-full px-2 py-1.5 bg-surface-base border border-edge rounded text-xs text-content-primary font-mono focus:ring-1 focus:ring-status-warning/50 outline-none"
                 />
                 <input
                   type="number"
@@ -354,7 +354,7 @@ export default function PayrollConfigPanel() {
                   placeholder={index === sortedBrackets.length - 1 ? '∞' : ''}
                   onChange={(e) => updateBracket(index, 'max', e.target.value)}
                   disabled={index === sortedBrackets.length - 1}
-                  className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded text-xs text-white font-mono focus:ring-1 focus:ring-amber-500/50 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-2 py-1.5 bg-surface-base border border-edge rounded text-xs text-content-primary font-mono focus:ring-1 focus:ring-status-warning/50 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                 />
                 <input
                   type="number"
@@ -363,11 +363,11 @@ export default function PayrollConfigPanel() {
                   max="100"
                   value={(bracket.rate * 100).toFixed(1)}
                   onChange={(e) => updateBracket(index, 'rate', e.target.value)}
-                  className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded text-xs text-white font-mono focus:ring-1 focus:ring-amber-500/50 outline-none"
+                  className="w-full px-2 py-1.5 bg-surface-base border border-edge rounded text-xs text-content-primary font-mono focus:ring-1 focus:ring-status-warning/50 outline-none"
                 />
                 <button
                   onClick={() => removeBracket(index)}
-                  className="p-1 text-red-500/60 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                  className="p-1 text-status-danger/60 hover:text-status-danger hover:bg-status-danger-bg rounded transition-colors"
                   title="Supprimer cette tranche"
                 >
                   <Trash2 size={14} />
@@ -376,7 +376,7 @@ export default function PayrollConfigPanel() {
             ))}
 
             {/* IPR simulation */}
-            <div className="mt-3 pt-3 border-t border-slate-700">
+            <div className="mt-3 pt-3 border-t border-edge">
               <IprSimulator brackets={sortedBrackets} />
             </div>
           </div>
@@ -411,20 +411,20 @@ function IprSimulator({ brackets }: { brackets: IprBracket[] }) {
   return (
     <div className="flex flex-wrap items-end gap-3">
       <div>
-        <label className="block text-[10px] text-slate-500 mb-1">Simuler sur un salaire</label>
+        <label className="block text-[10px] text-content-muted mb-1">Simuler sur un salaire</label>
         <input
           type="number"
           min="0"
           step="100000"
           value={testSalary}
           onChange={(e) => setTestSalary(e.target.value)}
-          className="w-44 px-2 py-1.5 bg-slate-900 border border-slate-700 rounded text-xs text-white font-mono focus:ring-1 focus:ring-amber-500/50 outline-none"
+          className="w-44 px-2 py-1.5 bg-surface-base border border-edge rounded text-xs text-content-primary font-mono focus:ring-1 focus:ring-status-warning/50 outline-none"
         />
       </div>
       <div className="text-xs">
-        <span className="text-slate-400">IPR : </span>
-        <span className="font-bold text-amber-400">{ipr.toLocaleString('fr-FR')} CDF</span>
-        <span className="text-slate-500 ml-2">({effectiveRate}% effectif)</span>
+        <span className="text-content-muted">IPR : </span>
+        <span className="font-bold text-status-warning">{ipr.toLocaleString('fr-FR')} CDF</span>
+        <span className="text-content-muted ml-2">({effectiveRate}% effectif)</span>
       </div>
     </div>
   );

@@ -23,8 +23,8 @@ interface SparkleConfig {
 // Generate random sparkle positions
 const generateSparklePositions = (isDebit: boolean): SparkleConfig[] => {
   const colors = isDebit
-    ? ['text-amber-400/40', 'text-orange-400/30', 'text-yellow-400/30']
-    : ['text-emerald-400/40', 'text-cyan-400/30', 'text-teal-400/30'];
+    ? ['text-status-warning/40', 'text-status-warning/30', 'text-status-warning/30']
+    : ['text-status-success/40', 'text-accent/30', 'text-accent/30'];
 
   return Array.from({ length: 5 }, (_, i) => ({
     top: `${Math.random() * 70 + 10}%`,
@@ -112,19 +112,19 @@ export const UniversalPaymentSuccessModal: React.FC<UniversalPaymentSuccessModal
   return (
     <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
       {/* Modal Container - Mobile: Bottom sheet, Desktop: Centered */}
-      <div className="bg-slate-900 w-full sm:max-w-md sm:rounded-2xl rounded-t-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-500 max-h-[95vh] flex flex-col">
+      <div className="bg-surface-base w-full sm:max-w-md sm:rounded-2xl rounded-t-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-500 max-h-[95vh] flex flex-col">
 
         {/* Mobile Handle */}
         <div className="sm:hidden flex justify-center pt-3 pb-1">
-          <div className="w-12 h-1.5 rounded-full bg-slate-700" />
+          <div className="w-12 h-1.5 rounded-full bg-surface-elevated" />
         </div>
 
         {/* Success Animation Header */}
-        <div className="relative bg-gradient-to-br from-emerald-500/20 via-emerald-500/10 to-transparent p-6 sm:p-8 overflow-hidden">
+        <div className="relative bg-gradient-to-br from-status-success/20 via-emerald-500/10 to-transparent p-6 sm:p-8 overflow-hidden">
           {/* Background Effects */}
           <div className="absolute inset-0 overflow-hidden">
-            <div className={`absolute -top-20 -right-20 w-40 h-40 ${isDebit ? 'bg-amber-500/20' : 'bg-emerald-500/20'} rounded-full blur-3xl animate-pulse`} />
-            <div className={`absolute -bottom-10 -left-10 w-32 h-32 ${isDebit ? 'bg-orange-500/10' : 'bg-cyan-500/10'} rounded-full blur-2xl`} />
+            <div className={`absolute -top-20 -right-20 w-40 h-40 ${isDebit ? 'bg-status-warning-bg' : 'bg-status-success-bg'} rounded-full blur-3xl animate-pulse`} />
+            <div className={`absolute -bottom-10 -left-10 w-32 h-32 ${isDebit ? 'bg-status-warning-bg' : 'bg-accent/10'} rounded-full blur-2xl`} />
             {/* Confetti-like particles with randomized positions */}
             {animationComplete && sparklePositions.map((sparkle, index) => (
               <Sparkles
@@ -144,7 +144,7 @@ export const UniversalPaymentSuccessModal: React.FC<UniversalPaymentSuccessModal
           {/* Close button - Desktop */}
           <button
             onClick={onClose}
-            className="hidden sm:flex absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-800/50 hover:bg-slate-700 items-center justify-center text-slate-400 hover:text-white transition-all"
+            className="hidden sm:flex absolute top-4 right-4 w-8 h-8 rounded-full bg-surface/50 hover:bg-surface-elevated items-center justify-center text-content-muted hover:text-content-primary transition-all"
           >
             <X size={16} />
           </button>
@@ -153,19 +153,19 @@ export const UniversalPaymentSuccessModal: React.FC<UniversalPaymentSuccessModal
           <div className="relative flex flex-col items-center">
             <div className={`
               relative w-20 h-20 sm:w-24 sm:h-24 rounded-full flex items-center justify-center mb-4
-              ${isDebit ? 'bg-amber-500' : 'bg-emerald-500'}
+              ${isDebit ? 'bg-status-warning' : 'bg-status-success'}
               shadow-[0_0_40px_rgba(16,185,129,0.4)]
               ring-4 ring-white/10
               transform transition-all duration-700
               ${animationComplete ? 'scale-100' : 'scale-0'}
             `}>
               {/* Ripple effect */}
-              <div className={`absolute inset-0 rounded-full ${isDebit ? 'bg-amber-500' : 'bg-emerald-500'} animate-ping opacity-20`} />
-              <CheckCircle2 size={40} className="text-white relative z-10" strokeWidth={2.5} />
+              <div className={`absolute inset-0 rounded-full ${isDebit ? 'bg-status-warning' : 'bg-status-success'} animate-ping opacity-20`} />
+              <CheckCircle2 size={40} className="text-content-primary relative z-10" strokeWidth={2.5} />
             </div>
 
             <h2 className={`
-              text-xl sm:text-2xl font-bold text-white mb-2
+              text-xl sm:text-2xl font-bold text-content-primary mb-2
               transform transition-all duration-500 delay-200
               ${animationComplete ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}
             `}>
@@ -178,7 +178,7 @@ export const UniversalPaymentSuccessModal: React.FC<UniversalPaymentSuccessModal
               disabled={!hasReference}
               className={`
                 flex items-center gap-2 px-4 py-1.5 rounded-full
-                ${isDebit ? 'bg-amber-500/20 border-amber-500/30' : 'bg-emerald-500/20 border-emerald-500/30'}
+                ${isDebit ? 'bg-status-warning-bg border-status-warning/30' : 'bg-status-success-bg border-status-success/30'}
                 border backdrop-blur-sm
                 transition-all
                 transform duration-500 delay-300
@@ -188,18 +188,18 @@ export const UniversalPaymentSuccessModal: React.FC<UniversalPaymentSuccessModal
             >
               {copied ? (
                 <>
-                  <Check size={12} className="text-emerald-400" />
-                  <span className="text-emerald-400 text-sm font-medium">Copié !</span>
+                  <Check size={12} className="text-status-success" />
+                  <span className="text-status-success text-sm font-medium">Copié !</span>
                 </>
               ) : hasReference ? (
                 <>
-                  <span className={`text-sm font-mono font-medium ${isDebit ? 'text-amber-400' : 'text-emerald-400'}`}>
+                  <span className={`text-sm font-mono font-medium ${isDebit ? 'text-status-warning' : 'text-status-success'}`}>
                     {reference}
                   </span>
-                  <Copy size={12} className={isDebit ? 'text-amber-400/60' : 'text-emerald-400/60'} />
+                  <Copy size={12} className={isDebit ? 'text-status-warning/60' : 'text-status-success/60'} />
                 </>
               ) : (
-                <span className="text-sm text-slate-500 italic">
+                <span className="text-sm text-content-muted italic">
                   Référence non disponible
                 </span>
               )}
@@ -215,83 +215,83 @@ export const UniversalPaymentSuccessModal: React.FC<UniversalPaymentSuccessModal
             <div className={`
               p-4 sm:p-5 rounded-2xl
               ${isDebit
-                ? 'bg-gradient-to-br from-amber-500/10 to-orange-500/5 border border-amber-500/20'
-                : 'bg-gradient-to-br from-emerald-500/10 to-cyan-500/5 border border-emerald-500/20'
+                ? 'bg-gradient-to-br from-status-warning/10 to-status-warning/5 border border-status-warning/20'
+                : 'bg-gradient-to-br from-status-success/10 to-accent/5 border border-status-success/20'
               }
             `}>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Montant</p>
-                  <p className={`text-3xl sm:text-4xl font-bold tabular-nums tracking-tight ${isDebit ? 'text-amber-400' : 'text-emerald-400'}`}>
+                  <p className="text-xs text-content-muted uppercase tracking-wider mb-1">Montant</p>
+                  <p className={`text-3xl sm:text-4xl font-bold tabular-nums tracking-tight ${isDebit ? 'text-status-warning' : 'text-status-success'}`}>
                     {isDebit ? '-' : '+'}{new Intl.NumberFormat('fr-FR').format(total)}
-                    <span className="text-base sm:text-lg font-normal text-slate-500 ml-2">{devise}</span>
+                    <span className="text-base sm:text-lg font-normal text-content-muted ml-2">{devise}</span>
                   </p>
                 </div>
                 <div className={`
                   p-3 rounded-xl
-                  ${isDebit ? 'bg-amber-500/20' : 'bg-emerald-500/20'}
+                  ${isDebit ? 'bg-status-warning-bg' : 'bg-status-success-bg'}
                 `}>
-                  <Wallet size={24} className={isDebit ? 'text-amber-400' : 'text-emerald-400'} />
+                  <Wallet size={24} className={isDebit ? 'text-status-warning' : 'text-status-success'} />
                 </div>
               </div>
 
               {/* Date & Time */}
-              <div className="flex items-center gap-4 mt-4 pt-4 border-t border-slate-700/50">
+              <div className="flex items-center gap-4 mt-4 pt-4 border-t border-edge-subtle">
                 <div className="flex items-center gap-2">
-                  <Clock size={14} className="text-slate-500" />
-                  <span className="text-sm text-slate-400">
+                  <Clock size={14} className="text-content-muted" />
+                  <span className="text-sm text-content-muted">
                     {date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </span>
                 </div>
-                <span className="text-slate-600">•</span>
-                <span className="text-sm text-slate-400">
+                <span className="text-content-muted">•</span>
+                <span className="text-sm text-content-muted">
                   {date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                 </span>
               </div>
             </div>
 
             {/* Expandable Details Section */}
-            <div className="rounded-xl border border-slate-800 overflow-hidden">
+            <div className="rounded-xl border border-edge overflow-hidden">
               <button
                 onClick={() => setShowDetails(!showDetails)}
-                className="w-full p-4 flex items-center justify-between bg-slate-800/30 hover:bg-slate-800/50 transition-colors"
+                className="w-full p-4 flex items-center justify-between bg-surface/30 hover:bg-surface/50 transition-colors"
               >
-                <span className="text-sm font-medium text-slate-300">Détails de la transaction</span>
+                <span className="text-sm font-medium text-content-secondary">Détails de la transaction</span>
                 {showDetails ? (
-                  <ChevronUp size={18} className="text-slate-500" />
+                  <ChevronUp size={18} className="text-content-muted" />
                 ) : (
-                  <ChevronDown size={18} className="text-slate-500" />
+                  <ChevronDown size={18} className="text-content-muted" />
                 )}
               </button>
 
               {showDetails && (
-                <div className="p-4 space-y-3 bg-slate-900/50 animate-in slide-in-from-top-2 duration-200">
+                <div className="p-4 space-y-3 bg-surface-base/50 animate-in slide-in-from-top-2 duration-200">
                   {/* Type */}
-                  <div className="flex items-center justify-between py-2 border-b border-slate-800/50">
+                  <div className="flex items-center justify-between py-2 border-b border-edge/50">
                     <div className="flex items-center gap-2">
-                      <Receipt size={14} className="text-slate-500" />
-                      <span className="text-sm text-slate-500">Type</span>
+                      <Receipt size={14} className="text-content-muted" />
+                      <span className="text-sm text-content-muted">Type</span>
                     </div>
-                    <span className="text-sm font-medium text-white">{type}</span>
+                    <span className="text-sm font-medium text-content-primary">{type}</span>
                   </div>
 
                   {/* Mode de paiement */}
-                  <div className="flex items-center justify-between py-2 border-b border-slate-800/50">
+                  <div className="flex items-center justify-between py-2 border-b border-edge/50">
                     <div className="flex items-center gap-2">
-                      <CreditCard size={14} className="text-slate-500" />
-                      <span className="text-sm text-slate-500">Mode</span>
+                      <CreditCard size={14} className="text-content-muted" />
+                      <span className="text-sm text-content-muted">Mode</span>
                     </div>
-                    <span className="text-sm font-medium text-white">{modePaiement}</span>
+                    <span className="text-sm font-medium text-content-primary">{modePaiement}</span>
                   </div>
 
                   {/* Client */}
                   {data.client && (
-                    <div className="flex items-center justify-between py-2 border-b border-slate-800/50">
+                    <div className="flex items-center justify-between py-2 border-b border-edge/50">
                       <div className="flex items-center gap-2">
-                        <User size={14} className="text-slate-500" />
-                        <span className="text-sm text-slate-500">Client</span>
+                        <User size={14} className="text-content-muted" />
+                        <span className="text-sm text-content-muted">Client</span>
                       </div>
-                      <span className="text-sm font-medium text-white">
+                      <span className="text-sm font-medium text-content-primary">
                         {formatClientName(data.client?.nom || '', data.client?.prenom)}
                       </span>
                     </div>
@@ -301,10 +301,10 @@ export const UniversalPaymentSuccessModal: React.FC<UniversalPaymentSuccessModal
                   {data.agent && (
                     <div className="flex items-center justify-between py-2">
                       <div className="flex items-center gap-2">
-                        <Building2 size={14} className="text-slate-500" />
-                        <span className="text-sm text-slate-500">Agent</span>
+                        <Building2 size={14} className="text-content-muted" />
+                        <span className="text-sm text-content-muted">Agent</span>
                       </div>
-                      <span className="text-sm font-medium text-white">
+                      <span className="text-sm font-medium text-content-primary">
                         {data.agent.prenom} {data.agent.nom}
                       </span>
                     </div>
@@ -312,12 +312,12 @@ export const UniversalPaymentSuccessModal: React.FC<UniversalPaymentSuccessModal
 
                   {/* Items breakdown */}
                   {data.items && data.items.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-slate-800">
-                      <p className="text-xs text-slate-500 uppercase tracking-wider mb-2">Détail</p>
+                    <div className="mt-3 pt-3 border-t border-edge">
+                      <p className="text-xs text-content-muted uppercase tracking-wider mb-2">Détail</p>
                       {data.items.map((item, idx) => (
                         <div key={idx} className="flex justify-between py-1.5 text-sm">
-                          <span className="text-slate-400">{item.description}</span>
-                          <span className="text-white font-mono">
+                          <span className="text-content-muted">{item.description}</span>
+                          <span className="text-content-primary font-mono">
                             {new Intl.NumberFormat('fr-FR').format(item.montant || 0)} F
                           </span>
                         </div>
@@ -339,10 +339,10 @@ export const UniversalPaymentSuccessModal: React.FC<UniversalPaymentSuccessModal
         </div>
 
         {/* Fixed Footer - Close Button */}
-        <div className="p-4 border-t border-slate-800 bg-slate-900/95 backdrop-blur-sm">
+        <div className="p-4 border-t border-edge bg-surface-base/95 backdrop-blur-sm">
           <button
             onClick={onClose}
-            className="w-full py-4 flex items-center justify-center gap-2 text-slate-400 hover:text-white text-sm font-medium transition-colors rounded-xl hover:bg-slate-800/50 active:scale-[0.98]"
+            className="w-full py-4 flex items-center justify-center gap-2 text-content-muted hover:text-content-primary text-sm font-medium transition-colors rounded-xl hover:bg-surface/50 active:scale-[0.98]"
           >
             <span>Fermer et Nouvelle Opération</span>
             <ArrowRight size={16} />

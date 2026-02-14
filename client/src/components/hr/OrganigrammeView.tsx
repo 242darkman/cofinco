@@ -9,6 +9,7 @@ import { usePermissions } from '../auth/ProtectedFeature';
 import { Employe } from '../../hooks/hr/useEmployes';
 import { resolveStorageUrl } from '@/lib/format';
 import { toast } from '../../lib/toast';
+import { useBranding } from '../../contexts/BrandingContext';
 // P4.1: Lazy-load heavy export libraries
 import { loadPDFLibraries } from '@/lib/lazy-export';
 
@@ -48,7 +49,7 @@ function getInitials(name: string): string {
 // ID spécial pour la racine virtuelle (entreprise)
 const VIRTUAL_ROOT_ID = '__company_root__';
 
-function transformApiDataToOrgChart(apiData: any[]): OrgChartNode[] {
+function transformApiDataToOrgChart(apiData: any[], appName: string = 'COFIN&CO-M'): OrgChartNode[] {
   if (!apiData || apiData.length === 0) return [];
 
   const nodes: OrgChartNode[] = [];
@@ -79,7 +80,7 @@ function transformApiDataToOrgChart(apiData: any[]): OrgChartNode[] {
   nodes.unshift({
     id: VIRTUAL_ROOT_ID,
     parentId: null,
-    name: 'COFINCO',
+    name: appName,
     title: 'Organisation',
     department: '',
     statut: 'ACTIVE',
@@ -108,22 +109,22 @@ const ReassignModal = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl animate-in fade-in zoom-in duration-200">
-        <h3 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
-          <UserCog size={20} className="text-cyan-400" />
+      <div className="bg-surface-base border border-edge rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl animate-in fade-in zoom-in duration-200">
+        <h3 className="text-lg font-bold text-content-primary mb-2 flex items-center gap-2">
+          <UserCog size={20} className="text-accent" />
           Réassigner l'employé
         </h3>
-        <p className="text-sm text-slate-400 mb-4">
+        <p className="text-sm text-content-muted mb-4">
           Sélectionnez le nouveau supérieur hiérarchique pour{' '}
-          <span className="text-white font-medium">{reassignData.employeName}</span>
+          <span className="text-content-primary font-medium">{reassignData.employeName}</span>
         </p>
 
         <div className="mb-4">
-          <label className="block text-xs text-slate-500 mb-2">Nouveau supérieur:</label>
+          <label className="block text-xs text-content-muted mb-2">Nouveau supérieur:</label>
           <select
             value={selectedManagerId || ''}
             onChange={(e) => setSelectedManagerId(e.target.value || null)}
-            className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
+            className="w-full bg-surface border border-edge-strong rounded-lg px-3 py-2 text-sm text-content-primary focus:outline-none focus:border-accent"
           >
             <option value="">Aucun (niveau direction)</option>
             {availableManagers
@@ -141,14 +142,14 @@ const ReassignModal = ({
           <button
             onClick={onCancel}
             disabled={isSubmitting}
-            className="px-4 py-2 rounded-lg text-sm text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="px-4 py-2 rounded-lg text-sm text-content-muted hover:text-content-primary hover:bg-surface transition-colors"
           >
             Annuler
           </button>
           <button
             onClick={() => onAccept(selectedManagerId)}
             disabled={isSubmitting}
-            className="px-4 py-2 rounded-lg text-sm bg-cyan-600 text-white hover:bg-cyan-500 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+            className="px-4 py-2 rounded-lg text-sm bg-accent-secondary text-content-primary hover:bg-accent-secondary transition-colors disabled:opacity-50 flex items-center gap-1.5"
           >
             {isSubmitting ? (
               <Loader2 size={14} className="animate-spin" />
@@ -182,7 +183,7 @@ const ExportMenu = ({
       <button
         onClick={() => setIsOpen(!isOpen)}
         disabled={disabled}
-        className="p-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition disabled:opacity-50 flex items-center gap-1"
+        className="p-1.5 bg-status-success hover:bg-status-success text-white rounded-lg transition disabled:opacity-50 flex items-center gap-1"
         title="Exporter"
       >
         <Download size={14} />
@@ -192,26 +193,26 @@ const ExportMenu = ({
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute right-0 top-full mt-1 z-50 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden min-w-[140px]">
+          <div className="absolute right-0 top-full mt-1 z-50 bg-surface border border-edge rounded-lg shadow-xl overflow-hidden min-w-[140px]">
             <button
               onClick={() => { onExportPNG(); setIsOpen(false); }}
-              className="w-full px-3 py-2 text-left text-xs text-slate-200 hover:bg-slate-700 flex items-center gap-2"
+              className="w-full px-3 py-2 text-left text-xs text-content-secondary hover:bg-surface-elevated flex items-center gap-2"
             >
-              <FileImage size={13} className="text-blue-400" />
+              <FileImage size={13} className="text-status-info" />
               PNG
             </button>
             <button
               onClick={() => { onExportSVG(); setIsOpen(false); }}
-              className="w-full px-3 py-2 text-left text-xs text-slate-200 hover:bg-slate-700 flex items-center gap-2"
+              className="w-full px-3 py-2 text-left text-xs text-content-secondary hover:bg-surface-elevated flex items-center gap-2"
             >
-              <Code size={13} className="text-green-400" />
+              <Code size={13} className="text-status-success" />
               SVG
             </button>
             <button
               onClick={() => { onExportPDF(); setIsOpen(false); }}
-              className="w-full px-3 py-2 text-left text-xs text-slate-200 hover:bg-slate-700 flex items-center gap-2"
+              className="w-full px-3 py-2 text-left text-xs text-content-secondary hover:bg-surface-elevated flex items-center gap-2"
             >
-              <FileText size={13} className="text-red-400" />
+              <FileText size={13} className="text-status-danger" />
               PDF
             </button>
           </div>
@@ -223,6 +224,7 @@ const ExportMenu = ({
 
 // --- Main Component ---
 export default function OrganigrammeView({ employes }: OrganigrammeViewProps) {
+  const { branding } = useBranding();
   const { hasPermission } = usePermissions();
   const canViewOrganigramme = hasPermission('rh', 'view');
   const canEditOrganigramme = hasPermission('rh', 'edit');
@@ -249,7 +251,7 @@ export default function OrganigrammeView({ employes }: OrganigrammeViewProps) {
       if (res.ok) {
         const apiData = await res.json();
         console.log('API organigramme data:', apiData);
-        const transformed = transformApiDataToOrgChart(apiData);
+        const transformed = transformApiDataToOrgChart(apiData, branding.appName);
         console.log('Transformed data:', transformed);
         setData(transformed);
         setLastUpdated(new Date());
@@ -769,11 +771,11 @@ export default function OrganigrammeView({ employes }: OrganigrammeViewProps) {
   if (!canViewOrganigramme) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center animate-in fade-in zoom-in duration-500">
-        <div className="p-6 bg-slate-800 rounded-full mb-6 ring-1 ring-slate-700 shadow-2xl">
-          <ShieldAlert size={64} className="text-red-500" />
+        <div className="p-6 bg-surface rounded-full mb-6 ring-1 ring-edge shadow-2xl">
+          <ShieldAlert size={64} className="text-status-danger" />
         </div>
-        <h3 className="text-2xl font-bold text-white mb-3">Accès Restreint</h3>
-        <p className="text-slate-400 max-w-md mx-auto leading-relaxed">
+        <h3 className="text-2xl font-bold text-content-primary mb-3">Accès Restreint</h3>
+        <p className="text-content-muted max-w-md mx-auto leading-relaxed">
           Cette vue contient des informations sensibles sur la structure de l'entreprise.
           Veuillez contacter votre administrateur pour obtenir les droits d'accès.
         </p>
@@ -789,22 +791,22 @@ export default function OrganigrammeView({ employes }: OrganigrammeViewProps) {
         <div className="flex items-center gap-2 sm:gap-3">
           {/* Title area */}
           <div className="flex items-center gap-2 min-w-0 shrink-0">
-            <Building2 size={18} className="text-indigo-400 shrink-0" />
-            <h3 className="text-sm font-bold text-white whitespace-nowrap">Organigramme</h3>
-            <span className="hidden sm:inline text-[10px] text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded-full font-medium">
+            <Building2 size={18} className="text-accent shrink-0" />
+            <h3 className="text-sm font-bold text-content-primary whitespace-nowrap">Organigramme</h3>
+            <span className="hidden sm:inline text-[10px] text-content-muted bg-surface px-1.5 py-0.5 rounded-full font-medium">
               {stats.total} collab.
             </span>
           </div>
 
           {/* Search — fills available space */}
           <div className="relative flex-1 max-w-[240px]">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" size={14} />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-content-muted" size={14} />
             <input
               type="text"
               placeholder="Rechercher..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:border-indigo-500/50 transition-colors"
+              className="w-full bg-surface-base border border-edge rounded-lg pl-8 pr-3 py-1.5 text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-accent/50 transition-colors"
             />
           </div>
 
@@ -814,28 +816,28 @@ export default function OrganigrammeView({ employes }: OrganigrammeViewProps) {
           {/* Controls group */}
           <div className="flex items-center gap-1">
             {/* Zoom controls */}
-            <div className="hidden sm:flex items-center bg-slate-900 rounded-lg border border-slate-800">
+            <div className="hidden sm:flex items-center bg-surface-base rounded-lg border border-edge">
               <button
                 onClick={handleZoomOut}
-                className="p-1.5 hover:bg-slate-800 rounded-l-lg text-slate-400 hover:text-white transition"
+                className="p-1.5 hover:bg-surface rounded-l-lg text-content-muted hover:text-content-primary transition"
                 title="Zoom arrière"
               >
                 <ZoomOut size={14} />
               </button>
-              <span className="text-[10px] text-slate-500 min-w-[36px] text-center font-mono tabular-nums">
+              <span className="text-[10px] text-content-muted min-w-[36px] text-center font-mono tabular-nums">
                 {zoomLevel}%
               </span>
               <button
                 onClick={handleZoomIn}
-                className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-white transition"
+                className="p-1.5 hover:bg-surface text-content-muted hover:text-content-primary transition"
                 title="Zoom avant"
               >
                 <ZoomIn size={14} />
               </button>
-              <div className="w-px h-4 bg-slate-700" />
+              <div className="w-px h-4 bg-surface-elevated" />
               <button
                 onClick={handleFit}
-                className="p-1.5 hover:bg-slate-800 rounded-r-lg text-slate-400 hover:text-white transition"
+                className="p-1.5 hover:bg-surface rounded-r-lg text-content-muted hover:text-content-primary transition"
                 title="Ajuster à la vue"
               >
                 <Maximize2 size={14} />
@@ -843,17 +845,17 @@ export default function OrganigrammeView({ employes }: OrganigrammeViewProps) {
             </div>
 
             {/* Expand/Collapse */}
-            <div className="hidden sm:flex items-center bg-slate-900 rounded-lg border border-slate-800">
+            <div className="hidden sm:flex items-center bg-surface-base rounded-lg border border-edge">
               <button
                 onClick={handleExpandAll}
-                className="p-1.5 hover:bg-slate-800 rounded-l-lg text-slate-400 hover:text-white transition"
+                className="p-1.5 hover:bg-surface rounded-l-lg text-content-muted hover:text-content-primary transition"
                 title="Tout développer"
               >
                 <Plus size={14} />
               </button>
               <button
                 onClick={handleCollapseAll}
-                className="p-1.5 hover:bg-slate-800 rounded-r-lg text-slate-400 hover:text-white transition"
+                className="p-1.5 hover:bg-surface rounded-r-lg text-content-muted hover:text-content-primary transition"
                 title="Tout réduire"
               >
                 <Minus size={14} />
@@ -872,7 +874,7 @@ export default function OrganigrammeView({ employes }: OrganigrammeViewProps) {
             <button
               onClick={fetchOrgChart}
               disabled={loading}
-              className="p-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition disabled:opacity-50"
+              className="p-1.5 bg-accent hover:bg-accent-primary-hover text-white rounded-lg transition disabled:opacity-50"
               title="Actualiser"
             >
               <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
@@ -883,44 +885,44 @@ export default function OrganigrammeView({ employes }: OrganigrammeViewProps) {
         {/* Row 2: Mobile-only zoom + contextual hint */}
         <div className="flex items-center justify-between sm:hidden">
           <div className="flex items-center gap-1">
-            <div className="flex items-center bg-slate-900 rounded-lg border border-slate-800">
-              <button onClick={handleZoomOut} className="p-1.5 hover:bg-slate-800 rounded-l-lg text-slate-400 hover:text-white transition">
+            <div className="flex items-center bg-surface-base rounded-lg border border-edge">
+              <button onClick={handleZoomOut} className="p-1.5 hover:bg-surface rounded-l-lg text-content-muted hover:text-content-primary transition">
                 <ZoomOut size={14} />
               </button>
-              <span className="text-[10px] text-slate-500 min-w-[36px] text-center font-mono">{zoomLevel}%</span>
-              <button onClick={handleZoomIn} className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-white transition">
+              <span className="text-[10px] text-content-muted min-w-[36px] text-center font-mono">{zoomLevel}%</span>
+              <button onClick={handleZoomIn} className="p-1.5 hover:bg-surface text-content-muted hover:text-content-primary transition">
                 <ZoomIn size={14} />
               </button>
-              <div className="w-px h-4 bg-slate-700" />
-              <button onClick={handleFit} className="p-1.5 hover:bg-slate-800 rounded-r-lg text-slate-400 hover:text-white transition">
+              <div className="w-px h-4 bg-surface-elevated" />
+              <button onClick={handleFit} className="p-1.5 hover:bg-surface rounded-r-lg text-content-muted hover:text-content-primary transition">
                 <Maximize2 size={14} />
               </button>
             </div>
-            <div className="flex items-center bg-slate-900 rounded-lg border border-slate-800">
-              <button onClick={handleExpandAll} className="p-1.5 hover:bg-slate-800 rounded-l-lg text-slate-400 hover:text-white transition">
+            <div className="flex items-center bg-surface-base rounded-lg border border-edge">
+              <button onClick={handleExpandAll} className="p-1.5 hover:bg-surface rounded-l-lg text-content-muted hover:text-content-primary transition">
                 <Plus size={14} />
               </button>
-              <button onClick={handleCollapseAll} className="p-1.5 hover:bg-slate-800 rounded-r-lg text-slate-400 hover:text-white transition">
+              <button onClick={handleCollapseAll} className="p-1.5 hover:bg-surface rounded-r-lg text-content-muted hover:text-content-primary transition">
                 <Minus size={14} />
               </button>
             </div>
           </div>
-          <span className="text-[10px] text-slate-600">{stats.total} collab.</span>
+          <span className="text-[10px] text-content-muted">{stats.total} collab.</span>
         </div>
       </div>
 
       {/* ── Chart Container ── */}
-      <div className="flex-1 relative min-h-0 bg-slate-950/50 rounded-lg border border-slate-800 overflow-hidden">
+      <div className="flex-1 relative min-h-0 bg-surface-base/50 rounded-lg border border-edge overflow-hidden">
         {loading && data.length === 0 ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
-            <div className="w-10 h-10 border-3 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
-            <p className="text-xs text-slate-500">Chargement de la structure...</p>
+            <div className="w-10 h-10 border-3 border-accent/30 border-t-indigo-500 rounded-full animate-spin" />
+            <p className="text-xs text-content-muted">Chargement de la structure...</p>
           </div>
         ) : data.length === 0 ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6">
-            <Users size={40} className="text-slate-700 mb-3" />
-            <p className="text-sm text-slate-400 font-medium">Aucune structure définie</p>
-            <p className="text-xs text-slate-600 mt-1">Ajoutez des managers et employés pour commencer.</p>
+            <Users size={40} className="text-content-secondary mb-3" />
+            <p className="text-sm text-content-muted font-medium">Aucune structure définie</p>
+            <p className="text-xs text-content-muted mt-1">Ajoutez des managers et employés pour commencer.</p>
           </div>
         ) : (
           <div
@@ -932,14 +934,14 @@ export default function OrganigrammeView({ employes }: OrganigrammeViewProps) {
 
         {/* Contextual hint for edit mode */}
         {canEditOrganigramme && data.length > 0 && !loading && (
-          <div className="absolute bottom-2 left-2 text-[10px] text-slate-600 bg-slate-900/80 backdrop-blur-sm px-2 py-1 rounded-md border border-slate-800">
+          <div className="absolute bottom-2 left-2 text-[10px] text-content-muted bg-surface-base/80 backdrop-blur-sm px-2 py-1 rounded-md border border-edge">
             Cliquez sur un noeud pour réassigner
           </div>
         )}
 
         {/* Loading overlay */}
         {loading && data.length > 0 && (
-          <div className="absolute top-2 right-2 bg-slate-800/90 backdrop-blur-sm px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 text-xs text-slate-400">
+          <div className="absolute top-2 right-2 bg-surface/90 backdrop-blur-sm px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 text-xs text-content-muted">
             <Loader2 size={12} className="animate-spin" />
             Actualisation...
           </div>

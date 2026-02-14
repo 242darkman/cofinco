@@ -12,6 +12,7 @@ import ClosureWizard from './ClosureWizard';
 import { StatutCompte, type StatutCompteType, TypeCompte, MethodePaiement } from '@shared/enum/status-constants';
 import { Actions } from '@shared/ability/actions';
 import { Subjects } from '@shared/ability/subjects';
+import { useCurrency } from '../../contexts/CurrencyContext';
 
 // Mapping FR → EN pour envoi backend
 const TYPE_COMPTE_TO_EN: Record<string, string> = {
@@ -83,6 +84,7 @@ function normalizeCompte(c: any): CompteBancaire {
 }
 
 export default function ClientAccounts({ clientId, agenceId }: ClientAccountsProps) {
+  const { currency, label } = useCurrency();
   // RBAC permissions
   const { hasPermission } = usePermissions();
   const canCreateAccounts = hasPermission('clients', 'edit') || hasPermission('comptes', 'create');
@@ -278,14 +280,14 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
-        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+        <h3 className="text-lg font-bold text-content-primary flex items-center gap-2">
             Comptes Bancaires
-            <span className="text-xs font-normal text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full">{comptes.length}</span>
+            <span className="text-xs font-normal text-content-muted bg-surface px-2 py-0.5 rounded-full">{comptes.length}</span>
         </h3>
         {canCreateAccounts && (
           <button
             onClick={() => setShowForm(true)}
-            className="px-3 py-1.5 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg transition flex items-center gap-1.5 text-sm shadow-lg shadow-cyan-500/20"
+            className="px-3 py-1.5 bg-accent-secondary hover:bg-accent-secondary-hover text-content-primary rounded-lg transition flex items-center gap-1.5 text-sm shadow-lg shadow-accent/20"
           >
             <Plus size={16} />
             <span className="hidden sm:inline">Nouveau Compte</span>
@@ -324,8 +326,8 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
         title="Lever la suspension"
         message={
           <div className="space-y-2">
-            <p>Le compte <span className="font-mono text-white">{selectedAccount?.numeroCompte}</span> sera de nouveau pleinement opérationnel.</p>
-            <p className="text-sm text-slate-400">Toutes les opérations (dépôts et retraits) seront réactivées.</p>
+            <p>Le compte <span className="font-mono text-content-primary">{selectedAccount?.numeroCompte}</span> sera de nouveau pleinement opérationnel.</p>
+            <p className="text-sm text-content-muted">Toutes les opérations (dépôts et retraits) seront réactivées.</p>
           </div>
         }
         confirmText="Lever la suspension"
@@ -357,19 +359,19 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
 
       {loading ? (
         <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div>
         </div>
       ) : comptes.length === 0 ? (
-        <Card variant="default" padding="lg" className="border-dashed border-slate-700 bg-transparent">
+        <Card variant="default" padding="lg" className="border-dashed border-edge bg-transparent">
           <div className="text-center">
-            <div className="bg-slate-800/50 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
-                 <AlertCircle className="text-slate-500" size={24} />
+            <div className="bg-surface/50 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
+                 <AlertCircle className="text-content-muted" size={24} />
             </div>
-            <p className="text-slate-400 text-sm mb-4">Aucun compte bancaire actif</p>
+            <p className="text-content-muted text-sm mb-4">Aucun compte bancaire actif</p>
             {canCreateAccounts && (
               <button
                   onClick={() => setShowForm(true)}
-                  className="text-cyan-400 hover:text-cyan-300 text-sm font-medium hover:underline"
+                  className="text-accent hover:text-accent text-sm font-medium hover:underline"
               >
                   Créer un premier compte
               </button>
@@ -395,16 +397,16 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
 
       {showForm && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-xl max-w-md w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
-            <div className="bg-slate-800/50 border-b border-slate-700 p-4 flex items-center justify-between">
+          <div className="bg-surface-base border border-edge rounded-xl max-w-md w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="bg-surface/50 border-b border-edge p-4 flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-bold text-white">
+                <h2 className="text-lg font-bold text-content-primary">
                   {editingCompte ? 'Détails du compte' : 'Nouveau compte'}
                 </h2>
               </div>
               <button
                 onClick={resetForm}
-                className="p-1.5 hover:bg-slate-700 rounded-lg transition text-slate-400 hover:text-white"
+                className="p-1.5 hover:bg-surface-elevated rounded-lg transition text-content-muted hover:text-content-primary"
               >
                 <X size={20} />
               </button>
@@ -413,8 +415,8 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
             <form onSubmit={handleSubmit} className="p-4 space-y-4">
                {/* Read-only details for verify */}
                {editingCompte && (
-                   <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg mb-4">
-                       <p className="text-sm text-blue-300 flex gap-2">
+                   <div className="p-3 bg-status-info-bg border border-status-info/30 rounded-lg mb-4">
+                       <p className="text-sm text-status-info flex gap-2">
                            <AlertCircle size={16} />
                            Pour modifier le solde, veuillez effectuer une opération de caisse (Dépôt/Retrait).
                        </p>
@@ -422,7 +424,7 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
                )}
 
               <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-2 uppercase">Type de compte</label>
+                <label className="block text-xs font-semibold text-content-muted mb-2 uppercase">Type de compte</label>
                 {/* Type selection logic same as before but disabled if editing */}
                  <div className="grid grid-cols-3 gap-2">
                   {['Courant', 'Épargne', 'Bloqué']
@@ -445,11 +447,11 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
                         onClick={() => setFormData(prev => ({ ...prev, typeCompte: type as any }))}
                         className={`p-3 rounded-lg border transition flex flex-col items-center gap-2 ${
                         formData.typeCompte === type
-                            ? 'border-cyan-500 bg-cyan-500/10'
-                            : 'border-slate-700 bg-slate-800/50'
-                        } ${editingCompte ? 'opacity-50 cursor-not-allowed' : 'hover:border-slate-600'}`}
+                            ? 'border-accent bg-accent/10'
+                            : 'border-edge bg-surface/50'
+                        } ${editingCompte ? 'opacity-50 cursor-not-allowed' : 'hover:border-edge-strong'}`}
                     >
-                        <span className={`text-xs font-medium ${formData.typeCompte === type ? 'text-cyan-400' : 'text-slate-400'}`}>{type}</span>
+                        <span className={`text-xs font-medium ${formData.typeCompte === type ? 'text-accent' : 'text-content-muted'}`}>{type}</span>
                     </button>
                   ))}
                  </div>
@@ -458,40 +460,40 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
               {/* Solde Initial - ONLY for NEW accounts */}
               {!editingCompte ? (
                   <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Solde initial (FCFA)</label>
+                    <label className="block text-xs font-semibold text-content-muted mb-1.5 uppercase">{label('Solde initial')}</label>
                     <div className="relative">
                         <input
                         type="number"
                         min="0"
                         value={formData.soldeInitial}
                         onChange={(e) => setFormData(prev => ({ ...prev, soldeInitial: Number(e.target.value) }))}
-                        className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-3 pr-12 py-2.5 text-white text-sm focus:ring-1 focus:ring-cyan-500 outline-none transition"
+                        className="w-full bg-surface-base border border-edge rounded-lg pl-3 pr-12 py-2.5 text-content-primary text-sm focus:ring-1 focus:ring-accent outline-none transition"
                         />
-                        <span className="absolute right-3 top-2.5 text-xs text-slate-500 font-medium">FCFA</span>
+                        <span className="absolute right-3 top-2.5 text-xs text-content-muted font-medium">{currency.symbol}</span>
                     </div>
                   </div>
               ) : (
                    <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Solde Actuel (FCFA)</label>
+                    <label className="block text-xs font-semibold text-content-muted mb-1.5 uppercase">{label('Solde Actuel')}</label>
                     <div className="relative">
                         <input
                         type="text"
                         disabled
                         value={Number(editingCompte.soldeCourant).toLocaleString()}
-                        className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-3 pr-12 py-2.5 text-slate-400 text-sm cursor-not-allowed"
+                        className="w-full bg-surface-base border border-edge rounded-lg pl-3 pr-12 py-2.5 text-content-muted text-sm cursor-not-allowed"
                         />
-                        <span className="absolute right-3 top-2.5 text-xs text-slate-600 font-medium">FCFA</span>
+                        <span className="absolute right-3 top-2.5 text-xs text-content-muted font-medium">{currency.symbol}</span>
                     </div>
                   </div>
               )}
 
               {formData.soldeInitial > 0 && !editingCompte && (
                   <div className="animate-in slide-in-from-top-2 duration-200">
-                      <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Méthode de paiement</label>
+                      <label className="block text-xs font-semibold text-content-muted mb-1.5 uppercase">Méthode de paiement</label>
                       <select
                           value={formData.methodePaiement}
                           onChange={(e) => setFormData(prev => ({ ...prev, methodePaiement: e.target.value as any }))}
-                          className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:ring-1 focus:ring-cyan-500 outline-none transition appearance-none"
+                          className="w-full bg-surface-base border border-edge rounded-lg px-3 py-2.5 text-content-primary text-sm focus:ring-1 focus:ring-accent outline-none transition appearance-none"
                       >
                           <option value="Espèces">Espèces</option>
                           <option value="Mobile Money">Mobile Money</option>
@@ -503,7 +505,7 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
 
               {formData.typeCompte === 'Épargne' && (
                 <div className="animate-in slide-in-from-top-2 duration-200">
-                  <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Taux d'intérêt (%)</label>
+                  <label className="block text-xs font-semibold text-content-muted mb-1.5 uppercase">Taux d'intérêt (%)</label>
                   <input
                     type="number"
                     min="0"
@@ -511,32 +513,32 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
                     step="0.1"
                     value={formData.tauxInteret}
                     onChange={(e) => setFormData(prev => ({ ...prev, tauxInteret: Number(e.target.value) }))}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:ring-1 focus:ring-emerald-500 outline-none transition"
+                    className="w-full bg-surface-base border border-edge rounded-lg px-3 py-2.5 text-content-primary text-sm focus:ring-1 focus:ring-status-success outline-none transition"
                   />
                 </div>
               )}
 
               {formData.typeCompte === 'Bloqué' && (
-                <div className="animate-in slide-in-from-top-2 duration-200 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-                  <p className="text-xs text-amber-400">
+                <div className="animate-in slide-in-from-top-2 duration-200 p-3 bg-status-warning-bg border border-status-warning/30 rounded-lg">
+                  <p className="text-xs text-status-warning">
                     <AlertTriangle size={12} className="inline mr-1" />
                     Les comptes bloqués permettent les dépôts mais interdisent les retraits jusqu'au déblocage explicite.
                   </p>
                 </div>
               )}
 
-              <div className="flex gap-3 pt-4 border-t border-slate-700 mt-2">
+              <div className="flex gap-3 pt-4 border-t border-edge mt-2">
                 <button
                   type="button"
                   onClick={resetForm}
-                  className="flex-1 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition text-sm font-medium"
+                  className="flex-1 px-4 py-2.5 bg-surface hover:bg-surface-elevated text-content-secondary rounded-lg transition text-sm font-medium"
                 >
                   Fermer
                 </button>
                 {!editingCompte && (
                     <button
                     type="submit"
-                    className="flex-1 px-4 py-2.5 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg transition flex items-center justify-center gap-2 text-sm font-bold shadow-lg shadow-cyan-500/20"
+                    className="flex-1 px-4 py-2.5 bg-accent-secondary hover:bg-accent-secondary-hover text-content-primary rounded-lg transition flex items-center justify-center gap-2 text-sm font-bold shadow-lg shadow-accent/20"
                     >
                     <Check size={16} />
                     Créer

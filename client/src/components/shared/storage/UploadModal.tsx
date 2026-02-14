@@ -31,9 +31,9 @@ export default function UploadModal({
       size="sm"
     >
       <div className="space-y-4">
-        <div className="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl p-8 text-center hover:bg-slate-50 dark:hover:bg-slate-700/50 transition bg-slate-50/50 dark:bg-slate-800/50">
-          <Upload className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-          <p className="text-slate-600 dark:text-slate-300 mb-4">
+        <div className="border-2 border-dashed border-edge-strong rounded-xl p-8 text-center hover:bg-surface-elevated/50 transition bg-surface/50">
+          <Upload className="w-12 h-12 text-content-muted mx-auto mb-4" />
+          <p className="text-content-muted mb-4">
             Glissez un fichier ici ou cliquez pour parcourir
           </p>
           <div onClick={() => document.getElementById('file-upload-input')?.click()}>
@@ -51,7 +51,7 @@ export default function UploadModal({
 
         {isUploading && (
           <div className="space-y-2">
-            <div className="flex justify-between text-sm text-slate-500">
+            <div className="flex justify-between text-sm text-content-muted">
               <span>Téléversement en cours...</span>
               <span>{progress}%</span>
             </div>

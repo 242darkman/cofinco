@@ -124,8 +124,8 @@ export default function RbacAuditHistoryViewer({
       <div
         key={entry.id}
         className={`
-          border-b border-slate-800/50 last:border-b-0
-          px-3 py-2.5 hover:bg-slate-800/30 transition-colors
+          border-b border-edge/50 last:border-b-0
+          px-3 py-2.5 hover:bg-surface/30 transition-colors
         `}
       >
         <div className="flex items-start gap-3">
@@ -133,11 +133,11 @@ export default function RbacAuditHistoryViewer({
           <div
             className={`
               w-8 h-8 rounded-full flex items-center justify-center shrink-0
-              ${isGrant ? 'bg-emerald-500/10 text-emerald-400' : ''}
-              ${isDeny ? 'bg-rose-500/10 text-rose-400' : ''}
-              ${isReset ? 'bg-amber-500/10 text-amber-400' : ''}
-              ${isBulk ? 'bg-indigo-500/10 text-indigo-400' : ''}
-              ${!isGrant && !isDeny && !isReset && !isBulk ? 'bg-slate-500/10 text-slate-400' : ''}
+              ${isGrant ? 'bg-status-success-bg text-status-success' : ''}
+              ${isDeny ? 'bg-status-danger/10 text-status-danger' : ''}
+              ${isReset ? 'bg-status-warning-bg text-status-warning' : ''}
+              ${isBulk ? 'bg-accent/10 text-accent' : ''}
+              ${!isGrant && !isDeny && !isReset && !isBulk ? 'bg-surface-subtle/30 text-content-muted' : ''}
             `}
           >
             {isGrant && <CheckCircle size={16} />}
@@ -151,10 +151,10 @@ export default function RbacAuditHistoryViewer({
           <div className="flex-1 min-w-0">
             {/* Actor and Action */}
             <div className="flex items-center gap-1.5 flex-wrap text-sm">
-              <span className="font-medium text-white">
+              <span className="font-medium text-content-primary">
                 {entry.actorName || 'Système'}
               </span>
-              <span className="text-slate-400">a</span>
+              <span className="text-content-muted">a</span>
               <Badge
                 variant={isGrant ? 'success' : isDeny ? 'danger' : 'neutral'}
                 size="xs"
@@ -163,8 +163,8 @@ export default function RbacAuditHistoryViewer({
               </Badge>
               {entry.targetName && (
                 <>
-                  <ArrowRight size={10} className="text-slate-600" />
-                  <span className="text-indigo-400 font-medium">
+                  <ArrowRight size={10} className="text-content-muted" />
+                  <span className="text-accent font-medium">
                     {entry.targetName}
                   </span>
                 </>
@@ -174,16 +174,16 @@ export default function RbacAuditHistoryViewer({
             {/* Permission Info */}
             {entry.permissionCode && (
               <div className="mt-1 flex items-center gap-2">
-                <code className="text-[10px] text-slate-500 font-mono bg-slate-800/50 px-1.5 py-0.5 rounded">
+                <code className="text-[10px] text-content-muted font-mono bg-surface/50 px-1.5 py-0.5 rounded">
                   {entry.permissionCode}
                 </code>
                 {entry.oldValue !== null && entry.newValue !== null && (
                   <div className="flex items-center gap-1 text-[10px]">
-                    <span className={entry.oldValue ? 'text-emerald-400' : 'text-rose-400'}>
+                    <span className={entry.oldValue ? 'text-status-success' : 'text-status-danger'}>
                       {entry.oldValue ? 'ON' : 'OFF'}
                     </span>
-                    <ArrowRight size={8} className="text-slate-600" />
-                    <span className={entry.newValue ? 'text-emerald-400' : 'text-rose-400'}>
+                    <ArrowRight size={8} className="text-content-muted" />
+                    <span className={entry.newValue ? 'text-status-success' : 'text-status-danger'}>
                       {entry.newValue ? 'ON' : 'OFF'}
                     </span>
                   </div>
@@ -198,20 +198,20 @@ export default function RbacAuditHistoryViewer({
 
             {/* Bulk changes info */}
             {isBulk && !!entry.metadata?.changesCount && (
-              <div className="mt-1 text-[10px] text-slate-500">
+              <div className="mt-1 text-[10px] text-content-muted">
                 {String(entry.metadata.changesCount)} permissions modifiées
               </div>
             )}
 
             {/* Reason */}
             {entry.reason && (
-              <div className="mt-1.5 text-[10px] text-slate-400 bg-slate-800/30 rounded px-2 py-1">
-                <span className="text-slate-500">Raison:</span> {entry.reason}
+              <div className="mt-1.5 text-[10px] text-content-muted bg-surface/30 rounded px-2 py-1">
+                <span className="text-content-muted">Raison:</span> {entry.reason}
               </div>
             )}
 
             {/* Timestamp */}
-            <div className="mt-1.5 flex items-center gap-1 text-[9px] text-slate-600">
+            <div className="mt-1.5 flex items-center gap-1 text-[9px] text-content-muted">
               <Clock size={9} />
               <span title={format(new Date(entry.createdAt), 'PPPpp', { locale: fr })}>
                 {formatDistanceToNow(new Date(entry.createdAt), {
@@ -230,10 +230,10 @@ export default function RbacAuditHistoryViewer({
     <div className="flex flex-col h-full">
       {/* Header */}
       {!compact && (
-        <div className="px-3 py-2 bg-slate-800/50 border-b border-slate-700 flex items-center justify-between gap-2">
+        <div className="px-3 py-2 bg-surface/50 border-b border-edge flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <History size={14} className="text-slate-400" />
-            <span className="font-semibold text-slate-300 text-sm">
+            <History size={14} className="text-content-muted" />
+            <span className="font-semibold text-content-secondary text-sm">
               Historique d'audit RBAC
             </span>
             <Badge variant="neutral" size="xs">
@@ -254,15 +254,15 @@ export default function RbacAuditHistoryViewer({
 
       {/* Filters */}
       {!compact && (
-        <div className="px-3 py-2 border-b border-slate-800 space-y-2">
+        <div className="px-3 py-2 border-b border-edge space-y-2">
           <div className="relative">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-500" size={12} />
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-content-muted" size={12} />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Rechercher..."
-              className="w-full bg-slate-900 border border-slate-700 rounded pl-7 pr-2 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none text-white placeholder:text-slate-500"
+              className="w-full bg-surface-base border border-edge rounded pl-7 pr-2 py-1.5 text-xs focus:ring-1 focus:ring-accent outline-none text-content-primary placeholder:text-content-muted"
             />
           </div>
 
@@ -270,7 +270,7 @@ export default function RbacAuditHistoryViewer({
             <select
               value={actionFilter}
               onChange={(e) => setActionFilter(e.target.value as RbacAuditAction | '')}
-              className="flex-1 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white"
+              className="flex-1 bg-surface-base border border-edge rounded px-2 py-1 text-xs text-content-primary"
             >
               {actionOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -282,7 +282,7 @@ export default function RbacAuditHistoryViewer({
             <select
               value={scopeFilter}
               onChange={(e) => setScopeFilter(e.target.value as PermissionScope | '')}
-              className="flex-1 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white"
+              className="flex-1 bg-surface-base border border-edge rounded px-2 py-1 text-xs text-content-primary"
             >
               {scopeOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -297,12 +297,12 @@ export default function RbacAuditHistoryViewer({
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
         {loading && history.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-10 text-slate-500">
+          <div className="flex flex-col items-center justify-center py-10 text-content-muted">
             <Loader2 className="animate-spin mb-2" size={24} />
             <span className="text-xs">Chargement...</span>
           </div>
         ) : error ? (
-          <div className="flex flex-col items-center justify-center py-10 text-rose-400">
+          <div className="flex flex-col items-center justify-center py-10 text-status-danger">
             <AlertCircle size={24} className="mb-2" />
             <span className="text-xs">{error}</span>
             <Button variant="ghost" size="sm" onClick={() => refresh()} className="mt-2">
@@ -310,12 +310,12 @@ export default function RbacAuditHistoryViewer({
             </Button>
           </div>
         ) : filteredHistory.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-10 text-slate-500">
+          <div className="flex flex-col items-center justify-center py-10 text-content-muted">
             <History size={24} className="mb-2 opacity-50" />
             <span className="text-xs">Aucune entrée d'audit</span>
           </div>
         ) : (
-          <div className="divide-y divide-slate-800/50">
+          <div className="divide-y divide-edge/50">
             {filteredHistory.map(renderEntry)}
           </div>
         )}
@@ -323,8 +323,8 @@ export default function RbacAuditHistoryViewer({
 
       {/* Pagination */}
       {!compact && totalPages > 1 && (
-        <div className="px-3 py-2 border-t border-slate-800 flex items-center justify-between">
-          <span className="text-[10px] text-slate-500">
+        <div className="px-3 py-2 border-t border-edge flex items-center justify-between">
+          <span className="text-[10px] text-content-muted">
             Page {currentPage} / {totalPages}
           </span>
 

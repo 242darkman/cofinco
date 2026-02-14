@@ -118,11 +118,11 @@ function KycDocumentCard({
   };
 
   return (
-    <Card variant="default" padding="sm" className="hover:border-slate-600 transition-colors">
+    <Card variant="default" padding="sm" className="hover:border-edge-strong transition-colors">
       <div className="flex items-start justify-between gap-3">
         {/* Icon & Info with Thumbnail Preview */}
         <div className="flex items-start gap-3 overflow-hidden">
-          <div className="w-12 h-12 bg-slate-800 rounded-lg shrink-0 overflow-hidden flex items-center justify-center">
+          <div className="w-12 h-12 bg-surface rounded-lg shrink-0 overflow-hidden flex items-center justify-center">
             {showSkeleton ? (
               <Skeleton variant="rounded" width={48} height={48} />
             ) : resolvedUrl && isImage(resolvedUrl) ? (
@@ -133,14 +133,14 @@ function KycDocumentCard({
                 onError={handleImageError}
               />
             ) : (
-              <FileText size={20} className="text-blue-400" />
+              <FileText size={20} className="text-status-info" />
             )}
           </div>
           <div className="min-w-0">
-            <p className="font-semibold text-white text-sm truncate pr-2">{doc.documentName}</p>
+            <p className="font-semibold text-content-primary text-sm truncate pr-2">{doc.documentName}</p>
             <div className="flex items-center gap-2 mt-1">
               <Badge value={translateDocumentType(doc.documentType)} size="sm" variant="neutral" />
-              <span className="text-[10px] text-slate-500">
+              <span className="text-[10px] text-content-muted">
                 {new Date(doc.createdAt).toLocaleDateString()}
               </span>
             </div>
@@ -157,24 +157,24 @@ function KycDocumentCard({
       </div>
 
       {/* Actions Toolbar */}
-      <div className="flex items-center justify-end gap-2 mt-3 pt-3 border-t border-slate-700/50">
+      <div className="flex items-center justify-end gap-2 mt-3 pt-3 border-t border-edge-subtle">
         {doc.status?.toLowerCase() === 'pending' && canVerifyDocuments && (
           <div className="flex items-center gap-1 mr-auto">
             <button
               onClick={() => onUpdateStatus(doc.id, 'verified')}
-              className="p-1.5 text-emerald-500 hover:bg-emerald-500/10 rounded transition"
+              className="p-1.5 text-status-success hover:bg-status-success-bg rounded transition"
               title="Valider"
             >
               <CheckCircle size={16} />
             </button>
             <button
               onClick={() => onUpdateStatus(doc.id, 'rejected')}
-              className="p-1.5 text-red-500 hover:bg-red-500/10 rounded transition"
+              className="p-1.5 text-status-danger hover:bg-status-danger-bg rounded transition"
               title="Rejeter"
             >
               <XCircle size={16} />
             </button>
-            <div className="w-px h-3 bg-slate-700 mx-1"></div>
+            <div className="w-px h-3 bg-surface-elevated mx-1"></div>
           </div>
         )}
 
@@ -185,12 +185,12 @@ function KycDocumentCard({
             href={resolvedUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs font-medium text-blue-400 hover:text-blue-300 flex items-center gap-1 px-2 py-1 hover:bg-blue-500/10 rounded transition"
+            className="text-xs font-medium text-status-info hover:text-status-info flex items-center gap-1 px-2 py-1 hover:bg-status-info-bg rounded transition"
           >
             <Eye size={14} /> Voir
           </a>
         ) : (
-          <span className="text-xs text-slate-500">
+          <span className="text-xs text-content-muted">
             {isError ? 'Accès refusé' : 'Indisponible'}
           </span>
         )}
@@ -198,7 +198,7 @@ function KycDocumentCard({
         {canDeleteDocuments && (
           <button
             onClick={() => onDelete(doc.id)}
-            className="text-xs font-medium text-slate-400 hover:text-red-400 flex items-center gap-1 px-2 py-1 hover:bg-slate-700 rounded transition"
+            className="text-xs font-medium text-content-muted hover:text-status-danger flex items-center gap-1 px-2 py-1 hover:bg-surface-elevated rounded transition"
           >
             <Trash2 size={14} />
           </button>
@@ -413,9 +413,9 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
   const getStatusIcon = (status: string) => {
     const statusLower = status?.toLowerCase();
     switch (statusLower) {
-      case 'verified': return <CheckCircle size={14} className="text-green-400" />;
-      case 'rejected': return <XCircle size={14} className="text-red-400" />;
-      default: return <Clock size={14} className="text-cyan-400" />;
+      case 'verified': return <CheckCircle size={14} className="text-status-success" />;
+      case 'rejected': return <XCircle size={14} className="text-status-danger" />;
+      default: return <Clock size={14} className="text-accent" />;
     }
   };
 
@@ -432,14 +432,14 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
     <div className="space-y-4">
       {/* Header Mobile First */}
       <div className="flex items-center justify-between gap-4">
-        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+        <h3 className="text-lg font-bold text-content-primary flex items-center gap-2">
             Dossier KYC
             {kycComplete && <Badge value="Complet" variant="success" size="sm" icon={<CheckCircle size={12}/>} />}
         </h3>
         {canAddDocuments && (
           <button
             onClick={() => setShowForm(!showForm)}
-            className="px-3 py-1.5 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg transition flex items-center gap-1.5 text-sm shadow-lg shadow-cyan-500/20"
+            className="px-3 py-1.5 bg-accent-secondary hover:bg-accent-secondary-hover text-content-primary rounded-lg transition flex items-center gap-1.5 text-sm shadow-lg shadow-accent/20"
           >
             <Plus size={16} />
             <span className="hidden sm:inline">Ajouter Document</span>
@@ -450,38 +450,38 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
 
       {/* Stats - Mobile Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card variant="default" padding="sm" className="bg-slate-800/50 border-slate-700/50">
-          <p className="text-[10px] uppercase text-slate-500 font-semibold mb-1">Total</p>
-          <p className="text-xl font-bold text-white">{kycStats.total}</p>
+        <Card variant="default" padding="sm" className="bg-surface/50 border-edge-subtle">
+          <p className="text-[10px] uppercase text-content-muted font-semibold mb-1">Total</p>
+          <p className="text-xl font-bold text-content-primary">{kycStats.total}</p>
         </Card>
-        <Card variant="default" padding="sm" className="bg-emerald-900/10 border-emerald-500/20">
-          <p className="text-[10px] uppercase text-emerald-500/70 font-semibold mb-1">Vérifiés</p>
-          <p className="text-xl font-bold text-emerald-400">{kycStats.verified}</p>
+        <Card variant="default" padding="sm" className="bg-status-success-bg border-status-success/20">
+          <p className="text-[10px] uppercase text-status-success/70 font-semibold mb-1">Vérifiés</p>
+          <p className="text-xl font-bold text-status-success">{kycStats.verified}</p>
         </Card>
-         <Card variant="default" padding="sm" className="bg-amber-900/10 border-amber-500/20">
-          <p className="text-[10px] uppercase text-amber-500/70 font-semibold mb-1">En attente</p>
-          <p className="text-xl font-bold text-amber-400">{kycStats.pending}</p>
+         <Card variant="default" padding="sm" className="bg-status-warning-bg border-status-warning/20">
+          <p className="text-[10px] uppercase text-status-warning/70 font-semibold mb-1">En attente</p>
+          <p className="text-xl font-bold text-status-warning">{kycStats.pending}</p>
         </Card>
-         <Card variant="default" padding="sm" className="bg-red-900/10 border-red-500/20">
-          <p className="text-[10px] uppercase text-red-500/70 font-semibold mb-1">Rejetés</p>
-          <p className="text-xl font-bold text-red-400">{kycStats.rejected}</p>
+         <Card variant="default" padding="sm" className="bg-status-danger-bg border-status-danger/20">
+          <p className="text-[10px] uppercase text-status-danger/70 font-semibold mb-1">Rejetés</p>
+          <p className="text-xl font-bold text-status-danger">{kycStats.rejected}</p>
         </Card>
       </div>
 
       {/* Formulaire Inline (Collapsible) */}
       {showForm && (
-        <Card variant="elevated" className="border-cyan-500/30 animate-in slide-in-from-top-2">
+        <Card variant="elevated" className="border-accent/30 animate-in slide-in-from-top-2">
             <Card.Header className="flex items-center justify-between text-base">
                 <span>Nouveau Document</span>
-                <button onClick={() => setShowForm(false)}><XCircle size={18} className="text-slate-400 hover:text-white" /></button>
+                <button onClick={() => setShowForm(false)}><XCircle size={18} className="text-content-muted hover:text-content-primary" /></button>
             </Card.Header>
             <div className="grid md:grid-cols-2 gap-4 mb-4">
             <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Type</label>
+                <label className="block text-xs font-semibold text-content-muted mb-1.5 uppercase">Type</label>
                 <select
                 value={newDoc.type}
                 onChange={(e) => setNewDoc(prev => ({ ...prev, type: e.target.value as ClientDocument['documentType'] }))}
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-1 focus:ring-cyan-500 outline-none"
+                className="w-full bg-surface-base border border-edge rounded-lg px-3 py-2 text-content-primary text-sm focus:ring-1 focus:ring-accent outline-none"
                 >
                 <option value="ID Card">Carte d'identité</option>
                 <option value="Passport">Passeport</option>
@@ -492,18 +492,18 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
             </div>
 
             <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Nom du fichier</label>
+                <label className="block text-xs font-semibold text-content-muted mb-1.5 uppercase">Nom du fichier</label>
                 <input
                 type="text"
                 value={newDoc.name}
                 onChange={(e) => setNewDoc(prev => ({ ...prev, name: e.target.value }))}
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-1 focus:ring-cyan-500 outline-none"
+                className="w-full bg-surface-base border border-edge rounded-lg px-3 py-2 text-content-primary text-sm focus:ring-1 focus:ring-accent outline-none"
                 placeholder="Ex: CNI_Jean_Dupont.pdf"
                 />
             </div>
 
             <div className="md:col-span-2">
-                <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Document</label>
+                <label className="block text-xs font-semibold text-content-muted mb-1.5 uppercase">Document</label>
                 <FileUploadZone
                   accept=".pdf,.jpg,.jpeg,.png"
                   maxSize={5}
@@ -524,7 +524,7 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
                   }}
                 />
                 {newDoc.url && (
-                  <p className="text-xs text-green-400 mt-2 flex items-center gap-1">
+                  <p className="text-xs text-status-success mt-2 flex items-center gap-1">
                     <CheckCircle size={12} /> Document chargé
                   </p>
                 )}
@@ -534,14 +534,14 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
             <div className="flex justify-end gap-2">
                  <button
                 onClick={() => setShowForm(false)}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition text-sm font-medium"
+                className="px-4 py-2 bg-surface hover:bg-surface-elevated text-content-secondary rounded-lg transition text-sm font-medium"
                 >
                 Annuler
                 </button>
                 <button
                 onClick={handleAddDocument}
                 disabled={uploading || !newDoc.name || !newDoc.url}
-                className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 disabled:opacity-50 text-white rounded-lg transition flex items-center gap-2 text-sm font-bold"
+                className="px-4 py-2 bg-accent-secondary hover:bg-accent-secondary-hover disabled:opacity-50 text-content-primary rounded-lg transition flex items-center gap-2 text-sm font-bold"
                 >
                 {uploading ? <Clock size={16} className="animate-spin" /> : <Upload size={16} />}
                 {uploading ? 'Ajout...' : 'Enregistrer'}
@@ -553,14 +553,14 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
       {/* Document List */}
         {loading ? (
            <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div>
           </div>
         ) : documents.length === 0 ? (
-          <Card variant="default" padding="lg" className="border-dashed border-slate-700 bg-transparent text-center">
-             <div className="bg-slate-800/50 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
-                 <FileText className="text-slate-500" size={24} />
+          <Card variant="default" padding="lg" className="border-dashed border-edge bg-transparent text-center">
+             <div className="bg-surface/50 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
+                 <FileText className="text-content-muted" size={24} />
             </div>
-            <p className="text-slate-400 text-sm">Aucun document dans le dossier</p>
+            <p className="text-content-muted text-sm">Aucun document dans le dossier</p>
           </Card>
         ) : (
           <div className="space-y-3">

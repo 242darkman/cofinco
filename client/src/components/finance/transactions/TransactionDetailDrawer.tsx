@@ -141,13 +141,13 @@ interface DetailRowProps {
 function DetailRow({ label, value, icon, mono = false, className = '' }: DetailRowProps) {
   if (!value) return null;
   return (
-    <div className="flex items-start justify-between py-1.5 border-b border-dashed border-slate-100 dark:border-slate-700/50 last:border-0">
-      <dt className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+    <div className="flex items-start justify-between py-1.5 border-b border-dashed border-edge-subtle-subtle last:border-0">
+      <dt className="flex items-center gap-2 text-sm text-content-muted">
         {icon}
         {label}
       </dt>
       <dd className={`
-        text-sm font-semibold text-slate-900 dark:text-slate-100 text-right max-w-[60%]
+        text-sm font-semibold text-content-primary text-right max-w-[60%]
         ${mono ? 'font-mono' : ''}
         ${className}
       `}>
@@ -188,23 +188,23 @@ const DrawerContent = React.memo(function DrawerContent({
   const StatusIcon = statusConfig.icon;
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-slate-900 rounded-t-[20px] md:rounded-l-2xl md:rounded-tr-none overflow-hidden">
+    <div className="flex flex-col h-full bg-surface rounded-t-[20px] md:rounded-l-2xl md:rounded-tr-none overflow-hidden">
       {/* Hero Header */}
       <div className={`
         relative px-6 pt-8 pb-6 text-center
         ${isCredit
-          ? 'bg-gradient-to-b from-emerald-500/10 via-emerald-500/5 to-transparent dark:from-emerald-500/20 dark:via-emerald-500/10'
-          : 'bg-gradient-to-b from-red-500/10 via-red-500/5 to-transparent dark:from-red-500/20 dark:via-red-500/10'
+          ? 'bg-gradient-to-b from-status-success/20 via-emerald-500/10 to-transparent'
+          : 'bg-gradient-to-b from-status-danger/20 via-red-500/10 to-transparent'
         }
       `}>
         {/* Close Button (Desktop) */}
         {isDesktop && (
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+            className="absolute top-4 right-4 p-2 rounded-full hover:bg-white/10 transition-colors"
             aria-label="Fermer"
           >
-            <X size={20} className="text-slate-500" />
+            <X size={20} className="text-content-muted" />
           </button>
         )}
 
@@ -212,7 +212,7 @@ const DrawerContent = React.memo(function DrawerContent({
         <div className="flex justify-center mb-5">
           <span className={`
             inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide
-            bg-${statusConfig.color}-500/15 text-${statusConfig.color}-600 dark:text-${statusConfig.color}-400
+            bg-${statusConfig.color}-500/15 text-${statusConfig.color}-400
             border border-${statusConfig.color}-500/20
           `}>
             <StatusIcon size={14} strokeWidth={2.5} />
@@ -225,17 +225,17 @@ const DrawerContent = React.memo(function DrawerContent({
           <span className={`
             text-4xl sm:text-5xl font-bold font-mono tracking-tight
             ${isCredit
-              ? 'text-emerald-600 dark:text-emerald-400'
-              : 'text-red-600 dark:text-red-400'
+              ? 'text-status-success'
+              : 'text-status-danger'
             }
           `}>
             {isCredit ? '+' : '-'}{formatMoney(transaction.amount, { showCurrency: false })}
           </span>
-          <span className="text-lg text-slate-400 font-medium ml-2">FCFA</span>
+          <span className="text-lg text-content-muted font-medium ml-2">FCFA</span>
         </div>
 
         {/* Transaction Type */}
-        <p className="text-lg font-medium text-slate-600 dark:text-slate-300 flex items-center justify-center gap-2 mb-6">
+        <p className="text-lg font-medium text-content-muted flex items-center justify-center gap-2 mb-6">
           {isCredit ? <ArrowDownLeft size={20} /> : <ArrowUpRight size={20} />}
           {getStatusLabel(transaction.typeOperation || transaction.type, ALL_STATUS_LABELS)}
         </p>
@@ -243,16 +243,16 @@ const DrawerContent = React.memo(function DrawerContent({
         {/* Reference (Copyable) */}
         <button
           onClick={onCopyReference}
-          className="mx-auto flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors group"
+          className="mx-auto flex items-center gap-2 px-4 py-2 rounded-xl bg-surface-muted hover:bg-surface-subtle-elevated transition-colors group"
         >
-          <Hash size={14} className="text-slate-400" />
-          <span className="text-sm font-mono text-slate-600 dark:text-slate-300 group-hover:text-slate-900 dark:group-hover:text-white">
+          <Hash size={14} className="text-content-muted" />
+          <span className="text-sm font-mono text-content-muted group-hover:text-content-primary">
             {transaction.reference}
           </span>
           {copied ? (
-            <CheckCircle size={14} className="text-emerald-500" />
+            <CheckCircle size={14} className="text-status-success" />
           ) : (
-            <Copy size={14} className="text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300" />
+            <Copy size={14} className="text-content-muted group-hover:text-content-secondary" />
           )}
         </button>
       </div>
@@ -264,27 +264,27 @@ const DrawerContent = React.memo(function DrawerContent({
           {/* Transfer Flow (if applicable) */}
           {isTransfer && (
             <section className="mb-6">
-              <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50">
+              <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-surface-muted/50">
                 {/* Source */}
                 <div className="text-center flex-1">
-                  <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">De</p>
-                  <p className="text-sm font-semibold text-slate-900 dark:text-white">{transaction.source?.name}</p>
+                  <p className="text-xs text-content-muted uppercase tracking-wider mb-1">De</p>
+                  <p className="text-sm font-semibold text-content-primary">{transaction.source?.name}</p>
                   {transaction.source?.accountNumber && (
-                    <p className="text-xs text-slate-500 font-mono mt-0.5">{transaction.source.accountNumber}</p>
+                    <p className="text-xs text-content-muted font-mono mt-0.5">{transaction.source.accountNumber}</p>
                   )}
                 </div>
 
                 {/* Arrow */}
-                <div className="shrink-0 w-10 h-10 rounded-full bg-cyan-500/10 flex items-center justify-center">
-                  <ArrowRight size={18} className="text-cyan-500" />
+                <div className="shrink-0 w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center">
+                  <ArrowRight size={18} className="text-accent" />
                 </div>
 
                 {/* Destination */}
                 <div className="text-center flex-1">
-                  <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Vers</p>
-                  <p className="text-sm font-semibold text-slate-900 dark:text-white">{transaction.destination?.name}</p>
+                  <p className="text-xs text-content-muted uppercase tracking-wider mb-1">Vers</p>
+                  <p className="text-sm font-semibold text-content-primary">{transaction.destination?.name}</p>
                   {transaction.destination?.accountNumber && (
-                    <p className="text-xs text-slate-500 font-mono mt-0.5">{transaction.destination.accountNumber}</p>
+                    <p className="text-xs text-content-muted font-mono mt-0.5">{transaction.destination.accountNumber}</p>
                   )}
                 </div>
               </div>
@@ -294,10 +294,10 @@ const DrawerContent = React.memo(function DrawerContent({
           {/* Client Info */}
           {transaction.client && !isTransfer && (
             <section>
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+              <h3 className="text-xs font-bold text-content-muted uppercase tracking-wider mb-3 flex items-center gap-2">
                 <User size={14} /> Client
               </h3>
-              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 space-y-3">
+              <div className="bg-surface-muted/50 rounded-xl p-4 space-y-3">
                 <DetailRow label="Nom" value={transaction.client.name} />
                 {transaction.client.phone && (
                   <DetailRow label="Téléphone" value={transaction.client.phone} />
@@ -313,37 +313,37 @@ const DrawerContent = React.memo(function DrawerContent({
 
           {/* Transaction Details */}
           <section>
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+            <h3 className="text-xs font-bold text-content-muted uppercase tracking-wider mb-3 flex items-center gap-2">
               <FileText size={14} /> Détails
             </h3>
-            <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 space-y-3">
+            <div className="bg-surface-muted/50 rounded-xl p-4 space-y-3">
               <DetailRow
                 label="Date & Heure"
                 value={formatDate(transaction.date, { format: 'datetime' })}
-                icon={<Calendar size={14} className="text-slate-400" />}
+                icon={<Calendar size={14} className="text-content-muted" />}
               />
               <DetailRow
                 label="Mode de paiement"
                 value={transaction.modePaiement || 'Espèces'}
-                icon={<CreditCard size={14} className="text-slate-400" />}
+                icon={<CreditCard size={14} className="text-content-muted" />}
               />
               <DetailRow
                 label="Agent"
                 value={transaction.agent || 'Système'}
-                icon={<User size={14} className="text-slate-400" />}
+                icon={<User size={14} className="text-content-muted" />}
               />
               {transaction.agence && (
                 <DetailRow
                   label="Agence"
                   value={transaction.agence}
-                  icon={<Building size={14} className="text-slate-400" />}
+                  icon={<Building size={14} className="text-content-muted" />}
                 />
               )}
               {transaction.description && (
                 <DetailRow
                   label="Note"
                   value={transaction.description}
-                  className="italic text-slate-500 dark:text-slate-400"
+                  className="italic text-content-muted"
                 />
               )}
             </div>
@@ -352,13 +352,13 @@ const DrawerContent = React.memo(function DrawerContent({
           {/* Error message if failed */}
           {showError && (
             <section className="animate-in fade-in slide-in-from-bottom-2">
-              <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-xl p-4 flex items-start gap-3">
-                <AlertTriangle size={20} className="text-red-500 shrink-0 mt-0.5" />
+              <div className="bg-status-danger-bg border border-status-danger/20 rounded-xl p-4 flex items-start gap-3">
+                <AlertTriangle size={20} className="text-status-danger shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-sm font-semibold text-red-700 dark:text-red-400">
+                  <p className="text-sm font-semibold text-status-danger">
                     Transaction échouée
                   </p>
-                  <p className="text-xs text-red-600/80 dark:text-red-400/80 mt-1">
+                  <p className="text-xs text-status-danger/80 mt-1">
                     {transaction.metadata?.errorMessage || 'Une erreur est survenue lors du traitement de cette transaction.'}
                   </p>
                 </div>
@@ -380,7 +380,7 @@ const DrawerContent = React.memo(function DrawerContent({
           {showError && (
             <button
               onClick={onReportProblem}
-              className="w-full py-2 text-sm text-red-500 hover:text-red-400 transition-colors flex items-center justify-center gap-2"
+              className="w-full py-2 text-sm text-status-danger hover:text-status-danger transition-colors flex items-center justify-center gap-2"
             >
               <AlertTriangle size={14} />
               Signaler un problème
@@ -483,7 +483,7 @@ export default function TransactionDetailDrawer({
         />
 
         {/* Slideover Content */}
-        <div className="relative w-full max-w-md h-full bg-white dark:bg-slate-900 shadow-2xl animate-in slide-in-from-right duration-300 ease-out flex flex-col border-l border-slate-200 dark:border-slate-800">
+        <div className="relative w-full max-w-md h-full bg-surface shadow-2xl animate-in slide-in-from-right duration-300 ease-out flex flex-col border-l border-edge">
           <DrawerContent
             transaction={transaction}
             receiptData={receiptData}
@@ -507,10 +507,10 @@ export default function TransactionDetailDrawer({
     <Drawer.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm" />
-        <Drawer.Content className="bg-white dark:bg-slate-900 flex flex-col rounded-t-[20px] h-[92vh] mt-24 fixed bottom-0 left-0 right-0 z-50 outline-none">
+        <Drawer.Content className="bg-surface flex flex-col rounded-t-[20px] h-[92vh] mt-24 fixed bottom-0 left-0 right-0 z-50 outline-none">
           {/* Handle Bar */}
-          <div className="py-3 bg-white dark:bg-slate-900 rounded-t-[20px] flex justify-center shrink-0">
-            <div className="w-12 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full" />
+          <div className="py-3 bg-surface rounded-t-[20px] flex justify-center shrink-0">
+            <div className="w-12 h-1.5 bg-surface-subtle-elevated rounded-full" />
           </div>
 
           <div className="flex-1 overflow-hidden flex flex-col">

@@ -48,15 +48,15 @@ type StatutFilter = 'all' | 'pending' | 'approved' | 'rejected';
 
 // Status keys are from backend (English) — labels from centralized STATUT_REEVALUATION_LABELS
 const STATUT_CONFIG: Record<string, { color: string; bg: string; icon: React.ReactNode; label: string }> = {
-  'REQUESTED': { color: 'text-blue-400', bg: 'bg-blue-500/10', icon: <Clock size={13} />, label: STATUT_REEVALUATION_LABELS.REQUESTED },
-  'ELIGIBILITY_CHECK': { color: 'text-amber-400', bg: 'bg-amber-500/10', icon: <Loader2 size={13} className="animate-spin" />, label: STATUT_REEVALUATION_LABELS.ELIGIBILITY_CHECK },
-  'AUTHORIZED': { color: 'text-cyan-400', bg: 'bg-cyan-500/10', icon: <CheckCircle size={13} />, label: STATUT_REEVALUATION_LABELS.AUTHORIZED },
-  'REFUSED': { color: 'text-red-400', bg: 'bg-red-500/10', icon: <XCircle size={13} />, label: STATUT_REEVALUATION_LABELS.REFUSED },
-  'ADDITIONAL_INVESTIGATION': { color: 'text-purple-400', bg: 'bg-purple-500/10', icon: <Search size={13} />, label: STATUT_REEVALUATION_LABELS.ADDITIONAL_INVESTIGATION },
-  'IN_COMMITTEE': { color: 'text-orange-400', bg: 'bg-orange-500/10', icon: <Users size={13} />, label: STATUT_REEVALUATION_LABELS.IN_COMMITTEE },
-  'APPROVED': { color: 'text-emerald-400', bg: 'bg-emerald-500/10', icon: <CheckCircle size={13} />, label: STATUT_REEVALUATION_LABELS.APPROVED },
-  'DEFINITIVELY_REJECTED': { color: 'text-red-400', bg: 'bg-red-500/10', icon: <XCircle size={13} />, label: STATUT_REEVALUATION_LABELS.DEFINITIVELY_REJECTED },
-  'CANCELLED': { color: 'text-slate-400', bg: 'bg-slate-500/10', icon: <XCircle size={13} />, label: STATUT_REEVALUATION_LABELS.CANCELLED },
+  'REQUESTED': { color: 'text-status-info', bg: 'bg-status-info-bg', icon: <Clock size={13} />, label: STATUT_REEVALUATION_LABELS.REQUESTED },
+  'ELIGIBILITY_CHECK': { color: 'text-status-warning', bg: 'bg-status-warning-bg', icon: <Loader2 size={13} className="animate-spin" />, label: STATUT_REEVALUATION_LABELS.ELIGIBILITY_CHECK },
+  'AUTHORIZED': { color: 'text-accent', bg: 'bg-accent/10', icon: <CheckCircle size={13} />, label: STATUT_REEVALUATION_LABELS.AUTHORIZED },
+  'REFUSED': { color: 'text-status-danger', bg: 'bg-status-danger-bg', icon: <XCircle size={13} />, label: STATUT_REEVALUATION_LABELS.REFUSED },
+  'ADDITIONAL_INVESTIGATION': { color: 'text-status-info', bg: 'bg-status-info-bg', icon: <Search size={13} />, label: STATUT_REEVALUATION_LABELS.ADDITIONAL_INVESTIGATION },
+  'IN_COMMITTEE': { color: 'text-status-warning', bg: 'bg-status-warning-bg', icon: <Users size={13} />, label: STATUT_REEVALUATION_LABELS.IN_COMMITTEE },
+  'APPROVED': { color: 'text-status-success', bg: 'bg-status-success-bg', icon: <CheckCircle size={13} />, label: STATUT_REEVALUATION_LABELS.APPROVED },
+  'DEFINITIVELY_REJECTED': { color: 'text-status-danger', bg: 'bg-status-danger-bg', icon: <XCircle size={13} />, label: STATUT_REEVALUATION_LABELS.DEFINITIVELY_REJECTED },
+  'CANCELLED': { color: 'text-content-muted', bg: 'bg-surface-subtle/30', icon: <XCircle size={13} />, label: STATUT_REEVALUATION_LABELS.CANCELLED },
 };
 
 export function ReevaluationList({ onSelect, demandeId, showFilters = true }: ReevaluationListProps) {
@@ -136,8 +136,8 @@ export function ReevaluationList({ onSelect, demandeId, showFilters = true }: Re
 
   const getStatutConfig = (statut: string) => {
     return STATUT_CONFIG[statut] || { 
-      color: 'text-slate-400', 
-      bg: 'bg-slate-500/10', 
+      color: 'text-content-muted', 
+      bg: 'bg-surface-subtle/30', 
       icon: <AlertTriangle size={13} />,
       label: statut 
     };
@@ -146,20 +146,20 @@ export function ReevaluationList({ onSelect, demandeId, showFilters = true }: Re
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <Loader2 className="animate-spin text-cyan-400" size={24} />
-        <span className="ml-3 text-slate-400 text-sm">Chargement...</span>
+        <Loader2 className="animate-spin text-accent" size={24} />
+        <span className="ml-3 text-content-muted text-sm">Chargement...</span>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-red-500/10 border border-red-500/50 rounded-lg p-4 text-center">
-        <XCircle className="mx-auto text-red-400 mb-2" size={24} />
-        <p className="text-red-400 text-sm">{error}</p>
+      <div className="bg-status-danger-bg border border-status-danger/50 rounded-lg p-4 text-center">
+        <XCircle className="mx-auto text-status-danger mb-2" size={24} />
+        <p className="text-status-danger text-sm">{error}</p>
         <button 
           onClick={loadReevaluations}
-          className="mt-2 px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition"
+          className="mt-2 px-3 py-1 bg-status-danger hover:bg-status-danger text-white text-xs rounded transition"
         >
           Réessayer
         </button>
@@ -172,9 +172,9 @@ export function ReevaluationList({ onSelect, demandeId, showFilters = true }: Re
       {/* Header Compact */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <RefreshCw className="text-amber-400" size={16} />
-          <h3 className="text-sm font-bold text-white uppercase tracking-wider">Réévaluations</h3>
-          <span className="px-1.5 py-0.5 bg-slate-700 text-slate-300 text-xs rounded-full font-mono">
+          <RefreshCw className="text-status-warning" size={16} />
+          <h3 className="text-sm font-bold text-content-primary uppercase tracking-wider">Réévaluations</h3>
+          <span className="px-1.5 py-0.5 bg-surface-elevated text-content-secondary text-xs rounded-full font-mono">
             {reevaluations.length}
           </span>
         </div>
@@ -182,17 +182,17 @@ export function ReevaluationList({ onSelect, demandeId, showFilters = true }: Re
         {showFilters && (
           <div className="flex items-center gap-2">
             <div className="relative">
-              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-content-muted" />
               <input
                 type="text"
                 placeholder="Rechercher..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-40 sm:w-64 bg-slate-900/50 border border-slate-700/50 rounded-md pl-8 pr-3 py-1 text-xs text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
+                className="w-40 sm:w-64 bg-surface-base/50 border border-edge-subtle rounded-md pl-8 pr-3 py-1 text-xs text-content-primary focus:outline-none focus:border-accent/50 transition-colors"
               />
             </div>
             
-            <div className="flex bg-slate-900/50 p-0.5 rounded-md border border-slate-700/50">
+            <div className="flex bg-surface-base/50 p-0.5 rounded-md border border-edge-subtle">
               {[
                 { value: 'all', label: 'Tout' },
                 { value: 'pending', label: 'En cours' },
@@ -204,8 +204,8 @@ export function ReevaluationList({ onSelect, demandeId, showFilters = true }: Re
                   onClick={() => setStatutFilter(filter.value as StatutFilter)}
                   className={`px-2.5 py-1 rounded text-xs font-medium transition-all ${
                     statutFilter === filter.value
-                      ? 'bg-slate-700 text-white shadow-sm'
-                      : 'text-slate-400 hover:text-slate-300 hover:bg-slate-800'
+                      ? 'bg-surface-elevated text-content-primary shadow-sm'
+                      : 'text-content-muted hover:text-content-secondary hover:bg-surface'
                   }`}
                 >
                   {filter.label}
@@ -218,8 +218,8 @@ export function ReevaluationList({ onSelect, demandeId, showFilters = true }: Re
 
       {/* List Compact */}
       {filteredReevaluations.length === 0 ? (
-        <div className="bg-slate-800/30 border border-slate-700/50 rounded-lg p-6 text-center">
-          <p className="text-slate-500 text-sm">Aucune réévaluation trouvée</p>
+        <div className="bg-surface/30 border border-edge-subtle rounded-lg p-6 text-center">
+          <p className="text-content-muted text-sm">Aucune réévaluation trouvée</p>
         </div>
       ) : (
         <div className="space-y-1">
@@ -231,7 +231,7 @@ export function ReevaluationList({ onSelect, demandeId, showFilters = true }: Re
               <div
                 key={reeval.id}
                 onClick={() => onSelect?.(reeval)}
-                className={`group bg-slate-800/40 border border-slate-700/50 hover:bg-slate-800 hover:border-cyan-500/30 rounded-lg p-2.5 transition-all ${
+                className={`group bg-surface/40 border border-edge-subtle hover:bg-surface hover:border-accent/30 rounded-lg p-2.5 transition-all ${
                   isClickable ? 'cursor-pointer' : ''
                 }`}
               >
@@ -248,25 +248,25 @@ export function ReevaluationList({ onSelect, demandeId, showFilters = true }: Re
                             <img
                               src={resolveStorageUrl(photoUrl)}
                               alt="Client"
-                              className="w-9 h-9 rounded-full object-cover border border-slate-600 group-hover:border-cyan-500/50 transition-colors"
+                              className="w-9 h-9 rounded-full object-cover border border-edge-strong group-hover:border-accent/50 transition-colors"
                             />
                           );
                         }
                         return (
-                          <div className="w-9 h-9 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-400 border border-slate-600 group-hover:border-cyan-500/50 transition-colors">
+                          <div className="w-9 h-9 rounded-full bg-surface-elevated flex items-center justify-center text-xs font-bold text-content-muted border border-edge-strong group-hover:border-accent/50 transition-colors">
                             {initials}
                           </div>
                         );
                       })()}
                       {/* Status Dot for very compact view */}
-                      <div className={`absolute -right-0.5 -bottom-0.5 w-3 h-3 rounded-full border-2 border-slate-800 ${statutConfig.bg.replace('/10', '')} ${statutConfig.color.replace('text-', 'bg-')}`}></div>
+                      <div className={`absolute -right-0.5 -bottom-0.5 w-3 h-3 rounded-full border-2 border-edge ${statutConfig.bg.replace('/10', '')} ${statutConfig.color.replace('text-', 'bg-')}`}></div>
                     </div>
                     
                     <div className="min-w-0">
-                      <p className="text-slate-200 font-semibold text-sm truncate group-hover:text-cyan-400 transition-colors">
+                      <p className="text-content-secondary font-semibold text-sm truncate group-hover:text-accent transition-colors">
                         {formatClientName(reeval.client?.nom || '', reeval.client?.prenom || '')}
                       </p>
-                      <div className="flex items-center gap-2 text-[10px] text-slate-500 font-mono">
+                      <div className="flex items-center gap-2 text-[10px] text-content-muted font-mono">
                          <span>{reeval.numeroReevaluation || `#${reeval.numeroVersion}`}</span>
                          <span>•</span>
                          <span>{new Date(reeval.createdAt).toLocaleDateString('fr-FR')}</span>
@@ -283,15 +283,15 @@ export function ReevaluationList({ onSelect, demandeId, showFilters = true }: Re
                   </div>
 
                   {/* Financial Details - New Compact Grid */}
-                  <div className="flex-1 grid grid-cols-2 gap-x-6 gap-y-1 border-l border-slate-700/50 pl-4">
+                  <div className="flex-1 grid grid-cols-2 gap-x-6 gap-y-1 border-l border-edge-subtle pl-4">
                     <div className="flex items-baseline justify-between">
-                       <span className="text-[10px] text-slate-500 uppercase tracking-wide">Initial</span>
-                       <span className="text-slate-400 text-xs font-mono">{formatMoney(Number(reeval.montantInitialDemande))}</span>
+                       <span className="text-[10px] text-content-muted uppercase tracking-wide">Initial</span>
+                       <span className="text-content-muted text-xs font-mono">{formatMoney(Number(reeval.montantInitialDemande))}</span>
                     </div>
                     
                     <div className="flex items-baseline justify-between">
-                       <span className="text-[10px] text-slate-500 uppercase tracking-wide">Nouveau</span>
-                       <span className="text-cyan-400 text-xs font-bold font-mono">
+                       <span className="text-[10px] text-content-muted uppercase tracking-wide">Nouveau</span>
+                       <span className="text-accent text-xs font-bold font-mono">
                          {reeval.nouveauMontantDemande ? formatMoney(Number(reeval.nouveauMontantDemande)) : '-'}
                        </span>
                     </div>
@@ -299,14 +299,14 @@ export function ReevaluationList({ onSelect, demandeId, showFilters = true }: Re
                     <div className="flex items-center justify-between col-span-2">
                        <div className="flex gap-2">
                           {reeval.elementsNouveaux?.slice(0, 3).map((el, i) => (
-                             <span key={i} className="text-[10px] text-slate-400 bg-slate-700/50 px-1.5 rounded truncate max-w-[100px]">
+                             <span key={i} className="text-[10px] text-content-muted bg-surface-elevated/50 px-1.5 rounded truncate max-w-[100px]">
                                {el.type}
                              </span>
                           ))}
                        </div>
                        
                        {reeval.deltaScore !== undefined && reeval.deltaScore !== null && (
-                        <div className={`text-xs font-mono font-medium ${reeval.deltaScore > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                        <div className={`text-xs font-mono font-medium ${reeval.deltaScore > 0 ? 'text-status-success' : 'text-status-danger'}`}>
                           {reeval.deltaScore > 0 ? '+' : ''}{reeval.deltaScore} pts
                         </div>
                        )}
@@ -316,7 +316,7 @@ export function ReevaluationList({ onSelect, demandeId, showFilters = true }: Re
                   {/* Action Arrow */}
                   {isClickable && (
                     <div className="shrink-0 pl-2">
-                      <ChevronRight size={16} className="text-slate-600 group-hover:text-cyan-400 transition-colors" />
+                      <ChevronRight size={16} className="text-content-muted group-hover:text-accent transition-colors" />
                     </div>
                   )}
                 </div>

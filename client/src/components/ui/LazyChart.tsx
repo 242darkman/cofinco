@@ -5,10 +5,10 @@ import { Loader2 } from 'lucide-react';
 export function ChartSkeleton({ height = 250 }: { height?: number }) {
   return (
     <div
-      className="w-full flex items-center justify-center bg-slate-900/30 rounded-xl border border-dashed border-slate-700 animate-pulse"
+      className="w-full flex items-center justify-center bg-surface-base/30 rounded-xl border border-dashed border-edge animate-pulse"
       style={{ height }}
     >
-      <div className="flex flex-col items-center gap-2 text-slate-500">
+      <div className="flex flex-col items-center gap-2 text-content-muted">
         <Loader2 className="h-6 w-6 animate-spin" />
         <span className="text-xs">Chargement du graphique...</span>
       </div>

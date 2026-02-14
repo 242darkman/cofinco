@@ -1,6 +1,7 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=Roboto:wght@300;400;500;700;900&display=swap");
 
 @import "tailwindcss";
+@config "../../tailwind.config.js";
 
 /* ==================== BANK-GRADE PROFESSIONAL DESIGN SYSTEM ==================== */
 /* Hybrid Theme System: CSS Variables + Tailwind dark: classes */
@@ -81,6 +82,39 @@
   --header-text: #1e293b;
   --header-icon: #475569;
   --header-icon-hover: #0f172a;
+
+  /* Button colors - FIXED across themes (white text on colored bg) */
+  --btn-success: #10b981;
+  --btn-success-hover: #059669;
+  --btn-danger: #ef4444;
+  --btn-danger-hover: #dc2626;
+  --btn-warning: #d97706;
+  --btn-warning-hover: #b45309;
+  --btn-info: #2563eb;
+  --btn-info-hover: #1d4ed8;
+
+  /* Brand/Logo colors - FIXED across themes (from cofin-logo.png) */
+  --brand-navy: #1B2A4A;
+  --brand-green: #2D8B57;
+  --brand-amber: #E8A33D;
+  --brand-teal: #3AAA8C;
+
+  /* Login page - theme-aware */
+  --login-bg-from: #f0f4f8;
+  --login-bg-via: #e8eef5;
+  --login-bg-to: #dce5f0;
+  --login-grid-color: rgba(4, 120, 87, 0.3);
+  --login-card-bg: rgba(255, 255, 255, 0.95);
+  --login-card-border: rgba(4, 120, 87, 0.15);
+  --login-card-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15), 0 0 40px -10px rgba(4, 120, 87, 0.1);
+  --login-glow-1: rgba(4, 120, 87, 0.08);
+  --login-glow-2: rgba(14, 116, 144, 0.06);
+  --login-accent-glow: rgba(4, 120, 87, 0.12);
+  --login-line-color: rgba(4, 120, 87, 0.06);
+  --login-shape-color-1: rgba(4, 120, 87, 0.1);
+  --login-shape-color-2: rgba(14, 116, 144, 0.08);
+  --login-dot-1: rgba(4, 120, 87, 0.2);
+  --login-dot-2: rgba(14, 116, 144, 0.2);
 }
 
 /* Dark Theme - Professional Navy/Cyan theme */
@@ -156,6 +190,39 @@
   --header-text: #f8fafc;
   --header-icon: #94a3b8;
   --header-icon-hover: #f8fafc;
+
+  /* Button colors - SAME as light theme (consistent across themes) */
+  --btn-success: #10b981;
+  --btn-success-hover: #059669;
+  --btn-danger: #ef4444;
+  --btn-danger-hover: #dc2626;
+  --btn-warning: #d97706;
+  --btn-warning-hover: #b45309;
+  --btn-info: #2563eb;
+  --btn-info-hover: #1d4ed8;
+
+  /* Brand/Logo colors - SAME as light theme */
+  --brand-navy: #1B2A4A;
+  --brand-green: #2D8B57;
+  --brand-amber: #E8A33D;
+  --brand-teal: #3AAA8C;
+
+  /* Login page - dark variant */
+  --login-bg-from: #0a1628;
+  --login-bg-via: #0f1d32;
+  --login-bg-to: #162544;
+  --login-grid-color: rgba(59, 130, 246, 0.5);
+  --login-card-bg: rgba(30, 41, 59, 0.95);
+  --login-card-border: rgba(34, 211, 238, 0.2);
+  --login-card-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 40px -10px rgba(34, 211, 238, 0.15);
+  --login-glow-1: rgba(34, 211, 238, 0.15);
+  --login-glow-2: rgba(96, 165, 250, 0.10);
+  --login-accent-glow: rgba(34, 211, 238, 0.10);
+  --login-line-color: rgba(59, 130, 246, 0.10);
+  --login-shape-color-1: rgba(34, 211, 238, 0.20);
+  --login-shape-color-2: rgba(96, 165, 250, 0.15);
+  --login-dot-1: rgba(34, 211, 238, 0.30);
+  --login-dot-2: rgba(96, 165, 250, 0.30);
 }
 
 /* Professional Typography */
@@ -188,119 +255,25 @@ body {
 
 @layer base {
   * {
-    @apply border-slate-700/50;
+    border-color: var(--border-subtle);
   }
 
   html {
-    @apply bg-gradient-to-br from-blue-950 via-slate-900 to-blue-950;
-  }
-
-  html.light {
-    @apply bg-white;
+    background-color: var(--bg-base);
   }
 
   body {
-    @apply antialiased bg-gradient-to-br from-blue-950 via-slate-900 to-blue-950 text-slate-100 transition-colors duration-500 overflow-x-hidden;
-  }
-
-  body.light {
-    @apply bg-white text-slate-900;
+    @apply antialiased transition-colors duration-300 overflow-x-hidden;
+    background-color: var(--bg-base);
+    color: var(--text-primary);
   }
 
   #root {
-    @apply bg-gradient-to-br from-blue-950 via-slate-900 to-blue-950 min-h-screen transition-colors duration-500 overflow-x-hidden max-w-full;
+    @apply min-h-screen transition-colors duration-300 overflow-x-hidden max-w-full;
+    background-color: var(--bg-base);
   }
 
-  .light #root {
-    @apply bg-white;
-  }
-
-  .light .bg-slate-900 {
-    @apply bg-white shadow-sm border border-slate-200;
-  }
-
-  .light .bg-slate-800 {
-    @apply bg-white shadow-sm border border-slate-200;
-  }
-
-  .light .bg-slate-800\/90 {
-    @apply bg-white shadow-sm border border-slate-200;
-  }
-
-  .light .bg-slate-900\/90 {
-    @apply bg-white shadow-sm border border-slate-200;
-  }
-
-  .light .bg-slate-800\/50 {
-    @apply bg-white shadow-sm;
-  }
-
-  .light .bg-slate-900\/50 {
-    @apply bg-white shadow-sm;
-  }
-
-  .light .bg-slate-700 {
-    @apply bg-white shadow-sm;
-  }
-
-  .light .bg-slate-600 {
-    @apply bg-slate-50;
-  }
-
-  .light .text-slate-300 {
-    @apply text-slate-700;
-  }
-
-  .light .text-slate-400 {
-    @apply text-slate-600;
-  }
-
-  .light .border-slate-700 {
-    @apply border-slate-300;
-  }
-
-  .light .border-slate-600 {
-    @apply border-slate-400;
-  }
-
-  .light [class*="border-slate-700/"] {
-    @apply border-slate-200;
-  }
-
-  .light .text-slate-100 {
-    @apply text-slate-900;
-  }
-
-  .light .text-slate-200 {
-    @apply text-slate-800;
-  }
-
-  .light *:hover[class*="hover:bg-slate-800"] {
-    @apply bg-slate-100;
-  }
-
-  .light *:hover[class*="hover:bg-slate-700"] {
-    @apply bg-slate-200;
-  }
-
-  .light .bg-slate-950 {
-    @apply bg-white;
-  }
-
-  /* Inputs et forms en mode clair */
-  .light input,
-  .light textarea,
-  .light select {
-    @apply bg-white border-slate-300 text-slate-900 placeholder:text-slate-500;
-  }
-
-  .light input:focus,
-  .light textarea:focus,
-  .light select:focus {
-    @apply border-emerald-500 ring-emerald-500/20;
-  }
-
-  /* Override browser autofill yellow background */
+  /* Override browser autofill yellow background - uses CSS vars for theme awareness */
   input:-webkit-autofill,
   input:-webkit-autofill:hover,
   input:-webkit-autofill:focus,
@@ -313,46 +286,10 @@ body {
   select:-webkit-autofill:hover,
   select:-webkit-autofill:focus,
   select:-webkit-autofill:active {
-    -webkit-box-shadow: 0 0 0 1000px white inset !important;
-    -webkit-text-fill-color: #0f172a !important;
-    caret-color: #0f172a !important;
+    -webkit-box-shadow: 0 0 0 1000px var(--input-bg) inset !important;
+    -webkit-text-fill-color: var(--input-text) !important;
+    caret-color: var(--input-text) !important;
     transition: background-color 5000s ease-in-out 0s;
-  }
-
-  /* Dark mode autofill override */
-  .dark input:-webkit-autofill,
-  .dark input:-webkit-autofill:hover,
-  .dark input:-webkit-autofill:focus,
-  .dark input:-webkit-autofill:active,
-  .dark textarea:-webkit-autofill,
-  .dark textarea:-webkit-autofill:hover,
-  .dark textarea:-webkit-autofill:focus,
-  .dark textarea:-webkit-autofill:active,
-  .dark select:-webkit-autofill,
-  .dark select:-webkit-autofill:hover,
-  .dark select:-webkit-autofill:focus,
-  .dark select:-webkit-autofill:active {
-    -webkit-box-shadow: 0 0 0 1000px #1e293b inset !important;
-    -webkit-text-fill-color: #f8fafc !important;
-    caret-color: #f8fafc !important;
-  }
-
-  /* Tables en mode clair */
-  .light table {
-    @apply bg-white;
-  }
-
-  .light thead {
-    @apply bg-slate-50 border-slate-200;
-  }
-
-  .light tbody tr {
-    @apply border-slate-200 hover:bg-slate-50;
-  }
-
-  .light td,
-  .light th {
-    @apply border-slate-200 text-slate-900;
   }
 
   /* Tableaux responsives */
@@ -370,293 +307,24 @@ body {
     }
   }
 
-  /* Badges et labels en mode clair */
-  .light [class*="bg-slate-500/20"] {
-    @apply bg-slate-100 text-slate-700;
-  }
-
-  .light [class*="bg-slate-600/20"] {
-    @apply bg-slate-100 text-slate-700;
-  }
-
-  .light [class*="bg-blue-600/20"],
-  .light [class*="bg-cyan-600/20"],
-  .light [class*="bg-green-600/20"],
-  .light [class*="bg-emerald-600/20"] {
-    @apply bg-slate-100 text-slate-700;
-  }
-
-  /* Header en mode clair */
-  .light header {
-    @apply bg-white border-slate-200 shadow-md;
-  }
-
-  .light header input {
-    @apply bg-slate-100 border-slate-300 text-slate-900 placeholder:text-slate-500;
-  }
-
-  .light header button:hover {
-    @apply bg-slate-100;
-  }
-
-  .light header .text-slate-300 {
-    @apply text-slate-700;
-  }
-
-  .light header .text-slate-400 {
-    @apply text-slate-600;
-  }
-
-  .light header .text-slate-200 {
-    @apply text-slate-800;
-  }
-
-  .light header .bg-slate-800 {
-    @apply bg-white shadow-md border-slate-300;
-  }
-
-  .light header .bg-slate-700 {
-    @apply bg-slate-100;
-  }
-
-  .light header *:hover[class*="hover:bg-slate-800"] {
-    @apply bg-slate-100;
-  }
-
-  .light header *:hover[class*="hover:bg-slate-700"] {
-    @apply bg-slate-200;
-  }
-
-  .light header .border-slate-700 {
-    @apply border-slate-300;
-  }
-
-  /* Sidebar en mode clair */
-  .light aside,
-  .light nav {
-    @apply bg-white border-slate-200 shadow-lg;
-  }
-
-  .light aside .text-slate-300 {
-    @apply text-slate-700;
-  }
-
-  .light aside .text-slate-400 {
-    @apply text-slate-600;
-  }
-
-  .light aside button,
-  .light nav button {
-    @apply hover:bg-slate-100;
-  }
-
-  .light [class*="hover:bg-slate-700"]:hover {
-    @apply bg-slate-100;
-  }
-
-  .light [class*="hover:bg-slate-800"]:hover {
-    @apply bg-slate-100;
-  }
-
-  .light [class*="bg-cyan-500/10"] {
-    @apply bg-emerald-50;
-  }
-
-  .light [class*="bg-blue-500/10"] {
-    @apply bg-emerald-50;
-  }
-
-  .light [class*="bg-emerald-500/10"] {
-    @apply bg-emerald-50;
-  }
-
-  /* Professional Banking Theme - Light Mode 
-     Uses consistent blue palette for institutional look */
-
-  /* Light mode professional background - clean white with subtle blue tint */
-  .light #root {
-    @apply bg-gradient-to-br from-slate-50 via-white to-blue-50/20;
-  }
-
-  .light html {
-    @apply bg-gradient-to-br from-slate-50 via-white to-blue-50/20;
-  }
-
-  .light body {
-    @apply bg-gradient-to-br from-slate-50 via-white to-blue-50/20;
-  }
-
-  /* Backgrounds avec gradients en mode clair - Only reset dark slate gradients */
-  .light [class*="from-slate-900"],
-  .light [class*="from-slate-800"],
-  .light [class*="from-blue-950"] {
-    background-image: none !important;
-    @apply bg-white;
-  }
-
-  /* Éliminer tous les backgrounds gris/bleus */
-  .light .bg-gray-900 {
-    @apply bg-white;
-  }
-
-  .light .bg-gray-800 {
-    @apply bg-white;
-  }
-
-  /* === MODE CLAIR - AMÉLIORATIONS COMPLÈTES === */
-
-  /* Cartes avec gradients */
-  .light [class*="bg-gradient-to-br"][class*="from-slate-800"],
-  .light [class*="bg-gradient-to-br"][class*="from-slate-900"] {
-    background-image: none !important;
-    @apply bg-white border border-slate-200 shadow-sm;
-  }
-
-  /* Texte blanc vers sombre */
-  .light .text-white {
-    @apply text-slate-900;
-  }
-
-  /* Textes colorés - conserver mais ajuster pour lisibilité */
-  .light .text-emerald-400 {
-    @apply text-emerald-600;
-  }
-
-  .light .text-cyan-400 {
-    @apply text-cyan-600;
-  }
-
-  .light .text-blue-400 {
-    @apply text-blue-600;
-  }
-
-  .light .text-purple-400 {
-    @apply text-purple-600;
-  }
-
-  .light .text-amber-400 {
-    @apply text-amber-600;
-  }
-
-  .light .text-red-400 {
-    @apply text-red-600;
-  }
-
-  /* Backgrounds avec opacité */
-  .light [class*="bg-slate-700/50"],
-  .light [class*="bg-slate-700/30"] {
-    @apply bg-slate-100;
-  }
-
-  .light [class*="bg-emerald-500/20"] {
-    @apply bg-emerald-50;
-  }
-
-  .light [class*="bg-cyan-500/20"] {
-    @apply bg-cyan-50;
-  }
-
-  .light [class*="bg-blue-500/20"] {
-    @apply bg-blue-50;
-  }
-
-  .light [class*="bg-purple-500/20"] {
-    @apply bg-purple-50;
-  }
-
-  .light [class*="bg-amber-500/20"] {
-    @apply bg-amber-50;
-  }
-
-  .light [class*="bg-red-500/20"],
-  .light [class*="bg-red-400/10"] {
-    @apply bg-red-50;
-  }
-
-  .light [class*="bg-emerald-400/10"] {
-    @apply bg-emerald-50;
-  }
-
-  .light [class*="bg-cyan-400/10"] {
-    @apply bg-cyan-50;
-  }
-
-  .light [class*="bg-amber-400/10"] {
-    @apply bg-amber-50;
-  }
-
-  /* Boutons en mode clair */
-  .light .bg-cyan-600 {
-    @apply bg-blue-600;
-  }
-
-  .light .bg-emerald-500 {
-    @apply bg-emerald-600;
-  }
-
-  .light .bg-blue-500 {
-    @apply bg-blue-600;
-  }
-
-  /* Graphiques et charts - backgrounds */
+  /* Recharts chart grid - library-level override */
   .light .recharts-cartesian-grid line {
-    stroke: #e2e8f0 !important;
+    stroke: var(--border-default) !important;
   }
 
-  .light .recharts-tooltip-wrapper .bg-slate-800 {
-    @apply bg-white border-slate-200 shadow-lg;
-  }
-
-  /* Tableaux de transactions */
-  .light [class*="border-slate-700/50"] {
-    @apply border-slate-200;
-  }
-
-  .light tr:hover[class*="hover:bg-slate-700/30"] {
-    @apply bg-slate-50;
-  }
-
-  /* Scrollbars en mode clair */
-  .light ::-webkit-scrollbar-track {
-    background: #f1f5f9;
-  }
-
-  .light ::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
-  }
-
-  .light ::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
-  }
-
-  /* Focus states en mode clair */
-  .light [class*="focus:ring-cyan-500"] {
-    --tw-ring-color: rgb(14 165 233 / 0.3);
-  }
-
-  .light [class*="focus:ring-emerald-500"] {
-    --tw-ring-color: rgb(16 185 129 / 0.3);
-  }
-
-  /* Placeholders */
-  .light ::placeholder {
-    @apply text-slate-400;
-  }
-
-  /* Select et dropdown backgrounds */
-  /* Select et dropdown backgrounds */
-  .light select option {
-    @apply bg-white text-slate-900;
-  }
-
-  /* Dark mode select options */
+  /* Select dropdown native styling */
   .dark select {
     color-scheme: dark;
   }
 
   .dark select option {
-    background-color: #1e293b;
-    color: #f8fafc;
+    background-color: var(--bg-surface);
+    color: var(--text-primary);
+  }
+
+  select option {
+    background-color: var(--bg-surface);
+    color: var(--text-primary);
   }
 }
 
@@ -702,80 +370,42 @@ body {
   }
 
   .glass-effect {
-    @apply bg-slate-800/40 backdrop-blur-xl border border-slate-700/50;
+    backdrop-filter: blur(24px);
+    background-color: color-mix(in srgb, var(--bg-surface) 60%, transparent);
+    border: 1px solid var(--border-subtle);
   }
 
   .card-hover {
-    @apply transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-blue-500/10;
-  }
-
-  .light .card-hover {
-    @apply hover:shadow-xl hover:shadow-emerald-500/15;
+    @apply transition-all duration-300 hover:scale-[1.02];
+    &:hover {
+      box-shadow: var(--shadow-lg);
+    }
   }
 
   .gradient-text {
-    @apply bg-gradient-to-r from-blue-400 via-cyan-400 to-emerald-400 bg-clip-text text-transparent;
+    background: linear-gradient(to right, var(--accent-primary), var(--accent-secondary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 
-  .light .gradient-text {
-    @apply bg-gradient-to-r from-emerald-600 via-teal-600 to-amber-600 bg-clip-text text-transparent;
+  .brand-gradient {
+    background: linear-gradient(to right, var(--accent-primary), var(--accent-secondary));
   }
 
-  .bgfi-gradient {
-    @apply bg-gradient-to-r from-blue-600 to-emerald-600;
+  .brand-gradient-gold {
+    background: linear-gradient(to right, var(--accent-secondary), var(--accent-primary));
   }
 
-  .light .bgfi-gradient {
-    @apply bg-gradient-to-r from-emerald-600 to-amber-500;
+  .brand-border {
+    border-color: color-mix(in srgb, var(--accent-primary) 50%, transparent);
   }
 
-  .bgfi-gradient-gold {
-    @apply bg-gradient-to-r from-emerald-500 to-blue-600;
-  }
-
-  .light .bgfi-gradient-gold {
-    @apply bg-gradient-to-r from-amber-500 to-emerald-600;
-  }
-
-  .bgfi-border {
-    @apply border-blue-600/50;
-  }
-
-  .light .bgfi-border {
-    @apply border-emerald-600/50;
-  }
-
-  .bgfi-hover {
-    @apply hover:bg-blue-700/20 hover:border-blue-500;
-  }
-
-  .light .bgfi-hover {
-    @apply hover:bg-emerald-700/20 hover:border-emerald-500;
-  }
-
-  /* African Finance Theme - Professional Light Mode Colors */
-  .finance-primary {
-    @apply text-emerald-600;
-  }
-
-  .finance-accent {
-    @apply text-amber-600;
-  }
-
-  .finance-bg-primary {
-    @apply bg-emerald-600;
-  }
-
-  .finance-bg-accent {
-    @apply bg-amber-500;
-  }
-
-  .finance-gradient {
-    @apply bg-gradient-to-r from-emerald-600 to-teal-600;
-  }
-
-  .finance-gradient-gold {
-    @apply bg-gradient-to-r from-emerald-600 via-teal-500 to-amber-500;
+  .brand-hover {
+    &:hover {
+      background-color: color-mix(in srgb, var(--accent-primary) 20%, transparent);
+      border-color: var(--accent-primary);
+    }
   }
 
   /* Options de polices modernes pour le logo */
@@ -963,19 +593,17 @@ body {
 }
 
 .scrollbar-thin::-webkit-scrollbar-track {
-  @apply bg-slate-800/50 rounded-full;
-}
-
-.light .scrollbar-thin::-webkit-scrollbar-track {
-  @apply bg-slate-200 rounded-full;
+  background: color-mix(in srgb, var(--bg-surface) 50%, transparent);
+  border-radius: 9999px;
 }
 
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  @apply bg-slate-600 rounded-full hover:bg-slate-500;
+  background: var(--border-strong);
+  border-radius: 9999px;
 }
 
-.light .scrollbar-thin::-webkit-scrollbar-thumb {
-  @apply bg-slate-400 rounded-full hover:bg-slate-500;
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
 }
 
 .no-scrollbar::-webkit-scrollbar {
@@ -988,47 +616,54 @@ body {
 }
 
 .input-focus {
-  @apply focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500 transition-all duration-200;
+  @apply transition-all duration-200;
+  &:focus {
+    outline: 2px solid color-mix(in srgb, var(--accent-primary) 50%, transparent);
+    outline-offset: 1px;
+    border-color: var(--accent-primary);
+  }
 }
 
 .btn-primary {
-  @apply bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-semibold px-6 py-2.5 rounded-lg transition-all duration-300 shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 hover:scale-105 active:scale-95;
-}
-
-.light .btn-primary {
-  @apply bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-emerald-500/30 hover:shadow-emerald-500/40;
+  background: linear-gradient(to right, var(--accent-primary), var(--accent-secondary));
+  @apply text-white font-semibold px-6 py-2.5 rounded-lg transition-all duration-300 hover:scale-105 active:scale-95;
+  box-shadow: var(--shadow-md);
+  &:hover {
+    filter: brightness(1.1);
+    box-shadow: var(--shadow-lg);
+  }
 }
 
 .btn-secondary {
-  @apply bg-slate-700 hover:bg-slate-600 text-white font-semibold px-6 py-2.5 rounded-lg transition-all duration-300 hover:scale-105 active:scale-95;
-}
-
-.light .btn-secondary {
-  @apply bg-slate-200 hover:bg-slate-300 text-slate-900 shadow-md;
+  background-color: var(--bg-elevated);
+  color: var(--text-primary);
+  @apply font-semibold px-6 py-2.5 rounded-lg transition-all duration-300 hover:scale-105 active:scale-95;
+  &:hover {
+    background-color: var(--bg-subtle);
+  }
 }
 
 .btn-danger {
   @apply bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-semibold px-6 py-2.5 rounded-lg transition-all duration-300 shadow-lg shadow-red-500/30 hover:shadow-xl hover:shadow-red-500/40 hover:scale-105 active:scale-95;
 }
 
-.light .btn-danger {
-  @apply bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 shadow-red-500/30 hover:shadow-red-500/40;
-}
-
 .card-gradient {
-  @apply bg-gradient-to-br from-slate-800/90 to-slate-900/90 backdrop-blur-xl border border-slate-700/50 rounded-xl shadow-2xl;
-}
-
-.light .card-gradient {
-  @apply bg-white backdrop-blur-xl border border-slate-200 rounded-xl shadow-md;
+  background-color: var(--bg-surface);
+  backdrop-filter: blur(24px);
+  border: 1px solid var(--border-subtle);
+  @apply rounded-xl;
+  box-shadow: var(--card-shadow);
 }
 
 .stat-card {
-  @apply p-6 rounded-xl border border-slate-700/50 backdrop-blur-sm transition-all duration-300 hover:scale-105 hover:shadow-2xl cursor-pointer;
-}
-
-.light .stat-card {
-  @apply border-slate-200 bg-white shadow-md hover:shadow-xl;
+  @apply p-6 rounded-xl transition-all duration-300 hover:scale-105 cursor-pointer;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  backdrop-filter: blur(4px);
+  box-shadow: var(--card-shadow);
+  &:hover {
+    box-shadow: var(--shadow-lg);
+  }
 }
 
 .custom-scrollbar::-webkit-scrollbar {
@@ -1036,28 +671,26 @@ body {
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
-  @apply bg-slate-800/50 rounded-full;
-}
-
-.light .custom-scrollbar::-webkit-scrollbar-track {
-  @apply bg-slate-200 rounded-full;
+  background: color-mix(in srgb, var(--bg-surface) 50%, transparent);
+  border-radius: 9999px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  @apply bg-slate-600 rounded-full hover:bg-blue-600;
+  background: var(--border-strong);
+  border-radius: 9999px;
 }
 
-.light .custom-scrollbar::-webkit-scrollbar-thumb {
-  @apply bg-slate-400 rounded-full hover:bg-emerald-500;
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-primary);
 }
 
 /* ==================== PROFESSIONAL DASHBOARD SCROLLBAR ==================== */
-/* Modern, minimal scrollbar with smooth appearance on all screen sizes */
+/* Uses CSS vars for theme-aware scrollbar */
 
 .pro-scrollbar {
   scroll-behavior: smooth;
   scrollbar-width: thin;
-  scrollbar-color: rgba(100, 116, 139, 0.5) transparent;
+  scrollbar-color: color-mix(in srgb, var(--text-muted) 50%, transparent) transparent;
 }
 
 .pro-scrollbar::-webkit-scrollbar {
@@ -1072,37 +705,20 @@ body {
 }
 
 .pro-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(100, 116, 139, 0.4);
+  background: color-mix(in srgb, var(--text-muted) 40%, transparent);
   border-radius: 100px;
   transition: background 0.2s ease;
 }
 
 .pro-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(100, 116, 139, 0.7);
+  background: color-mix(in srgb, var(--text-muted) 70%, transparent);
 }
 
 .pro-scrollbar::-webkit-scrollbar-thumb:active {
-  background: rgba(34, 211, 238, 0.8);
+  background: color-mix(in srgb, var(--accent-primary) 80%, transparent);
 }
 
-/* Light mode variant */
-.light .pro-scrollbar {
-  scrollbar-color: rgba(148, 163, 184, 0.5) transparent;
-}
-
-.light .pro-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.4);
-}
-
-.light .pro-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.7);
-}
-
-.light .pro-scrollbar::-webkit-scrollbar-thumb:active {
-  background: rgba(16, 185, 129, 0.8);
-}
-
-/* Scroll container with fade indicators */
+/* Scroll container with fade indicators - uses CSS var for bg-base */
 .scroll-fade-container {
   position: relative;
 }
@@ -1123,15 +739,15 @@ body {
 .scroll-fade-container::before {
   top: 0;
   background: linear-gradient(to bottom,
-    rgba(15, 23, 42, 0.95) 0%,
-    rgba(15, 23, 42, 0) 100%);
+    color-mix(in srgb, var(--bg-base) 95%, transparent) 0%,
+    transparent 100%);
 }
 
 .scroll-fade-container::after {
   bottom: 0;
   background: linear-gradient(to top,
-    rgba(15, 23, 42, 0.95) 0%,
-    rgba(15, 23, 42, 0) 100%);
+    color-mix(in srgb, var(--bg-base) 95%, transparent) 0%,
+    transparent 100%);
 }
 
 .scroll-fade-container.has-scroll-top::before {
@@ -1140,19 +756,6 @@ body {
 
 .scroll-fade-container.has-scroll-bottom::after {
   opacity: 1;
-}
-
-/* Light mode fade indicators */
-.light .scroll-fade-container::before {
-  background: linear-gradient(to bottom,
-    rgba(248, 250, 252, 0.95) 0%,
-    rgba(248, 250, 252, 0) 100%);
-}
-
-.light .scroll-fade-container::after {
-  background: linear-gradient(to top,
-    rgba(248, 250, 252, 0.95) 0%,
-    rgba(248, 250, 252, 0) 100%);
 }
 
 /* Mobile-specific scrollbar - slightly wider for touch */
@@ -1181,12 +784,9 @@ body {
 
 /* Fix pour les modals qui ne scrollent pas */
 .modal-overlay {
-  @apply fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4;
+  @apply fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4;
+  background-color: color-mix(in srgb, var(--bg-base) 60%, transparent);
   overflow-y: visible !important;
-}
-
-.light .modal-overlay {
-  @apply bg-slate-900/40 backdrop-blur-md;
 }
 
 .modal-content {
@@ -1203,16 +803,15 @@ body.modal-open {
   width: 8px;
 }
 .modal-content::-webkit-scrollbar-track {
-  @apply bg-slate-800/50 rounded-full;
-}
-.light .modal-content::-webkit-scrollbar-track {
-  @apply bg-slate-200 rounded-full;
+  background: color-mix(in srgb, var(--bg-surface) 50%, transparent);
+  border-radius: 9999px;
 }
 .modal-content::-webkit-scrollbar-thumb {
-  @apply bg-slate-600 rounded-full hover:bg-blue-600;
+  background: var(--border-strong);
+  border-radius: 9999px;
 }
-.light .modal-content::-webkit-scrollbar-thumb {
-  @apply bg-slate-400 rounded-full hover:bg-emerald-500;
+.modal-content::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-primary);
 }
 
 @layer utilities {

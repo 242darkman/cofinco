@@ -26,25 +26,25 @@ const STATUS_CONFIG = {
   },
   unstable: {
     show: true,
-    bg: 'bg-amber-500/15',
-    border: 'border-amber-500/30',
-    text: 'text-amber-300',
+    bg: 'bg-status-warning-bg',
+    border: 'border-status-warning/30',
+    text: 'text-status-warning',
     icon: WifiLow,
     message: 'Connexion instable',
   },
   offline: {
     show: true,
-    bg: 'bg-red-500/15',
-    border: 'border-red-500/30',
-    text: 'text-red-300',
+    bg: 'bg-status-danger-bg',
+    border: 'border-status-danger/30',
+    text: 'text-status-danger',
     icon: WifiOff,
     message: 'Hors ligne - Mode local',
   },
   api_down: {
     show: true,
-    bg: 'bg-red-500/15',
-    border: 'border-red-500/30',
-    text: 'text-red-300',
+    bg: 'bg-status-danger-bg',
+    border: 'border-status-danger/30',
+    text: 'text-status-danger',
     icon: ServerCrash,
     message: 'Serveur indisponible',
   },
@@ -104,7 +104,7 @@ export default function NetworkBanner({ dismissible = false, onDismiss }: Networ
         <div
           className={`
             flex items-center justify-center w-8 h-8 rounded-lg
-            bg-slate-900/50 ${config.text}
+            bg-surface-base/50 ${config.text}
           `}
         >
           <Icon className="w-4 h-4" />
@@ -117,7 +117,7 @@ export default function NetworkBanner({ dismissible = false, onDismiss }: Networ
 
           {/* Last sync time */}
           {lastSyncAt && (
-            <span className="text-xs text-slate-400 truncate">
+            <span className="text-xs text-content-muted truncate">
               Dernière synchro: {formatRelativeTime(lastSyncAt)}
             </span>
           )}
@@ -128,12 +128,12 @@ export default function NetworkBanner({ dismissible = false, onDismiss }: Networ
       <div className="flex items-center gap-3 flex-shrink-0">
         {/* Countdown for retry */}
         {nextRetryIn !== null && nextRetryIn > 0 && (
-          <span className="text-xs text-slate-400">
+          <span className="text-xs text-content-muted">
             Réessai dans{' '}
             <CountdownTimer
               seconds={nextRetryIn}
               format="short"
-              className="font-mono text-slate-300"
+              className="font-mono text-content-secondary"
             />
           </span>
         )}
@@ -145,7 +145,7 @@ export default function NetworkBanner({ dismissible = false, onDismiss }: Networ
           className={`
             flex items-center gap-1.5 px-3 py-1.5 rounded-lg
             text-xs font-medium transition-colors
-            bg-slate-800/50 hover:bg-slate-700/50
+            bg-surface/50 hover:bg-surface-elevated/50
             disabled:opacity-50 disabled:cursor-not-allowed
             ${config.text}
           `}
@@ -161,7 +161,7 @@ export default function NetworkBanner({ dismissible = false, onDismiss }: Networ
         {dismissible && onDismiss && (
           <button
             onClick={onDismiss}
-            className="p-1.5 rounded-lg hover:bg-slate-700/50 text-slate-400 hover:text-slate-300"
+            className="p-1.5 rounded-lg hover:bg-surface-elevated/50 text-content-muted hover:text-content-secondary"
             title="Fermer"
           >
             <X className="w-4 h-4" />
@@ -181,8 +181,8 @@ export function NetworkStatusIndicator() {
 
   if (status === 'online') {
     return (
-      <div className="flex items-center gap-1.5 text-emerald-400">
-        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+      <div className="flex items-center gap-1.5 text-status-success">
+        <span className="w-2 h-2 rounded-full bg-status-success animate-pulse" />
         <span className="text-xs">En ligne</span>
       </div>
     );

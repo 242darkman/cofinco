@@ -51,13 +51,13 @@ export default function AdminCreditSettings() {
   return (
     <div className="space-y-6">
       <Card>
-        <div className="flex items-center gap-3 mb-6 border-b border-slate-700/50 pb-4">
-          <div className="p-2 bg-blue-500/10 text-blue-400 rounded-lg">
+        <div className="flex items-center gap-3 mb-6 border-b border-edge-subtle pb-4">
+          <div className="p-2 bg-status-info-bg text-status-info rounded-lg">
             <Settings size={20} />
           </div>
           <div>
-            <h3 className="font-bold text-white">Configuration Générale</h3>
-            <p className="text-sm text-slate-400">Paramètres globaux pour le module crédit</p>
+            <h3 className="font-bold text-content-primary">Configuration Générale</h3>
+            <p className="text-sm text-content-muted">Paramètres globaux pour le module crédit</p>
           </div>
         </div>
 
@@ -80,7 +80,7 @@ export default function AdminCreditSettings() {
             />
         </div>
 
-         <div className="mt-6 pt-4 border-t border-slate-700/50 flex justify-end">
+         <div className="mt-6 pt-4 border-t border-edge-subtle flex justify-end">
             <Button 
                 variant="primary" 
                 icon={Save} 

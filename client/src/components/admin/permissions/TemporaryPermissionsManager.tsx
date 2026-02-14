@@ -74,20 +74,20 @@ function TempPermissionCard({
 
   return (
     <div className={cn(
-      "px-3 py-2.5 border rounded-lg bg-slate-800/50 transition-all",
-      permission.isExpiringSoon && !isExpired && "border-amber-500/30 bg-amber-500/5",
-      isExpired && "border-red-500/30 bg-red-500/5 opacity-60"
+      "px-3 py-2.5 border rounded-lg bg-surface/50 transition-all",
+      permission.isExpiringSoon && !isExpired && "border-status-warning/30 bg-status-warning/5",
+      isExpired && "border-status-danger/30 bg-status-danger/5 opacity-60"
     )}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 mb-1">
-            <Shield className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-            <span className="text-xs font-medium text-white truncate">
+            <Shield className="w-3.5 h-3.5 text-accent shrink-0" />
+            <span className="text-xs font-medium text-content-primary truncate">
               {permission.permissionName || permission.permissionCode}
             </span>
           </div>
 
-          <div className="text-[10px] text-slate-400 space-y-0.5">
+          <div className="text-[10px] text-content-muted space-y-0.5">
             <div className="flex items-center gap-1.5">
               <Users className="w-2.5 h-2.5" />
               <span>ID: {permission.userId.slice(0, 8)}...</span>
@@ -103,7 +103,7 @@ function TempPermissionCard({
           </div>
 
           {permission.reason && (
-            <p className="mt-1.5 text-[10px] text-slate-300 bg-slate-700/50 px-2 py-1 rounded truncate">
+            <p className="mt-1.5 text-[10px] text-content-secondary bg-surface-elevated/50 px-2 py-1 rounded truncate">
               {permission.reason}
             </p>
           )}
@@ -114,10 +114,10 @@ function TempPermissionCard({
           <div className={cn(
             "flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium",
             isExpired
-              ? "bg-red-500/10 text-red-400"
+              ? "bg-status-danger-bg text-status-danger"
               : permission.isExpiringSoon
-                ? "bg-amber-500/10 text-amber-400"
-                : "bg-indigo-500/10 text-indigo-400"
+                ? "bg-status-warning-bg text-status-warning"
+                : "bg-accent/10 text-accent"
           )}>
             <Timer className="w-3 h-3" />
             {formatTimeRemaining(timeRemaining)}
@@ -128,7 +128,7 @@ function TempPermissionCard({
             <button
               onClick={() => onRevoke(permission.id)}
               disabled={isRevoking}
-              className="p-1 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-colors disabled:opacity-50"
+              className="p-1 text-status-danger hover:text-status-danger hover:bg-status-danger-bg rounded transition-colors disabled:opacity-50"
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>
@@ -142,9 +142,9 @@ function TempPermissionCard({
 // Status badge component
 function StatusBadge({ status }: { status: 'active' | 'expired' | 'revoked' }) {
   const config = {
-    active: { icon: CheckCircle2, label: 'Actif', classes: 'bg-green-500/10 text-green-400 border-green-500/20' },
-    expired: { icon: AlertCircle, label: 'Expiré', classes: 'bg-slate-500/10 text-slate-400 border-slate-500/20' },
-    revoked: { icon: XCircle, label: 'Révoqué', classes: 'bg-red-500/10 text-red-400 border-red-500/20' },
+    active: { icon: CheckCircle2, label: 'Actif', classes: 'bg-status-success-bg text-status-success border-status-success/20' },
+    expired: { icon: AlertCircle, label: 'Expiré', classes: 'bg-surface-subtle/30 text-content-muted border-edge-strong/20' },
+    revoked: { icon: XCircle, label: 'Révoqué', classes: 'bg-status-danger-bg text-status-danger border-status-danger/20' },
   };
   const { icon: Icon, label, classes } = config[status];
 
@@ -162,9 +162,9 @@ function HistoryStatsCards({ stats, loading }: { stats: TempPermissionHistorySta
     return (
       <div className="grid grid-cols-5 gap-2">
         {[...Array(5)].map((_, i) => (
-          <div key={i} className="bg-slate-800/50 border border-slate-700 p-2 rounded-lg animate-pulse">
-            <div className="h-5 bg-slate-700 rounded w-8 mx-auto mb-1"></div>
-            <div className="h-2 bg-slate-700 rounded w-12 mx-auto"></div>
+          <div key={i} className="bg-surface/50 border border-edge p-2 rounded-lg animate-pulse">
+            <div className="h-5 bg-surface-elevated rounded w-8 mx-auto mb-1"></div>
+            <div className="h-2 bg-surface-elevated rounded w-12 mx-auto"></div>
           </div>
         ))}
       </div>
@@ -173,25 +173,25 @@ function HistoryStatsCards({ stats, loading }: { stats: TempPermissionHistorySta
 
   return (
     <div className="grid grid-cols-5 gap-2">
-      <div className="bg-slate-800/50 border border-slate-700 p-2 rounded-lg text-center">
-        <div className="text-base font-bold text-indigo-400">{stats.totalGranted}</div>
-        <div className="text-[8px] text-slate-500 uppercase">Total</div>
+      <div className="bg-surface/50 border border-edge p-2 rounded-lg text-center">
+        <div className="text-base font-bold text-accent">{stats.totalGranted}</div>
+        <div className="text-[8px] text-content-muted uppercase">Total</div>
       </div>
-      <div className="bg-slate-800/50 border border-slate-700 p-2 rounded-lg text-center">
-        <div className="text-base font-bold text-green-400">{stats.totalActive}</div>
-        <div className="text-[8px] text-slate-500 uppercase">Actives</div>
+      <div className="bg-surface/50 border border-edge p-2 rounded-lg text-center">
+        <div className="text-base font-bold text-status-success">{stats.totalActive}</div>
+        <div className="text-[8px] text-content-muted uppercase">Actives</div>
       </div>
-      <div className="bg-slate-800/50 border border-slate-700 p-2 rounded-lg text-center">
-        <div className="text-base font-bold text-slate-400">{stats.totalExpired}</div>
-        <div className="text-[8px] text-slate-500 uppercase">Expirées</div>
+      <div className="bg-surface/50 border border-edge p-2 rounded-lg text-center">
+        <div className="text-base font-bold text-content-muted">{stats.totalExpired}</div>
+        <div className="text-[8px] text-content-muted uppercase">Expirées</div>
       </div>
-      <div className="bg-slate-800/50 border border-slate-700 p-2 rounded-lg text-center">
-        <div className="text-base font-bold text-red-400">{stats.totalRevoked}</div>
-        <div className="text-[8px] text-slate-500 uppercase">Révoquées</div>
+      <div className="bg-surface/50 border border-edge p-2 rounded-lg text-center">
+        <div className="text-base font-bold text-status-danger">{stats.totalRevoked}</div>
+        <div className="text-[8px] text-content-muted uppercase">Révoquées</div>
       </div>
-      <div className="bg-slate-800/50 border border-slate-700 p-2 rounded-lg text-center">
-        <div className="text-base font-bold text-amber-400">{stats.avgDurationHours.toFixed(1)}h</div>
-        <div className="text-[8px] text-slate-500 uppercase">Durée moy.</div>
+      <div className="bg-surface/50 border border-edge p-2 rounded-lg text-center">
+        <div className="text-base font-bold text-status-warning">{stats.avgDurationHours.toFixed(1)}h</div>
+        <div className="text-[8px] text-content-muted uppercase">Durée moy.</div>
       </div>
     </div>
   );
@@ -203,17 +203,17 @@ function HistoryEntryCard({ entry }: { entry: TempPermissionHistoryEntry }) {
 
   return (
     <div className={cn(
-      "px-3 py-2.5 border rounded-lg bg-slate-800/50 transition-all",
-      entry.status === 'active' && "border-green-500/20",
-      entry.status === 'revoked' && "border-red-500/20",
-      entry.status === 'expired' && "border-slate-600"
+      "px-3 py-2.5 border rounded-lg bg-surface/50 transition-all",
+      entry.status === 'active' && "border-status-success/20",
+      entry.status === 'revoked' && "border-status-danger/20",
+      entry.status === 'expired' && "border-edge-strong"
     )}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           {/* Permission name and status */}
           <div className="flex items-center gap-2 mb-1.5">
-            <Shield className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-            <span className="text-xs font-medium text-white truncate">
+            <Shield className="w-3.5 h-3.5 text-accent shrink-0" />
+            <span className="text-xs font-medium text-content-primary truncate">
               {entry.permissionName || entry.permissionCode}
             </span>
             <StatusBadge status={entry.status} />
@@ -221,15 +221,15 @@ function HistoryEntryCard({ entry }: { entry: TempPermissionHistoryEntry }) {
 
           {/* User info */}
           <div className="flex items-center gap-1.5 mb-1">
-            <Users className="w-2.5 h-2.5 text-slate-500" />
-            <span className="text-[10px] text-slate-300 font-medium">{entry.userName}</span>
+            <Users className="w-2.5 h-2.5 text-content-muted" />
+            <span className="text-[10px] text-content-secondary font-medium">{entry.userName}</span>
             {entry.userEmail && (
-              <span className="text-[9px] text-slate-500">({entry.userEmail})</span>
+              <span className="text-[9px] text-content-muted">({entry.userEmail})</span>
             )}
           </div>
 
           {/* Grant info */}
-          <div className="text-[10px] text-slate-400 space-y-0.5">
+          <div className="text-[10px] text-content-muted space-y-0.5">
             <div className="flex items-center gap-1.5">
               <UserPlus className="w-2.5 h-2.5" />
               <span>Accordé par {entry.granterName} le {formatDate(entry.grantedAt)}</span>
@@ -239,7 +239,7 @@ function HistoryEntryCard({ entry }: { entry: TempPermissionHistoryEntry }) {
               <span>Durée: {durationHours}h | Expire(é): {formatDate(entry.expiresAt)}</span>
             </div>
             {entry.status === 'revoked' && entry.revokedAt && (
-              <div className="flex items-center gap-1.5 text-red-400">
+              <div className="flex items-center gap-1.5 text-status-danger">
                 <XCircle className="w-2.5 h-2.5" />
                 <span>Révoqué par {entry.revokerName || 'Système'} le {formatDate(entry.revokedAt)}</span>
               </div>
@@ -248,14 +248,14 @@ function HistoryEntryCard({ entry }: { entry: TempPermissionHistoryEntry }) {
 
           {/* Reason */}
           {entry.reason && (
-            <p className="mt-1.5 text-[10px] text-slate-300 bg-slate-700/50 px-2 py-1 rounded truncate">
+            <p className="mt-1.5 text-[10px] text-content-secondary bg-surface-elevated/50 px-2 py-1 rounded truncate">
               Raison: {entry.reason}
             </p>
           )}
 
           {/* Revoke reason if applicable */}
           {entry.revokeReason && (
-            <p className="mt-1 text-[10px] text-red-300 bg-red-500/10 px-2 py-1 rounded truncate">
+            <p className="mt-1 text-[10px] text-status-danger bg-status-danger-bg px-2 py-1 rounded truncate">
               Motif révocation: {entry.revokeReason}
             </p>
           )}
@@ -263,7 +263,7 @@ function HistoryEntryCard({ entry }: { entry: TempPermissionHistoryEntry }) {
 
         {/* Module badge */}
         {entry.moduleName && (
-          <span className="text-[9px] px-1.5 py-0.5 bg-indigo-500/10 text-indigo-400 rounded border border-indigo-500/20 shrink-0">
+          <span className="text-[9px] px-1.5 py-0.5 bg-accent/10 text-accent rounded border border-accent/20 shrink-0">
             {entry.moduleName}
           </span>
         )}
@@ -283,14 +283,14 @@ function HistoryFilters({
   permissions: any[];
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 p-2 bg-slate-800/30 rounded-lg border border-slate-700">
-      <Filter className="w-3.5 h-3.5 text-slate-500" />
+    <div className="flex flex-wrap items-center gap-2 p-2 bg-surface/30 rounded-lg border border-edge">
+      <Filter className="w-3.5 h-3.5 text-content-muted" />
 
       {/* Status filter */}
       <select
         value={filters.status || 'all'}
         onChange={(e) => onFilterChange({ status: e.target.value === 'all' ? undefined : e.target.value })}
-        className="h-7 px-2 bg-slate-800 border border-slate-700 rounded text-[10px] text-white focus:outline-none focus:border-indigo-500"
+        className="h-7 px-2 bg-surface border border-edge rounded text-[10px] text-content-primary focus:outline-none focus:border-accent"
       >
         <option value="all">Tous les statuts</option>
         <option value="active">Actives</option>
@@ -302,7 +302,7 @@ function HistoryFilters({
       <select
         value={filters.permissionCode || ''}
         onChange={(e) => onFilterChange({ permissionCode: e.target.value || undefined })}
-        className="h-7 px-2 bg-slate-800 border border-slate-700 rounded text-[10px] text-white focus:outline-none focus:border-indigo-500 max-w-[150px]"
+        className="h-7 px-2 bg-surface border border-edge rounded text-[10px] text-content-primary focus:outline-none focus:border-accent max-w-[150px]"
       >
         <option value="">Toutes permissions</option>
         {permissions.slice(0, 50).map(p => (
@@ -316,15 +316,15 @@ function HistoryFilters({
           type="date"
           value={filters.startDate || ''}
           onChange={(e) => onFilterChange({ startDate: e.target.value || undefined })}
-          className="h-7 px-2 bg-slate-800 border border-slate-700 rounded text-[10px] text-white focus:outline-none focus:border-indigo-500"
+          className="h-7 px-2 bg-surface border border-edge rounded text-[10px] text-content-primary focus:outline-none focus:border-accent"
           placeholder="Du"
         />
-        <span className="text-slate-500 text-xs">→</span>
+        <span className="text-content-muted text-xs">→</span>
         <input
           type="date"
           value={filters.endDate || ''}
           onChange={(e) => onFilterChange({ endDate: e.target.value || undefined })}
-          className="h-7 px-2 bg-slate-800 border border-slate-700 rounded text-[10px] text-white focus:outline-none focus:border-indigo-500"
+          className="h-7 px-2 bg-surface border border-edge rounded text-[10px] text-content-primary focus:outline-none focus:border-accent"
           placeholder="Au"
         />
       </div>
@@ -333,7 +333,7 @@ function HistoryFilters({
       {(filters.status || filters.permissionCode || filters.startDate || filters.endDate) && (
         <button
           onClick={() => onFilterChange({ status: 'all', permissionCode: undefined, startDate: undefined, endDate: undefined })}
-          className="h-7 px-2 text-[10px] text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors"
+          className="h-7 px-2 text-[10px] text-content-muted hover:text-content-primary hover:bg-surface-elevated rounded transition-colors"
         >
           Effacer
         </button>
@@ -373,11 +373,11 @@ function HistoryView({ permissions }: { permissions: any[] }) {
       />
 
       {/* Results info */}
-      <div className="flex items-center justify-between text-[10px] text-slate-500 px-1">
+      <div className="flex items-center justify-between text-[10px] text-content-muted px-1">
         <span>{total} enregistrement(s) trouvé(s)</span>
         <button
           onClick={() => refresh()}
-          className="flex items-center gap-1 hover:text-white transition-colors"
+          className="flex items-center gap-1 hover:text-content-primary transition-colors"
         >
           <RefreshCw className={cn("w-3 h-3", loading && "animate-spin")} />
           Actualiser
@@ -387,11 +387,11 @@ function HistoryView({ permissions }: { permissions: any[] }) {
       {/* History list */}
       <div className="flex-1 min-h-0 overflow-y-auto">
         {loading && history.length === 0 ? (
-          <div className="flex items-center justify-center py-8 text-slate-500">
+          <div className="flex items-center justify-center py-8 text-content-muted">
             <RefreshCw className="w-5 h-5 animate-spin" />
           </div>
         ) : history.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 text-slate-500">
+          <div className="flex flex-col items-center justify-center py-8 text-content-muted">
             <History className="w-8 h-8 mb-2 opacity-50" />
             <p className="text-xs">Aucun historique trouvé</p>
           </div>
@@ -406,22 +406,22 @@ function HistoryView({ permissions }: { permissions: any[] }) {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between px-2 py-1.5 bg-slate-800/30 rounded-lg border border-slate-700 shrink-0">
+        <div className="flex items-center justify-between px-2 py-1.5 bg-surface/30 rounded-lg border border-edge shrink-0">
           <button
             onClick={prevPage}
             disabled={!hasPrevPage}
-            className="flex items-center gap-1 px-2 py-1 text-[10px] text-slate-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center gap-1 px-2 py-1 text-[10px] text-content-muted hover:text-content-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <ChevronLeft className="w-3 h-3" />
             Précédent
           </button>
-          <span className="text-[10px] text-slate-500">
+          <span className="text-[10px] text-content-muted">
             Page {currentPage} sur {totalPages}
           </span>
           <button
             onClick={nextPage}
             disabled={!hasNextPage}
-            className="flex items-center gap-1 px-2 py-1 text-[10px] text-slate-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center gap-1 px-2 py-1 text-[10px] text-content-muted hover:text-content-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             Suivant
             <ChevronRight className="w-3 h-3" />
@@ -509,16 +509,16 @@ function GrantPermissionModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-md max-h-[85vh] overflow-hidden flex flex-col">
+      <div className="bg-surface-base border border-edge rounded-xl shadow-2xl w-full max-w-md max-h-[85vh] overflow-hidden flex flex-col">
         {/* Header - Compact */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700 bg-slate-800/50 shrink-0">
-          <h2 className="text-sm font-bold text-white flex items-center gap-2">
-            <div className="w-6 h-6 bg-indigo-500/10 rounded-lg flex items-center justify-center">
-              <Clock className="w-3.5 h-3.5 text-indigo-400" />
+        <div className="flex items-center justify-between px-4 py-3 border-b border-edge bg-surface/50 shrink-0">
+          <h2 className="text-sm font-bold text-content-primary flex items-center gap-2">
+            <div className="w-6 h-6 bg-accent/10 rounded-lg flex items-center justify-center">
+              <Clock className="w-3.5 h-3.5 text-accent" />
             </div>
             Accorder une permission temporaire
           </h2>
-          <button onClick={onClose} className="w-6 h-6 flex items-center justify-center hover:bg-slate-700 rounded transition-colors text-slate-400 hover:text-white">
+          <button onClick={onClose} className="w-6 h-6 flex items-center justify-center hover:bg-surface-elevated rounded transition-colors text-content-muted hover:text-content-primary">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -526,27 +526,27 @@ function GrantPermissionModal({
         <form onSubmit={handleSubmit} className="p-3 space-y-3 overflow-y-auto flex-1">
           {/* User selection - Compact */}
           <div>
-            <label className="block text-[11px] font-medium text-slate-400 mb-1">Utilisateur</label>
+            <label className="block text-[11px] font-medium text-content-muted mb-1">Utilisateur</label>
             <div className="relative mb-1.5">
-              <Users className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500" />
+              <Users className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-content-muted" />
               <input
                 type="text"
                 value={userSearch}
                 onChange={(e) => setUserSearch(e.target.value)}
                 placeholder="Rechercher un utilisateur..."
-                className="w-full h-7 pl-7 pr-2 bg-slate-800 border border-slate-700 rounded text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20"
+                className="w-full h-7 pl-7 pr-2 bg-surface border border-edge rounded text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/20"
               />
             </div>
-            <div className="max-h-24 overflow-y-auto border border-slate-700 rounded-lg bg-slate-800/50">
+            <div className="max-h-24 overflow-y-auto border border-edge rounded-lg bg-surface/50">
               {filteredUsers.map(user => (
                 <div
                   key={user.id}
                   onClick={() => setSelectedUserId(user.id)}
                   className={cn(
-                    "px-2.5 py-1.5 cursor-pointer transition-colors border-b border-slate-700/50 last:border-0",
+                    "px-2.5 py-1.5 cursor-pointer transition-colors border-b border-edge-subtle last:border-0",
                     selectedUserId === user.id
-                      ? "bg-indigo-500/20 text-white"
-                      : "hover:bg-slate-700/50 text-slate-300"
+                      ? "bg-accent/20 text-content-primary"
+                      : "hover:bg-surface-elevated/50 text-content-secondary"
                   )}
                 >
                   <span className="text-xs font-medium">{getUserFullName(user)}</span>
@@ -565,31 +565,31 @@ function GrantPermissionModal({
 
           {/* Permission selection - Compact */}
           <div>
-            <label className="block text-[11px] font-medium text-slate-400 mb-1">Permission</label>
+            <label className="block text-[11px] font-medium text-content-muted mb-1">Permission</label>
             <div className="relative mb-1.5">
-              <Shield className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-500" />
+              <Shield className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-content-muted" />
               <input
                 type="text"
                 value={permSearch}
                 onChange={(e) => setPermSearch(e.target.value)}
                 placeholder="Rechercher une permission..."
-                className="w-full h-7 pl-7 pr-2 bg-slate-800 border border-slate-700 rounded text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20"
+                className="w-full h-7 pl-7 pr-2 bg-surface border border-edge rounded text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/20"
               />
             </div>
-            <div className="max-h-24 overflow-y-auto border border-slate-700 rounded-lg bg-slate-800/50">
+            <div className="max-h-24 overflow-y-auto border border-edge rounded-lg bg-surface/50">
               {filteredPermissions.map(perm => (
                 <div
                   key={perm.id}
                   onClick={() => setSelectedPermission(perm.code)}
                   className={cn(
-                    "px-2.5 py-1.5 cursor-pointer transition-colors border-b border-slate-700/50 last:border-0",
+                    "px-2.5 py-1.5 cursor-pointer transition-colors border-b border-edge-subtle last:border-0",
                     selectedPermission === perm.code
-                      ? "bg-indigo-500/20 text-white"
-                      : "hover:bg-slate-700/50 text-slate-300"
+                      ? "bg-accent/20 text-content-primary"
+                      : "hover:bg-surface-elevated/50 text-content-secondary"
                   )}
                 >
                   <span className="text-xs font-medium">{perm.name}</span>
-                  <span className="text-[9px] text-slate-500 ml-1.5 font-mono">{perm.code}</span>
+                  <span className="text-[9px] text-content-muted ml-1.5 font-mono">{perm.code}</span>
                 </div>
               ))}
             </div>
@@ -597,7 +597,7 @@ function GrantPermissionModal({
 
           {/* Duration selection - Compact */}
           <div>
-            <label className="block text-[11px] font-medium text-slate-400 mb-1.5">Durée</label>
+            <label className="block text-[11px] font-medium text-content-muted mb-1.5">Durée</label>
             <div className="flex flex-wrap gap-1.5">
               {TEMP_PERMISSION_DURATIONS.map(d => (
                 <button
@@ -607,8 +607,8 @@ function GrantPermissionModal({
                   className={cn(
                     "px-2.5 py-1 text-[10px] font-medium rounded-md border transition-all",
                     durationPreset === d.value
-                      ? "bg-indigo-500 text-white border-indigo-500"
-                      : "bg-slate-800 text-slate-400 border-slate-700 hover:border-slate-600 hover:text-white"
+                      ? "bg-accent text-white border-accent"
+                      : "bg-surface text-content-muted border-edge hover:border-edge-strong hover:text-content-primary"
                   )}
                 >
                   {d.label}
@@ -620,7 +620,7 @@ function GrantPermissionModal({
                 type="datetime-local"
                 value={customDate}
                 onChange={e => setCustomDate(e.target.value)}
-                className="mt-2 w-full h-8 px-2 bg-slate-800 border border-slate-700 rounded text-xs text-white focus:outline-none focus:border-indigo-500"
+                className="mt-2 w-full h-8 px-2 bg-surface border border-edge rounded text-xs text-content-primary focus:outline-none focus:border-accent"
                 min={new Date().toISOString().slice(0, 16)}
               />
             )}
@@ -628,30 +628,30 @@ function GrantPermissionModal({
 
           {/* Reason - Compact */}
           <div>
-            <label className="block text-[11px] font-medium text-slate-400 mb-1">Raison (obligatoire)</label>
+            <label className="block text-[11px] font-medium text-content-muted mb-1">Raison (obligatoire)</label>
             <textarea
               value={reason}
               onChange={e => setReason(e.target.value)}
               placeholder="Expliquez pourquoi cette permission est nécessaire..."
-              className="w-full px-2.5 py-2 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 min-h-[60px] resize-none"
+              className="w-full px-2.5 py-2 bg-surface border border-edge rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/20 min-h-[60px] resize-none"
               required
             />
           </div>
 
           {/* Preview - Compact */}
           {selectedUserId && selectedPermission && expiresAt && (
-            <div className="bg-indigo-500/10 border border-indigo-500/20 p-2.5 rounded-lg">
-              <h4 className="text-[10px] font-bold text-indigo-400 uppercase tracking-wide mb-1">Aperçu</h4>
-              <p className="text-[11px] text-slate-300">
-                Permission <strong className="text-white">{selectedPermission}</strong> accordée jusqu'au{' '}
-                <strong className="text-white">{formatDate(expiresAt)}</strong>
+            <div className="bg-accent/10 border border-accent/20 p-2.5 rounded-lg">
+              <h4 className="text-[10px] font-bold text-accent uppercase tracking-wide mb-1">Aperçu</h4>
+              <p className="text-[11px] text-content-secondary">
+                Permission <strong className="text-content-primary">{selectedPermission}</strong> accordée jusqu'au{' '}
+                <strong className="text-content-primary">{formatDate(expiresAt)}</strong>
               </p>
             </div>
           )}
         </form>
 
         {/* Actions - Fixed Footer */}
-        <div className="flex justify-end gap-2 px-4 py-3 border-t border-slate-700 bg-slate-800/30 shrink-0">
+        <div className="flex justify-end gap-2 px-4 py-3 border-t border-edge bg-surface/30 shrink-0">
           <Button type="button" variant="ghost" size="sm" onClick={onClose} className="h-8 px-3 text-xs">
             Annuler
           </Button>
@@ -660,7 +660,7 @@ function GrantPermissionModal({
             size="sm"
             onClick={handleSubmit}
             disabled={!selectedUserId || !selectedPermission || !expiresAt || !reason || isGranting}
-            className="h-8 px-4 text-xs bg-indigo-600 hover:bg-indigo-500"
+            className="h-8 px-4 text-xs bg-accent hover:bg-accent-primary-hover"
           >
             {isGranting ? 'Attribution...' : 'Accorder'}
           </Button>
@@ -751,14 +751,14 @@ export default function TemporaryPermissionsManager({ users }: TemporaryPermissi
   return (
     <div className="flex flex-col h-full space-y-2">
       {/* Header - Compact */}
-      <div className="flex items-center justify-between gap-3 bg-slate-900 px-3 py-2 rounded-lg border border-slate-800 shrink-0">
+      <div className="flex items-center justify-between gap-3 bg-surface-base px-3 py-2 rounded-lg border border-edge shrink-0">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 bg-indigo-500/10 rounded-lg flex items-center justify-center shrink-0">
-            <Clock className="w-3.5 h-3.5 text-indigo-400" />
+          <div className="w-7 h-7 bg-accent/10 rounded-lg flex items-center justify-center shrink-0">
+            <Clock className="w-3.5 h-3.5 text-accent" />
           </div>
           <div>
-            <h2 className="text-sm font-bold text-white">Permissions Temporaires</h2>
-            <p className="text-[10px] text-slate-500">Élévations de privilèges limitées dans le temps</p>
+            <h2 className="text-sm font-bold text-content-primary">Permissions Temporaires</h2>
+            <p className="text-[10px] text-content-muted">Élévations de privilèges limitées dans le temps</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -766,7 +766,7 @@ export default function TemporaryPermissionsManager({ users }: TemporaryPermissi
             <>
               <button
                 onClick={refresh}
-                className="h-7 px-2 flex items-center gap-1.5 text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700 transition-colors"
+                className="h-7 px-2 flex items-center gap-1.5 text-[10px] bg-surface hover:bg-surface-elevated text-content-secondary rounded border border-edge transition-colors"
               >
                 <RefreshCw className="w-3 h-3" />
                 Actualiser
@@ -781,7 +781,7 @@ export default function TemporaryPermissionsManager({ users }: TemporaryPermissi
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-1 p-1 bg-slate-800/50 rounded-lg border border-slate-700 shrink-0">
+      <div className="flex items-center gap-1 p-1 bg-surface/50 rounded-lg border border-edge shrink-0">
         {tabs.map(tab => (
           <button
             key={tab.id}
@@ -789,8 +789,8 @@ export default function TemporaryPermissionsManager({ users }: TemporaryPermissi
             className={cn(
               "flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-[10px] font-medium transition-all",
               activeTab === tab.id
-                ? "bg-indigo-600 text-white shadow-sm"
-                : "text-slate-400 hover:text-white hover:bg-slate-700/50"
+                ? "bg-accent text-white shadow-sm"
+                : "text-content-muted hover:text-content-primary hover:bg-surface-elevated/50"
             )}
           >
             <tab.icon className="w-3 h-3" />
@@ -799,8 +799,8 @@ export default function TemporaryPermissionsManager({ users }: TemporaryPermissi
               <span className={cn(
                 "px-1.5 py-0.5 rounded text-[9px]",
                 activeTab === tab.id
-                  ? "bg-indigo-500/50"
-                  : "bg-slate-700"
+                  ? "bg-accent/50"
+                  : "bg-surface-elevated"
               )}>
                 {tab.count}
               </span>
@@ -814,37 +814,37 @@ export default function TemporaryPermissionsManager({ users }: TemporaryPermissi
         <>
           {/* Stats - Compact */}
           <div className="grid grid-cols-3 gap-2 shrink-0">
-            <div className="bg-slate-800/50 border border-slate-700 p-2 rounded-lg text-center">
-              <div className="text-lg font-bold text-indigo-400">{activeCount}</div>
-              <div className="text-[9px] text-slate-500 uppercase">Actives</div>
+            <div className="bg-surface/50 border border-edge p-2 rounded-lg text-center">
+              <div className="text-lg font-bold text-accent">{activeCount}</div>
+              <div className="text-[9px] text-content-muted uppercase">Actives</div>
             </div>
-            <div className="bg-slate-800/50 border border-slate-700 p-2 rounded-lg text-center">
-              <div className="text-lg font-bold text-amber-400">{expiringSoonCount}</div>
-              <div className="text-[9px] text-slate-500 uppercase">Expirent &lt;1h</div>
+            <div className="bg-surface/50 border border-edge p-2 rounded-lg text-center">
+              <div className="text-lg font-bold text-status-warning">{expiringSoonCount}</div>
+              <div className="text-[9px] text-content-muted uppercase">Expirent &lt;1h</div>
             </div>
-            <div className="bg-slate-800/50 border border-slate-700 p-2 rounded-lg text-center">
-              <div className="text-lg font-bold text-slate-400">{tempPermissions.length}</div>
-              <div className="text-[9px] text-slate-500 uppercase">Total</div>
+            <div className="bg-surface/50 border border-edge p-2 rounded-lg text-center">
+              <div className="text-lg font-bold text-content-muted">{tempPermissions.length}</div>
+              <div className="text-[9px] text-content-muted uppercase">Total</div>
             </div>
           </div>
 
           {/* Search - Compact */}
           <div className="relative shrink-0">
-            <Shield className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
+            <Shield className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-content-muted" />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Rechercher par permission ou utilisateur..."
-              className="w-full h-8 pl-8 pr-3 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20"
+              className="w-full h-8 pl-8 pr-3 bg-surface border border-edge rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/20"
             />
           </div>
 
           {/* Warning for expiring soon - Compact */}
           {expiringSoonCount > 0 && (
-            <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg px-2.5 py-1.5 flex items-center gap-2 shrink-0">
-              <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-              <span className="text-[10px] text-amber-300">
+            <div className="bg-status-warning-bg border border-status-warning/20 rounded-lg px-2.5 py-1.5 flex items-center gap-2 shrink-0">
+              <AlertTriangle className="w-3.5 h-3.5 text-status-warning shrink-0" />
+              <span className="text-[10px] text-status-warning">
                 {expiringSoonCount} permission(s) expire(nt) dans moins d'une heure
               </span>
             </div>
@@ -853,11 +853,11 @@ export default function TemporaryPermissionsManager({ users }: TemporaryPermissi
           {/* Permissions list - Compact */}
           <div className="flex-1 min-h-0 overflow-y-auto">
             {loading ? (
-              <div className="flex items-center justify-center py-8 text-slate-500">
+              <div className="flex items-center justify-center py-8 text-content-muted">
                 <RefreshCw className="w-5 h-5 animate-spin" />
               </div>
             ) : filteredPermissions.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8 text-slate-500">
+              <div className="flex flex-col items-center justify-center py-8 text-content-muted">
                 <Clock className="w-8 h-8 mb-2 opacity-50" />
                 <p className="text-xs">Aucune permission temporaire</p>
               </div>
@@ -877,9 +877,9 @@ export default function TemporaryPermissionsManager({ users }: TemporaryPermissi
 
           {/* Pagination Controls - Advanced */}
           {totalPages > 1 && (
-            <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+            <div className="p-3 bg-surface-base border border-edge rounded-lg flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
                 {/* Page info & size selector */}
-                <div className="flex items-center gap-3 text-xs text-slate-500">
+                <div className="flex items-center gap-3 text-xs text-content-muted">
                   <span className="hidden sm:inline">
                     {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, filteredPermissions.length)} sur {filteredPermissions.length}
                   </span>
@@ -892,7 +892,7 @@ export default function TemporaryPermissionsManager({ users }: TemporaryPermissi
                       setItemsPerPage(Number(e.target.value));
                       goToPage(1);
                     }}
-                    className="px-2 py-1 bg-slate-950 border border-slate-700 rounded text-xs text-slate-300 focus:border-indigo-500 outline-none"
+                    className="px-2 py-1 bg-surface-base border border-edge rounded text-xs text-content-secondary focus:border-accent outline-none"
                   >
                     <option value={6}>6 / page</option>
                     <option value={8}>8 / page</option>
@@ -906,14 +906,14 @@ export default function TemporaryPermissionsManager({ users }: TemporaryPermissi
                   <button
                     onClick={() => goToPage(1)}
                     disabled={currentPage === 1}
-                    className="p-1 rounded hover:bg-slate-800 text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    className="p-1 rounded hover:bg-surface text-content-muted hover:text-content-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                   >
                     <ChevronsLeft size={16} />
                   </button>
                   <button
                     onClick={() => goToPage(currentPage - 1)}
                     disabled={currentPage === 1}
-                    className="p-1 rounded hover:bg-slate-800 text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    className="p-1 rounded hover:bg-surface text-content-muted hover:text-content-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                   >
                     <ChevronLeft size={16} />
                   </button>
@@ -937,8 +937,8 @@ export default function TemporaryPermissionsManager({ users }: TemporaryPermissi
                             onClick={() => goToPage(pageNum)}
                             className={`w-6 h-6 rounded text-xs font-medium transition-colors ${
                               currentPage === pageNum
-                                ? 'bg-indigo-600 text-white'
-                                : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                                ? 'bg-accent text-white'
+                                : 'text-content-muted hover:bg-surface hover:text-content-primary'
                             }`}
                           >
                             {pageNum}
@@ -950,14 +950,14 @@ export default function TemporaryPermissionsManager({ users }: TemporaryPermissi
                   <button
                     onClick={() => goToPage(currentPage + 1)}
                     disabled={currentPage === totalPages}
-                    className="p-1 rounded hover:bg-slate-800 text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    className="p-1 rounded hover:bg-surface text-content-muted hover:text-content-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                   >
                     <ChevronRight size={16} />
                   </button>
                   <button
                     onClick={() => goToPage(totalPages)}
                     disabled={currentPage === totalPages}
-                    className="p-1 rounded hover:bg-slate-800 text-slate-500 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                    className="p-1 rounded hover:bg-surface text-content-muted hover:text-content-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                   >
                     <ChevronsRight size={16} />
                   </button>

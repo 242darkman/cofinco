@@ -175,7 +175,7 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
   if (loading) {
     return (
       <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
-        <div className="bg-slate-900 rounded-xl border border-slate-700 w-full max-w-4xl p-4 sm:p-6 space-y-4">
+        <div className="bg-surface-base rounded-xl border border-edge w-full max-w-4xl p-4 sm:p-6 space-y-4">
           <div className="flex justify-between items-center">
             <SkeletonCard className="h-6 sm:h-8 w-40 sm:w-48" />
             <SkeletonCard className="h-6 sm:h-8 w-6 sm:w-8 rounded-full" />
@@ -192,8 +192,8 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
   if (error || !credit) {
     return (
       <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div className="bg-slate-900 rounded-xl border border-slate-700 p-6 text-center max-w-md">
-          <p className="text-red-400 mb-4 text-sm">{error || 'Crédit non trouvé'}</p>
+        <div className="bg-surface-base rounded-xl border border-edge p-6 text-center max-w-md">
+          <p className="text-status-danger mb-4 text-sm">{error || 'Crédit non trouvé'}</p>
           <Button onClick={onClose} variant="primary">Fermer</Button>
         </div>
       </div>
@@ -205,13 +205,13 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
-      <div className="bg-slate-900 rounded-xl sm:rounded-2xl border border-slate-700 w-full max-w-6xl max-h-[98vh] sm:max-h-[95vh] flex flex-col sm:flex-row overflow-hidden shadow-2xl">
+      <div className="bg-surface-base rounded-xl sm:rounded-2xl border border-edge w-full max-w-6xl max-h-[98vh] sm:max-h-[95vh] flex flex-col sm:flex-row overflow-hidden shadow-2xl">
 
         {/* Left Sidebar: Timeline - Hidden on mobile, visible on lg+ */}
-        <div className="hidden lg:flex lg:w-64 xl:w-72 border-r border-slate-700 bg-slate-900/50 flex-col">
-           <div className="p-3 border-b border-slate-700 bg-slate-800/80">
-              <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                 <Clock size={14} className="text-blue-400" />
+        <div className="hidden lg:flex lg:w-64 xl:w-72 border-r border-edge bg-surface-base/50 flex-col">
+           <div className="p-3 border-b border-edge bg-surface/80">
+              <h3 className="text-xs font-bold text-content-secondary uppercase tracking-wider flex items-center gap-1.5">
+                 <Clock size={14} className="text-status-info" />
                  Parcours
               </h3>
            </div>
@@ -219,7 +219,7 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
               {credit.demandeId ? (
                  <CreditTimeline demandeId={credit.demandeId} compact />
               ) : (
-                 <div className="text-center py-6 text-slate-500 italic text-xs">
+                 <div className="text-center py-6 text-content-muted italic text-xs">
                     Liaison demande indisponible
                  </div>
               )}
@@ -227,24 +227,24 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
         </div>
 
         {/* Main Content Area */}
-        <div className="flex-1 flex flex-col min-w-0 bg-slate-800">
+        <div className="flex-1 flex flex-col min-w-0 bg-surface">
         {/* Header - Compact */}
-        <div className="p-3 sm:p-4 border-b border-slate-700 shrink-0">
+        <div className="p-3 sm:p-4 border-b border-edge shrink-0">
           <div className="flex justify-between items-start gap-2">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-base sm:text-xl font-bold text-white uppercase tracking-tight">
+                <h2 className="text-base sm:text-xl font-bold text-content-primary uppercase tracking-tight">
                   Dossier Crédit
                 </h2>
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wide shrink-0 ${
                     credit.fraisDossierPaye
-                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                    : 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                    ? 'bg-status-success-bg text-status-success border-status-success/20'
+                    : 'bg-status-warning-bg text-status-warning border-status-warning/20'
                 }`}>
                     {credit.fraisDossierPaye ? 'Frais Payés' : 'Frais Non Payés'}
                 </span>
               </div>
-              <p className="text-xs sm:text-sm text-slate-400 font-medium mt-1 truncate">
+              <p className="text-xs sm:text-sm text-content-muted font-medium mt-1 truncate">
                 #{credit.numeroCredit} - {client ? formatClientName(client.nom, client.prenom) : 'Sans client'}
               </p>
             </div>
@@ -254,17 +254,17 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
                  size="sm"
                  icon={Download}
                  onClick={() => handlePrint()}
-                 className="text-slate-400 hover:text-white hidden sm:flex"
+                 className="text-content-muted hover:text-content-primary hidden sm:flex"
               >
                 <span className="hidden md:inline">PDF</span>
               </Button>
               <button
                 onClick={() => handlePrint()}
-                className="sm:hidden p-1.5 text-slate-400 hover:text-white transition hover:bg-slate-700 rounded-lg"
+                className="sm:hidden p-1.5 text-content-muted hover:text-content-primary transition hover:bg-surface-elevated rounded-lg"
               >
                 <Download size={18} />
               </button>
-              <button onClick={onClose} className="text-slate-400 hover:text-white transition p-1.5 hover:bg-slate-700 rounded-lg">
+              <button onClick={onClose} className="text-content-muted hover:text-content-primary transition p-1.5 hover:bg-surface-elevated rounded-lg">
                 <X size={20} />
               </button>
             </div>
@@ -272,7 +272,7 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
         </div>
 
         {/* Tabs navigation - Compact */}
-        <div className="px-3 sm:px-4 border-b border-slate-700 shrink-0 bg-slate-800/50">
+        <div className="px-3 sm:px-4 border-b border-edge shrink-0 bg-surface/50">
           <TabGroup
             tabs={[
               { key: 'overview', label: "Vue d'ensemble" },
@@ -323,34 +323,34 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
               {/* Details Grid - Compact & Responsive */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-3">
                 {client && (
-                  <div className="bg-slate-800/40 rounded-lg p-3 border border-slate-700/30">
+                  <div className="bg-surface/40 rounded-lg p-3 border border-edge-subtle">
                     <div className="flex items-center gap-1.5 mb-2.5">
-                      <User size={14} className="text-blue-400" />
-                      <span className="text-slate-300 text-xs font-medium">Client</span>
+                      <User size={14} className="text-status-info" />
+                      <span className="text-content-secondary text-xs font-medium">Client</span>
                     </div>
                     <div className="space-y-2">
                       <div className="flex justify-between items-center">
-                        <span className="text-slate-500 text-xs">Nom</span>
-                        <span className="text-white font-medium text-xs truncate ml-2">{formatClientName(client.nom, client.prenom)}</span>
+                        <span className="text-content-muted text-xs">Nom</span>
+                        <span className="text-content-primary font-medium text-xs truncate ml-2">{formatClientName(client.nom, client.prenom)}</span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-slate-500 text-xs">Téléphone</span>
-                        <span className="text-slate-300 text-xs">{client.telephone || '-'}</span>
+                        <span className="text-content-muted text-xs">Téléphone</span>
+                        <span className="text-content-secondary text-xs">{client.telephone || '-'}</span>
                       </div>
                     </div>
                   </div>
                 )}
 
                 {/* Auto Repayment Config - Compact */}
-                <div className="bg-slate-800/40 rounded-lg p-3 border border-slate-700/30">
+                <div className="bg-surface/40 rounded-lg p-3 border border-edge-subtle">
                    <div className="flex items-center gap-1.5 mb-2.5">
-                      <Settings size={14} className="text-purple-400" />
-                      <span className="text-slate-300 text-xs font-medium">Automatisation</span>
+                      <Settings size={14} className="text-status-info" />
+                      <span className="text-content-secondary text-xs font-medium">Automatisation</span>
                    </div>
 
                    <div className="space-y-3">
                       <div className="flex items-center justify-between">
-                         <span className="text-slate-500 text-xs">Remboursement Auto</span>
+                         <span className="text-content-muted text-xs">Remboursement Auto</span>
                          <label className="relative inline-flex items-center cursor-pointer">
                             <input
                                type="checkbox"
@@ -359,17 +359,17 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
                                className="sr-only peer"
                                disabled={updatingAutoRepay}
                             />
-                            <div className="w-8 h-4 bg-slate-700 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-purple-600"></div>
+                            <div className="w-8 h-4 bg-edge-strong peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-status-info rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[1px] after:left-[2px] after:bg-white after:shadow-md after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-status-info"></div>
                          </label>
                       </div>
 
                       {credit.remboursementAutomatique && (
                          <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1">
-                             <span className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">Compte Source</span>
+                             <span className="text-[10px] text-content-muted uppercase tracking-wider font-bold">Compte Source</span>
                              <select
                                 value={credit.remboursementCompteId || ''}
                                 onChange={(e) => handleUpdateAutoRepayment(true, e.target.value)}
-                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white focus:outline-none focus:border-purple-500"
+                                className="w-full bg-surface-base border border-edge rounded-lg px-2 py-1.5 text-xs text-content-primary focus:outline-none focus:border-status-info"
                                 disabled={updatingAutoRepay}
                              >
                                 <option value="" disabled>Sélectionner un compte</option>
@@ -381,7 +381,7 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
                              </select>
 
                              {credit.prochaineEcheance && (
-                                 <div className="flex items-center gap-1.5 text-[10px] text-purple-300 bg-purple-500/10 p-1.5 rounded">
+                                 <div className="flex items-center gap-1.5 text-[10px] text-status-info bg-status-info-bg p-1.5 rounded">
                                      <CalendarClock size={10} />
                                      Prochain: {new Date(credit.prochaineEcheance).toLocaleDateString()}
                                  </div>
@@ -391,27 +391,27 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
                    </div>
                 </div>
 
-                <div className="bg-slate-800/40 rounded-lg p-3 border border-slate-700/30 md:col-span-2">
+                <div className="bg-surface/40 rounded-lg p-3 border border-edge-subtle md:col-span-2">
                   <div className="flex items-center gap-1.5 mb-2.5">
-                    <FileText size={14} className="text-blue-400" />
-                    <span className="text-slate-300 text-xs font-medium">Contrat</span>
+                    <FileText size={14} className="text-status-info" />
+                    <span className="text-content-secondary text-xs font-medium">Contrat</span>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     <div className="flex flex-col">
-                      <span className="text-slate-500 text-xs mb-0.5">Type</span>
-                      <span className="text-white font-medium text-xs">{credit.typeCredit || 'Standard'}</span>
+                      <span className="text-content-muted text-xs mb-0.5">Type</span>
+                      <span className="text-content-primary font-medium text-xs">{credit.typeCredit || 'Standard'}</span>
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-slate-500 text-xs mb-0.5">Durée</span>
-                      <span className="text-slate-300 text-xs">
+                      <span className="text-content-muted text-xs mb-0.5">Durée</span>
+                      <span className="text-content-secondary text-xs">
                         {credit.duree} {credit.echeance === 'Journalier' ? 'jours' : credit.echeance === 'Hebdomadaire' ? 'sem' : 'mois'}
                       </span>
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-slate-500 text-xs mb-0.5">Échéance</span>
+                      <span className="text-content-muted text-xs mb-0.5">Échéance</span>
                       <div>
-                        <span className="text-white font-semibold text-xs">{formatMoney(stats.installmentAmount)}</span>
-                        <span className="text-slate-500 text-[10px] ml-0.5">
+                        <span className="text-content-primary font-semibold text-xs">{formatMoney(stats.installmentAmount)}</span>
+                        <span className="text-content-muted text-[10px] ml-0.5">
                           /{credit.echeance === 'Journalier' ? 'j' : credit.echeance === 'Hebdomadaire' ? 's' : 'm'}
                         </span>
                       </div>
@@ -421,19 +421,19 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
               </div>
 
               {/* Progress Section - Compact */}
-              <div className="bg-slate-800/40 rounded-lg p-3 border border-slate-700/30">
+              <div className="bg-surface/40 rounded-lg p-3 border border-edge-subtle">
                 <div className="flex items-center justify-between mb-2.5">
                   <div className="flex items-center gap-1.5">
-                    <TrendingUp size={14} className="text-emerald-400" />
-                    <span className="text-slate-300 text-xs font-medium">Progression</span>
+                    <TrendingUp size={14} className="text-status-success" />
+                    <span className="text-content-secondary text-xs font-medium">Progression</span>
                   </div>
-                  <span className="text-xl sm:text-2xl font-bold text-white tabular-nums">{progression.toFixed(0)}%</span>
+                  <span className="text-xl sm:text-2xl font-bold text-content-primary tabular-nums">{progression.toFixed(0)}%</span>
                 </div>
 
                 {/* Progress Bar - Compact */}
-                <div className="relative h-1.5 bg-slate-700/50 rounded-full overflow-hidden mb-3">
+                <div className="relative h-1.5 bg-surface-elevated/50 rounded-full overflow-hidden mb-3">
                   <div
-                    className="absolute inset-y-0 left-0 bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full transition-all duration-700 ease-out"
+                    className="absolute inset-y-0 left-0 bg-gradient-to-r from-status-success to-status-success rounded-full transition-all duration-700 ease-out"
                     style={{ width: `${progression}%` }}
                   />
                 </div>
@@ -441,12 +441,12 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
                 {/* Summary Row - Compact */}
                 <div className="flex items-center justify-between text-xs sm:text-sm flex-wrap gap-2">
                   <div>
-                    <span className="text-slate-500">Total dû</span>
-                    <span className="text-white font-semibold ml-1.5 tabular-nums">{formatMoney(totalAvecInterets)}</span>
+                    <span className="text-content-muted">Total dû</span>
+                    <span className="text-content-primary font-semibold ml-1.5 tabular-nums">{formatMoney(totalAvecInterets)}</span>
                   </div>
                   <div className="text-right">
-                    <span className="text-slate-500">Restant</span>
-                    <span className="text-amber-400 font-semibold ml-1.5 tabular-nums">{formatMoney(soldeRestant)}</span>
+                    <span className="text-content-muted">Restant</span>
+                    <span className="text-status-warning font-semibold ml-1.5 tabular-nums">{formatMoney(soldeRestant)}</span>
                   </div>
                 </div>
               </div>
@@ -454,15 +454,15 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
           ) : (
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                <div className="flex justify-between items-center mb-3 sm:mb-4">
-                  <h3 className="text-sm sm:text-lg font-bold text-white flex items-center gap-1.5 uppercase tracking-tight">
-                     <Clock className="text-blue-400" size={16} /> Plan de Remboursement
+                  <h3 className="text-sm sm:text-lg font-bold text-content-primary flex items-center gap-1.5 uppercase tracking-tight">
+                     <Clock className="text-status-info" size={16} /> Plan de Remboursement
                   </h3>
                </div>
 
-               <div className="overflow-x-auto rounded-lg border border-slate-700 bg-slate-900/30">
+               <div className="overflow-x-auto rounded-lg border border-edge bg-surface-base/30">
                   <table className="w-full text-left min-w-[500px]">
                      <thead>
-                        <tr className="bg-slate-800 text-slate-400 text-[9px] sm:text-[10px] font-black uppercase tracking-widest border-b border-slate-700">
+                        <tr className="bg-surface text-content-muted text-[9px] sm:text-[10px] font-black uppercase tracking-widest border-b border-edge">
                            <th className="px-2 sm:px-3 py-2 sm:py-3">N°</th>
                            <th className="px-3 sm:px-4 py-2 sm:py-3">Date</th>
                            <th className="px-3 sm:px-4 py-2 sm:py-3 text-right">Montant</th>
@@ -470,25 +470,25 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
                            <th className="px-2 sm:px-3 py-2 sm:py-3 text-center">État</th>
                         </tr>
                      </thead>
-                     <tbody className="divide-y divide-slate-700/50">
+                     <tbody className="divide-y divide-edge/50">
                         {stats.schedule.map((item) => (
-                           <tr key={item.number} className={`hover:bg-slate-700/20 transition-colors ${item.status === StatutEcheanceCredit.SETTLED ? 'opacity-30' : ''}`}>
-                              <td className="px-2 sm:px-3 py-2 sm:py-3 text-slate-500 font-mono text-[10px] sm:text-xs">{item.number}</td>
-                              <td className="px-3 sm:px-4 py-2 sm:py-3 font-bold text-white whitespace-nowrap text-[10px] sm:text-sm">
+                           <tr key={item.number} className={`hover:bg-surface-elevated/20 transition-colors ${item.status === StatutEcheanceCredit.SETTLED ? 'opacity-30' : ''}`}>
+                              <td className="px-2 sm:px-3 py-2 sm:py-3 text-content-muted font-mono text-[10px] sm:text-xs">{item.number}</td>
+                              <td className="px-3 sm:px-4 py-2 sm:py-3 font-bold text-content-primary whitespace-nowrap text-[10px] sm:text-sm">
                                  {format(item.dueDate, 'dd MMM yyyy', { locale: fr })}
                               </td>
-                              <td className="px-3 sm:px-4 py-2 sm:py-3 text-right font-mono text-white whitespace-nowrap text-[10px] sm:text-sm">
+                              <td className="px-3 sm:px-4 py-2 sm:py-3 text-right font-mono text-content-primary whitespace-nowrap text-[10px] sm:text-sm">
                                  {formatMoney(item.amount)}
                               </td>
-                              <td className="px-3 sm:px-4 py-2 sm:py-3 text-right font-mono text-blue-400 whitespace-nowrap hidden sm:table-cell text-xs sm:text-sm">
+                              <td className="px-3 sm:px-4 py-2 sm:py-3 text-right font-mono text-status-info whitespace-nowrap hidden sm:table-cell text-xs sm:text-sm">
                                  {formatMoney(item.remainingBalance)}
                               </td>
                               <td className="px-2 sm:px-3 py-2 sm:py-3 text-center">
                                  <span className={`
                                     px-2 py-0.5 rounded-full text-[8px] sm:text-[9px] font-black uppercase tracking-wider border
-                                    ${item.status === StatutEcheanceCredit.PAID || item.status === StatutEcheanceCredit.SETTLED ? 'bg-green-500/10 text-green-400 border-green-500/20' :
-                                      item.status === StatutEcheanceCredit.LATE ? 'bg-red-500/10 text-red-400 border-red-500/20' :
-                                      'bg-slate-700/50 text-slate-500 border-slate-600'}
+                                    ${item.status === StatutEcheanceCredit.PAID || item.status === StatutEcheanceCredit.SETTLED ? 'bg-status-success-bg text-status-success border-status-success/20' :
+                                      item.status === StatutEcheanceCredit.LATE ? 'bg-status-danger-bg text-status-danger border-status-danger/20' :
+                                      'bg-surface-elevated/50 text-content-muted border-edge-strong'}
                                  `}>
                                     {getInstallmentStatusLabel(item.status)}
                                  </span>
@@ -499,10 +499,10 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
                   </table>
                </div>
 
-               <div className="mt-4 p-3 bg-blue-500/5 rounded-lg border border-blue-500/10 flex gap-2 sm:gap-3">
-                  <PieChart className="text-blue-400 shrink-0" size={16} />
-                  <div className="text-[10px] sm:text-xs text-slate-400 italic">
-                     Les échéances passées sont marquées comme <span className="text-green-400 font-bold">PAYÉ</span> si le capital correspondant a été amorti. Un remboursement total par anticipation solde l'ensemble de l'échéancier.
+               <div className="mt-4 p-3 bg-status-info/5 rounded-lg border border-status-info/10 flex gap-2 sm:gap-3">
+                  <PieChart className="text-status-info shrink-0" size={16} />
+                  <div className="text-[10px] sm:text-xs text-content-muted italic">
+                     Les échéances passées sont marquées comme <span className="text-status-success font-bold">PAYÉ</span> si le capital correspondant a été amorti. Un remboursement total par anticipation solde l'ensemble de l'échéancier.
                   </div>
                </div>
             </div>
@@ -510,7 +510,7 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
         </div>
 
         {/* Action Button Footer - Compact */}
-        <div className="p-3 sm:p-4 border-t border-slate-700 shrink-0 bg-slate-800/80">
+        <div className="p-3 sm:p-4 border-t border-edge shrink-0 bg-surface/80">
           <Button onClick={onClose} variant="ghost" className="w-full uppercase font-black tracking-widest py-2 text-xs sm:text-sm">
             Fermer le Dossier
           </Button>

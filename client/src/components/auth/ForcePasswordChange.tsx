@@ -139,9 +139,9 @@ export default function ForcePasswordChange({ onPasswordChanged }: ForcePassword
     >
       <form onSubmit={handleSubmit} className="space-y-2.5">
         {error && (
-          <div className="px-3 py-2 bg-red-500/20 border border-red-500/30 rounded-lg flex items-center gap-2">
-            <AlertCircle size={16} className="text-red-400 flex-shrink-0" />
-            <p className="text-red-400 text-xs">{error}</p>
+          <div className="px-3 py-2 bg-status-danger-bg border border-status-danger/30 rounded-lg flex items-center gap-2">
+            <AlertCircle size={16} className="text-status-danger flex-shrink-0" />
+            <p className="text-status-danger text-xs">{error}</p>
           </div>
         )}
 
@@ -159,7 +159,7 @@ export default function ForcePasswordChange({ onPasswordChanged }: ForcePassword
             onRightIconClick={() => setShowCurrentPassword(!showCurrentPassword)}
           />
           {currentPasswordError && (
-            <div className="flex items-center gap-1.5 mt-1 px-1 text-red-400">
+            <div className="flex items-center gap-1.5 mt-1 px-1 text-status-danger">
               <AlertCircle size={12} className="flex-shrink-0" />
               <span className="text-xs">{currentPasswordError}</span>
             </div>
@@ -194,7 +194,7 @@ export default function ForcePasswordChange({ onPasswordChanged }: ForcePassword
 
         {/* Password match feedback */}
         {confirmPassword.length > 0 && (
-          <div className={`flex items-center gap-1.5 px-1 ${newPassword === confirmPassword ? 'text-green-400' : 'text-red-400'}`}>
+          <div className={`flex items-center gap-1.5 px-1 ${newPassword === confirmPassword ? 'text-status-success' : 'text-status-danger'}`}>
             {newPassword === confirmPassword ? (
               <Check size={12} />
             ) : (
@@ -209,19 +209,19 @@ export default function ForcePasswordChange({ onPasswordChanged }: ForcePassword
         )}
 
         {/* Password Requirements - compact inline */}
-        <div className="bg-slate-800/50 border border-slate-700 rounded-lg px-3 py-2">
-          <p className="text-xs font-semibold text-slate-300 mb-1.5">Critères de sécurité</p>
+        <div className="bg-surface/50 border border-edge rounded-lg px-3 py-2">
+          <p className="text-xs font-semibold text-content-secondary mb-1.5">Critères de sécurité</p>
           <div className="flex flex-wrap gap-x-4 gap-y-1">
             {requirements.map(req => {
               const met = checkRequirement(newPassword, req.key);
               return (
                 <div key={req.key} className="flex items-center gap-1.5">
                   {met ? (
-                    <Check size={12} className="text-green-400" />
+                    <Check size={12} className="text-status-success" />
                   ) : (
-                    <X size={12} className="text-slate-500" />
+                    <X size={12} className="text-content-muted" />
                   )}
-                  <span className={`text-xs ${met ? 'text-green-400' : 'text-slate-400'}`}>
+                  <span className={`text-xs ${met ? 'text-status-success' : 'text-content-muted'}`}>
                     {req.label}
                   </span>
                 </div>
@@ -241,7 +241,7 @@ export default function ForcePasswordChange({ onPasswordChanged }: ForcePassword
           {loading ? 'Changement en cours...' : 'Changer le mot de passe'}
         </Button>
 
-        <p className="text-[11px] text-slate-500 text-center">
+        <p className="text-[11px] text-content-muted text-center">
           Ce changement est obligatoire pour accéder à l'application
         </p>
       </form>

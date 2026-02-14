@@ -74,9 +74,9 @@ export default function EmployesList({
 
   const getGradientColors = (nom: string) => {
     const colors = [
-      'from-slate-700 to-slate-800', 'from-blue-600 to-blue-700', 'from-indigo-600 to-indigo-700',
-      'from-purple-600 to-purple-700', 'from-emerald-600 to-emerald-700', 'from-teal-600 to-teal-700',
-      'from-cyan-600 to-cyan-700',
+      'from-accent to-accent-secondary', 'from-status-info to-accent', 'from-accent to-status-success',
+      'from-status-info to-status-info', 'from-status-success to-accent', 'from-accent-secondary to-accent',
+      'from-accent to-accent',
     ];
     const index = (nom || 'A').charCodeAt(0) % colors.length;
     return colors[index];
@@ -92,13 +92,13 @@ export default function EmployesList({
 
   const getContractBadge = (typeContrat: string) => {
     const contractColors: Record<string, string> = {
-      'CDI': 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-      'CDD': 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-      'Stage': 'bg-purple-500/10 text-purple-400 border-purple-500/20',
-      'Freelance': 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-      'Temporaire': 'bg-slate-500/10 text-slate-400 border-slate-500/20'
+      'CDI': 'bg-status-success-bg text-status-success border-status-success/20',
+      'CDD': 'bg-status-info-bg text-status-info border-status-info/20',
+      'Stage': 'bg-status-info-bg text-status-info border-status-info/20',
+      'Freelance': 'bg-status-warning-bg text-status-warning border-status-warning/20',
+      'Temporaire': 'bg-surface-subtle/30 text-content-muted border-edge-strong/20'
     };
-    return contractColors[typeContrat] || 'bg-slate-500/10 text-slate-400 border-slate-500/20';
+    return contractColors[typeContrat] || 'bg-surface-subtle/30 text-content-muted border-edge-strong/20';
   };
 
   const handleRowClick = (emp: Employe) => {
@@ -119,35 +119,35 @@ export default function EmployesList({
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-950 space-y-2">
+    <div className="flex flex-col h-full bg-surface-base space-y-2">
       
       {/* 2. BARRE D'OUTILS - Compact */}
       <div className="flex flex-col gap-2">
          {/* ... (keeping component content) ... */}
-         <div className="flex flex-col md:flex-row gap-2 bg-slate-900/50 p-2 rounded-lg border border-slate-800">
+         <div className="flex flex-col md:flex-row gap-2 bg-surface-base/50 p-2 rounded-lg border border-edge">
             {/* Same Toolbar Content */}
             <div className="relative flex-1">
-               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-3.5 h-3.5" />
+               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted w-3.5 h-3.5" />
                <input 
                  type="text"
                  value={searchTerm}
                  onChange={(e) => onSearchChange(e.target.value)}
                  placeholder="Rechercher..." 
-                 className="w-full bg-slate-950 border border-slate-800 rounded-md pl-9 pr-3 py-2 text-sm text-slate-200 focus:ring-1 focus:ring-indigo-500 focus:outline-none h-9"
+                 className="w-full bg-surface-base border border-edge rounded-md pl-9 pr-3 py-2 text-sm text-content-secondary focus:ring-1 focus:ring-accent focus:outline-none h-9"
                />
             </div>
             <div className="flex gap-2">
                <button 
                  onClick={() => setShowSalaries(!showSalaries)}
-                 className="px-3 py-1.5 text-slate-400 hover:text-white border border-slate-800 rounded-md bg-slate-950 flex items-center gap-1.5 text-xs transition-colors h-9"
+                 className="px-3 py-1.5 text-content-muted hover:text-content-primary border border-edge rounded-md bg-surface-base flex items-center gap-1.5 text-xs transition-colors h-9"
                >
                  {showSalaries ? <EyeOff size={14}/> : <Eye size={14}/>} 
                  <span className="hidden md:inline">Salaires</span>
                </button>
                <button 
                  onClick={() => setShowFilters(!showFilters)}
-                 className={`px-3 py-1.5 border border-slate-800 rounded-md bg-slate-950 flex items-center gap-1.5 text-xs transition-colors h-9 ${
-                   showFilters ? 'text-indigo-400 border-indigo-500/50' : 'text-slate-400 hover:text-white'
+                 className={`px-3 py-1.5 border border-edge rounded-md bg-surface-base flex items-center gap-1.5 text-xs transition-colors h-9 ${
+                   showFilters ? 'text-accent border-accent/50' : 'text-content-muted hover:text-content-primary'
                  }`}
                >
                  <Filter size={14}/> Filtres
@@ -157,14 +157,14 @@ export default function EmployesList({
          
          {/* Filters Panel */}
          {showFilters && (
-           <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-800 flex flex-col md:flex-row gap-4">
+           <div className="bg-surface-base/50 p-4 rounded-xl border border-edge flex flex-col md:flex-row gap-4">
              {/* Same Filters Content */}
              <div className="flex-1">
-               <label className="text-xs text-slate-400 uppercase mb-2 block">Statut</label>
+               <label className="text-xs text-content-muted uppercase mb-2 block">Statut</label>
                <select 
                  value={filterStatus}
                  onChange={(e) => setFilterStatus(e.target.value)}
-                 className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                 className="w-full bg-surface-base border border-edge rounded-lg px-3 py-2 text-content-secondary focus:ring-2 focus:ring-accent focus:outline-none"
                >
                  <option value="all">Tous les statuts</option>
                  <option value={StatutUser.ACTIVE}>Actif</option>
@@ -174,11 +174,11 @@ export default function EmployesList({
                </select>
              </div>
              <div className="flex-1">
-               <label className="text-xs text-slate-400 uppercase mb-2 block">Type de contrat</label>
+               <label className="text-xs text-content-muted uppercase mb-2 block">Type de contrat</label>
                <select 
                  value={filterContrat}
                  onChange={(e) => setFilterContrat(e.target.value)}
-                 className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                 className="w-full bg-surface-base border border-edge rounded-lg px-3 py-2 text-content-secondary focus:ring-2 focus:ring-accent focus:outline-none"
                >
                  <option value="all">Tous les contrats</option>
                  <option value="CDI">CDI</option>
@@ -191,7 +191,7 @@ export default function EmployesList({
              <div className="flex items-end">
                <button
                  onClick={() => { setFilterStatus('all'); setFilterContrat('all'); }}
-                 className="px-4 py-2 text-slate-400 hover:text-white border border-slate-800 rounded-lg bg-slate-950 text-sm transition-colors"
+                 className="px-4 py-2 text-content-muted hover:text-content-primary border border-edge rounded-lg bg-surface-base text-sm transition-colors"
                >
                  Réinitialiser
                </button>
@@ -201,30 +201,30 @@ export default function EmployesList({
       </div>
 
       {/* 3. TABLEAU PIXEL PERFECT (Desktop) */}
-      <div className="hidden md:block flex-1 bg-slate-900 border border-slate-800 rounded-lg overflow-hidden shadow-sm min-h-0">
+      <div className="hidden md:block flex-1 bg-surface-base border border-edge rounded-lg overflow-hidden shadow-sm min-h-0">
         <div className="h-full overflow-y-auto">
         <table className="w-full text-left border-collapse">
-          <thead className="sticky top-0 z-10 bg-slate-900 shadow-sm border-b border-slate-800">
+          <thead className="sticky top-0 z-10 bg-surface-base shadow-sm border-b border-edge">
             <tr>
-              <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider bg-slate-900/95 backdrop-blur">Employé</th>
-              <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider bg-slate-900/95 backdrop-blur">Poste & Service</th>
-              <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider bg-slate-900/95 backdrop-blur">Contrat</th>
-              <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider bg-slate-900/95 backdrop-blur">Statut</th>
-              <th className="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider bg-slate-900/95 backdrop-blur">Actions</th>
+              <th className="px-4 py-3 text-xs font-bold text-content-muted uppercase tracking-wider bg-surface-base/95 backdrop-blur">Employé</th>
+              <th className="px-4 py-3 text-xs font-bold text-content-muted uppercase tracking-wider bg-surface-base/95 backdrop-blur">Poste & Service</th>
+              <th className="px-4 py-3 text-xs font-bold text-content-muted uppercase tracking-wider bg-surface-base/95 backdrop-blur">Contrat</th>
+              <th className="px-4 py-3 text-xs font-bold text-content-muted uppercase tracking-wider bg-surface-base/95 backdrop-blur">Statut</th>
+              <th className="px-4 py-3 text-right text-xs font-bold text-content-muted uppercase tracking-wider bg-surface-base/95 backdrop-blur">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800/50">
+          <tbody className="divide-y divide-edge/50">
             {loading ? (
               <tr>
                 <td colSpan={5} className="px-4 py-12 text-center">
                   <div className="flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div>
                   </div>
                 </td>
               </tr>
             ) : paginatedEmployes.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-12 text-center text-slate-400">
+                <td colSpan={5} className="px-4 py-12 text-center text-content-muted">
                   Aucun employé trouvé.
                 </td>
               </tr>
@@ -233,14 +233,14 @@ export default function EmployesList({
                 <tr 
                   key={emp.id} 
                   onClick={() => handleRowClick(emp)}
-                  className="group hover:bg-slate-800/40 transition-colors cursor-pointer relative"
+                  className="group hover:bg-surface/40 transition-colors cursor-pointer relative"
                 >
                   
                   {/* 1. EMPLOYÉ (Alignement Flex) */}
                   <td className="px-4 py-2 align-middle">
                     <div className="flex items-center gap-3">
                       {emp.photoProfile ? (
-                        <div className="w-8 h-8 flex-shrink-0 rounded-full bg-slate-800 border border-slate-700 overflow-hidden">
+                        <div className="w-8 h-8 flex-shrink-0 rounded-full bg-surface border border-edge overflow-hidden">
                           <img 
                             src={resolveStorageUrl(emp.photoProfile)} 
                             alt={`${emp.nom} ${emp.prenom}`}
@@ -248,15 +248,15 @@ export default function EmployesList({
                           />
                         </div>
                       ) : (
-                        <div className={`w-8 h-8 flex-shrink-0 rounded-full bg-gradient-to-br ${getGradientColors(emp.nom)} border border-slate-700 flex items-center justify-center`}>
-                          <span className="font-bold text-slate-100 text-xs">{getInitials(emp.nom, emp.prenom)}</span>
+                        <div className={`w-8 h-8 flex-shrink-0 rounded-full bg-gradient-to-br ${getGradientColors(emp.nom)} border border-edge flex items-center justify-center`}>
+                          <span className="font-bold text-white text-xs">{getInitials(emp.nom, emp.prenom)}</span>
                         </div>
                       )}
                       <div>
-                        <div className="font-bold text-white text-xs group-hover:text-indigo-400 transition-colors">
+                        <div className="font-bold text-content-primary text-xs group-hover:text-accent transition-colors">
                           {emp.nom} {emp.prenom}
                         </div>
-                        <div className="text-[10px] text-slate-500 font-mono">{emp.matricule}</div>
+                        <div className="text-[10px] text-content-muted font-mono">{emp.matricule}</div>
                       </div>
                     </div>
                   </td>
@@ -264,8 +264,8 @@ export default function EmployesList({
                   {/* 2. POSTE */}
                   <td className="px-4 py-2 align-middle">
                      <div className="flex flex-col">
-                        <span className="text-xs text-slate-200 font-medium">{emp.poste || 'Non défini'}</span>
-                        <span className="text-[10px] text-slate-500">{emp.departement || 'N/A'}</span>
+                        <span className="text-xs text-content-secondary font-medium">{emp.poste || 'Non défini'}</span>
+                        <span className="text-[10px] text-content-muted">{emp.departement || 'N/A'}</span>
                      </div>
                   </td>
 
@@ -275,7 +275,7 @@ export default function EmployesList({
                         <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${getContractBadge(emp.typeContrat)}`}>
                           {emp.typeContrat}
                         </span>
-                        <span className={`text-xs font-medium transition-all ${showSalaries ? 'text-emerald-400' : 'text-slate-600 blur-sm select-none'}`}>
+                        <span className={`text-xs font-medium transition-all ${showSalaries ? 'text-status-success' : 'text-content-muted blur-sm select-none'}`}>
                           {parseFloat(emp.salaireBase || '0').toLocaleString()}
                         </span>
                      </div>
@@ -292,8 +292,8 @@ export default function EmployesList({
                        onClick={(e) => handleMenuOpen(e, emp)}
                        className={`p-1.5 rounded-lg transition-colors ${
                          menuState?.id === emp.id 
-                           ? 'bg-indigo-600 text-white' 
-                           : 'text-slate-500 hover:text-white hover:bg-slate-700'
+                           ? 'bg-accent text-white' 
+                           : 'text-content-muted hover:text-content-primary hover:bg-surface-elevated'
                        }`}
                      >
                        <MoreVertical size={14} />
@@ -311,10 +311,10 @@ export default function EmployesList({
       <div className="md:hidden space-y-3 pb-20 px-2">
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div>
           </div>
         ) : paginatedEmployes.length === 0 ? (
-          <div className="text-center py-12 text-slate-400">
+          <div className="text-center py-12 text-content-muted">
             Aucun employé trouvé.
           </div>
         ) : (
@@ -322,7 +322,7 @@ export default function EmployesList({
             <div 
               key={emp.id} 
               onClick={() => handleRowClick(emp)}
-              className="bg-slate-900 border border-slate-800 p-4 rounded-xl flex flex-col gap-3 shadow-md cursor-pointer hover:bg-slate-800/50 transition-colors"
+              className="bg-surface-base border border-edge p-4 rounded-xl flex flex-col gap-3 shadow-md cursor-pointer hover:bg-surface/50 transition-colors"
             >
                
                {/* Card Header */}
@@ -332,7 +332,7 @@ export default function EmployesList({
                       <img 
                         src={resolveStorageUrl(emp.photoProfile)} 
                         alt={`${emp.nom} ${emp.prenom}`}
-                        className="w-10 h-10 rounded-full object-cover border border-slate-700"
+                        className="w-10 h-10 rounded-full object-cover border border-edge"
                       />
                     ) : (
                       <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${getGradientColors(emp.nom)} flex items-center justify-center font-bold text-white`}>
@@ -340,25 +340,25 @@ export default function EmployesList({
                       </div>
                     )}
                     <div>
-                      <div className="font-bold text-white">{emp.nom} {emp.prenom}</div>
-                      <div className="text-xs text-slate-400">{emp.poste || 'Non défini'}</div>
+                      <div className="font-bold text-content-primary">{emp.nom} {emp.prenom}</div>
+                      <div className="text-xs text-content-muted">{emp.poste || 'Non défini'}</div>
                     </div>
                  </div>
                  <StatusBadge status={getStatusLabel(emp.statut)} />
                </div>
 
                {/* Card Body (Info Grid) */}
-               <div className="grid grid-cols-2 gap-3 text-sm bg-slate-950/50 p-3 rounded-lg border border-slate-800">
+               <div className="grid grid-cols-2 gap-3 text-sm bg-surface-base/50 p-3 rounded-lg border border-edge">
                   <div>
-                     <span className="text-[10px] text-slate-500 uppercase block mb-1">Matricule</span>
-                     <div className="font-mono text-xs text-slate-300">{emp.matricule}</div>
+                     <span className="text-[10px] text-content-muted uppercase block mb-1">Matricule</span>
+                     <div className="font-mono text-xs text-content-secondary">{emp.matricule}</div>
                      <span className={`mt-1 px-2 py-0.5 rounded text-[10px] font-bold border inline-block ${getContractBadge(emp.typeContrat)}`}>
                        {emp.typeContrat}
                      </span>
                   </div>
                   <div className="text-right">
-                     <span className="text-[10px] text-slate-500 uppercase block mb-1">Salaire</span>
-                     <div className={`font-medium text-xs ${showSalaries ? 'text-emerald-400' : 'blur-sm text-slate-600'}`}>
+                     <span className="text-[10px] text-content-muted uppercase block mb-1">Salaire</span>
+                     <div className={`font-medium text-xs ${showSalaries ? 'text-status-success' : 'blur-sm text-content-muted'}`}>
                        {parseFloat(emp.salaireBase || '0').toLocaleString()} FCFA
                      </div>
                   </div>
@@ -375,17 +375,17 @@ export default function EmployesList({
           <button
             onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
             disabled={currentPage === 1}
-            className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg border border-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-700 transition-colors text-sm"
+            className="px-4 py-2 bg-surface text-content-secondary rounded-lg border border-edge disabled:opacity-50 disabled:cursor-not-allowed hover:bg-surface-elevated transition-colors text-sm"
           >
             Précédent
           </button>
-          <span className="px-4 py-2 text-slate-400 flex items-center text-sm">
+          <span className="px-4 py-2 text-content-muted flex items-center text-sm">
             Page {currentPage} sur {totalPages}
           </span>
           <button
             onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
             disabled={currentPage === totalPages}
-            className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg border border-slate-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-700 transition-colors text-sm"
+            className="px-4 py-2 bg-surface text-content-secondary rounded-lg border border-edge disabled:opacity-50 disabled:cursor-not-allowed hover:bg-surface-elevated transition-colors text-sm"
           >
             Suivant
           </button>
@@ -416,13 +416,13 @@ export default function EmployesList({
             onClick={() => setMenuState(null)} 
           />
           <div 
-            className="fixed z-[70] w-48 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl py-1 animate-in fade-in zoom-in-95 duration-200"
+            className="fixed z-[70] w-48 bg-surface-base border border-edge rounded-lg shadow-2xl py-1 animate-in fade-in zoom-in-95 duration-200"
             style={{ 
               top: `${menuState.position.top}px`, 
               right: `${menuState.position.right}px` 
             }}
           >
-            <div className="px-3 py-2 text-[10px] uppercase font-bold text-slate-500 border-b border-slate-800">
+            <div className="px-3 py-2 text-[10px] uppercase font-bold text-content-muted border-b border-edge">
               Actions
             </div>
             
@@ -445,13 +445,13 @@ export default function EmployesList({
               }} 
             />
             
-            <div className="my-1 border-t border-slate-800" />
+            <div className="my-1 border-t border-edge" />
             
             {canDeleteEmployees && (
               <DropdownItem 
                 icon={UserX} 
                 label="Supprimer" 
-                color="text-red-500 hover:bg-red-500/10" 
+                color="text-status-danger hover:bg-status-danger-bg" 
                 onClick={(e) => { 
                   e.stopPropagation(); 
                   onDelete(menuState.emp.id); 
@@ -474,9 +474,9 @@ function StatusBadge({ status }: { status: string }) {
   const isSuspended = status === 'Suspendu';
   
   const getStyles = () => {
-    if (isActive) return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
-    if (isSuspended) return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
-    return 'bg-red-500/10 text-red-400 border-red-500/20';
+    if (isActive) return 'bg-status-success-bg text-status-success border-status-success/20';
+    if (isSuspended) return 'bg-status-warning-bg text-status-warning border-status-warning/20';
+    return 'bg-status-danger-bg text-status-danger border-status-danger/20';
   };
   
   return (
@@ -490,7 +490,7 @@ function DropdownItem({
   icon: Icon, 
   label, 
   onClick, 
-  color = "text-slate-300 hover:bg-slate-800" 
+  color = "text-content-secondary hover:bg-surface" 
 }: {
   icon: React.ElementType;
   label: string;

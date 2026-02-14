@@ -68,23 +68,23 @@ export default function CachedDataBadge({
 
   const variants = {
     offline: {
-      bg: 'bg-red-500/10',
-      border: 'border-red-500/30',
-      text: 'text-red-300',
+      bg: 'bg-status-danger-bg',
+      border: 'border-status-danger/30',
+      text: 'text-status-danger',
       icon: WifiOff,
       label: 'Hors ligne',
     },
     stale: {
-      bg: 'bg-amber-500/10',
-      border: 'border-amber-500/30',
-      text: 'text-amber-300',
+      bg: 'bg-status-warning-bg',
+      border: 'border-status-warning/30',
+      text: 'text-status-warning',
       icon: Clock,
       label: 'Données anciennes',
     },
     cached: {
-      bg: 'bg-slate-500/10',
-      border: 'border-slate-500/30',
-      text: 'text-slate-300',
+      bg: 'bg-surface-subtle/30',
+      border: 'border-edge-strong/30',
+      text: 'text-content-secondary',
       icon: Database,
       label: 'En cache',
     },
@@ -133,7 +133,7 @@ export function CachedIndicatorDot({
     return null;
   }
 
-  const color = isOffline ? 'bg-red-400' : 'bg-amber-400';
+  const color = isOffline ? 'bg-status-danger' : 'bg-status-warning';
 
   return (
     <span
@@ -156,7 +156,7 @@ export function LastUpdatedAt({
   if (!timestamp) return null;
 
   return (
-    <span className={`text-xs text-slate-400 ${className}`}>
+    <span className={`text-xs text-content-muted ${className}`}>
       Mis à jour {formatRelativeTime(timestamp)}
     </span>
   );

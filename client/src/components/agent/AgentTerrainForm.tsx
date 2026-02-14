@@ -245,12 +245,12 @@ export default function AgentTerrainForm({ onClose, onSuccess, agent }: AgentTer
             </div>
         </Card>
 
-        <Card padding="sm" className="bg-blue-500/5 border-blue-500/20">
+        <Card padding="sm" className="bg-status-info/5 border-status-info/20">
           <div className="flex items-start gap-3">
-             <Info className="text-blue-400 shrink-0 mt-0.5" size={18} />
+             <Info className="text-status-info shrink-0 mt-0.5" size={18} />
              <div>
-                <h3 className="text-blue-400 font-semibold text-sm mb-1">Rôles de l'Agent</h3>
-                <ul className="text-slate-400 text-xs sm:text-sm space-y-1 list-disc pl-4">
+                <h3 className="text-status-info font-semibold text-sm mb-1">Rôles de l'Agent</h3>
+                <ul className="text-content-muted text-xs sm:text-sm space-y-1 list-disc pl-4">
                   <li>Recouvrement des tontines et crédits</li>
                   <li>Encaissement des paiements clients</li>
                   <li>Prospection de nouveaux clients</li>
@@ -280,7 +280,7 @@ export default function AgentTerrainForm({ onClose, onSuccess, agent }: AgentTer
               {agent ? 'Mettre à Jour' : 'Créer l\'Agent'}
             </Button>
           ) : (
-            <div className="flex-1 px-4 py-2 bg-amber-500/20 text-amber-400 rounded-lg font-medium flex items-center justify-center gap-2">
+            <div className="flex-1 px-4 py-2 bg-status-warning-bg text-status-warning rounded-lg font-medium flex items-center justify-center gap-2">
               <AlertTriangle size={16} />
               Permission requise
             </div>

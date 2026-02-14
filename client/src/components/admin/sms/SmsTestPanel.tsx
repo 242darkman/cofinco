@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { smsApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
+import { useBranding } from '../../../contexts/BrandingContext';
 
 export interface SmsTestPanelProps {
   providers: { id: string; name: string; isActive: boolean }[];
@@ -37,9 +38,10 @@ export default function SmsTestPanel({
   defaultProvider,
   onTestComplete,
 }: SmsTestPanelProps) {
+  const { branding } = useBranding();
   const [selectedProvider, setSelectedProvider] = useState(defaultProvider || '');
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [message, setMessage] = useState('Ceci est un message de test de la plateforme COFIN.');
+  const [message, setMessage] = useState(`Ceci est un message de test de la plateforme ${branding.appName}.`);
   const [sending, setSending] = useState(false);
   const [lastResult, setLastResult] = useState<TestResult | null>(null);
 
@@ -120,15 +122,15 @@ export default function SmsTestPanel({
   const smsCount = Math.ceil(characterCount / 160) || 1;
 
   return (
-    <div className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
+    <div className="bg-surface/50 rounded-xl border border-edge overflow-hidden">
       {/* Header */}
-      <div className="p-4 border-b border-slate-700 flex items-center gap-3">
-        <div className="p-2 bg-cyan-500/20 rounded-lg">
-          <MessageSquare className="text-cyan-400" size={20} />
+      <div className="p-4 border-b border-edge flex items-center gap-3">
+        <div className="p-2 bg-accent/10 rounded-lg">
+          <MessageSquare className="text-accent" size={20} />
         </div>
         <div>
-          <h3 className="font-semibold text-white">Test d'envoi SMS</h3>
-          <p className="text-sm text-slate-400">Vérifiez la configuration de vos providers</p>
+          <h3 className="font-semibold text-content-primary">Test d'envoi SMS</h3>
+          <p className="text-sm text-content-muted">Vérifiez la configuration de vos providers</p>
         </div>
       </div>
 
@@ -136,9 +138,9 @@ export default function SmsTestPanel({
       <div className="p-4 space-y-4">
         {/* Provider Selection */}
         <div>
-          <label className="block text-sm text-slate-400 mb-2">Provider SMS</label>
+          <label className="block text-sm text-content-muted mb-2">Provider SMS</label>
           {activeProviders.length === 0 ? (
-            <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-center gap-2 text-amber-400 text-sm">
+            <div className="p-3 bg-status-warning-bg border border-status-warning/30 rounded-lg flex items-center gap-2 text-status-warning text-sm">
               <AlertTriangle size={16} />
               <span>Aucun provider SMS actif. Configurez un provider avant de tester.</span>
             </div>
@@ -146,7 +148,7 @@ export default function SmsTestPanel({
             <select
               value={selectedProvider}
               onChange={(e) => setSelectedProvider(e.target.value)}
-              className="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              className="w-full px-4 py-2.5 bg-surface-elevated border border-edge-strong rounded-lg text-content-primary focus:outline-none focus:ring-2 focus:ring-accent"
             >
               <option value="">Sélectionner un provider</option>
               {activeProviders.map((provider) => (
@@ -160,31 +162,31 @@ export default function SmsTestPanel({
 
         {/* Phone Number */}
         <div>
-          <label className="block text-sm text-slate-400 mb-2">Numéro de téléphone</label>
+          <label className="block text-sm text-content-muted mb-2">Numéro de téléphone</label>
           <div className="relative">
-            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" size={18} />
             <input
               type="tel"
               value={phoneNumber}
               onChange={(e) => setPhoneNumber(e.target.value)}
               placeholder="+242 06 XXX XX XX"
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              className="w-full pl-10 pr-4 py-2.5 bg-surface-elevated border border-edge-strong rounded-lg text-content-primary focus:outline-none focus:ring-2 focus:ring-accent"
             />
           </div>
-          <p className="mt-1 text-xs text-slate-500">Format international recommandé (+242...)</p>
+          <p className="mt-1 text-xs text-content-muted">Format international recommandé (+242...)</p>
         </div>
 
         {/* Message */}
         <div>
-          <label className="block text-sm text-slate-400 mb-2">Message de test</label>
+          <label className="block text-sm text-content-muted mb-2">Message de test</label>
           <div className="relative">
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               rows={3}
-              className="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 resize-none"
+              className="w-full px-4 py-2.5 bg-surface-elevated border border-edge-strong rounded-lg text-content-primary focus:outline-none focus:ring-2 focus:ring-accent resize-none"
             />
-            <div className="absolute bottom-2 right-2 flex items-center gap-2 text-xs text-slate-500">
+            <div className="absolute bottom-2 right-2 flex items-center gap-2 text-xs text-content-muted">
               <FileText size={12} />
               <span>
                 {characterCount} car. | {smsCount} SMS
@@ -197,7 +199,7 @@ export default function SmsTestPanel({
         <button
           onClick={handleTest}
           disabled={sending || !selectedProvider || !phoneNumber || !message}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-accent-secondary hover:bg-accent-secondary-hover text-content-primary rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {sending ? (
             <>
@@ -215,32 +217,32 @@ export default function SmsTestPanel({
 
       {/* Result */}
       {lastResult && (
-        <div className={`p-4 border-t border-slate-700 ${lastResult.success ? 'bg-emerald-500/10' : 'bg-red-500/10'}`}>
+        <div className={`p-4 border-t border-edge ${lastResult.success ? 'bg-status-success-bg' : 'bg-status-danger-bg'}`}>
           <div className="flex items-start gap-3">
             {lastResult.success ? (
-              <CheckCircle className="text-emerald-400 mt-0.5" size={20} />
+              <CheckCircle className="text-status-success mt-0.5" size={20} />
             ) : (
-              <XCircle className="text-red-400 mt-0.5" size={20} />
+              <XCircle className="text-status-danger mt-0.5" size={20} />
             )}
             <div className="flex-1">
-              <h4 className={`font-medium ${lastResult.success ? 'text-emerald-400' : 'text-red-400'}`}>
+              <h4 className={`font-medium ${lastResult.success ? 'text-status-success' : 'text-status-danger'}`}>
                 {lastResult.success ? 'Test réussi' : 'Échec du test'}
               </h4>
-              <div className="mt-2 space-y-1 text-sm text-slate-300">
+              <div className="mt-2 space-y-1 text-sm text-content-secondary">
                 <p>
-                  <span className="text-slate-500">Provider:</span> {lastResult.provider}
+                  <span className="text-content-muted">Provider:</span> {lastResult.provider}
                 </p>
                 <p>
-                  <span className="text-slate-500">Destinataire:</span> {lastResult.phoneNumber}
+                  <span className="text-content-muted">Destinataire:</span> {lastResult.phoneNumber}
                 </p>
                 {lastResult.deliveryTime && (
                   <p>
-                    <span className="text-slate-500">Temps de réponse:</span> {lastResult.deliveryTime}ms
+                    <span className="text-content-muted">Temps de réponse:</span> {lastResult.deliveryTime}ms
                   </p>
                 )}
                 {lastResult.error && (
-                  <p className="text-red-400">
-                    <span className="text-slate-500">Erreur:</span> {lastResult.error}
+                  <p className="text-status-danger">
+                    <span className="text-content-muted">Erreur:</span> {lastResult.error}
                   </p>
                 )}
               </div>

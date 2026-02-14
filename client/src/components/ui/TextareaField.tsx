@@ -50,14 +50,14 @@ const TextareaField = forwardRef<HTMLTextAreaElement, TextareaFieldProps>(
         <div className="flex items-center justify-between mb-2">
           <label
             htmlFor={name}
-            className="block text-xs sm:text-sm font-semibold text-slate-300"
+            className="block text-xs sm:text-sm font-semibold text-content-secondary"
           >
             {label}
-            {required && <span className="text-red-400 ml-1">*</span>}
+            {required && <span className="text-status-danger ml-1">*</span>}
           </label>
 
           {showCharCount && maxLength && (
-            <span className="text-xs text-slate-400">
+            <span className="text-xs text-content-muted">
               {currentLength}/{maxLength}
             </span>
           )}
@@ -74,16 +74,16 @@ const TextareaField = forwardRef<HTMLTextAreaElement, TextareaFieldProps>(
           aria-describedby={error ? `${name}-error` : helperText ? `${name}-helper` : undefined}
           className={`
             w-full px-4 py-2 sm:py-2.5
-            bg-slate-700 border rounded-lg
-            text-white text-sm sm:text-base
-            placeholder:text-slate-500
+            bg-input-bg border rounded-lg
+            text-input-text text-sm sm:text-base
+            placeholder:text-input-placeholder
             resize-y min-h-[80px]
             transition-colors duration-200
             focus:outline-none focus:ring-2
             disabled:opacity-50 disabled:cursor-not-allowed
             ${error
-              ? 'border-red-500/50 focus:border-red-500 focus:ring-red-500/30'
-              : 'border-slate-600 focus:border-cyan-500 focus:ring-cyan-500/30'
+              ? 'border-status-danger/50 focus:border-status-danger focus:ring-status-danger/30'
+              : 'border-input-border focus:border-input-focus focus:ring-input-focus/30'
             }
             ${className}
           `}
@@ -93,7 +93,7 @@ const TextareaField = forwardRef<HTMLTextAreaElement, TextareaFieldProps>(
         {error && (
           <p
             id={`${name}-error`}
-            className="mt-1.5 text-xs sm:text-sm text-red-400 flex items-center gap-1"
+            className="mt-1.5 text-xs sm:text-sm text-status-danger flex items-center gap-1"
             role="alert"
           >
             <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -108,7 +108,7 @@ const TextareaField = forwardRef<HTMLTextAreaElement, TextareaFieldProps>(
         )}
 
         {helperText && !error && (
-          <p id={`${name}-helper`} className="mt-1.5 text-xs sm:text-sm text-slate-400">
+          <p id={`${name}-helper`} className="mt-1.5 text-xs sm:text-sm text-content-muted">
             {helperText}
           </p>
         )}

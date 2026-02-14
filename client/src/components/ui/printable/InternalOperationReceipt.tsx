@@ -1,4 +1,5 @@
 import React from 'react';
+import { useBranding } from '@/contexts/BrandingContext';
 import { InternalTransactionType, InternalTransactionInfo } from './ReceiptTemplate';
 import { currencySymbol } from '@shared/config/currency';
 
@@ -74,10 +75,10 @@ const ENTITY_LABELS: Record<string, string> = {
 
 // Labels pour les statuts
 const STATUT_LABELS: Record<string, { label: string; style: string }> = {
-  EN_ATTENTE: { label: 'En attente', style: 'text-amber-600' },
-  VALIDE: { label: 'Validé', style: 'text-green-600 font-bold' },
-  REJETE: { label: 'Rejeté', style: 'text-red-600' },
-  ANNULE: { label: 'Annulé', style: 'text-gray-500 line-through' },
+  EN_ATTENTE: { label: 'En attente', style: 'text-status-warning' },
+  VALIDE: { label: 'Validé', style: 'text-status-success font-bold' },
+  REJETE: { label: 'Rejeté', style: 'text-status-danger' },
+  ANNULE: { label: 'Annulé', style: 'text-content-muted line-through' },
 };
 
 const formatDateTime = (value: string | Date) => {
@@ -100,7 +101,8 @@ const formatAmount = (amount: number, currency: string = currencySymbol()) => {
 
 export const InternalOperationReceipt = React.forwardRef<HTMLDivElement, InternalOperationReceiptProps>(
   ({ data }, ref) => {
-    const company = { ...DEFAULT_COMPANY, ...data.companyInfo };
+    const { branding } = useBranding();
+    const company = { ...DEFAULT_COMPANY, name: branding.appName, ...data.companyInfo };
     const currency = data.devise || currencySymbol();
     const typeLabel = INTERNAL_TYPE_LABELS[data.type] || data.type;
     const statutInfo = data.statut ? STATUT_LABELS[data.statut] : null;
@@ -195,8 +197,8 @@ export const InternalOperationReceipt = React.forwardRef<HTMLDivElement, Interna
         <div className="space-y-2 text-[12px]">
           {/* Source */}
           {data.source && (
-            <div className="bg-gray-50 p-2 rounded border border-gray-200">
-              <div className="text-[11px] font-semibold uppercase text-gray-600 mb-1">
+            <div className="bg-surface-muted p-2 rounded border border-edge">
+              <div className="text-[11px] font-semibold uppercase text-content-muted mb-1">
                 ↑ SOURCE
               </div>
               <div className="font-semibold">
@@ -208,12 +210,12 @@ export const InternalOperationReceipt = React.forwardRef<HTMLDivElement, Interna
           )}
 
           {/* Flèche de direction */}
-          <div className="text-center text-[16px] text-gray-400">↓</div>
+          <div className="text-center text-[16px] text-content-muted">↓</div>
 
           {/* Destination */}
           {data.destination && (
-            <div className="bg-gray-50 p-2 rounded border border-gray-200">
-              <div className="text-[11px] font-semibold uppercase text-gray-600 mb-1">
+            <div className="bg-surface-muted p-2 rounded border border-edge">
+              <div className="text-[11px] font-semibold uppercase text-content-muted mb-1">
                 ↓ DESTINATION
               </div>
               <div className="font-semibold">
@@ -229,7 +231,7 @@ export const InternalOperationReceipt = React.forwardRef<HTMLDivElement, Interna
 
         {/* Montant */}
         <div className="text-center py-2">
-          <div className="text-[11px] text-gray-600 uppercase">Montant</div>
+          <div className="text-[11px] text-content-muted uppercase">Montant</div>
           <div className="text-[18px] font-bold">
             {formatAmount(data.montant, currency)}
           </div>
@@ -280,8 +282,8 @@ export const InternalOperationReceipt = React.forwardRef<HTMLDivElement, Interna
         {data.autorisation && (
           <>
             <div className="receipt-divider border-t border-dashed border-black my-2" />
-            <div className="bg-gray-50 p-2 rounded border border-gray-200">
-              <div className="text-[11px] font-semibold uppercase text-center text-gray-600 mb-2">
+            <div className="bg-surface-muted p-2 rounded border border-edge">
+              <div className="text-[11px] font-semibold uppercase text-center text-content-muted mb-2">
                 ✓ AUTORISATION
               </div>
               <div className="space-y-1 text-[11px]">
@@ -328,18 +330,18 @@ export const InternalOperationReceipt = React.forwardRef<HTMLDivElement, Interna
         <div className="mt-3 space-y-4">
           <div className="flex justify-between text-[10px]">
             <div className="text-center flex-1">
-              <div className="border-b border-gray-300 mb-1 h-8" />
+              <div className="border-b border-edge mb-1 h-8" />
               <div>Signature Opérateur</div>
             </div>
             <div className="w-4" />
             <div className="text-center flex-1">
-              <div className="border-b border-gray-300 mb-1 h-8" />
+              <div className="border-b border-edge mb-1 h-8" />
               <div>Signature Autorisant</div>
             </div>
           </div>
         </div>
 
-        <div className="mt-4 text-center text-[10px] text-gray-500">
+        <div className="mt-4 text-center text-[10px] text-content-muted">
           Document généré automatiquement - Usage interne
         </div>
       </div>

@@ -95,6 +95,24 @@ export default {
           icon: 'var(--header-icon)',
           'icon-hover': 'var(--header-icon-hover)',
         },
+        // Button colors - consistent across light/dark themes
+        btn: {
+          success: 'var(--btn-success)',
+          'success-hover': 'var(--btn-success-hover)',
+          danger: 'var(--btn-danger)',
+          'danger-hover': 'var(--btn-danger-hover)',
+          warning: 'var(--btn-warning)',
+          'warning-hover': 'var(--btn-warning-hover)',
+          info: 'var(--btn-info)',
+          'info-hover': 'var(--btn-info-hover)',
+        },
+        // Brand/Logo colors - fixed across themes
+        brand: {
+          navy: 'var(--brand-navy)',
+          green: 'var(--brand-green)',
+          amber: 'var(--brand-amber)',
+          teal: 'var(--brand-teal)',
+        },
       },
       // Theme-aware shadows
       boxShadow: {

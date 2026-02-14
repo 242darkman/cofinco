@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, FileText } from 'lucide-react';
-import { Button, Card } from '../../ui';
+import { FileText } from 'lucide-react';
+import { Card } from '../../ui';
 import { computeSessionStatus, getSessionStatusLabel } from '../../../lib/format';
 import { SessionCaisse, CaisseTransaction } from '../../../types/finance';
 import { ReportsToolbar, CashJournal, DailySummary, DiscrepancyReport, type ReportType } from './etats';
@@ -23,7 +23,7 @@ export default function CaisseEtats({ onBack }: { onBack: () => void }) {
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 15;
+  const itemsPerPage = 8;
 
   // Charger les sessions
   const loadSessions = useCallback(async () => {
@@ -144,27 +144,9 @@ export default function CaisseEtats({ onBack }: { onBack: () => void }) {
   };
 
   return (
-    <div className="flex flex-col space-y-4 animate-in fade-in duration-500 font-sans selection:bg-cyan-500/30">
-      {/* Header */}
-      <div className="shrink-0 flex items-center justify-between gap-4 py-1">
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onBack}
-            className="rounded-full w-8 h-8 p-0 flex items-center justify-center hover:bg-slate-800 text-slate-400 hover:text-white transition-colors shrink-0"
-          >
-            <ArrowLeft size={18} />
-          </Button>
-          <div>
-            <h2 className="text-lg font-bold text-white tracking-tight">États Financiers</h2>
-            <p className="text-xs text-slate-400 font-medium whitespace-nowrap">Rapports & Analyses</p>
-          </div>
-        </div>
-      </div>
-
+    <div className="flex flex-col h-full overflow-hidden font-sans selection:bg-accent-secondary/30">
       {/* Toolbar */}
-      <div className="shrink-0">
+      <div className="shrink-0 pb-2">
         <ReportsToolbar
           dateDebut={dateDebut}
           dateFin={dateFin}
@@ -178,7 +160,7 @@ export default function CaisseEtats({ onBack }: { onBack: () => void }) {
         />
       </div>
 
-      <div className="flex flex-col">
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
           {typeRapport === 'journal' ? (
             <CashJournal
               sessions={sessions}
@@ -189,7 +171,7 @@ export default function CaisseEtats({ onBack }: { onBack: () => void }) {
               onPageChange={setCurrentPage}
             />
           ) : (
-            <div className="pb-4">
+            <div className="flex-1 min-h-0 overflow-y-auto">
                 {typeRapport === 'synthese' && (
                     <DailySummary sessions={sessions} transactions={transactions} loading={loading} />
                 )}
@@ -209,12 +191,12 @@ export default function CaisseEtats({ onBack }: { onBack: () => void }) {
           {/* Empty state */}
           {!loading && sessions.length === 0 && (
             <div className="flex items-center justify-center py-16">
-                <Card className="bg-slate-900/80 border-slate-800 py-16 text-center max-w-md w-full">
-                <div className="w-16 h-16 bg-slate-800/50 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <FileText size={32} className="text-slate-600" />
+                <Card className="bg-surface-base/80 border-edge py-16 text-center max-w-md w-full">
+                <div className="w-16 h-16 bg-surface/50 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <FileText size={32} className="text-content-muted" />
                 </div>
-                <h3 className="text-lg font-semibold text-white mb-1">Aucune donnée disponible</h3>
-                <p className="text-slate-500 text-sm">Sélectionnez une période différente pour voir les états.</p>
+                <h3 className="text-lg font-semibold text-content-primary mb-1">Aucune donnée disponible</h3>
+                <p className="text-content-muted text-sm">Sélectionnez une période différente pour voir les états.</p>
                 </Card>
             </div>
           )}

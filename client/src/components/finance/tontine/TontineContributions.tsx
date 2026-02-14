@@ -26,8 +26,8 @@ import mtnLogo from '@/assets/logos/mtn-logo.png';
 import airtelLogo from '@/assets/logos/airtel-logo.png';
 
 const MOBILE_OPERATORS = [
-  { id: 'mtn', name: 'MTN Mobile Money', color: 'bg-yellow-500', prefix: '+242 05/06', logo: mtnLogo },
-  { id: 'airtel', name: 'Airtel Money', color: 'bg-red-500', prefix: '+242 04', logo: airtelLogo },
+  { id: 'mtn', name: 'MTN Mobile Money', color: 'bg-status-warning-bg0', prefix: '+242 05/06', logo: mtnLogo },
+  { id: 'airtel', name: 'Airtel Money', color: 'bg-status-danger', prefix: '+242 04', logo: airtelLogo },
 ];
 
 /** Mapping modes de paiement UI vers enum */
@@ -151,13 +151,13 @@ const PaymentPreview = ({
   if (breakdown.length === 0) return null;
 
   return (
-    <div className="mt-3 p-3 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border border-cyan-500/30 rounded-xl animate-in fade-in slide-in-from-top-1 duration-200">
+    <div className="mt-3 p-3 bg-gradient-to-r from-accent/10 to-accent-secondary/10 border border-accent/30 rounded-xl animate-in fade-in slide-in-from-top-1 duration-200">
       <div className="flex items-start gap-2">
-        <div className="p-1.5 rounded-lg bg-cyan-500/20">
-          <Zap size={14} className="text-cyan-400" />
+        <div className="p-1.5 rounded-lg bg-accent/10">
+          <Zap size={14} className="text-accent" />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-xs font-bold text-cyan-300 mb-2">
+          <div className="text-xs font-bold text-accent mb-2">
             Ce montant paiera :
           </div>
           <div className="space-y-1.5">
@@ -167,18 +167,18 @@ const PaymentPreview = ({
                 className="flex items-center justify-between gap-2 text-xs"
               >
                 <span className={`flex items-center gap-1.5 ${
-                  item.type === 'penalty' ? 'text-red-400' :
-                  item.type === 'partial' ? 'text-amber-400' :
-                  'text-cyan-400'
+                  item.type === 'penalty' ? 'text-status-danger' :
+                  item.type === 'partial' ? 'text-status-warning' :
+                  'text-accent'
                 }`}>
                   <span className={`w-1.5 h-1.5 rounded-full ${
-                    item.type === 'penalty' ? 'bg-red-400' :
-                    item.type === 'partial' ? 'bg-amber-400' :
-                    'bg-cyan-400'
+                    item.type === 'penalty' ? 'bg-status-danger' :
+                    item.type === 'partial' ? 'bg-status-warning' :
+                    'bg-accent'
                   }`} />
                   {item.label}
                 </span>
-                <span className="font-mono font-bold text-white">
+                <span className="font-mono font-bold text-content-primary">
                   {item.amount.toLocaleString('fr-FR')} F
                 </span>
               </div>
@@ -212,10 +212,10 @@ const ContributionDetailsModal = ({ contribution, onClose }: { contribution: Ton
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-md shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
-        <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-800/50">
-          <h3 className="font-bold text-white flex items-center gap-2">
-            <span className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400">
+      <div className="bg-surface-base border border-edge rounded-xl w-full max-w-md shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="p-4 border-b border-edge flex items-center justify-between bg-surface/50">
+          <h3 className="font-bold text-content-primary flex items-center gap-2">
+            <span className="p-1.5 rounded-lg bg-status-success-bg text-status-success">
               <Banknote size={18} />
             </span>
             Détails de la contribution
@@ -225,31 +225,31 @@ const ContributionDetailsModal = ({ contribution, onClose }: { contribution: Ton
         
         <div className="p-6 space-y-6">
           <div className="text-center">
-             <div className="text-slate-400 text-xs uppercase tracking-wider mb-1">Montant versé</div>
-             <div className="text-3xl font-bold text-emerald-400">{formatMoney(contribution.montant)}</div>
-             <div className="text-sm text-slate-500 mt-1">Tour #{contribution.tourNumero}</div>
+             <div className="text-content-muted text-xs uppercase tracking-wider mb-1">Montant versé</div>
+             <div className="text-3xl font-bold text-status-success">{formatMoney(contribution.montant)}</div>
+             <div className="text-sm text-content-muted mt-1">Tour #{contribution.tourNumero}</div>
           </div>
 
-          <div className="bg-slate-800/50 rounded-xl p-4 space-y-3 border border-slate-700/50">
-             <div className="flex justify-between items-center py-1 border-b border-slate-700/50 last:border-0 last:pb-0">
-                <span className="text-slate-400 text-sm">Membre</span>
-                <span className="text-white font-medium text-right">
+          <div className="bg-surface/50 rounded-xl p-4 space-y-3 border border-edge-subtle">
+             <div className="flex justify-between items-center py-1 border-b border-edge-subtle last:border-0 last:pb-0">
+                <span className="text-content-muted text-sm">Membre</span>
+                <span className="text-content-primary font-medium text-right">
                   {contribution.client?.nom} {contribution.client?.prenom}
                 </span>
              </div>
              
-             <div className="flex justify-between items-center py-1 border-b border-slate-700/50 last:border-0 last:pb-0">
-                <span className="text-slate-400 text-sm">Date</span>
-                <span className="text-white font-medium text-right">
+             <div className="flex justify-between items-center py-1 border-b border-edge-subtle last:border-0 last:pb-0">
+                <span className="text-content-muted text-sm">Date</span>
+                <span className="text-content-primary font-medium text-right">
                   {new Date(contribution.dateContribution).toLocaleDateString('fr-FR', { 
                     day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
                   })}
                 </span>
              </div>
 
-             <div className="flex justify-between items-center py-1 border-b border-slate-700/50 last:border-0 last:pb-0">
-                <span className="text-slate-400 text-sm">Mode</span>
-                <span className="text-white font-medium text-right flex items-center gap-2">
+             <div className="flex justify-between items-center py-1 border-b border-edge-subtle last:border-0 last:pb-0">
+                <span className="text-content-muted text-sm">Mode</span>
+                <span className="text-content-primary font-medium text-right flex items-center gap-2">
                   {getModeLabel(contribution.modePaiement)}
                 </span>
              </div>
@@ -260,18 +260,18 @@ const ContributionDetailsModal = ({ contribution, onClose }: { contribution: Ton
                 // on pourrait avoir besoin de modifier le type ou le backend. 
                 // Mais s'il est dans 'notes' ou un champ dédié que j'aurais manqué...
                 // Pour l'instant on suppose qu'il n'est pas là ou qu'on l'affiche s'il existe.
-                 <div className="flex justify-between items-center py-1 border-b border-slate-700/50 last:border-0 last:pb-0">
-                    <span className="text-slate-400 text-sm">Référence</span>
-                    <span className="text-cyan-400 font-mono text-sm text-right break-all max-w-[150px]">
+                 <div className="flex justify-between items-center py-1 border-b border-edge-subtle last:border-0 last:pb-0">
+                    <span className="text-content-muted text-sm">Référence</span>
+                    <span className="text-accent font-mono text-sm text-right break-all max-w-[150px]">
                       {contribution.referencePaiement || 'N/A'}
                     </span>
                  </div>
              )}
              
              {contribution.referencePaiement && contribution.modePaiement !== MethodePaiement.MOBILE_MONEY && (
-                <div className="flex justify-between items-center py-1 border-b border-slate-700/50 last:border-0 last:pb-0">
-                  <span className="text-slate-400 text-sm">Référence</span>
-                  <span className="text-slate-200 font-mono text-sm text-right">
+                <div className="flex justify-between items-center py-1 border-b border-edge-subtle last:border-0 last:pb-0">
+                  <span className="text-content-muted text-sm">Référence</span>
+                  <span className="text-content-secondary font-mono text-sm text-right">
                     {contribution.referencePaiement}
                   </span>
                 </div>
@@ -279,16 +279,16 @@ const ContributionDetailsModal = ({ contribution, onClose }: { contribution: Ton
           </div>
           
           {contribution.notes && (
-            <div className="bg-slate-800/30 rounded-lg p-3 text-sm text-slate-300 italic border border-slate-700/30">
+            <div className="bg-surface/30 rounded-lg p-3 text-sm text-content-secondary italic border border-edge-subtle">
               "{contribution.notes}"
             </div>
           )}
 
           <div className="flex justify-center">
             <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${
-              contribution.statut === 'VALIDATED' ? 'bg-green-500/20 text-green-400' :
-              contribution.statut === 'PENDING' ? 'bg-amber-500/20 text-amber-400' :
-              'bg-red-500/20 text-red-400'
+              contribution.statut === 'VALIDATED' ? 'bg-status-success-bg text-status-success' :
+              contribution.statut === 'PENDING' ? 'bg-status-warning-bg text-status-warning' :
+              'bg-status-danger-bg text-status-danger'
             }`}>
               Statut: {ALL_STATUS_LABELS[contribution.statut] || contribution.statut}
             </span>
@@ -549,36 +549,36 @@ export default function TontineContributions({ tontineId }: TontineContributions
 
   const getStatutColor = useCallback((statut: string) => {
     if (statut === StatutContributionTontine.VALIDATED) {
-      return 'text-green-400 bg-green-500/20';
+      return 'text-status-success bg-status-success-bg';
     }
     if (statut === StatutContributionTontine.PENDING) {
-      return 'text-cyan-400 bg-cyan-500/20';
+      return 'text-accent bg-accent/10';
     }
     if (statut === StatutContributionTontine.REJECTED) {
-      return 'text-red-400 bg-red-500/20';
+      return 'text-status-danger bg-status-danger-bg';
     }
     if (statut === StatutContributionTontine.LATE) {
-      return 'text-amber-400 bg-amber-500/20';
+      return 'text-status-warning bg-status-warning-bg';
     }
-    return 'text-slate-400 bg-slate-500/20';
+    return 'text-content-muted bg-surface-subtle/40';
   }, []);
 
   const getModeIcon = useCallback((mode: string) => {
     switch (mode) {
       case MethodePaiement.CASH:
       case 'Cash': // Legacy support
-        return <Banknote size={14} className="inline text-green-400" aria-hidden="true" />;
+        return <Banknote size={14} className="inline text-status-success" aria-hidden="true" />;
       case MethodePaiement.MOBILE_MONEY:
       case 'Mobile Money': // Legacy support
-        return <Smartphone size={14} className="inline text-cyan-400" aria-hidden="true" />;
+        return <Smartphone size={14} className="inline text-accent" aria-hidden="true" />;
       case MethodePaiement.TRANSFER:
       case 'Virement': // Legacy support
-        return <Building size={14} className="inline text-blue-400" aria-hidden="true" />;
+        return <Building size={14} className="inline text-status-info" aria-hidden="true" />;
       case MethodePaiement.CHECK:
       case 'Chèque': // Legacy support
-        return <FileCheck size={14} className="inline text-purple-400" aria-hidden="true" />;
+        return <FileCheck size={14} className="inline text-status-info" aria-hidden="true" />;
       default:
-        return <DollarSign size={14} className="inline text-slate-400" aria-hidden="true" />;
+        return <DollarSign size={14} className="inline text-content-muted" aria-hidden="true" />;
     }
   }, []);
 
@@ -616,7 +616,7 @@ export default function TontineContributions({ tontineId }: TontineContributions
     <div className="space-y-4">
       {/* Offline Indicator */}
       {isOffline && (
-        <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg text-amber-400 text-sm">
+        <div className="flex items-center gap-2 px-4 py-2 bg-status-warning-bg border border-status-warning/30 rounded-lg text-status-warning text-sm">
           <WifiOff size={16} />
           <span>Mode hors ligne — Seules les cotisations en espèces sont disponibles.</span>
         </div>
@@ -625,11 +625,11 @@ export default function TontineContributions({ tontineId }: TontineContributions
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
         <div>
-          <h3 className="text-lg font-bold text-white" id="contributions-heading">
+          <h3 className="text-lg font-bold text-content-primary" id="contributions-heading">
             Contributions
           </h3>
-          <p className="text-sm text-slate-400">
-            Total: <span className="text-green-400 font-bold">{formatMoney(totalContributions)}</span>
+          <p className="text-sm text-content-muted">
+            Total: <span className="text-status-success font-bold">{formatMoney(totalContributions)}</span>
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -648,7 +648,7 @@ export default function TontineContributions({ tontineId }: TontineContributions
                 onClick={handleExportContributionsPDF}
                 aria-label="Exporter en PDF"
                 title="Exporter PDF"
-                className="text-cyan-400"
+                className="text-accent"
               />
             </>
           )}
@@ -671,7 +671,7 @@ export default function TontineContributions({ tontineId }: TontineContributions
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted"
               size={16}
               aria-hidden="true"
             />
@@ -683,7 +683,7 @@ export default function TontineContributions({ tontineId }: TontineContributions
                 pagination.reset();
               }}
               placeholder="Rechercher un membre..."
-              className="w-full bg-slate-800/50 text-white pl-10 pr-4 py-2 rounded-lg border border-slate-700 focus:outline-none focus:border-cyan-500 text-sm"
+              className="w-full bg-surface/50 text-content-primary pl-10 pr-4 py-2 rounded-lg border border-edge focus:outline-none focus:border-accent text-sm"
               aria-label="Rechercher une contribution"
             />
           </div>
@@ -693,7 +693,7 @@ export default function TontineContributions({ tontineId }: TontineContributions
               setStatusFilter(e.target.value);
               pagination.reset();
             }}
-            className="bg-slate-800/50 text-white px-3 py-2 rounded-lg border border-slate-700 focus:outline-none focus:border-cyan-500 text-sm"
+            className="bg-surface/50 text-content-primary px-3 py-2 rounded-lg border border-edge focus:outline-none focus:border-accent text-sm"
             aria-label="Filtrer par statut"
           >
             <option value="all">Tous les statuts</option>
@@ -714,11 +714,11 @@ export default function TontineContributions({ tontineId }: TontineContributions
         </div>
       ) : filteredContributions.length === 0 ? (
         <div
-          className="text-center py-12 border border-dashed border-slate-700 rounded-lg"
+          className="text-center py-12 border border-dashed border-edge rounded-lg"
           role="status"
         >
-          <DollarSign className="mx-auto text-slate-500 mb-3" size={48} aria-hidden="true" />
-          <p className="text-slate-400 font-medium">
+          <DollarSign className="mx-auto text-content-muted mb-3" size={48} aria-hidden="true" />
+          <p className="text-content-muted font-medium">
             {searchQuery || statusFilter !== 'all' ? 'Aucune contribution trouvée' : 'Aucune contribution'}
           </p>
           {canCreateContributions && !searchQuery && statusFilter === 'all' && (
@@ -733,20 +733,20 @@ export default function TontineContributions({ tontineId }: TontineContributions
             {paginatedContributions.map((contribution) => (
               <Card
                 key={contribution.id}
-                className="bg-slate-800/40 border-slate-700/50 p-4 hover:border-cyan-500/50 hover:bg-slate-800/60 transition-all cursor-pointer group relative overflow-hidden"
+                className="bg-surface/40 border-edge-subtle p-4 hover:border-accent/50 hover:bg-surface/60 transition-all cursor-pointer group relative overflow-hidden"
                 role="button"
                 tabIndex={0}
                 onClick={() => setSelectedContribution(contribution)}
               >
                 <div className="absolute top-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div className="bg-slate-700/80 p-1.5 rounded-lg text-xs text-slate-300 font-medium">
+                    <div className="bg-surface-elevated/80 p-1.5 rounded-lg text-xs text-content-secondary font-medium">
                         Voir détails
                     </div>
                 </div>
                 <div className="flex justify-between items-start gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <h4 className="font-bold text-white text-sm truncate">
+                      <h4 className="font-bold text-content-primary text-sm truncate">
                         {escapeHtml(contribution.client?.nom || 'Inconnu')}{' '}
                         {escapeHtml(contribution.client?.prenom || '')}
                       </h4>
@@ -757,24 +757,24 @@ export default function TontineContributions({ tontineId }: TontineContributions
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-3 text-xs text-slate-400 mb-2 flex-wrap">
+                    <div className="flex items-center gap-3 text-xs text-content-muted mb-2 flex-wrap">
                       <span className="flex items-center gap-1">
                         <Calendar size={12} aria-hidden="true" />
                         {formatDate(contribution.dateContribution)}
                       </span>
-                      <span className="flex items-center gap-1 text-slate-300">
+                      <span className="flex items-center gap-1 text-content-secondary">
                         {getModeIcon(contribution.modePaiement)}
                         {contribution.modePaiement}
                       </span>
                     </div>
 
-                    <div className="text-xs text-slate-500 flex items-center gap-2 flex-wrap">
-                      <span className="bg-slate-700/50 px-1.5 py-0.5 rounded text-white font-medium">
+                    <div className="text-xs text-content-muted flex items-center gap-2 flex-wrap">
+                      <span className="bg-surface-elevated/50 px-1.5 py-0.5 rounded text-content-primary font-medium">
                         Tour #{contribution.tourNumero}
                       </span>
                       {contribution.referencePaiement && (
                         <span
-                          className="font-mono text-[10px] px-1 bg-slate-800 rounded text-cyan-500/80 truncate max-w-[100px]"
+                          className="font-mono text-[10px] px-1 bg-surface rounded text-accent/80 truncate max-w-[100px]"
                           title={contribution.referencePaiement}
                         >
                           {escapeHtml(contribution.referencePaiement)}
@@ -784,12 +784,12 @@ export default function TontineContributions({ tontineId }: TontineContributions
                   </div>
 
                   <div className="text-right shrink-0">
-                    <div className="font-bold text-green-400 text-sm sm:text-base">
+                    <div className="font-bold text-status-success text-sm sm:text-base">
                       {formatMoney(contribution.montant)}
                     </div>
                     {contribution.notes && (
                       <div
-                        className="text-[10px] text-slate-500 mt-1 max-w-[100px] truncate"
+                        className="text-[10px] text-content-muted mt-1 max-w-[100px] truncate"
                         title={contribution.notes}
                       >
                         {escapeHtml(contribution.notes)}
@@ -825,9 +825,9 @@ export default function TontineContributions({ tontineId }: TontineContributions
           aria-labelledby="add-contribution-title"
           onClick={(e) => e.target === e.currentTarget && handleCloseModal()}
         >
-          <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-md shadow-2xl flex flex-col max-h-[90vh]">
-            <div className="p-4 border-b border-slate-700 flex items-center justify-between shrink-0">
-              <h2 id="add-contribution-title" className="text-lg font-bold text-white">
+          <div className="bg-surface-base border border-edge rounded-xl w-full max-w-md shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="p-4 border-b border-edge flex items-center justify-between shrink-0">
+              <h2 id="add-contribution-title" className="text-lg font-bold text-content-primary">
                 Nouvelle Contribution
               </h2>
               <IconButton icon={X} onClick={handleCloseModal} size="sm" aria-label="Fermer" />
@@ -836,14 +836,14 @@ export default function TontineContributions({ tontineId }: TontineContributions
             <div className="p-4 overflow-y-auto flex-1 space-y-4">
               {/* Error banner */}
               {errors.general && (
-                <div className="p-3 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400 text-sm" role="alert">
+                <div className="p-3 bg-status-danger-bg border border-status-danger/50 rounded-lg text-status-danger text-sm" role="alert">
                   {errors.general}
                 </div>
               )}
 
               {/* Member selection */}
               <div>
-                <label htmlFor="membre-select" className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                <label htmlFor="membre-select" className="block text-xs font-semibold text-content-muted uppercase tracking-wider mb-2">
                   Membre *
                 </label>
                 <select
@@ -867,8 +867,8 @@ export default function TontineContributions({ tontineId }: TontineContributions
                     }));
                     if (errors.membre_id) setErrors((prev) => ({ ...prev, membre_id: undefined }));
                   }}
-                  className={`w-full bg-slate-950 text-white px-3 py-2.5 rounded-lg border focus:outline-none focus:border-emerald-500 text-sm ${
-                    errors.membre_id ? 'border-red-500' : 'border-slate-800'
+                  className={`w-full bg-surface-base text-content-primary px-3 py-2.5 rounded-lg border focus:outline-none focus:border-accent text-sm ${
+                    errors.membre_id ? 'border-status-danger' : 'border-edge'
                   }`}
                   aria-invalid={!!errors.membre_id}
                   aria-describedby={errors.membre_id ? 'membre-error' : undefined}
@@ -881,7 +881,7 @@ export default function TontineContributions({ tontineId }: TontineContributions
                   ))}
                 </select>
                 {errors.membre_id && (
-                  <p id="membre-error" className="text-red-400 text-xs mt-1" role="alert">
+                  <p id="membre-error" className="text-status-danger text-xs mt-1" role="alert">
                     {errors.membre_id}
                   </p>
                 )}
@@ -890,7 +890,7 @@ export default function TontineContributions({ tontineId }: TontineContributions
               {/* Amount and Tour */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="montant-input" className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                  <label htmlFor="montant-input" className="block text-xs font-semibold text-content-muted uppercase tracking-wider mb-2">
                     Montant (FCFA) *
                   </label>
                   <input
@@ -903,8 +903,8 @@ export default function TontineContributions({ tontineId }: TontineContributions
                       setFormData((prev) => ({ ...prev, montant: Number(e.target.value) }));
                       if (errors.montant) setErrors((prev) => ({ ...prev, montant: undefined }));
                     }}
-                    className={`w-full bg-slate-950 text-white px-3 py-2.5 rounded-lg border focus:outline-none focus:border-emerald-500 text-sm ${
-                      errors.montant ? 'border-red-500' : 'border-slate-800'
+                    className={`w-full bg-surface-base text-content-primary px-3 py-2.5 rounded-lg border focus:outline-none focus:border-accent text-sm ${
+                      errors.montant ? 'border-status-danger' : 'border-edge'
                     }`}
                     aria-invalid={!!errors.montant}
                     aria-describedby={errors.montant ? 'montant-error' : undefined}
@@ -919,13 +919,13 @@ export default function TontineContributions({ tontineId }: TontineContributions
                     />
                   )}
                   {errors.montant && (
-                    <p id="montant-error" className="text-red-400 text-xs mt-1" role="alert">
+                    <p id="montant-error" className="text-status-danger text-xs mt-1" role="alert">
                       {errors.montant}
                     </p>
                   )}
                 </div>
                 <div>
-                  <label htmlFor="tour-input" className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                  <label htmlFor="tour-input" className="block text-xs font-semibold text-content-muted uppercase tracking-wider mb-2">
                     Tour *
                   </label>
                   <input
@@ -934,14 +934,14 @@ export default function TontineContributions({ tontineId }: TontineContributions
                     min="1"
                     value={formData.tour_numero}
                     onChange={(e) => setFormData((prev) => ({ ...prev, tour_numero: Number(e.target.value) }))}
-                    className="w-full bg-slate-950 text-white px-3 py-2.5 rounded-lg border border-slate-800 focus:outline-none focus:border-emerald-500 text-sm"
+                    className="w-full bg-surface-base text-content-primary px-3 py-2.5 rounded-lg border border-edge focus:outline-none focus:border-accent text-sm"
                   />
                 </div>
               </div>
 
               {/* Payment mode */}
               <div>
-                <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                <label className="block text-xs font-semibold text-content-muted uppercase tracking-wider mb-2">
                   Mode de paiement *
                 </label>
                 <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Mode de paiement">
@@ -958,10 +958,10 @@ export default function TontineContributions({ tontineId }: TontineContributions
                       onClick={() => !modeDisabled && setFormData((prev) => ({ ...prev, mode_paiement: option.value }))}
                       className={`flex items-center justify-center gap-2 p-2.5 rounded-lg border text-xs font-medium transition ${
                         formData.mode_paiement === option.value
-                          ? 'bg-emerald-600 border-emerald-500 text-white'
+                          ? 'bg-accent border-accent text-white'
                           : modeDisabled
-                            ? 'bg-slate-800/50 border-slate-800 text-slate-600 cursor-not-allowed opacity-50'
-                            : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+                            ? 'bg-surface/50 border-edge text-content-muted cursor-not-allowed opacity-50'
+                            : 'bg-surface border-edge text-content-secondary hover:bg-surface-elevated'
                       }`}
                       disabled={modeDisabled}
                     >
@@ -969,7 +969,7 @@ export default function TontineContributions({ tontineId }: TontineContributions
                     </button>
                     );
                   })}
-                  <div className="col-span-2 text-[10px] text-slate-500 italic text-center mt-1">
+                  <div className="col-span-2 text-[10px] text-content-muted italic text-center mt-1">
                     {isOffline ? '* Mode hors ligne — espèces uniquement' : '* Virement et Chèque bientôt disponibles'}
                   </div>
 
@@ -979,7 +979,7 @@ export default function TontineContributions({ tontineId }: TontineContributions
               {/* Mobile Money Operator */}
               {formData.mode_paiement === MethodePaiement.MOBILE_MONEY && (
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                  <label className="block text-xs font-semibold text-content-muted uppercase tracking-wider mb-2">
                     Opérateur *
                   </label>
                   <div className="grid grid-cols-2 gap-2">
@@ -993,8 +993,8 @@ export default function TontineContributions({ tontineId }: TontineContributions
                         }}
                         className={`flex items-center justify-center gap-2 p-2.5 rounded-lg border text-xs font-medium transition ${
                           selectedOperator === op.id
-                            ? `${op.color} border-transparent text-white`
-                            : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+                            ? `${op.color} border-transparent text-content-primary`
+                            : 'bg-surface border-edge text-content-secondary hover:bg-surface-elevated'
                         }`}
                       >
                         <img src={op.logo} alt={op.name} className="w-5 h-5 rounded-full object-contain" />
@@ -1003,7 +1003,7 @@ export default function TontineContributions({ tontineId }: TontineContributions
                     ))}
                   </div>
                   {errors.operateur && (
-                    <p className="text-red-400 text-xs mt-1" role="alert">
+                    <p className="text-status-danger text-xs mt-1" role="alert">
                       {errors.operateur}
                     </p>
                   )}
@@ -1012,14 +1012,14 @@ export default function TontineContributions({ tontineId }: TontineContributions
 
               {/* Notes */}
               <div>
-                <label htmlFor="notes-input" className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                <label htmlFor="notes-input" className="block text-xs font-semibold text-content-muted uppercase tracking-wider mb-2">
                   Notes (optionnel)
                 </label>
                 <textarea
                   id="notes-input"
                   value={formData.notes}
                   onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
-                  className="w-full bg-slate-950 text-white px-3 py-2.5 rounded-lg border border-slate-800 focus:outline-none focus:border-emerald-500 text-sm resize-none"
+                  className="w-full bg-surface-base text-content-primary px-3 py-2.5 rounded-lg border border-edge focus:outline-none focus:border-accent text-sm resize-none"
                   rows={2}
                   maxLength={500}
                   placeholder="Remarques ou informations supplémentaires..."
@@ -1027,7 +1027,7 @@ export default function TontineContributions({ tontineId }: TontineContributions
               </div>
             </div>
 
-            <div className="p-4 border-t border-slate-700 bg-slate-900/50 shrink-0 flex gap-3">
+            <div className="p-4 border-t border-edge bg-surface-base/50 shrink-0 flex gap-3">
               <Button variant="ghost" fullWidth onClick={handleCloseModal} disabled={submitting}>
                 Annuler
               </Button>

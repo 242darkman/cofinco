@@ -71,7 +71,7 @@ const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(
         <div className="relative">
           {Icon && (
             <Icon
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted pointer-events-none"
               size={18}
             />
           )}
@@ -117,7 +117,7 @@ const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(
           </select>
 
           <ChevronDown
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-content-muted pointer-events-none"
             size={18}
           />
         </div>

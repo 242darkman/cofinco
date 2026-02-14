@@ -110,14 +110,14 @@ export function OfflineIndicator() {
       {/* Dropdown Panel */}
       {showDetails && (
         <div className="absolute left-0 mt-3 z-50 animate-in slide-in-from-top-2 duration-200">
-          <Card className="w-80 shadow-2xl border-slate-700 bg-slate-900/95 backdrop-blur-md">
+          <Card className="w-80 shadow-2xl border-edge bg-surface-base/95 backdrop-blur-md">
             {/* Header */}
-            <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-700">
-              <h3 className="font-semibold text-white flex items-center gap-2">
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-edge">
+              <h3 className="font-semibold text-content-primary flex items-center gap-2">
                 {isConnected ? (
-                  <Cloud className="text-cyan-400" size={18} />
+                  <Cloud className="text-accent" size={18} />
                 ) : (
-                  <CloudOff className="text-slate-400" size={18} />
+                  <CloudOff className="text-content-muted" size={18} />
                 )}
                 {t('syncStatus') || 'État de synchronisation'}
               </h3>
@@ -125,7 +125,7 @@ export function OfflineIndicator() {
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowDetails(false)}
-                className="h-8 w-8 p-0 rounded-full hover:bg-slate-800"
+                className="h-8 w-8 p-0 rounded-full hover:bg-surface"
               >
                 <X size={16} />
               </Button>
@@ -136,26 +136,26 @@ export function OfflineIndicator() {
               <div
                 className={`flex items-center gap-3 p-3 rounded-xl border ${
                   isConnected
-                    ? 'bg-green-500/10 border-green-500/20'
-                    : 'bg-red-500/10 border-red-500/20'
+                    ? 'bg-status-success-bg border-status-success/20'
+                    : 'bg-status-danger-bg border-status-danger/20'
                 }`}
               >
                 <div
                   className={`p-2 rounded-full ${
-                    isConnected ? 'bg-green-500/20' : 'bg-red-500/20'
+                    isConnected ? 'bg-status-success-bg' : 'bg-status-danger-bg'
                   }`}
                 >
                   {isOffline ? (
-                    <WifiOff className="h-5 w-5 text-red-400" />
+                    <WifiOff className="h-5 w-5 text-status-danger" />
                   ) : (
-                    <Wifi className="h-5 w-5 text-green-400" />
+                    <Wifi className="h-5 w-5 text-status-success" />
                   )}
                 </div>
                 <div className="flex-1">
-                  <p className={`font-bold ${isConnected ? 'text-green-400' : 'text-red-400'}`}>
+                  <p className={`font-bold ${isConnected ? 'text-status-success' : 'text-status-danger'}`}>
                     {getConnectionStateLabel(connectionState)}
                   </p>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-content-muted">
                     {isConnected ? 'Synchronisation active' : 'Mode hors-ligne actif'}
                   </p>
                 </div>
@@ -164,8 +164,8 @@ export function OfflineIndicator() {
               {/* Latency & Last Sync */}
               <div className="grid grid-cols-2 gap-3">
                 {/* Latency with quality indicator */}
-                <div className="bg-slate-800/50 rounded-xl p-3 border border-slate-700/50">
-                  <div className="flex items-center gap-2 text-xs text-slate-400 mb-1">
+                <div className="bg-surface/50 rounded-xl p-3 border border-edge-subtle">
+                  <div className="flex items-center gap-2 text-xs text-content-muted mb-1">
                     <Zap size={12} />
                     <span>Latence</span>
                     {latencyQuality !== 'unknown' && (
@@ -180,38 +180,38 @@ export function OfflineIndicator() {
                 </div>
 
                 {/* Last Sync Time */}
-                <div className="bg-slate-800/50 rounded-xl p-3 border border-slate-700/50">
-                  <div className="flex items-center gap-2 text-xs text-slate-400 mb-1">
+                <div className="bg-surface/50 rounded-xl p-3 border border-edge-subtle">
+                  <div className="flex items-center gap-2 text-xs text-content-muted mb-1">
                     <Clock size={12} />
                     <span>Dernière sync</span>
                   </div>
-                  <p className="text-lg font-bold text-slate-200">{lastSyncFormatted}</p>
+                  <p className="text-lg font-bold text-content-secondary">{lastSyncFormatted}</p>
                 </div>
               </div>
 
               {/* Time Since Last Sync */}
               {lastSyncAt && (
-                <div className="text-center text-sm text-slate-400">
-                  <span className="text-slate-500">Il y a </span>
-                  <span className="font-mono text-cyan-400">{timeSinceLastSyncFormatted}</span>
+                <div className="text-center text-sm text-content-muted">
+                  <span className="text-content-muted">Il y a </span>
+                  <span className="font-mono text-accent">{timeSinceLastSyncFormatted}</span>
                 </div>
               )}
 
               {/* Sync Queue Stats */}
-              <div className="bg-slate-800/50 rounded-xl p-4 space-y-3 border border-slate-700/50">
+              <div className="bg-surface/50 rounded-xl p-4 space-y-3 border border-edge-subtle">
                 <div className="flex justify-between text-sm items-center">
-                  <span className="text-slate-400">{t('pendingOperations') || 'En attente'}</span>
+                  <span className="text-content-muted">{t('pendingOperations') || 'En attente'}</span>
                   <span
                     className={`font-bold px-2 py-0.5 rounded-md ${
-                      pending > 0 ? 'bg-orange-500/20 text-orange-400' : 'text-slate-200'
+                      pending > 0 ? 'bg-status-warning-bg text-status-warning' : 'text-content-secondary'
                     }`}
                   >
                     {pending}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm items-center">
-                  <span className="text-slate-400">{t('synced') || 'Synchronisées'}</span>
-                  <span className="font-bold text-green-400 flex items-center gap-1">
+                  <span className="text-content-muted">{t('synced') || 'Synchronisées'}</span>
+                  <span className="font-bold text-status-success flex items-center gap-1">
                     <CheckCircle size={12} /> {syncedSinceLast}
                   </span>
                 </div>
@@ -219,11 +219,11 @@ export function OfflineIndicator() {
 
               {/* Error Display */}
               {hasError && lastError && (
-                <div className="flex items-start gap-3 p-3 bg-red-500/10 border border-red-500/20 rounded-xl">
-                  <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
+                <div className="flex items-start gap-3 p-3 bg-status-danger-bg border border-status-danger/20 rounded-xl">
+                  <AlertCircle className="h-5 w-5 text-status-danger flex-shrink-0 mt-0.5" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-red-400">Dernière erreur</p>
-                    <p className="text-xs text-red-300/80 mt-1 break-words">{lastError}</p>
+                    <p className="text-sm font-medium text-status-danger">Dernière erreur</p>
+                    <p className="text-xs text-status-danger/80 mt-1 break-words">{lastError}</p>
                   </div>
                 </div>
               )}
@@ -243,9 +243,9 @@ export function OfflineIndicator() {
 
               {/* Offline Notice */}
               {isOffline && (
-                <div className="flex items-start gap-3 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
-                  <AlertTriangle className="h-5 w-5 text-yellow-500 flex-shrink-0" />
-                  <p className="text-xs text-yellow-200/80 leading-relaxed">
+                <div className="flex items-start gap-3 p-3 bg-status-warning-bg border border-status-warning/20 rounded-xl">
+                  <AlertTriangle className="h-5 w-5 text-status-warning flex-shrink-0" />
+                  <p className="text-xs text-status-warning-text/80 leading-relaxed">
                     {t('offlineNotice') ||
                       'Les opérations seront synchronisées automatiquement dès le retour de la connexion.'}
                   </p>

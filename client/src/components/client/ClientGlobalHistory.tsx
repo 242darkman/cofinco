@@ -43,14 +43,14 @@ interface ClientGlobalHistoryProps {
 // Icon resolver
 function getIcon(iconName: string) {
     const icons: Record<string, React.ReactElement> = {
-        'credit-card': <CreditCard size={16} className="text-blue-400" />,
-        'piggy-bank': <PiggyBank size={16} className="text-emerald-400" />,
-        'users': <Users size={16} className="text-amber-400" />,
-        'arrow-up-right': <ArrowUpRight size={16} className="text-red-400" />,
-        'arrow-down-left': <ArrowDownLeft size={16} className="text-green-400" />,
-        'refresh-cw': <RefreshCw size={16} className="text-cyan-400" />,
-        'banknote': <Banknote size={16} className="text-purple-400" />,
-        'activity': <Activity size={16} className="text-slate-400" />
+        'credit-card': <CreditCard size={16} className="text-status-info" />,
+        'piggy-bank': <PiggyBank size={16} className="text-status-success" />,
+        'users': <Users size={16} className="text-status-warning" />,
+        'arrow-up-right': <ArrowUpRight size={16} className="text-status-danger" />,
+        'arrow-down-left': <ArrowDownLeft size={16} className="text-status-success" />,
+        'refresh-cw': <RefreshCw size={16} className="text-accent" />,
+        'banknote': <Banknote size={16} className="text-status-info" />,
+        'activity': <Activity size={16} className="text-content-muted" />
     };
     return icons[iconName] || icons['activity'];
 }
@@ -130,14 +130,14 @@ export default function ClientGlobalHistory({ clientId }: ClientGlobalHistoryPro
     if (isLoading) {
         return (
             <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-6 h-6 animate-spin text-cyan-500" />
+                <Loader2 className="w-6 h-6 animate-spin text-accent" />
             </div>
         );
     }
 
     if (isError) {
         return (
-            <Card variant="default" padding="md" className="text-center text-red-400">
+            <Card variant="default" padding="md" className="text-center text-status-danger">
                 Erreur lors du chargement de l'historique
             </Card>
         );
@@ -146,8 +146,8 @@ export default function ClientGlobalHistory({ clientId }: ClientGlobalHistoryPro
     if (allItems.length === 0) {
         return (
             <Card variant="default" padding="lg" className="text-center">
-                <Activity className="w-8 h-8 text-slate-500 mx-auto mb-2" />
-                <p className="text-slate-400 text-sm">Aucune transaction enregistrée</p>
+                <Activity className="w-8 h-8 text-content-muted mx-auto mb-2" />
+                <p className="text-content-muted text-sm">Aucune transaction enregistrée</p>
             </Card>
         );
     }
@@ -156,10 +156,10 @@ export default function ClientGlobalHistory({ clientId }: ClientGlobalHistoryPro
         <div className="space-y-2">
             {/* Header */}
             <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">
+                <h3 className="text-sm font-semibold text-content-secondary uppercase tracking-wider">
                     Historique Global
                 </h3>
-                <span className="text-xs text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full">
+                <span className="text-xs text-content-muted bg-surface px-2 py-0.5 rounded-full">
                     {total} transactions
                 </span>
             </div>
@@ -169,21 +169,21 @@ export default function ClientGlobalHistory({ clientId }: ClientGlobalHistoryPro
                 {allItems.map((item, index) => (
                     <div 
                         key={item.id || index}
-                        className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-lg border border-slate-700/50 hover:bg-slate-800 transition-colors"
+                        className="flex items-center gap-3 p-3 bg-surface/50 rounded-lg border border-edge-subtle hover:bg-surface transition-colors"
                     >
                         {/* Icon */}
                         <div className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                            item.sens === 'CREDIT' ? 'bg-green-500/10' : 'bg-red-500/10'
+                            item.sens === 'CREDIT' ? 'bg-status-success-bg' : 'bg-status-danger-bg'
                         }`}>
                             {getIcon(item.icon)}
                         </div>
 
                         {/* Details */}
                         <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-white truncate">
+                            <p className="text-sm font-medium text-content-primary truncate">
                                 {item.type}
                             </p>
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs text-content-muted">
                                 {new Date(item.date).toLocaleDateString('fr-FR', {
                                     day: '2-digit',
                                     month: 'short',
@@ -197,11 +197,11 @@ export default function ClientGlobalHistory({ clientId }: ClientGlobalHistoryPro
                         {/* Amount */}
                         <div className="text-right shrink-0">
                             <p className={`text-sm font-bold ${
-                                item.sens === 'CREDIT' ? 'text-green-400' : 'text-red-400'
+                                item.sens === 'CREDIT' ? 'text-status-success' : 'text-status-danger'
                             }`}>
                                 {item.sens === 'CREDIT' ? '+' : '-'}{item.montant.toLocaleString()} F
                             </p>
-                            <p className="text-[10px] text-slate-500 uppercase">
+                            <p className="text-[10px] text-content-muted uppercase">
                                 {item.sourceModule}
                             </p>
                         </div>
@@ -214,7 +214,7 @@ export default function ClientGlobalHistory({ clientId }: ClientGlobalHistoryPro
                 <button
                     onClick={() => fetchNextPage()}
                     disabled={isFetchingNextPage}
-                    className="w-full py-3 mt-4 text-sm font-medium text-cyan-400 hover:text-cyan-300 bg-slate-800/50 hover:bg-slate-800 rounded-lg border border-slate-700 transition-colors disabled:opacity-50"
+                    className="w-full py-3 mt-4 text-sm font-medium text-accent hover:text-accent bg-surface/50 hover:bg-surface rounded-lg border border-edge transition-colors disabled:opacity-50"
                 >
                     {isFetchingNextPage ? (
                         <span className="flex items-center justify-center gap-2">

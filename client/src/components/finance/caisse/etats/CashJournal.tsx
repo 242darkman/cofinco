@@ -171,12 +171,12 @@ export function CashJournal({
           primary: true,
           format: (_: any, entry: JournalEntry) => (
             <div className="flex items-center gap-2">
-              <Clock size={12} className="text-slate-500" />
+              <Clock size={12} className="text-content-muted" />
               <div>
-                <p className="text-slate-300 font-medium text-xs">
+                <p className="text-content-secondary font-medium text-xs">
                   {entry.date.toLocaleDateString('fr-FR')}
                 </p>
-                <p className="text-slate-500 text-[10px] leading-none">
+                <p className="text-content-muted text-[10px] leading-none">
                   {entry.date.toLocaleTimeString('fr-FR', {
                     hour: '2-digit',
                     minute: '2-digit',
@@ -186,7 +186,7 @@ export function CashJournal({
             </div>
           ),
           mobileFormat: (_: any, entry: JournalEntry) => (
-             <div className="flex items-center gap-1.5 text-xs text-slate-500">
+             <div className="flex items-center gap-1.5 text-xs text-content-muted">
                 <Clock size={12} />
                 <span>{entry.date.toLocaleDateString('fr-FR')} {entry.date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
              </div>
@@ -199,12 +199,12 @@ export function CashJournal({
              <div>
                 <div className="flex items-center gap-1.5 mb-1">
                    {entry.type === 'OUVERTURE' && (
-                    <span className="px-1.5 py-0.5 bg-blue-500/10 text-blue-400 text-[10px] font-bold rounded border border-blue-500/20">
+                    <span className="px-1.5 py-0.5 bg-status-info-bg text-status-info text-[10px] font-bold rounded border border-status-info/20">
                       OUVERTURE
                     </span>
                    )}
                    {entry.type === 'FERMETURE' && (
-                    <span className="px-1.5 py-0.5 bg-purple-500/10 text-purple-400 text-[10px] font-bold rounded border border-purple-500/20">
+                    <span className="px-1.5 py-0.5 bg-status-info-bg text-status-info text-[10px] font-bold rounded border border-status-info/20">
                       FERMETURE
                     </span>
                    )}
@@ -212,8 +212,8 @@ export function CashJournal({
                     <span
                       className={`px-1.5 py-0.5 text-[10px] font-bold rounded border ${
                         entry.sens === 'ENTREE'
-                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                          : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                          ? 'bg-status-success-bg text-status-success border-status-success/20'
+                          : 'bg-status-danger/10 text-status-danger border-status-danger/20'
                       }`}
                     >
                       {entry.sens === 'ENTREE' ? '↓' : '↑'} {getOperationLabel(entry.operationType)}
@@ -221,13 +221,13 @@ export function CashJournal({
                    )}
                 </div>
                 {entry.description && entry.type === 'OPERATION' && (
-                  <p className="text-slate-500 text-[10px] truncate max-w-[180px]">
+                  <p className="text-content-muted text-[10px] truncate max-w-[180px]">
                     {entry.description}
                   </p>
                 )}
              </div>
           ),
-          mobileClassName: 'font-medium text-white mb-1'
+          mobileClassName: 'font-medium text-content-primary mb-1'
         },
         {
           key: 'tier',
@@ -238,7 +238,7 @@ export function CashJournal({
         {
           key: 'reference',
           label: 'Référence',
-          format: (val: string) => val ? <span className="text-slate-400 text-xs font-mono">{val}</span> : <span className="text-slate-600 text-xs">—</span>,
+          format: (val: string) => val ? <span className="text-content-muted text-xs font-mono">{val}</span> : <span className="text-content-muted text-xs">—</span>,
           hideOnMobile: true
         },
         {
@@ -247,10 +247,10 @@ export function CashJournal({
           align: 'right' as const,
           format: (_: any, entry: JournalEntry) => (
              entry.sens === 'ENTREE' ? (
-                <span className="text-emerald-400 font-bold font-mono">+{entry.montant.toLocaleString('fr-FR')}</span>
+                <span className="text-status-success font-bold font-mono">+{entry.montant.toLocaleString('fr-FR')}</span>
              ) : entry.type === 'OUVERTURE' ? (
-                <span className="text-blue-400 font-medium font-mono">+{entry.montant.toLocaleString('fr-FR')}</span>
-             ) : <span className="text-slate-600">—</span>
+                <span className="text-status-info font-medium font-mono">+{entry.montant.toLocaleString('fr-FR')}</span>
+             ) : <span className="text-content-muted">—</span>
           ),
           hideOnMobile: true
         },
@@ -260,8 +260,8 @@ export function CashJournal({
           align: 'right' as const,
           format: (_: any, entry: JournalEntry) => (
              entry.sens === 'SORTIE' ? (
-                <span className="text-rose-400 font-bold font-mono">-{entry.montant.toLocaleString('fr-FR')}</span>
-             ) : <span className="text-slate-600">—</span>
+                <span className="text-status-danger font-bold font-mono">-{entry.montant.toLocaleString('fr-FR')}</span>
+             ) : <span className="text-content-muted">—</span>
           ),
           hideOnMobile: true
         },
@@ -270,20 +270,20 @@ export function CashJournal({
             label: 'Solde',
             align: 'right' as const,
             format: (val: number, entry: JournalEntry) => (
-                <span className="text-white font-bold font-mono bg-slate-800/50 px-2 py-1 rounded text-xs">
+                <span className="text-content-primary font-bold font-mono bg-surface/50 px-2 py-1 rounded text-xs">
                     {entry.soldeProgressif.toLocaleString('fr-FR')}
                 </span>
             ),
             mobileFormat: (val: number, entry: JournalEntry) => (
-                <div className="flex justify-between items-center mt-2 pt-2 border-t border-slate-800/50">
+                <div className="flex justify-between items-center mt-2 pt-2 border-t border-edge/50">
                     <div className="text-lg font-bold">
-                        {entry.sens === 'ENTREE' && <span className="text-emerald-400">+{entry.montant.toLocaleString('fr-FR')}</span>}
-                        {entry.sens === 'SORTIE' && <span className="text-rose-400">-{entry.montant.toLocaleString('fr-FR')}</span>}
-                        {entry.sens === 'NEUTRE' && <span className="text-blue-400">{entry.montant.toLocaleString('fr-FR')}</span>}
+                        {entry.sens === 'ENTREE' && <span className="text-status-success">+{entry.montant.toLocaleString('fr-FR')}</span>}
+                        {entry.sens === 'SORTIE' && <span className="text-status-danger">-{entry.montant.toLocaleString('fr-FR')}</span>}
+                        {entry.sens === 'NEUTRE' && <span className="text-status-info">{entry.montant.toLocaleString('fr-FR')}</span>}
                     </div>
                     <div>
-                         <span className="text-[10px] text-slate-500 mr-2">Solde</span>
-                         <span className="text-white font-mono font-bold">{entry.soldeProgressif.toLocaleString('fr-FR')}</span>
+                         <span className="text-[10px] text-content-muted mr-2">Solde</span>
+                         <span className="text-content-primary font-mono font-bold">{entry.soldeProgressif.toLocaleString('fr-FR')}</span>
                     </div>
                 </div>
             )
@@ -292,67 +292,51 @@ export function CashJournal({
 
   if (loading && journalEntries.length === 0) {
     return (
-      <Card className="bg-slate-900/80 border-slate-800 p-8">
+      <Card className="bg-surface-base/80 border-edge p-8">
         <div className="flex items-center justify-center gap-3">
-          <div className="animate-spin w-5 h-5 border-2 border-cyan-500 border-t-transparent rounded-full" />
-          <span className="text-slate-400">Chargement du journal...</span>
+          <div className="animate-spin w-5 h-5 border-2 border-accent border-t-transparent rounded-full" />
+          <span className="text-content-muted">Chargement du journal...</span>
         </div>
       </Card>
     );
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0 space-y-4">
-      {/* Résumé rapide - Cards responsive */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 shrink-0">
-        <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border-emerald-500/20 p-3 sm:p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-emerald-500/20 rounded-lg shrink-0">
-              <ArrowDownLeft size={18} className="text-emerald-400" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs text-emerald-400/70 font-medium">Entrées</p>
-              <p className="text-base sm:text-lg font-bold text-emerald-400 truncate">
-                +{totaux.entrees.toLocaleString('fr-FR')}
-              </p>
-            </div>
+    <div className="flex flex-col flex-1 min-h-0 space-y-2">
+      {/* Résumé rapide - Compact inline stats */}
+      <div className="grid grid-cols-3 gap-2 shrink-0">
+        <div className="bg-status-success/5 border border-status-success/20 rounded-lg p-2 flex items-center gap-2">
+          <ArrowDownLeft size={14} className="text-status-success shrink-0" />
+          <div className="min-w-0">
+            <p className="text-[10px] text-status-success/70 font-medium">Entrées</p>
+            <p className="text-sm font-bold text-status-success truncate">+{totaux.entrees.toLocaleString('fr-FR')}</p>
           </div>
-        </Card>
-        <Card className="bg-gradient-to-br from-rose-500/10 to-rose-500/5 border-rose-500/20 p-3 sm:p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-rose-500/20 rounded-lg shrink-0">
-              <ArrowUpRight size={18} className="text-rose-400" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs text-rose-400/70 font-medium">Sorties</p>
-              <p className="text-base sm:text-lg font-bold text-rose-400 truncate">
-                -{totaux.sorties.toLocaleString('fr-FR')}
-              </p>
-            </div>
+        </div>
+        <div className="bg-status-danger/5 border border-status-danger/20 rounded-lg p-2 flex items-center gap-2">
+          <ArrowUpRight size={14} className="text-status-danger shrink-0" />
+          <div className="min-w-0">
+            <p className="text-[10px] text-status-danger/70 font-medium">Sorties</p>
+            <p className="text-sm font-bold text-status-danger truncate">-{totaux.sorties.toLocaleString('fr-FR')}</p>
           </div>
-        </Card>
-        <Card className="bg-gradient-to-br from-blue-500/10 to-blue-500/5 border-blue-500/20 p-3 sm:p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-500/20 rounded-lg shrink-0">
-              <CreditCard size={18} className="text-blue-400" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs text-blue-400/70 font-medium">Opérations</p>
-              <p className="text-base sm:text-lg font-bold text-blue-400">{totaux.nbOperations}</p>
-            </div>
+        </div>
+        <div className="bg-status-info/5 border border-status-info/20 rounded-lg p-2 flex items-center gap-2">
+          <CreditCard size={14} className="text-status-info shrink-0" />
+          <div className="min-w-0">
+            <p className="text-[10px] text-status-info/70 font-medium">Opérations</p>
+            <p className="text-sm font-bold text-status-info">{totaux.nbOperations}</p>
           </div>
-        </Card>
+        </div>
       </div>
 
       {/* Filter Pills */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 shrink-0 scrollbar-none">
-        <Filter size={16} className="text-slate-500 shrink-0" />
+        <Filter size={16} className="text-content-muted shrink-0" />
         <button
           onClick={() => { setFilter('all'); onPageChange(1); }}
           className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
             filter === 'all'
-              ? 'bg-cyan-500/20 text-cyan-400 ring-1 ring-cyan-500/30'
-              : 'bg-slate-800/50 text-slate-400 hover:bg-slate-700/50'
+              ? 'bg-accent/10 text-accent ring-1 ring-accent/30'
+              : 'bg-surface/50 text-content-muted hover:bg-surface-elevated/50'
           }`}
         >
           Toutes ({journalEntries.filter((e) => e.type === 'OPERATION').length})
@@ -361,8 +345,8 @@ export function CashJournal({
           onClick={() => { setFilter('entrees'); onPageChange(1); }}
           className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
             filter === 'entrees'
-              ? 'bg-emerald-500/20 text-emerald-400 ring-1 ring-emerald-500/30'
-              : 'bg-slate-800/50 text-slate-400 hover:bg-slate-700/50'
+              ? 'bg-status-success-bg text-status-success ring-1 ring-status-success/30'
+              : 'bg-surface/50 text-content-muted hover:bg-surface-elevated/50'
           }`}
         >
           Entrées ({journalEntries.filter((e) => e.sens === 'ENTREE').length})
@@ -371,8 +355,8 @@ export function CashJournal({
           onClick={() => { setFilter('sorties'); onPageChange(1); }}
           className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
             filter === 'sorties'
-              ? 'bg-rose-500/20 text-rose-400 ring-1 ring-rose-500/30'
-              : 'bg-slate-800/50 text-slate-400 hover:bg-slate-700/50'
+              ? 'bg-status-danger-bg text-status-danger ring-1 ring-status-danger/30'
+              : 'bg-surface/50 text-content-muted hover:bg-surface-elevated/50'
           }`}
         >
           Sorties ({journalEntries.filter((e) => e.sens === 'SORTIE').length})
@@ -380,7 +364,7 @@ export function CashJournal({
       </div>
 
       {/* Journal - Responsive Table */}
-      <div className="flex-1 min-h-0 border border-slate-800 rounded-xl bg-slate-900/50 overflow-hidden flex flex-col">
+      <div className="flex-1 min-h-0 border border-edge rounded-xl bg-surface-base/50 overflow-hidden flex flex-col">
          <ResponsiveTable
             data={paginatedEntries}
             columns={columns}
@@ -388,7 +372,7 @@ export function CashJournal({
             emptyMessage="Aucune opération trouvée"
             density="compact"
             className="flex-1 overflow-auto"
-            headerClassName="sticky top-0 z-10 bg-slate-900 border-b border-slate-800"
+            headerClassName="sticky top-0 z-10 bg-surface-base border-b border-edge"
             pagination={{
                 page: currentPage,
                 totalPages: totalPages,
@@ -406,8 +390,8 @@ function renderClientOrCaissier(entry: JournalEntry) {
   if (entry.type === 'OUVERTURE' || entry.type === 'FERMETURE') {
     return (
       <div className="flex items-center gap-2">
-        <UserCircle size={12} className="text-blue-400" />
-        <span className="text-blue-300 text-xs font-medium">{entry.caissier || 'Caissier'}</span>
+        <UserCircle size={12} className="text-status-info" />
+        <span className="text-status-info text-xs font-medium">{entry.caissier || 'Caissier'}</span>
       </div>
     );
   }
@@ -416,14 +400,14 @@ function renderClientOrCaissier(entry: JournalEntry) {
   if (entry.client) {
     return (
       <div className="flex items-center gap-2">
-        <User size={12} className="text-slate-500" />
-        <span className="text-slate-300 text-xs">{entry.client}</span>
+        <User size={12} className="text-content-muted" />
+        <span className="text-content-secondary text-xs">{entry.client}</span>
       </div>
     );
   }
 
   // No client info available
-  return <span className="text-slate-600 text-xs">—</span>;
+  return <span className="text-content-muted text-xs">—</span>;
 }
 
 // Helper functions (unchanged)

@@ -183,24 +183,24 @@ export function PhysicalConfirmationStep({
     >
       <div className="space-y-5">
         {/* Résumé de l'opération */}
-        <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 space-y-2">
+        <div className="bg-surface/50 border border-edge rounded-xl p-4 space-y-2">
           <div className="flex justify-between items-center">
-            <span className="text-slate-400 text-sm">Client:</span>
-            <span className="font-semibold text-white">{clientName}</span>
+            <span className="text-content-muted text-sm">Client:</span>
+            <span className="font-semibold text-content-primary">{clientName}</span>
           </div>
           {clientPhone && (
             <div className="flex justify-between items-center">
-              <span className="text-slate-400 text-sm">Téléphone:</span>
-              <span className="font-mono text-slate-300">{clientPhone}</span>
+              <span className="text-content-muted text-sm">Téléphone:</span>
+              <span className="font-mono text-content-secondary">{clientPhone}</span>
             </div>
           )}
           <div className="flex justify-between items-center">
-            <span className="text-slate-400 text-sm">Opération:</span>
-            <span className="font-medium text-white">{operationType}</span>
+            <span className="text-content-muted text-sm">Opération:</span>
+            <span className="font-medium text-content-primary">{operationType}</span>
           </div>
-          <div className="flex justify-between items-center pt-2 border-t border-slate-700">
-            <span className="text-slate-400 text-sm">Montant:</span>
-            <span className="font-bold text-emerald-400 text-lg">
+          <div className="flex justify-between items-center pt-2 border-t border-edge">
+            <span className="text-content-muted text-sm">Montant:</span>
+            <span className="font-bold text-status-success text-lg">
               {formatMoney(amount)}
             </span>
           </div>
@@ -208,11 +208,11 @@ export function PhysicalConfirmationStep({
 
         {/* Alerte montant élevé */}
         {requiresPassword && (
-          <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+          <div className="bg-status-warning-bg border border-status-warning/30 rounded-xl p-3 flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-status-warning flex-shrink-0 mt-0.5" />
             <div>
-              <p className="font-medium text-amber-300 text-sm">Montant élevé</p>
-              <p className="text-amber-200/70 text-xs mt-0.5">
+              <p className="font-medium text-status-warning text-sm">Montant élevé</p>
+              <p className="text-status-warning-text/70 text-xs mt-0.5">
                 Cette opération dépasse {formatMoney(PASSWORD_REQUIRED_THRESHOLD)}.
                 Votre mot de passe est requis pour validation.
               </p>
@@ -222,7 +222,7 @@ export function PhysicalConfirmationStep({
 
         {/* Méthode de vérification */}
         <div className="space-y-2">
-          <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+          <label className="text-xs font-bold text-content-muted uppercase tracking-wider">
             Méthode de vérification d'identité
           </label>
           <div className="grid grid-cols-1 gap-2">
@@ -234,20 +234,20 @@ export function PhysicalConfirmationStep({
                   onClick={() => setVerificationMethod(method.id)}
                   className={`p-3 rounded-xl border text-left transition-all flex items-center gap-3 ${
                     verificationMethod === method.id
-                      ? 'border-emerald-500/50 bg-emerald-900/20 text-emerald-200'
-                      : 'border-slate-700/50 bg-slate-800/30 text-slate-400 hover:bg-slate-800/50'
+                      ? 'border-status-success/50 bg-status-success-bg text-status-success-text'
+                      : 'border-edge-subtle bg-surface/30 text-content-muted hover:bg-surface/50'
                   }`}
                   type="button"
                 >
                   <div className={`p-2 rounded-lg ${
                     verificationMethod === method.id
-                      ? 'bg-emerald-500/20'
-                      : 'bg-slate-700/50'
+                      ? 'bg-status-success-bg'
+                      : 'bg-surface-elevated/50'
                   }`}>
                     <Icon size={18} className={
                       verificationMethod === method.id
-                        ? 'text-emerald-400'
-                        : 'text-slate-500'
+                        ? 'text-status-success'
+                        : 'text-content-muted'
                     } />
                   </div>
                   <div>
@@ -267,10 +267,10 @@ export function PhysicalConfirmationStep({
               type="checkbox"
               checked={identityConfirmed}
               onChange={(e) => setIdentityConfirmed(e.target.checked)}
-              className="mt-1 w-4 h-4 rounded border-slate-600 bg-slate-800 text-emerald-500 focus:ring-emerald-500/30"
+              className="mt-1 w-4 h-4 rounded border-edge-strong bg-surface text-status-success focus:ring-status-success/30"
             />
-            <span className="text-sm text-slate-300 group-hover:text-white transition-colors">
-              Je confirme avoir vérifié l'identité du client <strong className="text-white">{clientName}</strong>
+            <span className="text-sm text-content-secondary group-hover:text-content-primary transition-colors">
+              Je confirme avoir vérifié l'identité du client <strong className="text-content-primary">{clientName}</strong>
             </span>
           </label>
 
@@ -279,10 +279,10 @@ export function PhysicalConfirmationStep({
               type="checkbox"
               checked={responsibilityAccepted}
               onChange={(e) => setResponsibilityAccepted(e.target.checked)}
-              className="mt-1 w-4 h-4 rounded border-slate-600 bg-slate-800 text-emerald-500 focus:ring-emerald-500/30"
+              className="mt-1 w-4 h-4 rounded border-edge-strong bg-surface text-status-success focus:ring-status-success/30"
             />
-            <span className="text-sm text-slate-300 group-hover:text-white transition-colors">
-              J'accepte ma responsabilité pour cette opération de <strong className="text-emerald-400">{formatMoney(amount)}</strong>
+            <span className="text-sm text-content-secondary group-hover:text-content-primary transition-colors">
+              J'accepte ma responsabilité pour cette opération de <strong className="text-status-success">{formatMoney(amount)}</strong>
             </span>
           </label>
         </div>
@@ -290,7 +290,7 @@ export function PhysicalConfirmationStep({
         {/* Mot de passe (si montant élevé) */}
         {requiresPassword && (
           <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+            <label className="text-xs font-bold text-content-muted uppercase tracking-wider flex items-center gap-2">
               <Lock size={12} />
               Mot de passe agent
             </label>
@@ -303,22 +303,22 @@ export function PhysicalConfirmationStep({
                   setPasswordError('');
                 }}
                 placeholder="Entrez votre mot de passe"
-                className={`w-full px-4 py-3 pr-12 text-sm bg-slate-800/50 border rounded-xl focus:ring-2 focus:ring-emerald-500/30 outline-none text-white transition-all ${
+                className={`w-full px-4 py-3 pr-12 text-sm bg-surface/50 border rounded-xl focus:ring-2 focus:ring-status-success/30 outline-none text-content-primary transition-all ${
                   passwordError
-                    ? 'border-red-500 focus:border-red-500'
-                    : 'border-slate-700 focus:border-emerald-500'
+                    ? 'border-status-danger focus:border-status-danger'
+                    : 'border-edge focus:border-status-success'
                 }`}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-content-muted hover:text-content-secondary transition-colors"
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
             {passwordError && (
-              <p className="text-xs text-red-400 flex items-center gap-1">
+              <p className="text-xs text-status-danger flex items-center gap-1">
                 <AlertTriangle size={12} />
                 {passwordError}
               </p>
@@ -328,7 +328,7 @@ export function PhysicalConfirmationStep({
 
         {/* Notes optionnelles */}
         <div className="space-y-2">
-          <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+          <label className="text-xs font-bold text-content-muted uppercase tracking-wider">
             Notes (optionnel)
           </label>
           <textarea
@@ -336,7 +336,7 @@ export function PhysicalConfirmationStep({
             onChange={(e) => setAgentNotes(e.target.value)}
             placeholder="Observations ou remarques..."
             rows={2}
-            className="w-full px-4 py-3 text-sm bg-slate-800/50 border border-slate-700 rounded-xl focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 outline-none text-white resize-none"
+            className="w-full px-4 py-3 text-sm bg-surface/50 border border-edge rounded-xl focus:border-status-success focus:ring-2 focus:ring-status-success/30 outline-none text-content-primary resize-none"
           />
         </div>
       </div>

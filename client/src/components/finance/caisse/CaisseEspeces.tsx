@@ -532,52 +532,52 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
   }, [selectedClient, typeOperation, typeDepot, typeRetrait, montant]);
 
   return (
-    <div className="flex flex-col h-full font-sans selection:bg-emerald-500/30 p-2">
+    <div className="flex flex-col h-full font-sans selection:bg-status-success/30 p-2">
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 h-full">
         
         {/* LEFT COL: Search & Client Summary (Compact) */}
         <div className="lg:col-span-3 flex flex-col gap-3 h-full">
             {/* Search Section */}
-            <Card className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 p-3 shrink-0">
+            <Card className="bg-surface-base/80 backdrop-blur-xl border border-edge p-3 shrink-0">
                 <div className="flex items-center gap-2 mb-2">
-                    <Search className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" />
+                    <Search className="w-3.5 h-3.5 text-content-muted" aria-hidden="true" />
                     <input
                         type="text"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && rechercherClient()}
                         placeholder="Rechercher client..."
-                        className="flex-1 bg-transparent border-none text-sm text-white focus:ring-0 placeholder:text-slate-600 p-0"
+                        className="flex-1 bg-transparent border-none text-sm text-content-primary focus:ring-0 placeholder:text-content-muted p-0"
                     />
                 </div>
             </Card>
 
             {/* Client Profile Card (Only if selected) */}
             {selectedClient && (
-                <Card className="bg-slate-800/50 border border-slate-700/50 flex-1 p-3 flex flex-col items-center relative animate-in fade-in zoom-in-95 duration-300">
+                <Card className="bg-surface/50 border border-edge-subtle flex-1 p-3 flex flex-col items-center relative animate-in fade-in zoom-in-95 duration-300">
                     <button
                         onClick={reinitialiserFormulaire}
-                        className="absolute top-2 right-2 text-slate-500 hover:text-red-400 transition"
+                        className="absolute top-2 right-2 text-content-muted hover:text-status-danger transition"
                     >
                         <XCircle size={14} />
                     </button>
                     
-                    <div className="w-12 h-12 rounded-full p-0.5 bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/20 mb-2">
-                        <div className="w-full h-full rounded-full overflow-hidden bg-slate-900 flex items-center justify-center text-white">
+                    <div className="w-12 h-12 rounded-full p-0.5 bg-gradient-to-br from-status-success to-accent shadow-lg shadow-status-success/20 mb-2">
+                        <div className="w-full h-full rounded-full overflow-hidden bg-surface-base flex items-center justify-center text-content-primary">
                             <User size={20} aria-hidden="true" />
                         </div>
                     </div>
                     
-                    <h3 className="font-bold text-sm text-white truncate text-center w-full">
+                    <h3 className="font-bold text-sm text-content-primary truncate text-center w-full">
                         {escapeHtml(selectedClient.nom)} {escapeHtml(selectedClient.prenom || '')}
                     </h3>
-                    <p className="text-xs text-slate-400 mb-2">{escapeHtml(selectedClient.telephone || '')}</p>
+                    <p className="text-xs text-content-muted mb-2">{escapeHtml(selectedClient.telephone || '')}</p>
                     
                     {selectedClient.numeroCompte && (
                         <Badge
                             variant="neutral"
                             size="sm"
-                            className="bg-slate-800 border-slate-700 text-slate-300 text-[10px] mb-4"
+                            className="bg-surface border-edge text-content-secondary text-[10px] mb-4"
                             value={escapeHtml(selectedClient.numeroCompte)}
                         />
                     )}
@@ -587,23 +587,23 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
                       {infoCardData && (
                         <div className={`p-3 rounded-lg border text-center transition-all duration-300 ${
                             infoCardData.amount !== null && infoCardData.amount > 0 
-                            ? 'bg-purple-900/20 border-purple-500/30' 
-                            : 'bg-slate-900/50 border-slate-800'
+                            ? 'bg-status-info-bg border-status-info/30' 
+                            : 'bg-surface-base/50 border-edge'
                         }`}>
-                          <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-1 line-clamp-1">
+                          <p className="text-[10px] text-content-muted uppercase tracking-wider mb-1 line-clamp-1">
                             {infoCardData.title}
                           </p>
                           {infoLoading ? (
-                            <Loader className="w-3 h-3 animate-spin mx-auto text-emerald-400" />
+                            <Loader className="w-3 h-3 animate-spin mx-auto text-status-success" />
                           ) : (
                             <>
                               <p className={`font-mono text-base font-bold ${
-                                infoCardData.amount !== null ? 'text-white' : 'text-slate-600'
+                                infoCardData.amount !== null ? 'text-content-primary' : 'text-content-muted'
                               }`}>
                                 {infoCardData.amount !== null ? formatMoney(infoCardData.amount) : '-'}
                               </p>
                               {infoCardData.subtitle && (
-                                <p className="text-[9px] text-slate-500 mt-0.5 line-clamp-1">{infoCardData.subtitle}</p>
+                                <p className="text-[9px] text-content-muted mt-0.5 line-clamp-1">{infoCardData.subtitle}</p>
                               )}
                             </>
                           )}
@@ -611,8 +611,8 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
                       )}
                       
                       {!infoCardData && (
-                        <div className="p-2 rounded bg-slate-900/30 border border-slate-800/50 text-center">
-                            <p className="text-[10px] text-slate-600">Sélectionnez une opération</p>
+                        <div className="p-2 rounded bg-surface-base/30 border border-edge/50 text-center">
+                            <p className="text-[10px] text-content-muted">Sélectionnez une opération</p>
                         </div>
                       )}
                     </div>
@@ -623,17 +623,17 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
         {/* RIGHT COL: Operation Cockpit (Expanded) */}
         <div className="lg:col-span-9 h-full flex flex-col">
             {selectedClient ? (
-                <Card className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 h-full p-0 flex flex-col overflow-hidden relative animate-in slide-in-from-right-4 duration-300">
+                <Card className="bg-surface-base/80 backdrop-blur-xl border border-edge h-full p-0 flex flex-col overflow-hidden relative animate-in slide-in-from-right-4 duration-300">
                     
                     {/* Header: Operation Type Selector */}
-                    <div className="p-4 border-b border-slate-800 bg-slate-950/30">
+                    <div className="p-4 border-b border-edge bg-surface-base/30">
                         <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                                <Coins className="text-emerald-400" size={20} />
+                            <h2 className="text-lg font-bold text-content-primary flex items-center gap-2">
+                                <Coins className="text-status-success" size={20} />
                                 Opération Caisse
                             </h2>
                             {/* Segmented Control for Type */}
-                            <div className="flex bg-slate-950 p-1 rounded-lg border border-slate-800">
+                            <div className="flex bg-surface-base p-1 rounded-lg border border-edge">
                                 {(['Dépôt', 'Retrait'] as TypeOperation[]).map(type => (
                                     <button
                                         key={type}
@@ -646,8 +646,8 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
                                         }}
                                         className={`flex items-center gap-2 px-6 py-2 rounded-md text-sm font-bold transition-all ${
                                             typeOperation === type 
-                                            ? type === 'Dépôt' ? 'bg-emerald-600 text-white shadow-lg' : 'bg-rose-600 text-white shadow-lg' 
-                                            : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                                            ? type === 'Dépôt' ? 'bg-status-success text-white shadow-lg' : 'bg-status-danger text-white shadow-lg' 
+                                            : 'text-content-muted hover:text-content-secondary hover:bg-white/5'
                                         }`}
                                     >
                                         {type === 'Dépôt' ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />}
@@ -676,8 +676,8 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
                                     }}
                                     className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
                                       (typeDepot === subType || typeRetrait === subType)
-                                        ? 'bg-slate-800 text-white border-slate-600 shadow-sm'
-                                        : 'bg-transparent border-slate-800 text-slate-500 hover:border-slate-700'
+                                        ? 'bg-surface text-content-primary border-edge-strong shadow-sm'
+                                        : 'bg-transparent border-edge text-content-muted hover:border-edge'
                                     }`}
                                   >
                                     {subType}
@@ -692,8 +692,8 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
                         {/* Dynamic Sections: Credits */}
                         {typeDepot === 'Remboursement Crédit' && creditsActifs.length > 0 && (
                             <div className="space-y-2">
-                              <label className="text-[10px] font-bold text-slate-500 uppercase">Crédit à rembourser</label>
-                              <div className="flex overflow-x-auto gap-3 pb-2 -mx-1 px-1 scrollbar-thin scrollbar-thumb-slate-700">
+                              <label className="text-[10px] font-bold text-content-muted uppercase">Crédit à rembourser</label>
+                              <div className="flex overflow-x-auto gap-3 pb-2 -mx-1 px-1 scrollbar-thin scrollbar-thumb-edge">
                                 {creditsActifs.map((credit) => (
                                   <div
                                     key={credit.id}
@@ -703,12 +703,12 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
                                     }}
                                     className={`min-w-[180px] p-3 rounded-xl border cursor-pointer transition-all ${
                                       creditSelectionne?.id === credit.id
-                                        ? 'border-blue-500/50 bg-blue-900/20 shadow-lg'
-                                        : 'border-slate-800 bg-slate-900/50 text-slate-400 hover:border-slate-600'
+                                        ? 'border-status-info/50 bg-status-info-bg shadow-lg'
+                                        : 'border-edge bg-surface-base/50 text-content-muted hover:border-edge-strong'
                                     }`}
                                   >
-                                    <div className="text-xs font-bold text-slate-200"># {escapeHtml(credit.numeroCredit)}</div>
-                                    <div className="text-[10px] text-slate-400 mt-1">Reste: <span className="text-blue-400 font-bold">{formatMoney(credit.solde_restant)}</span></div>
+                                    <div className="text-xs font-bold text-content-secondary"># {escapeHtml(credit.numeroCredit)}</div>
+                                    <div className="text-[10px] text-content-muted mt-1">Reste: <span className="text-status-info font-bold">{formatMoney(credit.solde_restant)}</span></div>
                                   </div>
                                 ))}
                               </div>
@@ -720,13 +720,13 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {/* Left: Amount Input */}
                                 <div className="space-y-4">
-                                    <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                                    <div className="bg-surface-base p-4 rounded-xl border border-edge">
                                         <div className="flex justify-between items-center mb-2">
-                                            <label className="text-xs font-medium text-slate-500">Montant (FCFA)</label>
+                                            <label className="text-xs font-medium text-content-muted">Montant (FCFA)</label>
                                             <button
                                               onClick={toggleBilletage}
                                               className={`text-[10px] font-bold flex items-center gap-1.5 px-2 py-0.5 rounded transition-colors ${
-                                                showBilletage ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-500 hover:text-emerald-400'
+                                                showBilletage ? 'text-status-success bg-status-success-bg' : 'text-content-muted hover:text-status-success'
                                               }`}
                                             >
                                               <Coins size={12} />
@@ -743,19 +743,19 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
                                           disabled={typeDepot === 'Cotisation Tontine' || showBilletage}
                                           placeholder="0"
                                           className={`w-full py-2 text-3xl font-bold bg-transparent border-b-2 outline-none text-center transition-all ${
-                                              montantError ? 'border-red-500 text-red-400' : 'border-slate-700 text-white focus:border-emerald-500'
+                                              montantError ? 'border-status-danger text-status-danger' : 'border-edge text-content-primary focus:border-status-success'
                                           }`}
                                         />
-                                        {montantError && <p className="text-[10px] text-red-400 text-center mt-2">{montantError}</p>}
+                                        {montantError && <p className="text-[10px] text-status-danger text-center mt-2">{montantError}</p>}
                                     </div>
 
                                     {/* Physical Confirmation Indicator (If needed) */}
                                     {confirmationData && (
-                                        <div className="bg-blue-950/20 border border-blue-500/20 rounded-xl p-3 flex items-start gap-3">
-                                            <CheckCircle size={16} className="text-blue-400 mt-0.5" />
+                                        <div className="bg-status-info-bg border border-status-info/20 rounded-xl p-3 flex items-start gap-3">
+                                            <CheckCircle size={16} className="text-status-info mt-0.5" />
                                             <div>
-                                                <p className="text-xs font-bold text-blue-300">Identité Confirmée</p>
-                                                <p className="text-[10px] text-slate-400 capitalize">Méthode: {confirmationData.verificationMethod.replace('_', ' ')}</p>
+                                                <p className="text-xs font-bold text-status-info">Identité Confirmée</p>
+                                                <p className="text-[10px] text-content-muted capitalize">Méthode: {confirmationData.verificationMethod.replace('_', ' ')}</p>
                                             </div>
                                         </div>
                                     )}
@@ -763,17 +763,17 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
 
                                 {/* Right: Billetage (Conditional) */}
                                 {showBilletage && (
-                                    <div className="bg-slate-950/50 border border-slate-800 rounded-xl p-4 animate-in fade-in slide-in-from-right-4">
+                                    <div className="bg-surface-base/50 border border-edge rounded-xl p-4 animate-in fade-in slide-in-from-right-4">
                                         <div className="grid grid-cols-2 gap-3 mb-2 h-40 overflow-y-auto pr-1 custom-scrollbar">
                                             {DENOMINATIONS.map((denom) => (
                                                 <div key={denom.value} className="flex items-center gap-2">
-                                                    <span className="text-[10px] text-slate-500 w-10 text-right">{denom.label}</span>
+                                                    <span className="text-[10px] text-content-muted w-10 text-right">{denom.label}</span>
                                                     <input
                                                         type="number"
                                                         min="0"
                                                         value={billetage[denom.value] || ''}
                                                         onChange={(e) => updateBilletage(denom.value, parseInt(e.target.value) || 0)}
-                                                        className="flex-1 py-1 px-2 text-xs bg-slate-900 border border-slate-700 rounded text-right text-white focus:border-emerald-500 outline-none"
+                                                        className="flex-1 py-1 px-2 text-xs bg-surface-base border border-edge rounded text-right text-content-primary focus:border-status-success outline-none"
                                                     />
                                                 </div>
                                             ))}
@@ -785,14 +785,14 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
                     </div>
 
                     {/* Footer: Action Button */}
-                    <div className="p-4 border-t border-slate-800 bg-slate-950/50 mt-auto">
+                    <div className="p-4 border-t border-edge bg-surface-base/50 mt-auto">
                         <Button
                             onClick={preparerOperation}
                             disabled={loading || !montant || parseFloat(montant) <= 0 || !!montantError}
                             className={`w-full py-4 text-sm font-bold tracking-wide shadow-xl transition-all ${
                                 typeOperation === 'Retrait' 
-                                ? 'bg-rose-600 hover:bg-rose-500 shadow-rose-900/20' 
-                                : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-900/20'
+                                ? 'bg-status-danger hover:bg-status-danger shadow-status-danger/20' 
+                                : 'bg-status-success hover:bg-status-success shadow-status-success/20'
                             }`}
                         >
                             {loading ? <Loader className="w-5 h-5 animate-spin mx-auto" /> : `CONFIRMER ${typeOperation?.toUpperCase() || 'OPÉRATION'}`}
@@ -800,13 +800,13 @@ export default function CaisseEspeces({ sessionId, onTransactionComplete }: Cais
                     </div>
                 </Card>
             ) : (
-                <div className="h-full rounded-xl border-2 border-dashed border-slate-800 bg-slate-900/20 flex flex-col items-center justify-center text-slate-600 space-y-4 p-6">
-                    <div className="w-16 h-16 rounded-full bg-slate-900 flex items-center justify-center ring-4 ring-slate-800/50">
+                <div className="h-full rounded-xl border-2 border-dashed border-edge bg-surface-base/20 flex flex-col items-center justify-center text-content-muted space-y-4 p-6">
+                    <div className="w-16 h-16 rounded-full bg-surface-base flex items-center justify-center ring-4 ring-edge/50">
                         <Wallet size={24} className="opacity-50" />
                     </div>
                     <div className="text-center">
-                        <p className="text-sm font-medium text-slate-500">En attente de client</p>
-                        <p className="text-xs text-slate-600 mt-1">Utilisez la recherche à gauche pour commencer</p>
+                        <p className="text-sm font-medium text-content-muted">En attente de client</p>
+                        <p className="text-xs text-content-muted mt-1">Utilisez la recherche à gauche pour commencer</p>
                     </div>
                 </div>
             )}

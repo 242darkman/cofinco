@@ -210,7 +210,7 @@ export default function OnboardingWizard({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+        <Loader2 className="w-8 h-8 animate-spin text-status-warning" />
       </div>
     );
   }
@@ -219,9 +219,9 @@ export default function OnboardingWizard({
   if (!instance) {
     return (
       <div className="text-center py-8">
-        <UserPlus size={48} className="mx-auto text-slate-600 mb-4" />
-        <h3 className="text-lg font-semibold text-white mb-2">Démarrer l'onboarding</h3>
-        <p className="text-sm text-slate-400 mb-6 max-w-sm mx-auto">
+        <UserPlus size={48} className="mx-auto text-content-muted mb-4" />
+        <h3 className="text-lg font-semibold text-content-primary mb-2">Démarrer l'onboarding</h3>
+        <p className="text-sm text-content-muted mb-6 max-w-sm mx-auto">
           Commencez le processus d'intégration pour {candidat.prenom} {candidat.nom}.
           Vous pourrez suivre les étapes et convertir le candidat en employé.
         </p>
@@ -241,9 +241,9 @@ export default function OnboardingWizard({
   if (instance.statut === 'COMPLETED') {
     return (
       <div className="text-center py-8">
-        <CheckCircle size={48} className="mx-auto text-green-500 mb-4" />
-        <h3 className="text-lg font-semibold text-white mb-2">Onboarding terminé</h3>
-        <p className="text-sm text-slate-400">
+        <CheckCircle size={48} className="mx-auto text-status-success mb-4" />
+        <h3 className="text-lg font-semibold text-content-primary mb-2">Onboarding terminé</h3>
+        <p className="text-sm text-content-muted">
           {candidat.prenom} {candidat.nom} a été converti en employé.
         </p>
       </div>
@@ -253,8 +253,8 @@ export default function OnboardingWizard({
   if (instance.statut === 'CANCELLED') {
     return (
       <div className="text-center py-8">
-        <AlertCircle size={48} className="mx-auto text-red-500 mb-4" />
-        <h3 className="text-lg font-semibold text-white mb-2">Onboarding annulé</h3>
+        <AlertCircle size={48} className="mx-auto text-status-danger mb-4" />
+        <h3 className="text-lg font-semibold text-content-primary mb-2">Onboarding annulé</h3>
         <Button variant="primary" onClick={handleStartOnboarding} disabled={starting}>
           Recommencer
         </Button>
@@ -268,15 +268,15 @@ export default function OnboardingWizard({
   return (
     <div className="space-y-4">
       {/* Header with progress */}
-      <div className="bg-slate-800/50 rounded-lg p-4">
+      <div className="bg-surface/50 rounded-lg p-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-orange-500/20 rounded-full flex items-center justify-center">
-              <User size={20} className="text-orange-400" />
+            <div className="w-10 h-10 bg-status-warning-bg rounded-full flex items-center justify-center">
+              <User size={20} className="text-status-warning" />
             </div>
             <div>
-              <h3 className="font-semibold text-white">{candidat.prenom} {candidat.nom}</h3>
-              <p className="text-xs text-slate-400">{candidat.poste || 'Poste à définir'}</p>
+              <h3 className="font-semibold text-content-primary">{candidat.prenom} {candidat.nom}</h3>
+              <p className="text-xs text-content-muted">{candidat.poste || 'Poste à définir'}</p>
             </div>
           </div>
           <Badge
@@ -287,9 +287,9 @@ export default function OnboardingWizard({
         </div>
 
         {/* Progress bar */}
-        <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+        <div className="h-2 bg-surface-elevated rounded-full overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-orange-500 to-orange-400 transition-all duration-300"
+            className="h-full bg-gradient-to-r from-status-warning to-status-warning transition-all duration-300"
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -299,7 +299,7 @@ export default function OnboardingWizard({
       <div className="space-y-4 max-h-[400px] overflow-y-auto pr-1">
         {Object.entries(grouped).map(([category, items]) => (
           <div key={category}>
-            <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2">
+            <h4 className="text-xs font-semibold text-content-muted uppercase tracking-wider mb-2 flex items-center gap-2">
               <ClipboardCheck size={12} />
               {category}
             </h4>
@@ -315,11 +315,11 @@ export default function OnboardingWizard({
                     disabled={isLoading}
                     className={`w-full flex items-center gap-3 p-3 rounded-lg border transition ${
                       completed
-                        ? 'bg-green-500/10 border-green-500/30 hover:bg-green-500/20'
-                        : 'bg-slate-800/50 border-slate-700 hover:bg-slate-800'
+                        ? 'bg-status-success-bg border-status-success/30 hover:bg-status-success-bg'
+                        : 'bg-surface/50 border-edge hover:bg-surface'
                     }`}
                   >
-                    <div className={`flex-shrink-0 ${completed ? 'text-green-400' : 'text-slate-500'}`}>
+                    <div className={`flex-shrink-0 ${completed ? 'text-status-success' : 'text-content-muted'}`}>
                       {isLoading ? (
                         <Loader2 size={18} className="animate-spin" />
                       ) : completed ? (
@@ -328,7 +328,7 @@ export default function OnboardingWizard({
                         <Circle size={18} />
                       )}
                     </div>
-                    <span className={`flex-1 text-left text-sm ${completed ? 'text-green-300' : 'text-slate-300'}`}>
+                    <span className={`flex-1 text-left text-sm ${completed ? 'text-status-success' : 'text-content-secondary'}`}>
                       {item.name}
                     </span>
                     {item.required && !completed && (
@@ -343,7 +343,7 @@ export default function OnboardingWizard({
       </div>
 
       {/* Convert button */}
-      <div className="pt-4 border-t border-slate-700">
+      <div className="pt-4 border-t border-edge">
         <Button
           variant="success"
           className="w-full"
@@ -354,7 +354,7 @@ export default function OnboardingWizard({
           Convertir en employé
         </Button>
         {!canConvert() && (
-          <p className="text-xs text-slate-500 text-center mt-2">
+          <p className="text-xs text-content-muted text-center mt-2">
             Complétez tous les éléments requis pour continuer
           </p>
         )}
@@ -368,11 +368,11 @@ export default function OnboardingWizard({
         size="md"
       >
         <div className="space-y-4">
-          <div className="bg-slate-800/50 rounded-lg p-3 flex items-center gap-3">
-            <UserPlus size={20} className="text-green-400" />
+          <div className="bg-surface/50 rounded-lg p-3 flex items-center gap-3">
+            <UserPlus size={20} className="text-status-success" />
             <div>
-              <p className="text-sm font-medium text-white">{candidat.prenom} {candidat.nom}</p>
-              <p className="text-xs text-slate-400">Sera créé comme nouvel employé</p>
+              <p className="text-sm font-medium text-content-primary">{candidat.prenom} {candidat.nom}</p>
+              <p className="text-xs text-content-muted">Sera créé comme nouvel employé</p>
             </div>
           </div>
 
@@ -416,7 +416,7 @@ export default function OnboardingWizard({
             required
           />
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
+          <div className="flex justify-end gap-3 pt-4 border-t border-edge">
             <Button variant="secondary" onClick={() => setShowConvertModal(false)}>
               Annuler
             </Button>

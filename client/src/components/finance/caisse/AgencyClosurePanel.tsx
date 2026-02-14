@@ -118,8 +118,8 @@ export default function AgencyClosurePanel({ agenceId, agenceNom, onClosureCompl
     return (
       <Card className="p-6">
         <div className="flex items-center justify-center gap-3">
-          <RefreshCw className="w-5 h-5 animate-spin text-blue-500" />
-          <span className="text-slate-400">Chargement du statut...</span>
+          <RefreshCw className="w-5 h-5 animate-spin text-status-info" />
+          <span className="text-content-muted">Chargement du statut...</span>
         </div>
       </Card>
     );
@@ -139,31 +139,31 @@ export default function AgencyClosurePanel({ agenceId, agenceNom, onClosureCompl
         {/* En-tête compact */}
         <div className={`px-3 py-2 border-b flex items-center justify-between ${
           isClosed
-            ? 'bg-emerald-500/10 border-emerald-500/20'
+            ? 'bg-status-success-bg border-status-success/20'
             : status.ready
-              ? 'bg-blue-500/10 border-blue-500/20'
-              : 'bg-slate-800/50 border-slate-700/50'
+              ? 'bg-status-info-bg border-status-info/20'
+              : 'bg-surface/50 border-edge-subtle'
         }`}>
           <div className="flex items-center gap-2.5">
             <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-              isClosed ? 'bg-emerald-500/20' : status.ready ? 'bg-blue-500/20' : 'bg-slate-700'
+              isClosed ? 'bg-status-success-bg' : status.ready ? 'bg-status-info-bg' : 'bg-surface-elevated'
             }`}>
               {isClosed ? (
-                <Lock className="w-4 h-4 text-emerald-500" />
+                <Lock className="w-4 h-4 text-status-success" />
               ) : (
-                <Building2 className={`w-4 h-4 ${status.ready ? 'text-blue-500' : 'text-slate-400'}`} />
+                <Building2 className={`w-4 h-4 ${status.ready ? 'text-status-info' : 'text-content-muted'}`} />
               )}
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-white">{agenceNom || 'Siège'}</h3>
-              <p className="text-[10px] text-slate-400">
+              <h3 className="text-sm font-semibold text-content-primary">{agenceNom || 'Siège'}</h3>
+              <p className="text-[10px] text-content-muted">
                 {new Date(status.date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
               </p>
             </div>
           </div>
           <button
             onClick={() => refetch()}
-            className="flex items-center gap-1.5 text-[11px] text-slate-400 hover:text-white transition-colors"
+            className="flex items-center gap-1.5 text-[11px] text-content-muted hover:text-content-primary transition-colors"
           >
             <RefreshCw className="w-3.5 h-3.5" />
             Actualiser
@@ -174,12 +174,12 @@ export default function AgencyClosurePanel({ agenceId, agenceNom, onClosureCompl
         <div className="p-3">
           {isClosed ? (
             <div className="flex items-center justify-center gap-3 py-4">
-              <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                <CheckCircle className="w-5 h-5 text-emerald-500" />
+              <div className="w-10 h-10 rounded-full bg-status-success-bg flex items-center justify-center">
+                <CheckCircle className="w-5 h-5 text-status-success" />
               </div>
               <div>
-                <h4 className="text-sm font-semibold text-white">Journée clôturée</h4>
-                <p className="text-[10px] text-slate-400">
+                <h4 className="text-sm font-semibold text-content-primary">Journée clôturée</h4>
+                <p className="text-[10px] text-content-muted">
                   {new Date(status.closure?.closedAt || '').toLocaleString('fr-FR')}
                 </p>
               </div>
@@ -191,16 +191,16 @@ export default function AgencyClosurePanel({ agenceId, agenceNom, onClosureCompl
                 {/* Progress */}
                 <div className="flex-1">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-[10px] text-slate-500">Progression des caisses</span>
-                    <span className="text-[10px] font-medium text-slate-300">
+                    <span className="text-[10px] text-content-muted">Progression des caisses</span>
+                    <span className="text-[10px] font-medium text-content-secondary">
                       {status.caissesClosed}/{status.totalCaisses} fermées
                     </span>
                   </div>
-                  <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                  <div className="h-2 bg-surface-elevated rounded-full overflow-hidden">
                     <motion.div
                       initial={{ width: 0 }}
                       animate={{ width: `${progressPercent}%` }}
-                      className={`h-full rounded-full ${progressPercent === 100 ? 'bg-emerald-500' : 'bg-blue-500'}`}
+                      className={`h-full rounded-full ${progressPercent === 100 ? 'bg-status-success' : 'bg-status-info'}`}
                     />
                   </div>
                 </div>
@@ -208,46 +208,46 @@ export default function AgencyClosurePanel({ agenceId, agenceNom, onClosureCompl
 
               {/* Stats compactes */}
               <div className="grid grid-cols-4 gap-2">
-                <div className="bg-slate-800/50 rounded-lg p-2 text-center">
-                  <div className="text-lg font-bold text-white">{status.totalCaisses}</div>
-                  <div className="text-[9px] text-slate-500">Total</div>
+                <div className="bg-surface/50 rounded-lg p-2 text-center">
+                  <div className="text-lg font-bold text-content-primary">{status.totalCaisses}</div>
+                  <div className="text-[9px] text-content-muted">Total</div>
                 </div>
-                <div className="bg-emerald-500/10 rounded-lg p-2 text-center">
-                  <div className="text-lg font-bold text-emerald-400">{status.caissesClosed}</div>
-                  <div className="text-[9px] text-slate-500">Fermées</div>
+                <div className="bg-status-success-bg rounded-lg p-2 text-center">
+                  <div className="text-lg font-bold text-status-success">{status.caissesClosed}</div>
+                  <div className="text-[9px] text-content-muted">Fermées</div>
                 </div>
-                <div className={`rounded-lg p-2 text-center ${status.caissesOpen > 0 ? 'bg-amber-500/10' : 'bg-slate-800/50'}`}>
-                  <div className={`text-lg font-bold ${status.caissesOpen > 0 ? 'text-amber-400' : 'text-slate-500'}`}>
+                <div className={`rounded-lg p-2 text-center ${status.caissesOpen > 0 ? 'bg-status-warning-bg' : 'bg-surface/50'}`}>
+                  <div className={`text-lg font-bold ${status.caissesOpen > 0 ? 'text-status-warning' : 'text-content-muted'}`}>
                     {status.caissesOpen}
                   </div>
-                  <div className="text-[9px] text-slate-500">Ouvertes</div>
+                  <div className="text-[9px] text-content-muted">Ouvertes</div>
                 </div>
-                <div className={`rounded-lg p-2 text-center ${status.pendingEcarts > 0 ? 'bg-red-500/10' : 'bg-slate-800/50'}`}>
-                  <div className={`text-lg font-bold ${status.pendingEcarts > 0 ? 'text-red-400' : 'text-slate-500'}`}>
+                <div className={`rounded-lg p-2 text-center ${status.pendingEcarts > 0 ? 'bg-status-danger-bg' : 'bg-surface/50'}`}>
+                  <div className={`text-lg font-bold ${status.pendingEcarts > 0 ? 'text-status-danger' : 'text-content-muted'}`}>
                     {status.pendingEcarts}
                   </div>
-                  <div className="text-[9px] text-slate-500">Écarts</div>
+                  <div className="text-[9px] text-content-muted">Écarts</div>
                 </div>
               </div>
 
               {/* Blockers compacts */}
               {status.blockers.length > 0 && (
                 <div>
-                  <h4 className="text-[10px] font-medium text-slate-500 mb-1.5 flex items-center gap-1.5">
-                    <AlertTriangle className="w-3 h-3 text-amber-500" />
+                  <h4 className="text-[10px] font-medium text-content-muted mb-1.5 flex items-center gap-1.5">
+                    <AlertTriangle className="w-3 h-3 text-status-warning" />
                     Éléments bloquants ({status.blockers.length})
                   </h4>
                   <div className="space-y-1 max-h-28 overflow-y-auto">
                     {status.blockers.map((blocker, idx) => {
                       const Icon = blockerIcons[blocker.type] || AlertTriangle;
                       return (
-                        <div key={idx} className="flex items-center gap-2 p-1.5 bg-slate-800/50 rounded-lg">
-                          <div className="w-6 h-6 rounded bg-amber-500/10 flex items-center justify-center shrink-0">
-                            <Icon className="w-3 h-3 text-amber-500" />
+                        <div key={idx} className="flex items-center gap-2 p-1.5 bg-surface/50 rounded-lg">
+                          <div className="w-6 h-6 rounded bg-status-warning-bg flex items-center justify-center shrink-0">
+                            <Icon className="w-3 h-3 text-status-warning" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-[11px] text-white truncate">{blocker.description}</p>
-                            <p className="text-[9px] text-slate-500">
+                            <p className="text-[11px] text-content-primary truncate">{blocker.description}</p>
+                            <p className="text-[9px] text-content-muted">
                               {blockerLabels[blocker.type]}
                               {blocker.montant && ` - ${formatMoney(blocker.montant)} XOF`}
                             </p>
@@ -293,32 +293,32 @@ export default function AgencyClosurePanel({ agenceId, agenceNom, onClosureCompl
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="relative w-full max-w-md bg-slate-800 rounded-xl shadow-xl border border-slate-700 overflow-hidden"
+              className="relative w-full max-w-md bg-surface rounded-xl shadow-xl border border-edge overflow-hidden"
             >
-              <div className="px-4 py-3 bg-emerald-500/10 border-b border-slate-700">
-                <h3 className="font-semibold text-white flex items-center gap-2">
-                  <Lock className="w-5 h-5 text-emerald-500" />
+              <div className="px-4 py-3 bg-status-success-bg border-b border-edge">
+                <h3 className="font-semibold text-content-primary flex items-center gap-2">
+                  <Lock className="w-5 h-5 text-status-success" />
                   Finaliser la clôture
                 </h3>
               </div>
 
               <div className="p-4">
-                <p className="text-slate-300 mb-4">
+                <p className="text-content-secondary mb-4">
                   Vous allez finaliser la clôture journalière de l'agence.
                   Toutes les caisses sont fermées et les transferts exécutés.
                 </p>
 
-                <div className="bg-slate-700/30 rounded-lg p-3 mb-4">
+                <div className="bg-surface-elevated/30 rounded-lg p-3 mb-4">
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div>
-                      <span className="text-slate-400">Caisses fermées:</span>
-                      <span className="text-white ml-2 font-medium">
+                      <span className="text-content-muted">Caisses fermées:</span>
+                      <span className="text-content-primary ml-2 font-medium">
                         {status?.caissesClosed}/{status?.totalCaisses}
                       </span>
                     </div>
                     <div>
-                      <span className="text-slate-400">Date:</span>
-                      <span className="text-white ml-2 font-medium">
+                      <span className="text-content-muted">Date:</span>
+                      <span className="text-content-primary ml-2 font-medium">
                         {status?.date}
                       </span>
                     </div>
@@ -326,7 +326,7 @@ export default function AgencyClosurePanel({ agenceId, agenceNom, onClosureCompl
                 </div>
 
                 <div className="mb-4">
-                  <label className="block text-sm text-slate-400 mb-1">
+                  <label className="block text-sm text-content-muted mb-1">
                     Observations (optionnel)
                   </label>
                   <textarea
@@ -334,7 +334,7 @@ export default function AgencyClosurePanel({ agenceId, agenceNom, onClosureCompl
                     onChange={(e) => setObservations(e.target.value)}
                     placeholder="Ajouter des observations..."
                     rows={3}
-                    className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30"
+                    className="w-full px-3 py-2 bg-surface-elevated/50 border border-edge-strong rounded-lg text-content-primary placeholder-content-muted focus:border-status-info focus:ring-1 focus:ring-status-info/30"
                   />
                 </div>
 

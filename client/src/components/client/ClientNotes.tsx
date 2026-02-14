@@ -151,14 +151,14 @@ export default function ClientNotes({ clientId }: ClientNotesProps) {
     <div className="space-y-4">
       {/* Header Mobile First */}
       <div className="flex items-center justify-between gap-4">
-        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+        <h3 className="text-lg font-bold text-content-primary flex items-center gap-2">
             Notes & Remarques
-            <span className="text-xs font-normal text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full">{notes.length}</span>
+            <span className="text-xs font-normal text-content-muted bg-surface px-2 py-0.5 rounded-full">{notes.length}</span>
         </h3>
         {canAddNotes && (
           <button
             onClick={() => setShowForm(!showForm)}
-            className="px-3 py-1.5 bg-cyan-500 hover:bg-cyan-600 text-white rounded-lg transition flex items-center gap-1.5 text-sm shadow-lg shadow-cyan-500/20"
+            className="px-3 py-1.5 bg-accent-secondary hover:bg-accent-secondary-hover text-content-primary rounded-lg transition flex items-center gap-1.5 text-sm shadow-lg shadow-accent/20"
           >
             <Plus size={16} />
             <span className="hidden sm:inline">Nouvelle Note</span>
@@ -169,17 +169,17 @@ export default function ClientNotes({ clientId }: ClientNotesProps) {
 
        {/* Formulaire Inline (Collapsible) */}
        {showForm && (
-        <Card variant="elevated" className="border-cyan-500/30 animate-in slide-in-from-top-2">
+        <Card variant="elevated" className="border-accent/30 animate-in slide-in-from-top-2">
             <Card.Header className="flex items-center justify-between text-base">
                 <span className="flex items-center gap-2">
-                    <Edit2 size={16} className="text-cyan-400" />
+                    <Edit2 size={16} className="text-accent" />
                     Nouvelle note
                 </span>
-                <button onClick={() => setShowForm(false)}><X size={18} className="text-slate-400 hover:text-white" /></button>
+                <button onClick={() => setShowForm(false)}><X size={18} className="text-content-muted hover:text-content-primary" /></button>
             </Card.Header>
             <div className="space-y-4 mb-4">
                  <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Priorité</label>
+                    <label className="block text-xs font-semibold text-content-muted mb-1.5 uppercase">Priorité</label>
                     <div className="flex gap-2">
                         {['Basse', 'Moyenne', 'Haute'].map((p) => (
                             <button
@@ -188,8 +188,8 @@ export default function ClientNotes({ clientId }: ClientNotesProps) {
                                 className={`
                                     px-3 py-1.5 rounded-lg text-sm font-medium transition flex-1 border
                                     ${newNote.priority === p 
-                                        ? (p === 'Haute' ? 'bg-red-500/20 border-red-500 text-red-400' : p === 'Moyenne' ? 'bg-amber-500/20 border-amber-500 text-amber-400' : 'bg-blue-500/20 border-blue-500 text-blue-400')
-                                        : 'bg-slate-800 border-slate-700 text-slate-400 hover:bg-slate-700'
+                                        ? (p === 'Haute' ? 'bg-status-danger-bg border-status-danger text-status-danger' : p === 'Moyenne' ? 'bg-status-warning-bg border-status-warning text-status-warning' : 'bg-status-info-bg border-status-info text-status-info')
+                                        : 'bg-surface border-edge text-content-muted hover:bg-surface-elevated'
                                     }
                                 `}
                             >
@@ -200,11 +200,11 @@ export default function ClientNotes({ clientId }: ClientNotesProps) {
                 </div>
 
                 <div>
-                    <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">Contenu</label>
+                    <label className="block text-xs font-semibold text-content-muted mb-1.5 uppercase">Contenu</label>
                     <textarea
                     value={newNote.note}
                     onChange={(e) => setNewNote(prev => ({ ...prev, note: e.target.value }))}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-3 text-white text-sm focus:ring-1 focus:ring-cyan-500 outline-none min-h-[100px]"
+                    className="w-full bg-surface-base border border-edge rounded-lg px-3 py-3 text-content-primary text-sm focus:ring-1 focus:ring-accent outline-none min-h-[100px]"
                     placeholder="Saisissez votre note ici..."
                     />
                 </div>
@@ -213,14 +213,14 @@ export default function ClientNotes({ clientId }: ClientNotesProps) {
             <div className="flex justify-end gap-2">
                  <button
                 onClick={() => setShowForm(false)}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition text-sm font-medium"
+                className="px-4 py-2 bg-surface hover:bg-surface-elevated text-content-secondary rounded-lg transition text-sm font-medium"
                 >
                 Annuler
                 </button>
                 <button
                 onClick={handleAddNote}
                 disabled={!newNote.note.trim()}
-                className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 disabled:opacity-50 text-white rounded-lg transition flex items-center gap-2 text-sm font-bold"
+                className="px-4 py-2 bg-accent-secondary hover:bg-accent-secondary-hover disabled:opacity-50 text-content-primary rounded-lg transition flex items-center gap-2 text-sm font-bold"
                 >
                 <Save size={16} />
                 Enregistrer
@@ -232,21 +232,21 @@ export default function ClientNotes({ clientId }: ClientNotesProps) {
       {/* Notes List */}
         {loading ? (
            <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-500"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent"></div>
           </div>
         ) : notes.length === 0 ? (
-          <Card variant="default" padding="lg" className="border-dashed border-slate-700 bg-transparent text-center">
-             <div className="bg-slate-800/50 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
-                 <MessageSquare className="text-slate-500" size={24} />
+          <Card variant="default" padding="lg" className="border-dashed border-edge bg-transparent text-center">
+             <div className="bg-surface/50 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
+                 <MessageSquare className="text-content-muted" size={24} />
             </div>
-            <p className="text-slate-400 text-sm">Aucune note pour ce client</p>
+            <p className="text-content-muted text-sm">Aucune note pour ce client</p>
           </Card>
         ) : (
           <div className="space-y-3">
             {notes.map((note) => (
-               <Card key={note.id} variant="default" padding="sm" className="hover:border-slate-600 transition-colors group">
+               <Card key={note.id} variant="default" padding="sm" className="hover:border-edge-strong transition-colors group">
                     {/* Header: Priority & Date & Actions */}
-                    <div className="flex items-center justify-between mb-3 border-b border-slate-800/50 pb-2">
+                    <div className="flex items-center justify-between mb-3 border-b border-edge/50 pb-2">
                          <div className="flex items-center gap-2">
                              <Badge 
                                 value={note.priority} 
@@ -254,7 +254,7 @@ export default function ClientNotes({ clientId }: ClientNotesProps) {
                                 variant={getPriorityVariant(note.priority)}
                                 icon={getPriorityIcon(note.priority)}
                              />
-                             <span className="text-[10px] text-slate-500">
+                             <span className="text-[10px] text-content-muted">
                                 {new Date(note.createdAt).toLocaleDateString('fr-FR', {
                                     day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
                                 })}
@@ -267,14 +267,14 @@ export default function ClientNotes({ clientId }: ClientNotesProps) {
                                 <>
                                     <button
                                     onClick={() => handleUpdateNote(note.id)}
-                                    className="p-1.5 text-emerald-400 hover:bg-emerald-500/10 rounded transition"
+                                    className="p-1.5 text-status-success hover:bg-status-success-bg rounded transition"
                                     title="Confirmer"
                                     >
                                     <Save size={14} />
                                     </button>
                                     <button
                                     onClick={() => { setEditingId(null); setEditText(''); }}
-                                    className="p-1.5 text-slate-400 hover:bg-slate-700/50 rounded transition"
+                                    className="p-1.5 text-content-muted hover:bg-surface-elevated/50 rounded transition"
                                     title="Annuler"
                                     >
                                     <X size={14} />
@@ -285,7 +285,7 @@ export default function ClientNotes({ clientId }: ClientNotesProps) {
                                     {canEditNotes && (
                                       <button
                                       onClick={() => { setEditingId(note.id); setEditText(note.note); }}
-                                      className="p-1.5 text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/10 rounded transition"
+                                      className="p-1.5 text-content-muted hover:text-accent hover:bg-accent/10 rounded transition"
                                       title="Modifier"
                                       >
                                       <Edit2 size={14} />
@@ -294,7 +294,7 @@ export default function ClientNotes({ clientId }: ClientNotesProps) {
                                     {canDeleteNotes && (
                                       <button
                                       onClick={() => handleDeleteNote(note.id)}
-                                      className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded transition"
+                                      className="p-1.5 text-content-muted hover:text-status-danger hover:bg-status-danger-bg rounded transition"
                                       title="Supprimer"
                                       >
                                       <Trash2 size={14} />
@@ -310,11 +310,11 @@ export default function ClientNotes({ clientId }: ClientNotesProps) {
                         <textarea
                         value={editText}
                         onChange={(e) => setEditText(e.target.value)}
-                        className="w-full bg-slate-950 text-white px-3 py-2 rounded border border-slate-700 focus:outline-none focus:ring-1 focus:ring-cyan-500 min-h-[80px] text-sm"
+                        className="w-full bg-surface-base text-content-primary px-3 py-2 rounded border border-edge focus:outline-none focus:ring-1 focus:ring-accent min-h-[80px] text-sm"
                         autoFocus
                         />
                     ) : (
-                        <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">
+                        <p className="text-sm text-content-secondary whitespace-pre-wrap leading-relaxed">
                             {note.note}
                         </p>
                     )}

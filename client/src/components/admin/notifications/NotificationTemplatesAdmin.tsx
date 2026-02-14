@@ -180,24 +180,24 @@ export default function NotificationTemplatesAdmin() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <FileText size={20} className="text-purple-400" />
+          <h2 className="text-lg font-bold text-content-primary flex items-center gap-2">
+            <FileText size={20} className="text-status-info" />
             Templates de Notification
           </h2>
-          <p className="text-xs text-slate-500 mt-1">
+          <p className="text-xs text-content-muted mt-1">
             Gerez les modeles SMS et Email pour les notifications automatiques
           </p>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-4 border-b border-slate-800">
+      <div className="flex items-center gap-4 border-b border-edge">
         <button
           onClick={() => handleTabChange('sms')}
           className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition ${
             activeTab === 'sms'
-              ? 'text-cyan-400 border-cyan-400'
-              : 'text-slate-400 border-transparent hover:text-white'
+              ? 'text-accent border-accent'
+              : 'text-content-muted border-transparent hover:text-content-primary'
           }`}
         >
           <MessageSquare size={16} />
@@ -207,8 +207,8 @@ export default function NotificationTemplatesAdmin() {
           onClick={() => handleTabChange('email')}
           className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition ${
             activeTab === 'email'
-              ? 'text-blue-400 border-blue-400'
-              : 'text-slate-400 border-transparent hover:text-white'
+              ? 'text-status-info border-status-info'
+              : 'text-content-muted border-transparent hover:text-content-primary'
           }`}
         >
           <Mail size={16} />
@@ -218,30 +218,30 @@ export default function NotificationTemplatesAdmin() {
 
       {/* Search */}
       <div className="relative">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" />
         <input
           type="text"
           placeholder="Rechercher par code ou nom..."
           value={searchTerm}
           onChange={(e) => handleSearchChange(e.target.value)}
-          className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none"
+          className="w-full pl-10 pr-4 py-2 bg-surface border border-edge rounded-lg text-sm text-content-primary placeholder-content-muted focus:border-status-info focus:outline-none"
         />
       </div>
 
       {/* Templates list */}
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+          <Loader2 className="w-8 h-8 animate-spin text-status-info" />
         </div>
       ) : filteredTemplates.length === 0 ? (
-        <div className="text-center py-12 bg-slate-900/50 rounded-lg border border-slate-800">
-          <FileText size={40} className="mx-auto text-slate-600 mb-3" />
-          <p className="text-sm text-slate-500">Aucun template trouve</p>
+        <div className="text-center py-12 bg-surface-base/50 rounded-lg border border-edge">
+          <FileText size={40} className="mx-auto text-content-muted mb-3" />
+          <p className="text-sm text-content-muted">Aucun template trouve</p>
         </div>
       ) : (
         <div className="space-y-3">
           {/* Results count */}
-          <div className="flex items-center justify-between text-xs text-slate-500">
+          <div className="flex items-center justify-between text-xs text-content-muted">
             <span>
               {filteredTemplates.length} template{filteredTemplates.length > 1 ? 's' : ''}
               {searchTerm && ` pour "${searchTerm}"`}
@@ -258,21 +258,21 @@ export default function NotificationTemplatesAdmin() {
             return (
               <div
                 key={template.id}
-                className={`bg-slate-900/50 border rounded-lg p-4 transition ${
-                  template.actif ? 'border-slate-800' : 'border-slate-800/50 opacity-60'
+                className={`bg-surface-base/50 border rounded-lg p-4 transition ${
+                  template.actif ? 'border-edge' : 'border-edge/50 opacity-60'
                 }`}
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-2">
-                      <div className={`p-1.5 rounded ${isSms ? 'bg-cyan-500/10' : 'bg-blue-500/10'}`}>
+                      <div className={`p-1.5 rounded ${isSms ? 'bg-accent/10' : 'bg-status-info-bg'}`}>
                         {isSms ? (
-                          <MessageSquare size={14} className="text-cyan-400" />
+                          <MessageSquare size={14} className="text-accent" />
                         ) : (
-                          <Mail size={14} className="text-blue-400" />
+                          <Mail size={14} className="text-status-info" />
                         )}
                       </div>
-                      <span className="font-mono text-sm text-purple-400">{template.code}</span>
+                      <span className="font-mono text-sm text-status-info">{template.code}</span>
                       <Badge
                         variant={template.actif ? 'success' : 'neutral'}
                         value={template.actif ? 'Actif' : 'Inactif'}
@@ -280,15 +280,15 @@ export default function NotificationTemplatesAdmin() {
                       />
                     </div>
 
-                    <h4 className="text-sm font-medium text-white mb-1">{template.nom}</h4>
+                    <h4 className="text-sm font-medium text-content-primary mb-1">{template.nom}</h4>
 
                     {template.description && (
-                      <p className="text-xs text-slate-500 mb-2 line-clamp-1">{template.description}</p>
+                      <p className="text-xs text-content-muted mb-2 line-clamp-1">{template.description}</p>
                     )}
 
                     {/* Preview content */}
-                    <div className="bg-slate-800/50 rounded p-2 mb-2">
-                      <p className="text-xs text-slate-400 line-clamp-2 font-mono">
+                    <div className="bg-surface/50 rounded p-2 mb-2">
+                      <p className="text-xs text-content-muted line-clamp-2 font-mono">
                         {isSms ? (template as SmsTemplate).contenu : (template as EmailTemplate).contenuText}
                       </p>
                     </div>
@@ -299,7 +299,7 @@ export default function NotificationTemplatesAdmin() {
                         {placeholders.map((p, i) => (
                           <span
                             key={i}
-                            className="px-1.5 py-0.5 bg-purple-500/10 text-purple-400 text-[10px] rounded font-mono"
+                            className="px-1.5 py-0.5 bg-status-info-bg text-status-info text-[10px] rounded font-mono"
                           >
                             {`{{${p}}}`}
                           </span>
@@ -312,7 +312,7 @@ export default function NotificationTemplatesAdmin() {
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => setPreviewTemplate(template)}
-                      className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition"
+                      className="p-2 text-content-muted hover:text-content-primary hover:bg-surface rounded-lg transition"
                       title="Apercu"
                     >
                       <Eye size={16} />
@@ -321,7 +321,7 @@ export default function NotificationTemplatesAdmin() {
                       <>
                         <button
                           onClick={() => handleEdit(template)}
-                          className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition"
+                          className="p-2 text-content-muted hover:text-content-primary hover:bg-surface rounded-lg transition"
                           title="Modifier"
                         >
                           <Edit2 size={16} />
@@ -330,8 +330,8 @@ export default function NotificationTemplatesAdmin() {
                           onClick={() => handleToggleActive(template)}
                           className={`p-2 rounded-lg transition ${
                             template.actif
-                              ? 'text-green-400 hover:bg-green-500/10'
-                              : 'text-slate-500 hover:bg-slate-700'
+                              ? 'text-status-success hover:bg-status-success-bg'
+                              : 'text-content-muted hover:bg-surface-elevated'
                           }`}
                           title={template.actif ? 'Desactiver' : 'Activer'}
                         >
@@ -347,15 +347,15 @@ export default function NotificationTemplatesAdmin() {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between pt-4 border-t border-slate-800">
-              <span className="text-xs text-slate-500">
+            <div className="flex items-center justify-between pt-4 border-t border-edge">
+              <span className="text-xs text-content-muted">
                 Page {currentPage} sur {totalPages}
               </span>
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                   disabled={currentPage === 1}
-                  className="p-1.5 rounded hover:bg-slate-700/50 disabled:opacity-30 disabled:cursor-not-allowed text-slate-400"
+                  className="p-1.5 rounded hover:bg-surface-elevated/50 disabled:opacity-30 disabled:cursor-not-allowed text-content-muted"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
@@ -376,8 +376,8 @@ export default function NotificationTemplatesAdmin() {
                       onClick={() => setCurrentPage(pageNum)}
                       className={`w-7 h-7 text-xs rounded ${
                         currentPage === pageNum
-                          ? activeTab === 'sms' ? 'bg-cyan-600 text-white' : 'bg-blue-600 text-white'
-                          : 'hover:bg-slate-700/50 text-slate-400'
+                          ? activeTab === 'sms' ? 'bg-accent-secondary text-white' : 'bg-status-info text-white'
+                          : 'hover:bg-surface-elevated/50 text-content-muted'
                       }`}
                     >
                       {pageNum}
@@ -387,7 +387,7 @@ export default function NotificationTemplatesAdmin() {
                 <button
                   onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                   disabled={currentPage === totalPages}
-                  className="p-1.5 rounded hover:bg-slate-700/50 disabled:opacity-30 disabled:cursor-not-allowed text-slate-400"
+                  className="p-1.5 rounded hover:bg-surface-elevated/50 disabled:opacity-30 disabled:cursor-not-allowed text-content-muted"
                 >
                   <ChevronRight className="w-4 h-4" />
                 </button>
@@ -406,9 +406,9 @@ export default function NotificationTemplatesAdmin() {
       >
         {editingTemplate && (
           <div className="space-y-4">
-            <div className="bg-slate-800/50 rounded-lg p-3">
-              <span className="text-xs text-slate-500">Code</span>
-              <p className="font-mono text-purple-400">{editingTemplate.code}</p>
+            <div className="bg-surface/50 rounded-lg p-3">
+              <span className="text-xs text-content-muted">Code</span>
+              <p className="font-mono text-status-info">{editingTemplate.code}</p>
             </div>
 
             <FormField
@@ -421,19 +421,19 @@ export default function NotificationTemplatesAdmin() {
 
             {activeTab === 'sms' ? (
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-content-secondary mb-2">
                   Contenu SMS
                 </label>
                 <textarea
                   value={editForm.contenu || ''}
                   onChange={(e) => setEditForm({ ...editForm, contenu: e.target.value })}
                   rows={4}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white font-mono focus:ring-1 focus:ring-purple-500"
+                  className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-sm text-content-primary font-mono focus:ring-1 focus:ring-status-info"
                 />
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-content-muted mt-1">
                   {(editForm.contenu || '').length} caracteres
                   {(editForm.contenu || '').length > 160 && (
-                    <span className="text-amber-400 ml-2">
+                    <span className="text-status-warning ml-2">
                       ({Math.ceil((editForm.contenu || '').length / 160)} SMS)
                     </span>
                   )}
@@ -450,26 +450,26 @@ export default function NotificationTemplatesAdmin() {
                 />
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                  <label className="block text-sm font-medium text-content-secondary mb-2">
                     Contenu HTML
                   </label>
                   <textarea
                     value={editForm.contenuHtml || ''}
                     onChange={(e) => setEditForm({ ...editForm, contenuHtml: e.target.value })}
                     rows={8}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white font-mono focus:ring-1 focus:ring-purple-500"
+                    className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-sm text-content-primary font-mono focus:ring-1 focus:ring-status-info"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                  <label className="block text-sm font-medium text-content-secondary mb-2">
                     Contenu Texte (fallback)
                   </label>
                   <textarea
                     value={editForm.contenuText || ''}
                     onChange={(e) => setEditForm({ ...editForm, contenuText: e.target.value })}
                     rows={3}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white font-mono focus:ring-1 focus:ring-purple-500"
+                    className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-sm text-content-primary font-mono focus:ring-1 focus:ring-status-info"
                   />
                 </div>
               </>
@@ -495,12 +495,12 @@ export default function NotificationTemplatesAdmin() {
                 type="checkbox"
                 checked={editForm.actif}
                 onChange={(e) => setEditForm({ ...editForm, actif: e.target.checked })}
-                className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-purple-500 focus:ring-purple-500"
+                className="w-4 h-4 rounded border-edge-strong bg-surface text-status-info focus:ring-status-info"
               />
-              <span className="text-sm text-slate-300">Template actif</span>
+              <span className="text-sm text-content-secondary">Template actif</span>
             </label>
 
-            <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
+            <div className="flex justify-end gap-3 pt-4 border-t border-edge">
               <Button variant="secondary" onClick={() => setEditingTemplate(null)}>
                 Annuler
               </Button>

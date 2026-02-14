@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useBranding } from '../contexts/BrandingContext';
 import { addPdfLogoHeader } from '../lib/pdf-logo';
 // P4.1: Lazy-load heavy export libraries
 import { loadPDFLibraries } from '../lib/lazy-export';
@@ -20,6 +21,7 @@ export interface ActivityStats {
 }
 
 export function useUserActivity() {
+  const { branding } = useBranding();
   const [activities, setActivities] = useState<UserActivity[]>([]);
   const [loading, setLoading] = useState(false);
   const [dateDebut, setDateDebut] = useState('');
@@ -90,7 +92,7 @@ export function useUserActivity() {
     const separator = ';';
     
     let csvContent = BOM;
-    csvContent += `RAPPORT D'ACTIVITÉ UTILISATEURS - COFIN${separator}${separator}${separator}${separator}\n`;
+    csvContent += `RAPPORT D'ACTIVITÉ UTILISATEURS - ${branding.appName}${separator}${separator}${separator}${separator}\n`;
     csvContent += `Date d'export: ${dateExport}${separator}${separator}${separator}${separator}\n`;
     csvContent += `Utilisateurs: ${stats.totalUsers} | Actifs: ${stats.activeToday} | Actions: ${stats.totalActions}${separator}${separator}${separator}${separator}\n`;
     csvContent += `${separator}${separator}${separator}${separator}\n`;
@@ -104,7 +106,7 @@ export function useUserActivity() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `COFIN_Activite_Utilisateurs_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `${branding.appName}_Activite_Utilisateurs_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   };
@@ -119,6 +121,7 @@ export function useUserActivity() {
       title: "RAPPORT D'ACTIVITÉ UTILISATEURS",
       subtitle: `Utilisateurs: ${stats.totalUsers} | Actifs aujourd'hui: ${stats.activeToday} | Total actions: ${stats.totalActions}`,
       dateRight: `Export: ${dateExport}`,
+      appName: branding.appName,
     });
 
     const tableData = activities.slice(0, 50).map((act, idx) => [
@@ -138,12 +141,12 @@ export function useUserActivity() {
       alternateRowStyles: { fillColor: [240, 240, 240] }
     });
 
-    doc.save(`COFIN_Activite_Utilisateurs_${new Date().toISOString().split('T')[0]}.pdf`);
+    doc.save(`${branding.appName}_Activite_Utilisateurs_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
   const exportToJSON = () => {
     const exportData = {
-      titre: "Rapport d'Activité Utilisateurs COFIN",
+      titre: `Rapport d'Activité Utilisateurs ${branding.appName}`,
       dateExport: new Date().toISOString(),
       statistiques: stats,
       activites: activities.map(act => ({
@@ -159,7 +162,7 @@ export function useUserActivity() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `COFIN_Activite_Utilisateurs_${new Date().toISOString().split('T')[0]}.json`;
+    link.download = `${branding.appName}_Activite_Utilisateurs_${new Date().toISOString().split('T')[0]}.json`;
     link.click();
     URL.revokeObjectURL(url);
   };

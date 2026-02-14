@@ -279,15 +279,15 @@ export default function AdminGestionZones() {
         subtitle={FEATURE_DESCRIPTIONS['admin.zones'].subtitle}
         helpText={FEATURE_DESCRIPTIONS['admin.zones'].helpText}
         icon={
-          <div className="p-2 sm:p-3 bg-blue-500/20 rounded-xl">
-            <MapPin className="text-blue-400" size={22} />
+          <div className="p-2 sm:p-3 bg-status-info-bg rounded-xl">
+            <MapPin className="text-status-info" size={22} />
           </div>
         }
         actions={
-          <Card className="bg-slate-800 border-slate-700 px-3 py-2 sm:px-4 sm:py-2.5 flex items-center gap-2">
-            <Users size={16} className="text-slate-400" />
-            <span className="text-xs sm:text-sm text-slate-400">Agents avec zone:</span>
-            <span className="text-white font-bold text-sm sm:text-base">{agentsWithZones.length}/{activeAgentsCount}</span>
+          <Card className="bg-surface border-edge px-3 py-2 sm:px-4 sm:py-2.5 flex items-center gap-2">
+            <Users size={16} className="text-content-muted" />
+            <span className="text-xs sm:text-sm text-content-muted">Agents avec zone:</span>
+            <span className="text-content-primary font-bold text-sm sm:text-base">{agentsWithZones.length}/{activeAgentsCount}</span>
           </Card>
         }
       />
@@ -295,17 +295,17 @@ export default function AdminGestionZones() {
       {/* Message Alert */}
       {message && (
         <Card className={`p-3 flex items-center gap-2 ${
-          message.type === 'success' ? 'bg-green-500/20 border-green-500/30' : 'bg-red-500/20 border-red-500/30'
+          message.type === 'success' ? 'bg-status-success-bg border-status-success/30' : 'bg-status-danger-bg border-status-danger/30'
         }`}>
           {message.type === 'success' ? (
-            <CheckCircle size={18} className="text-green-400" />
+            <CheckCircle size={18} className="text-status-success" />
           ) : (
-            <AlertCircle size={18} className="text-red-400" />
+            <AlertCircle size={18} className="text-status-danger" />
           )}
-          <span className={`text-sm flex-1 ${message.type === 'success' ? 'text-green-400' : 'text-red-400'}`}>
+          <span className={`text-sm flex-1 ${message.type === 'success' ? 'text-status-success' : 'text-status-danger'}`}>
             {message.text}
           </span>
-          <button onClick={() => setMessage(null)} className="text-slate-400 hover:text-white">
+          <button onClick={() => setMessage(null)} className="text-content-muted hover:text-content-primary">
             <X size={16} />
           </button>
         </Card>
@@ -313,13 +313,13 @@ export default function AdminGestionZones() {
 
       {/* Overlap Warning Banner */}
       {overlappingCount > 0 && (
-        <Card className="p-3 flex items-center gap-3 bg-amber-500/10 border-amber-500/30">
-          <AlertTriangle size={20} className="text-amber-400 flex-shrink-0" />
+        <Card className="p-3 flex items-center gap-3 bg-status-warning-bg border-status-warning/30">
+          <AlertTriangle size={20} className="text-status-warning flex-shrink-0" />
           <div className="flex-1">
-            <p className="text-sm text-amber-300 font-medium">
+            <p className="text-sm text-status-warning font-medium">
               Chevauchement détecté : {overlappingCount} agent(s) ont des zones qui se superposent
             </p>
-            <p className="text-xs text-amber-400/70 mt-0.5">
+            <p className="text-xs text-status-warning/70 mt-0.5">
               Cela peut causer des conflits d'attribution de clients. Vérifiez les zones concernées.
             </p>
           </div>
@@ -327,7 +327,7 @@ export default function AdminGestionZones() {
             variant="secondary"
             size="sm"
             onClick={() => setShowOnlyOverlapping(!showOnlyOverlapping)}
-            className="text-amber-400 border-amber-500/50 hover:bg-amber-500/20"
+            className="text-status-warning border-status-warning/50 hover:bg-status-warning-bg"
           >
             {showOnlyOverlapping ? 'Voir tous' : 'Voir les conflits'}
           </Button>
@@ -338,7 +338,7 @@ export default function AdminGestionZones() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Agents List */}
         <div className="lg:col-span-1 space-y-3 sm:space-y-4">
-          <Card className="bg-slate-900 border-slate-800 p-3 sm:p-4">
+          <Card className="bg-surface-base border-edge p-3 sm:p-4">
             {/* Search */}
             <SearchInput
               value={searchTerm}
@@ -350,22 +350,22 @@ export default function AdminGestionZones() {
 
             {/* Filter Toggles */}
             <div className="space-y-2 mb-3">
-              <label className="flex items-center gap-2 text-slate-300 text-xs sm:text-sm cursor-pointer">
+              <label className="flex items-center gap-2 text-content-secondary text-xs sm:text-sm cursor-pointer">
                 <input
                   type="checkbox"
                   checked={showOnlyWithZone}
                   onChange={(e) => setShowOnlyWithZone(e.target.checked)}
-                  className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-blue-500"
+                  className="w-4 h-4 rounded border-edge-strong bg-surface-elevated text-status-info"
                 />
                 Agents avec zone uniquement
               </label>
               {overlappingCount > 0 && (
-                <label className="flex items-center gap-2 text-amber-300 text-xs sm:text-sm cursor-pointer">
+                <label className="flex items-center gap-2 text-status-warning text-xs sm:text-sm cursor-pointer">
                   <input
                     type="checkbox"
                     checked={showOnlyOverlapping}
                     onChange={(e) => setShowOnlyOverlapping(e.target.checked)}
-                    className="w-4 h-4 rounded border-amber-600 bg-slate-700 text-amber-500"
+                    className="w-4 h-4 rounded border-status-warning bg-surface-elevated text-status-warning"
                   />
                   Zones en chevauchement ({overlappingCount})
                 </label>
@@ -386,22 +386,22 @@ export default function AdminGestionZones() {
                     key={agent.id}
                     className={`p-2.5 sm:p-3 rounded-lg cursor-pointer transition-all ${
                       selectedAgent?.id === agent.id || editingAgent?.id === agent.id
-                        ? 'bg-blue-600/30 border border-blue-500'
+                        ? 'bg-status-info-bg border border-status-info'
                         : hasOverlap
-                        ? 'bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30'
-                        : 'bg-slate-800 hover:bg-slate-700 border border-transparent'
+                        ? 'bg-status-warning-bg hover:bg-status-warning/20 border border-status-warning/30'
+                        : 'bg-surface hover:bg-surface-elevated border border-transparent'
                     }`}
                     onClick={() => !editingAgent && setSelectedAgent(agent)}
                     data-testid={`agent-zone-item-${agent.id}`}
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="min-w-0 flex-1">
-                        <div className="text-white font-medium text-sm truncate">
+                        <div className="text-content-primary font-medium text-sm truncate">
                           {agent.prenom} {agent.nom}
                         </div>
-                        <div className="text-xs text-slate-400 truncate">{agent.zoneAffectation}</div>
+                        <div className="text-xs text-content-muted truncate">{agent.zoneAffectation}</div>
                         {hasOverlap && (
-                          <div className="flex items-center gap-1 mt-1 text-[10px] text-amber-400">
+                          <div className="flex items-center gap-1 mt-1 text-[10px] text-status-warning">
                             <AlertTriangle size={10} />
                             <span className="truncate">Chevauche: {overlapsWith.slice(0, 2).join(', ')}{overlapsWith.length > 2 ? '...' : ''}</span>
                           </div>
@@ -414,13 +414,13 @@ export default function AdminGestionZones() {
                             style={{ backgroundColor: zoneColors[actualIndex % zoneColors.length] }}
                           />
                         ) : (
-                          <span title="Aucune zone définie"><AlertCircle size={14} className="text-slate-500" /></span>
+                          <span title="Aucune zone définie"><AlertCircle size={14} className="text-content-muted" /></span>
                         )}
                         {canEditZones && (
                           <>
                             <button
                               onClick={(e) => { e.stopPropagation(); startEditing(agent); }}
-                              className="p-1 text-slate-400 hover:text-blue-400 transition"
+                              className="p-1 text-content-muted hover:text-status-info transition"
                               data-testid={`button-edit-zone-${agent.id}`}
                               title="Modifier la zone"
                             >
@@ -429,7 +429,7 @@ export default function AdminGestionZones() {
                             {hasZone && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); deleteZone(agent); }}
-                                className="p-1 text-slate-400 hover:text-red-400 transition"
+                                className="p-1 text-content-muted hover:text-status-danger transition"
                                 data-testid={`button-delete-zone-${agent.id}`}
                                 title="Supprimer la zone"
                               >
@@ -445,7 +445,7 @@ export default function AdminGestionZones() {
               })}
               
               {filteredAgents.length === 0 && (
-                <div className="text-center py-4 text-slate-500 text-sm">
+                <div className="text-center py-4 text-content-muted text-sm">
                   Aucun agent trouvé
                 </div>
               )}
@@ -453,8 +453,8 @@ export default function AdminGestionZones() {
 
             {/* Pagination Controls - Mobile First */}
             {totalPages > 1 && (
-              <div className="mt-3 pt-3 border-t border-slate-800 flex items-center justify-between gap-2">
-                <span className="text-xs text-slate-400">
+              <div className="mt-3 pt-3 border-t border-edge flex items-center justify-between gap-2">
+                <span className="text-xs text-content-muted">
                   {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, filteredAgents.length)} / {filteredAgents.length}
                 </span>
                 <div className="flex items-center gap-1">
@@ -464,10 +464,10 @@ export default function AdminGestionZones() {
                     size="sm"
                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                     disabled={currentPage === 1}
-                    className="w-7 h-7 text-slate-400 disabled:opacity-30"
+                    className="w-7 h-7 text-content-muted disabled:opacity-30"
                     aria-label="Page précédente"
                   />
-                  <span className="text-xs text-white font-medium px-2">
+                  <span className="text-xs text-content-primary font-medium px-2">
                     {currentPage}/{totalPages}
                   </span>
                   <IconButton
@@ -476,7 +476,7 @@ export default function AdminGestionZones() {
                     size="sm"
                     onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                     disabled={currentPage === totalPages}
-                    className="w-7 h-7 text-slate-400 disabled:opacity-30"
+                    className="w-7 h-7 text-content-muted disabled:opacity-30"
                     aria-label="Page suivante"
                   />
                 </div>
@@ -486,9 +486,9 @@ export default function AdminGestionZones() {
 
           {/* Edit Zone Form */}
           {editingAgent && (
-            <Card className="bg-slate-900 border-blue-500 p-3 sm:p-4">
-              <h3 className="font-bold text-white text-sm sm:text-base mb-3 flex items-center gap-2">
-                <Circle size={16} className="text-blue-400" />
+            <Card className="bg-surface-base border-status-info p-3 sm:p-4">
+              <h3 className="font-bold text-content-primary text-sm sm:text-base mb-3 flex items-center gap-2">
+                <Circle size={16} className="text-status-info" />
                 Zone de {editingAgent.prenom} {editingAgent.nom}
               </h3>
 
@@ -530,7 +530,7 @@ export default function AdminGestionZones() {
                   data-testid="input-rayon"
                 />
 
-                <p className="text-xs text-slate-400 flex items-center gap-1">
+                <p className="text-xs text-content-muted flex items-center gap-1">
                   <MapPin size={12} />
                   Cliquez sur la carte pour définir le centre de la zone
                 </p>
@@ -562,19 +562,19 @@ export default function AdminGestionZones() {
 
           {/* Selected Agent Info */}
           {selectedAgent && !editingAgent && (
-            <Card className="bg-slate-900 border-slate-800 p-3 sm:p-4">
-              <h3 className="font-bold text-white text-sm sm:text-base mb-3">
+            <Card className="bg-surface-base border-edge p-3 sm:p-4">
+              <h3 className="font-bold text-content-primary text-sm sm:text-base mb-3">
                 {selectedAgent.prenom} {selectedAgent.nom}
               </h3>
 
               {/* Overlap Warning */}
               {zoneOverlaps.has(selectedAgent.id) && (
-                <div className="mb-3 p-2 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-                  <div className="flex items-center gap-2 text-amber-400 text-xs">
+                <div className="mb-3 p-2 bg-status-warning-bg border border-status-warning/30 rounded-lg">
+                  <div className="flex items-center gap-2 text-status-warning text-xs">
                     <AlertTriangle size={14} />
                     <span className="font-medium">Zone en chevauchement avec:</span>
                   </div>
-                  <ul className="mt-1 text-xs text-amber-300/80 pl-5 list-disc">
+                  <ul className="mt-1 text-xs text-status-warning/80 pl-5 list-disc">
                     {zoneOverlaps.get(selectedAgent.id)!.map((overlap, i) => (
                       <li key={i}>{overlap}</li>
                     ))}
@@ -584,20 +584,20 @@ export default function AdminGestionZones() {
 
               <div className="space-y-2 text-xs sm:text-sm">
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Zone:</span>
-                  <span className="text-white">{selectedAgent.zoneAffectation || 'Non définie'}</span>
+                  <span className="text-content-muted">Zone:</span>
+                  <span className="text-content-primary">{selectedAgent.zoneAffectation || 'Non définie'}</span>
                 </div>
                 {selectedAgent.zoneLatitude && selectedAgent.zoneLongitude && (
                   <>
                     <div className="flex justify-between">
-                      <span className="text-slate-400">Position:</span>
-                      <span className="text-white text-xs">
+                      <span className="text-content-muted">Position:</span>
+                      <span className="text-content-primary text-xs">
                         {parseFloat(selectedAgent.zoneLatitude).toFixed(4)}, {parseFloat(selectedAgent.zoneLongitude).toFixed(4)}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-slate-400">Rayon:</span>
-                      <span className="text-white">{selectedAgent.zoneRayon || '2'} km</span>
+                      <span className="text-content-muted">Rayon:</span>
+                      <span className="text-content-primary">{selectedAgent.zoneRayon || '2'} km</span>
                     </div>
                   </>
                 )}
@@ -631,12 +631,12 @@ export default function AdminGestionZones() {
 
         {/* Map Section */}
         <div className="lg:col-span-2">
-          <Card className="bg-slate-900 border-slate-800 p-0 overflow-hidden">
+          <Card className="bg-surface-base border-edge p-0 overflow-hidden">
             {/* Map Header - Minimal */}
-            <div className="px-3 py-2 border-b border-slate-800 flex items-center justify-between">
-              <span className="text-xs sm:text-sm font-medium text-white">Carte des Zones</span>
+            <div className="px-3 py-2 border-b border-edge flex items-center justify-between">
+              <span className="text-xs sm:text-sm font-medium text-content-primary">Carte des Zones</span>
               {agentsWithZones.length > 0 && (
-                <span className="text-[10px] sm:text-xs text-slate-400">
+                <span className="text-[10px] sm:text-xs text-content-muted">
                   {agentsWithZones.length} zone{agentsWithZones.length > 1 ? 's' : ''} active{agentsWithZones.length > 1 ? 's' : ''}
                 </span>
               )}
@@ -660,15 +660,15 @@ export default function AdminGestionZones() {
               
               {/* Legend Overlay - Bottom of map */}
               {agentsWithZones.length > 0 && (
-                <div className="absolute bottom-2 left-2 right-2 bg-slate-900/90 backdrop-blur-sm rounded-lg p-2 border border-slate-700">
+                <div className="absolute bottom-2 left-2 right-2 bg-surface-base/90 backdrop-blur-sm rounded-lg p-2 border border-edge">
                   <div className="flex flex-wrap gap-1.5">
                     {agentsWithZones.slice(0, 6).map((agent, index) => (
                       <button 
                         key={agent.id}
                         className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] transition ${
-                          selectedAgent?.id === agent.id 
-                            ? 'bg-blue-500/30 text-white' 
-                            : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700'
+                          selectedAgent?.id === agent.id
+                            ? 'bg-status-info-bg text-content-primary'
+                            : 'bg-surface/80 text-content-secondary hover:bg-surface-elevated'
                         }`}
                         onClick={() => setSelectedAgent(agent)}
                       >
@@ -680,7 +680,7 @@ export default function AdminGestionZones() {
                       </button>
                     ))}
                     {agentsWithZones.length > 6 && (
-                      <span className="text-[10px] text-slate-400 px-1.5 py-0.5">
+                      <span className="text-[10px] text-content-muted px-1.5 py-0.5">
                         +{agentsWithZones.length - 6}
                       </span>
                     )}

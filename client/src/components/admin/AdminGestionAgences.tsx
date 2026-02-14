@@ -287,8 +287,8 @@ export default function AdminGestionAgences() {
         subtitle={`${FEATURE_DESCRIPTIONS['admin.agencies'].subtitle} (${agences.filter(a => !a.deletedAt).length} agences)`}
         helpText={FEATURE_DESCRIPTIONS['admin.agencies'].helpText}
         icon={
-          <div className="p-2 sm:p-3 bg-cyan-500/20 rounded-xl">
-            <Building2 className="text-cyan-400" size={22} />
+          <div className="p-2 sm:p-3 bg-accent/10 rounded-xl">
+            <Building2 className="text-accent" size={22} />
           </div>
         }
         actions={
@@ -310,7 +310,7 @@ export default function AdminGestionAgences() {
       />
 
       {/* Filters */}
-      <Card className="bg-slate-900 border-slate-800 p-3 sm:p-4">
+      <Card className="bg-surface-base border-edge p-3 sm:p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
           <div className="w-full sm:flex-1">
             <SearchInput
@@ -349,12 +349,12 @@ export default function AdminGestionAgences() {
             />
           </div>
           <div className="flex items-center gap-2">
-            <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer select-none whitespace-nowrap">
+            <label className="flex items-center gap-2 text-xs text-content-muted cursor-pointer select-none whitespace-nowrap">
               <input
                 type="checkbox"
                 checked={showDeleted}
                 onChange={(e) => setShowDeleted(e.target.checked)}
-                className="rounded border-slate-600 bg-slate-800 text-red-500 focus:ring-red-500/30"
+                className="rounded border-edge-strong bg-surface text-status-danger focus:ring-status-danger/30"
               />
               Supprimées
             </label>
@@ -367,9 +367,9 @@ export default function AdminGestionAgences() {
 
         {/* GPS Warning */}
         {viewMode === 'map' && filteredAgences.some(a => !a.latitude || !a.longitude) && (
-          <div className="mt-3 flex items-center gap-2 px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-            <AlertTriangle size={16} className="text-amber-400 flex-shrink-0" />
-            <span className="text-sm text-amber-300">
+          <div className="mt-3 flex items-center gap-2 px-3 py-2 bg-status-warning-bg border border-status-warning/30 rounded-lg">
+            <AlertTriangle size={16} className="text-status-warning flex-shrink-0" />
+            <span className="text-sm text-status-warning">
               {filteredAgences.filter(a => !a.latitude || !a.longitude).length} agence(s) sans coordonnées GPS ne s'afficheront pas sur la carte.
             </span>
           </div>
@@ -405,10 +405,10 @@ export default function AdminGestionAgences() {
               return (
               <Card
                 key={agence.id}
-                className={`bg-slate-900 border-slate-800 transition-all p-4 sm:p-5 cursor-pointer ${
+                className={`bg-surface-base border-edge transition-all p-4 sm:p-5 cursor-pointer ${
                   deleted
-                    ? 'opacity-50 border-red-500/30'
-                    : 'hover:border-cyan-500/50'
+                    ? 'opacity-50 border-status-danger/30'
+                    : 'hover:border-accent/50'
                 }`}
                 onClick={() => setViewingAgence(agence)}
               >
@@ -421,13 +421,13 @@ export default function AdminGestionAgences() {
                         size="sm"
                       />
                       {deleted && (
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-400 border border-red-500/30">
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-status-danger-bg text-status-danger border border-status-danger/30">
                           Supprimée
                         </span>
                       )}
                     </div>
-                    <h3 className="font-bold text-white text-sm sm:text-base truncate">{agence.nom}</h3>
-                    <p className="text-xs text-cyan-400 font-mono">{agence.codeAgence}</p>
+                    <h3 className="font-bold text-content-primary text-sm sm:text-base truncate">{agence.nom}</h3>
+                    <p className="text-xs text-accent font-mono">{agence.codeAgence}</p>
                   </div>
                   {!deleted && (
                     <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
@@ -446,7 +446,7 @@ export default function AdminGestionAgences() {
                           variant="ghost"
                           size="sm"
                           onClick={() => handleDelete(agence)}
-                          className="p-2 text-red-400 hover:text-red-300"
+                          className="p-2 text-status-danger hover:text-status-danger"
                         >
                           <Trash2 size={16} />
                         </Button>
@@ -458,19 +458,19 @@ export default function AdminGestionAgences() {
                 {/* Details */}
                 <div className="space-y-1.5 text-xs sm:text-sm">
                   {agence.ville && (
-                    <div className="flex items-center gap-2 text-slate-400">
+                    <div className="flex items-center gap-2 text-content-muted">
                       <MapPin size={14} className="flex-shrink-0" />
                       <span className="truncate">{agence.ville}{agence.region ? `, ${agence.region}` : ''}</span>
                     </div>
                   )}
                   {agence.telephone && (
-                    <div className="flex items-center gap-2 text-slate-400">
+                    <div className="flex items-center gap-2 text-content-muted">
                       <Phone size={14} className="flex-shrink-0" />
                       <span>{agence.telephone}</span>
                     </div>
                   )}
                   {agence.responsableNom && (
-                    <div className="flex items-center gap-2 text-slate-400">
+                    <div className="flex items-center gap-2 text-content-muted">
                       <User size={14} className="flex-shrink-0" />
                       <span className="truncate">{agence.responsableNom}</span>
                     </div>
@@ -478,14 +478,14 @@ export default function AdminGestionAgences() {
                 </div>
 
                 {/* Stats Footer */}
-                <div className="mt-3 pt-3 border-t border-slate-800 grid grid-cols-2 gap-3">
+                <div className="mt-3 pt-3 border-t border-edge grid grid-cols-2 gap-3">
                   <div>
-                    <p className="text-[10px] sm:text-xs text-slate-500">Employés</p>
-                    <p className="text-sm sm:text-base font-bold text-white">{agence.nombreEmployes || 0}</p>
+                    <p className="text-[10px] sm:text-xs text-content-muted">Employés</p>
+                    <p className="text-sm sm:text-base font-bold text-content-primary">{agence.nombreEmployes || 0}</p>
                   </div>
                   <div>
-                    <p className="text-[10px] sm:text-xs text-slate-500">Clients</p>
-                    <p className="text-sm sm:text-base font-bold text-white">{agence.nombreClients || 0}</p>
+                    <p className="text-[10px] sm:text-xs text-content-muted">Clients</p>
+                    <p className="text-sm sm:text-base font-bold text-content-primary">{agence.nombreClients || 0}</p>
                   </div>
                 </div>
               </Card>
@@ -556,7 +556,7 @@ export default function AdminGestionAgences() {
                     onClick={() => setCurrentPage(pageNum)}
                     className={`w-8 h-8 rounded-lg text-xs font-medium transition-colors ${
                       currentPage === pageNum
-                        ? 'bg-primary text-white'
+                        ? 'bg-primary text-content-primary'
                         : 'text-content-muted hover:bg-surface-muted'
                     }`}
                   >
@@ -592,10 +592,10 @@ export default function AdminGestionAgences() {
 
       {/* Read-only Detail Sheet */}
       <Sheet open={!!viewingAgence} onOpenChange={(open) => !open && setViewingAgence(null)}>
-        <SheetContent className="w-full sm:max-w-md overflow-y-auto bg-slate-950 border-l-slate-800 p-0">
-          <SheetHeader className="px-6 py-4 border-b border-slate-800 bg-slate-950/50 backdrop-blur sticky top-0 z-10">
-            <SheetTitle className="text-white">Détail de l'agence</SheetTitle>
-            <SheetDescription className="text-slate-400">
+        <SheetContent className="w-full sm:max-w-md overflow-y-auto bg-surface-base border-l-edge p-0">
+          <SheetHeader className="px-6 py-4 border-b border-edge bg-surface-base/50 backdrop-blur sticky top-0 z-10">
+            <SheetTitle className="text-content-primary">Détail de l'agence</SheetTitle>
+            <SheetDescription className="text-content-muted">
               Informations complètes
             </SheetDescription>
           </SheetHeader>
@@ -603,31 +603,31 @@ export default function AdminGestionAgences() {
           {viewingAgence && (
             <div className="p-6 space-y-6">
               {/* Identity */}
-              <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 space-y-3">
+              <div className="bg-surface-base/50 border border-edge rounded-xl p-4 space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <h3 className="text-lg font-bold text-white leading-tight">{viewingAgence.nom}</h3>
-                    <p className="text-xs text-cyan-400 font-mono mt-0.5">{viewingAgence.codeAgence}</p>
+                    <h3 className="text-lg font-bold text-content-primary leading-tight">{viewingAgence.nom}</h3>
+                    <p className="text-xs text-accent font-mono mt-0.5">{viewingAgence.codeAgence}</p>
                   </div>
                   <div className="flex flex-col items-end gap-1.5">
                     <span className={`px-2.5 py-1 rounded-md text-[10px] uppercase font-bold border tracking-wide ${
                       viewingAgence.statut === StatutAgence.ACTIVE
-                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                        ? 'bg-status-success-bg text-status-success border-status-success/20'
                         : viewingAgence.statut === StatutAgence.CLOSED
-                        ? 'bg-red-500/10 text-red-400 border-red-500/20'
-                        : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                        ? 'bg-status-danger-bg text-status-danger border-status-danger/20'
+                        : 'bg-status-warning-bg text-status-warning border-status-warning/20'
                     }`}>
                       {STATUT_AGENCE_LABELS[viewingAgence.statut] || viewingAgence.statut}
                     </span>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-accent/10 text-accent border border-accent/20">
                       {TYPE_AGENCE_LABELS[viewingAgence.typeAgence] || viewingAgence.typeAgence}
                     </span>
                   </div>
                 </div>
                 {isDeleted(viewingAgence) && (
-                  <div className="flex items-center gap-2 px-3 py-2 bg-red-500/10 border border-red-500/30 rounded-lg">
-                    <Trash2 size={14} className="text-red-400" />
-                    <span className="text-xs text-red-300 font-medium">
+                  <div className="flex items-center gap-2 px-3 py-2 bg-status-danger-bg border border-status-danger/30 rounded-lg">
+                    <Trash2 size={14} className="text-status-danger" />
+                    <span className="text-xs text-status-danger font-medium">
                       Supprimée le {new Date(viewingAgence.deletedAt!).toLocaleDateString('fr-FR')}
                     </span>
                   </div>
@@ -636,7 +636,7 @@ export default function AdminGestionAgences() {
 
               {/* Localisation */}
               <div className="space-y-3">
-                <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                <h4 className="text-xs font-bold text-content-muted uppercase flex items-center gap-2">
                   <MapPin size={12} /> Localisation
                 </h4>
                 <div className="grid grid-cols-2 gap-3">
@@ -650,7 +650,7 @@ export default function AdminGestionAgences() {
                   )}
                 </div>
                 {(viewingAgence.latitude || viewingAgence.longitude) && (
-                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <div className="flex items-center gap-2 text-xs text-content-muted">
                     <Globe size={12} />
                     <span className="font-mono">{viewingAgence.latitude}, {viewingAgence.longitude}</span>
                   </div>
@@ -659,7 +659,7 @@ export default function AdminGestionAgences() {
 
               {/* Contact */}
               <div className="space-y-3">
-                <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                <h4 className="text-xs font-bold text-content-muted uppercase flex items-center gap-2">
                   <Phone size={12} /> Contact
                 </h4>
                 <div className="grid grid-cols-2 gap-3">
@@ -672,24 +672,24 @@ export default function AdminGestionAgences() {
 
               {/* Stats */}
               <div className="space-y-3">
-                <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                <h4 className="text-xs font-bold text-content-muted uppercase flex items-center gap-2">
                   <Users size={12} /> Statistiques
                 </h4>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 bg-slate-900 rounded-lg border border-slate-800 text-center">
-                    <div className="text-2xl font-bold text-white">{viewingAgence.nombreEmployes || 0}</div>
-                    <div className="text-[10px] font-medium text-slate-500 uppercase mt-0.5">Employés actifs</div>
+                  <div className="p-3 bg-surface-base rounded-lg border border-edge text-center">
+                    <div className="text-2xl font-bold text-content-primary">{viewingAgence.nombreEmployes || 0}</div>
+                    <div className="text-[10px] font-medium text-content-muted uppercase mt-0.5">Employés actifs</div>
                   </div>
-                  <div className="p-3 bg-slate-900 rounded-lg border border-slate-800 text-center">
-                    <div className="text-2xl font-bold text-white">{viewingAgence.nombreClients || 0}</div>
-                    <div className="text-[10px] font-medium text-slate-500 uppercase mt-0.5">Clients actifs</div>
+                  <div className="p-3 bg-surface-base rounded-lg border border-edge text-center">
+                    <div className="text-2xl font-bold text-content-primary">{viewingAgence.nombreClients || 0}</div>
+                    <div className="text-[10px] font-medium text-content-muted uppercase mt-0.5">Clients actifs</div>
                   </div>
                 </div>
               </div>
 
               {/* Dates & Notes */}
               <div className="space-y-3">
-                <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                <h4 className="text-xs font-bold text-content-muted uppercase flex items-center gap-2">
                   <Calendar size={12} /> Informations
                 </h4>
                 <div className="grid grid-cols-2 gap-3">
@@ -703,16 +703,16 @@ export default function AdminGestionAgences() {
                   />
                 </div>
                 {viewingAgence.notes && (
-                  <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800">
-                    <div className="text-[10px] font-medium text-slate-500 uppercase mb-0.5">Notes</div>
-                    <div className="text-sm text-slate-200 leading-relaxed">{viewingAgence.notes}</div>
+                  <div className="p-2.5 bg-surface-base rounded-lg border border-edge">
+                    <div className="text-[10px] font-medium text-content-muted uppercase mb-0.5">Notes</div>
+                    <div className="text-sm text-content-secondary leading-relaxed">{viewingAgence.notes}</div>
                   </div>
                 )}
               </div>
 
               {/* Actions */}
               {!isDeleted(viewingAgence) && canEditAgences && (
-                <div className="pt-4 border-t border-slate-800/50">
+                <div className="pt-4 border-t border-edge/50">
                   <Button
                     variant="primary"
                     icon={Edit2}
@@ -838,7 +838,7 @@ export default function AdminGestionAgences() {
 
           {/* GPS info when ville is selected */}
           {formData.villeId && (formData.latitude || formData.longitude) && (
-            <div className="flex items-center gap-2 px-3 py-2 bg-cyan-500/10 border border-cyan-500/20 rounded-lg text-xs text-cyan-300">
+            <div className="flex items-center gap-2 px-3 py-2 bg-accent/10 border border-accent/20 rounded-lg text-xs text-accent">
               <Globe size={14} />
               <span>Coordonnées GPS: {formData.latitude}, {formData.longitude} (depuis la ville)</span>
             </div>
@@ -899,9 +899,9 @@ export default function AdminGestionAgences() {
 
 function DetailCard({ label, value }: { label: string; value: string | undefined }) {
   return (
-    <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800">
-      <div className="text-[10px] font-medium text-slate-500 uppercase mb-0.5">{label}</div>
-      <div className="text-sm text-slate-200 font-medium break-words">{value || '-'}</div>
+    <div className="p-2.5 bg-surface-base rounded-lg border border-edge">
+      <div className="text-[10px] font-medium text-content-muted uppercase mb-0.5">{label}</div>
+      <div className="text-sm text-content-secondary font-medium break-words">{value || '-'}</div>
     </div>
   );
 }

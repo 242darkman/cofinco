@@ -12,13 +12,13 @@ interface NotificationSectionProps {
 export default function NotificationSection({ 
   title, 
   icon: Icon, 
-  iconColorClass = "text-blue-600", 
+  iconColorClass = "text-status-info", 
   children 
 }: NotificationSectionProps) {
   return (
     <Card className="p-6">
-      <h2 className="text-lg font-semibold text-white mb-6 flex items-center gap-3">
-        <div className={`p-2 rounded-lg bg-slate-800 ${iconColorClass.replace('text-', 'bg-').replace('600', '500/10')} border border-slate-700`}>
+      <h2 className="text-lg font-semibold text-content-primary mb-6 flex items-center gap-3">
+        <div className={`p-2 rounded-lg bg-surface ${iconColorClass.replace('text-', 'bg-').replace('600', '500/10')} border border-edge`}>
            <Icon className={iconColorClass} size={20} />
         </div>
         {title}

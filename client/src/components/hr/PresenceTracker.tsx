@@ -166,7 +166,7 @@ export default function PresenceTracker({ employes }: PresenceTrackerProps) {
     }
   }, []);
 
-  if(!stats) return <div className="p-4 text-center text-slate-400">Chargement des présences...</div>;
+  if(!stats) return <div className="p-4 text-center text-content-muted">Chargement des présences...</div>;
 
   const getPresenceStatus = (empId: string): { status: string; color: 'success' | 'warning' | 'danger' | 'neutral'; time: string } => {
       const record = stats?.liste?.find((p: PresenceRecord) => p.employeId === empId);
@@ -201,19 +201,19 @@ export default function PresenceTracker({ employes }: PresenceTrackerProps) {
           label: 'Employé', key: 'nom', primary: true,
           format: (val: string, item: EmployePresenceData) => (
               <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-white">
+                  <div className="w-8 h-8 rounded-full bg-surface-elevated flex items-center justify-center text-xs font-bold text-content-primary">
                       {item.nom?.charAt(0)}{item.prenom?.charAt(0)}
                   </div>
                   <div>
-                      <div className="font-medium text-white">{item.nom} {item.prenom}</div>
-                      <div className="text-[10px] text-slate-400">{item.poste}</div>
+                      <div className="font-medium text-content-primary">{item.nom} {item.prenom}</div>
+                      <div className="text-[10px] text-content-muted">{item.poste}</div>
                   </div>
               </div>
           )
       },
       {
           label: 'Arrivée', key: 'arrivalTime',
-          format: (val: string) => <span className="font-mono text-slate-300 text-xs">{val}</span>
+          format: (val: string) => <span className="font-mono text-content-secondary text-xs">{val}</span>
       },
       {
           label: 'Statut', key: 'presenceStatus',
@@ -228,11 +228,11 @@ export default function PresenceTracker({ employes }: PresenceTrackerProps) {
       {/* Header with tabs */}
       <div className="shrink-0 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex gap-1 bg-slate-800/50 rounded-lg p-0.5">
+          <div className="flex gap-1 bg-surface/50 rounded-lg p-0.5">
             <button
               onClick={() => { setViewMode('daily'); setSelectedEmployeeForAnalytics(null); }}
               className={`px-3 py-1.5 text-xs font-medium rounded-md transition flex items-center gap-1.5 ${
-                viewMode === 'daily' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'
+                viewMode === 'daily' ? 'bg-surface-elevated text-content-primary' : 'text-content-muted hover:text-content-primary'
               }`}
             >
               <Clock size={12} />
@@ -241,7 +241,7 @@ export default function PresenceTracker({ employes }: PresenceTrackerProps) {
             <button
               onClick={() => setViewMode('analytics')}
               className={`px-3 py-1.5 text-xs font-medium rounded-md transition flex items-center gap-1.5 ${
-                viewMode === 'analytics' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'
+                viewMode === 'analytics' ? 'bg-surface-elevated text-content-primary' : 'text-content-muted hover:text-content-primary'
               }`}
             >
               <BarChart3 size={12} />
@@ -250,7 +250,7 @@ export default function PresenceTracker({ employes }: PresenceTrackerProps) {
           </div>
         </div>
         {viewMode === 'analytics' && !selectedEmployeeForAnalytics && (
-          <span className="text-xs text-slate-500">Sélectionnez un employé pour voir son historique</span>
+          <span className="text-xs text-content-muted">Sélectionnez un employé pour voir son historique</span>
         )}
       </div>
 
@@ -286,8 +286,8 @@ export default function PresenceTracker({ employes }: PresenceTrackerProps) {
           className="cursor-pointer hover:scale-[1.02] transition-transform p-3"
         />
 
-        <div className="bg-slate-800/50 rounded-xl p-2 border border-slate-700/50 flex flex-col justify-center items-center gap-1.5 h-full">
-            <h4 className="text-white text-[10px] font-bold uppercase tracking-wider">Pointage</h4>
+        <div className="bg-surface/50 rounded-xl p-2 border border-edge-subtle flex flex-col justify-center items-center gap-1.5 h-full">
+            <h4 className="text-content-primary text-[10px] font-bold uppercase tracking-wider">Pointage</h4>
             {!userPresence?.heureArrivee && (
               <Button
                 variant="primary"
@@ -322,19 +322,19 @@ export default function PresenceTracker({ employes }: PresenceTrackerProps) {
               </Button>
             )}
             {userPresence?.heureDepart && (
-              <div className="text-xs text-green-400 text-center font-bold">Terminé ✅</div>
+              <div className="text-xs text-status-success text-center font-bold">Terminé ✅</div>
             )}
         </div>
       </div>
 
       {/* Table Section - Flex Grow */}
-      <div className="flex-1 min-h-0 bg-slate-900/50 border border-slate-800 rounded-lg flex flex-col">
-        <div className="shrink-0 flex items-center justify-between p-2 border-b border-slate-800 bg-slate-900/50">
-            <h3 className="text-xs font-bold text-white flex items-center gap-2">
-                <Clock size={14} className="text-cyan-400" />
+      <div className="flex-1 min-h-0 bg-surface-base/50 border border-edge rounded-lg flex flex-col">
+        <div className="shrink-0 flex items-center justify-between p-2 border-b border-edge bg-surface-base/50">
+            <h3 className="text-xs font-bold text-content-primary flex items-center gap-2">
+                <Clock size={14} className="text-accent" />
                 Feuille de Présence - {new Date().toLocaleDateString('fr-FR')}
             </h3>
-            <span className="text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full">
+            <span className="text-[10px] text-content-muted bg-surface px-2 py-0.5 rounded-full">
                 {presenceData.length} employés
             </span>
         </div>
@@ -353,7 +353,7 @@ export default function PresenceTracker({ employes }: PresenceTrackerProps) {
               }}
               density="compact"
               className="border-0 rounded-none h-full"
-              headerClassName="bg-slate-900 sticky top-0"
+              headerClassName="bg-surface-base sticky top-0"
               onRowClick={(emp: EmployePresenceData) => {
                 setSelectedEmployeeForAnalytics(emp);
                 setViewMode('analytics');
@@ -374,9 +374,9 @@ export default function PresenceTracker({ employes }: PresenceTrackerProps) {
                 onChangeEmployee={() => setSelectedEmployeeForAnalytics(null)}
               />
           ) : (
-            <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 h-full overflow-y-auto">
-              <h4 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
-                <Calendar size={14} className="text-slate-400" />
+            <div className="bg-surface-base border border-edge rounded-lg p-4 h-full overflow-y-auto">
+              <h4 className="text-sm font-bold text-content-primary mb-3 flex items-center gap-2">
+                <Calendar size={14} className="text-content-muted" />
                 Sélectionner un employé
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
@@ -384,14 +384,14 @@ export default function PresenceTracker({ employes }: PresenceTrackerProps) {
                   <button
                     key={emp.id}
                     onClick={() => setSelectedEmployeeForAnalytics(emp)}
-                    className="flex items-center gap-3 p-3 bg-slate-800/50 hover:bg-slate-800 rounded-lg transition text-left"
+                    className="flex items-center gap-3 p-3 bg-surface/50 hover:bg-surface rounded-lg transition text-left"
                   >
-                    <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-white">
+                    <div className="w-8 h-8 rounded-full bg-surface-elevated flex items-center justify-center text-xs font-bold text-content-primary">
                       {emp.nom?.charAt(0)}{emp.prenom?.charAt(0)}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-white truncate">{emp.nom} {emp.prenom}</p>
-                      <p className="text-[10px] text-slate-400 truncate">{emp.poste}</p>
+                      <p className="text-sm font-medium text-content-primary truncate">{emp.nom} {emp.prenom}</p>
+                      <p className="text-[10px] text-content-muted truncate">{emp.poste}</p>
                     </div>
                   </button>
                 ))}
@@ -404,10 +404,10 @@ export default function PresenceTracker({ employes }: PresenceTrackerProps) {
       {/* Modal Liste Employés */}
       {showModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={() => setShowModal(false)}>
-          <div className="bg-slate-900 rounded-xl border border-slate-700 max-w-2xl w-full max-h-[80vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="p-4 border-b border-slate-700 flex justify-between items-center">
-              <h3 className="text-white font-bold">Employés - {modalStatus}</h3>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-white">
+          <div className="bg-surface-base rounded-xl border border-edge max-w-2xl w-full max-h-[80vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="p-4 border-b border-edge flex justify-between items-center">
+              <h3 className="text-content-primary font-bold">Employés - {modalStatus}</h3>
+              <button onClick={() => setShowModal(false)} className="text-content-muted hover:text-content-primary">
                 ✕
               </button>
             </div>
@@ -415,16 +415,16 @@ export default function PresenceTracker({ employes }: PresenceTrackerProps) {
               {modalEmployees.length > 0 ? (
                 <div className="space-y-2">
                   {modalEmployees.map(emp => (
-                    <div key={emp.id} className="flex items-center gap-3 p-3 bg-slate-800 rounded-lg">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-emerald-500 flex items-center justify-center text-white font-bold text-sm">
+                    <div key={emp.id} className="flex items-center gap-3 p-3 bg-surface rounded-lg">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-status-info to-status-success flex items-center justify-center text-white font-bold text-sm">
                         {emp.nom?.charAt(0)}{emp.prenom?.charAt(0)}
                       </div>
                       <div className="flex-1">
-                        <div className="text-white font-medium">{emp.nom} {emp.prenom}</div>
-                        <div className="text-xs text-slate-400">{emp.poste}</div>
+                        <div className="text-content-primary font-medium">{emp.nom} {emp.prenom}</div>
+                        <div className="text-xs text-content-muted">{emp.poste}</div>
                       </div>
                       {emp.heureArrivee && (
-                        <div className="text-xs text-slate-400">
+                        <div className="text-xs text-content-muted">
                           Arrivée: {new Date(emp.heureArrivee).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}
                         </div>
                       )}
@@ -432,7 +432,7 @@ export default function PresenceTracker({ employes }: PresenceTrackerProps) {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8 text-slate-400">Aucun employé dans cette catégorie</div>
+                <div className="text-center py-8 text-content-muted">Aucun employé dans cette catégorie</div>
               )}
             </div>
           </div>

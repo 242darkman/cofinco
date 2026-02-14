@@ -51,9 +51,9 @@ export default function CriticalPermissionReasonDialog({
   };
 
   const actionLabels = {
-    grant: { verb: 'Accorder', color: 'text-emerald-400', icon: '✓' },
-    deny: { verb: 'Refuser', color: 'text-rose-400', icon: '✗' },
-    reset: { verb: 'Réinitialiser', color: 'text-amber-400', icon: '↺' },
+    grant: { verb: 'Accorder', color: 'text-status-success', icon: '✓' },
+    deny: { verb: 'Refuser', color: 'text-status-danger', icon: '✗' },
+    reset: { verb: 'Réinitialiser', color: 'text-status-warning', icon: '↺' },
   };
 
   const currentAction = actionLabels[action];
@@ -64,7 +64,7 @@ export default function CriticalPermissionReasonDialog({
       onClose={onClose}
       title={
         <div className="flex items-center gap-2">
-          <AlertTriangle className="text-amber-400" size={20} />
+          <AlertTriangle className="text-status-warning" size={20} />
           <span>Permission critique</span>
         </div>
       }
@@ -74,15 +74,15 @@ export default function CriticalPermissionReasonDialog({
     >
       <div className="space-y-4">
         {/* Warning Banner */}
-        <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4">
+        <div className="bg-status-warning-bg border border-status-warning/20 rounded-lg p-4">
           <div className="flex items-start gap-3">
-            <Shield className="text-amber-400 shrink-0 mt-0.5" size={20} />
+            <Shield className="text-status-warning shrink-0 mt-0.5" size={20} />
             <div className="space-y-1">
-              <p className="text-amber-400 font-semibold text-sm">
+              <p className="text-status-warning font-semibold text-sm">
                 Cette permission est sensible
               </p>
-              <p className="text-slate-300 text-sm">
-                La modification de <code className="text-amber-300 bg-amber-500/10 px-1 rounded">
+              <p className="text-content-secondary text-sm">
+                La modification de <code className="text-status-warning bg-status-warning-bg px-1 rounded">
                   {permissionCode}
                 </code> peut avoir un impact important sur la sécurité du système.
               </p>
@@ -91,9 +91,9 @@ export default function CriticalPermissionReasonDialog({
         </div>
 
         {/* Action Summary */}
-        <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
+        <div className="bg-surface/50 rounded-lg p-3 border border-edge">
           <div className="flex items-center gap-2">
-            <span className="text-slate-400 text-sm">Action:</span>
+            <span className="text-content-muted text-sm">Action:</span>
             <span className={`font-semibold text-sm ${currentAction.color}`}>
               {currentAction.icon} {currentAction.verb}
             </span>
@@ -102,14 +102,14 @@ export default function CriticalPermissionReasonDialog({
 
         {/* Reason Input */}
         {loading ? (
-          <div className="flex items-center justify-center py-4 text-slate-400">
+          <div className="flex items-center justify-center py-4 text-content-muted">
             <Loader2 className="animate-spin mr-2" size={16} />
             <span className="text-sm">Vérification...</span>
           </div>
         ) : (
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-slate-300">
-              Justification {requiresReason && <span className="text-rose-400">*</span>}
+            <label className="block text-sm font-medium text-content-secondary">
+              Justification {requiresReason && <span className="text-status-danger">*</span>}
             </label>
             <textarea
               value={reason}
@@ -124,21 +124,21 @@ export default function CriticalPermissionReasonDialog({
               }
               className={`
                 w-full h-24 px-3 py-2
-                bg-slate-900 border rounded-lg
-                text-sm text-white placeholder:text-slate-500
+                bg-surface-base border rounded-lg
+                text-sm text-content-primary placeholder:text-content-muted
                 focus:outline-none focus:ring-2
                 resize-none
                 ${error
-                  ? 'border-rose-500 focus:ring-rose-500/20'
-                  : 'border-slate-700 focus:ring-indigo-500/20 focus:border-indigo-500'
+                  ? 'border-status-danger focus:ring-status-danger/20'
+                  : 'border-edge focus:ring-accent/20 focus:border-accent'
                 }
               `}
             />
             {error && (
-              <p className="text-rose-400 text-xs">{error}</p>
+              <p className="text-status-danger text-xs">{error}</p>
             )}
             {requiresReason && (
-              <p className="text-slate-500 text-xs">
+              <p className="text-content-muted text-xs">
                 Cette modification sera enregistrée dans l'historique d'audit.
               </p>
             )}
@@ -146,7 +146,7 @@ export default function CriticalPermissionReasonDialog({
         )}
 
         {/* Actions */}
-        <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+        <div className="flex justify-end gap-2 pt-2 border-t border-edge">
           <Button variant="ghost" size="sm" onClick={onClose} disabled={isSubmitting}>
             Annuler
           </Button>

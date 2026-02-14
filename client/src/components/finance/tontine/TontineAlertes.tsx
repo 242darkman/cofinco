@@ -141,8 +141,8 @@ export default function TontineAlertes({ tontineId }: TontineAlertesProps) {
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h3 className="text-lg font-bold text-white flex items-center gap-2">
-            <Bell size={20} className="text-cyan-400" />
+          <h3 className="text-lg font-bold text-content-primary flex items-center gap-2">
+            <Bell size={20} className="text-accent" />
             Alertes
             {alertesUrgentes.length > 0 && (
                <Badge variant="danger" value={`${alertesUrgentes.length} urgentes`} />
@@ -160,14 +160,14 @@ export default function TontineAlertes({ tontineId }: TontineAlertesProps) {
       </div>
 
       {loading && alertes.length === 0 ? (
-        <div className="text-center py-12 text-slate-400">Chargement...</div>
+        <div className="text-center py-12 text-content-muted">Chargement...</div>
       ) : alertes.length === 0 ? (
-        <Card className="flex flex-col items-center justify-center py-12 border-dashed border-slate-700 bg-slate-800/30">
-          <div className="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center mb-4">
-              <CheckCircle className="text-emerald-500" size={32} />
+        <Card className="flex flex-col items-center justify-center py-12 border-dashed border-edge bg-surface/30">
+          <div className="w-16 h-16 rounded-full bg-surface flex items-center justify-center mb-4">
+              <CheckCircle className="text-status-success" size={32} />
           </div>
-          <h3 className="text-lg font-bold text-white mb-2">Aucune alerte</h3>
-          <p className="text-slate-400 text-sm">Tout est en ordre pour le moment</p>
+          <h3 className="text-lg font-bold text-content-primary mb-2">Aucune alerte</h3>
+          <p className="text-content-muted text-sm">Tout est en ordre pour le moment</p>
         </Card>
       ) : (
         <div className="grid gap-3">
@@ -176,18 +176,18 @@ export default function TontineAlertes({ tontineId }: TontineAlertesProps) {
               key={alerte.id}
               className={`
                  p-4 border-l-4 transition-all
-                 ${isAlertUrgent(alerte.priorite) ? 'border-l-red-500 bg-red-900/10' :
-                   isAlertHigh(alerte.priorite) ? 'border-l-amber-500 bg-amber-900/10' :
-                   'border-l-cyan-500/50 bg-slate-800/50'}
+                 ${isAlertUrgent(alerte.priorite) ? 'border-l-status-danger bg-status-danger/5' :
+                   isAlertHigh(alerte.priorite) ? 'border-l-status-warning bg-status-warning/5' :
+                   'border-l-accent/50 bg-surface/50'}
                  ${isAlertResolved(alerte.statut) ? 'opacity-60 grayscale' : ''}
               `}
             >
               <div className="flex gap-4">
                 <div className={`
                     shrink-0 w-10 h-10 rounded-full flex items-center justify-center
-                    ${isAlertUrgent(alerte.priorite) ? 'bg-red-500/20 text-red-400' :
-                      isAlertHigh(alerte.priorite) ? 'bg-amber-500/20 text-amber-400' :
-                      'bg-cyan-500/20 text-cyan-400'}
+                    ${isAlertUrgent(alerte.priorite) ? 'bg-status-danger-bg text-status-danger' :
+                      isAlertHigh(alerte.priorite) ? 'bg-status-warning-bg text-status-warning' :
+                      'bg-accent/10 text-accent'}
                 `}>
                   {getTypeIcon(alerte.typeAlerte)}
                 </div>
@@ -196,37 +196,37 @@ export default function TontineAlertes({ tontineId }: TontineAlertesProps) {
                   <div className="flex items-start justify-between gap-2 mb-1">
                     <div>
                         <div className="flex items-center gap-2">
-                             <span className="font-bold text-white text-sm">{getTypeLabel(alerte.typeAlerte)}</span>
+                             <span className="font-bold text-content-primary text-sm">{getTypeLabel(alerte.typeAlerte)}</span>
                              <Badge variant={getPrioriteVariant(alerte.priorite)} value={getPrioriteLabel(alerte.priorite)} className="text-[10px] py-0" />
                         </div>
-                        <p className="text-sm text-slate-300 mt-1">{alerte.message}</p>
+                        <p className="text-sm text-content-secondary mt-1">{alerte.message}</p>
                     </div>
-                    <span className="text-[10px] text-slate-500 whitespace-nowrap">
+                    <span className="text-[10px] text-content-muted whitespace-nowrap">
                        {new Date(alerte.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
                     </span>
                   </div>
 
                   {alerte.tontineMembres && (
-                    <div className="text-xs text-slate-500 mt-2 flex items-center gap-1">
+                    <div className="text-xs text-content-muted mt-2 flex items-center gap-1">
                         <span>Membre:</span>
-                        <span className="text-slate-300 font-medium">{alerte.tontineMembres.clients.nom}</span>
+                        <span className="text-content-secondary font-medium">{alerte.tontineMembres.clients.nom}</span>
                     </div>
                   )}
 
                   {isAlertActive(alerte.statut) && (
-                      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-700/50 justify-end">
+                      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-edge-subtle justify-end">
                          <IconButton
                             icon={Check}
                             onClick={() => handleResolveAlerte(alerte.id)}
                             size="sm"
-                            className="bg-green-500/10 text-green-400 hover:bg-green-500/20"
+                            className="bg-status-success-bg text-status-success hover:bg-status-success-bg/80"
                             aria-label="Résoudre"
                          />
                          <IconButton
                             icon={X}
                             onClick={() => handleIgnoreAlerte(alerte.id)}
                             size="sm"
-                            className="bg-slate-700/50 text-slate-400 hover:bg-slate-700"
+                            className="bg-surface-elevated/50 text-content-muted hover:bg-surface-elevated"
                             aria-label="Ignorer"
                          />
                       </div>

@@ -83,8 +83,8 @@ export default function AccountsList({ data, type, onManage, onTransaction, load
   // Deterministic color for avatar based on name
   const getAvatarColor = (name: string) => {
     const colors = [
-      'bg-blue-500', 'bg-emerald-500', 'bg-violet-500', 
-      'bg-amber-500', 'bg-rose-500', 'bg-cyan-500'
+      'bg-status-info', 'bg-status-success', 'bg-accent', 
+      'bg-status-warning', 'bg-status-danger', 'bg-accent-secondary'
     ];
     let hash = 0;
     for (let i = 0; i < name.length; i++) {
@@ -115,18 +115,18 @@ export default function AccountsList({ data, type, onManage, onTransaction, load
                   <img
                     src={photoUrl}
                     alt={clientName}
-                    className="w-8 h-8 rounded-full object-cover shrink-0 shadow-sm ring-1 ring-slate-900/50 bg-slate-100 dark:bg-slate-800"
+                    className="w-8 h-8 rounded-full object-cover shrink-0 shadow-sm ring-1 ring-edge/50 bg-surface-muted"
                   />
                 ) : (
-                  <div className={`w-8 h-8 rounded-full ${avatarColor} flex items-center justify-center text-white text-[10px] font-bold tracking-wider shrink-0 shadow-sm ring-1 ring-slate-900/50`}>
+                  <div className={`w-8 h-8 rounded-full ${avatarColor} flex items-center justify-center text-white text-[10px] font-bold tracking-wider shrink-0 shadow-sm ring-1 ring-edge/50`}>
                     {initials}
                   </div>
                 )}
                 <div className="min-w-0">
-                    <h3 className="text-slate-900 dark:text-white font-medium text-xs truncate">{clientName}</h3>
+                    <h3 className="text-content-primary font-medium text-xs truncate">{clientName}</h3>
                     <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] text-slate-500 font-mono tracking-wide">{account.numeroCompte}</span>
-                        <span className="text-[9px] text-slate-500 border border-slate-200 dark:border-slate-700/50 px-1 rounded bg-slate-100 dark:bg-slate-800/50">
+                        <span className="text-[10px] text-content-muted font-mono tracking-wide">{account.numeroCompte}</span>
+                        <span className="text-[9px] text-content-muted border border-edge-subtle px-1 rounded bg-surface-muted/50">
                           {getTypeCompteLabel(account.typeCompte)}
                         </span>
                     </div>
@@ -150,19 +150,19 @@ export default function AccountsList({ data, type, onManage, onTransaction, load
               return (
                 <div className="flex flex-col items-end">
                   <div className="flex items-center justify-end gap-1">
-                    <Lock size={10} className="text-slate-400" />
-                    <span className="font-mono text-slate-400 line-through tracking-tight text-xs">{pendingAmount.toLocaleString('fr-FR')} <span className="text-[9px]">FCFA</span></span>
+                    <Lock size={10} className="text-content-muted" />
+                    <span className="font-mono text-content-muted line-through tracking-tight text-xs">{pendingAmount.toLocaleString('fr-FR')} <span className="text-[9px]">FCFA</span></span>
                   </div>
-                  <div className="text-[9px] text-amber-500 font-medium">Non encaissé</div>
+                  <div className="text-[9px] text-status-warning font-medium">Non encaissé</div>
                 </div>
               );
             }
 
             return (
               <div className="flex flex-col items-end">
-                <div className="font-bold text-emerald-600 dark:text-emerald-400 font-mono tracking-tight text-xs">{realBalance.toLocaleString('fr-FR')} <span className="text-[9px] text-slate-400">FCFA</span></div>
+                <div className="font-bold text-status-success font-mono tracking-tight text-xs">{realBalance.toLocaleString('fr-FR')} <span className="text-[9px] text-content-muted">FCFA</span></div>
                 {type === TypeCompte.SAVINGS && (account.tauxInteret || 0) > 0 && (
-                  <div className="text-[9px] text-slate-400">Taux: {account.tauxInteret}%</div>
+                  <div className="text-[9px] text-content-muted">Taux: {account.tauxInteret}%</div>
                 )}
               </div>
             );
@@ -189,31 +189,31 @@ export default function AccountsList({ data, type, onManage, onTransaction, load
         return (
           <DropdownMenu.Root>
               <DropdownMenu.Trigger asChild>
-                  <button className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded transition-colors outline-none focus:ring-2 focus:ring-blue-500/50">
+                  <button className="p-1 hover:bg-surface-muted text-content-muted hover:text-content-muted rounded transition-colors outline-none focus:ring-2 focus:ring-status-info/50">
                       <MoreHorizontal size={16} />
                   </button>
               </DropdownMenu.Trigger>
               
               <DropdownMenu.Portal>
                   <DropdownMenu.Content 
-                      className="min-w-[160px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-xl p-1 z-50 animate-in fade-in zoom-in-95 duration-100"
+                      className="min-w-[160px] bg-surface border border-edge rounded-lg shadow-xl p-1 z-50 animate-in fade-in zoom-in-95 duration-100"
                       sideOffset={5}
                       align="end"
                   >
                       <DropdownMenu.Item 
                           onSelect={() => onManage(account)}
-                          className="group flex items-center px-2 py-1.5 text-xs text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded outline-none cursor-pointer"
+                          className="group flex items-center px-2 py-1.5 text-xs text-content-muted hover:text-content-primary hover:bg-surface-muted rounded outline-none cursor-pointer"
                       >
-                          <Eye className="mr-2 h-3.5 w-3.5 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-white" />
+                          <Eye className="mr-2 h-3.5 w-3.5 text-content-muted group-hover:text-content-primary" />
                           Voir Détails
                       </DropdownMenu.Item>
                       
-                      <DropdownMenu.Separator className="h-px bg-slate-200 dark:bg-slate-800 my-1" />
+                      <DropdownMenu.Separator className="h-px bg-surface-subtle my-1" />
 
                       {isPending ? (
                         <DropdownMenu.Item
                           onSelect={() => onTransaction(account, 'Dépôt')}
-                          className="group flex items-center px-2 py-1.5 text-xs text-amber-600 dark:text-amber-500 hover:text-amber-700 dark:hover:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-500/10 rounded outline-none cursor-pointer font-medium"
+                          className="group flex items-center px-2 py-1.5 text-xs text-status-warning hover:text-status-warning hover:bg-status-warning-bg rounded outline-none cursor-pointer font-medium"
                         >
                           <Banknote className="mr-2 h-3.5 w-3.5" />
                           Encaisser le dépôt initial
@@ -223,7 +223,7 @@ export default function AccountsList({ data, type, onManage, onTransaction, load
                           <DropdownMenu.Item
                               onSelect={() => onTransaction(account, 'Dépôt')}
                               disabled={!uiConfig.canReceive}
-                              className="group flex items-center px-2 py-1.5 text-xs text-emerald-600 dark:text-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 rounded outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="group flex items-center px-2 py-1.5 text-xs text-status-success hover:text-status-success hover:bg-status-success-bg rounded outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                               <TrendingUp className="mr-2 h-3.5 w-3.5" />
                               Faire un Dépôt
@@ -232,7 +232,7 @@ export default function AccountsList({ data, type, onManage, onTransaction, load
                           <DropdownMenu.Item
                               onSelect={() => onTransaction(account, 'Retrait')}
                               disabled={!uiConfig.canTransferOut}
-                              className="group flex items-center px-2 py-1.5 text-xs text-blue-600 dark:text-blue-500 hover:text-blue-700 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                              className="group flex items-center px-2 py-1.5 text-xs text-status-info hover:text-status-info hover:bg-status-info-bg rounded outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                               <TrendingDown className="mr-2 h-3.5 w-3.5" />
                               Faire un Retrait

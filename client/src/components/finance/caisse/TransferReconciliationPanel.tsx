@@ -163,8 +163,8 @@ export default function TransferReconciliationPanel({
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-bold text-white flex items-center gap-2">
-          <ArrowLeftRight size={16} className="text-cyan-400" />
+        <h3 className="text-sm font-bold text-content-primary flex items-center gap-2">
+          <ArrowLeftRight size={16} className="text-accent" />
           Rapprochement Transferts
         </h3>
         <Button
@@ -180,21 +180,21 @@ export default function TransferReconciliationPanel({
       {/* Stats */}
       {stats && (
         <div className="grid grid-cols-4 gap-2">
-          <div className="bg-slate-800/50 rounded-lg p-2 text-center">
-            <p className="text-lg font-bold text-white">{stats.total}</p>
-            <p className="text-[10px] text-slate-400">Total</p>
+          <div className="bg-surface/50 rounded-lg p-2 text-center">
+            <p className="text-lg font-bold text-content-primary">{stats.total}</p>
+            <p className="text-[10px] text-content-muted">Total</p>
           </div>
-          <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-2 text-center">
-            <p className="text-lg font-bold text-amber-400">{stats.pending}</p>
-            <p className="text-[10px] text-slate-400">En transit</p>
+          <div className="bg-status-warning-bg border border-status-warning/30 rounded-lg p-2 text-center">
+            <p className="text-lg font-bold text-status-warning">{stats.pending}</p>
+            <p className="text-[10px] text-content-muted">En transit</p>
           </div>
-          <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-2 text-center">
-            <p className="text-lg font-bold text-green-400">{stats.reconciled}</p>
-            <p className="text-[10px] text-slate-400">Rapprochés</p>
+          <div className="bg-status-success-bg border border-status-success/30 rounded-lg p-2 text-center">
+            <p className="text-lg font-bold text-status-success">{stats.reconciled}</p>
+            <p className="text-[10px] text-content-muted">Rapprochés</p>
           </div>
-          <div className="bg-slate-800/50 rounded-lg p-2 text-center">
-            <p className="text-lg font-bold text-white">{stats.avgDaysInTransit?.toFixed(1) || '-'}</p>
-            <p className="text-[10px] text-slate-400">Jours moy.</p>
+          <div className="bg-surface/50 rounded-lg p-2 text-center">
+            <p className="text-lg font-bold text-content-primary">{stats.avgDaysInTransit?.toFixed(1) || '-'}</p>
+            <p className="text-[10px] text-content-muted">Jours moy.</p>
           </div>
         </div>
       )}
@@ -202,20 +202,20 @@ export default function TransferReconciliationPanel({
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex-1 min-w-[200px] relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" />
           <input
             type="text"
             placeholder="Rechercher par référence..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
+            className="w-full pl-9 pr-3 py-2 bg-surface border border-edge rounded-lg text-sm text-content-primary placeholder-content-muted focus:border-accent focus:outline-none"
           />
         </div>
 
         <select
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}
-          className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-300 focus:border-cyan-500 focus:outline-none"
+          className="px-3 py-2 bg-surface border border-edge rounded-lg text-sm text-content-secondary focus:border-accent focus:outline-none"
         >
           <option value="all">Tous</option>
           <option value="pending">Non rapprochés</option>
@@ -225,7 +225,7 @@ export default function TransferReconciliationPanel({
         <select
           value={filterDirection}
           onChange={(e) => setFilterDirection(e.target.value as any)}
-          className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-slate-300 focus:border-cyan-500 focus:outline-none"
+          className="px-3 py-2 bg-surface border border-edge rounded-lg text-sm text-content-secondary focus:border-accent focus:outline-none"
         >
           <option value="all">Tous transferts</option>
           <option value="sent">Envoyés</option>
@@ -237,10 +237,10 @@ export default function TransferReconciliationPanel({
       <div className="space-y-2 max-h-[400px] overflow-y-auto">
         {loading && transfers.length === 0 ? (
           <div className="flex justify-center py-8">
-            <Loader2 className="w-6 h-6 animate-spin text-cyan-500" />
+            <Loader2 className="w-6 h-6 animate-spin text-accent" />
           </div>
         ) : filteredTransfers.length === 0 ? (
-          <div className="text-center py-8 text-slate-500">
+          <div className="text-center py-8 text-content-muted">
             <CheckSquare size={32} className="mx-auto mb-2 opacity-50" />
             <p className="text-sm">Aucun transfert à rapprocher</p>
           </div>
@@ -254,12 +254,12 @@ export default function TransferReconciliationPanel({
             return (
               <div
                 key={transfer.id}
-                className={`bg-slate-800/50 border rounded-lg p-3 ${
+                className={`bg-surface/50 border rounded-lg p-3 ${
                   overdue
-                    ? 'border-red-500/50 bg-red-500/5'
+                    ? 'border-status-danger/50 bg-status-danger/5'
                     : transfer.reconciled
-                      ? 'border-green-500/30'
-                      : 'border-slate-700'
+                      ? 'border-status-success/30'
+                      : 'border-edge'
                 }`}
               >
                 <div className="flex items-start justify-between gap-3">
@@ -267,17 +267,17 @@ export default function TransferReconciliationPanel({
                     {/* Route */}
                     <div className="flex items-center gap-2 mb-2">
                       <span className={`text-xs px-1.5 py-0.5 rounded ${
-                        isSource ? 'bg-orange-500/20 text-orange-400' : 'bg-cyan-500/20 text-cyan-400'
+                        isSource ? 'bg-status-warning-bg text-status-warning' : 'bg-accent/10 text-accent'
                       }`}>
                         {isSource ? 'Envoyé' : 'Reçu'}
                       </span>
                       <div className="flex items-center gap-1.5 text-sm">
-                        <Building2 size={12} className="text-slate-400" />
-                        <span className="text-slate-300 truncate">
+                        <Building2 size={12} className="text-content-muted" />
+                        <span className="text-content-secondary truncate">
                           {transfer.agenceSourceNom || 'Source'}
                         </span>
-                        <ArrowRight size={12} className="text-slate-500" />
-                        <span className="text-slate-300 truncate">
+                        <ArrowRight size={12} className="text-content-muted" />
+                        <span className="text-content-secondary truncate">
                           {transfer.agenceDestNom || 'Dest'}
                         </span>
                       </div>
@@ -285,20 +285,20 @@ export default function TransferReconciliationPanel({
 
                     {/* Amount and reference */}
                     <div className="flex items-center gap-3 mb-1">
-                      <span className="text-base font-bold text-white">
+                      <span className="text-base font-bold text-content-primary">
                         {formatMoney(parseFloat(transfer.montant))}
                       </span>
-                      <span className="text-xs text-slate-500 font-mono">{transfer.reference}</span>
+                      <span className="text-xs text-content-muted font-mono">{transfer.reference}</span>
                     </div>
 
                     {/* Date and transit info */}
-                    <div className="flex items-center gap-3 text-xs text-slate-400">
+                    <div className="flex items-center gap-3 text-xs text-content-muted">
                       <span className="flex items-center gap-1">
                         <Calendar size={10} />
                         {formatDistanceToNow(new Date(transfer.dateCreation), { addSuffix: true, locale: fr })}
                       </span>
                       {transfer.daysInTransit !== undefined && transfer.daysInTransit > 0 && (
-                        <span className={`flex items-center gap-1 ${overdue ? 'text-red-400' : ''}`}>
+                        <span className={`flex items-center gap-1 ${overdue ? 'text-status-danger' : ''}`}>
                           <Clock size={10} />
                           {transfer.daysInTransit} jour{transfer.daysInTransit > 1 ? 's' : ''} en transit
                         </span>
@@ -306,7 +306,7 @@ export default function TransferReconciliationPanel({
                     </div>
 
                     {overdue && (
-                      <div className="flex items-center gap-1 mt-1 text-xs text-red-400">
+                      <div className="flex items-center gap-1 mt-1 text-xs text-status-danger">
                         <AlertTriangle size={10} />
                         Transfert en retard
                       </div>

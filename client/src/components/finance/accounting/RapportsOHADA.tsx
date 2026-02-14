@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { Download, Printer, FileText, BookOpen, ClipboardList, RefreshCw, Calendar } from 'lucide-react';
 import { toast, handleApiError } from '../../../lib/toast';
 import { addPdfLogoHeader, addPdfLogoFooter } from '../../../lib/pdf-logo';
+import { useBranding } from '../../../contexts/BrandingContext';
 import { loadExportLibraries } from '../../../lib/lazy-export';
 import {
   useJournalCentralisateur,
@@ -108,6 +109,7 @@ const MONTH_NAMES = [
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function RapportsOHADA() {
+  const { branding } = useBranding();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -173,6 +175,7 @@ export default function RapportsOHADA() {
         title: 'JOURNAL CENTRALISATEUR MENSUEL',
         subtitle: `Agence: ${d.agenceNom} — Norme OHADA/SYSCOHADA`,
         dateRight: `Période: ${d.periodLabel}`,
+        appName: branding.appName,
       });
 
       autoTable(doc, {
@@ -202,7 +205,7 @@ export default function RapportsOHADA() {
       doc.setTextColor(255);
       doc.text(balanced ? 'Équilibre vérifié : Débit = Crédit' : `DÉSÉQUILIBRE : écart de ${fmt(Math.abs(d.grandTotalDebit - d.grandTotalCredit))} FCFA`, 20, finalY + 13);
 
-      addPdfLogoFooter(doc, 'Journal Centralisateur');
+      addPdfLogoFooter(doc, 'Journal Centralisateur', branding.appName);
       doc.save(`Journal_Centralisateur_${d.periodLabel.replace(' ', '_')}.pdf`);
       toast.success('Export PDF réussi');
     } catch (e) { toast.error(handleApiError(e, 'Erreur export PDF')); }
@@ -254,6 +257,7 @@ export default function RapportsOHADA() {
         title: 'BILAN — OHADA/SYSCOHADA',
         subtitle: `Agence: ${d.agenceNom}`,
         dateRight: `Arrêté au ${d.dateArret}`,
+        appName: branding.appName,
       });
 
       // ACTIF section
@@ -319,7 +323,7 @@ export default function RapportsOHADA() {
         105, fy + 14, { align: 'center' }
       );
 
-      addPdfLogoFooter(doc, 'Bilan OHADA');
+      addPdfLogoFooter(doc, 'Bilan OHADA', branding.appName);
       doc.save(`Bilan_OHADA_${d.dateArret}.pdf`);
       toast.success('Export PDF réussi');
     } catch (e) { toast.error(handleApiError(e, 'Erreur export PDF')); }
@@ -379,6 +383,7 @@ export default function RapportsOHADA() {
         title: 'COMPTE DE RÉSULTAT — OHADA/SYSCOHADA',
         subtitle: `Agence: ${d.agenceNom}`,
         dateRight: `Du ${d.periodeDu} au ${d.periodeAu}`,
+        appName: branding.appName,
       });
 
       // PRODUITS section
@@ -440,7 +445,7 @@ export default function RapportsOHADA() {
       doc.setFontSize(12);
       doc.text(`RÉSULTAT NET : ${profit ? 'Bénéfice' : 'Perte'} de ${fmtFCFA(Math.abs(d.resultatNet))}`, 105, fy + 15, { align: 'center' });
 
-      addPdfLogoFooter(doc, 'Compte de Résultat OHADA');
+      addPdfLogoFooter(doc, 'Compte de Résultat OHADA', branding.appName);
       doc.save(`Compte_Resultat_OHADA_${exercice}.pdf`);
       toast.success('Export PDF réussi');
     } catch (e) { toast.error(handleApiError(e, 'Erreur export PDF')); }
@@ -503,6 +508,7 @@ export default function RapportsOHADA() {
         title: "LIVRE D'INVENTAIRE — OHADA/SYSCOHADA",
         subtitle: `Agence: ${d.agenceNom}`,
         dateRight: `Date inventaire: ${d.dateInventaire}`,
+        appName: branding.appName,
       });
 
       const activeLignes = d.lignes.filter(l => l.solde !== 0);
@@ -556,7 +562,7 @@ export default function RapportsOHADA() {
         theme: 'grid',
       });
 
-      addPdfLogoFooter(doc, "Livre d'Inventaire");
+      addPdfLogoFooter(doc, "Livre d'Inventaire", branding.appName);
       doc.save(`Livre_Inventaire_${d.dateInventaire}.pdf`);
       toast.success('Export PDF réussi');
     } catch (e) { toast.error(handleApiError(e, 'Erreur export PDF')); }
@@ -571,7 +577,7 @@ export default function RapportsOHADA() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="bg-gradient-to-r from-orange-600 to-red-600 rounded-xl p-3">
+      <div className="bg-gradient-to-r from-status-warning to-status-danger rounded-xl p-3">
         <div className="flex items-center gap-3 overflow-x-auto">
           <div className="flex items-center gap-2 flex-shrink-0">
             <FileText className="w-5 h-5 text-white" />
@@ -603,8 +609,8 @@ export default function RapportsOHADA() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
         {/* 1. Journal Centralisateur */}
-        <div className="bg-slate-800 rounded-xl overflow-hidden">
-          <div className="bg-gradient-to-r from-blue-600 to-cyan-600 p-3">
+        <div className="bg-surface rounded-xl overflow-hidden">
+          <div className="bg-gradient-to-r from-status-info to-accent p-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <BookOpen className="w-4 h-4 text-white" />
@@ -626,16 +632,16 @@ export default function RapportsOHADA() {
           <div className="p-3 space-y-2">
             <div className="flex gap-2">
               <div className="flex-1">
-                <label className="text-[10px] text-slate-400 block mb-1">Année</label>
-                <select value={year} onChange={e => setYear(Number(e.target.value))} className="w-full bg-slate-700 text-white text-xs px-2 py-1.5 rounded-lg border border-slate-600">
+                <label className="text-[10px] text-content-muted block mb-1">Année</label>
+                <select value={year} onChange={e => setYear(Number(e.target.value))} className="w-full bg-surface-elevated text-content-primary text-xs px-2 py-1.5 rounded-lg border border-edge-strong">
                   {Array.from({ length: 5 }, (_, i) => now.getFullYear() - i).map(y => (
                     <option key={y} value={y}>{y}</option>
                   ))}
                 </select>
               </div>
               <div className="flex-1">
-                <label className="text-[10px] text-slate-400 block mb-1">Mois</label>
-                <select value={month} onChange={e => setMonth(Number(e.target.value))} className="w-full bg-slate-700 text-white text-xs px-2 py-1.5 rounded-lg border border-slate-600">
+                <label className="text-[10px] text-content-muted block mb-1">Mois</label>
+                <select value={month} onChange={e => setMonth(Number(e.target.value))} className="w-full bg-surface-elevated text-content-primary text-xs px-2 py-1.5 rounded-lg border border-edge-strong">
                   {MONTH_NAMES.slice(1).map((m, i) => (
                     <option key={i + 1} value={i + 1}>{m}</option>
                   ))}
@@ -643,27 +649,27 @@ export default function RapportsOHADA() {
               </div>
             </div>
             {jcLoading ? (
-              <div className="h-16 bg-slate-700/50 rounded-lg animate-pulse" />
+              <div className="h-16 bg-surface-elevated/50 rounded-lg animate-pulse" />
             ) : (jcData as JournalCentralisateurData)?.entries?.length > 0 ? (
-              <div className="text-xs text-slate-300 space-y-1">
-                <div className="flex justify-between text-slate-400">
+              <div className="text-xs text-content-secondary space-y-1">
+                <div className="flex justify-between text-content-muted">
                   <span>{(jcData as JournalCentralisateurData).entries.length} journaux</span>
                   <span>Débit: {fmtFCFA((jcData as JournalCentralisateurData).grandTotalDebit)}</span>
                 </div>
-                <div className="flex justify-between text-slate-400">
+                <div className="flex justify-between text-content-muted">
                   <span>{(jcData as JournalCentralisateurData).periodLabel}</span>
                   <span>Crédit: {fmtFCFA((jcData as JournalCentralisateurData).grandTotalCredit)}</span>
                 </div>
               </div>
             ) : (
-              <p className="text-xs text-slate-500 text-center py-3">Aucune écriture pour cette période</p>
+              <p className="text-xs text-content-muted text-center py-3">Aucune écriture pour cette période</p>
             )}
           </div>
         </div>
 
         {/* 2. Bilan OHADA */}
-        <div className="bg-slate-800 rounded-xl overflow-hidden">
-          <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-3">
+        <div className="bg-surface rounded-xl overflow-hidden">
+          <div className="bg-gradient-to-r from-accent to-status-info p-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <ClipboardList className="w-4 h-4 text-white" />
@@ -684,31 +690,31 @@ export default function RapportsOHADA() {
           </div>
           <div className="p-3 space-y-2">
             <div>
-              <label className="text-[10px] text-slate-400 block mb-1">Date d'arrêté</label>
-              <input type="date" value={dateArret} onChange={e => setDateArret(e.target.value)} className="w-full bg-slate-700 text-white text-xs px-2 py-1.5 rounded-lg border border-slate-600" />
+              <label className="text-[10px] text-content-muted block mb-1">Date d'arrêté</label>
+              <input type="date" value={dateArret} onChange={e => setDateArret(e.target.value)} className="w-full bg-surface-elevated text-content-primary text-xs px-2 py-1.5 rounded-lg border border-edge-strong" />
             </div>
             {bilanLoading ? (
-              <div className="h-16 bg-slate-700/50 rounded-lg animate-pulse" />
+              <div className="h-16 bg-surface-elevated/50 rounded-lg animate-pulse" />
             ) : bilanData ? (
               <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-2">
-                  <div className="text-blue-400 font-bold">{fmtFCFA((bilanData as BilanData).totalActif)}</div>
-                  <div className="text-[9px] text-slate-400">Total Actif</div>
+                <div className="bg-status-info-bg border border-status-info/20 rounded-lg p-2">
+                  <div className="text-status-info font-bold">{fmtFCFA((bilanData as BilanData).totalActif)}</div>
+                  <div className="text-[9px] text-content-muted">Total Actif</div>
                 </div>
-                <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-2">
-                  <div className="text-purple-400 font-bold">{fmtFCFA((bilanData as BilanData).totalPassif)}</div>
-                  <div className="text-[9px] text-slate-400">Total Passif</div>
+                <div className="bg-status-info-bg border border-status-info/20 rounded-lg p-2">
+                  <div className="text-status-info font-bold">{fmtFCFA((bilanData as BilanData).totalPassif)}</div>
+                  <div className="text-[9px] text-content-muted">Total Passif</div>
                 </div>
               </div>
             ) : (
-              <p className="text-xs text-slate-500 text-center py-3">Aucune donnée</p>
+              <p className="text-xs text-content-muted text-center py-3">Aucune donnée</p>
             )}
           </div>
         </div>
 
         {/* 3. Compte de Résultat OHADA */}
-        <div className="bg-slate-800 rounded-xl overflow-hidden">
-          <div className="bg-gradient-to-r from-emerald-600 to-green-600 p-3">
+        <div className="bg-surface rounded-xl overflow-hidden">
+          <div className="bg-gradient-to-r from-status-success to-status-success p-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <FileText className="w-4 h-4 text-white" />
@@ -729,41 +735,41 @@ export default function RapportsOHADA() {
           </div>
           <div className="p-3 space-y-2">
             <div>
-              <label className="text-[10px] text-slate-400 block mb-1">Exercice</label>
-              <select value={exercice} onChange={e => setExercice(e.target.value)} className="w-full bg-slate-700 text-white text-xs px-2 py-1.5 rounded-lg border border-slate-600">
+              <label className="text-[10px] text-content-muted block mb-1">Exercice</label>
+              <select value={exercice} onChange={e => setExercice(e.target.value)} className="w-full bg-surface-elevated text-content-primary text-xs px-2 py-1.5 rounded-lg border border-edge-strong">
                 {Array.from({ length: 5 }, (_, i) => String(now.getFullYear() - i)).map(y => (
                   <option key={y} value={y}>{y}</option>
                 ))}
               </select>
             </div>
             {crLoading ? (
-              <div className="h-16 bg-slate-700/50 rounded-lg animate-pulse" />
+              <div className="h-16 bg-surface-elevated/50 rounded-lg animate-pulse" />
             ) : crData ? (
               <div className="space-y-1.5 text-xs">
                 <div className="flex justify-between">
-                  <span className="text-emerald-400">Produits</span>
-                  <span className="text-white font-mono">{fmtFCFA((crData as CompteResultatData).totalProduits)}</span>
+                  <span className="text-status-success">Produits</span>
+                  <span className="text-content-primary font-mono">{fmtFCFA((crData as CompteResultatData).totalProduits)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-red-400">Charges</span>
-                  <span className="text-white font-mono">{fmtFCFA((crData as CompteResultatData).totalCharges)}</span>
+                  <span className="text-status-danger">Charges</span>
+                  <span className="text-content-primary font-mono">{fmtFCFA((crData as CompteResultatData).totalCharges)}</span>
                 </div>
-                <div className="border-t border-slate-700 pt-1 flex justify-between font-bold">
-                  <span className={(crData as CompteResultatData).resultatNet >= 0 ? 'text-emerald-400' : 'text-red-400'}>
+                <div className="border-t border-edge pt-1 flex justify-between font-bold">
+                  <span className={(crData as CompteResultatData).resultatNet >= 0 ? 'text-status-success' : 'text-status-danger'}>
                     {(crData as CompteResultatData).resultatNet >= 0 ? 'Bénéfice' : 'Perte'}
                   </span>
-                  <span className="text-white font-mono">{fmtFCFA(Math.abs((crData as CompteResultatData).resultatNet))}</span>
+                  <span className="text-content-primary font-mono">{fmtFCFA(Math.abs((crData as CompteResultatData).resultatNet))}</span>
                 </div>
               </div>
             ) : (
-              <p className="text-xs text-slate-500 text-center py-3">Aucune donnée</p>
+              <p className="text-xs text-content-muted text-center py-3">Aucune donnée</p>
             )}
           </div>
         </div>
 
         {/* 4. Livre d'Inventaire */}
-        <div className="bg-slate-800 rounded-xl overflow-hidden">
-          <div className="bg-gradient-to-r from-amber-600 to-orange-600 p-3">
+        <div className="bg-surface rounded-xl overflow-hidden">
+          <div className="bg-gradient-to-r from-status-warning to-status-warning p-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <ClipboardList className="w-4 h-4 text-white" />
@@ -784,24 +790,24 @@ export default function RapportsOHADA() {
           </div>
           <div className="p-3 space-y-2">
             <div>
-              <label className="text-[10px] text-slate-400 block mb-1">Date inventaire</label>
-              <input type="date" value={dateArret} onChange={e => setDateArret(e.target.value)} className="w-full bg-slate-700 text-white text-xs px-2 py-1.5 rounded-lg border border-slate-600" />
+              <label className="text-[10px] text-content-muted block mb-1">Date inventaire</label>
+              <input type="date" value={dateArret} onChange={e => setDateArret(e.target.value)} className="w-full bg-surface-elevated text-content-primary text-xs px-2 py-1.5 rounded-lg border border-edge-strong" />
             </div>
             {liLoading ? (
-              <div className="h-16 bg-slate-700/50 rounded-lg animate-pulse" />
+              <div className="h-16 bg-surface-elevated/50 rounded-lg animate-pulse" />
             ) : liData ? (
               <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-2">
-                  <div className="text-amber-400 font-bold">{(liData as LivreInventaireData).lignes.filter(l => l.solde !== 0).length}</div>
-                  <div className="text-[9px] text-slate-400">Comptes actifs</div>
+                <div className="bg-status-warning-bg border border-status-warning/20 rounded-lg p-2">
+                  <div className="text-status-warning font-bold">{(liData as LivreInventaireData).lignes.filter(l => l.solde !== 0).length}</div>
+                  <div className="text-[9px] text-content-muted">Comptes actifs</div>
                 </div>
-                <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-2">
-                  <div className="text-orange-400 font-bold">{fmtFCFA((liData as LivreInventaireData).totalProduits - (liData as LivreInventaireData).totalCharges)}</div>
-                  <div className="text-[9px] text-slate-400">Résultat</div>
+                <div className="bg-status-warning-bg border border-status-warning/20 rounded-lg p-2">
+                  <div className="text-status-warning font-bold">{fmtFCFA((liData as LivreInventaireData).totalProduits - (liData as LivreInventaireData).totalCharges)}</div>
+                  <div className="text-[9px] text-content-muted">Résultat</div>
                 </div>
               </div>
             ) : (
-              <p className="text-xs text-slate-500 text-center py-3">Aucune donnée</p>
+              <p className="text-xs text-content-muted text-center py-3">Aucune donnée</p>
             )}
           </div>
         </div>

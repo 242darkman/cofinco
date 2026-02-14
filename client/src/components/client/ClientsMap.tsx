@@ -143,34 +143,34 @@ export default function ClientsMap({ clients: propClients, height = '500px', sho
   };
 
   const segmentColors: Record<string, string> = {
-    'Premium': 'bg-amber-500',
-    'Gold': 'bg-yellow-500',
-    'Standard': 'bg-green-500',
-    'Nouveau': 'bg-blue-500',
-    'all': 'bg-cyan-500'
+    'Premium': 'bg-status-warning',
+    'Gold': 'bg-status-warning',
+    'Standard': 'bg-status-success',
+    'Nouveau': 'bg-status-info',
+    'all': 'bg-accent'
   };
 
   if (loading) {
     return (
-      <div className="bg-slate-800 rounded-xl p-8 flex items-center justify-center" style={{ height }}>
+      <div className="bg-surface rounded-xl p-8 flex items-center justify-center" style={{ height }}>
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-slate-400">Chargement de la carte...</p>
+          <div className="w-12 h-12 border-4 border-accent border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-content-muted">Chargement de la carte...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-slate-800 rounded-xl overflow-hidden border border-slate-700 flex flex-col h-full">
+    <div className="bg-surface rounded-xl overflow-hidden border border-edge flex flex-col h-full">
       {showStats && (
-        <div className="px-3 py-2 sm:px-4 sm:py-3 border-b border-slate-700 bg-slate-800 shrink-0">
+        <div className="px-3 py-2 sm:px-4 sm:py-3 border-b border-edge bg-surface shrink-0">
           <div className="flex flex-col gap-2">
 
             {/* Header Top: Title & Count */}
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-white">
-                <MapPin className="text-cyan-400" size={18} />
+              <div className="flex items-center gap-2 text-content-primary">
+                <MapPin className="text-accent" size={18} />
                 <span className="font-bold text-sm sm:text-base">{stats.total} clients localisés</span>
               </div>
             </div>
@@ -184,12 +184,12 @@ export default function ClientsMap({ clients: propClients, height = '500px', sho
                     className={`
                       whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all border
                       ${filter === seg
-                        ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-100'
-                        : 'bg-slate-700/50 border-slate-600 text-slate-400 hover:bg-slate-700 hover:border-slate-500'
+                        ? 'bg-accent-bg border-accent/50 text-accent'
+                        : 'bg-surface-elevated/50 border-edge-strong text-content-muted hover:bg-surface-elevated hover:border-edge-strong'
                       }
                     `}
                   >
-                    <span className={`w-2 h-2 rounded-full ${segmentColors[seg] || 'bg-slate-400'}`} />
+                    <span className={`w-2 h-2 rounded-full ${segmentColors[seg] || 'bg-surface-subtle'}`} />
                     <span>{seg === 'all' ? 'Tous' : seg}</span>
                     <span className="opacity-60 ml-0.5 text-[10px] bg-black/20 px-1 py-0.5 rounded-full">
                       {seg === 'all' ? stats.total : (stats.segments[seg] || 0)}
@@ -231,33 +231,33 @@ export default function ClientsMap({ clients: propClients, height = '500px', sho
               >
                 <Popup>
                   <div className="min-w-[200px]">
-                    <div className="font-bold text-lg text-slate-800 mb-2">
+                    <div className="font-bold text-lg text-content-primary mb-2">
                       {formatClientName(client.nom, client.prenom)}
                     </div>
                     <div className="space-y-1 text-sm">
-                      <div className="flex items-center gap-2 text-slate-600">
+                      <div className="flex items-center gap-2 text-content-muted">
                         <MapPin size={14} />
                         <span>{client.ville || 'Non spécifié'}</span>
                       </div>
-                      <div className="flex items-center gap-2 text-slate-600">
+                      <div className="flex items-center gap-2 text-content-muted">
                         <span className="font-medium">Segment:</span>
                         <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                          client.segment === 'Premium' ? 'bg-amber-100 text-amber-700' :
-                          client.segment === 'Gold' ? 'bg-yellow-100 text-yellow-700' :
-                          client.segment === 'Standard' ? 'bg-green-100 text-green-700' :
-                          'bg-blue-100 text-blue-700'
+                          client.segment === 'Premium' ? 'bg-status-warning-bg text-status-warning' :
+                          client.segment === 'Gold' ? 'bg-status-warning-bg text-status-warning' :
+                          client.segment === 'Standard' ? 'bg-status-success-bg text-status-success' :
+                          'bg-status-info-bg text-status-info'
                         }`}>
                           {client.segment}
                         </span>
                       </div>
                       {client.creditTotal !== undefined && client.creditTotal > 0 && (
-                        <div className="flex items-center gap-2 text-slate-600">
+                        <div className="flex items-center gap-2 text-content-muted">
                           <CreditCard size={14} />
                           <span>Crédit: {client.creditTotal.toLocaleString()} FCFA</span>
                         </div>
                       )}
                       {client.epargneTotal !== undefined && client.epargneTotal > 0 && (
-                        <div className="flex items-center gap-2 text-slate-600">
+                        <div className="flex items-center gap-2 text-content-muted">
                           <PiggyBank size={14} />
                           <span>Épargne: {client.epargneTotal.toLocaleString()} FCFA</span>
                         </div>

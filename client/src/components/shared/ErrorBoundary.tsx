@@ -34,17 +34,17 @@ export default class ErrorBoundary extends Component<Props, State> {
       }
 
       return (
-        <div className="flex flex-col items-center justify-center min-h-[80vh] bg-slate-950 p-6 animate-in fade-in duration-500">
-          <Card className="max-w-md w-full p-8 border-slate-800 shadow-xl text-center">
-            <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mb-6 mx-auto animate-pulse">
-              <AlertCircle size={40} className="text-red-500" />
+        <div className="flex flex-col items-center justify-center min-h-[80vh] bg-surface-base p-6 animate-in fade-in duration-500">
+          <Card className="max-w-md w-full p-8 border-edge shadow-xl text-center">
+            <div className="w-20 h-20 bg-status-danger-bg rounded-full flex items-center justify-center mb-6 mx-auto animate-pulse">
+              <AlertCircle size={40} className="text-status-danger" />
             </div>
             
-            <h2 className="text-2xl font-bold text-white mb-2">
+            <h2 className="text-2xl font-bold text-content-primary mb-2">
               Une erreur est survenue
             </h2>
             
-            <p className="text-slate-400 mb-8 leading-relaxed">
+            <p className="text-content-muted mb-8 leading-relaxed">
               {this.state.error?.message || 'Une erreur inattendue s\'est produite. Nos équipes ont été notifiées.'}
             </p>
 

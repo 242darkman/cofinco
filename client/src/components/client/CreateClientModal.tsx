@@ -234,18 +234,18 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
 
-      <div className="w-full max-w-3xl max-h-[95vh] sm:max-h-[90vh] bg-slate-950 border border-slate-800 rounded-xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+      <div className="w-full max-w-3xl max-h-[95vh] sm:max-h-[90vh] bg-surface-base border border-edge rounded-xl sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden">
 
         {/* 1. HEADER (Stepper) */}
-        <div className="bg-slate-900 border-b border-slate-800 px-3 sm:px-6 py-3 sm:py-4 flex-shrink-0">
+        <div className="bg-surface-base border-b border-edge px-3 sm:px-6 py-3 sm:py-4 flex-shrink-0">
            <div className="flex justify-between items-center mb-4 sm:mb-6">
-              <h2 className="text-lg sm:text-xl font-bold text-white">Nouveau Client</h2>
-              <button onClick={onClose} className="p-1"><X className="text-slate-500 hover:text-white w-5 h-5 sm:w-6 sm:h-6" /></button>
+              <h2 className="text-lg sm:text-xl font-bold text-content-primary">Nouveau Client</h2>
+              <button onClick={onClose} className="p-1"><X className="text-content-muted hover:text-content-primary w-5 h-5 sm:w-6 sm:h-6" /></button>
            </div>
 
            {/* Progress Steps */}
            <div className="flex justify-between relative px-1 sm:px-4">
-              <div className="absolute top-1/2 left-1 right-1 sm:left-4 sm:right-4 h-0.5 bg-slate-800 -z-0"></div>
+              <div className="absolute top-1/2 left-1 right-1 sm:left-4 sm:right-4 h-0.5 bg-surface -z-0"></div>
               <StepItem num={1} icon={User} label="Identité" current={step} />
               <StepItem num={2} icon={MapPin} label="Contact" current={step} />
               <StepItem num={3} icon={Briefcase} label="Profil Pro" current={step} />
@@ -268,8 +268,8 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
                    <option value="F">Féminin</option>
                 </Select>
 
-                <div className="col-span-1 sm:col-span-2 mt-2 p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
-                   <p className="text-xs text-indigo-300 flex items-center gap-2">
+                <div className="col-span-1 sm:col-span-2 mt-2 p-3 bg-accent/10 border border-accent/20 rounded-xl">
+                   <p className="text-xs text-accent flex items-center gap-2">
                      <Check size={14} /> Assurez-vous que les informations correspondent strictement à la pièce d'identité.
                    </p>
                 </div>
@@ -280,11 +280,11 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
            {step === 2 && (
              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 animate-in slide-in-from-right fade-in duration-300">
                 <div className="col-span-1 sm:col-span-2">
-                   <label className="text-xs font-bold text-slate-500 uppercase mb-1.5 block">Téléphone<span className="text-red-400 ml-0.5">*</span></label>
+                   <label className="text-xs font-bold text-content-muted uppercase mb-1.5 block">Téléphone<span className="text-status-danger ml-0.5">*</span></label>
                    <div className="flex h-11 sm:h-12">
-                      <span className="bg-slate-900 border border-slate-700 border-r-0 rounded-l-xl px-3 sm:px-4 flex items-center text-slate-400 text-sm font-mono">+242</span>
+                      <span className="bg-surface-base border border-edge border-r-0 rounded-l-xl px-3 sm:px-4 flex items-center text-content-muted text-sm font-mono">+242</span>
                       <input
-                        className="flex-1 bg-slate-900 border border-slate-700 rounded-r-xl px-3 sm:px-4 text-white focus:ring-2 focus:ring-indigo-500 outline-none placeholder:text-slate-600 font-mono"
+                        className="flex-1 bg-surface-base border border-edge rounded-r-xl px-3 sm:px-4 text-content-primary focus:ring-2 focus:ring-accent outline-none placeholder:text-content-muted font-mono"
                         placeholder="06 000 0000"
                         value={formData.telephoneRaw}
                         onChange={handlePhoneChange}
@@ -327,8 +327,8 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
 
                 <div className="col-span-1 sm:col-span-2 grid grid-cols-2 gap-4">
                   <div className="w-full">
-                     <label className="text-[11px] sm:text-xs font-bold text-slate-500 uppercase mb-1 sm:mb-1.5 block">Fréquence Revenu</label>
-                     <div className="flex bg-slate-900 border border-slate-700 rounded-xl p-1 h-11 sm:h-12 relative">
+                     <label className="text-[11px] sm:text-xs font-bold text-content-muted uppercase mb-1 sm:mb-1.5 block">Fréquence Revenu</label>
+                     <div className="flex bg-surface-base border border-edge rounded-xl p-1 h-11 sm:h-12 relative">
                         {['Mensuel', 'Journalier'].map((type) => {
                            const isActive = formData.typeRevenu === type;
                            return (
@@ -337,8 +337,8 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
                                onClick={() => updatedField('typeRevenu', type)}
                                className={`flex-1 rounded-lg text-xs font-bold flex items-center justify-center transition-all duration-300 ${
                                  isActive 
-                                   ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20' 
-                                   : 'text-slate-400 hover:text-white'
+                                   ? 'bg-accent text-white shadow-lg shadow-accent/20' 
+                                   : 'text-content-muted hover:text-content-primary'
                                }`}
                                type="button"
                              >
@@ -367,7 +367,7 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
                    {CLIENT_ORIGIN_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </Select>
 
-                <div className="col-span-1 sm:col-span-2 pt-4 border-t border-slate-800 mt-2">
+                <div className="col-span-1 sm:col-span-2 pt-4 border-t border-edge mt-2">
                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
                       {isAdmin ? (
                         <Select label="Agence de rattachement" required value={formData.agenceId} onChange={e => updatedField('agenceId', e.target.value)}>
@@ -404,22 +404,22 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
 
                 {/* Info Box */}
                  <div className="col-span-1 flex flex-col justify-center order-first sm:order-none">
-                    <div className="p-3 sm:p-4 bg-slate-900 border border-slate-800 rounded-xl">
-                       <h4 className="text-sm font-bold text-white mb-2">Documents Requis</h4>
-                       <ul className="text-xs text-slate-400 space-y-1">
-                          <li className="flex gap-2"><Check size={12} className={formData.files.cniRecto ? "text-emerald-500" : "text-slate-600"}/> {formData.typePiece === 'CNI' ? 'CNI (Recto + Verso)' : 'Passeport'}</li>
-                          <li className="flex gap-2"><Check size={12} className={formData.files.photo ? "text-emerald-500" : "text-slate-600"}/> Photo claire et récente (Opt.)</li>
-                          <li className="flex gap-2"><Check size={12} className="text-slate-600"/> Justificatif de domicile (Opt.)</li>
+                    <div className="p-3 sm:p-4 bg-surface-base border border-edge rounded-xl">
+                       <h4 className="text-sm font-bold text-content-primary mb-2">Documents Requis</h4>
+                       <ul className="text-xs text-content-muted space-y-1">
+                          <li className="flex gap-2"><Check size={12} className={formData.files.cniRecto ? "text-status-success" : "text-content-muted"}/> {formData.typePiece === 'CNI' ? 'CNI (Recto + Verso)' : 'Passeport'}</li>
+                          <li className="flex gap-2"><Check size={12} className={formData.files.photo ? "text-status-success" : "text-content-muted"}/> Photo claire et récente (Opt.)</li>
+                          <li className="flex gap-2"><Check size={12} className="text-content-muted"/> Justificatif de domicile (Opt.)</li>
                        </ul>
                     </div>
                  </div>
 
                 {/* Type de pièce d'identité */}
                 <div className="col-span-1 sm:col-span-2">
-                  <label className="text-[11px] sm:text-xs font-bold text-slate-500 uppercase mb-1 sm:mb-1.5 block">
-                    Type de pièce d'identité<span className="text-red-400 ml-0.5">*</span>
+                  <label className="text-[11px] sm:text-xs font-bold text-content-muted uppercase mb-1 sm:mb-1.5 block">
+                    Type de pièce d'identité<span className="text-status-danger ml-0.5">*</span>
                   </label>
-                  <div className="flex bg-slate-900 border border-slate-700 rounded-xl p-1 h-11 sm:h-12">
+                  <div className="flex bg-surface-base border border-edge rounded-xl p-1 h-11 sm:h-12">
                     {([{ value: 'CNI', label: 'Carte Nationale d\'Identité' }, { value: 'PASSEPORT', label: 'Passeport' }] as const).map((opt) => {
                       const isActive = formData.typePiece === opt.value;
                       return (
@@ -433,8 +433,8 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
                           }}
                           className={`flex-1 rounded-lg text-xs font-bold flex items-center justify-center transition-all duration-300 ${
                             isActive
-                              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/20'
-                              : 'text-slate-400 hover:text-white'
+                              ? 'bg-accent text-white shadow-lg shadow-accent/20'
+                              : 'text-content-muted hover:text-content-primary'
                           }`}
                           type="button"
                         >
@@ -474,10 +474,10 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
         </div>
 
         {/* 3. FOOTER (Navigation) */}
-        <div className="p-3 sm:p-4 md:p-6 bg-slate-900 border-t border-slate-800 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 sm:gap-0 flex-shrink-0">
+        <div className="p-3 sm:p-4 md:p-6 bg-surface-base border-t border-edge flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 sm:gap-0 flex-shrink-0">
            <button
              onClick={() => step > 1 && setStep(step - 1)}
-             className={`px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 transition flex items-center justify-center gap-2 text-sm sm:text-base order-2 sm:order-1 ${step === 1 ? 'invisible hidden sm:flex' : ''}`}
+             className={`px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl border border-edge text-content-secondary hover:text-content-primary hover:bg-surface transition flex items-center justify-center gap-2 text-sm sm:text-base order-2 sm:order-1 ${step === 1 ? 'invisible hidden sm:flex' : ''}`}
            >
               <ChevronLeft size={18} /> <span className="hidden xs:inline">Précédent</span><span className="xs:hidden">Retour</span>
            </button>
@@ -485,7 +485,7 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
            <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 order-1 sm:order-2">
               <button
                 onClick={onClose}
-                className="px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition text-sm font-medium"
+                className="px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl text-content-muted hover:text-content-primary hover:bg-surface transition text-sm font-medium"
               >
                 Annuler
               </button>
@@ -496,8 +496,8 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
                   disabled={!isStepValid(step)}
                   className={`px-6 sm:px-8 py-2.5 sm:py-3 rounded-xl font-bold transition flex items-center justify-center gap-2 shadow-lg text-sm sm:text-base ${
                     isStepValid(step)
-                      ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-900/20'
-                      : 'bg-slate-700 text-slate-500 cursor-not-allowed shadow-none'
+                      ? 'bg-accent hover:bg-accent-primary-hover text-white shadow-accent/20'
+                      : 'bg-surface-elevated text-content-muted cursor-not-allowed shadow-none'
                   }`}
                 >
                    Suivant <ChevronRight size={18} />
@@ -508,8 +508,8 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
                   disabled={isSubmitting || !isFormValid}
                   className={`px-6 sm:px-8 py-2.5 sm:py-3 rounded-xl font-bold transition flex items-center justify-center gap-2 shadow-lg text-sm sm:text-base ${
                     isFormValid
-                      ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/20'
-                      : 'bg-slate-700 text-slate-500 cursor-not-allowed shadow-none'
+                      ? 'bg-status-success hover:bg-status-success text-white shadow-status-success/20'
+                      : 'bg-surface-elevated text-content-muted cursor-not-allowed shadow-none'
                   } ${isSubmitting ? 'opacity-50 cursor-wait' : ''}`}
                 >
                    {isSubmitting ? 'Enregistrement...' : <> <Save size={18} /> <span className="hidden sm:inline">Enregistrer Client</span><span className="sm:hidden">Enregistrer</span> </>}
@@ -530,10 +530,10 @@ function StepItem({ num, icon: Icon, label, current }: { num: number, icon: any,
   const isCurrent = current === num;
   return (
     <div className="relative z-10 flex flex-col items-center gap-1 sm:gap-2 w-14 sm:w-20">
-       <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-300 ${active ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30' : 'bg-slate-800 text-slate-500 border border-slate-700'} ${isCurrent ? 'ring-2 sm:ring-4 ring-indigo-500/20 scale-105 sm:scale-110' : ''}`}>
+       <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-300 ${active ? 'bg-accent text-white shadow-lg shadow-accent/30' : 'bg-surface text-content-muted border border-edge'} ${isCurrent ? 'ring-2 sm:ring-4 ring-accent/20 scale-105 sm:scale-110' : ''}`}>
           <Icon className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
        </div>
-       <span className={`text-[8px] sm:text-[10px] font-bold uppercase tracking-wider text-center leading-tight ${active ? 'text-white' : 'text-slate-600'}`}>{label}</span>
+       <span className={`text-[8px] sm:text-[10px] font-bold uppercase tracking-wider text-center leading-tight ${active ? 'text-content-primary' : 'text-content-muted'}`}>{label}</span>
     </div>
   )
 }
@@ -547,10 +547,10 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 function Input({ label, suffix, required: isRequired, className, ...props }: InputProps) {
   return (
     <div className="w-full">
-       <label className="text-[11px] sm:text-xs font-bold text-slate-500 uppercase mb-1 sm:mb-1.5 block">{label}{isRequired && <span className="text-red-400 ml-0.5">*</span>}</label>
+       <label className="text-[11px] sm:text-xs font-bold text-content-muted uppercase mb-1 sm:mb-1.5 block">{label}{isRequired && <span className="text-status-danger ml-0.5">*</span>}</label>
        <div className="relative">
-          <input className={`w-full h-11 sm:h-12 bg-slate-900 border border-slate-700 rounded-xl px-3 sm:px-4 text-sm sm:text-base text-white placeholder-slate-600 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all ${className}`} {...props} />
-          {suffix && <span className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 text-slate-500 text-[10px] sm:text-xs font-bold bg-slate-800 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded">{suffix}</span>}
+          <input className={`w-full h-11 sm:h-12 bg-surface-base border border-edge rounded-xl px-3 sm:px-4 text-sm sm:text-base text-content-primary placeholder-content-muted focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all ${className}`} {...props} />
+          {suffix && <span className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 text-content-muted text-[10px] sm:text-xs font-bold bg-surface px-1.5 sm:px-2 py-0.5 sm:py-1 rounded">{suffix}</span>}
        </div>
     </div>
   )
@@ -564,12 +564,12 @@ interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
 function Select({ label, required: isRequired, children, ...props }: SelectProps) {
   return (
     <div className="w-full">
-       <label className="text-[11px] sm:text-xs font-bold text-slate-500 uppercase mb-1 sm:mb-1.5 block">{label}{isRequired && <span className="text-red-400 ml-0.5">*</span>}</label>
+       <label className="text-[11px] sm:text-xs font-bold text-content-muted uppercase mb-1 sm:mb-1.5 block">{label}{isRequired && <span className="text-status-danger ml-0.5">*</span>}</label>
        <div className="relative">
-         <select className="w-full h-11 sm:h-12 bg-slate-900 border border-slate-700 rounded-xl px-3 sm:px-4 text-sm sm:text-base text-white focus:ring-2 focus:ring-indigo-500 outline-none appearance-none cursor-pointer" {...props}>
+         <select className="w-full h-11 sm:h-12 bg-surface-base border border-edge rounded-xl px-3 sm:px-4 text-sm sm:text-base text-content-primary focus:ring-2 focus:ring-accent outline-none appearance-none cursor-pointer" {...props}>
             {children}
          </select>
-         <div className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
+         <div className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 pointer-events-none text-content-muted">
            <svg width="10" height="6" viewBox="0 0 10 6" fill="currentColor">
              <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
            </svg>
@@ -681,7 +681,7 @@ function PhotoUpload({ file, onFileChange }: { file: File | null; onFileChange: 
 
   return (
     <div className="col-span-1 flex flex-col gap-2">
-       <label className="text-[11px] sm:text-xs font-bold text-slate-500 uppercase">Photo de Profil</label>
+       <label className="text-[11px] sm:text-xs font-bold text-content-muted uppercase">Photo de Profil</label>
 
        {/* Hidden file inputs */}
        <input
@@ -703,17 +703,17 @@ function PhotoUpload({ file, onFileChange }: { file: File | null; onFileChange: 
        {/* Preview or Upload Zone */}
        <div className={`flex-1 min-h-[120px] sm:min-h-[140px] border-2 border-dashed rounded-xl flex flex-col items-center justify-center transition-colors overflow-hidden ${
          file
-           ? 'border-emerald-500/50 bg-emerald-500/5'
-           : 'border-slate-700 bg-slate-900/50'
+           ? 'border-status-success/50 bg-status-success/5'
+           : 'border-edge bg-surface-base/50'
        }`}>
           {file ? (
             isPdf ? (
-              <div className="relative w-full h-full flex flex-col items-center justify-center bg-slate-800/50 p-3 sm:p-4">
-                <FileIcon size={28} className="text-red-400 mb-2 sm:w-8 sm:h-8" />
-                <span className="text-[11px] sm:text-xs text-slate-300 font-medium truncate max-w-[90%] px-2">{file.name}</span>
+              <div className="relative w-full h-full flex flex-col items-center justify-center bg-surface/50 p-3 sm:p-4">
+                <FileIcon size={28} className="text-status-danger mb-2 sm:w-8 sm:h-8" />
+                <span className="text-[11px] sm:text-xs text-content-secondary font-medium truncate max-w-[90%] px-2">{file.name}</span>
                 <button
                   onClick={() => onFileChange(null)}
-                  className="mt-2 sm:mt-3 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-lg text-[11px] sm:text-xs text-white transition"
+                  className="mt-2 sm:mt-3 px-3 py-1.5 bg-surface-elevated hover:bg-surface-subtle rounded-lg text-[11px] sm:text-xs text-content-primary transition"
                 >
                   Supprimer
                 </button>
@@ -724,7 +724,7 @@ function PhotoUpload({ file, onFileChange }: { file: File | null; onFileChange: 
                 <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 active:opacity-100 transition-opacity">
                   <button
                     onClick={() => onFileChange(null)}
-                    className="px-3 sm:px-4 py-1.5 sm:py-2 bg-red-600 hover:bg-red-500 rounded-lg text-xs sm:text-sm text-white font-medium transition"
+                    className="px-3 sm:px-4 py-1.5 sm:py-2 bg-status-danger hover:bg-status-danger rounded-lg text-xs sm:text-sm text-white font-medium transition"
                   >
                     Supprimer
                   </button>
@@ -733,26 +733,26 @@ function PhotoUpload({ file, onFileChange }: { file: File | null; onFileChange: 
             )
           ) : (
             <div className="flex flex-col items-center p-3 sm:p-4">
-              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-slate-800 rounded-full flex items-center justify-center mb-3 sm:mb-4">
-                 <Camera className="w-5 h-5 sm:w-6 sm:h-6 text-slate-500" />
+              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-surface rounded-full flex items-center justify-center mb-3 sm:mb-4">
+                 <Camera className="w-5 h-5 sm:w-6 sm:h-6 text-content-muted" />
               </div>
 
               {/* Two action buttons */}
               <div className="flex flex-col sm:flex-row gap-2">
                 <button
                   onClick={openCamera}
-                  className="px-3 sm:px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-[11px] sm:text-xs font-bold text-white transition flex items-center justify-center gap-1.5"
+                  className="px-3 sm:px-4 py-2 bg-accent hover:bg-accent-primary-hover rounded-lg text-[11px] sm:text-xs font-bold text-white transition flex items-center justify-center gap-1.5"
                 >
                   <Camera size={14} /> <span className="whitespace-nowrap">Prendre photo</span>
                 </button>
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="px-3 sm:px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-[11px] sm:text-xs font-bold text-white transition flex items-center justify-center gap-1.5"
+                  className="px-3 sm:px-4 py-2 bg-surface-elevated hover:bg-surface-subtle rounded-lg text-[11px] sm:text-xs font-bold text-content-primary transition flex items-center justify-center gap-1.5"
                 >
                   <UploadCloud size={14} /> Importer
                 </button>
               </div>
-              <p className="text-[9px] sm:text-[10px] text-slate-600 mt-2">Formats : JPG, PNG, PDF</p>
+              <p className="text-[9px] sm:text-[10px] text-content-muted mt-2">Formats : JPG, PNG, PDF</p>
             </div>
           )}
        </div>
@@ -760,10 +760,10 @@ function PhotoUpload({ file, onFileChange }: { file: File | null; onFileChange: 
        {/* Camera Modal */}
        {showCameraModal && (
          <div className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-2 sm:p-4">
-           <div className="bg-slate-900 rounded-xl sm:rounded-2xl overflow-hidden max-w-lg w-full max-h-[90vh] flex flex-col">
-             <div className="p-3 sm:p-4 border-b border-slate-800 flex items-center justify-between flex-shrink-0">
-               <h3 className="text-white font-bold text-sm sm:text-base">Prendre une photo</h3>
-               <button onClick={closeCamera} className="text-slate-400 hover:text-white p-1">
+           <div className="bg-surface-base rounded-xl sm:rounded-2xl overflow-hidden max-w-lg w-full max-h-[90vh] flex flex-col">
+             <div className="p-3 sm:p-4 border-b border-edge flex items-center justify-between flex-shrink-0">
+               <h3 className="text-content-primary font-bold text-sm sm:text-base">Prendre une photo</h3>
+               <button onClick={closeCamera} className="text-content-muted hover:text-content-primary p-1">
                  <X size={20} />
                </button>
              </div>
@@ -771,11 +771,11 @@ function PhotoUpload({ file, onFileChange }: { file: File | null; onFileChange: 
              <div className="relative aspect-[4/3] bg-black flex-shrink-0">
                {cameraError ? (
                  <div className="absolute inset-0 flex flex-col items-center justify-center p-4 sm:p-6 text-center">
-                   <Camera className="w-10 h-10 sm:w-12 sm:h-12 text-red-400 mb-3 sm:mb-4" />
-                   <p className="text-red-400 text-xs sm:text-sm mb-3 sm:mb-4">{cameraError}</p>
+                   <Camera className="w-10 h-10 sm:w-12 sm:h-12 text-status-danger mb-3 sm:mb-4" />
+                   <p className="text-status-danger text-xs sm:text-sm mb-3 sm:mb-4">{cameraError}</p>
                    <button
                      onClick={() => fileInputRef.current?.click()}
-                     className="px-3 sm:px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-xs sm:text-sm text-white font-medium"
+                     className="px-3 sm:px-4 py-2 bg-accent hover:bg-accent-primary-hover rounded-lg text-xs sm:text-sm text-white font-medium"
                    >
                      Importer une photo à la place
                    </button>
@@ -796,9 +796,9 @@ function PhotoUpload({ file, onFileChange }: { file: File | null; onFileChange: 
                <div className="p-3 sm:p-4 flex justify-center flex-shrink-0">
                  <button
                    onClick={capturePhoto}
-                   className="w-14 h-14 sm:w-16 sm:h-16 bg-white rounded-full flex items-center justify-center hover:bg-slate-200 active:scale-95 transition shadow-lg"
+                   className="w-14 h-14 sm:w-16 sm:h-16 bg-white rounded-full flex items-center justify-center hover:bg-surface-subtle active:scale-95 transition shadow-lg"
                  >
-                   <div className="w-10 h-10 sm:w-12 sm:h-12 bg-indigo-600 rounded-full" />
+                   <div className="w-10 h-10 sm:w-12 sm:h-12 bg-accent rounded-full" />
                  </button>
                </div>
              )}
@@ -840,7 +840,7 @@ function DocUpload({ label, file, onFileChange, required: isRequired }: { label:
 
   return (
     <div className="flex-1 min-w-0">
-       <label className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase mb-1 sm:mb-1.5 block truncate">{label}{isRequired && <span className="text-red-400 ml-0.5">*</span>}</label>
+       <label className="text-[10px] sm:text-xs font-bold text-content-muted uppercase mb-1 sm:mb-1.5 block truncate">{label}{isRequired && <span className="text-status-danger ml-0.5">*</span>}</label>
        <input
          ref={inputRef}
          type="file"
@@ -853,32 +853,32 @@ function DocUpload({ label, file, onFileChange, required: isRequired }: { label:
          onClick={handleClick}
          className={`h-20 sm:h-24 border border-dashed rounded-xl flex items-center justify-center gap-2 sm:gap-3 transition-all cursor-pointer group overflow-hidden ${
            file
-             ? 'border-emerald-500/50 bg-emerald-500/5'
-             : 'border-slate-700 bg-slate-900/30 hover:border-indigo-500 hover:bg-indigo-500/5 active:border-indigo-500 active:bg-indigo-500/5'
+             ? 'border-status-success/50 bg-status-success/5'
+             : 'border-edge bg-surface-base/30 hover:border-accent hover:bg-accent-primary-hover/5 active:border-accent active:bg-accent/5'
          }`}
        >
           {file ? (
             isPdf ? (
-              <div className="relative w-full h-full flex flex-col items-center justify-center bg-slate-800/30">
-                <FileIcon className="w-5 h-5 sm:w-6 sm:h-6 text-red-400 mb-1" />
-                <span className="text-[9px] sm:text-[10px] text-slate-400 truncate max-w-[90%] px-2">{file.name}</span>
+              <div className="relative w-full h-full flex flex-col items-center justify-center bg-surface/30">
+                <FileIcon className="w-5 h-5 sm:w-6 sm:h-6 text-status-danger mb-1" />
+                <span className="text-[9px] sm:text-[10px] text-content-muted truncate max-w-[90%] px-2">{file.name}</span>
                 <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 active:opacity-100 transition-opacity">
-                  <span className="text-[11px] sm:text-xs text-white font-medium">Changer</span>
+                  <span className="text-[11px] sm:text-xs text-content-primary font-medium">Changer</span>
                 </div>
               </div>
             ) : (
               <div className="relative w-full h-full">
                 <img src={preview!} alt="Preview" className="w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 active:opacity-100 transition-opacity">
-                  <span className="text-[11px] sm:text-xs text-white font-medium">Changer</span>
+                  <span className="text-[11px] sm:text-xs text-content-primary font-medium">Changer</span>
                 </div>
               </div>
             )
           ) : (
             <div className="flex flex-col sm:flex-row items-center gap-1.5 sm:gap-2 p-2">
-              <UploadCloud className="w-5 h-5 sm:w-5 sm:h-5 text-slate-500 group-hover:scale-110 group-hover:text-indigo-400 transition-all"/>
-              <span className="text-[10px] sm:text-xs text-slate-500 group-hover:text-indigo-400 text-center leading-tight">Scanner / Uploader</span>
-              <span className="text-[8px] sm:text-[9px] text-slate-600 mt-0.5">JPG, PNG, PDF</span>
+              <UploadCloud className="w-5 h-5 sm:w-5 sm:h-5 text-content-muted group-hover:scale-110 group-hover:text-accent transition-all"/>
+              <span className="text-[10px] sm:text-xs text-content-muted group-hover:text-accent text-center leading-tight">Scanner / Uploader</span>
+              <span className="text-[8px] sm:text-[9px] text-content-muted mt-0.5">JPG, PNG, PDF</span>
             </div>
           )}
        </div>

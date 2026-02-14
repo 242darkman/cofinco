@@ -28,10 +28,10 @@ type AlertType = 'INFO' | 'WARNING' | 'CRITICAL' | 'SUCCESS';
 type TargetAudience = 'ALL' | 'ADMINS' | 'AGENTS' | 'SPECIFIC_USERS';
 
 const ALERT_TYPES: { value: AlertType; label: string; icon: React.ElementType; color: string }[] = [
-  { value: 'INFO', label: 'Information', icon: Info, color: 'text-blue-400 bg-blue-500/20' },
-  { value: 'WARNING', label: 'Avertissement', icon: AlertTriangle, color: 'text-amber-400 bg-amber-500/20' },
-  { value: 'CRITICAL', label: 'Critique', icon: AlertCircle, color: 'text-red-400 bg-red-500/20' },
-  { value: 'SUCCESS', label: 'Succès', icon: CheckCircle, color: 'text-emerald-400 bg-emerald-500/20' },
+  { value: 'INFO', label: 'Information', icon: Info, color: 'text-status-info bg-status-info-bg' },
+  { value: 'WARNING', label: 'Avertissement', icon: AlertTriangle, color: 'text-status-warning bg-status-warning-bg' },
+  { value: 'CRITICAL', label: 'Critique', icon: AlertCircle, color: 'text-status-danger bg-status-danger-bg' },
+  { value: 'SUCCESS', label: 'Succès', icon: CheckCircle, color: 'text-status-success bg-status-success-bg' },
 ];
 
 const TARGET_OPTIONS: { value: TargetAudience; label: string; description: string }[] = [
@@ -99,18 +99,18 @@ export default function CreateAlertModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-lg overflow-hidden shadow-2xl">
+      <div className="bg-surface rounded-2xl border border-edge w-full max-w-lg overflow-hidden shadow-2xl">
         {/* Header */}
-        <div className="p-4 border-b border-slate-700 flex items-center justify-between">
+        <div className="p-4 border-b border-edge flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-amber-500/20 rounded-lg">
-              <AlertTriangle className="text-amber-400" size={20} />
+            <div className="p-2 bg-status-warning-bg rounded-lg">
+              <AlertTriangle className="text-status-warning" size={20} />
             </div>
-            <h2 className="text-lg font-semibold text-white">Nouvelle alerte</h2>
+            <h2 className="text-lg font-semibold text-content-primary">Nouvelle alerte</h2>
           </div>
           <button
             onClick={handleClose}
-            className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition"
+            className="p-2 text-content-muted hover:text-content-primary hover:bg-surface-elevated rounded-lg transition"
           >
             <X size={20} />
           </button>
@@ -120,7 +120,7 @@ export default function CreateAlertModal({
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
           {/* Alert Type */}
           <div>
-            <label className="block text-sm text-slate-400 mb-2">Type d'alerte</label>
+            <label className="block text-sm text-content-muted mb-2">Type d'alerte</label>
             <div className="grid grid-cols-4 gap-2">
               {ALERT_TYPES.map((alertType) => {
                 const Icon = alertType.icon;
@@ -132,7 +132,7 @@ export default function CreateAlertModal({
                     className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border transition ${
                       type === alertType.value
                         ? `border-transparent ${alertType.color}`
-                        : 'border-slate-600 bg-slate-700/50 hover:border-slate-500'
+                        : 'border-edge-strong bg-surface-elevated/50 hover:border-edge-strong'
                     }`}
                   >
                     <Icon size={20} />
@@ -145,12 +145,12 @@ export default function CreateAlertModal({
 
           {/* Title */}
           <div>
-            <label className="block text-sm text-slate-400 mb-1">Titre *</label>
+            <label className="block text-sm text-content-muted mb-1">Titre *</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+              className="w-full px-4 py-2.5 bg-surface-elevated border border-edge-strong rounded-lg text-content-primary focus:outline-none focus:ring-2 focus:ring-status-warning"
               placeholder="Titre de l'alerte"
               maxLength={100}
             />
@@ -158,22 +158,22 @@ export default function CreateAlertModal({
 
           {/* Message */}
           <div>
-            <label className="block text-sm text-slate-400 mb-1">Message *</label>
+            <label className="block text-sm text-content-muted mb-1">Message *</label>
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               rows={4}
-              className="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-amber-500 resize-none"
+              className="w-full px-4 py-2.5 bg-surface-elevated border border-edge-strong rounded-lg text-content-primary focus:outline-none focus:ring-2 focus:ring-status-warning resize-none"
               placeholder="Contenu détaillé de l'alerte..."
             />
-            <p className="mt-1 text-xs text-slate-500 text-right">
+            <p className="mt-1 text-xs text-content-muted text-right">
               {message.length} / 500 caractères
             </p>
           </div>
 
           {/* Target Audience */}
           <div>
-            <label className="block text-sm text-slate-400 mb-2">
+            <label className="block text-sm text-content-muted mb-2">
               <Users size={14} className="inline mr-1" />
               Audience cible
             </label>
@@ -185,12 +185,12 @@ export default function CreateAlertModal({
                   onClick={() => setTargetAudience(option.value)}
                   className={`p-3 rounded-lg border text-left transition ${
                     targetAudience === option.value
-                      ? 'border-amber-500/50 bg-amber-500/10'
-                      : 'border-slate-600 bg-slate-700/50 hover:border-slate-500'
+                      ? 'border-status-warning/50 bg-status-warning-bg'
+                      : 'border-edge-strong bg-surface-elevated/50 hover:border-edge-strong'
                   }`}
                 >
-                  <span className="block text-sm text-white">{option.label}</span>
-                  <span className="block text-xs text-slate-400">{option.description}</span>
+                  <span className="block text-sm text-content-primary">{option.label}</span>
+                  <span className="block text-xs text-content-muted">{option.description}</span>
                 </button>
               ))}
             </div>
@@ -198,7 +198,7 @@ export default function CreateAlertModal({
 
           {/* Expiration */}
           <div>
-            <label className="block text-sm text-slate-400 mb-1">
+            <label className="block text-sm text-content-muted mb-1">
               <Calendar size={14} className="inline mr-1" />
               Date d'expiration (optionnel)
             </label>
@@ -206,20 +206,20 @@ export default function CreateAlertModal({
               type="datetime-local"
               value={expiresAt}
               onChange={(e) => setExpiresAt(e.target.value)}
-              className="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+              className="w-full px-4 py-2.5 bg-surface-elevated border border-edge-strong rounded-lg text-content-primary focus:outline-none focus:ring-2 focus:ring-status-warning"
             />
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-content-muted">
               L'alerte sera automatiquement masquée après cette date
             </p>
           </div>
 
           {/* Preview */}
           {title && (
-            <div className="p-4 bg-slate-900/50 rounded-lg border border-slate-700">
-              <p className="text-xs text-slate-400 mb-2">Aperçu</p>
+            <div className="p-4 bg-surface-base/50 rounded-lg border border-edge">
+              <p className="text-xs text-content-muted mb-2">Aperçu</p>
               <div
                 className={`p-3 rounded-lg ${
-                  ALERT_TYPES.find((t) => t.value === type)?.color || 'bg-slate-700'
+                  ALERT_TYPES.find((t) => t.value === type)?.color || 'bg-surface-elevated'
                 }`}
               >
                 <div className="flex items-start gap-2">
@@ -228,7 +228,7 @@ export default function CreateAlertModal({
                     return <AlertIcon size={18} className="mt-0.5" />;
                   })()}
                   <div>
-                    <h4 className="font-medium text-white">{title}</h4>
+                    <h4 className="font-medium text-content-primary">{title}</h4>
                     {message && <p className="text-sm opacity-90 mt-1">{message}</p>}
                   </div>
                 </div>
@@ -237,18 +237,18 @@ export default function CreateAlertModal({
           )}
 
           {/* Actions */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
+          <div className="flex justify-end gap-3 pt-4 border-t border-edge">
             <button
               type="button"
               onClick={handleClose}
-              className="px-4 py-2 text-slate-400 hover:text-white transition"
+              className="px-4 py-2 text-content-muted hover:text-content-primary transition"
             >
               Annuler
             </button>
             <button
               type="submit"
               disabled={saving || !title || !message}
-              className="flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 bg-status-warning hover:bg-status-warning text-white rounded-lg transition disabled:opacity-50"
             >
               {saving ? (
                 <Loader2 className="animate-spin" size={18} />

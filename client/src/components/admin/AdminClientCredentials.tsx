@@ -189,8 +189,8 @@ export default function AdminClientCredentials() {
             subtitle={`${FEATURE_DESCRIPTIONS['admin.credentials'].subtitle} (${clients.length} sans accès)`}
             helpText={FEATURE_DESCRIPTIONS['admin.credentials'].helpText}
             icon={
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-teal-500/10 rounded-xl flex items-center justify-center shrink-0">
-                <Key className="w-5 h-5 sm:w-6 sm:h-6 text-teal-400" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-accent/10 rounded-xl flex items-center justify-center shrink-0">
+                <Key className="w-5 h-5 sm:w-6 sm:h-6 text-accent" />
               </div>
             }
             actions={
@@ -247,8 +247,8 @@ export default function AdminClientCredentials() {
         </div>
 
         {/* Info banner */}
-        <div className="p-3 bg-blue-500/10 border-b border-blue-500/20">
-          <p className="text-xs text-blue-400 flex items-center gap-2">
+        <div className="p-3 bg-status-info-bg border-b border-status-info/20">
+          <p className="text-xs text-status-info flex items-center gap-2">
             <AlertTriangle size={14} />
             Ces clients ont été créés sans accès portail. Vous pouvez leur générer des identifiants de connexion.
             Le mot de passe devra être changé à la première connexion.
@@ -345,7 +345,7 @@ export default function AdminClientCredentials() {
                 <p className="text-xs text-content-muted">
                   {generatedResults.filter(r => r.username).length} succès, {generatedResults.filter(r => r.error).length} erreurs
                   {sendEmail && (
-                    <span className="ml-2 text-blue-400">
+                    <span className="ml-2 text-status-info">
                       • {generatedResults.filter(r => r.emailSent).length} emails envoyés
                     </span>
                   )}
@@ -369,8 +369,8 @@ export default function AdminClientCredentials() {
               </div>
             </div>
 
-            <div className="p-3 bg-amber-500/10 border-b border-amber-500/20">
-              <p className="text-xs text-amber-400 flex items-center gap-2">
+            <div className="p-3 bg-status-warning-bg border-b border-status-warning/20">
+              <p className="text-xs text-status-warning flex items-center gap-2">
                 <AlertTriangle size={14} />
                 Notez ces identifiants maintenant ! Les mots de passe ne seront plus visibles après fermeture.
               </p>
@@ -381,27 +381,27 @@ export default function AdminClientCredentials() {
                 {generatedResults.map((result) => (
                   <div
                     key={result.clientId}
-                    className={`p-3 rounded-lg border ${result.error ? 'bg-red-500/5 border-red-500/30' : 'bg-success/5 border-success/30'}`}
+                    className={`p-3 rounded-lg border ${result.error ? 'bg-status-danger/5 border-status-danger/30' : 'bg-success/5 border-success/30'}`}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-medium text-content-primary">{result.nom}</p>
                           {result.emailSent && (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-500/10 text-blue-400 rounded text-[10px] font-medium">
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-status-info-bg text-status-info rounded text-[10px] font-medium">
                               <Mail size={10} />
                               Email envoyé
                             </span>
                           )}
                           {result.email && !result.emailSent && sendEmail && (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-500/10 text-amber-400 rounded text-[10px] font-medium">
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-status-warning-bg text-status-warning rounded text-[10px] font-medium">
                               <AlertTriangle size={10} />
                               Email non envoyé
                             </span>
                           )}
                         </div>
                         {result.error ? (
-                          <p className="text-xs text-red-400 mt-1 flex items-center gap-1">
+                          <p className="text-xs text-status-danger mt-1 flex items-center gap-1">
                             <XCircle size={12} /> {result.error}
                           </p>
                         ) : (

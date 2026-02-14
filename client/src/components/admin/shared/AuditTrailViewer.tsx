@@ -34,29 +34,29 @@ export interface AuditTrailViewerProps {
 }
 
 const ACTION_COLORS: Record<string, string> = {
-  CREATE: 'bg-emerald-500/20 text-emerald-400',
-  UPDATE: 'bg-amber-500/20 text-amber-400',
-  DELETE: 'bg-red-500/20 text-red-400',
-  ROLLBACK: 'bg-purple-500/20 text-purple-400',
-  LOGIN: 'bg-blue-500/20 text-blue-400',
-  LOGOUT: 'bg-slate-500/20 text-slate-400',
-  EXPORT: 'bg-cyan-500/20 text-cyan-400',
-  IMPORT: 'bg-indigo-500/20 text-indigo-400',
-  GRANT: 'bg-emerald-500/20 text-emerald-400',
-  REVOKE: 'bg-red-500/20 text-red-400',
+  CREATE: 'bg-status-success-bg text-status-success',
+  UPDATE: 'bg-status-warning-bg text-status-warning',
+  DELETE: 'bg-status-danger-bg text-status-danger',
+  ROLLBACK: 'bg-status-info-bg text-status-info',
+  LOGIN: 'bg-status-info-bg text-status-info',
+  LOGOUT: 'bg-surface-subtle/40 text-content-muted',
+  EXPORT: 'bg-accent/10 text-accent',
+  IMPORT: 'bg-accent/10 text-accent',
+  GRANT: 'bg-status-success-bg text-status-success',
+  REVOKE: 'bg-status-danger-bg text-status-danger',
 };
 
 const RISK_COLORS: Record<string, string> = {
-  low: 'text-slate-400',
-  medium: 'text-amber-400',
-  high: 'text-orange-400',
-  critical: 'text-red-400',
+  low: 'text-content-muted',
+  medium: 'text-status-warning',
+  high: 'text-status-warning',
+  critical: 'text-status-danger',
 };
 
 const STATUS_ICONS: Record<string, React.ReactNode> = {
-  success: <CheckCircle className="text-emerald-400" size={16} />,
-  failure: <XCircle className="text-red-400" size={16} />,
-  blocked: <Shield className="text-amber-400" size={16} />,
+  success: <CheckCircle className="text-status-success" size={16} />,
+  failure: <XCircle className="text-status-danger" size={16} />,
+  blocked: <Shield className="text-status-warning" size={16} />,
 };
 
 export default function AuditTrailViewer({
@@ -123,9 +123,9 @@ export default function AuditTrailViewer({
 
     if (!before && !after) {
       return (
-        <div className="text-sm text-slate-400">
+        <div className="text-sm text-content-muted">
           {details ? (
-            <pre className="whitespace-pre-wrap text-xs bg-slate-900/50 p-3 rounded-lg overflow-auto max-h-48">
+            <pre className="whitespace-pre-wrap text-xs bg-surface-base/50 p-3 rounded-lg overflow-auto max-h-48">
               {JSON.stringify(details, null, 2)}
             </pre>
           ) : (
@@ -148,20 +148,20 @@ export default function AuditTrailViewer({
 
           return (
             <div key={key} className="flex items-start gap-3 text-sm">
-              <span className="font-medium text-slate-300 min-w-[120px]">{key}:</span>
+              <span className="font-medium text-content-secondary min-w-[120px]">{key}:</span>
               <div className="flex-1 space-y-1">
                 {beforeVal !== undefined && (
                   <div className="flex items-center gap-2">
-                    <span className="text-red-400 text-xs">Avant:</span>
-                    <span className="text-slate-400 bg-red-500/10 px-2 py-0.5 rounded">
+                    <span className="text-status-danger text-xs">Avant:</span>
+                    <span className="text-content-muted bg-status-danger-bg px-2 py-0.5 rounded">
                       {typeof beforeVal === 'object' ? JSON.stringify(beforeVal) : String(beforeVal)}
                     </span>
                   </div>
                 )}
                 {afterVal !== undefined && (
                   <div className="flex items-center gap-2">
-                    <span className="text-emerald-400 text-xs">Après:</span>
-                    <span className="text-slate-300 bg-emerald-500/10 px-2 py-0.5 rounded">
+                    <span className="text-status-success text-xs">Après:</span>
+                    <span className="text-content-secondary bg-status-success-bg px-2 py-0.5 rounded">
                       {typeof afterVal === 'object' ? JSON.stringify(afterVal) : String(afterVal)}
                     </span>
                   </div>
@@ -175,23 +175,23 @@ export default function AuditTrailViewer({
   };
 
   return (
-    <div className="bg-slate-800/50 rounded-xl border border-slate-700">
+    <div className="bg-surface/50 rounded-xl border border-edge">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-slate-700">
+      <div className="flex items-center justify-between p-4 border-b border-edge">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-indigo-500/20 rounded-lg">
-            <History className="text-indigo-400" size={20} />
+          <div className="p-2 bg-accent/10 rounded-lg">
+            <History className="text-accent" size={20} />
           </div>
           <div>
-            <h3 className="font-semibold text-white">{title}</h3>
-            <p className="text-sm text-slate-400">{total} entrée(s)</p>
+            <h3 className="font-semibold text-content-primary">{title}</h3>
+            <p className="text-sm text-content-muted">{total} entrée(s)</p>
           </div>
         </div>
       </div>
 
       {/* Filters */}
       {showFilters && (
-        <div className="p-4 border-b border-slate-700 flex flex-wrap gap-3">
+        <div className="p-4 border-b border-edge flex flex-wrap gap-3">
           <DateRangeFilter
             startDate={filters.dateFrom}
             endDate={filters.dateTo}
@@ -201,7 +201,7 @@ export default function AuditTrailViewer({
           <select
             value={filters.action}
             onChange={(e) => setFilters((prev) => ({ ...prev, action: e.target.value }))}
-            className="px-3 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+            className="px-3 py-2 bg-surface-elevated text-content-primary rounded-lg border border-edge-strong focus:outline-none focus:ring-2 focus:ring-accent text-sm"
           >
             <option value="">Toutes actions</option>
             <option value="CREATE">Création</option>
@@ -215,7 +215,7 @@ export default function AuditTrailViewer({
             value={filters.search}
             onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
             placeholder="Rechercher..."
-            className="flex-1 min-w-[150px] px-3 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+            className="flex-1 min-w-[150px] px-3 py-2 bg-surface-elevated text-content-primary rounded-lg border border-edge-strong focus:outline-none focus:ring-2 focus:ring-accent text-sm"
           />
         </div>
       )}
@@ -224,17 +224,17 @@ export default function AuditTrailViewer({
       <div className="overflow-auto" style={{ maxHeight }}>
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="animate-spin text-indigo-400" size={32} />
+            <Loader2 className="animate-spin text-accent" size={32} />
           </div>
         ) : logs.length === 0 ? (
-          <div className="text-center py-12 text-slate-400">
+          <div className="text-center py-12 text-content-muted">
             <History size={48} className="mx-auto mb-4 opacity-50" />
             <p>Aucun historique disponible</p>
           </div>
         ) : (
-          <div className="divide-y divide-slate-700/50">
+          <div className="divide-y divide-edge/50">
             {logs.map((log) => (
-              <div key={log.id} className="p-4 hover:bg-slate-700/30 transition">
+              <div key={log.id} className="p-4 hover:bg-surface-elevated/30 transition">
                 {/* Main Row */}
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
@@ -242,7 +242,7 @@ export default function AuditTrailViewer({
                       {/* Action Badge */}
                       <span
                         className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
-                          ACTION_COLORS[log.action] || 'bg-slate-500/20 text-slate-400'
+                          ACTION_COLORS[log.action] || 'bg-surface-subtle/40 text-content-muted'
                         }`}
                       >
                         {log.action}
@@ -261,23 +261,23 @@ export default function AuditTrailViewer({
 
                       {/* Rolled Back Badge */}
                       {log.rolledBackAt && (
-                        <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded text-xs">
+                        <span className="px-2 py-0.5 bg-status-info-bg text-status-info rounded text-xs">
                           Annulé
                         </span>
                       )}
                     </div>
 
                     {/* Resource Info */}
-                    <p className="text-sm text-white mb-1">
-                      <span className="text-slate-400">Ressource:</span>{' '}
+                    <p className="text-sm text-content-primary mb-1">
+                      <span className="text-content-muted">Ressource:</span>{' '}
                       <span className="font-medium">{log.resource}</span>
                       {log.resourceId && (
-                        <span className="text-slate-500 ml-1">#{log.resourceId.slice(0, 8)}</span>
+                        <span className="text-content-muted ml-1">#{log.resourceId.slice(0, 8)}</span>
                       )}
                     </p>
 
                     {/* Meta Info */}
-                    <div className="flex flex-wrap items-center gap-4 text-xs text-slate-400">
+                    <div className="flex flex-wrap items-center gap-4 text-xs text-content-muted">
                       <span className="flex items-center gap-1">
                         <Clock size={12} />
                         {formatDate(log.createdAt)}
@@ -306,7 +306,7 @@ export default function AuditTrailViewer({
                       <button
                         onClick={() => handleRollback(log.id)}
                         disabled={rollingBack === log.id}
-                        className="p-2 text-amber-400 hover:bg-amber-500/20 rounded-lg transition disabled:opacity-50"
+                        className="p-2 text-status-warning hover:bg-status-warning-bg rounded-lg transition disabled:opacity-50"
                         title="Annuler cette action"
                       >
                         {rollingBack === log.id ? (
@@ -320,7 +320,7 @@ export default function AuditTrailViewer({
                     {/* Expand/Collapse */}
                     <button
                       onClick={() => setExpandedId(expandedId === log.id ? null : log.id)}
-                      className="p-2 text-slate-400 hover:bg-slate-700 rounded-lg transition"
+                      className="p-2 text-content-muted hover:bg-surface-elevated rounded-lg transition"
                     >
                       {expandedId === log.id ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                     </button>
@@ -329,14 +329,14 @@ export default function AuditTrailViewer({
 
                 {/* Expanded Details */}
                 {expandedId === log.id && (
-                  <div className="mt-4 pt-4 border-t border-slate-700/50">
-                    <h4 className="text-sm font-medium text-white mb-3">Détails des modifications</h4>
+                  <div className="mt-4 pt-4 border-t border-edge-subtle">
+                    <h4 className="text-sm font-medium text-content-primary mb-3">Détails des modifications</h4>
                     {renderChanges(log)}
 
                     {/* Technical Details */}
                     {log.userAgent && (
-                      <div className="mt-4 pt-3 border-t border-slate-700/50">
-                        <div className="flex items-center gap-2 text-xs text-slate-500">
+                      <div className="mt-4 pt-3 border-t border-edge-subtle">
+                        <div className="flex items-center gap-2 text-xs text-content-muted">
                           <Monitor size={12} />
                           <span className="truncate">{log.userAgent}</span>
                         </div>
@@ -352,22 +352,22 @@ export default function AuditTrailViewer({
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between p-4 border-t border-slate-700">
-          <span className="text-sm text-slate-400">
+        <div className="flex items-center justify-between p-4 border-t border-edge">
+          <span className="text-sm text-content-muted">
             Page {page} sur {totalPages}
           </span>
           <div className="flex gap-2">
             <button
               onClick={() => fetchLogs({ resource, resourceId, userId, ...filters, page: page - 1, limit: 20 })}
               disabled={page <= 1}
-              className="px-3 py-1.5 bg-slate-700 text-white rounded-lg disabled:opacity-50 text-sm"
+              className="px-3 py-1.5 bg-surface-elevated text-content-primary rounded-lg disabled:opacity-50 text-sm"
             >
               Précédent
             </button>
             <button
               onClick={() => fetchLogs({ resource, resourceId, userId, ...filters, page: page + 1, limit: 20 })}
               disabled={page >= totalPages}
-              className="px-3 py-1.5 bg-slate-700 text-white rounded-lg disabled:opacity-50 text-sm"
+              className="px-3 py-1.5 bg-surface-elevated text-content-primary rounded-lg disabled:opacity-50 text-sm"
             >
               Suivant
             </button>

@@ -11,7 +11,7 @@ export interface CreditApprovalVars {
   clientName: string;
   amount: string;
   creditNumber?: string;
-  agenceName?: string;
+  appName?: string;
 }
 
 export interface CreditRejectionVars {
@@ -39,7 +39,7 @@ export interface CreditApplicationReceivedVars {
   clientName: string;
   amount: string;
   creditNumber: string;
-  agenceName?: string;
+  appName?: string;
 }
 
 export interface CreditInvestigationAssignedVars {
@@ -184,7 +184,7 @@ export interface TempPermissionRevokedVars {
 
 export interface WelcomeVars {
   clientName: string;
-  agenceName?: string;
+  appName?: string;
 }
 
 export interface PasswordResetVars {
@@ -394,7 +394,7 @@ export interface InterestCapitalizedVars {
 
 export interface ClientWelcomeVars {
   clientName: string;
-  agenceName?: string;
+  appName?: string;
   accountNumber?: string;
 }
 
@@ -411,7 +411,7 @@ export interface EmployeeWelcomeVars {
   employeeName: string;
   matricule: string;
   username?: string;
-  agenceName?: string;
+  appName?: string;
 }
 
 // ============================================================================

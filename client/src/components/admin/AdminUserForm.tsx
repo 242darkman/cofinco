@@ -133,12 +133,12 @@ export default function AdminUserForm({ user, onClose, onSuccess }: AdminUserFor
               disabled={loading}
               icon={Save}
               variant="primary"
-              className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+              className="bg-gradient-to-r from-status-success to-status-success hover:from-status-success hover:to-status-success"
             >
               {loading ? 'Sauvegarde...' : user ? 'Modifier' : 'Créer'}
             </Button>
           ) : (
-            <div className="px-4 py-2 bg-amber-500/20 text-amber-400 rounded-lg text-sm flex items-center gap-2">
+            <div className="px-4 py-2 bg-status-warning-bg text-status-warning rounded-lg text-sm flex items-center gap-2">
               <AlertTriangle size={16} />
               Permission requise
             </div>
@@ -148,7 +148,7 @@ export default function AdminUserForm({ user, onClose, onSuccess }: AdminUserFor
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <div className="bg-blue-500/20 border border-blue-500 rounded-lg p-4 flex items-center gap-3 text-blue-400">
+          <div className="bg-status-info-bg border border-status-info rounded-lg p-4 flex items-center gap-3 text-status-info">
             <AlertCircle size={20} />
             <span>{error}</span>
           </div>

@@ -79,15 +79,15 @@ export function AgentTrackingMap() {
                     <Badge 
                         variant="neutral" 
                         value={isConnected ? 'Temps Réel' : 'Déconnecté'}
-                        className={isConnected ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/30" : "bg-red-500/10 text-red-500 border-red-500/30"}
+                        className={isConnected ? "bg-status-success-bg text-status-success border-status-success/30" : "bg-status-danger-bg text-status-danger border-status-danger/30"}
                     />
                 </h3>
-                <div className="text-sm text-slate-400">
+                <div className="text-sm text-content-muted">
                     {Object.keys(agents).length} agents actifs
                 </div>
             </div>
             
-            <div className="flex-1 rounded-lg overflow-hidden border border-slate-700">
+            <div className="flex-1 rounded-lg overflow-hidden border border-edge">
                 <MapContainer center={center} zoom={13} style={{ height: '100%', width: '100%' }}>
                     <TileLayer
                         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -100,7 +100,7 @@ export function AgentTrackingMap() {
                             icon={agentIcon}
                         >
                             <Popup>
-                                <div className="text-slate-900">
+                                <div className="text-content-primary">
                                     <strong>Agent #{agent.userId.substring(0, 5)}...</strong><br/>
                                     Vu à: {agent.lastSeen.toLocaleTimeString()}
                                 </div>

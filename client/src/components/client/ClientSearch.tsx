@@ -61,28 +61,28 @@ export default function ClientSearch({ onSearch, onClose }: ClientSearchProps) {
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-gradient-to-br from-slate-900 to-slate-800 border border-slate-700 rounded-xl max-w-4xl w-full shadow-2xl max-h-[90vh] overflow-y-auto">
-        <div className="bg-slate-900/95 backdrop-blur-sm border-b border-slate-700 p-6 flex items-center justify-between sticky top-0 z-10">
+      <div className="bg-gradient-to-br from-surface-base to-surface border border-edge rounded-xl max-w-4xl w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div className="bg-surface-base/95 backdrop-blur-sm border-b border-edge p-6 flex items-center justify-between sticky top-0 z-10">
           <div>
-            <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-              <Filter className="text-cyan-400" size={28} />
+            <h2 className="text-2xl font-bold text-content-primary flex items-center gap-3">
+              <Filter className="text-accent" size={28} />
               Recherche Avancée
             </h2>
-            <p className="text-slate-400 text-sm mt-1">
+            <p className="text-content-muted text-sm mt-1">
               Filtrez les clients selon plusieurs critères
             </p>
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-slate-700 rounded-lg transition text-slate-400 hover:text-white"
+            className="p-2 hover:bg-surface-elevated rounded-lg transition text-content-muted hover:text-content-primary"
           >
             <X size={24} />
           </button>
         </div>
 
         <div className="p-6 space-y-6">
-          <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-            <label className="block text-sm font-semibold text-slate-300 mb-2 flex items-center gap-2">
+          <div className="bg-surface/50 border border-edge rounded-lg p-4">
+            <label className="block text-sm font-semibold text-content-secondary mb-2 flex items-center gap-2">
               <Search size={16} />
               Recherche générale
             </label>
@@ -90,18 +90,18 @@ export default function ClientSearch({ onSearch, onClose }: ClientSearchProps) {
               type="text"
               value={filters.searchTerm}
               onChange={(e) => setFilters(prev => ({ ...prev, searchTerm: e.target.value }))}
-              className="w-full bg-slate-700 text-white px-4 py-2 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              className="w-full bg-surface-elevated text-content-primary px-4 py-2 rounded-lg border border-edge-strong focus:outline-none focus:ring-2 focus:ring-accent"
               placeholder="Nom complet, prénom, email, téléphone..."
             />
           </div>
 
           <div className="grid md:grid-cols-2 gap-6">
-            <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-              <label className="block text-sm font-semibold text-slate-300 mb-2">Statut</label>
+            <div className="bg-surface/50 border border-edge rounded-lg p-4">
+              <label className="block text-sm font-semibold text-content-secondary mb-2">Statut</label>
               <select
                 value={filters.status}
                 onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
-                className="w-full bg-slate-700 text-white px-4 py-2 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                className="w-full bg-surface-elevated text-content-primary px-4 py-2 rounded-lg border border-edge-strong focus:outline-none focus:ring-2 focus:ring-accent"
               >
                 <option value="all">Tous les statuts</option>
                 <option value={StatutClient.ACTIVE}>{STATUT_CLIENT_LABELS[StatutClient.ACTIVE]}</option>
@@ -110,12 +110,12 @@ export default function ClientSearch({ onSearch, onClose }: ClientSearchProps) {
               </select>
             </div>
 
-            <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-              <label className="block text-sm font-semibold text-slate-300 mb-2">Segment</label>
+            <div className="bg-surface/50 border border-edge rounded-lg p-4">
+              <label className="block text-sm font-semibold text-content-secondary mb-2">Segment</label>
               <select
                 value={filters.segment}
                 onChange={(e) => setFilters(prev => ({ ...prev, segment: e.target.value }))}
-                className="w-full bg-slate-700 text-white px-4 py-2 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                className="w-full bg-surface-elevated text-content-primary px-4 py-2 rounded-lg border border-edge-strong focus:outline-none focus:ring-2 focus:ring-accent"
               >
                 <option value="all">Tous les segments</option>
                 <option value="VIP">VIP</option>
@@ -125,64 +125,64 @@ export default function ClientSearch({ onSearch, onClose }: ClientSearchProps) {
             </div>
           </div>
 
-          <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-            <label className="block text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+          <div className="bg-surface/50 border border-edge rounded-lg p-4">
+            <label className="block text-sm font-semibold text-content-secondary mb-3 flex items-center gap-2">
               <DollarSign size={16} />
               Montant Crédit Total
             </label>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs text-slate-400 mb-1">Minimum (FC)</label>
+                <label className="block text-xs text-content-muted mb-1">Minimum (FC)</label>
                 <input
                   type="number"
                   min="0"
                   value={filters.creditMin}
                   onChange={(e) => setFilters(prev => ({ ...prev, creditMin: Number(e.target.value) }))}
-                  className="w-full bg-slate-700 text-white px-4 py-2 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                  className="w-full bg-surface-elevated text-content-primary px-4 py-2 rounded-lg border border-edge-strong focus:outline-none focus:ring-2 focus:ring-accent"
                 />
               </div>
               <div>
-                <label className="block text-xs text-slate-400 mb-1">Maximum (FC)</label>
+                <label className="block text-xs text-content-muted mb-1">Maximum (FC)</label>
                 <input
                   type="number"
                   min="0"
                   value={filters.creditMax}
                   onChange={(e) => setFilters(prev => ({ ...prev, creditMax: Number(e.target.value) }))}
-                  className="w-full bg-slate-700 text-white px-4 py-2 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                  className="w-full bg-surface-elevated text-content-primary px-4 py-2 rounded-lg border border-edge-strong focus:outline-none focus:ring-2 focus:ring-accent"
                 />
               </div>
             </div>
           </div>
 
-          <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-            <label className="block text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+          <div className="bg-surface/50 border border-edge rounded-lg p-4">
+            <label className="block text-sm font-semibold text-content-secondary mb-3 flex items-center gap-2">
               <Calendar size={16} />
               Période d'inscription
             </label>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs text-slate-400 mb-1">Date début</label>
+                <label className="block text-xs text-content-muted mb-1">Date début</label>
                 <input
                   type="date"
                   value={filters.dateFrom}
                   onChange={(e) => setFilters(prev => ({ ...prev, dateFrom: e.target.value }))}
-                  className="w-full bg-slate-700 text-white px-4 py-2 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                  className="w-full bg-surface-elevated text-content-primary px-4 py-2 rounded-lg border border-edge-strong focus:outline-none focus:ring-2 focus:ring-accent"
                 />
               </div>
               <div>
-                <label className="block text-xs text-slate-400 mb-1">Date fin</label>
+                <label className="block text-xs text-content-muted mb-1">Date fin</label>
                 <input
                   type="date"
                   value={filters.dateTo}
                   onChange={(e) => setFilters(prev => ({ ...prev, dateTo: e.target.value }))}
-                  className="w-full bg-slate-700 text-white px-4 py-2 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                  className="w-full bg-surface-elevated text-content-primary px-4 py-2 rounded-lg border border-edge-strong focus:outline-none focus:ring-2 focus:ring-accent"
                 />
               </div>
             </div>
           </div>
 
-          <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-            <label className="block text-sm font-semibold text-slate-300 mb-2 flex items-center gap-2">
+          <div className="bg-surface/50 border border-edge rounded-lg p-4">
+            <label className="block text-sm font-semibold text-content-secondary mb-2 flex items-center gap-2">
               <MapPin size={16} />
               Localisation
             </label>
@@ -190,21 +190,21 @@ export default function ClientSearch({ onSearch, onClose }: ClientSearchProps) {
               type="text"
               value={filters.ville}
               onChange={(e) => setFilters(prev => ({ ...prev, ville: e.target.value }))}
-              className="w-full bg-slate-700 text-white px-4 py-2 rounded-lg border border-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+              className="w-full bg-surface-elevated text-content-primary px-4 py-2 rounded-lg border border-edge-strong focus:outline-none focus:ring-2 focus:ring-accent"
               placeholder="Brazzaville, Poto-Poto, etc..."
             />
           </div>
 
-          <div className="flex gap-3 pt-4 border-t border-slate-700">
+          <div className="flex gap-3 pt-4 border-t border-edge">
             <button
               onClick={handleReset}
-              className="flex-1 px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-lg transition"
+              className="flex-1 px-6 py-3 bg-surface-elevated hover:bg-surface-subtle text-content-primary font-semibold rounded-lg transition"
             >
               Réinitialiser
             </button>
             <button
               onClick={handleSearch}
-              className="flex-1 px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-semibold rounded-lg transition flex items-center justify-center gap-2"
+              className="flex-1 px-6 py-3 bg-gradient-to-r from-accent to-status-info hover:from-accent hover:to-status-info text-white font-semibold rounded-lg transition flex items-center justify-center gap-2"
             >
               <Search size={20} />
               Rechercher

@@ -233,25 +233,25 @@ export default function TresoreriePage() {
       {/* ─── Header ─── */}
       <div className="shrink-0 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-white flex items-center gap-2">
-            <Wallet className="text-cyan-400" size={22} />
+          <h1 className="text-xl font-bold text-content-primary flex items-center gap-2">
+            <Wallet className="text-accent" size={22} />
             Trésorerie
           </h1>
-          <p className="text-slate-500 text-[11px] mt-0.5">
+          <p className="text-content-muted text-[11px] mt-0.5">
             Encaisse disponible — caisses physiques et comptes Mobile Money
           </p>
         </div>
         <div className="flex items-center gap-2">
           {dataUpdatedAt > 0 && (
-            <span className="text-[10px] text-slate-600 flex items-center gap-1">
-              <Signal size={9} className="text-emerald-500" />
+            <span className="text-[10px] text-content-muted flex items-center gap-1">
+              <Signal size={9} className="text-status-success" />
               {new Date(dataUpdatedAt).toLocaleTimeString('fr-FR')}
             </span>
           )}
           <button
             onClick={() => refetch()}
             disabled={isFetching}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white text-xs transition-all disabled:opacity-50 border border-slate-700/50"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface/80 hover:bg-surface-elevated text-content-secondary hover:text-content-primary text-xs transition-all disabled:opacity-50 border border-edge-subtle"
           >
             <RefreshCw size={13} className={isFetching ? 'animate-spin' : ''} />
             Actualiser
@@ -262,8 +262,8 @@ export default function TresoreriePage() {
       {isLoading ? (
         <div className="flex-1 flex items-center justify-center">
           <div className="flex flex-col items-center gap-2">
-            <Loader2 size={28} className="text-cyan-500 animate-spin" />
-            <span className="text-xs text-slate-500">Chargement de la trésorerie...</span>
+            <Loader2 size={28} className="text-accent animate-spin" />
+            <span className="text-xs text-content-muted">Chargement de la trésorerie...</span>
           </div>
         </div>
       ) : (
@@ -271,57 +271,57 @@ export default function TresoreriePage() {
           {/* ─── KPI Cards ─── */}
           <div className="grid grid-cols-3 gap-2.5">
             {/* Total Encaisse */}
-            <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-cyan-500/15 via-blue-500/10 to-indigo-500/15 border border-cyan-500/20 p-4">
+            <div className="relative overflow-hidden rounded-xl bg-gradient-to-br from-accent/15 via-status-info/10 to-accent/15 border border-accent/20 p-4">
               <div className="absolute -right-3 -top-3 opacity-[0.04]">
                 <Wallet size={72} />
               </div>
-              <p className="text-[10px] text-cyan-300/80 uppercase tracking-widest font-semibold mb-1">Encaisse Totale</p>
+              <p className="text-[10px] text-accent/80 uppercase tracking-widest font-semibold mb-1">Encaisse Totale</p>
               <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl font-extrabold text-white tracking-tight">{totalGlobal.toLocaleString('fr-FR')}</span>
-                <span className="text-xs text-cyan-400/60 font-medium">FCFA</span>
+                <span className="text-2xl font-extrabold text-content-primary tracking-tight">{totalGlobal.toLocaleString('fr-FR')}</span>
+                <span className="text-xs text-accent/60 font-medium">FCFA</span>
               </div>
-              <div className="mt-2 flex items-center gap-3 text-[10px] text-slate-400">
-                <span className="flex items-center gap-1"><Banknote size={10} className="text-emerald-400" /> {totalEspeces.toLocaleString('fr-FR')}</span>
-                <span className="text-slate-600">|</span>
-                <span className="flex items-center gap-1"><Smartphone size={10} className="text-violet-400" /> {pawapayTotal.toLocaleString('fr-FR')}</span>
+              <div className="mt-2 flex items-center gap-3 text-[10px] text-content-muted">
+                <span className="flex items-center gap-1"><Banknote size={10} className="text-status-success" /> {totalEspeces.toLocaleString('fr-FR')}</span>
+                <span className="text-content-muted">|</span>
+                <span className="flex items-center gap-1"><Smartphone size={10} className="text-accent" /> {pawapayTotal.toLocaleString('fr-FR')}</span>
               </div>
             </div>
 
             {/* Espèces (Caisses + Coffres) */}
-            <div className="relative overflow-hidden rounded-xl bg-slate-800/50 border border-slate-700/40 p-4">
+            <div className="relative overflow-hidden rounded-xl bg-surface/50 border border-edge/40 p-4">
               <div className="absolute -right-2 -top-2 opacity-[0.04]">
                 <Banknote size={60} />
               </div>
-              <p className="text-[10px] text-emerald-400/80 uppercase tracking-widest font-semibold mb-1 flex items-center gap-1">
+              <p className="text-[10px] text-status-success/80 uppercase tracking-widest font-semibold mb-1 flex items-center gap-1">
                 <Banknote size={11} /> Espèces
               </p>
               <div className="flex items-baseline gap-1.5">
-                <span className="text-xl font-bold text-white">{totalEspeces.toLocaleString('fr-FR')}</span>
-                <span className="text-[10px] text-slate-500">FCFA</span>
+                <span className="text-xl font-bold text-content-primary">{totalEspeces.toLocaleString('fr-FR')}</span>
+                <span className="text-[10px] text-content-muted">FCFA</span>
               </div>
               <div className="mt-2 flex items-center justify-between">
-                <span className="text-[10px] text-slate-500">
+                <span className="text-[10px] text-content-muted">
                   {pureCaisses.length} caisses · {realCoffres.length} coffres
                 </span>
-                <span className="text-[10px] font-medium text-emerald-400/60">{totalGlobal > 0 ? Math.round((totalEspeces / totalGlobal) * 100) : 0}%</span>
+                <span className="text-[10px] font-medium text-status-success/60">{totalGlobal > 0 ? Math.round((totalEspeces / totalGlobal) * 100) : 0}%</span>
               </div>
             </div>
 
             {/* Mobile Money (solde pawaPay réel) */}
-            <div className="relative overflow-hidden rounded-xl bg-slate-800/50 border border-slate-700/40 p-4">
+            <div className="relative overflow-hidden rounded-xl bg-surface/50 border border-edge/40 p-4">
               <div className="absolute -right-2 -top-2 opacity-[0.04]">
                 <Smartphone size={60} />
               </div>
-              <p className="text-[10px] text-violet-400/80 uppercase tracking-widest font-semibold mb-1 flex items-center gap-1">
+              <p className="text-[10px] text-accent/80 uppercase tracking-widest font-semibold mb-1 flex items-center gap-1">
                 <Smartphone size={11} /> Mobile Money
               </p>
               <div className="flex items-baseline gap-1.5">
-                <span className="text-xl font-bold text-white">{pawapayTotal.toLocaleString('fr-FR')}</span>
-                <span className="text-[10px] text-slate-500">FCFA</span>
+                <span className="text-xl font-bold text-content-primary">{pawapayTotal.toLocaleString('fr-FR')}</span>
+                <span className="text-[10px] text-content-muted">FCFA</span>
               </div>
               <div className="mt-2 flex items-center justify-between">
-                <span className="text-[10px] text-slate-500">via pawaPay</span>
-                <span className="text-[10px] font-medium text-violet-400/60">{totalGlobal > 0 ? Math.round((pawapayTotal / totalGlobal) * 100) : 0}%</span>
+                <span className="text-[10px] text-content-muted">via pawaPay</span>
+                <span className="text-[10px] font-medium text-accent/60">{totalGlobal > 0 ? Math.round((pawapayTotal / totalGlobal) * 100) : 0}%</span>
               </div>
             </div>
           </div>
@@ -332,14 +332,10 @@ export default function TresoreriePage() {
             <WalletCard
               logo={mtnLogo}
               name="MTN Mobile Money"
-              gradient="bg-gradient-to-br from-yellow-500 via-yellow-600 to-amber-700"
-              borderColor="border-yellow-500/15"
-              textAccent="text-yellow-100"
-              balanceAccent="text-yellow-400"
-              chipBg="bg-yellow-200/30"
-              chipBorder="border-yellow-200/20"
-              badgeBg="bg-yellow-100/10"
-              badgeText="text-yellow-100/40"
+              gradient="bg-gradient-to-br from-[#c89200] via-[#e0a800] to-[#c89200]"
+              borderColor="border-[#c89200]/20"
+              chipBg="bg-white/15"
+              chipBorder="border-white/20"
               providerBalance={mtnBalance}
               agences={mtnData.byAgence}
               expanded={mtnExpanded}
@@ -350,14 +346,10 @@ export default function TresoreriePage() {
             <WalletCard
               logo={airtelLogo}
               name="Airtel Money"
-              gradient="bg-gradient-to-br from-red-600 via-red-700 to-rose-800"
-              borderColor="border-red-500/15"
-              textAccent="text-red-100"
-              balanceAccent="text-red-400"
-              chipBg="bg-red-200/30"
-              chipBorder="border-red-200/20"
-              badgeBg="bg-red-100/10"
-              badgeText="text-red-100/40"
+              gradient="bg-gradient-to-br from-[#cc0000] via-[#e61a1a] to-[#cc0000]"
+              borderColor="border-[#cc0000]/20"
+              chipBg="bg-white/15"
+              chipBorder="border-white/20"
               providerBalance={airtelBalance}
               agences={airtelData.byAgence}
               expanded={airtelExpanded}
@@ -366,15 +358,15 @@ export default function TresoreriePage() {
           </div>
 
           {/* ─── Caisses & Coffres Physiques ─── */}
-          <div className="bg-slate-900/50 border border-slate-700/40 rounded-xl overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-700/40 flex items-center justify-between bg-slate-800/30">
+          <div className="bg-surface-base/50 border border-edge/40 rounded-xl overflow-hidden">
+            <div className="px-4 py-3 border-b border-edge-subtle flex items-center justify-between bg-surface/30">
               <div className="flex items-center gap-2">
-                <Landmark size={15} className="text-emerald-400" />
-                <h2 className="text-sm font-bold text-white">Caisses & Coffres Physiques</h2>
+                <Landmark size={15} className="text-status-success" />
+                <h2 className="text-sm font-bold text-content-primary">Caisses & Coffres Physiques</h2>
               </div>
               <div className="flex items-center gap-3">
                 {/* Segmented filter */}
-                <div className="flex items-center bg-slate-800/80 rounded-lg p-0.5 border border-slate-700/50">
+                <div className="flex items-center bg-surface/80 rounded-lg p-0.5 border border-edge-subtle">
                   {([
                     { key: 'ALL', label: 'Tout', icon: null },
                     { key: 'CAISSE', label: 'Caisses', icon: Banknote },
@@ -385,8 +377,8 @@ export default function TresoreriePage() {
                       onClick={() => setPhysicalFilter(key)}
                       className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-semibold transition-all ${
                         physicalFilter === key
-                          ? 'bg-slate-700 text-white shadow-sm'
-                          : 'text-slate-500 hover:text-slate-300'
+                          ? 'bg-surface-elevated text-content-primary shadow-sm'
+                          : 'text-content-muted hover:text-content-secondary'
                       }`}
                     >
                       {Icon && <Icon size={10} />}
@@ -402,42 +394,42 @@ export default function TresoreriePage() {
             {unifiedList.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
-                  <thead className="bg-slate-900/80 sticky top-0 z-10 backdrop-blur-sm">
+                  <thead className="bg-surface-base/80 sticky top-0 z-10 backdrop-blur-sm">
                     <tr>
-                      <th className="px-4 py-2.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Nom</th>
-                      <th className="px-4 py-2.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Agence</th>
-                      <th className="px-4 py-2.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-center">Statut</th>
-                      <th className="px-4 py-2.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">Solde</th>
+                      <th className="px-4 py-2.5 text-[10px] font-bold text-content-muted uppercase tracking-wider">Nom</th>
+                      <th className="px-4 py-2.5 text-[10px] font-bold text-content-muted uppercase tracking-wider">Agence</th>
+                      <th className="px-4 py-2.5 text-[10px] font-bold text-content-muted uppercase tracking-wider text-center">Statut</th>
+                      <th className="px-4 py-2.5 text-[10px] font-bold text-content-muted uppercase tracking-wider text-right">Solde</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/40">
+                  <tbody className="divide-y divide-edge/40">
                     {unifiedList.map((caisse: CaisseSummary) => (
-                      <tr key={caisse.id} className="hover:bg-slate-800/30 transition-colors group">
+                      <tr key={caisse.id} className="hover:bg-surface/30 transition-colors group">
                         <td className="px-4 py-2.5">
                           <div className="flex items-center gap-1.5">
                             {caisse.type === 'COFFRE' ? (
-                              <Vault size={12} className="text-amber-400/60 shrink-0" />
+                              <Vault size={12} className="text-status-warning/60 shrink-0" />
                             ) : (
-                              <Banknote size={12} className="text-emerald-400/60 shrink-0" />
+                              <Banknote size={12} className="text-status-success/60 shrink-0" />
                             )}
-                            <span className="text-xs font-medium text-slate-200 group-hover:text-white transition-colors">{caisse.nom}</span>
+                            <span className="text-xs font-medium text-content-secondary group-hover:text-content-primary transition-colors">{caisse.nom}</span>
                           </div>
                         </td>
                         <td className="px-4 py-2.5">
-                          <span className="text-xs text-slate-500">{caisse.agenceNom || '-'}</span>
+                          <span className="text-xs text-content-muted">{caisse.agenceNom || '-'}</span>
                         </td>
                         <td className="px-4 py-2.5 text-center">
                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-[9px] font-bold uppercase border ${
                             caisse.statut === 'OPEN'
-                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                              : 'bg-slate-700/50 text-slate-500 border-slate-600/30'
+                              ? 'bg-status-success-bg text-status-success border-status-success/20'
+                              : 'bg-surface-elevated/50 text-content-muted border-edge-strong/30'
                           }`}>
                             {caisse.statut === 'OPEN' ? 'Ouverte' : 'Fermée'}
                           </span>
                         </td>
                         <td className="px-4 py-2.5 text-right">
-                          <span className="font-mono text-xs font-bold text-white">{Number(caisse.solde).toLocaleString('fr-FR')}</span>
-                          <span className="text-[9px] text-slate-600 ml-1">FCFA</span>
+                          <span className="font-mono text-xs font-bold text-content-primary">{Number(caisse.solde).toLocaleString('fr-FR')}</span>
+                          <span className="text-[9px] text-content-muted ml-1">FCFA</span>
                         </td>
                       </tr>
                     ))}
@@ -445,7 +437,7 @@ export default function TresoreriePage() {
                 </table>
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center py-10 text-slate-600">
+              <div className="flex flex-col items-center justify-center py-10 text-content-muted">
                 <Banknote size={28} className="mb-2 opacity-20" />
                 <p className="text-xs">
                   {physicalFilter === 'COFFRE' ? 'Aucun coffre-fort' : physicalFilter === 'CAISSE' ? 'Aucune caisse' : 'Aucune caisse physique'}
@@ -466,12 +458,8 @@ interface WalletCardProps {
   name: string;
   gradient: string;
   borderColor: string;
-  textAccent: string;
-  balanceAccent: string;
   chipBg: string;
   chipBorder: string;
-  badgeBg: string;
-  badgeText: string;
   providerBalance: ReturnType<typeof resolveProviderBalance>;
   agences: DigitalCaisseByAgence[];
   expanded: boolean;
@@ -479,14 +467,14 @@ interface WalletCardProps {
 }
 
 function WalletCard({
-  logo, name, gradient, borderColor, textAccent, balanceAccent,
-  chipBg, chipBorder, badgeBg, badgeText,
+  logo, name, gradient, borderColor,
+  chipBg, chipBorder,
   providerBalance, agences, expanded, onToggle,
 }: WalletCardProps) {
   const hasAgences = agences.length > 0;
 
   return (
-    <div className={`rounded-xl overflow-hidden border ${borderColor} bg-slate-900/40`}>
+    <div className={`rounded-xl overflow-hidden border ${borderColor} bg-surface-base/40`}>
       {/* Credit card gradient header */}
       <div className={`${gradient} p-4 relative overflow-hidden`}>
         <div className="absolute -right-6 -bottom-4 opacity-10">
@@ -499,8 +487,8 @@ function WalletCard({
         <div className="flex items-center gap-2.5 mb-3">
           <img src={logo} alt={name} className="h-7 w-7 rounded" />
           <div>
-            <span className="font-bold text-sm text-white/95">{name}</span>
-            <p className={`text-[9px] ${textAccent}/50`}>Solde disponible</p>
+            <span className="font-bold text-sm text-white">{name}</span>
+            <p className="text-[9px] text-white/50">Solde disponible</p>
           </div>
         </div>
 
@@ -512,21 +500,21 @@ function WalletCard({
               : '---'
             }
           </span>
-          <span className={`text-xs ${textAccent}/60 font-medium`}>FCFA</span>
-          {providerBalance?.active && <CheckCircle2 size={12} className="text-emerald-300 ml-1" />}
+          <span className="text-xs text-white/60 font-medium">FCFA</span>
+          {providerBalance?.active && <CheckCircle2 size={12} className="text-white/80 ml-1" />}
         </div>
 
         {providerBalance?.error && (
-          <p className="text-[10px] text-red-300/70 flex items-center gap-1 mt-1">
+          <p className="text-[10px] text-white/70 flex items-center gap-1 mt-1">
             <AlertCircle size={10} /> {providerBalance.error}
           </p>
         )}
 
         <div className="mt-2 flex items-center justify-between">
-          <span className={`text-[10px] ${badgeText} flex items-center gap-1`}>
+          <span className="text-[10px] text-white/40 flex items-center gap-1">
             {providerBalance?.shared && <><Link2 size={8} /> Wallet commun</>}
           </span>
-          <span className={`text-[9px] ${badgeText} ${badgeBg} px-1.5 py-0.5 rounded`}>pawaPay</span>
+          <span className="text-[9px] text-white/50 bg-white/10 px-1.5 py-0.5 rounded">pawaPay</span>
         </div>
       </div>
 
@@ -535,7 +523,7 @@ function WalletCard({
         <div>
           <button
             onClick={onToggle}
-            className="w-full flex items-center justify-between px-3 py-2 text-[10px] text-slate-400 hover:text-slate-300 transition-colors bg-slate-800/30"
+            className="w-full flex items-center justify-between px-3 py-2 text-[10px] text-content-muted hover:text-content-secondary transition-colors bg-surface/30"
           >
             <span className="uppercase tracking-wider font-semibold">Répartition par agence</span>
             {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
@@ -543,12 +531,12 @@ function WalletCard({
           {expanded && (
             <div className="p-2 space-y-1">
               {agences.map((caisse) => (
-                <div key={caisse.caisseId} className="flex items-center justify-between p-2 rounded-lg bg-slate-800/40 border border-slate-700/20 hover:bg-slate-800/70 transition-colors">
+                <div key={caisse.caisseId} className="flex items-center justify-between p-2 rounded-lg bg-surface/40 border border-edge/20 hover:bg-surface/70 transition-colors">
                   <div className="flex items-center gap-2 overflow-hidden">
-                    <Building2 size={11} className="text-slate-600 shrink-0" />
-                    <span className="text-xs text-slate-300 truncate">{caisse.agenceNom}</span>
+                    <Building2 size={11} className="text-content-muted shrink-0" />
+                    <span className="text-xs text-content-secondary truncate">{caisse.agenceNom}</span>
                   </div>
-                  <span className={`text-xs font-mono font-semibold ${balanceAccent} ml-2`}>{Number(caisse.solde).toLocaleString('fr-FR')}</span>
+                  <span className="text-xs font-mono font-semibold text-content-primary ml-2">{Number(caisse.solde).toLocaleString('fr-FR')}</span>
                 </div>
               ))}
             </div>
@@ -563,11 +551,11 @@ function WalletCard({
 
 function Badge({ value, variant = 'neutral', className = '' }: { value: string | React.ReactNode, variant?: 'success' | 'warning' | 'error' | 'info' | 'neutral', className?: string }) {
   const variants = {
-    success: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
-    warning: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
-    error: 'bg-red-500/10 text-red-500 border-red-500/20',
-    info: 'bg-cyan-500/10 text-cyan-500 border-cyan-500/20',
-    neutral: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
+    success: 'bg-status-success-bg text-status-success border-status-success/20',
+    warning: 'bg-status-warning-bg text-status-warning border-status-warning/20',
+    error: 'bg-status-danger-bg text-status-danger border-status-danger/20',
+    info: 'bg-accent/10 text-accent border-accent/20',
+    neutral: 'bg-surface-subtle/30 text-content-muted border-edge-strong/20',
   };
   return (
     <span className={`inline-flex items-center justify-center rounded border px-2 py-0.5 text-xs font-medium ${variants[variant]} ${className}`}>

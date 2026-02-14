@@ -99,27 +99,27 @@ function ProspectionKpiSection({ agentId }: { agentId?: string }) {
 
   return (
     <div className="space-y-2">
-      <h3 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
-        <UserPlus size={16} className="text-purple-400" />
+      <h3 className="text-sm font-semibold text-content-secondary flex items-center gap-2">
+        <UserPlus size={16} className="text-status-info" />
         Prospection
       </h3>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-        <div className="bg-slate-800/80 border border-slate-700 rounded-xl p-2.5 sm:p-3">
-          <div className="text-[10px] font-medium text-slate-400 uppercase mb-1">Prospects</div>
-          <div className="text-lg font-bold text-white">{prospectsCreated}</div>
-          {toFollowUp > 0 && <div className="text-[10px] text-amber-400 mt-0.5">{toFollowUp} a suivre</div>}
+        <div className="bg-surface/80 border border-edge rounded-xl p-2.5 sm:p-3">
+          <div className="text-[10px] font-medium text-content-muted uppercase mb-1">Prospects</div>
+          <div className="text-lg font-bold text-content-primary">{prospectsCreated}</div>
+          {toFollowUp > 0 && <div className="text-[10px] text-status-warning mt-0.5">{toFollowUp} a suivre</div>}
         </div>
-        <div className="bg-slate-800/80 border border-slate-700 rounded-xl p-2.5 sm:p-3">
-          <div className="text-[10px] font-medium text-slate-400 uppercase mb-1">Convertis</div>
-          <div className="text-lg font-bold text-purple-400">{converted}</div>
+        <div className="bg-surface/80 border border-edge rounded-xl p-2.5 sm:p-3">
+          <div className="text-[10px] font-medium text-content-muted uppercase mb-1">Convertis</div>
+          <div className="text-lg font-bold text-status-info">{converted}</div>
         </div>
-        <div className="bg-slate-800/80 border border-slate-700 rounded-xl p-2.5 sm:p-3">
-          <div className="text-[10px] font-medium text-slate-400 uppercase mb-1">Taux Conversion</div>
-          <div className="text-lg font-bold text-cyan-400">{conversionRate.toFixed(1)}%</div>
+        <div className="bg-surface/80 border border-edge rounded-xl p-2.5 sm:p-3">
+          <div className="text-[10px] font-medium text-content-muted uppercase mb-1">Taux Conversion</div>
+          <div className="text-lg font-bold text-accent">{conversionRate.toFixed(1)}%</div>
         </div>
-        <div className="bg-slate-800/80 border border-slate-700 rounded-xl p-2.5 sm:p-3">
-          <div className="text-[10px] font-medium text-slate-400 uppercase mb-1">Primes</div>
-          <div className="text-lg font-bold text-emerald-400">
+        <div className="bg-surface/80 border border-edge rounded-xl p-2.5 sm:p-3">
+          <div className="text-[10px] font-medium text-content-muted uppercase mb-1">Primes</div>
+          <div className="text-lg font-bold text-status-success">
             {bonusAmount >= 1000 ? `${(bonusAmount / 1000).toFixed(0)}K` : bonusAmount.toLocaleString()} FCFA
           </div>
         </div>
@@ -460,8 +460,8 @@ export default function AgentDashboard({ agentId: propAgentId, selectedAgentId: 
   if (loading) {
     return (
       <Card className="p-8 sm:p-12 flex flex-col items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 sm:h-12 sm:w-12 border-b-2 border-cyan-500 mb-4" />
-        <p className="text-sm sm:text-base text-slate-400">Chargement du tableau de bord...</p>
+        <div className="animate-spin rounded-full h-8 w-8 sm:h-12 sm:w-12 border-b-2 border-accent mb-4" />
+        <p className="text-sm sm:text-base text-content-muted">Chargement du tableau de bord...</p>
       </Card>
     );
   }
@@ -479,34 +479,34 @@ export default function AgentDashboard({ agentId: propAgentId, selectedAgentId: 
         />
         <Card className="p-6">
           <div className="flex items-center gap-3 mb-4">
-            <UserCircle className="text-cyan-400" size={24} />
-            <h3 className="text-lg font-semibold text-white">Selectionnez un Agent Terrain</h3>
+            <UserCircle className="text-accent" size={24} />
+            <h3 className="text-lg font-semibold text-content-primary">Selectionnez un Agent Terrain</h3>
           </div>
-          <p className="text-sm text-slate-400 mb-4">
+          <p className="text-sm text-content-muted mb-4">
             En tant qu'administrateur, vous pouvez visualiser le tableau de bord de n'importe quel agent terrain.
           </p>
 
           {/* Search */}
           <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" size={18} />
             <input
               type="text"
               placeholder="Rechercher un agent..."
               value={agentSearchQuery}
               onChange={(e) => setAgentSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder:text-slate-500 focus:border-cyan-500 focus:outline-none"
+              className="w-full pl-10 pr-4 py-2.5 bg-surface border border-edge rounded-lg text-content-primary placeholder:text-content-muted focus:border-accent focus:outline-none"
             />
           </div>
 
           {/* Agents list */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[400px] overflow-y-auto">
             {loadingAgents ? (
-              <div className="col-span-full text-center py-8 text-slate-400">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-cyan-500 mx-auto mb-2" />
+              <div className="col-span-full text-center py-8 text-content-muted">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent mx-auto mb-2" />
                 Chargement des agents...
               </div>
             ) : filteredAgents.length === 0 ? (
-              <div className="col-span-full text-center py-8 text-slate-400">
+              <div className="col-span-full text-center py-8 text-content-muted">
                 {agentSearchQuery ? 'Aucun agent correspondant à la recherche' : 'Aucun agent terrain enregistré'}
               </div>
             ) : (
@@ -514,15 +514,15 @@ export default function AgentDashboard({ agentId: propAgentId, selectedAgentId: 
                 <button
                   key={agent.id}
                   onClick={() => setSelectedAgentId(agent.id)}
-                  className="flex items-center gap-3 p-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-cyan-500/50 rounded-xl transition-all text-left"
+                  className="flex items-center gap-3 p-4 bg-surface hover:bg-surface-elevated border border-edge hover:border-accent/50 rounded-xl transition-all text-left"
                 >
-                  <div className="w-10 h-10 rounded-full bg-cyan-500/20 flex items-center justify-center flex-shrink-0">
-                    <UserCircle className="text-cyan-400" size={24} />
+                  <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center flex-shrink-0">
+                    <UserCircle className="text-accent" size={24} />
                   </div>
                   <div className="min-w-0">
-                    <p className="font-medium text-white truncate">{agent.prenom} {agent.nom}</p>
+                    <p className="font-medium text-content-primary truncate">{agent.prenom} {agent.nom}</p>
                     {agent.zoneAffectation && (
-                      <p className="text-xs text-slate-400 truncate">{agent.zoneAffectation}</p>
+                      <p className="text-xs text-content-muted truncate">{agent.zoneAffectation}</p>
                     )}
                   </div>
                 </button>
@@ -538,9 +538,9 @@ export default function AgentDashboard({ agentId: propAgentId, selectedAgentId: 
   if (notAgentTerrain && !isAdmin) {
     return (
       <Card className="p-8 sm:p-12 flex flex-col items-center justify-center">
-        <Users className="text-amber-400 mb-4" size={40} />
-        <p className="text-base sm:text-lg font-semibold text-slate-200 mb-2">Profil agent terrain non trouve</p>
-        <p className="text-sm text-slate-400 text-center max-w-md">
+        <Users className="text-status-warning mb-4" size={40} />
+        <p className="text-base sm:text-lg font-semibold text-content-secondary mb-2">Profil agent terrain non trouve</p>
+        <p className="text-sm text-content-muted text-center max-w-md">
           Votre compte utilisateur n'est pas associe a un profil d'agent terrain.
           Contactez l'administrateur pour configurer votre acces.
         </p>
@@ -551,8 +551,8 @@ export default function AgentDashboard({ agentId: propAgentId, selectedAgentId: 
   if (!stats) {
     return (
       <Card className="p-8 sm:p-12 flex flex-col items-center justify-center">
-        <AlertCircle className="text-slate-400 mb-4" size={32} />
-        <p className="text-sm sm:text-base text-slate-400">Aucune donnee disponible</p>
+        <AlertCircle className="text-content-muted mb-4" size={32} />
+        <p className="text-sm sm:text-base text-content-muted">Aucune donnee disponible</p>
         <Button variant="outline" size="sm" className="mt-4" onClick={() => loadDashboard(false)}>
           Reessayer
         </Button>
@@ -580,9 +580,9 @@ export default function AgentDashboard({ agentId: propAgentId, selectedAgentId: 
               <div className="relative">
                 <button
                   onClick={() => setShowAgentSelector(!showAgentSelector)}
-                  className="flex items-center gap-2 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white hover:border-cyan-500/50 transition"
+                  className="flex items-center gap-2 px-3 py-2 bg-surface border border-edge rounded-lg text-sm text-content-primary hover:border-accent/50 transition"
                 >
-                  <UserCircle size={16} className="text-cyan-400" />
+                  <UserCircle size={16} className="text-accent" />
                   <span className="hidden sm:inline max-w-[150px] truncate">
                     {agentProfile ? `${agentProfile.prenom} ${agentProfile.nom}` : 'Changer agent'}
                   </span>
@@ -595,16 +595,16 @@ export default function AgentDashboard({ agentId: propAgentId, selectedAgentId: 
                       className="fixed inset-0 z-40"
                       onClick={() => setShowAgentSelector(false)}
                     />
-                    <div className="absolute right-0 top-full mt-2 w-72 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden">
-                      <div className="p-2 border-b border-slate-700">
+                    <div className="absolute right-0 top-full mt-2 w-72 bg-surface-base border border-edge rounded-xl shadow-2xl z-50 overflow-hidden">
+                      <div className="p-2 border-b border-edge">
                         <div className="relative">
-                          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-content-muted" size={14} />
                           <input
                             type="text"
                             placeholder="Rechercher..."
                             value={agentSearchQuery}
                             onChange={(e) => setAgentSearchQuery(e.target.value)}
-                            className="w-full pl-8 pr-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder:text-slate-500 focus:border-cyan-500 focus:outline-none"
+                            className="w-full pl-8 pr-3 py-1.5 bg-surface border border-edge rounded-lg text-sm text-content-primary placeholder:text-content-muted focus:border-accent focus:outline-none"
                           />
                         </div>
                       </div>
@@ -617,8 +617,8 @@ export default function AgentDashboard({ agentId: propAgentId, selectedAgentId: 
                               setShowAgentSelector(false);
                               setAgentSearchQuery('');
                             }}
-                            className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-800 transition ${
-                              selectedAgentId === agent.id ? 'bg-cyan-500/10 text-cyan-400' : 'text-white'
+                            className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-surface transition ${
+                              selectedAgentId === agent.id ? 'bg-accent/10 text-accent' : 'text-content-primary'
                             }`}
                           >
                             <UserCircle size={16} />
@@ -632,14 +632,14 @@ export default function AgentDashboard({ agentId: propAgentId, selectedAgentId: 
               </div>
             )}
 
-            <div className="flex gap-1 bg-slate-800 p-1 rounded-lg flex-1 sm:flex-none overflow-x-auto">
+            <div className="flex gap-1 bg-surface p-1 rounded-lg flex-1 sm:flex-none overflow-x-auto">
               {(['jour', 'semaine', 'mois'] as const).map(period => (
                 <Button
                   key={period}
                   onClick={() => setSelectedPeriod(period)}
                   variant={selectedPeriod === period ? 'primary' : 'ghost'}
                   size="sm"
-                  className={`text-xs flex-1 sm:flex-none ${selectedPeriod === period ? '' : 'text-slate-400'}`}
+                  className={`text-xs flex-1 sm:flex-none ${selectedPeriod === period ? '' : 'text-content-muted'}`}
                 >
                   {period.charAt(0).toUpperCase() + period.slice(1)}
                 </Button>
@@ -649,7 +649,7 @@ export default function AgentDashboard({ agentId: propAgentId, selectedAgentId: 
               variant="ghost"
               size="sm"
               onClick={() => loadDashboard(true)}
-              className="text-slate-400"
+              className="text-content-muted"
             >
               <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
             </Button>
@@ -701,19 +701,19 @@ export default function AgentDashboard({ agentId: propAgentId, selectedAgentId: 
       {/* Performance + Objectifs */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
         <Card className="lg:col-span-2" padding="none">
-          <Card.Header as="div" className="p-3 sm:p-4 border-b border-slate-700">
-            <h3 className="text-sm sm:text-lg font-bold text-white">Performance Globale</h3>
+          <Card.Header as="div" className="p-3 sm:p-4 border-b border-edge">
+            <h3 className="text-sm sm:text-lg font-bold text-content-primary">Performance Globale</h3>
           </Card.Header>
           <Card.Content className="p-3 sm:p-4 space-y-4">
             {/* Presence bar */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs sm:text-sm font-medium text-slate-400">Presence & Ponctualite</span>
-                <span className="text-xs sm:text-sm font-bold text-white">{stats.presenceStats.tauxPresence.toFixed(0)}%</span>
+                <span className="text-xs sm:text-sm font-medium text-content-muted">Presence & Ponctualite</span>
+                <span className="text-xs sm:text-sm font-bold text-content-primary">{stats.presenceStats.tauxPresence.toFixed(0)}%</span>
               </div>
-              <div className="bg-slate-700/50 rounded-full h-1.5 sm:h-2">
+              <div className="bg-surface-elevated/50 rounded-full h-1.5 sm:h-2">
                 <div
-                  className="bg-blue-500 h-1.5 sm:h-2 rounded-full transition-all duration-500"
+                  className="bg-status-info h-1.5 sm:h-2 rounded-full transition-all duration-500"
                   style={{ width: `${Math.min(stats.presenceStats.tauxPresence, 100)}%` }}
                 />
               </div>
@@ -722,16 +722,16 @@ export default function AgentDashboard({ agentId: propAgentId, selectedAgentId: 
             {/* Collectes bar */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs sm:text-sm font-medium text-slate-400">Collectes Cash</span>
-                <span className="text-xs sm:text-sm font-bold text-white">
+                <span className="text-xs sm:text-sm font-medium text-content-muted">Collectes Cash</span>
+                <span className="text-xs sm:text-sm font-bold text-content-primary">
                   {stats.recouvrementStats.objectifMontant > 0
                     ? `${Math.min((stats.collecteStats.montantTotal / stats.recouvrementStats.objectifMontant) * 100, 100).toFixed(0)}%`
                     : `${stats.collecteStats.nombreCollectes} ops`}
                 </span>
               </div>
-              <div className="bg-slate-700/50 rounded-full h-1.5 sm:h-2">
+              <div className="bg-surface-elevated/50 rounded-full h-1.5 sm:h-2">
                 <div
-                  className="bg-green-500 h-1.5 sm:h-2 rounded-full transition-all duration-500"
+                  className="bg-status-success h-1.5 sm:h-2 rounded-full transition-all duration-500"
                   style={{
                     width: stats.recouvrementStats.objectifMontant > 0
                       ? `${Math.min((stats.collecteStats.montantTotal / stats.recouvrementStats.objectifMontant) * 100, 100)}%`
@@ -744,12 +744,12 @@ export default function AgentDashboard({ agentId: propAgentId, selectedAgentId: 
             {/* Recouvrement bar */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs sm:text-sm font-medium text-slate-400">Recouvrement</span>
-                <span className="text-xs sm:text-sm font-bold text-white">{stats.recouvrementStats.tauxRecouvrement.toFixed(0)}%</span>
+                <span className="text-xs sm:text-sm font-medium text-content-muted">Recouvrement</span>
+                <span className="text-xs sm:text-sm font-bold text-content-primary">{stats.recouvrementStats.tauxRecouvrement.toFixed(0)}%</span>
               </div>
-              <div className="bg-slate-700/50 rounded-full h-1.5 sm:h-2">
+              <div className="bg-surface-elevated/50 rounded-full h-1.5 sm:h-2">
                 <div
-                  className="bg-orange-500 h-1.5 sm:h-2 rounded-full transition-all duration-500"
+                  className="bg-status-warning h-1.5 sm:h-2 rounded-full transition-all duration-500"
                   style={{ width: `${Math.min(stats.recouvrementStats.tauxRecouvrement, 100)}%` }}
                 />
               </div>
@@ -757,22 +757,22 @@ export default function AgentDashboard({ agentId: propAgentId, selectedAgentId: 
 
             {/* Performance summary cards */}
             <div className="mt-6 grid grid-cols-3 gap-2">
-              <div className="bg-cyan-500/10 border border-cyan-500/20 rounded-lg p-2 text-center">
-                <Star className="mx-auto text-cyan-500 mb-1" size={16} fill="currentColor" />
-                <div className="text-base sm:text-lg font-bold text-white">{stats.performanceStats.performance}%</div>
-                <div className="text-[10px] text-slate-400">Performance</div>
+              <div className="bg-accent/10 border border-accent/20 rounded-lg p-2 text-center">
+                <Star className="mx-auto text-accent mb-1" size={16} fill="currentColor" />
+                <div className="text-base sm:text-lg font-bold text-content-primary">{stats.performanceStats.performance}%</div>
+                <div className="text-[10px] text-content-muted">Performance</div>
               </div>
-              <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-2 text-center">
-                <Award className="mx-auto text-blue-500 mb-1" size={16} />
-                <div className="text-base sm:text-lg font-bold text-white">
+              <div className="bg-status-info-bg border border-status-info/20 rounded-lg p-2 text-center">
+                <Award className="mx-auto text-status-info mb-1" size={16} />
+                <div className="text-base sm:text-lg font-bold text-content-primary">
                   {stats.performanceStats.objectifsAtteints}/{stats.performanceStats.objectifsTotal}
                 </div>
-                <div className="text-[10px] text-slate-400">Objectifs</div>
+                <div className="text-[10px] text-content-muted">Objectifs</div>
               </div>
-              <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-2 text-center">
-                <Zap className="mx-auto text-emerald-500 mb-1" size={16} />
-                <div className="text-base sm:text-lg font-bold text-white">{stats.performanceStats.points}</div>
-                <div className="text-[10px] text-slate-400">Points</div>
+              <div className="bg-status-success-bg border border-status-success/20 rounded-lg p-2 text-center">
+                <Zap className="mx-auto text-status-success mb-1" size={16} />
+                <div className="text-base sm:text-lg font-bold text-content-primary">{stats.performanceStats.points}</div>
+                <div className="text-[10px] text-content-muted">Points</div>
               </div>
             </div>
           </Card.Content>
@@ -781,19 +781,19 @@ export default function AgentDashboard({ agentId: propAgentId, selectedAgentId: 
         {/* Objectifs du Jour + Formation */}
         <div className="space-y-3 sm:space-y-4">
           <Card padding="none">
-            <Card.Header as="div" className="p-3 sm:p-4 border-b border-slate-700">
-              <h3 className="text-sm sm:text-lg font-bold text-white">Objectifs du Jour</h3>
+            <Card.Header as="div" className="p-3 sm:p-4 border-b border-edge">
+              <h3 className="text-sm sm:text-lg font-bold text-content-primary">Objectifs du Jour</h3>
             </Card.Header>
             <Card.Content className="p-3 sm:p-4 space-y-3">
               {stats.objectifsJour.map((obj, idx) => (
                 <div key={idx} className="flex items-start gap-2">
                   <CheckCircle
-                    className={`flex-shrink-0 mt-0.5 ${obj.valeurRealisee >= obj.valeurObjectif ? 'text-green-500' : 'text-slate-600'}`}
+                    className={`flex-shrink-0 mt-0.5 ${obj.valeurRealisee >= obj.valeurObjectif ? 'text-status-success' : 'text-content-muted'}`}
                     size={16}
                   />
                   <div className="flex-1">
-                    <div className="font-medium text-sm text-white">{obj.label}</div>
-                    <div className="text-xs text-slate-400">
+                    <div className="font-medium text-sm text-content-primary">{obj.label}</div>
+                    <div className="text-xs text-content-muted">
                       {obj.valeurRealisee}/{obj.valeurObjectif} {obj.valeurRealisee >= obj.valeurObjectif ? 'Complete' : 'En cours'}
                     </div>
                   </div>
@@ -804,17 +804,17 @@ export default function AgentDashboard({ agentId: propAgentId, selectedAgentId: 
 
           {/* Prochaine formation */}
           {stats.formationProchaine ? (
-            <Card className="bg-gradient-to-br from-cyan-600 to-blue-700 text-white border-none shadow-lg" padding="sm">
+            <Card className="bg-gradient-to-br from-accent to-status-info text-white border-none shadow-lg" padding="sm">
               <Card.Content>
                 <h3 className="text-sm font-bold mb-2 flex items-center gap-2">
                   <BookOpen size={14} /> Formation en cours
                 </h3>
                 <div className="space-y-2">
-                  <div className="font-semibold text-xs text-white">{stats.formationProchaine.titre}</div>
+                  <div className="font-semibold text-xs text-content-primary">{stats.formationProchaine.titre}</div>
                   {stats.formationProchaine.dateDebut && (
                     <div className="flex items-center gap-2">
-                      <Calendar size={14} className="text-cyan-100" />
-                      <span className="text-xs text-cyan-50">
+                      <Calendar size={14} className="text-accent" />
+                      <span className="text-xs text-accent">
                         Debut: {new Date(stats.formationProchaine.dateDebut).toLocaleDateString('fr-FR')}
                       </span>
                     </div>
@@ -825,15 +825,15 @@ export default function AgentDashboard({ agentId: propAgentId, selectedAgentId: 
                       style={{ width: `${stats.formationProchaine.progression}%` }}
                     />
                   </div>
-                  <div className="text-[10px] text-cyan-100 text-right">{stats.formationProchaine.progression}% complete</div>
+                  <div className="text-[10px] text-accent text-right">{stats.formationProchaine.progression}% complete</div>
                 </div>
               </Card.Content>
             </Card>
           ) : (
-            <Card className="bg-slate-800/50 border-slate-700" padding="sm">
+            <Card className="bg-surface/50 border-edge" padding="sm">
               <Card.Content className="flex flex-col items-center justify-center py-4 text-center">
-                <BookOpen size={20} className="text-slate-500 mb-2" />
-                <p className="text-xs text-slate-500">Aucune formation en cours</p>
+                <BookOpen size={20} className="text-content-muted mb-2" />
+                <p className="text-xs text-content-muted">Aucune formation en cours</p>
               </Card.Content>
             </Card>
           )}
@@ -843,64 +843,64 @@ export default function AgentDashboard({ agentId: propAgentId, selectedAgentId: 
       {/* Actions Rapides + Alertes */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
         <Card padding="none">
-          <Card.Header as="div" className="p-3 sm:p-4 border-b border-slate-700">
-            <h3 className="text-sm sm:text-lg font-bold text-white">Resume Activite</h3>
+          <Card.Header as="div" className="p-3 sm:p-4 border-b border-edge">
+            <h3 className="text-sm sm:text-lg font-bold text-content-primary">Resume Activite</h3>
           </Card.Header>
           <Card.Content className="p-3 sm:p-4 space-y-3">
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-slate-800/50 rounded-lg p-3 text-center border border-slate-700/50">
-                <Banknote className="mx-auto text-green-400 mb-1.5" size={20} />
-                <div className="text-lg font-bold text-white">{stats.collecteStats.nombreCollectes}</div>
-                <div className="text-[10px] text-slate-400 uppercase">Collectes</div>
+              <div className="bg-surface/50 rounded-lg p-3 text-center border border-edge-subtle">
+                <Banknote className="mx-auto text-status-success mb-1.5" size={20} />
+                <div className="text-lg font-bold text-content-primary">{stats.collecteStats.nombreCollectes}</div>
+                <div className="text-[10px] text-content-muted uppercase">Collectes</div>
               </div>
-              <div className="bg-slate-800/50 rounded-lg p-3 text-center border border-slate-700/50">
-                <MapPin className="mx-auto text-blue-400 mb-1.5" size={20} />
-                <div className="text-lg font-bold text-white">{stats.presenceStats.joursPresents}</div>
-                <div className="text-[10px] text-slate-400 uppercase">Visites</div>
+              <div className="bg-surface/50 rounded-lg p-3 text-center border border-edge-subtle">
+                <MapPin className="mx-auto text-status-info mb-1.5" size={20} />
+                <div className="text-lg font-bold text-content-primary">{stats.presenceStats.joursPresents}</div>
+                <div className="text-[10px] text-content-muted uppercase">Visites</div>
               </div>
-              <div className="bg-slate-800/50 rounded-lg p-3 text-center border border-slate-700/50">
-                <Clock className="mx-auto text-cyan-400 mb-1.5" size={20} />
-                <div className="text-lg font-bold text-white">{stats.presenceStats.heuresMoyennes.toFixed(1)}h</div>
-                <div className="text-[10px] text-slate-400 uppercase">Moy. heures</div>
+              <div className="bg-surface/50 rounded-lg p-3 text-center border border-edge-subtle">
+                <Clock className="mx-auto text-accent mb-1.5" size={20} />
+                <div className="text-lg font-bold text-content-primary">{stats.presenceStats.heuresMoyennes.toFixed(1)}h</div>
+                <div className="text-[10px] text-content-muted uppercase">Moy. heures</div>
               </div>
-              <div className="bg-slate-800/50 rounded-lg p-3 text-center border border-slate-700/50">
-                <TrendingUp className="mx-auto text-emerald-400 mb-1.5" size={20} />
-                <div className="text-lg font-bold text-white">{stats.collecteStats.montantMoyen > 0 ? `${(stats.collecteStats.montantMoyen / 1000).toFixed(0)}K` : '0'}</div>
-                <div className="text-[10px] text-slate-400 uppercase">Moy. collecte</div>
+              <div className="bg-surface/50 rounded-lg p-3 text-center border border-edge-subtle">
+                <TrendingUp className="mx-auto text-status-success mb-1.5" size={20} />
+                <div className="text-lg font-bold text-content-primary">{stats.collecteStats.montantMoyen > 0 ? `${(stats.collecteStats.montantMoyen / 1000).toFixed(0)}K` : '0'}</div>
+                <div className="text-[10px] text-content-muted uppercase">Moy. collecte</div>
               </div>
             </div>
           </Card.Content>
         </Card>
 
         <Card padding="none">
-          <Card.Header as="div" className="p-3 sm:p-4 border-b border-slate-700">
-            <h3 className="text-sm sm:text-lg font-bold text-white">Alertes</h3>
+          <Card.Header as="div" className="p-3 sm:p-4 border-b border-edge">
+            <h3 className="text-sm sm:text-lg font-bold text-content-primary">Alertes</h3>
           </Card.Header>
           <Card.Content className="p-3 sm:p-4 space-y-2">
             {stats.incidentsOuverts > 0 && (
-              <div className="flex items-start gap-2 p-2 bg-red-900/10 border border-red-800/30 rounded-lg">
-                <AlertCircle className="text-red-500 flex-shrink-0 mt-0.5" size={16} />
+              <div className="flex items-start gap-2 p-2 bg-status-danger-bg border border-status-danger/30/30 rounded-lg">
+                <AlertCircle className="text-status-danger flex-shrink-0 mt-0.5" size={16} />
                 <div>
-                  <div className="font-medium text-white text-xs">{stats.incidentsOuverts} incident{stats.incidentsOuverts > 1 ? 's' : ''} ouvert{stats.incidentsOuverts > 1 ? 's' : ''}</div>
-                  <div className="text-[10px] text-slate-400">Action requise</div>
+                  <div className="font-medium text-content-primary text-xs">{stats.incidentsOuverts} incident{stats.incidentsOuverts > 1 ? 's' : ''} ouvert{stats.incidentsOuverts > 1 ? 's' : ''}</div>
+                  <div className="text-[10px] text-content-muted">Action requise</div>
                 </div>
               </div>
             )}
             {stats.communicationsNonLues > 0 && (
-              <div className="flex items-start gap-2 p-2 bg-blue-900/10 border border-blue-800/30 rounded-lg">
-                <Phone className="text-blue-500 flex-shrink-0 mt-0.5" size={16} />
+              <div className="flex items-start gap-2 p-2 bg-status-info-bg border border-status-info/20 rounded-lg">
+                <Phone className="text-status-info flex-shrink-0 mt-0.5" size={16} />
                 <div>
-                  <div className="font-medium text-white text-xs">{stats.communicationsNonLues} message{stats.communicationsNonLues > 1 ? 's' : ''} non lu{stats.communicationsNonLues > 1 ? 's' : ''}</div>
-                  <div className="text-[10px] text-slate-400">Communication interne</div>
+                  <div className="font-medium text-content-primary text-xs">{stats.communicationsNonLues} message{stats.communicationsNonLues > 1 ? 's' : ''} non lu{stats.communicationsNonLues > 1 ? 's' : ''}</div>
+                  <div className="text-[10px] text-content-muted">Communication interne</div>
                 </div>
               </div>
             )}
             {stats.recouvrementStats.dossiersActifs > 0 && (
-              <div className="flex items-start gap-2 p-2 bg-amber-900/10 border border-amber-800/30 rounded-lg">
-                <Target className="text-amber-500 flex-shrink-0 mt-0.5" size={16} />
+              <div className="flex items-start gap-2 p-2 bg-status-warning-bg border border-status-warning/20 rounded-lg">
+                <Target className="text-status-warning flex-shrink-0 mt-0.5" size={16} />
                 <div>
-                  <div className="font-medium text-white text-xs">{stats.recouvrementStats.dossiersActifs} objectif{stats.recouvrementStats.dossiersActifs > 1 ? 's' : ''} en cours</div>
-                  <div className="text-[10px] text-slate-400">
+                  <div className="font-medium text-content-primary text-xs">{stats.recouvrementStats.dossiersActifs} objectif{stats.recouvrementStats.dossiersActifs > 1 ? 's' : ''} en cours</div>
+                  <div className="text-[10px] text-content-muted">
                     Progression: {stats.recouvrementStats.tauxRecouvrement.toFixed(0)}%
                   </div>
                 </div>
@@ -908,8 +908,8 @@ export default function AgentDashboard({ agentId: propAgentId, selectedAgentId: 
             )}
             {stats.incidentsOuverts === 0 && stats.communicationsNonLues === 0 && stats.recouvrementStats.dossiersActifs === 0 && (
               <div className="flex flex-col items-center justify-center py-6 text-center">
-                <CheckCircle className="text-emerald-500 mb-2" size={24} />
-                <p className="text-xs text-slate-400">Aucune alerte en cours</p>
+                <CheckCircle className="text-status-success mb-2" size={24} />
+                <p className="text-xs text-content-muted">Aucune alerte en cours</p>
               </div>
             )}
           </Card.Content>

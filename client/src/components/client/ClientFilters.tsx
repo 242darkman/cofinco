@@ -98,10 +98,10 @@ export default function ClientFilters({ onFilterChange, initialFilters, classNam
       <select
         value={filters.status}
         onChange={handleStatusChange}
-        className={`h-10 sm:h-11 text-xs sm:text-sm font-medium rounded-lg border px-3 pr-7 appearance-none bg-no-repeat bg-[length:14px] bg-[right_8px_center] cursor-pointer transition-colors outline-none focus:ring-2 focus:ring-blue-500/30 ${
+        className={`h-10 sm:h-11 text-xs sm:text-sm font-medium rounded-lg border px-3 pr-7 appearance-none bg-no-repeat bg-[length:14px] bg-[right_8px_center] cursor-pointer transition-colors outline-none focus:ring-2 focus:ring-status-info/30 ${
           filters.status !== 'all'
-            ? 'bg-blue-500/10 border-blue-500/40 text-blue-400'
-            : 'bg-slate-800 border-slate-700 text-slate-300 hover:border-slate-600'
+            ? 'bg-status-info-bg border-status-info/40 text-status-info'
+            : 'bg-surface border-edge text-content-secondary hover:border-edge-strong'
         }`}
         style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")` }}
       >
@@ -114,10 +114,10 @@ export default function ClientFilters({ onFilterChange, initialFilters, classNam
       <select
         value={filters.segment}
         onChange={handleSegmentChange}
-        className={`h-10 sm:h-11 text-xs sm:text-sm font-medium rounded-lg border px-3 pr-7 appearance-none bg-no-repeat bg-[length:14px] bg-[right_8px_center] cursor-pointer transition-colors outline-none focus:ring-2 focus:ring-blue-500/30 ${
+        className={`h-10 sm:h-11 text-xs sm:text-sm font-medium rounded-lg border px-3 pr-7 appearance-none bg-no-repeat bg-[length:14px] bg-[right_8px_center] cursor-pointer transition-colors outline-none focus:ring-2 focus:ring-status-info/30 ${
           filters.segment !== 'all'
-            ? 'bg-blue-500/10 border-blue-500/40 text-blue-400'
-            : 'bg-slate-800 border-slate-700 text-slate-300 hover:border-slate-600'
+            ? 'bg-status-info-bg border-status-info/40 text-status-info'
+            : 'bg-surface border-edge text-content-secondary hover:border-edge-strong'
         }`}
         style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")` }}
       >
@@ -130,7 +130,7 @@ export default function ClientFilters({ onFilterChange, initialFilters, classNam
       {hasActiveFilters && (
         <button
           onClick={clearFilters}
-          className="h-10 sm:h-11 px-2.5 flex items-center gap-1 text-xs sm:text-sm font-medium text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-lg transition-colors shrink-0"
+          className="h-10 sm:h-11 px-2.5 flex items-center gap-1 text-xs sm:text-sm font-medium text-status-danger hover:text-status-danger bg-status-danger-bg hover:bg-status-danger-bg border border-status-danger/30 rounded-lg transition-colors shrink-0"
           title="Effacer les filtres"
         >
           <X size={12} />

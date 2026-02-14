@@ -36,16 +36,16 @@ export default function AgentHeader({
           />
         </div>
         <div>
-          <h1 className="text-lg md:text-xl font-bold text-white">Interface Agent de Caisse</h1>
-          <p className="text-sm text-slate-400">
+          <h1 className="text-lg md:text-xl font-bold text-content-primary">Interface Agent de Caisse</h1>
+          <p className="text-sm text-content-muted">
             {agent?.nomComplet || 'Agent'} • {agent?.codeAgent || ''}
           </p>
         </div>
       </div>
       <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2 px-3 py-2 bg-slate-700/50 rounded-lg">
-          <Clock size={16} className="text-slate-400" />
-          <span className="text-sm text-slate-300">
+        <div className="flex items-center gap-2 px-3 py-2 bg-surface-elevated/50 rounded-lg">
+          <Clock size={16} className="text-content-muted" />
+          <span className="text-sm text-content-secondary">
             {currentTime.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
           </span>
         </div>

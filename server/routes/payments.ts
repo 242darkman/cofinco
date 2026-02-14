@@ -29,6 +29,7 @@ import type { PawaPayProvider } from "../services/mobile-money/providers/pawapay
 import { requireAuth } from "../auth";
 import { attachAbility, requireAbility } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
+import { currencySymbol } from "@shared/config/currency";
 
 export const paymentsRouter = Router();
 export const webhooksRouter = Router();
@@ -578,7 +579,7 @@ paymentsRouter.post("/:id/refund", requireAuth, attachAbility, requireAbility(Ac
 
     res.status(201).json({
       success: true,
-      message: amount ? `Remboursement partiel de ${amount} XAF initié` : "Remboursement total initié",
+      message: amount ? `Remboursement partiel de ${amount} ${currencySymbol()} initié` : "Remboursement total initié",
       intent,
     });
   } catch (error) {

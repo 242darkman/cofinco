@@ -84,19 +84,19 @@ export default function AdminAlerts() {
 
   const getSeverityColor = (severity: string) => {
     switch (severity) {
-      case 'info': return 'border-blue-500 bg-blue-500/10';
-      case 'warning': return 'border-cyan-500 bg-cyan-500/10';
-      case 'critical': return 'border-blue-500 bg-blue-500/10';
-      default: return 'border-slate-500 bg-slate-700';
+      case 'info': return 'border-status-info bg-status-info-bg';
+      case 'warning': return 'border-accent bg-accent/10';
+      case 'critical': return 'border-status-info bg-status-info-bg';
+      default: return 'border-edge-strong bg-surface-elevated';
     }
   };
 
   const getSeverityIcon = (severity: string) => {
     switch (severity) {
-      case 'info': return <Info size={20} className="text-blue-400" />;
-      case 'warning': return <AlertTriangle size={20} className="text-cyan-400" />;
-      case 'critical': return <XCircle size={20} className="text-blue-400" />;
-      default: return <Bell size={20} className="text-slate-400" />;
+      case 'info': return <Info size={20} className="text-status-info" />;
+      case 'warning': return <AlertTriangle size={20} className="text-accent" />;
+      case 'critical': return <XCircle size={20} className="text-status-info" />;
+      default: return <Bell size={20} className="text-content-muted" />;
     }
   };
 
@@ -112,12 +112,12 @@ export default function AdminAlerts() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <h3 className="text-2xl font-bold text-white flex items-center gap-2">
+          <h3 className="text-2xl font-bold text-content-primary flex items-center gap-2">
             <Bell size={28} />
             Alertes ({alerts.length})
           </h3>
           {unreadCount > 0 && (
-            <span className="px-3 py-1 bg-blue-500 text-white rounded-full text-sm font-bold">
+            <span className="px-3 py-1 bg-status-info text-white rounded-full text-sm font-bold">
               {unreadCount} non lues
             </span>
           )}
@@ -126,7 +126,7 @@ export default function AdminAlerts() {
           <button
             onClick={fetchAlerts}
             disabled={loading}
-            className="p-2 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg transition"
+            className="p-2 bg-surface-elevated hover:bg-surface-subtle text-content-secondary rounded-lg transition"
           >
             <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
           </button>
@@ -134,8 +134,8 @@ export default function AdminAlerts() {
             onClick={() => setShowUnreadOnly(!showUnreadOnly)}
             className={`px-4 py-2 rounded-lg font-semibold transition ${
               showUnreadOnly
-                ? 'bg-blue-600 text-white'
-                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                ? 'bg-status-info text-white'
+                : 'bg-surface-elevated text-content-secondary hover:bg-surface-subtle'
             }`}
           >
             {showUnreadOnly ? 'Toutes' : 'Non lues'}
@@ -143,7 +143,7 @@ export default function AdminAlerts() {
           {unreadCount > 0 && (
             <button
               onClick={markAllAsRead}
-              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition flex items-center gap-2"
+              className="px-4 py-2 bg-status-success hover:bg-status-success text-white rounded-lg font-semibold transition flex items-center gap-2"
             >
               <Check size={16} />
               Tout marquer lu
@@ -151,7 +151,7 @@ export default function AdminAlerts() {
           )}
           <button
             onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-semibold transition flex items-center gap-2"
+            className="px-4 py-2 bg-status-warning hover:bg-status-warning text-white rounded-lg font-semibold transition flex items-center gap-2"
           >
             <Plus size={16} />
             Nouvelle alerte
@@ -160,7 +160,7 @@ export default function AdminAlerts() {
       </div>
 
       {alerts.length === 0 ? (
-        <div className="text-center py-12 text-slate-400">
+        <div className="text-center py-12 text-content-muted">
           {showUnreadOnly ? 'Aucune alerte non lue' : 'Aucune alerte'}
         </div>
       ) : (
@@ -177,23 +177,23 @@ export default function AdminAlerts() {
                   {getSeverityIcon(alert.severity)}
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-1">
-                      <h4 className="text-white font-bold">{alert.title}</h4>
+                      <h4 className="text-content-primary font-bold">{alert.title}</h4>
                       {!alert.is_read && (
-                        <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                        <span className="w-2 h-2 bg-status-info rounded-full"></span>
                       )}
                     </div>
-                    <p className="text-slate-300 text-sm mb-2">{alert.message}</p>
+                    <p className="text-content-secondary text-sm mb-2">{alert.message}</p>
                     {alert.metadata && (
                       <details className="mt-2">
-                        <summary className="text-xs text-slate-400 cursor-pointer hover:text-slate-300">
+                        <summary className="text-xs text-content-muted cursor-pointer hover:text-content-secondary">
                           Détails
                         </summary>
-                        <pre className="mt-2 text-xs text-slate-400 bg-slate-800 rounded p-2 overflow-x-auto">
+                        <pre className="mt-2 text-xs text-content-muted bg-surface rounded p-2 overflow-x-auto">
                           {JSON.stringify(alert.metadata, null, 2)}
                         </pre>
                       </details>
                     )}
-                    <div className="text-xs text-slate-400 mt-2">
+                    <div className="text-xs text-content-muted mt-2">
                       {formatTimeAgo(alert.createdAt)}
                     </div>
                   </div>
@@ -202,14 +202,14 @@ export default function AdminAlerts() {
                   {!alert.is_read && (
                     <button
                       onClick={() => markAsRead(alert.id)}
-                      className="px-3 py-1 bg-slate-600 hover:bg-slate-500 text-white rounded text-sm font-semibold transition"
+                      className="px-3 py-1 bg-surface-subtle hover:bg-surface-muted0 text-content-primary rounded text-sm font-semibold transition"
                     >
                       Marquer lu
                     </button>
                   )}
                   <button
                     onClick={() => deleteAlert(alert.id)}
-                    className="p-2 text-red-400 hover:bg-red-500/20 rounded transition"
+                    className="p-2 text-status-danger hover:bg-status-danger-bg rounded transition"
                     title="Supprimer"
                   >
                     <Trash2 size={16} />

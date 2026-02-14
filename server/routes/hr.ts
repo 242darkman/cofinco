@@ -64,6 +64,7 @@ import { users } from "@shared/schema";
 import { getWsInstance } from "../ws-server";
 import { z } from "zod";
 import { dispatchDomainEvent } from "../services/notifications/domain-events/event-registry";
+import { currencySymbol } from "@shared/config/currency";
 import { enqueueNotification } from "../services/notifications/notification-service";
 import multer from "multer";
 import { importEmployees, parseCsv } from "../services/hr-import-service";
@@ -199,7 +200,7 @@ async function generatePdfsAndSendEmails(
   // 1. Fetch shared data (company settings, agence)
   const [settings] = await db.select().from(systemSettings);
   const company = settings ? {
-    agenceName: settings.agenceName,
+    appName: settings.appName,
     adresse: settings.adresse,
     telephone: settings.telephone,
     niu: settings.niu || null,
@@ -2551,7 +2552,7 @@ hrRouter.get("/bulletins/:id", getAuthUser, async (req, res) => {
         conventionCollective,
       } : null,
       company: settings ? {
-        agenceName: settings.agenceName,
+        appName: settings.appName,
         adresse: settings.adresse,
         telephone: settings.telephone,
         niu: settings.niu || null,
@@ -2942,7 +2943,7 @@ hrRouter.patch("/paie/pay", getAuthUser, attachAbility, requireAbility(Actions.M
             employeeId: b.employeId,
             montant: net,
             label: `Salaire ${item.employeNom || ''} ${item.employePrenom || ''}`.trim(),
-            description: `Paiement salaire ${run.period} — ${net.toLocaleString('fr-FR')} FCFA`,
+            description: `Paiement salaire ${run.period} — ${net.toLocaleString('fr-FR')} ${currencySymbol()}`,
             metadata: {
               payrollRunId: runId,
               period: run.period,

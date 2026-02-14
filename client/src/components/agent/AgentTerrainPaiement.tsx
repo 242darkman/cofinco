@@ -114,21 +114,21 @@ const CompactSelect = ({
       disabled={disabled}
       className={`
         w-full h-11 px-3 ${Icon ? 'pl-9' : ''} pr-8 rounded-lg appearance-none
-        bg-slate-800/80 border text-sm
-        ${error ? 'border-red-500/50' : 'border-slate-700/50 focus:border-cyan-500/50'}
-        text-white disabled:opacity-50 disabled:cursor-not-allowed
-        focus:outline-none focus:ring-2 focus:ring-cyan-500/20
+        bg-surface/80 border text-sm
+        ${error ? 'border-status-danger/50' : 'border-edge-subtle focus:border-accent/50'}
+        text-content-primary disabled:opacity-50 disabled:cursor-not-allowed
+        focus:outline-none focus:ring-2 focus:ring-accent/20
         transition-all cursor-pointer
       `}
     >
-      <option value="" className="bg-slate-900">{placeholder}</option>
+      <option value="" className="bg-surface-base">{placeholder}</option>
       {options.map(opt => (
-        <option key={opt.value} value={opt.value} className="bg-slate-900">{opt.label}</option>
+        <option key={opt.value} value={opt.value} className="bg-surface-base">{opt.label}</option>
       ))}
     </select>
-    {Icon && <Icon size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />}
-    <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
-    {error && <p className="text-[10px] text-red-400 mt-0.5 pl-1">{error}</p>}
+    {Icon && <Icon size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" />}
+    <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-content-muted pointer-events-none" />
+    {error && <p className="text-[10px] text-status-danger mt-0.5 pl-1">{error}</p>}
   </div>
 );
 
@@ -185,38 +185,38 @@ const SearchableSelect = ({
         disabled={disabled}
         className={`
           w-full h-11 px-3 rounded-lg text-left flex items-center justify-between
-          bg-slate-800/80 border text-sm
-          ${error ? 'border-red-500/50' : 'border-slate-700/50'}
-          ${isOpen ? 'border-cyan-500/50 ring-2 ring-cyan-500/20' : ''}
-          text-white disabled:opacity-50 disabled:cursor-not-allowed
+          bg-surface/80 border text-sm
+          ${error ? 'border-status-danger/50' : 'border-edge-subtle'}
+          ${isOpen ? 'border-accent/50 ring-2 ring-accent/20' : ''}
+          text-content-primary disabled:opacity-50 disabled:cursor-not-allowed
           transition-all
         `}
       >
         {selectedOption ? (
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            <span className="text-white font-medium truncate">{selectedOption.label}</span>
+            <span className="text-content-primary font-medium truncate">{selectedOption.label}</span>
             {selectedOption.sublabel && (
-              <span className="text-slate-500 text-xs flex-shrink-0">• {selectedOption.sublabel}</span>
+              <span className="text-content-muted text-xs flex-shrink-0">• {selectedOption.sublabel}</span>
             )}
           </div>
         ) : (
-          <span className="text-slate-500">{placeholder}</span>
+          <span className="text-content-muted">{placeholder}</span>
         )}
-        <ChevronDown size={14} className={`text-slate-500 transition-transform flex-shrink-0 ml-2 ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown size={14} className={`text-content-muted transition-transform flex-shrink-0 ml-2 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {/* Dropdown */}
       {isOpen && (
-        <div className="absolute z-50 mt-1 w-full bg-slate-900 border border-slate-700/50 rounded-xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+        <div className="absolute z-50 mt-1 w-full bg-surface-base border border-edge-subtle rounded-xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
           {/* Search Input */}
-          <div className="p-2 border-b border-slate-800">
+          <div className="p-2 border-b border-edge">
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Rechercher..."
               autoFocus
-              className="w-full h-9 px-3 rounded-lg text-sm bg-slate-800 border border-slate-700/50 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50"
+              className="w-full h-9 px-3 rounded-lg text-sm bg-surface border border-edge-subtle text-content-primary placeholder-content-muted focus:outline-none focus:border-accent/50"
             />
           </div>
 
@@ -224,10 +224,10 @@ const SearchableSelect = ({
           <div className="max-h-48 overflow-y-auto overscroll-contain">
             {isLoading ? (
               <div className="p-4 flex items-center justify-center">
-                <div className="w-5 h-5 border-2 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin" />
+                <div className="w-5 h-5 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
               </div>
             ) : filteredOptions.length === 0 ? (
-              <div className="p-4 text-center text-sm text-slate-500">
+              <div className="p-4 text-center text-sm text-content-muted">
                 {search ? 'Aucun résultat' : 'Aucune option'}
               </div>
             ) : (
@@ -242,25 +242,25 @@ const SearchableSelect = ({
                   }}
                   className={`
                     w-full px-3 py-2.5 text-left flex items-center gap-3
-                    hover:bg-slate-800 transition-colors
-                    ${value === opt.value ? 'bg-cyan-500/10' : ''}
+                    hover:bg-surface transition-colors
+                    ${value === opt.value ? 'bg-accent/10' : ''}
                   `}
                 >
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500/20 to-blue-500/20 flex items-center justify-center flex-shrink-0">
-                    <Users size={14} className={value === opt.value ? 'text-cyan-400' : 'text-slate-400'} />
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent/20 to-status-info/20 flex items-center justify-center flex-shrink-0">
+                    <Users size={14} className={value === opt.value ? 'text-accent' : 'text-content-muted'} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className={`text-xs font-medium truncate ${value === opt.value ? 'text-cyan-400' : 'text-white'}`}>
+                    <p className={`text-xs font-medium truncate ${value === opt.value ? 'text-accent' : 'text-content-primary'}`}>
                       {opt.label}
                     </p>
                     {opt.sublabel && (
-                      <p className="text-[11px] text-slate-500 flex items-center gap-1">
+                      <p className="text-[11px] text-content-muted flex items-center gap-1">
                         <Phone size={10} />
                         {opt.sublabel}
                       </p>
                     )}
                   </div>
-                  {value === opt.value && <CheckCircle2 size={16} className="text-cyan-400 flex-shrink-0" />}
+                  {value === opt.value && <CheckCircle2 size={16} className="text-accent flex-shrink-0" />}
                 </button>
               ))
             )}
@@ -268,7 +268,7 @@ const SearchableSelect = ({
         </div>
       )}
 
-      {error && <p className="text-[10px] text-red-400 mt-0.5 pl-1">{error}</p>}
+      {error && <p className="text-[10px] text-status-danger mt-0.5 pl-1">{error}</p>}
     </div>
   );
 };
@@ -930,17 +930,17 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
           {/* Modal Content */}
-          <div className="relative w-full max-w-md max-h-[92vh] bg-gradient-to-b from-slate-900 to-slate-950 rounded-t-2xl sm:rounded-2xl border border-slate-800/50 shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom-4 duration-200">
+          <div className="relative w-full max-w-md max-h-[92vh] bg-gradient-to-b from-surface-base to-surface-base rounded-t-2xl sm:rounded-2xl border border-edge/50 shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom-4 duration-200">
 
             {/* Header - Fixed */}
-            <div className="flex-shrink-0 px-4 py-3 border-b border-slate-800/50 flex items-center justify-between bg-slate-900/80 backdrop-blur-sm">
+            <div className="flex-shrink-0 px-4 py-3 border-b border-edge/50 flex items-center justify-between bg-surface-base/80 backdrop-blur-sm">
               <div>
-                <h2 className="text-base font-bold text-white">Nouvelle Collecte</h2>
-                <p className="text-[10px] text-slate-500 mt-0.5">Enregistrer un paiement client</p>
+                <h2 className="text-base font-bold text-content-primary">Nouvelle Collecte</h2>
+                <p className="text-[10px] text-content-muted mt-0.5">Enregistrer un paiement client</p>
               </div>
               <button
                 onClick={onClose}
-                className="p-2 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                className="p-2 rounded-lg hover:bg-surface text-content-muted hover:text-content-primary transition-colors"
               >
                 <X size={18} />
               </button>
@@ -951,7 +951,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
               <form onSubmit={handleSubmit} className="p-4 space-y-3">
 
                 {errors.submit && (
-                  <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-3 py-2 rounded-lg text-xs flex items-center gap-2">
+                  <div className="bg-status-danger-bg border border-status-danger/30 text-status-danger px-3 py-2 rounded-lg text-xs flex items-center gap-2">
                     <AlertCircle size={14} />
                     {errors.submit}
                   </div>
@@ -960,7 +960,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                 {/* Agent & Client Row */}
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-1 block">Agent</label>
+                    <label className="text-[10px] font-medium text-content-muted uppercase tracking-wider mb-1 block">Agent</label>
                     <CompactSelect
                       value={formData.agent_id}
                       onChange={(v) => setFormData({ ...formData, agent_id: v })}
@@ -971,8 +971,8 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-1 block">
-                      Client {clients.length > 0 && <span className="text-slate-600">({clients.length})</span>}
+                    <label className="text-[10px] font-medium text-content-muted uppercase tracking-wider mb-1 block">
+                      Client {clients.length > 0 && <span className="text-content-muted">({clients.length})</span>}
                     </label>
                     <SearchableSelect
                       value={formData.client_id}
@@ -997,7 +997,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
 
                 {/* Payment Type */}
                 <div>
-                  <label className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-1 block">Type</label>
+                  <label className="text-[10px] font-medium text-content-muted uppercase tracking-wider mb-1 block">Type</label>
                   <CompactSelect
                     value={formData.type_paiement}
                     onChange={(v) => {
@@ -1016,17 +1016,17 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
 
                 {/* Tontine Selection */}
                 {isTontinePayment && formData.client_id && (
-                  <div className="bg-violet-500/5 border border-violet-500/20 rounded-xl p-3">
+                  <div className="bg-accent/5 border border-accent/20 rounded-xl p-3">
                     <div className="flex items-center gap-2 mb-2">
-                      <Users size={14} className="text-violet-400" />
-                      <span className="text-xs font-semibold text-violet-300">Tontine</span>
+                      <Users size={14} className="text-accent" />
+                      <span className="text-xs font-semibold text-accent">Tontine</span>
                     </div>
                     {loadingTontines ? (
                       <div className="h-10 flex items-center justify-center">
-                        <div className="w-4 h-4 border-2 border-violet-500/30 border-t-violet-500 rounded-full animate-spin" />
+                        <div className="w-4 h-4 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
                       </div>
                     ) : clientTontines.length === 0 ? (
-                      <p className="text-xs text-amber-400 flex items-center gap-1.5">
+                      <p className="text-xs text-status-warning flex items-center gap-1.5">
                         <AlertCircle size={12} />
                         Aucune tontine active
                       </p>
@@ -1040,23 +1040,23 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                             className={`
                               w-full px-3 py-2 rounded-lg border text-left flex items-center justify-between transition-all
                               ${selectedTontine?.id === ct.id
-                                ? 'border-emerald-500/50 bg-emerald-500/10'
-                                : 'border-slate-700/50 bg-slate-800/30 hover:border-violet-500/30'
+                                ? 'border-status-success/50 bg-status-success-bg'
+                                : 'border-edge-subtle bg-surface/30 hover:border-accent/30'
                               }
                             `}
                           >
                             <div>
-                              <p className="text-xs font-medium text-white">{ct.tontine.nom}</p>
-                              <p className="text-[10px] text-slate-500">
+                              <p className="text-xs font-medium text-content-primary">{ct.tontine.nom}</p>
+                              <p className="text-[10px] text-content-muted">
                                 {parseFloat(ct.tontine.montantCotisation).toLocaleString()} F • {ct.tontine.frequence}
                               </p>
                             </div>
-                            {selectedTontine?.id === ct.id && <CheckCircle2 size={16} className="text-emerald-400" />}
+                            {selectedTontine?.id === ct.id && <CheckCircle2 size={16} className="text-status-success" />}
                           </button>
                         ))}
                       </div>
                     )}
-                    {errors.tontine && <p className="text-[10px] text-red-400 mt-1">{errors.tontine}</p>}
+                    {errors.tontine && <p className="text-[10px] text-status-danger mt-1">{errors.tontine}</p>}
                   </div>
                 )}
 
@@ -1091,8 +1091,8 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                 )}
 
                 {/* Amount Section */}
-                <div className="bg-slate-800/30 rounded-xl p-3 border border-slate-700/30">
-                  <label className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-2 block">
+                <div className="bg-surface/30 rounded-xl p-3 border border-edge-subtle">
+                  <label className="text-[10px] font-medium text-content-muted uppercase tracking-wider mb-2 block">
                     Montant (FCFA)
                   </label>
                   <div className="relative">
@@ -1104,15 +1104,15 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                       placeholder="0"
                       className={`
                         w-full h-14 px-4 rounded-xl text-2xl font-bold text-center
-                        bg-slate-900/80 border-2
-                        ${errors.montant ? 'border-red-500/50' : 'border-slate-700/50 focus:border-cyan-500/50'}
-                        text-white placeholder-slate-600
-                        focus:outline-none focus:ring-4 focus:ring-cyan-500/10
+                        bg-surface-base/80 border-2
+                        ${errors.montant ? 'border-status-danger/50' : 'border-edge-subtle focus:border-accent/50'}
+                        text-content-primary placeholder-content-muted
+                        focus:outline-none focus:ring-4 focus:ring-accent/10
                         [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none
                       `}
                     />
                   </div>
-                  {errors.montant && <p className="text-[10px] text-red-400 mt-1 text-center">{errors.montant}</p>}
+                  {errors.montant && <p className="text-[10px] text-status-danger mt-1 text-center">{errors.montant}</p>}
 
                   {/* Quick Amount Chips */}
                   <div className="flex gap-1.5 mt-2 flex-wrap justify-center">
@@ -1121,7 +1121,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                         key={amt}
                         type="button"
                         onClick={() => setFormData({ ...formData, montant: (montantNum + amt).toString() })}
-                        className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 active:scale-95 transition-all"
+                        className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-accent/10 border border-accent/30 text-accent hover:bg-accent/20 active:scale-95 transition-all"
                       >
                         +{(amt / 1000)}k
                       </button>
@@ -1129,7 +1129,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                     <button
                       type="button"
                       onClick={() => setFormData({ ...formData, montant: '' })}
-                      className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-700/50 text-slate-400 hover:bg-slate-700 active:scale-95 transition-all"
+                      className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-surface-elevated/50 text-content-muted hover:bg-surface-elevated active:scale-95 transition-all"
                     >
                       C
                     </button>
@@ -1138,7 +1138,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
 
                 {/* Payment Method */}
                 <div>
-                  <label className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mb-2 block">
+                  <label className="text-[10px] font-medium text-content-muted uppercase tracking-wider mb-2 block">
                     Mode de paiement
                   </label>
                   <div className="grid grid-cols-3 gap-2">
@@ -1160,25 +1160,25 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                           relative py-3 px-2 rounded-xl border-2 flex flex-col items-center gap-1 transition-all
                           ${formData.methode_paiement === m.id
                             ? m.id === 'Espèces'
-                              ? 'border-emerald-500/60 bg-emerald-500/10'
+                              ? 'border-status-success/60 bg-status-success-bg'
                               : m.id === 'Airtel Money'
-                                ? 'border-red-500/60 bg-red-500/10'
-                                : 'border-yellow-500/60 bg-yellow-500/10'
-                            : 'border-slate-700/50 bg-slate-800/30 hover:border-slate-600'
+                                ? 'border-status-danger/60 bg-status-danger-bg'
+                                : 'border-status-warning/60 bg-status-warning-bg'
+                            : 'border-edge-subtle bg-surface/30 hover:border-edge-strong'
                           }
                         `}
                       >
                         <m.icon size={18} className={
                           formData.methode_paiement === m.id
-                            ? m.id === 'Espèces' ? 'text-emerald-400'
-                              : m.id === 'Airtel Money' ? 'text-red-400' : 'text-yellow-400'
-                            : 'text-slate-500'
+                            ? m.id === 'Espèces' ? 'text-status-success'
+                              : m.id === 'Airtel Money' ? 'text-status-danger' : 'text-status-warning'
+                            : 'text-content-muted'
                         } />
                         <span className={`text-[10px] font-semibold ${
                           formData.methode_paiement === m.id
-                            ? m.id === 'Espèces' ? 'text-emerald-400'
-                              : m.id === 'Airtel Money' ? 'text-red-400' : 'text-yellow-400'
-                            : 'text-slate-500'
+                            ? m.id === 'Espèces' ? 'text-status-success'
+                              : m.id === 'Airtel Money' ? 'text-status-danger' : 'text-status-warning'
+                            : 'text-content-muted'
                         }`}>
                           {m.label}
                         </span>
@@ -1191,12 +1191,12 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                 {isMobileMoneyPayment && (
                   <div className={`p-3 rounded-xl border ${
                     formData.methode_paiement === 'Airtel Money'
-                      ? 'bg-red-500/5 border-red-500/20'
-                      : 'bg-yellow-500/5 border-yellow-500/20'
+                      ? 'bg-status-danger/5 border-status-danger/20'
+                      : 'bg-status-warning/5 border-status-warning/20'
                   }`}>
                     <div className="flex items-center gap-2 mb-2">
-                      <Phone size={14} className={formData.methode_paiement === 'Airtel Money' ? 'text-red-400' : 'text-yellow-400'} />
-                      <span className={`text-xs font-semibold ${formData.methode_paiement === 'Airtel Money' ? 'text-red-300' : 'text-yellow-300'}`}>
+                      <Phone size={14} className={formData.methode_paiement === 'Airtel Money' ? 'text-status-danger' : 'text-status-warning'} />
+                      <span className={`text-xs font-semibold ${formData.methode_paiement === 'Airtel Money' ? 'text-status-danger' : 'text-status-warning'}`}>
                         Numéro {formData.methode_paiement === 'Airtel Money' ? 'Airtel' : 'MTN'}
                       </span>
                     </div>
@@ -1206,17 +1206,17 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                         value={formData.numero_telephone}
                         onChange={(e) => setFormData({ ...formData, numero_telephone: e.target.value })}
                         placeholder="06XXXXXXXX ou 05XXXXXXXX"
-                        className={`w-full h-12 px-4 rounded-lg text-base font-medium bg-slate-900/80 border text-white placeholder-slate-600 focus:outline-none ${
+                        className={`w-full h-12 px-4 rounded-lg text-base font-medium bg-surface-base/80 border text-content-primary placeholder-content-muted focus:outline-none ${
                           errors.numero_telephone
-                            ? 'border-red-500/50'
+                            ? 'border-status-danger/50'
                             : formData.methode_paiement === 'Airtel Money'
-                              ? 'border-red-500/30 focus:border-red-500/60'
-                              : 'border-yellow-500/30 focus:border-yellow-500/60'
+                              ? 'border-status-danger/30 focus:border-status-danger/60'
+                              : 'border-status-warning/30 focus:border-status-warning/60'
                         }`}
                       />
                     </div>
-                    {errors.numero_telephone && <p className="text-[10px] text-red-400 mt-1">{errors.numero_telephone}</p>}
-                    <p className="text-[10px] text-slate-500 mt-1.5">
+                    {errors.numero_telephone && <p className="text-[10px] text-status-danger mt-1">{errors.numero_telephone}</p>}
+                    <p className="text-[10px] text-content-muted mt-1.5">
                       Le client recevra une demande de paiement sur ce numéro
                     </p>
                   </div>
@@ -1224,7 +1224,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
 
                 {/* Notes - Collapsible */}
                 <details className="group">
-                  <summary className="text-[10px] font-medium text-slate-500 uppercase tracking-wider cursor-pointer flex items-center gap-1 select-none">
+                  <summary className="text-[10px] font-medium text-content-muted uppercase tracking-wider cursor-pointer flex items-center gap-1 select-none">
                     <ChevronDown size={12} className="group-open:rotate-180 transition-transform" />
                     Options avancées
                   </summary>
@@ -1234,14 +1234,14 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                       value={formData.reference}
                       onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
                       placeholder="Référence (optionnel)"
-                      className="w-full h-10 px-3 rounded-lg text-sm bg-slate-800/50 border border-slate-700/30 text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500/50"
+                      className="w-full h-10 px-3 rounded-lg text-sm bg-surface/50 border border-edge-subtle text-content-primary placeholder-content-muted focus:outline-none focus:border-accent/50"
                     />
                     <textarea
                       value={formData.notes}
                       onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                       placeholder="Notes..."
                       rows={2}
-                      className="w-full px-3 py-2 rounded-lg text-sm bg-slate-800/50 border border-slate-700/30 text-white placeholder-slate-600 focus:outline-none focus:border-cyan-500/50 resize-none"
+                      className="w-full px-3 py-2 rounded-lg text-sm bg-surface/50 border border-edge-subtle text-content-primary placeholder-content-muted focus:outline-none focus:border-accent/50 resize-none"
                     />
                   </div>
                 </details>
@@ -1249,12 +1249,12 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
             </div>
 
             {/* Footer - Fixed */}
-            <div className="flex-shrink-0 p-4 border-t border-slate-800/50 bg-slate-900/80 backdrop-blur-sm">
+            <div className="flex-shrink-0 p-4 border-t border-edge/50 bg-surface-base/80 backdrop-blur-sm">
               {/* Total Preview */}
               {montantNum > 0 && (
-                <div className="mb-3 flex items-center justify-between px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                  <span className="text-xs text-emerald-300">Total</span>
-                  <span className="text-lg font-bold text-emerald-400">{montantNum.toLocaleString()} <span className="text-xs">F</span></span>
+                <div className="mb-3 flex items-center justify-between px-3 py-2 rounded-lg bg-status-success-bg border border-status-success/20">
+                  <span className="text-xs text-status-success">Total</span>
+                  <span className="text-lg font-bold text-status-success">{montantNum.toLocaleString()} <span className="text-xs">F</span></span>
                 </div>
               )}
 
@@ -1263,7 +1263,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                   type="button"
                   onClick={onClose}
                   disabled={loading}
-                  className="flex-1 h-12 rounded-xl font-semibold text-slate-400 bg-slate-800/50 hover:bg-slate-800 border border-slate-700/50 transition-all disabled:opacity-50"
+                  className="flex-1 h-12 rounded-xl font-semibold text-content-muted bg-surface/50 hover:bg-surface border border-edge-subtle transition-all disabled:opacity-50"
                 >
                   Annuler
                 </button>
@@ -1272,7 +1272,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                     type="button"
                     onClick={handleSubmit}
                     disabled={loading || montantNum <= 0}
-                    className="flex-[2] h-12 rounded-xl font-semibold text-white bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
+                    className="flex-[2] h-12 rounded-xl font-semibold text-white bg-gradient-to-r from-status-success to-accent hover:from-status-success/90 hover:to-accent/90 shadow-lg shadow-status-success/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
                   >
                     {loading ? (
                       <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -1284,7 +1284,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                     )}
                   </button>
                 ) : (
-                  <div className="flex-[2] h-12 rounded-xl font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/30 flex items-center justify-center gap-2">
+                  <div className="flex-[2] h-12 rounded-xl font-semibold text-status-warning bg-status-warning-bg border border-status-warning/30 flex items-center justify-center gap-2">
                     <AlertTriangle size={16} />
                     Permission requise
                   </div>
@@ -1316,15 +1316,15 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
       {mmPaymentStatus === 'pending' && mmPaymentIntent && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
-          <div className="relative bg-slate-900 rounded-2xl border border-slate-700/50 p-6 max-w-sm mx-4 text-center animate-in zoom-in-95 duration-200">
+          <div className="relative bg-surface-base rounded-2xl border border-edge-subtle p-6 max-w-sm mx-4 text-center animate-in zoom-in-95 duration-200">
             {/* Provider Logo */}
             <div className="mb-4">
               {mmPaymentIntent.provider === 'MTN' ? (
-                <div className="w-16 h-16 mx-auto bg-yellow-500/10 rounded-full flex items-center justify-center">
+                <div className="w-16 h-16 mx-auto bg-status-warning-bg rounded-full flex items-center justify-center">
                   <MTNLogo className="h-10 w-10" />
                 </div>
               ) : (
-                <div className="w-16 h-16 mx-auto bg-red-500/10 rounded-full flex items-center justify-center">
+                <div className="w-16 h-16 mx-auto bg-status-danger-bg rounded-full flex items-center justify-center">
                   <AirtelLogo className="h-10 w-10" />
                 </div>
               )}
@@ -1333,42 +1333,42 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
             {/* Spinner */}
             <div className="mb-4">
               <Loader2 size={32} className={`mx-auto animate-spin ${
-                mmPaymentIntent.provider === 'MTN' ? 'text-yellow-400' : 'text-red-400'
+                mmPaymentIntent.provider === 'MTN' ? 'text-status-warning' : 'text-status-danger'
               }`} />
             </div>
 
             {/* Title */}
-            <h3 className="text-lg font-bold text-white mb-2">
+            <h3 className="text-lg font-bold text-content-primary mb-2">
               En attente de confirmation
             </h3>
 
             {/* Instructions */}
-            <p className="text-sm text-slate-400 mb-4">
+            <p className="text-sm text-content-muted mb-4">
               Une demande de paiement a été envoyée au numéro{' '}
-              <span className="font-semibold text-white">{formData.numero_telephone}</span>
+              <span className="font-semibold text-content-primary">{formData.numero_telephone}</span>
             </p>
 
             {/* Amount */}
             <div className={`py-3 px-4 rounded-xl mb-4 ${
-              mmPaymentIntent.provider === 'MTN' ? 'bg-yellow-500/10' : 'bg-red-500/10'
+              mmPaymentIntent.provider === 'MTN' ? 'bg-status-warning-bg' : 'bg-status-danger-bg'
             }`}>
-              <p className="text-xs text-slate-400 mb-1">Montant à confirmer</p>
+              <p className="text-xs text-content-muted mb-1">Montant à confirmer</p>
               <p className={`text-2xl font-bold ${
-                mmPaymentIntent.provider === 'MTN' ? 'text-yellow-400' : 'text-red-400'
+                mmPaymentIntent.provider === 'MTN' ? 'text-status-warning' : 'text-status-danger'
               }`}>
                 {Number(mmPaymentIntent.amount).toLocaleString()} <span className="text-sm">FCFA</span>
               </p>
             </div>
 
             {/* Ref */}
-            <p className="text-[10px] text-slate-600 mb-4">
+            <p className="text-[10px] text-content-muted mb-4">
               Réf: {mmPaymentIntent.externalRef?.slice(0, 8)}...
             </p>
 
             {/* Cancel button */}
             <button
               onClick={cancelMmPayment}
-              className="w-full py-3 rounded-xl font-semibold text-slate-400 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-all"
+              className="w-full py-3 rounded-xl font-semibold text-content-muted bg-surface hover:bg-surface-elevated border border-edge transition-all"
             >
               Annuler
             </button>

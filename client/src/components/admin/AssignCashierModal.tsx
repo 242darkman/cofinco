@@ -75,40 +75,40 @@ export default function AssignCashierModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
 
-      <div className="w-full max-w-md bg-slate-950 border border-slate-800 rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
+      <div className="w-full max-w-md bg-surface-base border border-edge rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
 
         {/* HEADER */}
-        <div className="p-5 border-b border-slate-800 flex justify-between items-start bg-slate-900/50 rounded-t-2xl">
+        <div className="p-5 border-b border-edge flex justify-between items-start bg-surface-base/50 rounded-t-2xl">
           <div>
-            <h3 className="text-lg font-bold text-white">Agents habilités - {caisseName}</h3>
-            <p className="text-xs text-slate-400 mt-1">Ces agents pourront ouvrir une session sur cette caisse</p>
+            <h3 className="text-lg font-bold text-content-primary">Agents habilités - {caisseName}</h3>
+            <p className="text-xs text-content-muted mt-1">Ces agents pourront ouvrir une session sur cette caisse</p>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-500 hover:text-white transition-colors p-1 hover:bg-slate-800 rounded-lg"
+            className="text-content-muted hover:text-content-primary transition-colors p-1 hover:bg-surface rounded-lg"
           >
             <X size={20} />
           </button>
         </div>
 
         {/* SEARCH */}
-        <div className="p-4 border-b border-slate-800 bg-slate-900/30">
+        <div className="p-4 border-b border-edge bg-surface-base/30">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted w-4 h-4" />
             <input
               type="text"
               placeholder="Rechercher par nom ou matricule..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all text-white placeholder-slate-500"
+              className="w-full bg-surface-base border border-edge rounded-xl pl-10 pr-4 py-3 text-sm focus:ring-2 focus:ring-accent focus:border-accent transition-all text-content-primary placeholder-content-muted"
               autoFocus
             />
           </div>
           {/* Compteur de sélection */}
           {selectedUserIds.length > 0 && (
             <div className="mt-3 flex items-center gap-2 text-xs">
-              <Users size={14} className="text-indigo-400" />
-              <span className="text-slate-400">
+              <Users size={14} className="text-accent" />
+              <span className="text-content-muted">
                 {selectedUserIds.length} agent{selectedUserIds.length > 1 ? 's' : ''} habilité{selectedUserIds.length > 1 ? 's' : ''}
               </span>
             </div>
@@ -118,7 +118,7 @@ export default function AssignCashierModal({
         {/* LISTE */}
         <div className="flex-1 overflow-y-auto p-4 space-y-2 max-h-[60vh]">
           {isLoading ? (
-            <div className="flex flex-col items-center justify-center py-12 text-slate-500">
+            <div className="flex flex-col items-center justify-center py-12 text-content-muted">
               <Loader2 className="w-8 h-8 animate-spin mb-3 opacity-50" />
               <p className="text-sm">Chargement des agents...</p>
             </div>
@@ -138,10 +138,10 @@ export default function AssignCashierModal({
                   className={`
                     w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all relative group
                     ${isBusyElsewhere
-                      ? 'opacity-40 grayscale border-slate-800 bg-slate-900 cursor-not-allowed'
+                      ? 'opacity-40 grayscale border-edge bg-surface-base cursor-not-allowed'
                       : isSelected
-                        ? 'border-indigo-500 bg-indigo-500/10 shadow-[0_0_15px_rgba(99,102,241,0.15)]'
-                        : 'border-slate-800 bg-slate-900/40 hover:border-slate-600 hover:bg-slate-800'
+                        ? 'border-accent bg-accent/10 shadow-[0_0_15px_rgba(99,102,241,0.15)]'
+                        : 'border-edge bg-surface-base/40 hover:border-edge-strong hover:bg-surface'
                     }
                   `}
                 >
@@ -149,15 +149,15 @@ export default function AssignCashierModal({
                   <div className={`
                     w-5 h-5 rounded flex-shrink-0 flex items-center justify-center transition-all
                     ${isSelected
-                      ? 'bg-indigo-600 border-indigo-600'
-                      : 'border-2 border-slate-600 group-hover:border-slate-500'
+                      ? 'bg-accent border-accent'
+                      : 'border-2 border-edge-strong group-hover:border-edge-strong'
                     }
                   `}>
-                    {isSelected && <CheckCircle size={14} className="text-white" />}
+                    {isSelected && <CheckCircle size={14} className="text-content-primary" />}
                   </div>
 
                   {/* Avatar */}
-                  <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs relative overflow-hidden flex-shrink-0 ${isSelected ? 'bg-indigo-600/30 text-indigo-300' : 'bg-slate-800 text-slate-400'}`}>
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs relative overflow-hidden flex-shrink-0 ${isSelected ? 'bg-accent/30 text-accent' : 'bg-surface text-content-muted'}`}>
                     {user.photoProfile ? (
                       <img src={resolveStorageUrl(user.photoProfile)} alt={fullName} className="w-full h-full object-cover" />
                     ) : (
@@ -165,26 +165,26 @@ export default function AssignCashierModal({
                     )}
                     {isCurrent && (
                       <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500 border border-slate-900"></span>
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-status-success opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-status-success border border-edge"></span>
                       </span>
                     )}
                   </div>
 
                   {/* Infos */}
                   <div className="flex-1 min-w-0">
-                    <div className={`font-medium text-sm flex items-center gap-2 ${isSelected ? 'text-white' : 'text-slate-200'}`}>
+                    <div className={`font-medium text-sm flex items-center gap-2 ${isSelected ? 'text-content-primary' : 'text-content-secondary'}`}>
                       <span className="truncate">{fullName}</span>
                       {isCurrent && (
-                        <span className="flex-shrink-0 text-[9px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                        <span className="flex-shrink-0 text-[9px] bg-status-success-bg text-status-success px-1.5 py-0.5 rounded border border-status-success/20">
                           Déjà habilité
                         </span>
                       )}
                     </div>
-                    <div className="text-xs text-slate-500 flex items-center gap-1.5">
+                    <div className="text-xs text-content-muted flex items-center gap-1.5">
                       <span>@{user.username || 'N/A'}</span>
-                      <span className="text-slate-600">•</span>
-                      <span className="text-slate-400 text-[10px]">
+                      <span className="text-content-muted">•</span>
+                      <span className="text-content-muted text-[10px]">
                         {getRoleLabel(user.role)}
                       </span>
                     </div>
@@ -192,7 +192,7 @@ export default function AssignCashierModal({
 
                   {/* Status */}
                   {isBusyElsewhere && (
-                    <span className="flex-shrink-0 text-[10px] text-amber-500 bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20 font-medium">
+                    <span className="flex-shrink-0 text-[10px] text-status-warning bg-status-warning-bg px-2 py-1 rounded border border-status-warning/20 font-medium">
                       Occupé
                     </span>
                   )}
@@ -201,28 +201,28 @@ export default function AssignCashierModal({
             })
           ) : (
             // Empty State
-            <div className="text-center py-10 text-slate-500">
+            <div className="text-center py-10 text-content-muted">
               <User size={32} className="mx-auto mb-3 opacity-50" />
               <p className="text-sm font-medium">Aucun agent trouvé</p>
               {search && (
-                <p className="text-xs mt-1 text-slate-600">pour "{search}"</p>
+                <p className="text-xs mt-1 text-content-muted">pour "{search}"</p>
               )}
             </div>
           )}
         </div>
 
         {/* FOOTER */}
-        <div className="p-4 border-t border-slate-800 bg-slate-900 rounded-b-2xl">
+        <div className="p-4 border-t border-edge bg-surface-base rounded-b-2xl">
           {/* Résumé des changements */}
           {hasChanges && (
             <div className="mb-3 flex items-center gap-3 text-xs">
               {addedCount > 0 && (
-                <span className="text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded">
+                <span className="text-status-success bg-status-success-bg px-2 py-1 rounded">
                   +{addedCount} ajouté{addedCount > 1 ? 's' : ''}
                 </span>
               )}
               {removedCount > 0 && (
-                <span className="text-red-400 bg-red-500/10 px-2 py-1 rounded">
+                <span className="text-status-danger bg-status-danger-bg px-2 py-1 rounded">
                   -{removedCount} retiré{removedCount > 1 ? 's' : ''}
                 </span>
               )}
@@ -233,7 +233,7 @@ export default function AssignCashierModal({
             <button
               onClick={onClose}
               disabled={isSaving}
-              className="px-4 py-2.5 text-slate-400 hover:text-white transition-colors text-sm font-medium disabled:opacity-50"
+              className="px-4 py-2.5 text-content-muted hover:text-content-primary transition-colors text-sm font-medium disabled:opacity-50"
             >
               Annuler
             </button>
@@ -241,7 +241,7 @@ export default function AssignCashierModal({
             <button
               onClick={() => onSave(selectedUserIds)}
               disabled={!hasChanges || isSaving}
-              className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-lg transition-all flex items-center gap-2 text-sm"
+              className="px-6 py-2.5 bg-accent hover:bg-accent-primary-hover disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-lg transition-all flex items-center gap-2 text-sm"
             >
               {isSaving ? (
                 <>

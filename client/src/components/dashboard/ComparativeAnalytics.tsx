@@ -176,16 +176,16 @@ export default function ComparativeAnalytics() {
     <div className="space-y-4">
       {/* Period Selector */}
       <div className="flex items-center gap-2 flex-wrap">
-        <Calendar size={14} className="text-slate-400" />
-        <span className="text-xs text-slate-400">{t('comparerLabel')}</span>
+        <Calendar size={14} className="text-content-muted" />
+        <span className="text-xs text-content-muted">{t('comparerLabel')}</span>
         {(['month', 'quarter', 'year'] as PresetPeriod[]).map(p => (
           <button
             key={p}
             onClick={() => setPreset(p)}
             className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
               preset === p
-                ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
-                : 'bg-slate-800 text-slate-400 border border-slate-700 hover:border-slate-600'
+                ? 'bg-accent/10 text-accent border border-accent/30'
+                : 'bg-surface text-content-muted border border-edge hover:border-edge-strong'
             }`}
           >
             {p === 'month' ? t('moisPeriode') : p === 'quarter' ? t('trimestrePeriode') : t('anneePeriode')}
@@ -195,7 +195,7 @@ export default function ComparativeAnalytics() {
 
       {/* Comparative Cards */}
       {compLoading ? (
-        <div className="flex items-center justify-center py-8 text-slate-500 text-xs">
+        <div className="flex items-center justify-center py-8 text-content-muted text-xs">
           <RefreshCw className="animate-spin mr-2" size={14} />
           {t('chargement')}
         </div>
@@ -207,18 +207,18 @@ export default function ComparativeAnalytics() {
             // For withdrawals, up = bad
             const isPositive = key === 'montantRetraits' ? !isUp : isUp;
             return (
-              <Card key={key} padding="sm" className="bg-slate-800/80 border-slate-700">
-                <p className="text-[10px] text-slate-500 uppercase tracking-wide truncate">{t(METRIC_LABEL_KEYS[key] || key)}</p>
+              <Card key={key} padding="sm" className="bg-surface/80 border-edge">
+                <p className="text-[10px] text-content-muted uppercase tracking-wide truncate">{t(METRIC_LABEL_KEYS[key] || key)}</p>
                 <div className="flex items-baseline gap-1.5 mt-1">
-                  <span className="text-lg font-bold text-white font-mono">
+                  <span className="text-lg font-bold text-content-primary font-mono">
                     {isMoney ? formatMoney(v.periodB) : v.periodB.toLocaleString(locale)}
                   </span>
-                  <span className={`text-[10px] font-bold flex items-center gap-0.5 ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+                  <span className={`text-[10px] font-bold flex items-center gap-0.5 ${isPositive ? 'text-status-success' : 'text-status-danger'}`}>
                     {isUp ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
                     {v.changePercent > 0 ? '+' : ''}{v.changePercent}%
                   </span>
                 </div>
-                <p className="text-[9px] text-slate-600 mt-0.5">
+                <p className="text-[9px] text-content-muted mt-0.5">
                   {t('vsPrecedent')} {isMoney ? formatMoney(v.periodA) : v.periodA.toLocaleString(locale)}
                 </p>
               </Card>
@@ -228,11 +228,11 @@ export default function ComparativeAnalytics() {
       ) : null}
 
       {/* Forecast Chart */}
-      <Card padding="sm" className="bg-slate-800/80 border-slate-700">
+      <Card padding="sm" className="bg-surface/80 border-edge">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <Activity size={14} className="text-cyan-400" />
-            <h4 className="text-xs font-bold text-white uppercase tracking-wide">{t('previsionsNMois')}</h4>
+            <Activity size={14} className="text-accent" />
+            <h4 className="text-xs font-bold text-content-primary uppercase tracking-wide">{t('previsionsNMois')}</h4>
           </div>
           <div className="flex gap-1">
             {(['clients', 'credits', 'deposits'] as const).map(m => (
@@ -241,8 +241,8 @@ export default function ComparativeAnalytics() {
                 onClick={() => setForecastMetric(m)}
                 className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
                   forecastMetric === m
-                    ? 'bg-cyan-500/20 text-cyan-400'
-                    : 'text-slate-500 hover:text-slate-300'
+                    ? 'bg-accent/10 text-accent'
+                    : 'text-content-muted hover:text-content-secondary'
                 }`}
               >
                 {m === 'clients' ? t('clientsMetrique') : m === 'credits' ? t('creditsMetrique') : t('depotsMetrique')}
@@ -252,7 +252,7 @@ export default function ComparativeAnalytics() {
         </div>
 
         {forecastLoading ? (
-          <div className="flex items-center justify-center py-12 text-slate-500 text-xs">
+          <div className="flex items-center justify-center py-12 text-content-muted text-xs">
             <RefreshCw className="animate-spin mr-2" size={14} />
             {t('chargement')}
           </div>
@@ -269,20 +269,20 @@ export default function ComparativeAnalytics() {
                   <stop offset="95%" stopColor="#a78bfa" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
               <XAxis
                 dataKey="month"
-                tick={{ fill: '#64748b', fontSize: 10 }}
-                axisLine={{ stroke: '#334155' }}
+                tick={{ fill: 'var(--text-muted)', fontSize: 10 }}
+                axisLine={{ stroke: 'var(--border-default)' }}
               />
               <YAxis
-                tick={{ fill: '#64748b', fontSize: 10 }}
-                axisLine={{ stroke: '#334155' }}
+                tick={{ fill: 'var(--text-muted)', fontSize: 10 }}
+                axisLine={{ stroke: 'var(--border-default)' }}
                 tickFormatter={(v) => forecastMetric === 'clients' ? v : formatMoney(v)}
               />
               <Tooltip
-                contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px', fontSize: '11px' }}
-                labelStyle={{ color: '#94a3b8' }}
+                contentStyle={{ backgroundColor: 'var(--bg-elevated)', border: '1px solid var(--border-default)', borderRadius: '8px', fontSize: '11px' }}
+                labelStyle={{ color: 'var(--text-muted)' }}
                 formatter={(val: number, name: string) => [
                   forecastMetric === 'clients' ? val.toLocaleString(locale) : formatMoney(val),
                   name === 'value' ? t('reelLabel') : t('previsionLabel')
@@ -309,12 +309,12 @@ export default function ComparativeAnalytics() {
               />
               <Legend
                 wrapperStyle={{ fontSize: '10px', paddingTop: '8px' }}
-                formatter={(value) => <span className="text-slate-400">{value}</span>}
+                formatter={(value) => <span className="text-content-muted">{value}</span>}
               />
             </AreaChart>
           </ResponsiveContainer>
         ) : (
-          <div className="text-center py-8 text-slate-500 text-xs">
+          <div className="text-center py-8 text-content-muted text-xs">
             {t('donneesInsuffisantesPrevision')}
           </div>
         )}

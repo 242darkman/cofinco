@@ -195,7 +195,7 @@ export default function PendingDisbursements({
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center gap-2 text-slate-400 p-8">
+      <div className="flex items-center justify-center gap-2 text-content-muted p-8">
         <RefreshCw className="animate-spin" size={18} />
         <span className="text-sm">Chargement...</span>
       </div>
@@ -203,17 +203,17 @@ export default function PendingDisbursements({
   }
 
   return (
-    <div className="h-full flex flex-col bg-slate-950/50 rounded-xl border border-slate-800 overflow-hidden">
+    <div className="h-full flex flex-col bg-surface-base/50 rounded-xl border border-edge overflow-hidden">
       {/* Compact Header */}
-      <div className="px-3 py-2.5 border-b border-slate-800 bg-slate-900/80 flex flex-wrap items-center justify-between gap-2 shrink-0">
+      <div className="px-3 py-2.5 border-b border-edge bg-surface-base/80 flex flex-wrap items-center justify-between gap-2 shrink-0">
         <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg bg-orange-500/10 shrink-0">
-            <Wallet className="w-4 h-4 text-orange-400" />
+          <div className="p-1.5 rounded-lg bg-status-warning-bg shrink-0">
+            <Wallet className="w-4 h-4 text-status-warning" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-white">Décaissements Prêts</h3>
+            <h3 className="text-sm font-bold text-content-primary">Décaissements Prêts</h3>
             {count > 0 && (
-              <p className="text-[10px] text-slate-500">
+              <p className="text-[10px] text-content-muted">
                 {count} en attente • {formatMoney(totalAmount)}
               </p>
             )}
@@ -225,19 +225,19 @@ export default function PendingDisbursements({
             <button
               onClick={() => setShowBatchConfirm(true)}
               disabled={batchPayoutMutation.isPending}
-              className="px-2 py-1 text-[10px] font-bold bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition flex items-center gap-1"
+              className="px-2 py-1 text-[10px] font-bold bg-status-warning text-white rounded-lg hover:bg-status-warning transition flex items-center gap-1"
             >
               <CheckCircle size={12} />
               {batchPayoutMutation.isPending ? '...' : `(${selectedIds.size})`}
             </button>
           )}
           {count > 1 && (
-            <label className="flex items-center gap-1 cursor-pointer text-[10px] text-slate-400 px-1.5 py-1 rounded hover:bg-slate-800">
+            <label className="flex items-center gap-1 cursor-pointer text-[10px] text-content-muted px-1.5 py-1 rounded hover:bg-surface">
               <input
                 type="checkbox"
                 checked={selectedIds.size === count && count > 0}
                 onChange={toggleSelectAll}
-                className="w-3 h-3 rounded border-slate-600 text-orange-500 focus:ring-0"
+                className="w-3 h-3 rounded border-edge-strong text-status-warning focus:ring-0"
               />
               <span className="hidden sm:inline">Tout</span>
             </label>
@@ -245,7 +245,7 @@ export default function PendingDisbursements({
           <button
             onClick={() => refetch()}
             disabled={isRefetching}
-            className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 transition"
+            className="p-1.5 rounded-lg hover:bg-surface text-content-muted transition"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isRefetching ? 'animate-spin' : ''}`} />
           </button>
@@ -265,10 +265,10 @@ export default function PendingDisbursements({
                 key={credit.id}
                 className={`rounded-lg border transition-all ${
                   isExpanded
-                    ? 'bg-slate-800/80 border-orange-500/40 shadow-lg'
+                    ? 'bg-surface/80 border-status-warning/40 shadow-lg'
                     : isSelected
-                    ? 'bg-orange-950/20 border-orange-500/20'
-                    : 'bg-slate-900/60 border-slate-800 hover:border-slate-700'
+                    ? 'bg-status-warning-bg border-status-warning/20'
+                    : 'bg-surface-base/60 border-edge hover:border-edge'
                 }`}
               >
                 {/* Collapsed Row */}
@@ -283,41 +283,41 @@ export default function PendingDisbursements({
                       checked={isSelected}
                       onClick={(e) => toggleSelect(credit.id, e)}
                       onChange={() => {}}
-                      className="w-3.5 h-3.5 rounded border-slate-600 text-orange-500 focus:ring-0 shrink-0 mt-1"
+                      className="w-3.5 h-3.5 rounded border-edge-strong text-status-warning focus:ring-0 shrink-0 mt-1"
                     />
 
-                    <div className="w-9 h-9 rounded-full bg-slate-800 border border-slate-700 overflow-hidden shrink-0">
+                    <div className="w-9 h-9 rounded-full bg-surface border border-edge overflow-hidden shrink-0">
                       {credit.client.photoUrl ? (
                         <img src={resolveStorageUrl(credit.client.photoUrl)} className="w-full h-full object-cover" alt="" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <User size={16} className="text-slate-500" />
+                          <User size={16} className="text-content-muted" />
                         </div>
                       )}
                     </div>
 
                     <div className="flex-1">
-                      <p className="text-xs font-semibold text-white leading-tight">
+                      <p className="text-xs font-semibold text-content-primary leading-tight">
                         {formatClientName(credit.client.nom, credit.client.prenom)}
                       </p>
-                      <p className="text-[10px] text-slate-500 font-mono">
+                      <p className="text-[10px] text-content-muted font-mono">
                         #{credit.numeroCredit}
                       </p>
                     </div>
 
                     <ChevronDown
                       size={14}
-                      className={`text-slate-500 transition-transform shrink-0 ${isExpanded ? 'rotate-180 text-orange-400' : ''}`}
+                      className={`text-content-muted transition-transform shrink-0 ${isExpanded ? 'rotate-180 text-status-warning' : ''}`}
                     />
                   </div>
 
                   {/* Bottom Row: Amount & Date */}
                   <div className="flex items-center justify-between pl-6">
-                    <div className="flex items-center gap-1 text-[10px] text-slate-500">
+                    <div className="flex items-center gap-1 text-[10px] text-content-muted">
                       <Clock size={10} />
                       {new Date(credit.createdAt || '').toLocaleDateString('fr', { day: '2-digit', month: '2-digit' })}
                     </div>
-                    <p className="text-sm font-bold text-orange-400 tabular-nums">
+                    <p className="text-sm font-bold text-status-warning tabular-nums">
                       {formatMoney(parseFloat(credit.montant))}
                     </p>
                   </div>
@@ -325,26 +325,26 @@ export default function PendingDisbursements({
 
                 {/* Expanded Detail Panel */}
                 {isExpanded && (
-                  <div className="px-3 pb-3 pt-1 border-t border-slate-700/50 animate-in slide-in-from-top-1 duration-200">
+                  <div className="px-3 pb-3 pt-1 border-t border-edge-subtle animate-in slide-in-from-top-1 duration-200">
                     {/* Identity Verification Alert */}
-                    <div className="flex items-start gap-2 p-2 bg-orange-500/10 border border-orange-500/20 rounded-lg mb-3">
-                      <Shield size={14} className="text-orange-400 shrink-0 mt-0.5" />
-                      <p className="text-[10px] text-orange-200/80 leading-relaxed">
-                        <span className="font-bold text-orange-200">Vérifiez l'identité</span> du client avant de procéder au décaissement.
+                    <div className="flex items-start gap-2 p-2 bg-status-warning-bg border border-status-warning/20 rounded-lg mb-3">
+                      <Shield size={14} className="text-status-warning shrink-0 mt-0.5" />
+                      <p className="text-[10px] text-status-warning-text/80 leading-relaxed">
+                        <span className="font-bold text-status-warning-text">Vérifiez l'identité</span> du client avant de procéder au décaissement.
                       </p>
                     </div>
 
                     {/* Transaction Info Grid */}
                     <div className="grid grid-cols-2 gap-2 mb-3">
-                      <div className="bg-slate-950/50 rounded-lg p-2 text-center">
-                        <p className="text-[9px] text-slate-500 uppercase tracking-wider">Montant</p>
-                        <p className="text-lg font-black text-white tabular-nums">
+                      <div className="bg-surface-base/50 rounded-lg p-2 text-center">
+                        <p className="text-[9px] text-content-muted uppercase tracking-wider">Montant</p>
+                        <p className="text-lg font-black text-content-primary tabular-nums">
                           {formatMoney(parseFloat(credit.montant))}
                         </p>
                       </div>
-                      <div className="bg-slate-950/50 rounded-lg p-2 text-center">
-                        <p className="text-[9px] text-slate-500 uppercase tracking-wider">Crédit</p>
-                        <p className="text-xs font-bold text-slate-300 font-mono mt-1">
+                      <div className="bg-surface-base/50 rounded-lg p-2 text-center">
+                        <p className="text-[9px] text-content-muted uppercase tracking-wider">Crédit</p>
+                        <p className="text-xs font-bold text-content-secondary font-mono mt-1">
                           #{credit.numeroCredit}
                         </p>
                       </div>
@@ -353,13 +353,13 @@ export default function PendingDisbursements({
                     {/* Receipt Input */}
                     <div className="mb-3">
                       <div className="relative">
-                        <FileText size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                        <FileText size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-content-muted" />
                         <input
                           type="text"
                           value={receiptNumbers[credit.id] || ''}
                           onChange={(e) => setReceiptNumbers(prev => ({ ...prev, [credit.id]: e.target.value }))}
                           placeholder="Réf. reçu (optionnel)"
-                          className="w-full pl-8 pr-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white placeholder:text-slate-600 focus:border-orange-500 outline-none"
+                          className="w-full pl-8 pr-3 py-2 bg-surface-base border border-edge rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:border-status-warning outline-none"
                           onClick={(e) => e.stopPropagation()}
                         />
                       </div>
@@ -370,7 +370,7 @@ export default function PendingDisbursements({
                       <button
                         onClick={(e) => handleCancelClick(credit, e)}
                         disabled={cancelMutation.isPending}
-                        className="flex-1 py-2 px-3 text-[10px] font-bold text-rose-400 border border-rose-500/30 rounded-lg hover:bg-rose-500/10 transition flex items-center justify-center gap-1"
+                        className="flex-1 py-2 px-3 text-[10px] font-bold text-status-danger border border-status-danger/30 rounded-lg hover:bg-status-danger/10 transition flex items-center justify-center gap-1"
                       >
                         <XCircle size={12} />
                         Annuler
@@ -378,7 +378,7 @@ export default function PendingDisbursements({
                       <button
                         onClick={(e) => { e.stopPropagation(); handlePayout(credit); }}
                         disabled={isPaying}
-                        className="flex-[2] py-2.5 px-3 text-xs font-bold text-white bg-gradient-to-r from-orange-600 to-amber-600 rounded-lg hover:from-orange-500 hover:to-amber-500 transition flex items-center justify-center gap-1.5 shadow-lg shadow-orange-900/20"
+                        className="flex-[2] py-2.5 px-3 text-xs font-bold text-white bg-gradient-to-r from-status-warning to-status-warning rounded-lg hover:from-status-warning hover:to-status-warning transition flex items-center justify-center gap-1.5 shadow-lg shadow-status-warning/20"
                       >
                         {isPaying ? (
                           <><RefreshCw size={14} className="animate-spin" /> Traitement...</>
@@ -394,11 +394,11 @@ export default function PendingDisbursements({
           })
         ) : (
           /* Empty State */
-          <div className="h-full flex flex-col items-center justify-center text-slate-500 py-12">
-            <div className="p-3 bg-slate-900 rounded-full mb-3 border border-slate-800">
-              <CheckCircle size={20} className="text-emerald-500/50" />
+          <div className="h-full flex flex-col items-center justify-center text-content-muted py-12">
+            <div className="p-3 bg-surface-base rounded-full mb-3 border border-edge">
+              <CheckCircle size={20} className="text-status-success/50" />
             </div>
-            <p className="text-xs font-medium text-slate-400">Aucun décaissement en attente</p>
+            <p className="text-xs font-medium text-content-muted">Aucun décaissement en attente</p>
             <p className="text-[10px] mt-1 opacity-60">Les nouveaux prêts apparaîtront ici</p>
           </div>
         )}

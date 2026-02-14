@@ -152,11 +152,11 @@ export default function FormationCertificatesPanel({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-bold text-white flex items-center gap-2">
-            <Award size={16} className="text-amber-400" />
+          <h3 className="text-sm font-bold text-content-primary flex items-center gap-2">
+            <Award size={16} className="text-status-warning" />
             Certificats
           </h3>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-content-muted">
             {certificates.length} certificat(s) emis
           </p>
         </div>
@@ -188,9 +188,9 @@ export default function FormationCertificatesPanel({
       </div>
 
       {!isCompleted && (
-        <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 flex items-center gap-2">
-          <AlertTriangle size={16} className="text-amber-400" />
-          <p className="text-xs text-amber-300">
+        <div className="bg-status-warning-bg border border-status-warning/30 rounded-lg p-3 flex items-center gap-2">
+          <AlertTriangle size={16} className="text-status-warning" />
+          <p className="text-xs text-status-warning">
             Les certificats ne peuvent etre emis qu'apres la fin de la formation.
           </p>
         </div>
@@ -199,14 +199,14 @@ export default function FormationCertificatesPanel({
       {/* Certificates list */}
       {isLoading ? (
         <div className="flex items-center justify-center py-8">
-          <Loader2 className="w-6 h-6 animate-spin text-amber-500" />
+          <Loader2 className="w-6 h-6 animate-spin text-status-warning" />
         </div>
       ) : certificates.length === 0 ? (
-        <div className="text-center py-8 bg-slate-900/50 rounded-lg border border-slate-800">
-          <Award size={32} className="mx-auto text-slate-600 mb-2" />
-          <p className="text-sm text-slate-500">Aucun certificat emis</p>
+        <div className="text-center py-8 bg-surface-base/50 rounded-lg border border-edge">
+          <Award size={32} className="mx-auto text-content-muted mb-2" />
+          <p className="text-sm text-content-muted">Aucun certificat emis</p>
           {canManage && isCompleted && eligibleParticipants.length > 0 && (
-            <p className="text-xs text-slate-600 mt-1">
+            <p className="text-xs text-content-muted mt-1">
               {eligibleParticipants.length} participant(s) eligible(s)
             </p>
           )}
@@ -221,29 +221,29 @@ export default function FormationCertificatesPanel({
             return (
               <div
                 key={cert.id}
-                className={`bg-slate-900/50 border rounded-lg p-3 ${
-                  cert.statut === 'REVOKED' ? 'border-red-500/30 opacity-60' :
-                  isExpired ? 'border-amber-500/30' :
-                  'border-slate-800'
+                className={`bg-surface-base/50 border rounded-lg p-3 ${
+                  cert.statut === 'REVOKED' ? 'border-status-danger/30 opacity-60' :
+                  isExpired ? 'border-status-warning/30' :
+                  'border-edge'
                 }`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-start gap-3">
                     <div className={`p-2 rounded-lg ${
-                      cert.statut === 'REVOKED' ? 'bg-red-500/10' :
-                      isExpired ? 'bg-amber-500/10' :
-                      'bg-amber-500/10'
+                      cert.statut === 'REVOKED' ? 'bg-status-danger-bg' :
+                      isExpired ? 'bg-status-warning-bg' :
+                      'bg-status-warning-bg'
                     }`}>
                       <Award size={20} className={
-                        cert.statut === 'REVOKED' ? 'text-red-400' :
-                        isExpired ? 'text-amber-400' :
-                        'text-amber-400'
+                        cert.statut === 'REVOKED' ? 'text-status-danger' :
+                        isExpired ? 'text-status-warning' :
+                        'text-status-warning'
                       } />
                     </div>
 
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-medium text-white">{cert.employeNom}</span>
+                        <span className="text-sm font-medium text-content-primary">{cert.employeNom}</span>
                         <Badge
                           variant={status.color as any}
                           value={isExpired && cert.statut === 'ISSUED' ? 'Expire' : status.label}
@@ -251,14 +251,14 @@ export default function FormationCertificatesPanel({
                         />
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-3 text-[10px] text-slate-500">
-                        <span className="font-mono text-amber-400/70">{cert.numeroCertificat}</span>
+                      <div className="flex flex-wrap items-center gap-3 text-[10px] text-content-muted">
+                        <span className="font-mono text-status-warning/70">{cert.numeroCertificat}</span>
                         <span className="flex items-center gap-1">
                           <Calendar size={10} />
                           Emis le {new Date(cert.dateEmission).toLocaleDateString('fr-FR')}
                         </span>
                         {cert.dateExpiration && (
-                          <span className={`flex items-center gap-1 ${isExpired ? 'text-amber-400' : ''}`}>
+                          <span className={`flex items-center gap-1 ${isExpired ? 'text-status-warning' : ''}`}>
                             <AlertTriangle size={10} />
                             Expire le {new Date(cert.dateExpiration).toLocaleDateString('fr-FR')}
                           </span>
@@ -270,7 +270,7 @@ export default function FormationCertificatesPanel({
                           {cert.competences.split(',').map((comp, i) => (
                             <span
                               key={i}
-                              className="px-1.5 py-0.5 bg-slate-800 text-slate-400 text-[9px] rounded"
+                              className="px-1.5 py-0.5 bg-surface text-content-muted text-[9px] rounded"
                             >
                               {comp.trim()}
                             </span>
@@ -279,7 +279,7 @@ export default function FormationCertificatesPanel({
                       )}
 
                       {cert.motifRevocation && (
-                        <p className="text-xs text-red-400 mt-2 flex items-center gap-1">
+                        <p className="text-xs text-status-danger mt-2 flex items-center gap-1">
                           <XCircle size={10} />
                           {cert.motifRevocation}
                         </p>
@@ -293,7 +293,7 @@ export default function FormationCertificatesPanel({
                         href={cert.fichierUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition"
+                        className="p-1.5 text-content-muted hover:text-content-primary hover:bg-surface-elevated rounded transition"
                         title="Telecharger"
                       >
                         <Download size={14} />
@@ -302,7 +302,7 @@ export default function FormationCertificatesPanel({
                     {canManage && cert.statut === 'ISSUED' && !isExpired && (
                       <button
                         onClick={() => setShowRevokeModal(cert)}
-                        className="p-1.5 text-red-400 hover:bg-red-500/10 rounded transition"
+                        className="p-1.5 text-status-danger hover:bg-status-danger-bg rounded transition"
                         title="Revoquer"
                       >
                         <XCircle size={14} />
@@ -324,17 +324,17 @@ export default function FormationCertificatesPanel({
         size="md"
       >
         <div className="space-y-4">
-          <div className="bg-slate-800/50 rounded-lg p-3">
-            <p className="text-xs text-slate-400">Formation</p>
-            <p className="text-sm font-medium text-white">{formationTitre}</p>
+          <div className="bg-surface/50 rounded-lg p-3">
+            <p className="text-xs text-content-muted">Formation</p>
+            <p className="text-sm font-medium text-content-primary">{formationTitre}</p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">Participant</label>
+            <label className="block text-sm font-medium text-content-secondary mb-2">Participant</label>
             <select
               value={selectedParticipant}
               onChange={(e) => setSelectedParticipant(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:ring-1 focus:ring-amber-500/50"
+              className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-sm text-content-primary focus:ring-1 focus:ring-status-warning/50"
             >
               <option value="">Selectionner un participant</option>
               {eligibleParticipants.map((p) => (
@@ -362,7 +362,7 @@ export default function FormationCertificatesPanel({
             onChange={(e) => setIssueForm(prev => ({ ...prev, dateExpiration: e.target.value }))}
           />
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
+          <div className="flex justify-end gap-3 pt-4 border-t border-edge">
             <Button variant="secondary" onClick={() => setShowIssueModal(false)}>
               Annuler
             </Button>
@@ -385,20 +385,20 @@ export default function FormationCertificatesPanel({
         size="md"
       >
         <div className="space-y-4">
-          <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
-            <div className="flex items-center gap-2 text-amber-400 mb-2">
+          <div className="bg-status-warning-bg border border-status-warning/30 rounded-lg p-3">
+            <div className="flex items-center gap-2 text-status-warning mb-2">
               <Users size={16} />
               <span className="text-sm font-medium">{eligibleParticipants.length} participant(s) eligible(s)</span>
             </div>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-content-muted">
               Les certificats seront emis pour tous les participants marques "Present" qui n'ont pas encore de certificat.
             </p>
           </div>
 
-          <div className="max-h-32 overflow-y-auto bg-slate-800/50 rounded-lg p-2 space-y-1">
+          <div className="max-h-32 overflow-y-auto bg-surface/50 rounded-lg p-2 space-y-1">
             {eligibleParticipants.map(p => (
-              <div key={p.employeId} className="flex items-center gap-2 text-xs text-slate-300">
-                <User size={12} className="text-slate-500" />
+              <div key={p.employeId} className="flex items-center gap-2 text-xs text-content-secondary">
+                <User size={12} className="text-content-muted" />
                 {p.employeNom}
               </div>
             ))}
@@ -421,7 +421,7 @@ export default function FormationCertificatesPanel({
             onChange={(e) => setBatchForm(prev => ({ ...prev, dateExpiration: e.target.value }))}
           />
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
+          <div className="flex justify-end gap-3 pt-4 border-t border-edge">
             <Button variant="secondary" onClick={() => setShowBatchModal(false)}>
               Annuler
             </Button>
@@ -445,9 +445,9 @@ export default function FormationCertificatesPanel({
       >
         {showRevokeModal && (
           <div className="space-y-4">
-            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
-              <p className="text-sm text-red-400 font-medium mb-1">Attention</p>
-              <p className="text-xs text-slate-400">
+            <div className="bg-status-danger-bg border border-status-danger/30 rounded-lg p-3">
+              <p className="text-sm text-status-danger font-medium mb-1">Attention</p>
+              <p className="text-xs text-content-muted">
                 Cette action est irreversible. Le certificat de {showRevokeModal.employeNom} sera marque comme revoque.
               </p>
             </div>
@@ -461,7 +461,7 @@ export default function FormationCertificatesPanel({
               required
             />
 
-            <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
+            <div className="flex justify-end gap-3 pt-4 border-t border-edge">
               <Button variant="secondary" onClick={() => setShowRevokeModal(null)}>
                 Annuler
               </Button>

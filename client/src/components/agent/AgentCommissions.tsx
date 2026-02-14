@@ -231,7 +231,7 @@ export default function AgentCommissions({ agentId }: AgentCommissionsProps) {
       <div className="flex flex-col sm:flex-row gap-2">
         <button
           onClick={() => setShowForm(!showForm)}
-          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center gap-1.5 transition text-xs font-bold"
+          className="px-3 py-1.5 bg-status-info hover:bg-status-info text-white rounded-lg flex items-center justify-center gap-1.5 transition text-xs font-bold"
         >
           <Plus size={14} />
           Nouvelle
@@ -241,7 +241,7 @@ export default function AgentCommissions({ agentId }: AgentCommissionsProps) {
           type="month"
           value={selectedPeriode}
           onChange={(e) => setSelectedPeriode(e.target.value)}
-          className="px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs"
+          className="px-3 py-1.5 bg-surface border border-edge rounded-lg text-content-primary text-xs"
         />
 
         <div className="flex items-center gap-2 ml-auto">
@@ -270,7 +270,7 @@ export default function AgentCommissions({ agentId }: AgentCommissionsProps) {
                 link.click();
                 URL.revokeObjectURL(url);
             }}
-            className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg flex items-center gap-1.5 transition text-xs border border-slate-700"
+            className="px-3 py-1.5 bg-surface hover:bg-surface-elevated text-content-secondary rounded-lg flex items-center gap-1.5 transition text-xs border border-edge"
             title="Exporter CSV"
             >
             <Download size={14} />
@@ -280,7 +280,7 @@ export default function AgentCommissions({ agentId }: AgentCommissionsProps) {
             <button
             onClick={recalculateAll}
             disabled={recalculating === 'all' || commissions.length === 0}
-            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg flex items-center gap-1.5 transition disabled:opacity-50 text-xs font-medium"
+            className="px-3 py-1.5 bg-accent hover:bg-accent-primary-hover text-white rounded-lg flex items-center gap-1.5 transition disabled:opacity-50 text-xs font-medium"
             >
             {recalculating === 'all' ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
             <span className="hidden sm:inline">Recalculer Tout</span>
@@ -290,8 +290,8 @@ export default function AgentCommissions({ agentId }: AgentCommissionsProps) {
 
       {/* Formulaire Compact */}
       {showForm && (
-        <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700 text-sm animate-in slide-in-from-top-2">
-          <h3 className="text-base font-bold text-white mb-3">Nouvelle Commission</h3>
+        <div className="bg-surface/50 rounded-xl p-4 border border-edge text-sm animate-in slide-in-from-top-2">
+          <h3 className="text-base font-bold text-content-primary mb-3">Nouvelle Commission</h3>
           <form onSubmit={handleSubmit} className="space-y-3">
              {/* Compact Form Grid */}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -301,11 +301,11 @@ export default function AgentCommissions({ agentId }: AgentCommissionsProps) {
               <FormInput label="Primes (FC)" type="number" value={formData.primes} onChange={v => setFormData({...formData, primes: Number(v)})} />
               <FormInput label="Avances (FC)" type="number" value={formData.avances} onChange={v => setFormData({...formData, avances: Number(v)})} />
               <div>
-                <label className="block text-xs font-semibold text-slate-400 mb-1">Méthode</label>
+                <label className="block text-xs font-semibold text-content-muted mb-1">Méthode</label>
                 <select
                   value={formData.methode_paiement}
                   onChange={(e) => setFormData({ ...formData, methode_paiement: e.target.value })}
-                  className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded text-white text-xs focus:ring-1 focus:ring-blue-500 max-h-[34px]"
+                  className="w-full px-2 py-1.5 bg-surface-base border border-edge rounded text-content-primary text-xs focus:ring-1 focus:ring-status-info max-h-[34px]"
                 >
                   <option value="Espèces">Espèces</option>
                   <option value="Virement">Virement</option>
@@ -315,63 +315,63 @@ export default function AgentCommissions({ agentId }: AgentCommissionsProps) {
               </div>
             </div>
             <div>
-               <label className="block text-xs font-semibold text-slate-400 mb-1">Notes</label>
-               <input type="text" value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded text-white text-xs" />
+               <label className="block text-xs font-semibold text-content-muted mb-1">Notes</label>
+               <input type="text" value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} className="w-full px-2 py-1.5 bg-surface-base border border-edge rounded text-content-primary text-xs" />
             </div>
 
             <div className="flex gap-2 justify-end">
-               <button type="button" onClick={() => setShowForm(false)} className="px-3 py-1.5 text-slate-400 hover:text-white text-xs">Annuler</button>
-               <button type="submit" disabled={loading} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-bold">Enregistrer ({previewNet.toLocaleString()} FCFA Net)</button>
+               <button type="button" onClick={() => setShowForm(false)} className="px-3 py-1.5 text-content-muted hover:text-content-primary text-xs">Annuler</button>
+               <button type="submit" disabled={loading} className="px-4 py-1.5 bg-status-info hover:bg-status-info text-white rounded text-xs font-bold">Enregistrer ({previewNet.toLocaleString()} FCFA Net)</button>
             </div>
           </form>
         </div>
       )}
 
       {/* Liste Compacte */}
-      <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+      <div className="bg-surface rounded-xl border border-edge overflow-hidden">
         {loading && commissions.length === 0 ? (
-             <div className="p-8 text-center text-slate-500"><Loader2 className="animate-spin mx-auto mb-2" />Chargement...</div>
+             <div className="p-8 text-center text-content-muted"><Loader2 className="animate-spin mx-auto mb-2" />Chargement...</div>
         ) : commissions.length === 0 ? (
-             <div className="p-8 text-center text-slate-500">Aucune commission trouvée</div>
+             <div className="p-8 text-center text-content-muted">Aucune commission trouvée</div>
         ) : (
             <div className="overflow-x-auto">
             <table className="w-full">
-                <thead className="bg-slate-900/50">
+                <thead className="bg-surface-base/50">
                 <tr>
-                    {!agentId && <th className="px-3 py-2 text-left text-xs font-bold text-slate-400 uppercase">Agent</th>}
-                    <th className="px-3 py-2 text-left text-xs font-bold text-slate-400 uppercase">Période</th>
-                    <th className="px-3 py-2 text-right text-xs font-bold text-slate-400 uppercase hidden sm:table-cell">Collecté</th>
-                    <th className="px-3 py-2 text-right text-xs font-bold text-slate-400 uppercase hidden md:table-cell">Taux</th>
-                    <th className="px-3 py-2 text-right text-xs font-bold text-slate-400 uppercase hidden md:table-cell">Primes</th>
-                    <th className="px-3 py-2 text-right text-xs font-bold text-slate-400 uppercase hidden md:table-cell">Avances</th>
-                    <th className="px-3 py-2 text-right text-xs font-bold text-slate-400 uppercase">Net</th>
-                    <th className="px-3 py-2 text-left text-xs font-bold text-slate-400 uppercase">Statut</th>
-                    <th className="px-3 py-2 text-right text-xs font-bold text-slate-400 uppercase"></th>
+                    {!agentId && <th className="px-3 py-2 text-left text-xs font-bold text-content-muted uppercase">Agent</th>}
+                    <th className="px-3 py-2 text-left text-xs font-bold text-content-muted uppercase">Période</th>
+                    <th className="px-3 py-2 text-right text-xs font-bold text-content-muted uppercase hidden sm:table-cell">Collecté</th>
+                    <th className="px-3 py-2 text-right text-xs font-bold text-content-muted uppercase hidden md:table-cell">Taux</th>
+                    <th className="px-3 py-2 text-right text-xs font-bold text-content-muted uppercase hidden md:table-cell">Primes</th>
+                    <th className="px-3 py-2 text-right text-xs font-bold text-content-muted uppercase hidden md:table-cell">Avances</th>
+                    <th className="px-3 py-2 text-right text-xs font-bold text-content-muted uppercase">Net</th>
+                    <th className="px-3 py-2 text-left text-xs font-bold text-content-muted uppercase">Statut</th>
+                    <th className="px-3 py-2 text-right text-xs font-bold text-content-muted uppercase"></th>
                 </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-700/50">
+                <tbody className="divide-y divide-edge/50">
                 {paginatedCommissions.map((commission) => (
                     <tr 
                         key={commission.id} 
-                        className="hover:bg-slate-700/30 transition cursor-pointer group"
+                        className="hover:bg-surface-elevated/30 transition cursor-pointer group"
                         onClick={() => setSelectedCommission(commission)}
                     >
                     {!agentId && (
-                        <td className="px-3 py-2 text-xs text-white font-medium">
+                        <td className="px-3 py-2 text-xs text-content-primary font-medium">
                         {commission.agent?.nom} {commission.agent?.prenom}
                         </td>
                     )}
-                    <td className="px-3 py-2 text-xs text-slate-300">{commission.periode}</td>
-                    <td className="px-3 py-2 text-right text-xs text-slate-400 hidden sm:table-cell">{commission.montantCollecte.toLocaleString()}</td>
-                    <td className="px-3 py-2 text-right text-xs text-slate-400 hidden md:table-cell">{commission.tauxCommission}%</td>
-                    <td className="px-3 py-2 text-right text-xs text-green-400 hidden md:table-cell">+{commission.primes.toLocaleString()}</td>
-                    <td className="px-3 py-2 text-right text-xs text-amber-400 hidden md:table-cell">-{commission.avances.toLocaleString()}</td>
-                    <td className="px-3 py-2 text-right text-xs text-white font-bold">{commission.montantNet.toLocaleString()} FCFA</td>
+                    <td className="px-3 py-2 text-xs text-content-secondary">{commission.periode}</td>
+                    <td className="px-3 py-2 text-right text-xs text-content-muted hidden sm:table-cell">{commission.montantCollecte.toLocaleString()}</td>
+                    <td className="px-3 py-2 text-right text-xs text-content-muted hidden md:table-cell">{commission.tauxCommission}%</td>
+                    <td className="px-3 py-2 text-right text-xs text-status-success hidden md:table-cell">+{commission.primes.toLocaleString()}</td>
+                    <td className="px-3 py-2 text-right text-xs text-status-warning hidden md:table-cell">-{commission.avances.toLocaleString()}</td>
+                    <td className="px-3 py-2 text-right text-xs text-content-primary font-bold">{commission.montantNet.toLocaleString()} FCFA</td>
                     <td className="px-3 py-2">
                          <StatusBadge status={commission.statutPaiement} />
                     </td>
                     <td className="px-3 py-2 text-right">
-                        <Eye size={14} className="text-slate-600 group-hover:text-cyan-400 inline-block" />
+                        <Eye size={14} className="text-content-muted group-hover:text-accent inline-block" />
                     </td>
                     </tr>
                 ))}
@@ -382,20 +382,20 @@ export default function AgentCommissions({ agentId }: AgentCommissionsProps) {
         
         {/* Pagination Footer */}
         {totalPages > 1 && (
-            <div className="flex items-center justify-between px-3 py-2 border-t border-slate-700/50 bg-slate-900/20">
-              <span className="text-[10px] text-slate-500">Page {currentPage} sur {totalPages}</span>
+            <div className="flex items-center justify-between px-3 py-2 border-t border-edge-subtle bg-surface-base/20">
+              <span className="text-[10px] text-content-muted">Page {currentPage} sur {totalPages}</span>
               <div className="flex gap-1">
                 <button
                   onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
-                  className="p-1 rounded bg-slate-800 border border-slate-700 text-slate-400 hover:text-white disabled:opacity-30 transition"
+                  className="p-1 rounded bg-surface border border-edge text-content-muted hover:text-content-primary disabled:opacity-30 transition"
                 >
                   <ChevronLeft size={12} />
                 </button>
                 <button
                   onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages}
-                  className="p-1 rounded bg-slate-800 border border-slate-700 text-slate-400 hover:text-white disabled:opacity-30 transition"
+                  className="p-1 rounded bg-surface border border-edge text-content-muted hover:text-content-primary disabled:opacity-30 transition"
                 >
                   <ChevronRight size={12} />
                 </button>
@@ -406,50 +406,50 @@ export default function AgentCommissions({ agentId }: AgentCommissionsProps) {
 
        {/* Detail Sheet */}
        <Sheet open={!!selectedCommission} onOpenChange={(open) => !open && setSelectedCommission(null)}>
-        <SheetContent className="w-full sm:max-w-md bg-slate-950 border-l-slate-800 p-0 overflow-y-auto">
+        <SheetContent className="w-full sm:max-w-md bg-surface-base border-l-edge p-0 overflow-y-auto">
             {selectedCommission && (
                 <>
-                <SheetHeader className="px-6 py-4 border-b border-slate-800 bg-slate-950/50 backdrop-blur sticky top-0 z-10">
-                    <SheetTitle className="text-white">Détail Commission</SheetTitle>
-                    <SheetDescription className="text-slate-400">
+                <SheetHeader className="px-6 py-4 border-b border-edge bg-surface-base/50 backdrop-blur sticky top-0 z-10">
+                    <SheetTitle className="text-content-primary">Détail Commission</SheetTitle>
+                    <SheetDescription className="text-content-muted">
                         Période {selectedCommission.periode}
                     </SheetDescription>
                 </SheetHeader>
                 <div className="p-6 space-y-6">
                     {/* Header Card */}
-                    <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 flex justify-between items-start">
+                    <div className="bg-surface-base/50 border border-edge rounded-xl p-4 flex justify-between items-start">
                         <div>
-                            <div className="text-xs text-slate-400 uppercase font-bold mb-1">Montant Net à Payer</div>
-                            <div className="text-2xl font-bold text-white tracking-tight">{selectedCommission.montantNet.toLocaleString()} FCFA</div>
+                            <div className="text-xs text-content-muted uppercase font-bold mb-1">Montant Net à Payer</div>
+                            <div className="text-2xl font-bold text-content-primary tracking-tight">{selectedCommission.montantNet.toLocaleString()} FCFA</div>
                         </div>
                         <StatusBadge status={selectedCommission.statutPaiement} />
                     </div>
 
                      {/* Details Calculation */}
                     <div className="space-y-3">
-                         <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                         <h4 className="text-xs font-bold text-content-muted uppercase flex items-center gap-2">
                             <DollarSign size={12} /> Détails Calcul
                          </h4>
-                         <div className="bg-slate-900 rounded-lg border border-slate-800 divide-y divide-slate-800 text-sm">
+                         <div className="bg-surface-base rounded-lg border border-edge divide-y divide-edge text-sm">
                              <div className="flex justify-between p-3">
-                                 <span className="text-slate-400">Montant Collecté</span>
-                                 <span className="text-white font-mono">{selectedCommission.montantCollecte.toLocaleString()} FCFA</span>
+                                 <span className="text-content-muted">Montant Collecté</span>
+                                 <span className="text-content-primary font-mono">{selectedCommission.montantCollecte.toLocaleString()} FCFA</span>
                              </div>
                              <div className="flex justify-between p-3">
-                                 <span className="text-slate-400">Taux Commission</span>
-                                 <span className="text-white font-mono">{selectedCommission.tauxCommission}%</span>
+                                 <span className="text-content-muted">Taux Commission</span>
+                                 <span className="text-content-primary font-mono">{selectedCommission.tauxCommission}%</span>
                              </div>
-                             <div className="flex justify-between p-3 bg-slate-800/30">
-                                 <span className="text-blue-300">Commission Brute</span>
-                                 <span className="text-blue-300 font-bold font-mono">{selectedCommission.montantCommission.toLocaleString()} FCFA</span>
-                             </div>
-                             <div className="flex justify-between p-3">
-                                 <span className="text-slate-400">Primes / Bonus</span>
-                                 <span className="text-green-400 font-mono">+{selectedCommission.primes.toLocaleString()} FCFA</span>
+                             <div className="flex justify-between p-3 bg-surface/30">
+                                 <span className="text-status-info">Commission Brute</span>
+                                 <span className="text-status-info font-bold font-mono">{selectedCommission.montantCommission.toLocaleString()} FCFA</span>
                              </div>
                              <div className="flex justify-between p-3">
-                                 <span className="text-slate-400">Avances / Déductions</span>
-                                 <span className="text-amber-400 font-mono">-{selectedCommission.avances.toLocaleString()} FCFA</span>
+                                 <span className="text-content-muted">Primes / Bonus</span>
+                                 <span className="text-status-success font-mono">+{selectedCommission.primes.toLocaleString()} FCFA</span>
+                             </div>
+                             <div className="flex justify-between p-3">
+                                 <span className="text-content-muted">Avances / Déductions</span>
+                                 <span className="text-status-warning font-mono">-{selectedCommission.avances.toLocaleString()} FCFA</span>
                              </div>
                          </div>
                     </div>
@@ -462,21 +462,21 @@ export default function AgentCommissions({ agentId }: AgentCommissionsProps) {
 
                     {selectedCommission.notes && (
                          <div className="space-y-2">
-                             <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                             <h4 className="text-xs font-bold text-content-muted uppercase flex items-center gap-2">
                                 <FileText size={12} /> Notes
                              </h4>
-                             <div className="p-3 bg-slate-900/50 rounded-lg border border-slate-800 text-slate-300 text-sm italic">
+                             <div className="p-3 bg-surface-base/50 rounded-lg border border-edge text-content-secondary text-sm italic">
                                  "{selectedCommission.notes}"
                              </div>
                          </div>
                     )}
 
                     {/* Actions */}
-                    <div className="pt-4 border-t border-slate-800 flex flex-col gap-3">
+                    <div className="pt-4 border-t border-edge flex flex-col gap-3">
                          {selectedCommission.statutPaiement === StatutPaiementCommission.PENDING && (
                             <button
                                 onClick={() => handlePayer(selectedCommission.id)}
-                                className="w-full py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold text-sm shadow-lg shadow-green-900/20 transition"
+                                className="w-full py-3 bg-status-success hover:bg-status-success text-white rounded-xl font-bold text-sm shadow-lg shadow-status-success/20 transition"
                             >
                                 Marquer comme Payé
                             </button>
@@ -484,7 +484,7 @@ export default function AgentCommissions({ agentId }: AgentCommissionsProps) {
                          <button
                             onClick={() => recalculateOne(selectedCommission.id)}
                             disabled={recalculating === selectedCommission.id}
-                            className="w-full py-3 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 hover:text-indigo-300 border border-indigo-500/20 rounded-xl font-bold text-sm flex justify-center items-center gap-2 transition"
+                            className="w-full py-3 bg-accent/10 hover:bg-accent/10 text-accent hover:text-accent border border-accent/20 rounded-xl font-bold text-sm flex justify-center items-center gap-2 transition"
                          >
                             {recalculating === selectedCommission.id ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
                             Recalculer cette Commission
@@ -502,10 +502,10 @@ export default function AgentCommissions({ agentId }: AgentCommissionsProps) {
 // Sub-components for cleaner code
 function StatCard({ icon, label, value, color }: { icon: React.ReactNode, label: string, value: string, color: string }) {
     const colorClasses: Record<string, string> = {
-        blue: 'from-blue-500/20 to-blue-600/5 border-blue-500/20 text-blue-400',
-        green: 'from-green-500/20 to-green-600/5 border-green-500/20 text-green-400',
-        emerald: 'from-emerald-500/20 to-emerald-600/5 border-emerald-500/20 text-emerald-400',
-        amber: 'from-amber-500/20 to-amber-600/5 border-amber-500/20 text-amber-400',
+        blue: 'from-status-info/20 to-status-info/5 border-status-info/20 text-status-info',
+        green: 'from-status-success/20 to-status-success/5 border-status-success/20 text-status-success',
+        emerald: 'from-status-success/20 to-status-success/5 border-status-success/20 text-status-success',
+        amber: 'from-status-warning/20 to-status-warning/5 border-status-warning/20 text-status-warning',
     };
     
     return (
@@ -513,7 +513,7 @@ function StatCard({ icon, label, value, color }: { icon: React.ReactNode, label:
             <div className="flex justify-between items-start mb-1">
                 <div className="p-1.5 rounded-lg bg-white/5">{icon}</div>
             </div>
-            <div className="text-lg font-bold text-white truncate">{value}</div>
+            <div className="text-lg font-bold text-content-primary truncate">{value}</div>
             <div className="text-[10px] uppercase font-bold opacity-70 tracking-wide">{label}</div>
         </div>
     );
@@ -521,10 +521,10 @@ function StatCard({ icon, label, value, color }: { icon: React.ReactNode, label:
 
 function StatusBadge({ status }: { status: string }) {
     const styles = status === StatutPaiementCommission.PAID
-        ? 'bg-green-500/10 text-green-500 border-green-500/20'
+        ? 'bg-status-success-bg text-status-success border-status-success/20'
         : status === StatutPaiementCommission.PENDING
-        ? 'bg-amber-500/10 text-amber-500 border-amber-500/20'
-        : 'bg-blue-500/10 text-blue-500 border-blue-500/20';
+        ? 'bg-status-warning-bg text-status-warning border-status-warning/20'
+        : 'bg-status-info-bg text-status-info border-status-info/20';
         
     const label = STATUT_PAIEMENT_COMMISSION_LABELS[status as keyof typeof STATUT_PAIEMENT_COMMISSION_LABELS] || status;
 
@@ -537,9 +537,9 @@ function StatusBadge({ status }: { status: string }) {
 
 function InfoItem({ label, value }: { label: string, value: string | undefined }) {
     return (
-        <div className="p-2.5 bg-slate-900 rounded-lg border border-slate-800">
-            <div className="text-[10px] uppercase font-bold text-slate-500 mb-0.5">{label}</div>
-            <div className="text-sm font-medium text-slate-200">{value || '-'}</div>
+        <div className="p-2.5 bg-surface-base rounded-lg border border-edge">
+            <div className="text-[10px] uppercase font-bold text-content-muted mb-0.5">{label}</div>
+            <div className="text-sm font-medium text-content-secondary">{value || '-'}</div>
         </div>
     );
 }
@@ -556,14 +556,14 @@ interface FormInputProps {
 function FormInput({ label, type, value, onChange, required, step }: FormInputProps) {
     return (
         <div>
-            <label className="block text-xs font-semibold text-slate-400 mb-1">{label}</label>
+            <label className="block text-xs font-semibold text-content-muted mb-1">{label}</label>
             <input 
                 type={type} 
                 value={value} 
                 onChange={e => onChange(e.target.value)} 
                 required={required} 
                 step={step}
-                className="w-full px-2 py-1.5 bg-slate-900 border border-slate-700 rounded text-white text-xs focus:ring-1 focus:ring-blue-500" 
+                className="w-full px-2 py-1.5 bg-surface-base border border-edge rounded text-content-primary text-xs focus:ring-1 focus:ring-status-info" 
             />
         </div>
     );

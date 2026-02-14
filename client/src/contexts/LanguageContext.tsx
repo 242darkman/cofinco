@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import { useBranding } from './BrandingContext';
 
 type Language = 'fr' | 'en';
 
@@ -57,6 +58,7 @@ const translations: Translations = {
   french: { fr: 'Français', en: 'French' },
   english: { fr: 'Anglais', en: 'English' },
 
+  // Default app name — overridden at runtime by BrandingContext via brandedOverrides below
   cofinPlatform: { fr: 'COFIN&CO-M', en: 'COFIN&CO-M' },
   platformeMicrofinance: { fr: 'Plateforme Microfinance', en: 'Microfinance Platform' },
 
@@ -429,6 +431,7 @@ const translations: Translations = {
   premium: { fr: 'Premium', en: 'Premium' },
   
   // Welcome message
+  // Default welcome message — overridden at runtime by BrandingContext via brandedOverrides below
   bienvenueCofin: { fr: 'Bienvenue sur COFIN&CO-M', en: 'Welcome to COFIN&CO-M' },
   gestionMicrofinance: { fr: 'Gestion complète de microfinance', en: 'Complete microfinance management' },
   
@@ -562,6 +565,7 @@ const translations: Translations = {
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
+  const { branding } = useBranding();
   const [language, setLanguageState] = useState<Language>(() => {
     const saved = localStorage.getItem('language');
     return (saved as Language) || 'fr';
@@ -575,8 +579,14 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     setLanguageState(lang);
   };
 
+  // Dynamic branding overrides for translation keys that contain the app name
+  const brandedOverrides = useMemo<Translations>(() => ({
+    cofinPlatform: { fr: branding.appName, en: branding.appName },
+    bienvenueCofin: { fr: `Bienvenue sur ${branding.appName}`, en: `Welcome to ${branding.appName}` },
+  }), [branding.appName]);
+
   const t = (key: string): string => {
-    return translations[key]?.[language] || key;
+    return brandedOverrides[key]?.[language] || translations[key]?.[language] || key;
   };
 
   return (

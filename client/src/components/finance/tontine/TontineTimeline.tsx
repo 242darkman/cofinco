@@ -45,7 +45,7 @@ export function TontineTimeline({
     <div className="relative">
       {/* Indicateur de début tronqué */}
       {compact && startTour > 1 && (
-        <div className="flex items-center gap-2 mb-2 text-slate-500 text-[10px]">
+        <div className="flex items-center gap-2 mb-2 text-content-muted text-[10px]">
           <span>...</span>
           <span>{startTour - 1} tour{startTour > 2 ? 's' : ''} précédent{startTour > 2 ? 's' : ''}</span>
         </div>
@@ -66,12 +66,12 @@ export function TontineTimeline({
                     w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold
                     border-2 transition-all shrink-0
                     ${isBenefice
-                      ? 'bg-amber-500 border-amber-400 text-white shadow-lg shadow-amber-500/30'
+                      ? 'bg-status-warning border-status-warning text-white shadow-lg shadow-status-warning/30'
                       : isPaid
-                        ? 'bg-green-500 border-green-400 text-white'
+                        ? 'bg-status-success border-status-success text-white'
                         : isCurrent
-                          ? 'bg-cyan-500/20 border-cyan-500 text-cyan-400 animate-pulse'
-                          : 'bg-slate-800 border-slate-700 text-slate-500'
+                          ? 'bg-accent/10 border-accent text-accent animate-pulse'
+                          : 'bg-surface border-edge text-content-muted'
                     }
                   `}
                   title={
@@ -97,7 +97,7 @@ export function TontineTimeline({
                   <div
                     className={`
                       w-0.5 flex-1 min-h-[12px]
-                      ${isPaid && tour < toursPayes ? 'bg-green-500' : 'bg-slate-700'}
+                      ${isPaid && tour < toursPayes ? 'bg-status-success' : 'bg-surface-elevated'}
                     `}
                   />
                 )}
@@ -115,18 +115,18 @@ export function TontineTimeline({
                     className={`
                       text-xs truncate
                       ${isBenefice
-                        ? 'text-amber-400 font-bold'
+                        ? 'text-status-warning font-bold'
                         : isPaid
-                          ? 'text-green-400'
+                          ? 'text-status-success'
                           : isCurrent
-                            ? 'text-cyan-400 font-bold'
-                            : 'text-slate-500'
+                            ? 'text-accent font-bold'
+                            : 'text-content-muted'
                       }
                     `}
                   >
                     Tour {tour}
                     {isCurrent && (
-                      <span className="ml-1.5 px-1.5 py-0.5 bg-cyan-500/20 rounded text-[9px] uppercase tracking-wider">
+                      <span className="ml-1.5 px-1.5 py-0.5 bg-accent/10 rounded text-[9px] uppercase tracking-wider">
                         En cours
                       </span>
                     )}
@@ -136,12 +136,12 @@ export function TontineTimeline({
                     className={`
                       text-[10px] shrink-0
                       ${isBenefice
-                        ? 'text-amber-400'
+                        ? 'text-status-warning'
                         : isPaid
-                          ? 'text-green-400/70'
+                          ? 'text-status-success/70'
                           : isPast
-                            ? 'text-red-400/70'
-                            : 'text-slate-600'
+                            ? 'text-status-danger/70'
+                            : 'text-content-muted'
                       }
                     `}
                   >
@@ -163,7 +163,7 @@ export function TontineTimeline({
 
       {/* Indicateur de fin tronquée */}
       {compact && endTour < nombreMembres && (
-        <div className="flex items-center gap-2 mt-2 text-slate-500 text-[10px]">
+        <div className="flex items-center gap-2 mt-2 text-content-muted text-[10px]">
           <span>...</span>
           <span>{nombreMembres - endTour} tour{nombreMembres - endTour > 1 ? 's' : ''} restant{nombreMembres - endTour > 1 ? 's' : ''}</span>
         </div>
@@ -193,7 +193,7 @@ export function TontineTimelineHorizontal({
   return (
     <div className="flex items-center gap-0.5 overflow-hidden">
       {startTour > 1 && (
-        <span className="text-slate-600 text-[10px] mr-1">...</span>
+        <span className="text-content-muted text-[10px] mr-1">...</span>
       )}
 
       {tours.map((tour) => {
@@ -207,10 +207,10 @@ export function TontineTimelineHorizontal({
               w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold
               transition-all shrink-0
               ${isPaid
-                ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                ? 'bg-status-success-bg text-status-success border border-status-success/30'
                 : isCurrent
-                  ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/50 animate-pulse'
-                  : 'bg-slate-800/50 text-slate-600 border border-slate-700/50'
+                  ? 'bg-accent/10 text-accent border border-accent/50 animate-pulse'
+                  : 'bg-surface/50 text-content-muted border border-edge-subtle'
               }
             `}
             title={`Tour ${tour}: ${isPaid ? 'Payé' : isCurrent ? 'En cours' : 'À venir'}`}
@@ -221,7 +221,7 @@ export function TontineTimelineHorizontal({
       })}
 
       {endTour < nombreMembres && (
-        <span className="text-slate-600 text-[10px] ml-1">...</span>
+        <span className="text-content-muted text-[10px] ml-1">...</span>
       )}
     </div>
   );

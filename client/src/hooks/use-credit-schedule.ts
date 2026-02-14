@@ -240,33 +240,33 @@ export function formatEcheanceStatus(statut: EcheanceCredit['statut']): {
   const statusConfig = {
     UPCOMING: {
       label: 'À venir',
-      color: 'text-blue-700',
-      bgColor: 'bg-blue-50'
+      color: 'text-status-info',
+      bgColor: 'bg-status-info-bg'
     },
     DUE: {
       label: 'Échue',
-      color: 'text-orange-700',
-      bgColor: 'bg-orange-50'
+      color: 'text-status-warning',
+      bgColor: 'bg-status-warning-bg'
     },
     PARTIALLY_PAID: {
       label: 'Partiellement payée',
-      color: 'text-yellow-700',
-      bgColor: 'bg-yellow-50'
+      color: 'text-status-warning',
+      bgColor: 'bg-status-warning-bg'
     },
     PAID: {
       label: 'Payée',
-      color: 'text-green-700',
-      bgColor: 'bg-green-50'
+      color: 'text-status-success',
+      bgColor: 'bg-status-success-bg'
     },
     LATE: {
       label: 'En retard',
-      color: 'text-red-700',
-      bgColor: 'bg-red-50'
+      color: 'text-status-danger',
+      bgColor: 'bg-status-danger-bg'
     },
     SETTLED: {
       label: 'Soldée',
-      color: 'text-gray-700',
-      bgColor: 'bg-gray-50'
+      color: 'text-content-secondary',
+      bgColor: 'bg-surface-muted'
     }
   };
 

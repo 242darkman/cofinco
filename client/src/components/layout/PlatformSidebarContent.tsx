@@ -5,7 +5,7 @@ import { maintenanceApi, creditRefundsApi } from '../../lib/api-client';
 import { PLATFORM_MENU_ITEMS } from '../../constants/menuItems';
 import { ROUTES, canAccessRoute, type RouteConfig, getRouteByKey } from '../../lib/routes-config';
 import IconButton from '../ui/IconButton';
-import { useSystemSettings } from '../../hooks/settings/useSystemSettings';
+import { useBranding } from '../../contexts/BrandingContext';
 import { usePermissionsContextOptional } from '../../contexts/PermissionsContext';
 import { isAdminRole } from '@shared/types/roles';
 import { useValidationsBadge } from '../../hooks/useValidationsBadge';
@@ -34,9 +34,9 @@ export default function PlatformSidebarContent({
   userRole = 'agent'
 }: PlatformSidebarContentProps) {
   const { t } = useLanguage();
-  const { settings: systemSettings } = useSystemSettings();
+  const { branding } = useBranding();
   usePermissionsContextOptional(); // Subscribe to permission changes to force re-render
-  const agenceName = systemSettings?.find(s => s.cle === 'agence_name')?.valeur || 'COFIN&CO-M';
+  const appName = branding.appName;
 
   // Maintenance Status State
   const [lockedModules, setLockedModules] = useState<Set<string>>(new Set());
@@ -246,7 +246,7 @@ export default function PlatformSidebarContent({
           onClick={onLogout}
           className={`
             w-full flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer
-            text-red-400 hover:text-red-300 hover:bg-red-500/10
+            text-status-danger hover:text-status-danger hover:bg-status-danger-bg
             transition-all duration-200
             ${!sidebarOpen ? 'justify-center' : ''}
           `}
@@ -304,7 +304,7 @@ export default function PlatformSidebarContent({
 
         {/* Maintenance Lock Overlay (or icon replacement) */}
         {showMaintenanceLock ? (
-           <Lock size={20} className="shrink-0 text-amber-500/80" />
+           <Lock size={20} className="shrink-0 text-status-warning/80" />
         ) : (
           Icon && (
             <Icon
@@ -317,37 +317,37 @@ export default function PlatformSidebarContent({
 
         {/* Real-time Badge for Collapsed Sidebar - Validations */}
         {!sidebarOpen && route.key === 'validations' && pendingValidationsCount > 0 && (
-          <div className="absolute top-1 right-2 bg-red-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center animate-in zoom-in duration-300 ring-2 ring-sidebar-bg">
+          <div className="absolute top-1 right-2 bg-status-danger text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center animate-in zoom-in duration-300 ring-2 ring-sidebar-bg">
             {pendingValidationsCount}
           </div>
         )}
         {/* Real-time Badge for Collapsed Sidebar - Restitutions Frais */}
         {!sidebarOpen && route.key === 'remboursements' && pendingRefundsCount > 0 && (
-          <div className="absolute top-1 right-2 bg-cyan-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center animate-in zoom-in duration-300 ring-2 ring-sidebar-bg">
+          <div className="absolute top-1 right-2 bg-accent-secondary text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center animate-in zoom-in duration-300 ring-2 ring-sidebar-bg">
             {pendingRefundsCount}
           </div>
         )}
         {/* Real-time Badge for Collapsed Sidebar - Messages */}
         {!sidebarOpen && route.key === 'messages' && unreadMessagesCount > 0 && (
-          <div className="absolute top-1 right-2 bg-red-500 text-white text-[9px] font-bold min-w-[16px] h-4 px-0.5 rounded-full flex items-center justify-center animate-in zoom-in duration-300 ring-2 ring-sidebar-bg">
+          <div className="absolute top-1 right-2 bg-status-danger text-white text-[9px] font-bold min-w-[16px] h-4 px-0.5 rounded-full flex items-center justify-center animate-in zoom-in duration-300 ring-2 ring-sidebar-bg">
             {unreadMessagesCount > 99 ? '99+' : unreadMessagesCount}
           </div>
         )}
         {/* Real-time Badge for Collapsed Sidebar - Gestion Agent (prospections + enquêtes) */}
         {!sidebarOpen && route.key === 'agentModules' && agentModulesBadge > 0 && (
-          <div className="absolute top-1 right-2 bg-violet-500 text-white text-[9px] font-bold min-w-[16px] h-4 px-0.5 rounded-full flex items-center justify-center animate-in zoom-in duration-300 ring-2 ring-sidebar-bg">
+          <div className="absolute top-1 right-2 bg-accent text-white text-[9px] font-bold min-w-[16px] h-4 px-0.5 rounded-full flex items-center justify-center animate-in zoom-in duration-300 ring-2 ring-sidebar-bg">
             {agentModulesBadge > 99 ? '99+' : agentModulesBadge}
           </div>
         )}
         {/* Real-time Badge for Collapsed Sidebar - Coffre-Fort */}
         {!sidebarOpen && route.key === 'coffre' && pendingCoffreCount > 0 && (
-          <div className="absolute top-1 right-2 bg-amber-500 text-white text-[9px] font-bold min-w-[16px] h-4 px-0.5 rounded-full flex items-center justify-center animate-in zoom-in duration-300 ring-2 ring-sidebar-bg">
+          <div className="absolute top-1 right-2 bg-status-warning text-white text-[9px] font-bold min-w-[16px] h-4 px-0.5 rounded-full flex items-center justify-center animate-in zoom-in duration-300 ring-2 ring-sidebar-bg">
             {pendingCoffreCount > 99 ? '99+' : pendingCoffreCount}
           </div>
         )}
         {/* Real-time Badge for Collapsed Sidebar - Caisse Payment Requests */}
         {!sidebarOpen && route.key === 'caisse' && pendingCaisseRequestsCount > 0 && (
-          <div className="absolute top-1 right-2 bg-emerald-500 text-white text-[9px] font-bold min-w-[16px] h-4 px-0.5 rounded-full flex items-center justify-center animate-in zoom-in duration-300 ring-2 ring-sidebar-bg">
+          <div className="absolute top-1 right-2 bg-status-success text-white text-[9px] font-bold min-w-[16px] h-4 px-0.5 rounded-full flex items-center justify-center animate-in zoom-in duration-300 ring-2 ring-sidebar-bg">
             {pendingCaisseRequestsCount > 99 ? '99+' : pendingCaisseRequestsCount}
           </div>
         )}
@@ -358,39 +358,39 @@ export default function PlatformSidebarContent({
               {t(route.labelKey || route.key)}
             </span>
             {route.key === 'validations' && pendingValidationsCount > 0 && (
-              <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center animate-in zoom-in duration-300">
+              <span className="bg-status-danger text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center animate-in zoom-in duration-300">
                 {pendingValidationsCount}
               </span>
             )}
             {route.key === 'remboursements' && pendingRefundsCount > 0 && (
-              <span className="bg-cyan-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center animate-in zoom-in duration-300">
+              <span className="bg-accent-secondary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center animate-in zoom-in duration-300">
                 {pendingRefundsCount}
               </span>
             )}
             {route.key === 'messages' && unreadMessagesCount > 0 && (
-              <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center animate-in zoom-in duration-300">
+              <span className="bg-status-danger text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center animate-in zoom-in duration-300">
                 {unreadMessagesCount > 99 ? '99+' : unreadMessagesCount}
               </span>
             )}
             {route.key === 'agentModules' && agentModulesBadge > 0 && (
-              <span className="bg-violet-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center animate-in zoom-in duration-300">
+              <span className="bg-accent text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center animate-in zoom-in duration-300">
                 {agentModulesBadge > 99 ? '99+' : agentModulesBadge}
               </span>
             )}
             {route.key === 'coffre' && pendingCoffreCount > 0 && (
-              <span className="bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center animate-in zoom-in duration-300">
+              <span className="bg-status-warning text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center animate-in zoom-in duration-300">
                 {pendingCoffreCount > 99 ? '99+' : pendingCoffreCount}
               </span>
             )}
             {route.key === 'caisse' && pendingCaisseRequestsCount > 0 && (
-              <span className="bg-emerald-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center animate-in zoom-in duration-300">
+              <span className="bg-status-success text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center animate-in zoom-in duration-300">
                 {pendingCaisseRequestsCount > 99 ? '99+' : pendingCaisseRequestsCount}
               </span>
             )}
             {isDisabled && (
               <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold border ${
                 showMaintenanceLock 
-                  ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' 
+                  ? 'bg-status-warning-bg text-status-warning border-status-warning/30' 
                   : 'bg-content-muted/20 text-content-muted border-content-muted/30'
               }`}>
                 {showMaintenanceLock ? 'Maint.' : 'Bientôt'}

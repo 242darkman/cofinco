@@ -1,4 +1,5 @@
 import React from 'react';
+import { useBranding } from '@/contexts/BrandingContext';
 import { LOGO_BASE64 } from '@/lib/pdf-logo';
 import { currencySymbol } from '@shared/config/currency';
 
@@ -51,7 +52,7 @@ export interface PayslipData {
     conventionCollective: string | null;
   } | null;
   company: {
-    agenceName: string | null;
+    appName: string | null;
     adresse: string | null;
     telephone: string | null;
     niu: string | null;
@@ -115,7 +116,7 @@ const LogoImage: React.FC = () => {
   const [hasError, setHasError] = React.useState(false);
   if (hasError || !LOGO_BASE64) {
     return (
-      <div className="w-12 h-12 bg-gradient-to-br from-blue-700 to-emerald-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+      <div className="w-12 h-12 bg-gradient-to-br from-status-info to-status-success rounded-lg flex items-center justify-center text-white font-bold text-sm">
         CM
       </div>
     );
@@ -138,8 +139,9 @@ interface PayslipTemplateProps {
 
 export const PayslipTemplate = React.forwardRef<HTMLDivElement, PayslipTemplateProps>(
   ({ data }, ref) => {
+    const { branding } = useBranding();
     const { bulletin, lines, employe, company, agence, leaves, heuresTravaillees } = data;
-    const companyName = company?.agenceName || 'COFIN&CO-M';
+    const companyName = company?.appName || branding.appName;
     const employeeName = employe ? `${employe.nom} ${employe.prenom || ''}`.trim() : 'N/A';
 
     // Sort lines by sortOrder for proper section display (GAIN → SUBTOTAL brut → RETENUE → SUBTOTAL → PATRONAL → NET)
@@ -156,7 +158,7 @@ export const PayslipTemplate = React.forwardRef<HTMLDivElement, PayslipTemplateP
       <div
         ref={ref}
         data-receipt-root
-        className="bg-white text-slate-900 w-full max-w-[210mm] mx-auto min-h-[297mm] p-6 print:p-4 font-sans text-[10px] leading-tight relative"
+        className="bg-white text-content-primary w-full max-w-[210mm] mx-auto min-h-[297mm] p-6 print:p-4 font-sans text-[10px] leading-tight relative"
       >
         <style type="text/css" media="print">{`
           @page { size: A4; margin: 10mm; }
@@ -168,7 +170,7 @@ export const PayslipTemplate = React.forwardRef<HTMLDivElement, PayslipTemplateP
 
         {/* ── HEADER ──────────────────────────────────────── */}
         <div className="text-center mb-4">
-          <h1 className="text-xl font-black uppercase tracking-widest text-slate-900">
+          <h1 className="text-xl font-black uppercase tracking-widest text-content-primary">
             Bulletin de Paie
           </h1>
         </div>
@@ -176,8 +178,8 @@ export const PayslipTemplate = React.forwardRef<HTMLDivElement, PayslipTemplateP
         {/* ── EMPLOYER / EMPLOYEE BLOC ────────────────────── */}
         <div className="grid grid-cols-2 gap-3 mb-3">
           {/* Employeur */}
-          <div className="border border-slate-700 rounded-sm overflow-hidden">
-            <div className="bg-blue-100 border-b border-slate-700 px-2 py-0.5 font-bold text-center uppercase text-[9px]">
+          <div className="border border-edge rounded-sm overflow-hidden">
+            <div className="bg-status-info-bg border-b border-edge px-2 py-0.5 font-bold text-center uppercase text-[9px]">
               Employeur
             </div>
             <div className="p-2 space-y-1">
@@ -185,7 +187,7 @@ export const PayslipTemplate = React.forwardRef<HTMLDivElement, PayslipTemplateP
                 <LogoImage />
                 <div>
                   <div className="font-bold text-sm uppercase">{companyName}</div>
-                  <div className="text-slate-600 text-[9px]">
+                  <div className="text-content-muted text-[9px]">
                     {company?.adresse || agence?.adresse || 'Brazzaville, Congo'}
                   </div>
                 </div>
@@ -206,7 +208,7 @@ export const PayslipTemplate = React.forwardRef<HTMLDivElement, PayslipTemplateP
           {/* Employé */}
           <div className="flex flex-col gap-2">
             {/* Identité contrat */}
-            <div className="border border-slate-700 rounded-sm overflow-hidden text-[9px]">
+            <div className="border border-edge rounded-sm overflow-hidden text-[9px]">
               <div className="grid grid-cols-[auto_1fr]">
                 {([
                   ['Matricule', employe?.matricule || 'N/A'],
@@ -218,10 +220,10 @@ export const PayslipTemplate = React.forwardRef<HTMLDivElement, PayslipTemplateP
                   employe?.dateSortie ? ['Sortie', new Date(employe.dateSortie).toLocaleDateString('fr-FR')] : null,
                 ] as ([string, string] | null)[]).filter((row): row is [string, string] => row !== null).map(([label, value], i) => (
                   <React.Fragment key={i}>
-                    <div className={`bg-blue-50 px-1.5 py-0.5 font-bold border-r border-slate-700 ${i > 0 ? 'border-t border-slate-300' : ''}`}>
+                    <div className={`bg-status-info-bg px-1.5 py-0.5 font-bold border-r border-edge ${i > 0 ? 'border-t border-edge' : ''}`}>
                       {label}
                     </div>
-                    <div className={`px-1.5 py-0.5 ${i > 0 ? 'border-t border-slate-300' : ''} ${label === 'Sortie' ? 'text-red-600 font-bold' : ''}`}>
+                    <div className={`px-1.5 py-0.5 ${i > 0 ? 'border-t border-edge' : ''} ${label === 'Sortie' ? 'text-status-danger font-bold' : ''}`}>
                       {value}
                     </div>
                   </React.Fragment>
@@ -230,7 +232,7 @@ export const PayslipTemplate = React.forwardRef<HTMLDivElement, PayslipTemplateP
             </div>
 
             {/* Identité employé */}
-            <div className="border border-slate-700 rounded-sm p-2 bg-slate-50 flex-1">
+            <div className="border border-edge rounded-sm p-2 bg-surface-muted flex-1">
               <div className="font-bold text-xs uppercase">{employeeName}</div>
               {employe?.numeroCnss && (
                 <div className="text-[9px] mt-0.5">N° CNSS: {employe.numeroCnss}</div>
@@ -243,7 +245,7 @@ export const PayslipTemplate = React.forwardRef<HTMLDivElement, PayslipTemplateP
         </div>
 
         {/* ── BANDEAU PÉRIODE & PAIEMENT ──────────────────── */}
-        <div className="border border-slate-700 mb-3 bg-blue-50 flex divide-x divide-slate-700 text-[9px]">
+        <div className="border border-edge mb-3 bg-status-info-bg flex divide-x divide-edge text-[9px]">
           <div className="flex-1 px-2 py-1">
             <b>Période:</b> {formatPeriod(bulletin.mois)}
           </div>
@@ -258,17 +260,17 @@ export const PayslipTemplate = React.forwardRef<HTMLDivElement, PayslipTemplateP
         </div>
 
         {/* ── TABLEAU CENTRAL ─────────────────────────────── */}
-        <table className="w-full border-collapse border border-slate-700 mb-3 text-[10px]">
+        <table className="w-full border-collapse border border-edge mb-3 text-[10px]">
           <thead>
-            <tr className="bg-blue-100 text-slate-900">
-              <th className="border border-slate-700 px-1 py-0.5 w-10 text-center">Code</th>
-              <th className="border border-slate-700 px-1 py-0.5 text-left">Libellé</th>
-              <th className="border border-slate-700 px-1 py-0.5 w-[70px] text-right"><div className="text-[8px] leading-tight">Base<br/><span className="font-normal text-slate-500">({currencySymbol()})</span></div></th>
-              <th className="border border-slate-700 px-1 py-0.5 w-12 text-center">Taux</th>
-              <th className="border border-slate-700 px-1 py-0.5 w-[70px] text-right"><div className="text-[8px] leading-tight">Gains<br/><span className="font-normal text-slate-500">({currencySymbol()})</span></div></th>
-              <th className="border border-slate-700 px-1 py-0.5 w-[70px] text-right"><div className="text-[8px] leading-tight">Retenues<br/><span className="font-normal text-slate-500">({currencySymbol()})</span></div></th>
-              <th className="border border-slate-700 px-1 py-0.5 w-[70px] text-right bg-slate-200">
-                <div className="text-[8px] leading-tight text-center">Cotis. Pat.<br/><span className="font-normal text-slate-500">({currencySymbol()})</span></div>
+            <tr className="bg-status-info-bg text-content-primary">
+              <th className="border border-edge px-1 py-0.5 w-10 text-center">Code</th>
+              <th className="border border-edge px-1 py-0.5 text-left">Libellé</th>
+              <th className="border border-edge px-1 py-0.5 w-[70px] text-right"><div className="text-[8px] leading-tight">Base<br/><span className="font-normal text-content-muted">({currencySymbol()})</span></div></th>
+              <th className="border border-edge px-1 py-0.5 w-12 text-center">Taux</th>
+              <th className="border border-edge px-1 py-0.5 w-[70px] text-right"><div className="text-[8px] leading-tight">Gains<br/><span className="font-normal text-content-muted">({currencySymbol()})</span></div></th>
+              <th className="border border-edge px-1 py-0.5 w-[70px] text-right"><div className="text-[8px] leading-tight">Retenues<br/><span className="font-normal text-content-muted">({currencySymbol()})</span></div></th>
+              <th className="border border-edge px-1 py-0.5 w-[70px] text-right bg-surface-subtle">
+                <div className="text-[8px] leading-tight text-center">Cotis. Pat.<br/><span className="font-normal text-content-muted">({currencySymbol()})</span></div>
               </th>
             </tr>
           </thead>
@@ -281,33 +283,33 @@ export const PayslipTemplate = React.forwardRef<HTMLDivElement, PayslipTemplateP
                   key={i}
                   className={
                     isSubtotal
-                      ? 'bg-blue-50 font-bold'
+                      ? 'bg-status-info-bg font-bold'
                       : isNet
-                        ? 'bg-blue-900 text-white font-bold'
+                        ? 'bg-status-info text-white font-bold'
                         : i % 2 === 0
                           ? 'bg-white'
-                          : 'bg-slate-50'
+                          : 'bg-surface-muted'
                   }
                 >
-                  <td className="border-r border-slate-600 px-1 py-0.5 text-center font-mono text-slate-500 text-[9px]">
+                  <td className="border-r border-edge-strong px-1 py-0.5 text-center font-mono text-content-muted text-[9px]">
                     {line.code}
                   </td>
-                  <td className={`border-r border-slate-600 px-1 py-0.5 ${isSubtotal || isNet ? 'font-bold' : ''}`}>
+                  <td className={`border-r border-edge-strong px-1 py-0.5 ${isSubtotal || isNet ? 'font-bold' : ''}`}>
                     {line.libelle}
                   </td>
-                  <td className="border-r border-slate-600 px-1 py-0.5 text-right font-mono text-[9px]">
+                  <td className="border-r border-edge-strong px-1 py-0.5 text-right font-mono text-[9px]">
                     {line.base ? fmt(line.base) : ''}
                   </td>
-                  <td className="border-r border-slate-600 px-1 py-0.5 text-center text-[9px]">
+                  <td className="border-r border-edge-strong px-1 py-0.5 text-center text-[9px]">
                     {fmtRate(line.taux)}
                   </td>
-                  <td className="border-r border-slate-600 px-1 py-0.5 text-right font-mono">
+                  <td className="border-r border-edge-strong px-1 py-0.5 text-right font-mono">
                     {line.montantGain ? fmt(line.montantGain) : ''}
                   </td>
-                  <td className={`border-r border-slate-600 px-1 py-0.5 text-right font-mono ${!isSubtotal && !isNet && line.montantRetenue ? 'text-red-700' : ''}`}>
+                  <td className={`border-r border-edge-strong px-1 py-0.5 text-right font-mono ${!isSubtotal && !isNet && line.montantRetenue ? 'text-status-danger' : ''}`}>
                     {line.montantRetenue ? fmt(line.montantRetenue) : ''}
                   </td>
-                  <td className="px-1 py-0.5 text-right font-mono text-slate-500 bg-slate-100/50 text-[9px]">
+                  <td className="px-1 py-0.5 text-right font-mono text-content-muted bg-surface-muted/50 text-[9px]">
                     {line.montantPatronal ? fmt(line.montantPatronal) : ''}
                   </td>
                 </tr>
@@ -316,12 +318,12 @@ export const PayslipTemplate = React.forwardRef<HTMLDivElement, PayslipTemplateP
             {/* Empty filler rows */}
             {Array.from({ length: emptyRows }).map((_, i) => (
               <tr key={`empty-${i}`}>
-                <td className="border-r border-slate-600 h-[18px]" />
-                <td className="border-r border-slate-600" />
-                <td className="border-r border-slate-600" />
-                <td className="border-r border-slate-600" />
-                <td className="border-r border-slate-600" />
-                <td className="border-r border-slate-600" />
+                <td className="border-r border-edge-strong h-[18px]" />
+                <td className="border-r border-edge-strong" />
+                <td className="border-r border-edge-strong" />
+                <td className="border-r border-edge-strong" />
+                <td className="border-r border-edge-strong" />
+                <td className="border-r border-edge-strong" />
                 <td />
               </tr>
             ))}
@@ -334,29 +336,29 @@ export const PayslipTemplate = React.forwardRef<HTMLDivElement, PayslipTemplateP
           <div className="flex-1 flex flex-col gap-2">
             {/* Heures travaillées */}
             {heuresTravaillees && (
-              <div className="border border-slate-700 rounded-sm p-2 text-[9px]">
-                <div className="font-bold border-b border-slate-300 mb-1 pb-0.5">Activité du mois</div>
+              <div className="border border-edge rounded-sm p-2 text-[9px]">
+                <div className="font-bold border-b border-edge mb-1 pb-0.5">Activité du mois</div>
                 <div className="flex justify-between">
                   <span>Jours: <b>{heuresTravaillees.joursTravailles}</b></span>
                   <span>Heures: <b>{Math.floor(heuresTravaillees.heuresNormales / 60)}h{String(heuresTravaillees.heuresNormales % 60).padStart(2, '0')}</b></span>
                   {heuresTravaillees.heuresSupplementaires > 0 && (
-                    <span>H. Sup: <b className="text-amber-600">{Math.floor(heuresTravaillees.heuresSupplementaires / 60)}h{String(heuresTravaillees.heuresSupplementaires % 60).padStart(2, '0')}</b></span>
+                    <span>H. Sup: <b className="text-status-warning">{Math.floor(heuresTravaillees.heuresSupplementaires / 60)}h{String(heuresTravaillees.heuresSupplementaires % 60).padStart(2, '0')}</b></span>
                   )}
                 </div>
               </div>
             )}
             {/* Congés */}
             {leaves && (
-              <div className="border border-slate-700 rounded-sm p-2 text-[9px]">
-                <div className="font-bold border-b border-slate-300 mb-1 pb-0.5">Compteur Congés</div>
+              <div className="border border-edge rounded-sm p-2 text-[9px]">
+                <div className="font-bold border-b border-edge mb-1 pb-0.5">Compteur Congés</div>
                 <div className="flex justify-between">
                   <span>Acquis: <b>{leaves.acquired}</b></span>
                   <span>Pris: <b>{leaves.used}</b></span>
-                  <span>Solde: <b className="text-blue-700">{leaves.balance}</b></span>
+                  <span>Solde: <b className="text-status-info">{leaves.balance}</b></span>
                 </div>
               </div>
             )}
-            <div className="border border-slate-700 rounded-sm p-2 text-[9px] flex-1">
+            <div className="border border-edge rounded-sm p-2 text-[9px] flex-1">
               <div className="font-bold mb-1">Récapitulatif</div>
               <div className="space-y-0.5">
                 <div className="flex justify-between">
@@ -365,19 +367,19 @@ export const PayslipTemplate = React.forwardRef<HTMLDivElement, PayslipTemplateP
                 </div>
                 <div className="flex justify-between">
                   <span>Retenues</span>
-                  <span className="font-mono text-red-600">{fmt(bulletin.totalRetenues)} {currencySymbol()}</span>
+                  <span className="font-mono text-status-danger">{fmt(bulletin.totalRetenues)} {currencySymbol()}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Cotis. Patronales</span>
-                  <span className="font-mono text-slate-500">{fmt(bulletin.totalChargesPatronales)} {currencySymbol()}</span>
+                  <span className="font-mono text-content-muted">{fmt(bulletin.totalChargesPatronales)} {currencySymbol()}</span>
                 </div>
               </div>
             </div>
           </div>
 
           {/* NET À PAYER */}
-          <div className="w-48 border-2 border-slate-900 rounded-sm flex flex-col overflow-hidden">
-            <div className="bg-blue-900 text-white font-bold text-center py-2 uppercase text-xs">
+          <div className="w-48 border-2 border-edge rounded-sm flex flex-col overflow-hidden">
+            <div className="bg-status-info text-white font-bold text-center py-2 uppercase text-xs">
               Net à Payer
             </div>
             <div className="flex-1 flex items-center justify-center bg-white px-2">
@@ -385,33 +387,33 @@ export const PayslipTemplate = React.forwardRef<HTMLDivElement, PayslipTemplateP
                 {fmt(bulletin.salaireNet)} <span className="text-xs font-normal">{currencySymbol()}</span>
               </span>
             </div>
-            <div className="text-[8px] text-center bg-slate-100 p-1 border-t border-slate-200 capitalize">
+            <div className="text-[8px] text-center bg-surface-muted p-1 border-t border-edge capitalize">
               {formatMonthLabel(bulletin.mois)}
             </div>
           </div>
         </div>
 
         {/* ── MENTIONS LÉGALES & SIGNATURE ─────────────────── */}
-        <div className="flex justify-between items-end text-[9px] mt-4 pt-4 border-t border-slate-300">
-          <div className="italic text-slate-500 max-w-xs leading-relaxed">
+        <div className="flex justify-between items-end text-[9px] mt-4 pt-4 border-t border-edge">
+          <div className="italic text-content-muted max-w-xs leading-relaxed">
             Conservez ce bulletin de paie sans limitation de durée.
             <br />
             Conformité Code du Travail & CNSS - République du Congo.
           </div>
           <div className="text-center">
-            <div className="border-t border-slate-900 w-40 pt-1 font-bold">
+            <div className="border-t border-edge w-40 pt-1 font-bold">
               Signature de l'Employeur
             </div>
           </div>
           <div className="text-center">
-            <div className="border-t border-slate-900 w-40 pt-1 font-bold">
+            <div className="border-t border-edge w-40 pt-1 font-bold">
               Signature du Salarié
             </div>
           </div>
         </div>
 
         {/* ── FOOTER ──────────────────────────────────────── */}
-        <div className="absolute bottom-4 left-6 right-6 text-[8px] text-slate-400 text-center">
+        <div className="absolute bottom-4 left-6 right-6 text-[8px] text-content-muted text-center">
           Document généré le {new Date(bulletin.createdAt).toLocaleDateString('fr-FR')} — Confidentiel
         </div>
       </div>

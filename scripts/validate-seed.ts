@@ -101,7 +101,7 @@ async function validateSeed(): Promise<ValidationResult[]> {
   results.push({
     invariant: 'systemSettings exists',
     passed: !!sysSettings,
-    details: sysSettings ? `agenceName=${sysSettings.agenceName}` : 'NOT FOUND',
+    details: sysSettings ? `appName=${sysSettings.appName}` : 'NOT FOUND',
     severity: 'critical'
   });
 

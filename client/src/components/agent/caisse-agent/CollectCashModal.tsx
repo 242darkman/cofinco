@@ -286,14 +286,14 @@ export default function CollectCashModal({
             id="geolocation"
             checked={useGeolocation}
             onChange={(e) => setUseGeolocation(e.target.checked)}
-            className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-cyan-500 focus:ring-cyan-500"
+            className="w-4 h-4 rounded border-edge-strong bg-surface-elevated text-accent focus:ring-accent"
           />
-          <label htmlFor="geolocation" className="text-sm text-slate-300 flex items-center gap-2">
-            <MapPin size={16} className="text-cyan-400" />
+          <label htmlFor="geolocation" className="text-sm text-content-secondary flex items-center gap-2">
+            <MapPin size={16} className="text-accent" />
             Enregistrer la position GPS
           </label>
           {latitude && longitude && (
-            <span className="text-xs text-slate-500 ml-auto">
+            <span className="text-xs text-content-muted ml-auto">
               {latitude.toFixed(4)}, {longitude.toFixed(4)}
             </span>
           )}
@@ -301,19 +301,19 @@ export default function CollectCashModal({
 
         {/* Observations */}
         <div className="space-y-2">
-          <label className="text-sm font-medium text-slate-300">Observations</label>
+          <label className="text-sm font-medium text-content-secondary">Observations</label>
           <textarea
             value={observations}
             onChange={(e) => setObservations(e.target.value)}
             placeholder="Notes ou commentaires..."
             rows={2}
-            className="w-full px-3 py-2 bg-surface-elevated border border-edge rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 resize-none"
+            className="w-full px-3 py-2 bg-surface-elevated border border-edge rounded-lg text-content-primary placeholder-content-muted focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent resize-none"
           />
         </div>
 
         {/* Info box */}
-        <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-          <p className="text-xs text-amber-300">
+        <div className="p-3 bg-status-warning-bg border border-status-warning/20 rounded-lg">
+          <p className="text-xs text-status-warning">
             Cette opération sera soumise pour validation par un superviseur.
             Aucune écriture comptable ne sera effectuée avant l'approbation.
           </p>

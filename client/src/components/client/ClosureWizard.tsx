@@ -237,14 +237,14 @@ export default function ClosureWizard({
           <>
             <button
               onClick={onClose}
-              className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition text-sm font-medium"
+              className="px-4 py-2.5 bg-surface hover:bg-surface-elevated text-content-secondary rounded-lg transition text-sm font-medium"
             >
               Fermer
             </button>
             <button
               onClick={handleCancelExistingRequest}
               disabled={cancelling || cancelReason.trim().length < 3}
-              className="px-4 py-2.5 bg-red-500 hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition flex items-center gap-2 text-sm font-bold"
+              className="px-4 py-2.5 bg-status-danger hover:bg-status-danger disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition flex items-center gap-2 text-sm font-bold"
             >
               {cancelling ? (
                 <Loader2 size={16} className="animate-spin" />
@@ -258,43 +258,43 @@ export default function ClosureWizard({
       >
         <div className="space-y-4">
           {/* Status banner */}
-          <div className="p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg flex items-start gap-3">
-            <Clock size={18} className="text-purple-400 shrink-0 mt-0.5" />
+          <div className="p-3 bg-status-info-bg border border-status-info/30 rounded-lg flex items-start gap-3">
+            <Clock size={18} className="text-status-info shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm text-purple-300 font-semibold">En attente d'approbation</p>
-              <p className="text-xs text-purple-300/70 mt-0.5">
+              <p className="text-sm text-status-info font-semibold">En attente d'approbation</p>
+              <p className="text-xs text-status-info/70 mt-0.5">
                 Une demande de clôture existe déjà pour ce compte. Vous pouvez l'annuler ci-dessous si nécessaire.
               </p>
             </div>
           </div>
 
           {/* Request details */}
-          <div className="p-3 bg-slate-800/50 rounded-lg space-y-2 text-sm">
+          <div className="p-3 bg-surface/50 rounded-lg space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-slate-400">Date de la demande</span>
-              <span className="text-white">{formattedDate}</span>
+              <span className="text-content-muted">Date de la demande</span>
+              <span className="text-content-primary">{formattedDate}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-400">Motif</span>
-              <span className="text-white max-w-[200px] text-right">{existingRequest.reason}</span>
+              <span className="text-content-muted">Motif</span>
+              <span className="text-content-primary max-w-[200px] text-right">{existingRequest.reason}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-400">Méthode de paiement</span>
-              <span className="text-white">{payoutLabel}</span>
+              <span className="text-content-muted">Méthode de paiement</span>
+              <span className="text-content-primary">{payoutLabel}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-400">Solde au moment de la demande</span>
-              <span className="text-white font-medium">{Number(existingRequest.balanceAtInitiation).toLocaleString()} FCFA</span>
+              <span className="text-content-muted">Solde au moment de la demande</span>
+              <span className="text-content-primary font-medium">{Number(existingRequest.balanceAtInitiation).toLocaleString()} FCFA</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-400">Montant à restituer</span>
-              <span className="text-emerald-400 font-bold">{Number(existingRequest.payoutAmount).toLocaleString()} FCFA</span>
+              <span className="text-content-muted">Montant à restituer</span>
+              <span className="text-status-success font-bold">{Number(existingRequest.payoutAmount).toLocaleString()} FCFA</span>
             </div>
           </div>
 
           {/* Cancel reason */}
           <div>
-            <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">
+            <label className="block text-xs font-semibold text-content-muted mb-1.5 uppercase">
               Motif d'annulation *
             </label>
             <textarea
@@ -302,10 +302,10 @@ export default function ClosureWizard({
               onChange={(e) => setCancelReason(e.target.value)}
               placeholder="Ex: Demande du client de maintenir le compte, erreur de saisie..."
               rows={2}
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:ring-1 focus:ring-red-500 outline-none transition resize-none"
+              className="w-full bg-surface-base border border-edge rounded-lg px-3 py-2.5 text-content-primary text-sm focus:ring-1 focus:ring-status-danger outline-none transition resize-none"
             />
             {cancelReason.length > 0 && cancelReason.length < 3 && (
-              <p className="text-xs text-red-400 mt-1">Minimum 3 caractères</p>
+              <p className="text-xs text-status-danger mt-1">Minimum 3 caractères</p>
             )}
           </div>
         </div>
@@ -331,7 +331,7 @@ export default function ClosureWizard({
             <button
               onClick={() => setStep(STEPS[stepIndex - 1])}
               disabled={loading}
-              className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition text-sm font-medium flex items-center gap-1.5"
+              className="px-4 py-2.5 bg-surface hover:bg-surface-elevated text-content-secondary rounded-lg transition text-sm font-medium flex items-center gap-1.5"
             >
               <ChevronLeft size={16} />
               Retour
@@ -340,7 +340,7 @@ export default function ClosureWizard({
           <button
             onClick={onClose}
             disabled={loading}
-            className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition text-sm font-medium"
+            className="px-4 py-2.5 bg-surface hover:bg-surface-elevated text-content-secondary rounded-lg transition text-sm font-medium"
           >
             Annuler
           </button>
@@ -348,7 +348,7 @@ export default function ClosureWizard({
             <button
               onClick={() => setStep('payout')}
               disabled={!preconditionsOk}
-              className="px-4 py-2.5 bg-cyan-500 hover:bg-cyan-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition flex items-center gap-1.5 text-sm font-bold"
+              className="px-4 py-2.5 bg-accent-secondary hover:bg-accent-secondary-hover disabled:opacity-50 disabled:cursor-not-allowed text-content-primary rounded-lg transition flex items-center gap-1.5 text-sm font-bold"
             >
               Suivant
               <ChevronRight size={16} />
@@ -358,7 +358,7 @@ export default function ClosureWizard({
             <button
               onClick={() => setStep('confirm')}
               disabled={!canProceedFromPayout}
-              className="px-4 py-2.5 bg-cyan-500 hover:bg-cyan-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition flex items-center gap-1.5 text-sm font-bold"
+              className="px-4 py-2.5 bg-accent-secondary hover:bg-accent-secondary-hover disabled:opacity-50 disabled:cursor-not-allowed text-content-primary rounded-lg transition flex items-center gap-1.5 text-sm font-bold"
             >
               Suivant
               <ChevronRight size={16} />
@@ -368,7 +368,7 @@ export default function ClosureWizard({
             <button
               onClick={handleSubmit}
               disabled={!confirmed || loading}
-              className="px-4 py-2.5 bg-red-500 hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition flex items-center gap-2 text-sm font-bold"
+              className="px-4 py-2.5 bg-status-danger hover:bg-status-danger disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition flex items-center gap-2 text-sm font-bold"
             >
               {loading ? (
                 <Loader2 size={16} className="animate-spin" />
@@ -385,20 +385,20 @@ export default function ClosureWizard({
       <div className="flex items-center gap-2 mb-6">
         {stepLabels.map((label, i) => (
           <React.Fragment key={label}>
-            {i > 0 && <div className="flex-1 h-px bg-slate-700" />}
+            {i > 0 && <div className="flex-1 h-px bg-surface-elevated" />}
             <div className="flex items-center gap-1.5">
               <div
                 className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
                   i <= stepIndex
-                    ? 'bg-cyan-500 text-white'
-                    : 'bg-slate-800 text-slate-500'
+                    ? 'bg-accent-secondary text-content-primary'
+                    : 'bg-surface text-content-muted'
                 }`}
               >
                 {i + 1}
               </div>
               <span
                 className={`text-xs font-medium hidden sm:inline ${
-                  i <= stepIndex ? 'text-cyan-400' : 'text-slate-500'
+                  i <= stepIndex ? 'text-accent' : 'text-content-muted'
                 }`}
               >
                 {label}
@@ -411,28 +411,28 @@ export default function ClosureWizard({
       {/* Step 1: Preconditions */}
       {step === 'preconditions' && (
         <div className="space-y-4">
-          <div className="p-3 bg-slate-800/50 rounded-lg">
-            <p className="text-sm text-slate-300 mb-1">Solde actuel</p>
-            <p className="text-2xl font-bold text-white">
-              {balance.toLocaleString()} <span className="text-sm text-slate-500">FCFA</span>
+          <div className="p-3 bg-surface/50 rounded-lg">
+            <p className="text-sm text-content-secondary mb-1">Solde actuel</p>
+            <p className="text-2xl font-bold text-content-primary">
+              {balance.toLocaleString()} <span className="text-sm text-content-muted">FCFA</span>
             </p>
           </div>
 
           <div className="space-y-2">
-            <p className="text-xs font-semibold text-slate-400 uppercase">Vérifications</p>
+            <p className="text-xs font-semibold text-content-muted uppercase">Vérifications</p>
             {checks.map((check, i) => (
               <div
                 key={i}
-                className="flex items-center gap-3 p-3 bg-slate-900 border border-slate-700 rounded-lg"
+                className="flex items-center gap-3 p-3 bg-surface-base border border-edge rounded-lg"
               >
                 {check.loading ? (
-                  <Loader2 size={16} className="animate-spin text-slate-400" />
+                  <Loader2 size={16} className="animate-spin text-content-muted" />
                 ) : check.ok ? (
-                  <CheckCircle size={16} className="text-emerald-400" />
+                  <CheckCircle size={16} className="text-status-success" />
                 ) : (
-                  <XCircle size={16} className="text-red-400" />
+                  <XCircle size={16} className="text-status-danger" />
                 )}
-                <span className={`text-sm ${check.ok ? 'text-slate-300' : 'text-red-300'}`}>
+                <span className={`text-sm ${check.ok ? 'text-content-secondary' : 'text-status-danger'}`}>
                   {check.label}
                 </span>
               </div>
@@ -440,8 +440,8 @@ export default function ClosureWizard({
           </div>
 
           {!preconditionsOk && checks.every((c) => !c.loading) && (
-            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
-              <p className="text-sm text-red-300">
+            <div className="p-3 bg-status-danger-bg border border-status-danger/30 rounded-lg">
+              <p className="text-sm text-status-danger">
                 Certaines conditions ne sont pas remplies. Veuillez résoudre les problèmes avant de continuer.
               </p>
             </div>
@@ -454,7 +454,7 @@ export default function ClosureWizard({
         <div className="space-y-5">
           {/* Payout method */}
           <div>
-            <label className="block text-xs font-semibold text-slate-400 mb-2 uppercase">
+            <label className="block text-xs font-semibold text-content-muted mb-2 uppercase">
               Méthode de restitution du solde
             </label>
             <div className="grid grid-cols-2 gap-3">
@@ -463,17 +463,17 @@ export default function ClosureWizard({
                 onClick={() => setPayoutMethod(ClosurePayoutMethod.CASH)}
                 className={`p-4 rounded-lg border transition flex flex-col items-center gap-2 ${
                   payoutMethod === ClosurePayoutMethod.CASH
-                    ? 'border-cyan-500 bg-cyan-500/10'
-                    : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
+                    ? 'border-accent bg-accent/10'
+                    : 'border-edge bg-surface/50 hover:border-edge-strong'
                 }`}
               >
                 <Banknote
                   size={24}
-                  className={payoutMethod === ClosurePayoutMethod.CASH ? 'text-cyan-400' : 'text-slate-400'}
+                  className={payoutMethod === ClosurePayoutMethod.CASH ? 'text-accent' : 'text-content-muted'}
                 />
                 <span
                   className={`text-sm font-medium ${
-                    payoutMethod === ClosurePayoutMethod.CASH ? 'text-cyan-400' : 'text-slate-400'
+                    payoutMethod === ClosurePayoutMethod.CASH ? 'text-accent' : 'text-content-muted'
                   }`}
                 >
                   {CLOSURE_PAYOUT_METHOD_LABELS[ClosurePayoutMethod.CASH]}
@@ -484,19 +484,19 @@ export default function ClosureWizard({
                 onClick={() => setPayoutMethod(ClosurePayoutMethod.MOBILE_MONEY)}
                 className={`p-4 rounded-lg border transition flex flex-col items-center gap-2 ${
                   payoutMethod === ClosurePayoutMethod.MOBILE_MONEY
-                    ? 'border-cyan-500 bg-cyan-500/10'
-                    : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
+                    ? 'border-accent bg-accent/10'
+                    : 'border-edge bg-surface/50 hover:border-edge-strong'
                 }`}
               >
                 <Smartphone
                   size={24}
                   className={
-                    payoutMethod === ClosurePayoutMethod.MOBILE_MONEY ? 'text-cyan-400' : 'text-slate-400'
+                    payoutMethod === ClosurePayoutMethod.MOBILE_MONEY ? 'text-accent' : 'text-content-muted'
                   }
                 />
                 <span
                   className={`text-sm font-medium ${
-                    payoutMethod === ClosurePayoutMethod.MOBILE_MONEY ? 'text-cyan-400' : 'text-slate-400'
+                    payoutMethod === ClosurePayoutMethod.MOBILE_MONEY ? 'text-accent' : 'text-content-muted'
                   }`}
                 >
                   {CLOSURE_PAYOUT_METHOD_LABELS[ClosurePayoutMethod.MOBILE_MONEY]}
@@ -508,43 +508,43 @@ export default function ClosureWizard({
           {/* Phone number (mobile money only) */}
           {payoutMethod === ClosurePayoutMethod.MOBILE_MONEY && (
             <div className="animate-in slide-in-from-top-2 duration-200">
-              <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">
+              <label className="block text-xs font-semibold text-content-muted mb-1.5 uppercase">
                 Numéro de téléphone *
               </label>
               <div className="relative">
-                <Phone size={16} className="absolute left-3 top-3 text-slate-500" />
+                <Phone size={16} className="absolute left-3 top-3 text-content-muted" />
                 <input
                   type="tel"
                   value={phoneNumber}
                   onChange={(e) => setPhoneNumber(e.target.value)}
                   placeholder="Ex: 069123456"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-10 pr-3 py-2.5 text-white text-sm focus:ring-1 focus:ring-cyan-500 outline-none transition"
+                  className="w-full bg-surface-base border border-edge rounded-lg pl-10 pr-3 py-2.5 text-content-primary text-sm focus:ring-1 focus:ring-accent outline-none transition"
                 />
               </div>
             </div>
           )}
 
           {/* Payout summary */}
-          <div className="p-3 bg-slate-800/50 rounded-lg space-y-2">
+          <div className="p-3 bg-surface/50 rounded-lg space-y-2">
             <div className="flex justify-between text-sm">
-              <span className="text-slate-400">Solde actuel</span>
-              <span className="text-white font-medium">{balance.toLocaleString()} FCFA</span>
+              <span className="text-content-muted">Solde actuel</span>
+              <span className="text-content-primary font-medium">{balance.toLocaleString()} FCFA</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-slate-400">Frais de clôture</span>
-              <span className={`font-medium ${closingFee > 0 ? 'text-red-400' : 'text-white'}`}>
+              <span className="text-content-muted">Frais de clôture</span>
+              <span className={`font-medium ${closingFee > 0 ? 'text-status-danger' : 'text-content-primary'}`}>
                 {closingFee > 0 ? `- ${closingFee.toLocaleString()}` : '0'} FCFA
               </span>
             </div>
-            <div className="border-t border-slate-700 pt-2 flex justify-between text-sm">
-              <span className="text-slate-300 font-semibold">Montant à restituer</span>
-              <span className="text-emerald-400 font-bold">{Math.max(0, balance - closingFee).toLocaleString()} FCFA</span>
+            <div className="border-t border-edge pt-2 flex justify-between text-sm">
+              <span className="text-content-secondary font-semibold">Montant à restituer</span>
+              <span className="text-status-success font-bold">{Math.max(0, balance - closingFee).toLocaleString()} FCFA</span>
             </div>
           </div>
 
           {/* Reason */}
           <div>
-            <label className="block text-xs font-semibold text-slate-400 mb-1.5 uppercase">
+            <label className="block text-xs font-semibold text-content-muted mb-1.5 uppercase">
               Motif de la clôture *
             </label>
             <textarea
@@ -552,10 +552,10 @@ export default function ClosureWizard({
               onChange={(e) => setReason(e.target.value)}
               placeholder="Ex: Demande du client, migration vers autre institution..."
               rows={2}
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:ring-1 focus:ring-cyan-500 outline-none transition resize-none"
+              className="w-full bg-surface-base border border-edge rounded-lg px-3 py-2.5 text-content-primary text-sm focus:ring-1 focus:ring-accent outline-none transition resize-none"
             />
             {reason.length > 0 && reason.length < 3 && (
-              <p className="text-xs text-red-400 mt-1">Minimum 3 caractères</p>
+              <p className="text-xs text-status-danger mt-1">Minimum 3 caractères</p>
             )}
           </div>
         </div>
@@ -564,11 +564,11 @@ export default function ClosureWizard({
       {/* Step 3: Confirmation */}
       {step === 'confirm' && (
         <div className="space-y-5">
-          <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start gap-3">
-            <AlertTriangle size={20} className="text-red-400 shrink-0 mt-0.5" />
+          <div className="p-4 bg-status-danger-bg border border-status-danger/30 rounded-lg flex items-start gap-3">
+            <AlertTriangle size={20} className="text-status-danger shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm text-red-300 font-semibold mb-1">Action irréversible</p>
-              <p className="text-sm text-red-300/80">
+              <p className="text-sm text-status-danger font-semibold mb-1">Action irréversible</p>
+              <p className="text-sm text-status-danger/80">
                 La clôture du compte est définitive une fois approuvée.
                 Le solde sera restitué au client selon la méthode choisie.
               </p>
@@ -577,48 +577,48 @@ export default function ClosureWizard({
 
           {/* Summary */}
           <div className="space-y-3">
-            <h4 className="text-xs font-semibold text-slate-400 uppercase">Récapitulatif</h4>
-            <div className="p-3 bg-slate-800/50 rounded-lg space-y-2 text-sm">
+            <h4 className="text-xs font-semibold text-content-muted uppercase">Récapitulatif</h4>
+            <div className="p-3 bg-surface/50 rounded-lg space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-slate-400">Compte</span>
-                <span className="text-white font-mono">{numeroCompte}</span>
+                <span className="text-content-muted">Compte</span>
+                <span className="text-content-primary font-mono">{numeroCompte}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Méthode de paiement</span>
-                <span className="text-white">{CLOSURE_PAYOUT_METHOD_LABELS[payoutMethod]}</span>
+                <span className="text-content-muted">Méthode de paiement</span>
+                <span className="text-content-primary">{CLOSURE_PAYOUT_METHOD_LABELS[payoutMethod]}</span>
               </div>
               {payoutMethod === ClosurePayoutMethod.MOBILE_MONEY && (
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Téléphone</span>
-                  <span className="text-white">{phoneNumber}</span>
+                  <span className="text-content-muted">Téléphone</span>
+                  <span className="text-content-primary">{phoneNumber}</span>
                 </div>
               )}
               {closingFee > 0 && (
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Frais de clôture</span>
-                  <span className="text-red-400 font-medium">- {closingFee.toLocaleString()} FCFA</span>
+                  <span className="text-content-muted">Frais de clôture</span>
+                  <span className="text-status-danger font-medium">- {closingFee.toLocaleString()} FCFA</span>
                 </div>
               )}
               <div className="flex justify-between">
-                <span className="text-slate-400">Montant à restituer</span>
-                <span className="text-emerald-400 font-bold">{Math.max(0, balance - closingFee).toLocaleString()} FCFA</span>
+                <span className="text-content-muted">Montant à restituer</span>
+                <span className="text-status-success font-bold">{Math.max(0, balance - closingFee).toLocaleString()} FCFA</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Motif</span>
-                <span className="text-white max-w-[200px] text-right">{reason}</span>
+                <span className="text-content-muted">Motif</span>
+                <span className="text-content-primary max-w-[200px] text-right">{reason}</span>
               </div>
             </div>
           </div>
 
           {/* Confirmation checkbox */}
-          <label className="flex items-start gap-3 cursor-pointer group p-3 bg-slate-900 border border-slate-700 rounded-lg hover:border-slate-600 transition">
+          <label className="flex items-start gap-3 cursor-pointer group p-3 bg-surface-base border border-edge rounded-lg hover:border-edge-strong transition">
             <input
               type="checkbox"
               checked={confirmed}
               onChange={(e) => setConfirmed(e.target.checked)}
-              className="mt-0.5 w-4 h-4 rounded border-slate-600 bg-slate-800 text-red-500 focus:ring-red-500"
+              className="mt-0.5 w-4 h-4 rounded border-edge-strong bg-surface text-status-danger focus:ring-status-danger"
             />
-            <span className="text-sm text-slate-300 group-hover:text-white transition">
+            <span className="text-sm text-content-secondary group-hover:text-content-primary transition">
               Je confirme vouloir soumettre cette demande de clôture.
               Un approbateur différent devra la valider avant exécution.
             </span>

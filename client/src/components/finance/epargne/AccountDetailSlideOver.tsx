@@ -175,29 +175,29 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRe
   // Gradient based on type
   const getGradient = () => {
     const type = compte?.typeCompte || '';
-    if (type.includes('Épargne')) return 'bg-gradient-to-br from-emerald-600 to-teal-800';
-    if (type.includes('Bloqué')) return 'bg-gradient-to-br from-slate-700 to-slate-900';
-    return 'bg-gradient-to-br from-blue-600 to-indigo-900';
+    if (type.includes('Épargne')) return 'bg-gradient-to-br from-status-success to-accent';
+    if (type.includes('Bloqué')) return 'bg-gradient-to-br from-surface-elevated to-surface-base';
+    return 'bg-gradient-to-br from-status-info to-accent';
   };
 
   return (
     <>
       {/* Disable modal behavior (focus trap) and hide overlay when activation modal is open */}
       <Sheet open={isOpen} onOpenChange={onClose} modal={!showActivationModal}>
-        <SheetContent side="right" hideOverlay={showActivationModal} className="w-full sm:max-w-xl p-0 flex flex-col bg-slate-900 border-l border-slate-800">
+        <SheetContent side="right" hideOverlay={showActivationModal} className="w-full sm:max-w-xl p-0 flex flex-col bg-surface-base border-l border-edge">
           
           {/* 1. Sticky Header */}
-          <div className="flex items-center justify-between p-4 border-b border-slate-800 bg-slate-900/95 backdrop-blur z-10 sticky top-0">
+          <div className="flex items-center justify-between p-4 border-b border-edge bg-surface-base/95 backdrop-blur z-10 sticky top-0">
              <div className="flex items-center gap-3">
                <div>
                   <div className="flex items-center gap-2">
-                     <SheetTitle className="font-mono text-lg font-bold text-white tracking-tight">
+                     <SheetTitle className="font-mono text-lg font-bold text-content-primary tracking-tight">
                         {compte?.numeroCompte || 'Chargement...'}
                      </SheetTitle>
                      {compte?.numeroCompte && (
                         <button 
                            onClick={() => navigator.clipboard.writeText(compte.numeroCompte)}
-                           className="text-slate-500 hover:text-white transition-colors"
+                           className="text-content-muted hover:text-content-primary transition-colors"
                            title="Copier le numéro"
                         >
                            <Copy size={14} />
@@ -207,7 +207,7 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRe
                   <SheetDescription className="sr-only">
                     Détails du compte et historique des transactions
                   </SheetDescription>
-                  <div className="text-xs text-slate-400">{getTypeCompteLabel(compte?.typeCompte || '')}</div>
+                  <div className="text-xs text-content-muted">{getTypeCompteLabel(compte?.typeCompte || '')}</div>
                </div>
                {compte && (
                  <Badge 
@@ -250,26 +250,26 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRe
                    {/* 2. Hero Section (Virtual Card) - Different for PENDING_ACTIVATION */}
                    {isPending ? (
                      // PENDING ACTIVATION: Special "funds not yet deposited" card
-                     <div className="relative overflow-hidden rounded-xl sm:rounded-2xl border-2 border-dashed border-amber-500/50 bg-slate-900 p-4 sm:p-6">
+                     <div className="relative overflow-hidden rounded-xl sm:rounded-2xl border-2 border-dashed border-status-warning/50 bg-surface-base p-4 sm:p-6">
                        {/* Hatched pattern background to signify "not yet real" */}
                        <div className="absolute inset-0 opacity-[0.03] bg-[linear-gradient(135deg,#fff_25%,transparent_25%,transparent_50%,#fff_50%,#fff_75%,transparent_75%,transparent)] bg-[length:20px_20px]" />
 
                        <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-6">
                          <div className="space-y-2 flex-1">
-                           <div className="flex items-center gap-2 text-amber-500 font-bold text-xs uppercase tracking-wider">
+                           <div className="flex items-center gap-2 text-status-warning font-bold text-xs uppercase tracking-wider">
                              <AlertTriangle size={14} />
                              <span>Activation Requise</span>
                            </div>
 
                            <div className="flex items-center gap-3 opacity-60">
-                             <Lock size={24} className="text-slate-400" />
-                             <span className="text-4xl font-mono text-slate-300 line-through decoration-slate-600">
+                             <Lock size={24} className="text-content-muted" />
+                             <span className="text-4xl font-mono text-content-secondary line-through decoration-content-muted">
                                {pendingAmount.toLocaleString('fr-FR')} <span className="text-lg font-sans">FCFA</span>
                              </span>
                            </div>
 
-                           <p className="text-sm text-slate-500 max-w-sm">
-                             Ce montant est en attente. Le solde réel du compte est de <strong className="text-white">0 FCFA</strong> tant que le versement initial n'est pas validé.
+                           <p className="text-sm text-content-muted max-w-sm">
+                             Ce montant est en attente. Le solde réel du compte est de <strong className="text-content-primary">0 FCFA</strong> tant que le versement initial n'est pas validé.
                            </p>
                          </div>
 
@@ -302,7 +302,7 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRe
                              // Fallback: use internal modal
                              setShowActivationModal(true);
                            }}
-                           className="flex items-center gap-3 px-6 py-4 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold rounded-xl shadow-lg shadow-amber-900/20 transition-all hover:scale-[1.02]"
+                           className="flex items-center gap-3 px-6 py-4 bg-status-warning hover:bg-status-warning text-white font-bold rounded-xl shadow-lg shadow-status-warning/20 transition-all hover:scale-[1.02]"
                          >
                            <Banknote size={20} />
                            <span>Encaisser maintenant</span>
@@ -310,20 +310,20 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRe
                        </div>
 
                        {/* Footer info */}
-                       <div className="relative z-10 flex justify-between items-end text-sm mt-6 pt-4 border-t border-slate-800">
+                       <div className="relative z-10 flex justify-between items-end text-sm mt-6 pt-4 border-t border-edge">
                          <div>
-                           <div className="text-xs text-slate-600 uppercase tracking-wider mb-0.5">Titulaire</div>
-                           <div className="text-slate-400">{formatClientName(compte.clients?.nom, compte.clients?.prenom)}</div>
+                           <div className="text-xs text-content-muted uppercase tracking-wider mb-0.5">Titulaire</div>
+                           <div className="text-content-muted">{formatClientName(compte.clients?.nom, compte.clients?.prenom)}</div>
                          </div>
                          <div className="text-right">
-                           <div className="text-xs text-slate-600 uppercase tracking-wider mb-0.5">Ouverture</div>
-                           <div className="text-slate-400">{formatDateSafe(compte.dateOuverture || compte.createdAt)}</div>
+                           <div className="text-xs text-content-muted uppercase tracking-wider mb-0.5">Ouverture</div>
+                           <div className="text-content-muted">{formatDateSafe(compte.dateOuverture || compte.createdAt)}</div>
                          </div>
                        </div>
                      </div>
                    ) : (
                      // ACTIVE: Standard balance card - Compact & Responsive
-                     <div className={`rounded-xl sm:rounded-2xl p-4 sm:p-5 text-white shadow-xl relative overflow-hidden ${getGradient()}`}>
+                     <div className={`rounded-xl sm:rounded-2xl p-4 sm:p-5 text-content-primary shadow-xl relative overflow-hidden ${getGradient()}`}>
                         <div className="absolute top-0 right-0 p-32 bg-white/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
 
                         <div className="relative z-10">
@@ -331,7 +331,7 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRe
                               <p className="opacity-80 text-xs sm:text-sm font-medium">Solde Disponible</p>
                               {(() => {
                                  const Icon = uiConfig.icon;
-                                 return <Icon className="text-white/80 w-5 h-5 sm:w-6 sm:h-6" />;
+                                 return <Icon className="text-content-primary/80 w-5 h-5 sm:w-6 sm:h-6" />;
                               })()}
                            </div>
 
@@ -355,22 +355,22 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRe
 
                    {/* KPIs (In/Out) - Compact */}
                    <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                      <div className="bg-slate-800/50 p-2 sm:p-3 rounded-lg sm:rounded-xl border border-slate-700/50 flex items-center gap-2 sm:gap-3">
-                         <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500 shrink-0">
+                      <div className="bg-surface/50 p-2 sm:p-3 rounded-lg sm:rounded-xl border border-edge-subtle flex items-center gap-2 sm:gap-3">
+                         <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-status-success-bg flex items-center justify-center text-status-success shrink-0">
                             <ArrowDownLeft size={14} className="sm:w-4 sm:h-4" />
                          </div>
                          <div className="min-w-0">
-                            <div className="text-[10px] sm:text-xs text-slate-500">Entrées</div>
-                            <div className="text-xs sm:text-sm font-bold text-emerald-400 truncate">+{stats.totalDepots.toLocaleString()}</div>
+                            <div className="text-[10px] sm:text-xs text-content-muted">Entrées</div>
+                            <div className="text-xs sm:text-sm font-bold text-status-success truncate">+{stats.totalDepots.toLocaleString()}</div>
                          </div>
                       </div>
-                      <div className="bg-slate-800/50 p-2 sm:p-3 rounded-lg sm:rounded-xl border border-slate-700/50 flex items-center gap-2 sm:gap-3">
-                         <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-red-500/10 flex items-center justify-center text-red-500 shrink-0">
+                      <div className="bg-surface/50 p-2 sm:p-3 rounded-lg sm:rounded-xl border border-edge-subtle flex items-center gap-2 sm:gap-3">
+                         <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-status-danger-bg flex items-center justify-center text-status-danger shrink-0">
                             <ArrowUpRight size={14} className="sm:w-4 sm:h-4" />
                          </div>
                          <div className="min-w-0">
-                            <div className="text-[10px] sm:text-xs text-slate-500">Sorties</div>
-                            <div className="text-xs sm:text-sm font-bold text-red-400 truncate">-{stats.totalRetraits.toLocaleString()}</div>
+                            <div className="text-[10px] sm:text-xs text-content-muted">Sorties</div>
+                            <div className="text-xs sm:text-sm font-bold text-status-danger truncate">-{stats.totalRetraits.toLocaleString()}</div>
                          </div>
                       </div>
                    </div>
@@ -388,34 +388,34 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRe
                       {activeTab === 'transactions' && (
                          <div className="space-y-2 sm:space-y-3">
                             <div className="flex justify-between items-center pb-1 sm:pb-2">
-                               <h3 className="text-xs sm:text-sm font-semibold text-white">Dernières opérations</h3>
-                               <span className="text-[10px] sm:text-xs text-slate-500">{transactions.length} transactions</span>
+                               <h3 className="text-xs sm:text-sm font-semibold text-content-primary">Dernières opérations</h3>
+                               <span className="text-[10px] sm:text-xs text-content-muted">{transactions.length} transactions</span>
                             </div>
 
                             {transactions.length === 0 ? (
-                               <div className="text-center py-6 sm:py-10 text-slate-500 text-xs sm:text-sm bg-slate-800/30 rounded-lg sm:rounded-xl border border-slate-800">
+                               <div className="text-center py-6 sm:py-10 text-content-muted text-xs sm:text-sm bg-surface/30 rounded-lg sm:rounded-xl border border-edge">
                                   Aucune transaction
                                </div>
                             ) : (
                                transactions.map((t) => {
                                   const isDebit = isWithdrawalType(t.typePaiement) || t.montant < 0;
                                   return (
-                                  <div key={t.id} className="bg-slate-800/30 border border-slate-700/50 p-2 sm:p-3 rounded-lg sm:rounded-xl flex items-center justify-between hover:bg-slate-800/50 transition-colors group">
+                                  <div key={t.id} className="bg-surface/30 border border-edge-subtle p-2 sm:p-3 rounded-lg sm:rounded-xl flex items-center justify-between hover:bg-surface/50 transition-colors group">
                                      <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
                                         <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center shrink-0 ${
-                                           !isDebit ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'
+                                           !isDebit ? 'bg-status-success-bg text-status-success' : 'bg-status-danger-bg text-status-danger'
                                         }`}>
                                            {!isDebit ? <TrendingUp size={14} className="sm:w-[18px] sm:h-[18px]"/> : <TrendingDown size={14} className="sm:w-[18px] sm:h-[18px]"/>}
                                         </div>
                                         <div className="min-w-0">
-                                           <div className="font-medium text-slate-200 text-xs sm:text-sm truncate">{t.typeTransaction}</div>
-                                           <div className="text-[10px] sm:text-xs text-slate-500">
+                                           <div className="font-medium text-content-secondary text-xs sm:text-sm truncate">{t.typeTransaction}</div>
+                                           <div className="text-[10px] sm:text-xs text-content-muted">
                                              {new Date(t.dateTransaction).toLocaleDateString()} • {new Date(t.dateTransaction).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                                            </div>
                                         </div>
                                      </div>
                                      <div className="text-right shrink-0 ml-2">
-                                        <div className={`font-mono font-bold text-xs sm:text-sm ${!isDebit ? 'text-emerald-400' : 'text-red-400'}`}>
+                                        <div className={`font-mono font-bold text-xs sm:text-sm ${!isDebit ? 'text-status-success' : 'text-status-danger'}`}>
                                            {!isDebit ? '+' : '-'}{Math.abs(t.montant).toLocaleString()}
                                         </div>
                                         {/* Actions opacity 0 until hover */}
@@ -440,46 +440,46 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRe
                       {activeTab === 'details' && (
                          <div className="space-y-3 sm:space-y-4">
                             {/* Information Titulaire - Compact */}
-                            <div className="bg-slate-800/30 rounded-lg sm:rounded-xl p-3 sm:p-4 border border-slate-700/50">
-                               <h3 className="text-xs sm:text-sm font-semibold text-white mb-2 sm:mb-3 flex items-center gap-2">
-                                  <User size={14} className="text-cyan-400 sm:w-4 sm:h-4"/>
+                            <div className="bg-surface/30 rounded-lg sm:rounded-xl p-3 sm:p-4 border border-edge-subtle">
+                               <h3 className="text-xs sm:text-sm font-semibold text-content-primary mb-2 sm:mb-3 flex items-center gap-2">
+                                  <User size={14} className="text-accent sm:w-4 sm:h-4"/>
                                   Information Titulaire
                                </h3>
-                               <div className="space-y-0 text-xs sm:text-sm divide-y divide-slate-700/50">
+                               <div className="space-y-0 text-xs sm:text-sm divide-y divide-edge/50">
                                   <div className="flex justify-between items-center py-1.5 sm:py-2">
-                                     <span className="text-slate-500">Nom Complet</span>
-                                     <span className="text-white font-medium truncate ml-2 text-right">{formatClientName(compte.clients?.nom, compte.clients?.prenom) || '—'}</span>
+                                     <span className="text-content-muted">Nom Complet</span>
+                                     <span className="text-content-primary font-medium truncate ml-2 text-right">{formatClientName(compte.clients?.nom, compte.clients?.prenom) || '—'}</span>
                                   </div>
                                   <div className="flex justify-between items-center py-1.5 sm:py-2">
-                                     <span className="text-slate-500">Téléphone</span>
-                                     <span className="text-white font-mono text-[11px] sm:text-sm">{compte.clients?.phone || compte.clients?.telephone || '—'}</span>
+                                     <span className="text-content-muted">Téléphone</span>
+                                     <span className="text-content-primary font-mono text-[11px] sm:text-sm">{compte.clients?.phone || compte.clients?.telephone || '—'}</span>
                                   </div>
                                   <div className="flex justify-between items-center py-1.5 sm:py-2">
-                                     <span className="text-slate-500">Email</span>
-                                     <span className="text-white truncate ml-2 text-right max-w-[160px] sm:max-w-none">{compte.clients?.email || '—'}</span>
+                                     <span className="text-content-muted">Email</span>
+                                     <span className="text-content-primary truncate ml-2 text-right max-w-[160px] sm:max-w-none">{compte.clients?.email || '—'}</span>
                                   </div>
                                </div>
                             </div>
 
                             {/* Détails Compte - Compact */}
-                            <div className="bg-slate-800/30 rounded-lg sm:rounded-xl p-3 sm:p-4 border border-slate-700/50">
-                               <h3 className="text-xs sm:text-sm font-semibold text-white mb-2 sm:mb-3 flex items-center gap-2">
-                                  <CreditCard size={14} className="text-emerald-400 sm:w-4 sm:h-4"/>
+                            <div className="bg-surface/30 rounded-lg sm:rounded-xl p-3 sm:p-4 border border-edge-subtle">
+                               <h3 className="text-xs sm:text-sm font-semibold text-content-primary mb-2 sm:mb-3 flex items-center gap-2">
+                                  <CreditCard size={14} className="text-status-success sm:w-4 sm:h-4"/>
                                   Détails Compte
                                </h3>
-                               <div className="space-y-0 text-xs sm:text-sm divide-y divide-slate-700/50">
+                               <div className="space-y-0 text-xs sm:text-sm divide-y divide-edge/50">
                                   <div className="flex justify-between items-center py-1.5 sm:py-2">
-                                     <span className="text-slate-500">Numéro</span>
-                                     <span className="text-white font-mono text-[11px] sm:text-sm">{compte.numeroCompte}</span>
+                                     <span className="text-content-muted">Numéro</span>
+                                     <span className="text-content-primary font-mono text-[11px] sm:text-sm">{compte.numeroCompte}</span>
                                   </div>
                                   <div className="flex justify-between items-center py-1.5 sm:py-2">
-                                     <span className="text-slate-500">Date d'ouverture</span>
-                                     <span className="text-white">{formatDateSafe(compte.dateOuverture || compte.createdAt)}</span>
+                                     <span className="text-content-muted">Date d'ouverture</span>
+                                     <span className="text-content-primary">{formatDateSafe(compte.dateOuverture || compte.createdAt)}</span>
                                   </div>
                                   {uiConfig.interestRate > 0 && (
                                      <div className="flex justify-between items-center py-1.5 sm:py-2">
-                                        <span className="text-slate-500">Taux d'intérêt</span>
-                                        <div className="flex items-center gap-1 text-emerald-400 font-bold">
+                                        <span className="text-content-muted">Taux d'intérêt</span>
+                                        <div className="flex items-center gap-1 text-status-success font-bold">
                                            <Percent size={10} className="sm:w-3 sm:h-3"/>
                                            {uiConfig.interestRate}%
                                         </div>
