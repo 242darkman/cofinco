@@ -71,8 +71,15 @@ export const paymentIntents = pgTable(
     errorMessage: text("error_message"),
 
     // Fees (pawaPay 1% + MMO pass-through)
-    feeAmount: numeric("fee_amount"),                            // Total frais facturés
+    feeAmount: numeric("fee_amount"),                            // Total frais facturés par pawaPay (coût Cofinco)
     feeBreakdown: jsonb("fee_breakdown"),                        // { aggregatorFee, mmoFee, totalFee, currency }
+
+    // Cofinco client-facing fee (separate from pawaPay aggregator fee)
+    feeOption: text("fee_option"),                               // "CLIENT_PAYS" | "FEES_DEDUCTED" | null (pas de frais)
+    clientFeeAmount: numeric("client_fee_amount"),               // Frais Cofinco facturés au client
+    clientFeeRate: numeric("client_fee_rate"),                   // Taux utilisé (ex: 4.0 = 4%)
+    montantBrut: numeric("montant_brut"),                        // Total débité de la source
+    montantNet: numeric("montant_net"),                          // Montant crédité à la destination
 
     // Callback audit
     rawCallbackPayload: jsonb("raw_callback_payload"),           // Payload brut du callback pawaPay

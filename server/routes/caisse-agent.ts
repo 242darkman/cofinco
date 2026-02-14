@@ -29,6 +29,7 @@ import { SystemRole, normalizeRole } from "@shared/types/roles";
 import { db } from "../db";
 import { users } from "@shared/schema/auth";
 import { eq } from "drizzle-orm";
+import { handleInsufficientFundsError } from "../middleware/financial-validation";
 
 export const caisseAgentRouter = Router();
 
@@ -279,6 +280,7 @@ caisseAgentRouter.post(
         mouvements: result.mouvements,
       });
     } catch (error: any) {
+      if (handleInsufficientFundsError(error, res)) return;
       logger.error({ err: error }, 'Erreur approbation opération');
       res.status(500).json({
         error: error.message || "Erreur interne",

@@ -38,3 +38,49 @@ export class DecaissementInsufficientFundsError extends Error {
     };
   }
 }
+
+/**
+ * Generic insufficient funds error for any entity type.
+ * Used by the liquidity guard and update*Solde functions
+ * to enforce zero negative balance.
+ */
+export type LiquidityEntityType = "compte" | "caisse" | "coffre" | "session" | "tontine" | "mobile_money";
+
+export class InsufficientFundsError extends Error {
+  public readonly code = "INSUFFICIENT_FUNDS" as const;
+  public readonly httpStatus = 422;
+  public readonly entityType: LiquidityEntityType;
+  public readonly entityId: string;
+  public readonly currentBalance: number;
+  public readonly requestedAmount: number;
+  public readonly deficit: number;
+
+  constructor(
+    entityType: LiquidityEntityType,
+    entityId: string,
+    currentBalance: number,
+    requestedAmount: number,
+  ) {
+    const deficit = requestedAmount - currentBalance;
+    const message = `Liquidité insuffisante pour effectuer cette opération. Disponible: ${currentBalance.toLocaleString("fr-FR")}, Demandé: ${requestedAmount.toLocaleString("fr-FR")}`;
+    super(message);
+    this.name = "InsufficientFundsError";
+    this.entityType = entityType;
+    this.entityId = entityId;
+    this.currentBalance = currentBalance;
+    this.requestedAmount = requestedAmount;
+    this.deficit = deficit;
+  }
+
+  toJSON() {
+    return {
+      code: this.code,
+      message: this.message,
+      entityType: this.entityType,
+      entityId: this.entityId,
+      available: this.currentBalance,
+      requested: this.requestedAmount,
+      deficit: this.deficit,
+    };
+  }
+}

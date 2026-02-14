@@ -30,6 +30,7 @@ import { requireAuth } from "../auth";
 import { attachAbility, requireAbility } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
 import { currencySymbol } from "@shared/config/currency";
+import { calculateFee } from "../services/mobile-money/fee-calculator";
 
 export const paymentsRouter = Router();
 export const webhooksRouter = Router();
@@ -121,6 +122,7 @@ const collectSchema = z.object({
   idempotencyKey: z.string().optional(),
   agenceId: z.string().uuid().optional(),
   metadata: z.record(z.unknown()).optional(),
+  feeOption: z.enum(["CLIENT_PAYS", "FEES_DEDUCTED"]).optional(),
 });
 
 const payoutSchema = z.object({
@@ -136,6 +138,14 @@ const payoutSchema = z.object({
   idempotencyKey: z.string().optional(),
   agenceId: z.string().uuid().optional(),
   metadata: z.record(z.unknown()).optional(),
+  feeOption: z.enum(["CLIENT_PAYS", "FEES_DEDUCTED"]).optional(),
+});
+
+const feeEstimateSchema = z.object({
+  amount: z.coerce.number().positive(),
+  provider: z.enum(["MTN", "AIRTEL"]),
+  direction: z.enum(["COLLECTION", "PAYOUT"]),
+  feeOption: z.enum(["CLIENT_PAYS", "FEES_DEDUCTED"]),
 });
 
 const listFilterSchema = z.object({
@@ -514,6 +524,34 @@ paymentsRouter.post("/circuit-breaker/reset", requireAuth, attachAbility, requir
     res.json({ success: true, message: "Circuit breaker réinitialisé" });
   } catch (error) {
     res.status(500).json({ error: "Erreur lors du reset du circuit breaker" });
+  }
+});
+
+// ============================================
+// FEE ESTIMATE (registered BEFORE /:id to avoid shadowing)
+// ============================================
+
+/**
+ * GET /api/payments/fee-estimate
+ * Preview des frais avant soumission du paiement
+ */
+paymentsRouter.get("/fee-estimate", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const parsed = feeEstimateSchema.safeParse(req.query);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: "Paramètres invalides",
+        details: parsed.error.errors,
+      });
+    }
+
+    const { amount, provider, direction, feeOption } = parsed.data;
+    const estimate = await calculateFee(amount, provider, direction, feeOption);
+
+    res.json(estimate);
+  } catch (error) {
+    logger.error({ err: error }, 'Fee estimate error');
+    res.status(500).json({ error: "Erreur lors du calcul des frais" });
   }
 });
 

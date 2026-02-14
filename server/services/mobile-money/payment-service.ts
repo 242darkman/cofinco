@@ -40,6 +40,7 @@ import { TypeOperationCaisse, MethodePaiement } from "@shared/enum/status-consta
 import { operatorToCorrespondent, correspondentToOperator, resolveOperatorFromPhone } from "./providers/pawapay/pawapay-config";
 import { createLogger } from "../../lib/logger";
 import { currencyCode } from "@shared/config/currency";
+import { calculateFee, type FeeEstimate } from "./fee-calculator";
 
 const logger = createLogger('PaymentService');
 
@@ -113,6 +114,17 @@ class PaymentService {
     const operator = resolveOperator(provider, phone);
     const correspondent = operatorToCorrespondent(operator);
 
+    // Calculer les frais Cofinco si feeOption est fourni
+    let feeEstimate: FeeEstimate | null = null;
+    if (params.feeOption) {
+      feeEstimate = await calculateFee(amount, operator, "COLLECTION", params.feeOption);
+    }
+
+    // Montant envoyé à pawaPay : Option A → amount + fee, Option B → amount, pas d'option → amount
+    const pawaPayAmount = feeEstimate && params.feeOption === "CLIENT_PAYS"
+      ? feeEstimate.montantBrut
+      : amount;
+
     // Récupérer le provider pawaPay
     const pawaPayProvider = providerRegistry.getPawaPay();
 
@@ -133,6 +145,12 @@ class PaymentService {
       tontineId,
       agenceId,
       idempotencyKey,
+      // Cofinco client fee fields
+      feeOption: params.feeOption || null,
+      clientFeeAmount: feeEstimate?.feeAmount?.toString() || null,
+      clientFeeRate: feeEstimate?.feeRate?.toString() || null,
+      montantBrut: feeEstimate?.montantBrut?.toString() || null,
+      montantNet: feeEstimate?.montantNet?.toString() || null,
       metadata: {
         ...metadata,
         description,
@@ -144,7 +162,7 @@ class PaymentService {
     try {
       // Appeler pawaPay collect avec le correspondant
       const response = await pawaPayProvider.collect({
-        amount,
+        amount: pawaPayAmount,
         phone,
         externalRef: intent.externalRef,
         callbackUrl: "", // pawaPay v2 ne supporte pas callbackUrl dans le body — configurer dans le dashboard pawaPay
@@ -214,6 +232,18 @@ class PaymentService {
     const operator = resolveOperator(provider, phone);
     const correspondent = operatorToCorrespondent(operator);
 
+    // Calculer les frais Cofinco si feeOption est fourni
+    let feeEstimate: FeeEstimate | null = null;
+    if (params.feeOption) {
+      feeEstimate = await calculateFee(amount, operator, "PAYOUT", params.feeOption);
+    }
+
+    // Montant envoyé au téléphone via pawaPay :
+    // Option A → amount (client reçoit le montant intégral, compte débité amount + fee)
+    // Option B → amount - fee (frais déduits, compte débité amount)
+    // Pas d'option → amount
+    const pawaPayAmount = feeEstimate ? feeEstimate.montantNet : amount;
+
     // Récupérer le provider pawaPay
     const pawaPayProvider = providerRegistry.getPawaPay();
 
@@ -241,6 +271,12 @@ class PaymentService {
       tontineId,
       agenceId,
       idempotencyKey,
+      // Cofinco client fee fields
+      feeOption: params.feeOption || null,
+      clientFeeAmount: feeEstimate?.feeAmount?.toString() || null,
+      clientFeeRate: feeEstimate?.feeRate?.toString() || null,
+      montantBrut: feeEstimate?.montantBrut?.toString() || null,
+      montantNet: feeEstimate?.montantNet?.toString() || null,
       metadata: {
         ...metadata,
         description,
@@ -252,7 +288,7 @@ class PaymentService {
     try {
       // Appeler pawaPay payout
       const response = await pawaPayProvider.payout({
-        amount,
+        amount: pawaPayAmount,
         phone,
         externalRef: intent.externalRef,
         correspondent,
@@ -479,6 +515,12 @@ class PaymentService {
     if (effectiveFee > 0) {
       await this.postFeeGlEntry(intent, effectiveFee);
     }
+
+    // Post GL entry for Cofinco client-facing fees (DR 578x / CR 708700)
+    const clientFee = intent.clientFeeAmount ? parseFloat(intent.clientFeeAmount) : 0;
+    if (clientFee > 0) {
+      await this.postClientFeeGlEntry(intent, clientFee);
+    }
   }
 
   /**
@@ -538,10 +580,16 @@ class PaymentService {
     // GL routing utilise le champ provider (= operator MTN/AIRTEL)
     const operator = (intent as any).operator || intent.provider;
 
+    // Déterminer les montants selon l'option frais
+    const clientFeeAmount = intent.clientFeeAmount ? parseFloat(intent.clientFeeAmount) : 0;
+    const creditAmount = intent.montantNet ? parseFloat(intent.montantNet) : amount; // Montant crédité au compte
+    const caisseAmount = intent.montantBrut ? parseFloat(intent.montantBrut) : amount; // Montant entré dans le wallet MM
+    const feeObservation = clientFeeAmount > 0 ? ` (frais MM: ${clientFeeAmount.toLocaleString("fr-FR")})` : '';
+
     const { mouvement } = await executeWithLedger(
       "MOBILE_MONEY",
       {
-        montant: amount.toString(),
+        montant: caisseAmount.toString(), // GL mouvement = montant total entré dans le wallet
         sens: "CREDIT",
         clientId: intent.clientId || undefined,
         compteId: intent.compteId || undefined,
@@ -558,6 +606,8 @@ class PaymentService {
           correspondent: (intent as any).correspondent,
           phone: intent.phone,
           externalRef: intent.externalRef,
+          feeOption: intent.feeOption || undefined,
+          clientFeeAmount: clientFeeAmount || undefined,
           ...(metadata || {}),
         },
       },
@@ -565,9 +615,9 @@ class PaymentService {
         let additionalEventData: Record<string, unknown> = {};
         let operationCaisseId: string | undefined;
 
-        // 1. Mettre à jour le solde du compte si applicable
+        // 1. Mettre à jour le solde du compte si applicable (montant NET)
         if (intent.compteId) {
-          const nouveauSolde = await updateCompteSolde(tx, intent.compteId, amount);
+          const nouveauSolde = await updateCompteSolde(tx, intent.compteId, creditAmount);
           additionalEventData.nouveauSoldeCompte = nouveauSolde;
 
           // Create transaction record for account history
@@ -576,21 +626,21 @@ class PaymentService {
             mouvementId: mouvement.id,
             typePaiement: typePaiement as any,
             sens: "CREDIT",
-            montant: amount.toString(),
+            montant: creditAmount.toString(),
             soldeApres: nouveauSolde,
             methodePaiement: MethodePaiement.MOBILE_MONEY,
-            observations: `Dépôt Mobile Money ${operator} via pawaPay`,
+            observations: `Dépôt Mobile Money ${operator} via pawaPay${feeObservation}`,
             idempotencyKey: `tx-momo-col-${intent.id}`,
             createdBy: intent.createdBy,
           });
         }
 
-        // 2. Allocation crédit si applicable (remboursement)
+        // 2. Allocation crédit si applicable (remboursement) — utilise montant net
         if (intent.creditId) {
           const allocation = await allocateCreditRepayment(
             tx,
             intent.creditId,
-            amount,
+            creditAmount,
             mouvement.id,
             intent.id,
             "MOBILE_MONEY"
@@ -599,11 +649,11 @@ class PaymentService {
           additionalEventData.nouveauSoldeCredit = allocation.soldeApres;
         }
 
-        // 3. Mettre à jour la caisse digitale si agence définie
+        // 3. Mettre à jour la caisse digitale si agence définie (montant BRUT = tout entre dans le wallet)
         if (intent.agenceId) {
           try {
             const digitalCaisse = await getOrCreateDigitalCaisse(tx, operator as "MTN" | "AIRTEL", intent.agenceId);
-            await updateDigitalCaisseSolde(tx, digitalCaisse.id, amount, mouvement.id);
+            await updateDigitalCaisseSolde(tx, digitalCaisse.id, caisseAmount, mouvement.id);
             additionalEventData.digitalCaisseId = digitalCaisse.id;
           } catch (error) {
             logger.warn({ err: error }, 'Could not update digital caisse');
@@ -622,10 +672,10 @@ class PaymentService {
                   mouvementId: mouvement.id,
                   clientId: intent.clientId,
                   typeOperation: this.mapToOperationType(intent) as any,
-                  montant: amount.toString(),
+                  montant: caisseAmount.toString(),
                   methodePaiement: MethodePaiement.MOBILE_MONEY,
                   reference: `MM-${operator}-${intent.externalRef}`,
-                  description: `Paiement Mobile Money ${operator} via pawaPay`,
+                  description: `Paiement Mobile Money ${operator} via pawaPay${feeObservation}`,
                   metadata: {
                     gateway: "PAWAPAY",
                     operator,
@@ -693,10 +743,16 @@ class PaymentService {
         ? "CLOSURE_PAYOUT"
         : "WITHDRAWAL_SAVINGS";
 
+    // Déterminer les montants selon l'option frais
+    const clientFeeAmount = intent.clientFeeAmount ? parseFloat(intent.clientFeeAmount) : 0;
+    const debitAmount = intent.montantBrut ? parseFloat(intent.montantBrut) : amount; // Montant débité du compte
+    const caisseAmount = intent.montantNet ? parseFloat(intent.montantNet) : amount; // Montant sorti du wallet MM (envoyé au téléphone)
+    const feeObservation = clientFeeAmount > 0 ? ` (frais MM: ${clientFeeAmount.toLocaleString("fr-FR")})` : '';
+
     const { mouvement } = await executeWithLedger(
       "MOBILE_MONEY",
       {
-        montant: amount.toString(),
+        montant: debitAmount.toString(), // GL mouvement = montant total débité du compte
         sens: "DEBIT",
         clientId: intent.clientId || undefined,
         compteId: intent.compteId || undefined,
@@ -713,6 +769,8 @@ class PaymentService {
           correspondent: (intent as any).correspondent,
           phone: intent.phone,
           externalRef: intent.externalRef,
+          feeOption: intent.feeOption || undefined,
+          clientFeeAmount: clientFeeAmount || undefined,
           ...(metadata || {}),
         },
       },
@@ -720,9 +778,9 @@ class PaymentService {
         let additionalEventData: Record<string, unknown> = {};
         let operationCaisseId: string | undefined;
 
-        // 1. Mettre à jour le solde du compte si applicable
+        // 1. Mettre à jour le solde du compte si applicable (montant BRUT = total débité)
         if (intent.compteId) {
-          const nouveauSolde = await updateCompteSolde(tx, intent.compteId, -amount);
+          const nouveauSolde = await updateCompteSolde(tx, intent.compteId, -debitAmount);
           additionalEventData.nouveauSoldeCompte = nouveauSolde;
 
           // Create transaction record for account history
@@ -731,20 +789,20 @@ class PaymentService {
             mouvementId: mouvement.id,
             typePaiement: typePaiement as any,
             sens: "DEBIT",
-            montant: amount.toString(),
+            montant: debitAmount.toString(),
             soldeApres: nouveauSolde,
             methodePaiement: MethodePaiement.MOBILE_MONEY,
-            observations: `Retrait Mobile Money ${operator} via pawaPay`,
+            observations: `Retrait Mobile Money ${operator} via pawaPay${feeObservation}`,
             idempotencyKey: `tx-momo-pay-${intent.id}`,
             createdBy: intent.createdBy,
           });
         }
 
-        // 2. Mettre à jour la caisse digitale si agence définie (débit)
+        // 2. Mettre à jour la caisse digitale si agence définie (montant NET = ce qui sort réellement du wallet)
         if (intent.agenceId) {
           try {
             const digitalCaisse = await getOrCreateDigitalCaisse(tx, operator as "MTN" | "AIRTEL", intent.agenceId);
-            await updateDigitalCaisseSolde(tx, digitalCaisse.id, -amount, mouvement.id);
+            await updateDigitalCaisseSolde(tx, digitalCaisse.id, -caisseAmount, mouvement.id);
             additionalEventData.digitalCaisseId = digitalCaisse.id;
           } catch (error) {
             logger.warn({ err: error }, 'Could not update digital caisse');
@@ -767,10 +825,10 @@ class PaymentService {
                   mouvementId: mouvement.id,
                   clientId: intent.clientId,
                   typeOperation: opType as any,
-                  montant: amount.toString(),
+                  montant: debitAmount.toString(),
                   methodePaiement: MethodePaiement.MOBILE_MONEY,
                   reference: `MM-${operator}-${intent.externalRef}`,
-                  description: `Payout Mobile Money ${operator} via pawaPay`,
+                  description: `Payout Mobile Money ${operator} via pawaPay${feeObservation}`,
                   metadata: {
                     gateway: "PAWAPAY",
                     operator,
@@ -822,6 +880,50 @@ class PaymentService {
       } catch (error) {
         logger.error({ intentId: intent.id, err: error }, 'Failed to finalize closure after payout');
       }
+    }
+  }
+
+  /**
+   * Poste l'écriture GL pour les frais Cofinco facturés au client
+   * Utilise les règles MM_FEE_REVENUE_MTN / MM_FEE_REVENUE_AIRTEL (eventType: MM_FEE_REVENUE)
+   * DR 578x (Compte Mobile Money) / CR 708700 (Frais services Mobile Money)
+   */
+  private async postClientFeeGlEntry(intent: PaymentIntent, feeAmount: number): Promise<void> {
+    const operator = (intent as any).operator || intent.provider;
+
+    try {
+      await executeWithLedger(
+        "MOBILE_MONEY",
+        {
+          montant: feeAmount.toString(),
+          sens: "CREDIT",
+          clientId: intent.clientId || undefined,
+          compteId: intent.compteId || undefined,
+          methodePaiement: "MOBILE_MONEY",
+          typePaiement: "MM_FEE_REVENUE",
+          referenceExterne: intent.providerTxnId || undefined,
+          idempotencyKey: `momo-client-fee-${intent.id}`,
+          agenceId: intent.agenceId || undefined,
+          requiresGlPosting: false, // Non-bloquant: si la règle GL n'existe pas, ne pas bloquer
+          metadata: {
+            provider: operator,
+            gateway: "PAWAPAY",
+            correspondent: (intent as any).correspondent,
+            originalIntentId: intent.id,
+            feeOption: intent.feeOption,
+            clientFeeRate: intent.clientFeeRate,
+          },
+        },
+        async (_tx, mouvement) => {
+          return { result: mouvement };
+        },
+        intent.createdBy || undefined
+      );
+
+      logger.info({ intentId: intent.id, feeAmount, operator }, 'Client fee GL entry posted');
+    } catch (error) {
+      // Fee posting is non-critical — log but don't fail the payment
+      logger.warn({ intentId: intent.id, feeAmount, err: error }, 'Could not post client fee GL entry');
     }
   }
 

@@ -1,12 +1,15 @@
 /**
  * GL Balance Reader Service
  *
- * Service spécialisé pour lire les soldes GL des caisses.
+ * Service universel pour lire les soldes GL des entités financières.
  * Utilisé par le système GL Guard pour vérifier la cohérence
- * entre le billetage physique et le solde comptable à l'ouverture.
+ * entre les soldes cached et le solde comptable (source de vérité).
  *
  * OHADA Classe 5 - Comptes de trésorerie:
  * - 521xxx: Caisse Guichet
+ * - 531xxx: Coffre-fort
+ * - 512xxx: Banque
+ * - 578xxx: Mobile Money (5781 = MTN, 5782 = Airtel)
  */
 
 import { db } from "../../db";
@@ -19,6 +22,7 @@ import {
   EntryStatus,
 } from "@shared/schema/accounting";
 import { caisses } from "@shared/schema/finance";
+import { coffresForts } from "@shared/schema/coffres-forts";
 import { createLogger } from "../../lib/logger";
 
 const logger = createLogger("Treasury:GlBalanceReader");
@@ -47,8 +51,29 @@ export interface GlBalanceReadResult {
   error?: string;
 }
 
-// Préfixe des comptes de caisse (OHADA classe 5)
+export interface GlAccountBalance {
+  accountNumber: string;
+  glBalance: number;
+  agenceId: string;
+  source: "GL_COMPUTED" | "NO_GL_DATA";
+  computedAt: string;
+}
+
+export interface GlAccountBalanceResult {
+  success: boolean;
+  balance: GlAccountBalance | null;
+  error?: string;
+}
+
+// Préfixes des comptes GL (OHADA classe 5)
 const CAISSE_ACCOUNT_PREFIX = "521";
+const COFFRE_ACCOUNT_PREFIX = "531";
+const BANQUE_ACCOUNT_PREFIX = "512";
+const MOBILE_MONEY_ACCOUNT_PREFIX = "578";
+const MOBILE_MONEY_ACCOUNTS: Record<string, string> = {
+  MTN: "5781",
+  AIRTEL: "5782",
+};
 
 // ============================================================================
 // SERVICE
@@ -103,7 +128,7 @@ class GlBalanceReaderService {
 
       if (dedicatedAccount) {
         // Compte dédié trouvé - utiliser son solde
-        glBalance = await this.getAccountBalance(dedicatedAccount.numeroCompte, caisse.agenceId, tx);
+        glBalance = await this._getAccountBalance(dedicatedAccount.numeroCompte, caisse.agenceId, tx);
         source = "DEDICATED_ACCOUNT";
         glAccountNumber = dedicatedAccount.numeroCompte;
 
@@ -184,6 +209,179 @@ class GlBalanceReaderService {
   }
 
   // ============================================================================
+  // PUBLIC GL BALANCE METHODS (Universal)
+  // ============================================================================
+
+  /**
+   * Calcule le solde d'un compte GL spécifique par son numéro.
+   * Pour les comptes d'actif (classe 5): solde = Σ débits - Σ crédits
+   *
+   * C'est LA source de vérité pour tous les soldes.
+   */
+  async getAccountBalance(
+    numeroCompte: string,
+    agenceId: string,
+    tx: Tx = db
+  ): Promise<number> {
+    return this._getAccountBalance(numeroCompte, agenceId, tx);
+  }
+
+  /**
+   * Calcule le solde GL d'un compte par numéro, avec résultat structuré.
+   */
+  async getGlBalanceByAccountNumber(
+    numeroCompte: string,
+    agenceId: string,
+    tx: Tx = db
+  ): Promise<GlAccountBalanceResult> {
+    try {
+      const balance = await this._getAccountBalance(numeroCompte, agenceId, tx);
+      return {
+        success: true,
+        balance: {
+          accountNumber: numeroCompte,
+          glBalance: balance,
+          agenceId,
+          source: balance === 0 ? "NO_GL_DATA" : "GL_COMPUTED",
+          computedAt: new Date().toISOString(),
+        },
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error({ err: error, numeroCompte, agenceId }, "Erreur lecture solde GL");
+      return { success: false, balance: null, error: message };
+    }
+  }
+
+  /**
+   * Obtient le solde GL pour un coffre-fort spécifique.
+   * Utilise les comptes 531xxx.
+   */
+  async getGlBalanceForCoffre(
+    coffreId: string,
+    tx: Tx = db
+  ): Promise<GlAccountBalanceResult> {
+    try {
+      // 1. Récupérer les infos du coffre
+      const [coffre] = await tx
+        .select({
+          id: coffresForts.id,
+          nom: coffresForts.nom,
+          code: coffresForts.code,
+          ownerId: coffresForts.ownerId,
+        })
+        .from(coffresForts)
+        .where(eq(coffresForts.id, coffreId))
+        .limit(1);
+
+      if (!coffre) {
+        return { success: false, balance: null, error: `Coffre non trouvé: ${coffreId}` };
+      }
+
+      const agenceId = coffre.ownerId || "SIEGE";
+
+      // 2. Chercher un compte GL dédié (531xxx avec nom du coffre)
+      const dedicatedAccount = await this.findDedicatedGlAccountByPrefix(
+        coffre.nom,
+        agenceId,
+        COFFRE_ACCOUNT_PREFIX,
+        tx
+      );
+
+      let glBalance: number;
+      let accountNumber: string;
+
+      if (dedicatedAccount) {
+        glBalance = await this._getAccountBalance(dedicatedAccount.numeroCompte, agenceId, tx);
+        accountNumber = dedicatedAccount.numeroCompte;
+      } else {
+        // Agrège tous les comptes 531xxx de l'agence
+        glBalance = await this.getAgencyTotalBalanceByPrefix(agenceId, COFFRE_ACCOUNT_PREFIX, tx);
+        accountNumber = COFFRE_ACCOUNT_PREFIX + "x";
+      }
+
+      logger.debug({ coffreId, glBalance, accountNumber }, "Solde GL coffre");
+
+      return {
+        success: true,
+        balance: {
+          accountNumber,
+          glBalance,
+          agenceId,
+          source: glBalance === 0 ? "NO_GL_DATA" : "GL_COMPUTED",
+          computedAt: new Date().toISOString(),
+        },
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error({ err: error, coffreId }, "Erreur lecture solde GL coffre");
+      return { success: false, balance: null, error: message };
+    }
+  }
+
+  /**
+   * Obtient le solde GL pour un opérateur Mobile Money.
+   * MTN = compte 5781, Airtel = compte 5782.
+   */
+  async getGlBalanceForMobileMoney(
+    operator: "MTN" | "AIRTEL",
+    agenceId: string,
+    tx: Tx = db
+  ): Promise<GlAccountBalanceResult> {
+    try {
+      const accountNumber = MOBILE_MONEY_ACCOUNTS[operator];
+      if (!accountNumber) {
+        return { success: false, balance: null, error: `Opérateur inconnu: ${operator}` };
+      }
+
+      const glBalance = await this._getAccountBalance(accountNumber, agenceId, tx);
+
+      return {
+        success: true,
+        balance: {
+          accountNumber,
+          glBalance,
+          agenceId,
+          source: glBalance === 0 ? "NO_GL_DATA" : "GL_COMPUTED",
+          computedAt: new Date().toISOString(),
+        },
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error({ err: error, operator, agenceId }, "Erreur lecture solde GL Mobile Money");
+      return { success: false, balance: null, error: message };
+    }
+  }
+
+  /**
+   * Obtient le solde GL pour les comptes bancaires de l'agence.
+   * Comptes 512xxx.
+   */
+  async getGlBalanceForBanque(
+    agenceId: string,
+    tx: Tx = db
+  ): Promise<GlAccountBalanceResult> {
+    try {
+      const glBalance = await this.getAgencyTotalBalanceByPrefix(agenceId, BANQUE_ACCOUNT_PREFIX, tx);
+
+      return {
+        success: true,
+        balance: {
+          accountNumber: BANQUE_ACCOUNT_PREFIX + "x",
+          glBalance,
+          agenceId,
+          source: glBalance === 0 ? "NO_GL_DATA" : "GL_COMPUTED",
+          computedAt: new Date().toISOString(),
+        },
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error({ err: error, agenceId }, "Erreur lecture solde GL banque");
+      return { success: false, balance: null, error: message };
+    }
+  }
+
+  // ============================================================================
   // PRIVATE METHODS
   // ============================================================================
 
@@ -222,10 +420,74 @@ class GlBalanceReaderService {
   }
 
   /**
-   * Calcule le solde d'un compte GL spécifique.
+   * Cherche un compte GL dédié par préfixe et nom d'entité.
+   */
+  private async findDedicatedGlAccountByPrefix(
+    entityName: string,
+    agenceId: string,
+    prefix: string,
+    tx: Tx = db
+  ): Promise<{ numeroCompte: string; intitule: string } | null> {
+    const searchPattern = `%${entityName}%`;
+    const result = await tx
+      .select({
+        numeroCompte: planComptable.numeroCompte,
+        intitule: planComptable.intitule,
+      })
+      .from(planComptable)
+      .where(
+        and(
+          like(planComptable.numeroCompte, `${prefix}%`),
+          sql`lower(${planComptable.intitule}) LIKE lower(${searchPattern})`,
+          or(
+            eq(planComptable.agenceId, agenceId),
+            sql`${planComptable.agenceId} IS NULL`
+          ),
+          eq(planComptable.actif, true)
+        )
+      )
+      .limit(1);
+
+    return result.length > 0 ? result[0] : null;
+  }
+
+  /**
+   * Calcule le solde total de tous les comptes avec un préfixe donné pour une agence.
+   */
+  private async getAgencyTotalBalanceByPrefix(
+    agenceId: string,
+    prefix: string,
+    tx: Tx = db
+  ): Promise<number> {
+    const result = await tx
+      .select({
+        totalDebit: sql<string>`COALESCE(SUM(CAST(${lignesEcritures.debit} AS DECIMAL)), 0)`,
+        totalCredit: sql<string>`COALESCE(SUM(CAST(${lignesEcritures.credit} AS DECIMAL)), 0)`,
+      })
+      .from(lignesEcritures)
+      .innerJoin(planComptable, eq(lignesEcritures.compteId, planComptable.id))
+      .innerJoin(ecritures, eq(lignesEcritures.ecritureId, ecritures.id))
+      .where(
+        and(
+          like(planComptable.numeroCompte, `${prefix}%`),
+          eq(ecritures.statut, EntryStatus.POSTED),
+          or(
+            eq(ecritures.agenceId, agenceId),
+            sql`${ecritures.agenceId} IS NULL`
+          )
+        )
+      );
+
+    const totalDebit = Number(result[0]?.totalDebit || 0);
+    const totalCredit = Number(result[0]?.totalCredit || 0);
+    return totalDebit - totalCredit;
+  }
+
+  /**
+   * Calcule le solde d'un compte GL spécifique (implémentation interne).
    * Pour les comptes d'actif (classe 5): solde = Σ débits - Σ crédits
    */
-  private async getAccountBalance(
+  private async _getAccountBalance(
     numeroCompte: string,
     agenceId: string,
     tx: Tx = db
@@ -262,29 +524,7 @@ class GlBalanceReaderService {
     agenceId: string,
     tx: Tx = db
   ): Promise<number> {
-    const result = await tx
-      .select({
-        totalDebit: sql<string>`COALESCE(SUM(CAST(${lignesEcritures.debit} AS DECIMAL)), 0)`,
-        totalCredit: sql<string>`COALESCE(SUM(CAST(${lignesEcritures.credit} AS DECIMAL)), 0)`,
-      })
-      .from(lignesEcritures)
-      .innerJoin(planComptable, eq(lignesEcritures.compteId, planComptable.id))
-      .innerJoin(ecritures, eq(lignesEcritures.ecritureId, ecritures.id))
-      .where(
-        and(
-          like(planComptable.numeroCompte, `${CAISSE_ACCOUNT_PREFIX}%`),
-          eq(ecritures.statut, EntryStatus.POSTED),
-          or(
-            eq(ecritures.agenceId, agenceId),
-            sql`${ecritures.agenceId} IS NULL`
-          )
-        )
-      );
-
-    const totalDebit = Number(result[0]?.totalDebit || 0);
-    const totalCredit = Number(result[0]?.totalCredit || 0);
-
-    return totalDebit - totalCredit;
+    return this.getAgencyTotalBalanceByPrefix(agenceId, CAISSE_ACCOUNT_PREFIX, tx);
   }
 
   /**

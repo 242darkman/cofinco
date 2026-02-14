@@ -276,6 +276,9 @@ export const typeEvenementEnum = pgEnum("type_evenement_enum", [
   "CAISSE_LIQUIDATED",
   // GL Posting events (PR-0)
   "GL_POSTING_FAILED",
+  // Liquidity & GL events
+  "LIQUIDITY_CHANGED",
+  "GL_ENTRY_POSTED",
 ]);
 
 // ============================================

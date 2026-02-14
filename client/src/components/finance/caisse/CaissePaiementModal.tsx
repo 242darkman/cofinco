@@ -98,6 +98,16 @@ export default function CaissePaiementModal({
   const [showReceipt, setShowReceipt] = useState(false);
   const [receiptData, setReceiptData] = useState<ReceiptData | undefined>(undefined);
   const [factureId, setFactureId] = useState<string | undefined>(undefined);
+  const [mobileProvider, setMobileProvider] = useState<'MTN' | 'AIRTEL' | null>(null);
+  const [feeOption, setFeeOption] = useState<'CLIENT_PAYS' | 'FEES_DEDUCTED' | ''>('');
+  const [feeEstimate, setFeeEstimate] = useState<{
+    feeAmount: number;
+    feeRate: number;
+    montantBrut: number;
+    montantNet: number;
+    feeOption: string;
+  } | null>(null);
+  const [loadingFeeEstimate, setLoadingFeeEstimate] = useState(false);
   const [clientAccounts, setClientAccounts] = useState<any[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
   const [selectedAccount, setSelectedAccount] = useState<any>(null); // Full object for status check
@@ -151,6 +161,46 @@ export default function CaissePaiementModal({
     return isOperationCaisseEntree(typeOp);
   }, []);
 
+  // Debounced fee estimate when amount + feeOption change
+  useEffect(() => {
+    if (formData.mode_paiement !== MethodePaiement.MOBILE_MONEY || !feeOption || !formData.montant) {
+      setFeeEstimate(null);
+      return;
+    }
+
+    const amount = parseFloat(formData.montant);
+    if (isNaN(amount) || amount <= 0) {
+      setFeeEstimate(null);
+      return;
+    }
+
+    const provider = mobileProvider || 'MTN';
+    const direction = isOperationEntree(formData.type_operation) ? 'COLLECTION' : 'PAYOUT';
+
+    const timer = setTimeout(async () => {
+      setLoadingFeeEstimate(true);
+      try {
+        const params = new URLSearchParams({
+          amount: amount.toString(),
+          provider,
+          direction,
+          feeOption,
+        });
+        const res = await fetch(`/api/payments/fee-estimate?${params}`, { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          setFeeEstimate(data);
+        }
+      } catch (err) {
+        console.error('Fee estimate error:', err);
+      } finally {
+        setLoadingFeeEstimate(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [formData.montant, formData.mode_paiement, formData.numero_telephone, formData.type_operation, feeOption, isOperationEntree, mobileProvider]);
+
   const isTontineOperation =
     formData.type_operation === TypeOperationCaisse.TONTINE_CONTRIBUTION ||
     formData.type_operation === TypeOperationCaisse.TONTINE_WITHDRAWAL;
@@ -198,6 +248,12 @@ export default function CaissePaiementModal({
 
   useEffect(() => {
     if (formData.client_id) {
+        // Auto-fill phone from selected client
+        const selectedCl = clients.find(c => c.id === formData.client_id);
+        if (selectedCl?.telephone && !formData.numero_telephone) {
+          setFormData(prev => ({ ...prev, numero_telephone: selectedCl.telephone }));
+        }
+
         setLoadingTontines(true);
         const displayClientSummary = async () => {
              try {
@@ -281,6 +337,13 @@ export default function CaissePaiementModal({
     return `PAY-${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}-${Array.from(array, b => b.toString(16).padStart(2, '0')).join('').slice(0, 6).toUpperCase()}`;
   }, []);
 
+  // Auto-generate reference when switching to Mobile Money
+  useEffect(() => {
+    if (formData.mode_paiement === MethodePaiement.MOBILE_MONEY && !formData.numero_transaction) {
+      setFormData(prev => ({ ...prev, numero_transaction: genererReference() }));
+    }
+  }, [formData.mode_paiement, formData.numero_transaction, genererReference]);
+
   const validate = useCallback(() => {
     const newErrors: Record<string, string> = {};
 
@@ -300,9 +363,6 @@ export default function CaissePaiementModal({
     if (formData.mode_paiement === MethodePaiement.MOBILE_MONEY) {
       if (!formData.numero_telephone) {
         newErrors.numero_telephone = 'Numéro requis';
-      }
-      if (!formData.numero_transaction) {
-        newErrors.numero_transaction = 'Numéro transaction requis';
       }
     }
 
@@ -398,7 +458,8 @@ export default function CaissePaiementModal({
         // Metadata
         referenceExterne: formData.reference_virement,
         numeroTransaction: formData.numero_transaction,
-        numeroTelephone: formData.numero_telephone
+        numeroTelephone: formData.numero_telephone,
+        mobileProvider: mobileProvider || undefined
       });
       
       const rData: ReceiptData = {
@@ -411,9 +472,14 @@ export default function CaissePaiementModal({
           prenom: clients.find(c => c.id === formData.client_id)?.prenom || '',
           telephone: formData.numero_telephone
         },
-        items: [{ description: formData.description, montant: operationData.amount, quantite: 1 }],
+        items: [
+          { description: formData.description, montant: operationData.amount, quantite: 1 },
+          ...(feeEstimate && feeOption ? [{ description: `Frais Mobile Money (${feeEstimate.feeRate}%)`, montant: feeEstimate.feeAmount, quantite: 1 }] : []),
+        ],
         total: Number(formData.montant),
-        modePaiement: METHODE_PAIEMENT_LABELS[formData.mode_paiement] || formData.mode_paiement,
+        modePaiement: formData.mode_paiement === MethodePaiement.MOBILE_MONEY && mobileProvider
+          ? (mobileProvider === 'MTN' ? 'MTN MoMo' : 'Airtel Money')
+          : (METHODE_PAIEMENT_LABELS[formData.mode_paiement as MethodePaiementType] || formData.mode_paiement),
         devise: currencySymbol(),
         agent: { nom: 'Caissier', prenom: '' }
       };
@@ -441,7 +507,7 @@ export default function CaissePaiementModal({
     } finally {
       setLoading(false);
     }
-  }, [formData, selectedTontine, selectedAccountId, clients, saveReceiptToLoge]);
+  }, [formData, selectedTontine, selectedAccountId, clients, saveReceiptToLoge, mobileProvider, feeEstimate, feeOption]);
 
   const handleSubmit = useCallback(async () => {
     if (!validate()) return;
@@ -638,22 +704,25 @@ export default function CaissePaiementModal({
              <label className="text-[10px] sm:text-xs font-bold text-content-muted uppercase tracking-wider ml-1">Mode de paiement</label>
              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
                 {[
-                   { id: MethodePaiement.CASH, label: 'Espèces', icon: Banknote, color: 'emerald' },
-                   { id: MethodePaiement.MOBILE_MONEY, label: 'MTN MoMo', img: mtnMomoLogo, color: 'yellow' },
-                   { id: 'airtel', label: 'Airtel Money', img: airtelMoneyLogo, color: 'rose' },
-                   { id: MethodePaiement.TRANSFER, label: 'Virement', icon: Building2, color: 'indigo' },
+                   { id: MethodePaiement.CASH, provider: null, label: 'Espèces', icon: Banknote, selectedBorder: 'border-status-success/50', selectedBg: 'bg-status-success/10' },
+                   { id: MethodePaiement.MOBILE_MONEY, provider: 'MTN' as const, label: 'MTN MoMo', img: mtnMomoLogo, selectedBorder: 'border-status-warning/50', selectedBg: 'bg-status-warning/10' },
+                   { id: MethodePaiement.MOBILE_MONEY, provider: 'AIRTEL' as const, label: 'Airtel Money', img: airtelMoneyLogo, selectedBorder: 'border-status-danger/50', selectedBg: 'bg-status-danger/10' },
+                   { id: MethodePaiement.TRANSFER, provider: null, label: 'Virement', icon: Building2, selectedBorder: 'border-accent/50', selectedBg: 'bg-accent/10' },
                 ].map((m) => {
-                   const isSelected = formData.mode_paiement === m.id;
+                   const isSelected = formData.mode_paiement === m.id && (m.provider ? mobileProvider === m.provider : true);
                    const Icon = m.icon;
 
                    return (
                      <button
-                        key={m.id}
+                        key={m.provider || m.id}
                         type="button"
-                        onClick={() => setFormData(prev => ({...prev, mode_paiement: m.id as any}))}
-                        className={`h-14 sm:h-16 rounded-xl sm:rounded-2xl border flex flex-col items-center justify-center gap-1 sm:gap-1.5 transition-all relative ${
+                        onClick={() => {
+                          setFormData(prev => ({...prev, mode_paiement: m.id as any}));
+                          setMobileProvider(m.provider);
+                        }}
+                        className={`h-14 sm:h-16 rounded-xl sm:rounded-2xl border-2 flex flex-col items-center justify-center gap-1 sm:gap-1.5 transition-all relative ${
                            isSelected
-                           ? `border-${m.color}-500/50 bg-${m.color}-500/10 shadow-lg`
+                           ? `${m.selectedBorder} ${m.selectedBg} shadow-lg ring-1 ring-accent/20`
                            : 'border-edge bg-surface-base text-content-muted hover:border-edge-strong'
                         }`}
                      >
@@ -665,36 +734,65 @@ export default function CaissePaiementModal({
              </div>
           </div>
 
-          {(formData.mode_paiement === MethodePaiement.MOBILE_MONEY || formData.mode_paiement === MethodePaiement.TRANSFER) && (
+          {formData.mode_paiement === MethodePaiement.MOBILE_MONEY && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 animate-in slide-in-from-top-2">
               <div className="space-y-1">
                 <label className="text-[9px] sm:text-[10px] font-bold text-content-muted uppercase tracking-widest">
-                  {formData.mode_paiement === MethodePaiement.MOBILE_MONEY ? 'Téléphone' : 'Banque'} <span className="text-status-danger">*</span>
+                  Téléphone <span className="text-status-danger">*</span>
                 </label>
                 <input
                   type="text"
                   className={`w-full h-10 sm:h-11 bg-surface-base border rounded-lg sm:rounded-xl px-3 sm:px-4 text-sm text-content-primary focus:border-accent outline-none ${
-                    (errors.numero_telephone || errors.banque_origine) ? 'border-status-danger' : 'border-edge'
+                    errors.numero_telephone ? 'border-status-danger' : 'border-edge'
                   }`}
-                  value={formData.mode_paiement === MethodePaiement.MOBILE_MONEY ? formData.numero_telephone : formData.banque_origine}
-                  onChange={(e) => setFormData(p => ({ ...p, [formData.mode_paiement === MethodePaiement.MOBILE_MONEY ? 'numero_telephone' : 'banque_origine']: e.target.value }))}
+                  value={formData.numero_telephone}
+                  onChange={(e) => setFormData(p => ({ ...p, numero_telephone: e.target.value }))}
+                  placeholder="Ex: 050000000"
                 />
                 {errors.numero_telephone && <p className="text-status-danger text-xs">{errors.numero_telephone}</p>}
+              </div>
+              <div className="space-y-1">
+                <label className="text-[9px] sm:text-[10px] font-bold text-content-muted uppercase tracking-widest">
+                  Référence
+                </label>
+                <input
+                  type="text"
+                  readOnly
+                  className="w-full h-10 sm:h-11 bg-surface/50 border border-edge rounded-lg sm:rounded-xl px-3 sm:px-4 text-sm text-content-muted cursor-not-allowed"
+                  value={formData.numero_transaction}
+                />
+              </div>
+            </div>
+          )}
+
+          {formData.mode_paiement === MethodePaiement.TRANSFER && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 animate-in slide-in-from-top-2">
+              <div className="space-y-1">
+                <label className="text-[9px] sm:text-[10px] font-bold text-content-muted uppercase tracking-widest">
+                  Banque <span className="text-status-danger">*</span>
+                </label>
+                <input
+                  type="text"
+                  className={`w-full h-10 sm:h-11 bg-surface-base border rounded-lg sm:rounded-xl px-3 sm:px-4 text-sm text-content-primary focus:border-accent outline-none ${
+                    errors.banque_origine ? 'border-status-danger' : 'border-edge'
+                  }`}
+                  value={formData.banque_origine}
+                  onChange={(e) => setFormData(p => ({ ...p, banque_origine: e.target.value }))}
+                />
                 {errors.banque_origine && <p className="text-status-danger text-xs">{errors.banque_origine}</p>}
               </div>
               <div className="space-y-1">
                 <label className="text-[9px] sm:text-[10px] font-bold text-content-muted uppercase tracking-widest">
-                  Référence / ID <span className="text-status-danger">*</span>
+                  Référence virement <span className="text-status-danger">*</span>
                 </label>
                 <input
                   type="text"
                   className={`w-full h-10 sm:h-11 bg-surface-base border rounded-lg sm:rounded-xl px-3 sm:px-4 text-sm text-content-primary focus:border-accent outline-none ${
-                    (errors.numero_transaction || errors.reference_virement) ? 'border-status-danger' : 'border-edge'
+                    errors.reference_virement ? 'border-status-danger' : 'border-edge'
                   }`}
-                  value={formData.mode_paiement === MethodePaiement.MOBILE_MONEY ? formData.numero_transaction : formData.reference_virement}
-                  onChange={(e) => setFormData(p => ({ ...p, [formData.mode_paiement === MethodePaiement.MOBILE_MONEY ? 'numero_transaction' : 'reference_virement']: e.target.value }))}
+                  value={formData.reference_virement}
+                  onChange={(e) => setFormData(p => ({ ...p, reference_virement: e.target.value }))}
                 />
-                {errors.numero_transaction && <p className="text-status-danger text-xs">{errors.numero_transaction}</p>}
                 {errors.reference_virement && <p className="text-status-danger text-xs">{errors.reference_virement}</p>}
               </div>
             </div>
@@ -707,12 +805,14 @@ export default function CaissePaiementModal({
                   <Banknote size={22} className="sm:w-7 sm:h-7" />
                </span>
                <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   className={`w-full h-14 sm:h-16 bg-surface-base border-2 rounded-xl sm:rounded-2xl pl-12 sm:pl-14 pr-14 sm:pr-16 text-2xl sm:text-3xl font-black text-content-primary outline-none focus:border-accent transition-all font-mono ${errors.montant ? 'border-status-danger' : 'border-edge'}`}
                   placeholder="0"
                   value={formData.montant}
                   onChange={(e) => {
-                    setFormData(prev => ({ ...prev, montant: e.target.value }));
+                    const val = e.target.value.replace(/[^0-9]/g, '');
+                    setFormData(prev => ({ ...prev, montant: val }));
                     if (errors.montant) setErrors(prev => { const { montant, ...rest } = prev; return rest; });
                   }}
                />
@@ -720,6 +820,75 @@ export default function CaissePaiementModal({
             </div>
             {errors.montant && <p className="text-status-danger text-xs mt-1">{errors.montant}</p>}
           </div>
+
+          {/* Fee Option Selector (Mobile Money only — after montant) */}
+          {formData.mode_paiement === MethodePaiement.MOBILE_MONEY && (
+            <div className="animate-in fade-in slide-in-from-top-2 duration-300 space-y-3">
+              <label className="text-[10px] sm:text-xs font-bold text-content-muted uppercase tracking-wider ml-1">
+                Option frais Mobile Money
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFeeOption(feeOption === 'CLIENT_PAYS' ? '' : 'CLIENT_PAYS')}
+                  className={`p-3 rounded-xl border text-left transition-all ${
+                    feeOption === 'CLIENT_PAYS'
+                      ? 'border-accent/50 bg-accent/10'
+                      : 'border-edge bg-surface-base hover:border-edge-strong'
+                  }`}
+                >
+                  <p className={`text-xs font-bold ${feeOption === 'CLIENT_PAYS' ? 'text-accent' : 'text-content-primary'}`}>
+                    Client paie en plus
+                  </p>
+                  <p className="text-[9px] text-content-muted mt-0.5">Frais ajoutés au montant</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFeeOption(feeOption === 'FEES_DEDUCTED' ? '' : 'FEES_DEDUCTED')}
+                  className={`p-3 rounded-xl border text-left transition-all ${
+                    feeOption === 'FEES_DEDUCTED'
+                      ? 'border-accent/50 bg-accent/10'
+                      : 'border-edge bg-surface-base hover:border-edge-strong'
+                  }`}
+                >
+                  <p className={`text-xs font-bold ${feeOption === 'FEES_DEDUCTED' ? 'text-accent' : 'text-content-primary'}`}>
+                    Frais déduits
+                  </p>
+                  <p className="text-[9px] text-content-muted mt-0.5">Frais déduits du montant</p>
+                </button>
+              </div>
+
+              {/* Fee Preview */}
+              {feeOption && feeEstimate && (
+                <div className="bg-accent/5 border border-accent/20 rounded-xl p-3 space-y-1.5">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-content-muted">Montant opération</span>
+                    <span className="text-content-primary font-medium">{Number(formData.montant).toLocaleString()} FCFA</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-content-muted">Frais MM ({feeEstimate.feeRate}%)</span>
+                    <span className="text-status-warning font-medium">{feeEstimate.feeAmount.toLocaleString()} FCFA</span>
+                  </div>
+                  <div className="flex justify-between text-xs pt-1.5 border-t border-accent/20">
+                    <span className="text-content-muted font-semibold">
+                      {isOperationEntree(formData.type_operation)
+                        ? (feeOption === 'CLIENT_PAYS' ? 'Total débité du téléphone' : 'Crédité au compte')
+                        : (feeOption === 'CLIENT_PAYS' ? 'Débité du compte' : 'Reçu au téléphone')}
+                    </span>
+                    <span className="text-content-primary font-bold">
+                      {(feeOption === 'CLIENT_PAYS' ? feeEstimate.montantBrut : feeEstimate.montantNet).toLocaleString()} FCFA
+                    </span>
+                  </div>
+                </div>
+              )}
+              {feeOption && loadingFeeEstimate && (
+                <div className="flex items-center gap-2 text-xs text-content-muted">
+                  <Loader2 size={12} className="animate-spin" />
+                  Calcul des frais...
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <label className="text-[10px] sm:text-xs font-bold text-content-muted uppercase tracking-wider ml-1">
@@ -739,17 +908,26 @@ export default function CaissePaiementModal({
         </div>
 
         <div className="p-4 sm:p-5 bg-surface-base border-t border-edge flex flex-col gap-3">
-           {formattedMontant && (
-             <div className="text-center text-xs sm:text-sm font-medium text-content-muted">
-                Confirmation: <span className="text-content-primary font-bold">{formattedMontant}</span>
-             </div>
-           )}
            <button
              onClick={handleSubmit}
              disabled={loading}
              className="w-full h-11 sm:h-12 bg-accent hover:bg-accent-primary-hover disabled:opacity-50 text-white rounded-xl sm:rounded-2xl font-bold text-sm sm:text-base flex items-center justify-center gap-2 transition-all"
            >
-              {loading ? <Loader2 size={20} className="animate-spin" /> : <><CheckCircle size={18} /> Valider la Transaction</>}
+              {loading ? (
+                <Loader2 size={20} className="animate-spin" />
+              ) : (
+                <>
+                  <CheckCircle size={18} />
+                  Valider la Transaction
+                  {formattedMontant && (
+                    <span className="font-black">
+                      ({feeEstimate && feeOption === 'CLIENT_PAYS'
+                        ? formatMoney(feeEstimate.montantBrut)
+                        : formattedMontant})
+                    </span>
+                  )}
+                </>
+              )}
            </button>
            <button onClick={onClose} className="text-[10px] sm:text-xs font-bold text-content-muted hover:text-content-secondary transition-colors uppercase tracking-widest">
              Annuler

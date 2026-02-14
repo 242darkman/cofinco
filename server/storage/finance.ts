@@ -40,9 +40,9 @@ import {
   getTypePaiementForCompte,
 } from "@shared/enum/status-constants";
 
-import { DecaissementInsufficientFundsError, InsufficientFundsErrorData } from "./errors";
+import { DecaissementInsufficientFundsError, InsufficientFundsError, InsufficientFundsErrorData } from "./errors";
 // Re-export for compatibility
-export { DecaissementInsufficientFundsError, type InsufficientFundsErrorData };
+export { DecaissementInsufficientFundsError, InsufficientFundsError, type InsufficientFundsErrorData };
 
   import {
     type Credit, type InsertCredit, type DemandeCredit, type InsertDemandeCredit,
@@ -3000,11 +3000,10 @@ export async function processLoanCashPayout(data: {
             }
         },
         async (tx, mouvement) => {
-            // Guard: Check if session has enough funds
-            const sessionSolde = parseFloat(session.montantFermetureTheorique || "0");
-            if (sessionSolde < montant) {
-                throw new Error(`Fonds insuffisants en caisse. Solde: ${sessionSolde}, Requis: ${montant}`);
-            }
+            // GL-backed liquidity guard: verify funds via GL before proceeding
+            // Note: updateSessionSolde also enforces zero-negative as a safety net
+            const { liquidityGuard } = await import("../services/liquidity-guard");
+            await liquidityGuard.requireLiquidity("session", data.sessionCaisseId, montant, tx);
 
             // Debit the Session (and physical Caisse) atomically
             const newSessionSolde = await updateSessionSolde(tx, data.sessionCaisseId, -montant);
@@ -3261,11 +3260,11 @@ export async function createCashTransactionWithLedger(data: {
     const [foundCompte] = await db.select().from(comptes).where(eq(comptes.id, data.compteId));
     if (!foundCompte) throw new Error(`Compte ${data.compteId} non trouvé`);
 
-    // Validation du solde pour les retraits
+    // Validation du solde pour les retraits (pre-flight + updateCompteSolde enforces at write time)
     if (isOutgoing) {
       const soldeActuel = parseFloat(foundCompte.soldeCourant || "0");
       if (soldeActuel < montantNum) {
-        throw new Error(`Solde insuffisant. Disponible: ${soldeActuel.toLocaleString()} FCFA, Demandé: ${montantNum.toLocaleString()} FCFA`);
+        throw new InsufficientFundsError("compte", data.compteId!, soldeActuel, montantNum);
       }
 
       // Vérifier si le compte n'est pas bloqué
@@ -3290,11 +3289,11 @@ export async function createCashTransactionWithLedger(data: {
   if (!session?.session) throw new Error(`Session ${data.sessionId} non trouvée`);
   if (session.session.closedAt) throw new Error("La session de caisse est fermée");
 
-  // Vérifier le solde de caisse pour les retraits
+  // Vérifier le solde de caisse pour les retraits (pre-flight + updateSessionSolde enforces at write time)
   if (isOutgoing && session.caisse) {
     const soldeCaisse = parseFloat(session.caisse.solde || "0");
     if (soldeCaisse < montantNum) {
-      throw new Error(`Solde caisse insuffisant. Disponible: ${soldeCaisse.toLocaleString()} FCFA`);
+      throw new InsufficientFundsError("caisse", session.caisse.id, soldeCaisse, montantNum);
     }
   }
 
@@ -3421,12 +3420,12 @@ export async function validateTransfertWithLedger(
     if (!sessionDest) throw new Error("Session destination introuvable");
     if (sessionDest.closedAt) throw new Error("La session de destination doit être ouverte");
 
-    // Check Sufficient Funds
+    // Check Sufficient Funds (pre-flight; updateSessionSolde also enforces at write time)
     const currentSolde = Number(sessionSource.montantFermetureTheorique || sessionSource.montantOuverture || 0);
     const amount = Number(transfert.montant);
 
     if (currentSolde < amount) {
-        throw new Error(`Solde insuffisant dans la caisse source (${currentSolde} < ${amount})`);
+        throw new InsufficientFundsError("session", sessionSource.id, currentSolde, amount);
     }
 
     // 3. Process SOURCE (DEBIT / OUT)

@@ -72,6 +72,12 @@ interface PaymentIntent {
   creditId?: string;
   tontineId?: string;
   agenceId?: string;
+  // Cofinco client fees
+  feeOption?: string | null;
+  clientFeeAmount?: string | null;
+  clientFeeRate?: string | null;
+  montantBrut?: string | null;
+  montantNet?: string | null;
   createdAt: string;
   initiatedAt?: string;
   confirmedAt?: string;
@@ -169,6 +175,11 @@ export default function MobileMoneyTransactionsPage() {
       confirmedAt: payment.confirmedAt,
       client: payment.client,
       agence: payment.agence,
+      feeOption: payment.feeOption,
+      clientFeeAmount: payment.clientFeeAmount,
+      clientFeeRate: payment.clientFeeRate,
+      montantBrut: payment.montantBrut,
+      montantNet: payment.montantNet,
     };
     setSelectedPayment(detailData);
     setShowDetailModal(true);

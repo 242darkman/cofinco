@@ -21,6 +21,7 @@ import { balanceService } from "./balance-service";
 import type { BalanceEntityType } from "@shared/types/balances";
 import { createLogger } from "../lib/logger";
 import { validateAccountingRule, handleGLPostingFailure, isGLStrictMode } from "./accounting-validation";
+import { InsufficientFundsError } from "../storage/errors";
 
 const logger = createLogger('Ledger');
 
@@ -41,7 +42,9 @@ export type TypeEvenement =
   | "COMPTE_BLOQUE"
   | "COMPTE_DEBLOQUE"
   | "COMPTE_TRANSFERE_AGENCE"
-  | "GL_POSTING_FAILED";
+  | "GL_POSTING_FAILED"
+  | "LIQUIDITY_CHANGED"
+  | "GL_ENTRY_POSTED";
 
 export interface MouvementData {
   montant: string;
@@ -371,22 +374,31 @@ export async function updateCompteSolde(
   delta: number
 ): Promise<string> {
   // Pessimistic Lock (SELECT ... FOR UPDATE) to prevent race conditions
-  await tx
-    .select({ id: comptes.id })
+  const [locked] = await tx
+    .select({ id: comptes.id, solde: comptes.soldeCourant })
     .from(comptes)
     .where(eq(comptes.id, compteId))
     .for("update");
 
+  if (!locked) throw new Error(`Compte ${compteId} not found`);
+
+  // Guard: prevent negative balance on debit operations
+  if (delta < 0) {
+    const currentSolde = parseFloat(locked.solde || "0");
+    if (currentSolde + delta < 0) {
+      throw new InsufficientFundsError("compte", compteId, currentSolde, Math.abs(delta));
+    }
+  }
+
   // Atomic update to handle concurrency
   const [updated] = await tx.update(comptes)
-    .set({ 
+    .set({
       soldeCourant: sql`${comptes.soldeCourant} + ${delta}`,
-      updatedAt: new Date() 
+      updatedAt: new Date()
     })
     .where(eq(comptes.id, compteId))
     .returning({ solde: comptes.soldeCourant });
 
-  if (!updated) throw new Error(`Compte ${compteId} not found`);
   return updated.solde;
 }
 
@@ -439,12 +451,24 @@ export async function updateSessionSolde(
 ): Promise<string> {
   // Pessimistic Lock on session
   const [session] = await tx
-    .select({ id: sessionsCaisse.id, caisseId: sessionsCaisse.caisseId })
+    .select({
+      id: sessionsCaisse.id,
+      caisseId: sessionsCaisse.caisseId,
+      solde: sessionsCaisse.montantFermetureTheorique,
+    })
     .from(sessionsCaisse)
     .where(eq(sessionsCaisse.id, sessionId))
     .for("update");
 
   if (!session) throw new Error(`Session ${sessionId} not found`);
+
+  // Guard: prevent negative session balance on debit operations
+  if (delta < 0) {
+    const currentSolde = parseFloat(session.solde || "0");
+    if (currentSolde + delta < 0) {
+      throw new InsufficientFundsError("session", sessionId, currentSolde, Math.abs(delta));
+    }
+  }
 
   // 1. Mettre à jour le solde théorique de la session (montantFermetureTheorique)
   const [updated] = await tx.update(sessionsCaisse)
@@ -480,21 +504,30 @@ export async function updateTontineSolde(
   delta: number
 ): Promise<string> {
   // Pessimistic Lock
-  await tx
-    .select({ id: tontines.id })
+  const [locked] = await tx
+    .select({ id: tontines.id, solde: tontines.solde })
     .from(tontines)
     .where(eq(tontines.id, tontineId))
     .for("update");
 
+  if (!locked) throw new Error(`Tontine ${tontineId} not found`);
+
+  // Guard: prevent negative tontine balance on debit operations
+  if (delta < 0) {
+    const currentSolde = parseFloat(locked.solde || "0");
+    if (currentSolde + delta < 0) {
+      throw new InsufficientFundsError("tontine", tontineId, currentSolde, Math.abs(delta));
+    }
+  }
+
   const [updated] = await tx.update(tontines)
-    .set({ 
+    .set({
       solde: sql`${tontines.solde} + ${delta}`,
       updatedAt: new Date()
     })
     .where(eq(tontines.id, tontineId))
     .returning({ solde: tontines.solde });
-  
-  if (!updated) throw new Error(`Tontine ${tontineId} not found`);
+
   return updated.solde || "0";
 }
 
@@ -507,21 +540,30 @@ export async function updateCaisseSolde(
   delta: number
 ): Promise<string> {
   // Pessimistic Lock
-  await tx
-    .select({ id: caisses.id })
+  const [locked] = await tx
+    .select({ id: caisses.id, solde: caisses.solde })
     .from(caisses)
     .where(eq(caisses.id, caisseId))
     .for("update");
 
+  if (!locked) throw new Error(`Caisse ${caisseId} not found`);
+
+  // Guard: prevent negative caisse balance on debit operations
+  if (delta < 0) {
+    const currentSolde = parseFloat(locked.solde || "0");
+    if (currentSolde + delta < 0) {
+      throw new InsufficientFundsError("caisse", caisseId, currentSolde, Math.abs(delta));
+    }
+  }
+
   const [updated] = await tx.update(caisses)
-    .set({ 
+    .set({
       solde: sql`${caisses.solde} + ${delta}`,
       updatedAt: new Date()
     })
     .where(eq(caisses.id, caisseId))
     .returning({ solde: caisses.solde });
-  
-  if (!updated) throw new Error(`Caisse ${caisseId} not found`);
+
   return updated.solde || "0";
 }
 
@@ -757,6 +799,29 @@ export async function executeWithLedger<T>(
     } catch {
       // Don't let WS failure break business flow
     }
+  }
+
+  // 8. Emit LIQUIDITY_CHANGED for real-time treasury monitoring
+  try {
+    const { getWsInstance } = await import("../ws-server");
+    const wsInstance = getWsInstance();
+    if (wsInstance && mouvementData.agenceId) {
+      wsInstance.broadcastToAgency(mouvementData.agenceId, {
+        type: "LIQUIDITY_CHANGED",
+        payload: {
+          mouvementId: transactionResult.mouvement.id,
+          sourceModule,
+          montant: mouvementData.montant,
+          sens: mouvementData.sens,
+          agenceId: mouvementData.agenceId,
+          compteId: mouvementData.compteId,
+          creditId: mouvementData.creditId,
+          sessionCaisseId: mouvementData.sessionCaisseId,
+        },
+      });
+    }
+  } catch {
+    // Don't let WS failure break business flow
   }
 
   return { result: transactionResult.result, mouvement: transactionResult.mouvement };

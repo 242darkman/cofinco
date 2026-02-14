@@ -48,7 +48,7 @@ type MessageType =
   | "CREDIT_UPDATE" | "CLIENT_UPDATE" | "COMPTE_UPDATE"
   | "CAISSE_UPDATE" | "TONTINE_UPDATE" | "OPERATIONS_UPDATE"
   | "EMPLOYE_UPDATE" | "AGENCE_UPDATE" | "HR_UPDATE"
-  | "ACCOUNTING_UPDATE" | "LOYALTY_UPDATE"
+  | "ACCOUNTING_UPDATE" | "LIQUIDITY_CHANGED" | "LOYALTY_UPDATE"
   | "SETTINGS_UPDATE" | "RBAC_UPDATE"
 
   // =============================================
@@ -621,6 +621,15 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          debounceInvalidate(["/api/comptabilite"]);
          debounceInvalidate(["/api/factures"]);
          window.dispatchEvent(new CustomEvent('accounting-update', { detail: message.payload }));
+         break;
+
+      case "LIQUIDITY_CHANGED":
+         // Refresh treasury, balance, and caisse views when liquidity changes
+         debounceInvalidate(balanceKeys.all);
+         debounceInvalidate(caisseKeys.all);
+         debounceInvalidate(coffreKeys.all);
+         debounceInvalidate(dashboardKeys.stats());
+         window.dispatchEvent(new CustomEvent('liquidity-changed', { detail: message.payload }));
          break;
 
       case "OPERATIONS_UPDATE":

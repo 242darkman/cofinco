@@ -75,6 +75,7 @@ import { agentsTerrain } from '@shared/schema/operations';
 import { tontineRulesets } from '@shared/schema/tontines';
 import { configEcartCaisse } from '@shared/schema/caisse-closing';
 import { currencyPresets } from '@shared/schema/settings';
+import { mmFeeSchedules } from '@shared/schema/mm-fee-schedules';
 import { hashPassword } from './auth';
 import { SystemRole } from '@shared/types/roles';
 import { StatutUser, StatutCoffre, TypeAgence, StatutCaisse } from '@shared/enum/status-constants';
@@ -85,7 +86,7 @@ import { MODULES_DATA } from '@shared/config/rbac';
 // ============================================================================
 
 type SeedContext = 'EMPTY' | 'SEEDED' | 'PRODUCTION';
-type SeedAction = 'created' | 'updated' | 'skipped' | 'deleted';
+type SeedAction = 'created' | 'updated' | 'skipped' | 'deleted' | 'replaced';
 
 interface SeedStepResult {
   table: string;
@@ -370,6 +371,7 @@ const PLAN_COMPTABLE_DATA = [
   { num: '708400', label: 'Pénalités de retard', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
   { num: '708500', label: "Frais d'ouverture de compte", classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
   { num: '708600', label: 'Frais de clôture de compte', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
+  { num: '708700', label: 'Frais services Mobile Money', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
   { num: '758', label: 'Produits divers de gestion courante', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: false },
   { num: '772', label: 'Produits sur transit', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
   { num: '76', label: 'Produits financiers', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
@@ -1164,6 +1166,39 @@ const ACCOUNTING_RULES_DATA = [
     debitAccount: '6272',  // Commissions Mobile Money
     creditAccount: '5782', // Mobile Money Airtel
     descriptionTemplate: 'Commission Airtel Money',
+    priority: 10,
+  },
+
+  // ============================================================================
+  // FRAIS MM FACTURÉS AU CLIENT (Revenus Cofinco)
+  // ============================================================================
+
+  {
+    code: 'MM_FEE_REVENUE_MTN',
+    name: 'Frais MM facturés client (MTN)',
+    description: 'Revenus des frais Mobile Money facturés au client - MTN',
+    sourceType: 'MOUVEMENT',
+    eventType: 'MM_FEE_REVENUE',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'MTN',
+    journalCode: 'MMTN',
+    debitAccount: '5781',   // Mobile Money MTN (les frais restent dans le wallet MM)
+    creditAccount: '708700', // Frais services Mobile Money (revenu)
+    descriptionTemplate: 'Frais Mobile Money MTN facturés au client',
+    priority: 10,
+  },
+  {
+    code: 'MM_FEE_REVENUE_AIRTEL',
+    name: 'Frais MM facturés client (Airtel)',
+    description: 'Revenus des frais Mobile Money facturés au client - Airtel',
+    sourceType: 'MOUVEMENT',
+    eventType: 'MM_FEE_REVENUE',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'AIRTEL',
+    journalCode: 'MAIR',
+    debitAccount: '5782',   // Mobile Money Airtel
+    creditAccount: '708700', // Frais services Mobile Money (revenu)
+    descriptionTemplate: 'Frais Mobile Money Airtel facturés au client',
     priority: 10,
   },
 
@@ -2645,22 +2680,18 @@ async function seedProductsCatalog(context: SeedContext, dryRun: boolean): Promi
   }
   results.push({ table: 'produitsCompte', action: 'created', count: produits.length });
 
-  // Credit Plans - upsert by nom
+  // Credit Plans - delete all existing then insert canonical plans
   const creditPlansData = [
-    { nom: 'Crédit 50.000', description: 'Micro-crédit de 50.000 FCFA', typeCredit: 'Personnel', montantMin: '50000', montantMax: '50000', tauxInteret: '20', dureeValeur: 30, dureeUnite: 'Jour', frequenceRemboursement: 'Journalier', fraisDossier: '2500', conditions: ['Carte d\'identité'], actif: true },
-    { nom: 'Crédit 75.000', description: 'Micro-crédit de 75.000 FCFA', typeCredit: 'Personnel', montantMin: '75000', montantMax: '75000', tauxInteret: '20', dureeValeur: 30, dureeUnite: 'Jour', frequenceRemboursement: 'Journalier', fraisDossier: '3750', conditions: ['Carte d\'identité'], actif: true },
-    { nom: 'Crédit 100.000', description: 'Micro-crédit de 100.000 FCFA', typeCredit: 'Personnel', montantMin: '100000', montantMax: '100000', tauxInteret: '20', dureeValeur: 30, dureeUnite: 'Jour', frequenceRemboursement: 'Hebdomadaire', fraisDossier: '5000', conditions: ['Carte d\'identité', 'Garant'], actif: true },
-    { nom: 'Crédit 150.000', description: 'Micro-crédit de 150.000 FCFA', typeCredit: 'Commercial', montantMin: '150000', montantMax: '150000', tauxInteret: '20', dureeValeur: 60, dureeUnite: 'Jour', frequenceRemboursement: 'Hebdomadaire', fraisDossier: '7500', conditions: ['Carte d\'identité', 'Commerce'], actif: true },
-    { nom: 'Crédit 200.000', description: 'Micro-crédit de 200.000 FCFA', typeCredit: 'Commercial', montantMin: '200000', montantMax: '200000', tauxInteret: '20', dureeValeur: 90, dureeUnite: 'Jour', frequenceRemboursement: 'Hebdomadaire', fraisDossier: '10000', conditions: ['Carte d\'identité', 'Commerce', 'Garant'], actif: true }
+    { nom: 'Pamba', description: 'Crédit Pamba', typeCredit: 'Personnel', montantMin: '50000', montantMax: '100000', tauxInteret: '10', dureeValeur: 10, dureeUnite: 'DAY', frequenceRemboursement: 'DAILY', conditions: [] as string[], actif: true },
+    { nom: 'Solidaire-Fidel 1', description: 'Crédit Solidaire-Fidel 1', typeCredit: 'Personnel', montantMin: '200000', montantMax: '300000', tauxInteret: '12', dureeValeur: 84, dureeUnite: 'DAY', frequenceRemboursement: 'WEEKLY', conditions: [] as string[], actif: true },
+    { nom: 'Scolaire', description: 'Crédit Scolaire', typeCredit: 'Personnel', montantMin: '50000', montantMax: '100000', tauxInteret: '21', dureeValeur: 42, dureeUnite: 'DAY', frequenceRemboursement: 'WEEKLY', conditions: [] as string[], actif: true },
   ];
 
+  await db.delete(creditPlans);
   for (const plan of creditPlansData) {
-    const [existing] = await db.select().from(creditPlans).where(eq(creditPlans.nom, plan.nom));
-    if (!existing) {
-      await db.insert(creditPlans).values(plan);
-    }
+    await db.insert(creditPlans).values(plan);
   }
-  results.push({ table: 'creditPlans', action: 'created', count: creditPlansData.length });
+  results.push({ table: 'creditPlans', action: 'replaced', count: creditPlansData.length });
 
   // Tontine Rulesets - insert default ruleset
   const [existingRuleset] = await db.select().from(tontineRulesets).where(eq(tontineRulesets.isDefault, true));
@@ -4243,6 +4274,50 @@ async function seedNotificationSystem(context: SeedContext, dryRun: boolean): Pr
  * - 0030_accounting_gl_enhancement.sql: journaux et plan comptable OHADA
  * - 0034_rbac_versions.sql: version RBAC (table non implémentée)
  */
+async function seedMmFeeSchedules(dryRun: boolean): Promise<SeedStepResult[]> {
+  logger.info('Seeding MM Fee Schedules...');
+  const results: SeedStepResult[] = [];
+
+  const MM_FEE_DEFAULTS = [
+    { provider: 'MTN' as const, direction: 'COLLECTION' as const, feePct: '4.0', feeFixed: '0', minFee: '0', maxFee: '999999999' },
+    { provider: 'MTN' as const, direction: 'PAYOUT' as const,     feePct: '4.0', feeFixed: '0', minFee: '0', maxFee: '999999999' },
+    { provider: 'AIRTEL' as const, direction: 'COLLECTION' as const, feePct: '4.0', feeFixed: '0', minFee: '0', maxFee: '999999999' },
+    { provider: 'AIRTEL' as const, direction: 'PAYOUT' as const,     feePct: '4.0', feeFixed: '0', minFee: '0', maxFee: '999999999' },
+  ];
+
+  if (!dryRun) {
+    let created = 0;
+    for (const schedule of MM_FEE_DEFAULTS) {
+      const [existing] = await db.select({ id: mmFeeSchedules.id })
+        .from(mmFeeSchedules)
+        .where(and(
+          eq(mmFeeSchedules.provider, schedule.provider),
+          eq(mmFeeSchedules.direction, schedule.direction),
+          eq(mmFeeSchedules.active, true),
+        ))
+        .limit(1);
+
+      if (!existing) {
+        await db.insert(mmFeeSchedules).values({
+          provider: schedule.provider,
+          direction: schedule.direction,
+          feePct: schedule.feePct,
+          feeFixed: schedule.feeFixed,
+          minFee: schedule.minFee,
+          maxFee: schedule.maxFee,
+          active: true,
+        });
+        created++;
+      }
+    }
+    results.push({ table: 'mm_fee_schedules', action: created > 0 ? 'created' : 'skipped', count: created, details: `${MM_FEE_DEFAULTS.length} schedules (4% default)` });
+  } else {
+    results.push({ table: 'mm_fee_schedules', action: 'skipped', count: 0, details: 'DRY_RUN' });
+  }
+
+  return results;
+}
+
 async function seedMigrationBackfills(context: SeedContext, dryRun: boolean): Promise<SeedStepResult[]> {
   logger.info('Seeding Migration Backfills...');
   const results: SeedStepResult[] = [];
@@ -4679,6 +4754,10 @@ async function seedProd() {
     // Accounting
     const accountingResults = await seedAccountingBootstrap(report.context, DRY_RUN);
     report.steps.push(...accountingResults);
+
+    // MM Fee Schedules
+    const mmFeeResults = await seedMmFeeSchedules(DRY_RUN);
+    report.steps.push(...mmFeeResults);
 
     // Vault & Transfers
     const vaultResults = await seedVaultAndTransfersConfig(report.context, DRY_RUN);

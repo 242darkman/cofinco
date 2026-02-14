@@ -175,6 +175,8 @@ export interface InitiateCollectionParams {
   idempotencyKey?: string;
   agenceId?: string;
   metadata?: Record<string, unknown>;
+  /** Option frais: CLIENT_PAYS (frais ajoutés) ou FEES_DEDUCTED (frais déduits) */
+  feeOption?: "CLIENT_PAYS" | "FEES_DEDUCTED";
 }
 
 export interface InitiatePayoutParams {
@@ -190,6 +192,8 @@ export interface InitiatePayoutParams {
   idempotencyKey?: string;
   agenceId?: string;
   metadata?: Record<string, unknown>;
+  /** Option frais: CLIENT_PAYS (frais ajoutés) ou FEES_DEDUCTED (frais déduits) */
+  feeOption?: "CLIENT_PAYS" | "FEES_DEDUCTED";
 }
 
 export interface PaymentIntentFilter {

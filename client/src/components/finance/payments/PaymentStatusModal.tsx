@@ -23,6 +23,8 @@ export interface PaymentStatusModalProps {
   reference?: string;
   providerTxnId?: string;
   errorMessage?: string;
+  clientFeeAmount?: number;
+  montantNet?: number;
   onRetry?: () => void;
   onViewDetails?: () => void;
 }
@@ -91,6 +93,8 @@ export function PaymentStatusModal({
   reference,
   providerTxnId,
   errorMessage,
+  clientFeeAmount,
+  montantNet,
   onRetry,
   onViewDetails,
 }: PaymentStatusModalProps) {
@@ -164,6 +168,13 @@ export function PaymentStatusModal({
             {amount.toLocaleString()} <span className="text-sm">FCFA</span>
           </p>
         </div>
+
+        {/* Fee info (on success with fees) */}
+        {isSuccess && clientFeeAmount != null && clientFeeAmount > 0 && montantNet != null && (
+          <p className="text-xs text-content-muted text-center mb-2">
+            {montantNet.toLocaleString()} FCFA crédités (frais: {clientFeeAmount.toLocaleString()} FCFA)
+          </p>
+        )}
 
         {/* Phone */}
         <div className="flex items-center justify-center gap-2 text-sm text-content-muted mb-2">

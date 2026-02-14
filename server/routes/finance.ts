@@ -26,7 +26,7 @@ import { storage } from "../storage";
 import { createMouvementFinancier } from "../services/ledger";
 import { postGlForMouvement } from "../services/accounting-posting-service";
 import { getComptesByClient } from "../storage/finance";
-import { DecaissementInsufficientFundsError } from "../storage/errors";
+import { DecaissementInsufficientFundsError, InsufficientFundsError } from "../storage/errors";
 
 import { isCoffreCaisseError } from "../services/coffre/coffre-errors";
 // State Machine errors for proper error handling
@@ -583,6 +583,13 @@ export function registerFinanceRoutes(app: Express) {
       logger.error({ err: error }, 'Erreur décaissement crédit');
 
       // Gestion d'erreur structurée pour le workflow de réapprovisionnement
+      if (error instanceof InsufficientFundsError) {
+        return res.status(error.httpStatus).json({
+          success: false,
+          error: error.toJSON(),
+        });
+      }
+
       if (error instanceof DecaissementInsufficientFundsError) {
         return res.status(error.httpStatus).json({
           success: false,
@@ -741,6 +748,13 @@ export function registerFinanceRoutes(app: Express) {
 
     } catch (error: any) {
       logger.error({ err: error }, 'Erreur décaissement caisse');
+
+      if (error instanceof InsufficientFundsError) {
+        return res.status(error.httpStatus).json({
+          success: false,
+          error: error.toJSON(),
+        });
+      }
 
       if (error instanceof DecaissementInsufficientFundsError) {
         return res.status(error.httpStatus).json({
@@ -1509,7 +1523,13 @@ export function registerFinanceRoutes(app: Express) {
 
       const wsInstance = getWsInstance();
       if (wsInstance) {
+        // Broadcast to all for badge/list updates
         wsInstance.broadcast({ type: "CREDIT_UPDATE", payload: { type: 'investigation_assigned', id, agentId: assignedAgentId } });
+        // Targeted notification to the assigned agent for instant visibility
+        wsInstance.sendToUser(assignedAgentId, {
+          type: "CREDIT_UPDATE",
+          payload: { type: 'enquete_assigned_to_me', enqueteId: enquete.id, demandeId: id, priority },
+        });
       }
 
       // Domain event: investigation assigned/started
@@ -5630,6 +5650,81 @@ export function registerFinanceRoutes(app: Express) {
       type: key.startsWith('billets_') ? 'billet' : 'piece',
     }));
     res.json({ denominations: entries });
+  });
+
+  // =====================================================
+  // LIQUIDITY CHECK — Double validation UI+Backend
+  // =====================================================
+
+  /**
+   * GET /api/liquidity/check
+   * Pré-vérifie la liquidité avant une opération financière.
+   * Permet à l'UI de désactiver les boutons si liquidité insuffisante.
+   *
+   * Query params:
+   * - entityType: "compte" | "session" | "coffre" | "mobile_money"
+   * - entityId: UUID de l'entité
+   * - amount: Montant à vérifier
+   * - operator: "MTN" | "AIRTEL" (requis si entityType=mobile_money)
+   * - agenceId: UUID de l'agence (requis si entityType=mobile_money)
+   *
+   * For cash operations with coffre fallback:
+   * - entityType: "cash_availability"
+   * - sessionId: UUID de la session caisse
+   * - coffreId: UUID du coffre
+   * - amount: Montant à vérifier
+   */
+  app.get("/api/liquidity/check", requireAuth, async (req, res) => {
+    try {
+      const { entityType, entityId, amount, sessionId, coffreId, operator, agenceId } = req.query as Record<string, string>;
+
+      const montant = parseFloat(amount);
+      if (!amount || isNaN(montant) || montant <= 0) {
+        return res.status(400).json({ message: "Le montant doit être un nombre positif." });
+      }
+
+      const { liquidityGuard } = await import("../services/liquidity-guard");
+
+      // Cash availability check (caisse → coffre cascade)
+      if (entityType === "cash_availability") {
+        if (!sessionId || !coffreId) {
+          return res.status(400).json({ message: "sessionId et coffreId sont requis pour cash_availability." });
+        }
+        const result = await liquidityGuard.checkCashAvailability(sessionId, coffreId, montant);
+        return res.json(result);
+      }
+
+      // Mobile Money check
+      if (entityType === "mobile_money") {
+        if (!operator || !agenceId) {
+          return res.status(400).json({ message: "operator et agenceId sont requis pour mobile_money." });
+        }
+        const result = await liquidityGuard.checkMobileMoneyLiquidity(operator as "MTN" | "AIRTEL", agenceId, montant);
+        return res.json(result);
+      }
+
+      // Standard entity checks
+      if (!entityType || !entityId) {
+        return res.status(400).json({ message: "entityType et entityId sont requis." });
+      }
+
+      const validTypes = ["compte", "session", "coffre"];
+      if (!validTypes.includes(entityType)) {
+        return res.status(400).json({ message: `entityType invalide. Valeurs acceptées: ${validTypes.join(", ")}, mobile_money, cash_availability` });
+      }
+
+      const result = await liquidityGuard.requireLiquidity(entityType as any, entityId, montant);
+      res.json(result);
+    } catch (error: any) {
+      if (error instanceof InsufficientFundsError) {
+        return res.status(200).json({
+          allowed: false,
+          ...error.toJSON(),
+        });
+      }
+      logger.error({ err: error }, "Erreur vérification liquidité");
+      res.status(500).json({ message: error.message || "Erreur lors de la vérification de liquidité" });
+    }
   });
 
 }

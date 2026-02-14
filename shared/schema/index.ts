@@ -22,6 +22,7 @@ export * from "./coffres-forts";
 export * from "./evacuation-coffre";
 export * from "./agency_migration";
 export * from "./mobile-money";
+export * from "./mm-fee-schedules";
 export * from "./dossier-credit";
 export * from "./notifications";
 export * from "./agent-modules";

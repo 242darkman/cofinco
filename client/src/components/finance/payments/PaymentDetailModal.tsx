@@ -59,6 +59,12 @@ export interface PaymentDetailData {
   };
   // Allocation details (for credit repayments)
   allocation?: PaymentAllocation;
+  // Cofinco client-facing fees
+  feeOption?: string | null;
+  clientFeeAmount?: string | null;
+  clientFeeRate?: string | null;
+  montantBrut?: string | null;
+  montantNet?: string | null;
   // Agence
   agence?: {
     id: string;
@@ -192,6 +198,44 @@ export function PaymentDetailModal({
               {Number(payment.amount).toLocaleString()} <span className="text-lg text-content-muted">FCFA</span>
             </p>
           </div>
+
+          {/* Fee Breakdown (if Cofinco client fees apply) */}
+          {payment.clientFeeAmount && Number(payment.clientFeeAmount) > 0 && (
+            <div className="bg-accent/5 border border-accent/20 rounded-xl p-4">
+              <h5 className="text-xs font-semibold text-accent mb-3">
+                Détails frais Mobile Money
+              </h5>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-content-muted">Montant brut</span>
+                  <span className="text-content-primary font-medium">
+                    {Number(payment.montantBrut || 0).toLocaleString()} FCFA
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-content-muted">
+                    Frais MM ({payment.clientFeeRate || '0'}%)
+                  </span>
+                  <span className="text-status-warning font-medium">
+                    {Number(payment.clientFeeAmount).toLocaleString()} FCFA
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm pt-2 border-t border-accent/20">
+                  <span className="text-content-muted">
+                    {payment.type === 'COLLECTION' ? 'Montant crédité' : 'Montant reçu'}
+                  </span>
+                  <span className="text-content-primary font-bold">
+                    {Number(payment.montantNet || 0).toLocaleString()} FCFA
+                  </span>
+                </div>
+                <p className="text-[10px] text-content-muted mt-1">
+                  {payment.feeOption === 'CLIENT_PAYS'
+                    ? 'Client paie les frais en plus du montant'
+                    : 'Frais déduits du montant'}
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Transaction Info */}
           <div>

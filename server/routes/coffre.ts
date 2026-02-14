@@ -16,6 +16,7 @@ import { requireAuth } from "../auth";
 import { attachAbility, requireAbility } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
 import { dispatchDomainEvent } from "../services/notifications/domain-events/event-registry";
+import { handleInsufficientFundsError } from "../middleware/financial-validation";
 
 export const coffreRouter = Router();
 const service = new TransfertCoffreService();
@@ -236,6 +237,7 @@ coffreRouter.post(
 
       res.json(result);
     } catch (e: any) {
+      if (handleInsufficientFundsError(e, res)) return;
       res.status(400).json({ error: e.message });
     }
   }
