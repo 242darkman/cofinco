@@ -48,6 +48,7 @@ import { StatutTransaction, TypeCompte, TypeOperationCaisse, TypeOperationTerrai
 import { eq, sql, and, isNull, asc, desc } from "drizzle-orm";
 import { generateReference, updateCreditSolde, updateSessionSolde, type MouvementFinancier } from "../ledger";
 import { postGlForMouvement } from "../accounting-posting-service";
+import { recalculateAgentObjectifs } from "../objectif-recalculation-service";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 
 // Type pour les résultats d'approbation
@@ -123,7 +124,7 @@ export class ApprovalService {
    * TRANSACTIONNEL et IDEMPOTENT
    */
   async approveOperation(params: ApproveOperationInput): Promise<ApprovalResult> {
-    return await db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx) => {
       // 1. Verrouiller l'opération (SELECT FOR UPDATE)
       const [operation] = await tx
         .select()
@@ -235,6 +236,13 @@ export class ApprovalService {
 
       return { success: true, operation: updatedOperation, mouvements };
     });
+
+    // 8. Fire-and-forget: recalculate agent objectives for current period
+    if (result.success && result.operation) {
+      recalculateAgentObjectifs(result.operation.agentId).catch(() => {});
+    }
+
+    return result;
   }
 
   /**

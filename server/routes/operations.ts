@@ -19,6 +19,7 @@ import { db } from "../db";
 import { eq } from "drizzle-orm";
 import { dispatchDomainEvent } from "../services/notifications/domain-events/event-registry";
 import { createClientAccount } from "../storage/finance";
+import { recalculateAgentObjectifs } from "../services/objectif-recalculation-service";
 import type { StatutProspectionType } from "@shared/enum/status-constants";
 
 export function registerOperationsRoutes(app: Express) {
@@ -238,6 +239,11 @@ export function registerOperationsRoutes(app: Express) {
         const wsInstance = getWsInstance();
         if (wsInstance) {
             wsInstance.broadcast({ type: "OPERATIONS_UPDATE", payload: { type: 'prospection_new', id: prospection.id } });
+        }
+
+        // Auto-recalculate agent objectives (fire-and-forget)
+        if (parsed.agentId) {
+          recalculateAgentObjectifs(parsed.agentId).catch(() => {});
         }
 
         res.json(prospection);

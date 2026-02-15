@@ -194,6 +194,15 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
     return () => window.removeEventListener('session-agent-update', handler);
   }, [targetAgentId]);
 
+  // Real-time: refresh KPIs when objectives are auto-recalculated
+  useEffect(() => {
+    const handler = () => {
+      if (targetAgentId) loadKPIs(targetAgentId);
+    };
+    window.addEventListener('agent-modules-update', handler);
+    return () => window.removeEventListener('agent-modules-update', handler);
+  }, [targetAgentId, loadKPIs]);
+
   const loadAgents = async () => {
     try {
       // For non-admin users, first try to get their own agent profile
@@ -317,13 +326,15 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
       fetch(`/api/agent-communications?agentId=${agentId}&lu=false`, { credentials: 'include' }).then(r => r.ok ? r.json() : []),
     ]);
 
-    // Objectifs: average progress %
+    // Objectifs: average progress % (current period only)
     if (fetches[0].status === 'fulfilled') {
-      const objectifs = Array.isArray(fetches[0].value) ? fetches[0].value : [];
+      const allObjectifs = Array.isArray(fetches[0].value) ? fetches[0].value : [];
+      const currentPeriode = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+      const objectifs = allObjectifs.filter((o: any) => o.periode === currentPeriode);
       if (objectifs.length > 0) {
         const totalPct = objectifs.reduce((sum: number, o: any) => {
-          const target = Number(o.target_value || o.targetValue || 1);
-          const current = Number(o.current_value || o.currentValue || 0);
+          const target = Number(o.valeurObjectif || 1);
+          const current = Number(o.valeurRealisee || 0);
           return sum + Math.min((current / target) * 100, 100);
         }, 0);
         kpiState.objectifPct = Math.round(totalPct / objectifs.length);
