@@ -37,6 +37,8 @@ import {
   departments,
   jobPositions,
   avantages,
+  avantagesEmployes,
+  agentObjectifs,
   payslipLines,
   payrollRuns,
   PayrollRunStatus,
@@ -2972,6 +2974,31 @@ hrRouter.patch("/paie/pay", getAuthUser, attachAbility, requireAbility(Actions.M
       const freshRun = (await db.select().from(payrollRuns).where(eq(payrollRuns.id, runId)))[0];
       const payResult = await postRunPayment(freshRun, agenceId, userId);
       glError = payResult.error;
+    }
+
+    // Mark objective prizes as paid for this period
+    try {
+      const eligible = await db.select().from(agentObjectifs).where(and(
+        eq(agentObjectifs.periode, run.period),
+        eq(agentObjectifs.primeStatut, "ELIGIBLE"),
+        isNull(agentObjectifs.deletedAt),
+      ));
+      for (const obj of eligible) {
+        await db.update(agentObjectifs).set({
+          primeStatut: "PAID",
+          updatedAt: new Date(),
+        }).where(eq(agentObjectifs.id, obj.id));
+        if (obj.avantageEmployeId) {
+          await db.update(avantagesEmployes)
+            .set({ statut: "SUSPENDED" })
+            .where(eq(avantagesEmployes.id, obj.avantageEmployeId));
+        }
+      }
+      if (eligible.length > 0) {
+        logger.info({ period: run.period, count: eligible.length }, "Marked objective prizes as PAID");
+      }
+    } catch (prizeErr) {
+      logger.error({ err: prizeErr }, "Failed to mark objective prizes as paid (non-blocking)");
     }
 
     await hrService.logAction(

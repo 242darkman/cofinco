@@ -72,6 +72,12 @@ export const agentObjectifs = pgTable("agent_objectifs", {
   unite: text("unite").notNull().default(DEFAULT_CURRENCY.symbol),
   statut: text("statut").notNull().default("IN_PROGRESS"),
   recompense: numeric("recompense").notNull().default("0"),
+  // Lien vers la config de prime (catalogue avantages RH)
+  avantageId: integer("avantage_id"),
+  // Lien vers l'enregistrement avantagesEmployes créé quand la prime est éligible
+  avantageEmployeId: integer("avantage_employe_id"),
+  // Cycle de vie prime : NONE | PENDING | ELIGIBLE | PAID
+  primeStatut: text("prime_statut").notNull().default("NONE"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   deletedAt: timestamp("deleted_at"),

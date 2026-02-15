@@ -4,7 +4,8 @@ import { StatutObjectif } from '@shared/enum/status-constants';
 import { ALL_STATUS_LABELS } from '@/lib/status-labels';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../ui/sheet';
 import { authService } from '../../lib/auth';
-import { currencySymbol } from '@shared/config/currency';
+import { currencySymbol, formatMoney } from '@shared/config/currency';
+import { useAvantages, type Avantage } from '../../hooks/hr/useAvantages';
 
 interface Objectif {
   id: string;
@@ -16,6 +17,9 @@ interface Objectif {
   unite: string;
   statut: string;
   recompense: number;
+  avantageId: number | null;
+  avantageEmployeId: number | null;
+  primeStatut: string;
   createdAt: string;
   agent?: {
     nom: string;
@@ -42,13 +46,17 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
   const [selectedObjectif, setSelectedObjectif] = useState<Objectif | null>(null);
   const [updateValue, setUpdateValue] = useState<string>('');
 
+  // Load available PERFORMANCE prize configs
+  const { avantagesList } = useAvantages();
+  const primeConfigs = avantagesList.filter((a: Avantage) => a.categorie === 'PERFORMANCE');
+
   const [formData, setFormData] = useState({
     agent_id: agentId || '',
     periode: new Date().toISOString().slice(0, 7),
     type_objectif: 'Collecte',
     valeur_objectif: 0,
     unite: currencySymbol(),
-    recompense: 0
+    avantageId: null as number | null,
   });
 
   useEffect(() => {
@@ -80,11 +88,19 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
     e.preventDefault();
     setLoading(true);
     try {
+      const body = {
+        agentId: formData.agent_id,
+        periode: formData.periode,
+        typeObjectif: formData.type_objectif,
+        valeurObjectif: String(formData.valeur_objectif),
+        unite: formData.unite,
+        avantageId: formData.avantageId,
+      };
       const response = await fetch('/api/agent-objectifs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ ...formData, valeur_realisee: 0, statut: 'IN_PROGRESS' })
+        body: JSON.stringify(body)
       });
       if (!response.ok) {
         const error = await response.json();
@@ -98,7 +114,7 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
         type_objectif: 'Collecte',
         valeur_objectif: 0,
         unite: currencySymbol(),
-        recompense: 0
+        avantageId: null,
       });
     } catch (error: any) {
       alert('Erreur: ' + error.message);
@@ -180,7 +196,7 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
         <StatCard icon={<Target size={14} />} label={canManage ? "Total Objectifs" : "Mes Objectifs"} value={objectifs.length.toString()} color="blue" />
         <StatCard icon={<Check size={14} />} label="Atteints" value={objectifsAtteints.toString()} color="green" />
-        <StatCard icon={<DollarSign size={14} />} label={canManage ? "Primes" : "Mes Primes"} value={`${(totalRecompenses / 1000).toFixed(0)}k ${currencySymbol()}`} color="emerald" />
+        <StatCard icon={<DollarSign size={14} />} label={canManage ? "Primes" : "Mes Primes"} value={formatMoney(totalRecompenses, { compact: true })} color="emerald" />
         <StatCard icon={<TrendingUp size={14} />} label="Réussite" value={`${tauxReussite.toFixed(0)}%`} color="cyan" />
       </div>
 
@@ -238,8 +254,19 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
                   <option value={currencySymbol()}>{currencySymbol()}</option><option value="Clients">Clients</option><option value="Visites">Visites</option><option value="%">%</option><option value="Points">Points</option>
                 </select>
               </FormField>
-              <FormField label={`Prime (${currencySymbol()})`}>
-                <input type="text" inputMode="numeric" value={formData.recompense || ''} onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormData({ ...formData, recompense: v ? Number(v) : 0 }); }} className="w-full px-2 py-1.5 bg-surface border border-edge rounded-lg text-content-primary text-xs" placeholder="0" />
+              <FormField label="Prime liée">
+                <select
+                  value={formData.avantageId ?? ''}
+                  onChange={(e) => setFormData({ ...formData, avantageId: e.target.value ? Number(e.target.value) : null })}
+                  className="w-full px-2 py-1.5 bg-surface border border-edge rounded-lg text-content-primary text-xs"
+                >
+                  <option value="">Sans prime</option>
+                  {primeConfigs.map((a: Avantage) => (
+                    <option key={a.id} value={a.id}>
+                      {a.nom} — {a.modeCalcul === 'POURCENTAGE' ? `${a.pourcentage}%` : `${Number(a.montantParDefaut).toLocaleString()} ${currencySymbol()}`}
+                    </option>
+                  ))}
+                </select>
               </FormField>
             </div>
             <button type="submit" disabled={loading} className="w-full py-2 bg-status-info hover:bg-status-info text-white rounded-lg font-bold text-xs mt-2 flex items-center justify-center gap-2">
@@ -304,11 +331,27 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
                       <span className="mx-1">/</span>
                       <span>{Number(obj.valeurObjectif).toLocaleString()} {obj.unite}</span>
                    </div>
-                   {Number(obj.recompense) > 0 && (
-                     <div className="flex items-center gap-1 text-status-success font-bold bg-status-success-bg px-2 py-0.5 rounded">
-                       <DollarSign size={10} /> {Number(obj.recompense / 1000).toFixed(0)}k
-                     </div>
-                   )}
+                   <div className="flex items-center gap-1.5">
+                     {obj.primeStatut && obj.primeStatut !== 'NONE' && (
+                       <span className={`inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                         obj.primeStatut === 'PAID'
+                           ? 'bg-status-success/10 text-status-success'
+                           : obj.primeStatut === 'ELIGIBLE'
+                             ? 'bg-status-warning/10 text-status-warning'
+                             : 'bg-surface-elevated text-content-muted'
+                       }`}>
+                         <Award size={8} />
+                         {obj.primeStatut === 'PAID' ? 'Versée'
+                           : obj.primeStatut === 'ELIGIBLE' ? 'Éligible'
+                           : 'En attente'}
+                       </span>
+                     )}
+                     {Number(obj.recompense) > 0 && (
+                       <div className="flex items-center gap-1 text-status-success font-bold bg-status-success-bg px-2 py-0.5 rounded">
+                         <DollarSign size={10} /> {formatMoney(obj.recompense, { compact: true })}
+                       </div>
+                     )}
+                   </div>
                 </div>
               </div>
             );
@@ -363,7 +406,17 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
                 <div className="grid grid-cols-2 gap-3">
                   <InfoItem label="Objectif" value={`${selectedObjectif.valeurObjectif.toLocaleString()} ${selectedObjectif.unite}`} />
                   <InfoItem label="Réalisé" value={`${selectedObjectif.valeurRealisee.toLocaleString()} ${selectedObjectif.unite}`} />
-                  <InfoItem label="Récompense" value={`${selectedObjectif.recompense.toLocaleString()} ${currencySymbol()}`} />
+                  <InfoItem
+                    label="Prime"
+                    value={selectedObjectif.avantageId
+                      ? `${formatMoney(selectedObjectif.recompense)} (${
+                          selectedObjectif.primeStatut === 'PAID' ? 'Versée via salaire' :
+                          selectedObjectif.primeStatut === 'ELIGIBLE' ? 'Prochaine paie' :
+                          selectedObjectif.primeStatut === 'PENDING' ? 'Atteinte requise' : '—'
+                        })`
+                      : 'Aucune prime'
+                    }
+                  />
                   <InfoItem label="Reste à faire" value={`${Math.max(0, selectedObjectif.valeurObjectif - selectedObjectif.valeurRealisee).toLocaleString()} ${selectedObjectif.unite}`} />
                 </div>
 

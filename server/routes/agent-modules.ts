@@ -38,9 +38,13 @@ import {
   paiementsTerrain,
   visitesTerrain,
   prospections,
+  avantages,
+  avantagesEmployes,
+  type AgentObjectif,
 } from "@shared/schema";
 import { getWsInstance } from "../ws-server";
 import { logAudit } from "../audit";
+import { calculateObjectifPrize } from "../services/objectif-recalculation-service";
 
 // Helper to get user from request
 function getUser(req: Request): { id: string; agenceId?: string } | null {
@@ -371,9 +375,23 @@ export function registerAgentModulesRoutes(app: Express) {
   app.post("/api/agent-objectifs", requireAuth, async (req: Request, res: Response) => {
     try {
       const parsed = insertAgentObjectifSchema.parse(req.body);
-      const [row] = await db.insert(agentObjectifs).values(parsed).returning();
 
-      logAudit(req, "CREATE", "agent_objectif", row.id, { agentId: parsed.agentId, periode: parsed.periode });
+      // Auto-calculate prize from linked avantage config
+      let recompense = parsed.recompense || "0";
+      let primeStatut = "NONE";
+      if (parsed.avantageId) {
+        const montant = await calculateObjectifPrize(parsed.avantageId, parsed.agentId);
+        recompense = String(montant);
+        primeStatut = "PENDING";
+      }
+
+      const [row] = await db.insert(agentObjectifs).values({
+        ...parsed,
+        recompense,
+        primeStatut,
+      }).returning();
+
+      logAudit(req, "CREATE", "agent_objectif", row.id, { agentId: parsed.agentId, periode: parsed.periode, avantageId: parsed.avantageId });
 
       const ws = getWsInstance();
       if (ws) ws.broadcast({ type: "AGENT_MODULES_UPDATE", payload: { entity: "objectif", action: "created", id: row.id } });
@@ -389,6 +407,24 @@ export function registerAgentModulesRoutes(app: Express) {
     try {
       const { id } = req.params;
       const updates = req.body;
+
+      // If avantageId changes, recalculate the prize
+      if (updates.avantageId !== undefined) {
+        // Need the objective's agentId for calculation
+        const [current] = await db.select().from(agentObjectifs)
+          .where(and(eq(agentObjectifs.id, id), isNull(agentObjectifs.deletedAt)));
+        if (!current) return res.status(404).json({ error: "Objectif non trouvé" });
+
+        if (updates.avantageId) {
+          const montant = await calculateObjectifPrize(updates.avantageId, current.agentId);
+          updates.recompense = String(montant);
+          if (!updates.primeStatut) updates.primeStatut = "PENDING";
+        } else {
+          updates.recompense = "0";
+          updates.primeStatut = "NONE";
+        }
+      }
+
       const [row] = await db.update(agentObjectifs)
         .set({ ...updates, updatedAt: new Date() })
         .where(and(eq(agentObjectifs.id, id), isNull(agentObjectifs.deletedAt)))
@@ -495,7 +531,7 @@ export function registerAgentModulesRoutes(app: Express) {
   }
 
   /**
-   * Apply computed value to an objectif: update DB + return updated row.
+   * Apply computed value to an objectif: update DB + derive status + handle prize eligibility.
    */
   async function applyRecalculation(objectifId: string, valeurRealisee: number, valeurObjectif: number) {
     const target = Number(valeurObjectif || 1);
@@ -504,10 +540,49 @@ export function registerAgentModulesRoutes(app: Express) {
     if (pct >= 110) statut = "Depasse";
     else if (pct >= 100) statut = "Atteint";
 
+    const [currentObj] = await db.select().from(agentObjectifs).where(eq(agentObjectifs.id, objectifId));
+    if (!currentObj) return null;
+
+    const wasAchieved = currentObj.statut === "Atteint" || currentObj.statut === "Depasse";
+    const isNowAchieved = statut === "Atteint" || statut === "Depasse";
+
+    let primeStatut = currentObj.primeStatut || "NONE";
+    let avantageEmployeId = currentObj.avantageEmployeId;
+
+    // Transition: non-achieved → achieved with linked prize
+    if (!wasAchieved && isNowAchieved && currentObj.avantageId && primeStatut === "PENDING") {
+      const montant = Number(currentObj.recompense) || 0;
+      if (montant > 0) {
+        const [agent] = await db.select().from(agentsTerrain).where(eq(agentsTerrain.id, currentObj.agentId));
+        if (agent?.employeId) {
+          const dateAttribution = `${currentObj.periode}-01`;
+          const [assigned] = await db.insert(avantagesEmployes).values({
+            employeId: agent.employeId,
+            avantageId: currentObj.avantageId,
+            montant,
+            statut: "ACTIVE",
+            dateAttribution,
+          }).returning();
+          avantageEmployeId = assigned.id;
+          primeStatut = "ELIGIBLE";
+        }
+      }
+    }
+
+    // Reverse transition (data correction): achieved → not achieved
+    if (wasAchieved && !isNowAchieved && primeStatut === "ELIGIBLE" && avantageEmployeId) {
+      await db.update(avantagesEmployes)
+        .set({ statut: "SUSPENDED" })
+        .where(eq(avantagesEmployes.id, avantageEmployeId));
+      primeStatut = "PENDING";
+    }
+
     const [updated] = await db.update(agentObjectifs)
       .set({
         valeurRealisee: String(valeurRealisee),
         statut,
+        primeStatut,
+        avantageEmployeId,
         updatedAt: new Date(),
       })
       .where(eq(agentObjectifs.id, objectifId))

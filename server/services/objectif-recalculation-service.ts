@@ -10,9 +10,14 @@
 import { db } from "../db";
 import {
   agentObjectifs,
+  type AgentObjectif,
   paiementsTerrain,
   visitesTerrain,
   prospections,
+  avantages,
+  avantagesEmployes,
+  agentsTerrain,
+  employes,
 } from "@shared/schema";
 import { eq, and, isNull, gte, lt, ne, sql } from "drizzle-orm";
 import { getWsInstance } from "../ws-server";
@@ -111,7 +116,57 @@ async function computeObjectifValue(
 }
 
 /**
- * Apply a computed value to an objective: update DB + derive status.
+ * Calculate the prize amount from a linked avantage config.
+ * Exported for use by routes.
+ */
+export async function calculateObjectifPrize(avantageId: number, agentId: string): Promise<number> {
+  const [av] = await db.select().from(avantages)
+    .where(and(eq(avantages.id, avantageId), eq(avantages.actif, true)));
+  if (!av) return 0;
+
+  if (av.modeCalcul === "POURCENTAGE") {
+    const [agent] = await db.select().from(agentsTerrain).where(eq(agentsTerrain.id, agentId));
+    if (!agent?.employeId) return Number(av.montantParDefaut || 0);
+    const [emp] = await db.select().from(employes).where(eq(employes.id, agent.employeId));
+    if (!emp) return 0;
+    const pct = Number(av.pourcentage) || 0;
+    let montant = Math.round((pct / 100) * Number(emp.salaireBase || 0));
+    if (av.plafond && montant > Number(av.plafond)) montant = Number(av.plafond);
+    return montant;
+  }
+  return Number(av.montantParDefaut || 0);
+}
+
+/**
+ * Create an avantagesEmployes record so the payroll engine picks up the prize.
+ * Uses PONCTUEL frequency + dateAttribution matching for correct month targeting.
+ */
+async function createPrizeEligibility(objectif: AgentObjectif): Promise<number | null> {
+  if (!objectif.avantageId) return null;
+  const montant = Number(objectif.recompense) || 0;
+  if (montant <= 0) return null;
+
+  const [agent] = await db.select().from(agentsTerrain).where(eq(agentsTerrain.id, objectif.agentId));
+  if (!agent?.employeId) {
+    logger.warn({ agentId: objectif.agentId }, "Agent sans employeId, prime non applicable au salaire");
+    return null;
+  }
+
+  const dateAttribution = `${objectif.periode}-01`;
+
+  const [assigned] = await db.insert(avantagesEmployes).values({
+    employeId: agent.employeId,
+    avantageId: objectif.avantageId,
+    montant,
+    statut: "ACTIVE",
+    dateAttribution,
+  }).returning();
+
+  return assigned.id;
+}
+
+/**
+ * Apply a computed value to an objective: update DB + derive status + handle prize eligibility.
  */
 async function applyRecalculation(objectifId: string, valeurRealisee: number, valeurObjectif: number) {
   const target = Number(valeurObjectif || 1);
@@ -120,10 +175,39 @@ async function applyRecalculation(objectifId: string, valeurRealisee: number, va
   if (pct >= 110) statut = "Depasse";
   else if (pct >= 100) statut = "Atteint";
 
+  const [currentObj] = await db.select().from(agentObjectifs).where(eq(agentObjectifs.id, objectifId));
+  if (!currentObj) return;
+
+  const wasAchieved = currentObj.statut === "Atteint" || currentObj.statut === "Depasse";
+  const isNowAchieved = statut === "Atteint" || statut === "Depasse";
+
+  let primeStatut = currentObj.primeStatut || "NONE";
+  let avantageEmployeId = currentObj.avantageEmployeId;
+
+  // Transition: non-achieved → achieved with linked prize
+  if (!wasAchieved && isNowAchieved && currentObj.avantageId && primeStatut === "PENDING") {
+    const aeId = await createPrizeEligibility(currentObj);
+    if (aeId) {
+      avantageEmployeId = aeId;
+      primeStatut = "ELIGIBLE";
+    }
+  }
+
+  // Reverse transition (data correction): achieved → not achieved
+  if (wasAchieved && !isNowAchieved && primeStatut === "ELIGIBLE" && avantageEmployeId) {
+    await db.update(avantagesEmployes)
+      .set({ statut: "SUSPENDED" })
+      .where(eq(avantagesEmployes.id, avantageEmployeId));
+    primeStatut = "PENDING";
+  }
+  // If PAID: never revert (salary already paid)
+
   await db.update(agentObjectifs)
     .set({
       valeurRealisee: String(valeurRealisee),
       statut,
+      primeStatut,
+      avantageEmployeId,
       updatedAt: new Date(),
     })
     .where(eq(agentObjectifs.id, objectifId));
