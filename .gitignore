@@ -10,6 +10,8 @@ vite.config.ts.*
 /logs
 .local
 .config
+/client/dev-dist
+/client/dev-dist/sw.js
 
 deploy_key
 deploy_key.pub
