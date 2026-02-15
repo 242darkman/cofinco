@@ -1,12 +1,11 @@
 import { useState, useCallback } from 'react';
 import { View, Text, FlatList, TextInput, Pressable, ActivityIndicator } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { api } from '@/lib/api-client';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
-import { Card } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/loading';
 
 interface ClientResult {
@@ -23,8 +22,12 @@ interface ClientResult {
 
 export default function ClientSearchScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ target?: string }>();
   const scheme = useColorScheme();
   const colors = Colors[scheme];
+
+  // target can be 'deposit' (default), 'withdrawal', or anything else
+  const target = params.target || 'deposit';
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<ClientResult[]>([]);
@@ -48,21 +51,24 @@ export default function ClientSearchScreen() {
   }, [query]);
 
   const selectClient = (client: ClientResult) => {
-    router.push({
-      pathname: '/(agent)/deposit',
-      params: {
-        clientId: client.id,
-        clientNom: `${client.prenom ?? ''} ${client.nom}`.trim(),
-        clientTelephone: client.telephone,
-      },
-    });
+    const clientParams = {
+      clientId: client.id,
+      clientNom: `${client.prenom ?? ''} ${client.nom}`.trim(),
+      clientTelephone: client.telephone,
+    };
+
+    if (target === 'withdrawal') {
+      router.push({ pathname: '/(agent)/withdrawal', params: clientParams });
+    } else {
+      router.push({ pathname: '/(agent)/deposit', params: clientParams });
+    }
   };
 
   return (
     <View className="flex-1 bg-bg-base">
       {/* Search bar */}
       <View className="px-5 pt-4 pb-3">
-        <View className="flex-row items-center bg-input border border-input-border rounded-xl px-3">
+        <View className="flex-row items-center bg-input-bg border border-input-border rounded-xl px-3">
           <Ionicons name="search" size={20} color={colors.textMuted} />
           <TextInput
             className="flex-1 py-3 px-2 text-text-primary text-base"
