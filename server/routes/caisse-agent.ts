@@ -102,7 +102,7 @@ const cancelOperationSchema = z.object({
 const listOperationsQuerySchema = z.object({
   agentId: z.string().uuid().optional(),
   clientId: z.string().uuid().optional(),
-  statut: z.enum(["SUBMITTED", "APPROVED", "SETTLED", "REJECTED", "CANCELLED"]).optional(),
+  statut: z.enum(["SUBMITTED", "APPROVED", "PENDING_SETTLEMENT", "SETTLED", "REJECTED", "CANCELLED"]).optional(),
   type: z.enum(["COLLECT_CASH", "SETTLEMENT_CASH", "PROVISIONING", "SESSION_CLOSE"]).optional(),
   dateFrom: z.string().datetime().optional(),
   dateTo: z.string().datetime().optional(),
@@ -634,7 +634,7 @@ caisseAgentRouter.get(
       const parsed = z.object({
         limit: z.coerce.number().min(1).max(100).default(50),
         offset: z.coerce.number().min(0).default(0),
-        statut: z.enum(["SUBMITTED", "APPROVED", "SETTLED", "REJECTED", "CANCELLED"]).optional(),
+        statut: z.enum(["SUBMITTED", "APPROVED", "PENDING_SETTLEMENT", "SETTLED", "REJECTED", "CANCELLED"]).optional(),
       }).safeParse(req.query);
 
       if (!parsed.success) {

@@ -2843,11 +2843,11 @@ export interface OperationTerrainFilters {
   agentId?: string;
   clientId?: string;
   type?: 'COLLECT_CASH' | 'SETTLEMENT_CASH';
-  statut?: 'SUBMITTED' | 'APPROVED' | 'SETTLED' | 'REJECTED' | 'CANCELLED';
-  dateDebut?: string;
-  dateFin?: string;
+  statut?: 'SUBMITTED' | 'APPROVED' | 'PENDING_SETTLEMENT' | 'SETTLED' | 'REJECTED' | 'CANCELLED';
+  dateFrom?: string;
+  dateTo?: string;
   limit?: number;
-  page?: number;
+  offset?: number;
 }
 
 /**
@@ -2892,10 +2892,10 @@ export const caisseAgentApi = {
     if (filters?.clientId) queryParams.append('clientId', filters.clientId);
     if (filters?.type) queryParams.append('type', filters.type);
     if (filters?.statut) queryParams.append('statut', filters.statut);
-    if (filters?.dateDebut) queryParams.append('dateDebut', filters.dateDebut);
-    if (filters?.dateFin) queryParams.append('dateFin', filters.dateFin);
+    if (filters?.dateFrom) queryParams.append('dateFrom', filters.dateFrom);
+    if (filters?.dateTo) queryParams.append('dateTo', filters.dateTo);
     if (filters?.limit) queryParams.append('limit', String(filters.limit));
-    if (filters?.page) queryParams.append('page', String(filters.page));
+    if (filters?.offset) queryParams.append('offset', String(filters.offset));
     const query = queryParams.toString();
     return request<OperationTerrainListResponse>(`/caisse-agent/operations-terrain${query ? `?${query}` : ''}`);
   },

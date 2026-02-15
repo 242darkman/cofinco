@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { requestAllPages } from '../../lib/api-client';
-import { FileText, Download, TrendingUp, Users, DollarSign, Activity, BarChart3, Filter, ChevronLeft, ChevronRight, Eye, Calendar, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { requestListAll, caisseAgentApi } from '../../lib/api-client';
+import { FileText, Download, Users, DollarSign, Activity, BarChart3, Filter, ChevronLeft, ChevronRight, Eye, Loader2 } from 'lucide-react';
 import { addPdfLogoHeader } from '@/lib/pdf-logo';
 import { useBranding } from '@/contexts/BrandingContext';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { toast } from '../../lib/toast';
 import { loadPDFLibraries } from '@/lib/lazy-export';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../ui/sheet';
@@ -30,6 +31,7 @@ interface Rapport {
 
 export default function AgentRapports({ agentId }: { agentId?: string }) {
   const { branding } = useBranding();
+  const { fmt, label: currencyLabel } = useCurrency();
   const [rapports, setRapports] = useState<Rapport[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -45,29 +47,36 @@ export default function AgentRapports({ agentId }: { agentId?: string }) {
   // Detail Sheet
   const [selectedRapport, setSelectedRapport] = useState<Rapport | null>(null);
 
+  // Sync selectedAgent when agentId prop changes
   useEffect(() => {
-    loadRapports();
-  }, [selectedAgent, periodeDu, periodeAu, typeRapport]);
+    if (agentId) {
+      setSelectedAgent(agentId);
+    }
+  }, [agentId]);
 
-  const loadRapports = async () => {
+  const loadRapports = useCallback(async () => {
     try {
       setLoading(true);
-      let url = '/api/agent-rapports?';
-      if (selectedAgent) url += `agent_id=${selectedAgent}&`;
-      if (typeRapport !== 'all') url += `type_rapport=${typeRapport}&`;
-      
-      const response = await fetch(url);
-      if (response.ok) {
-        const data = await response.json();
-        setRapports(data || []);
-        setCurrentPage(1);
-      }
+      const params: Record<string, unknown> = {};
+      if (selectedAgent) params.agent_id = selectedAgent;
+      if (typeRapport !== 'all') params.type_rapport = typeRapport;
+      if (periodeDu) params.periode_du = periodeDu;
+      if (periodeAu) params.periode_au = periodeAu;
+
+      const data = await requestListAll<Rapport>('/agent-rapports', params);
+      setRapports(data || []);
+      setCurrentPage(1);
     } catch (error) {
-      console.error('Erreur:', error);
+      console.error('Erreur chargement rapports:', error);
+      toast.error('Erreur lors du chargement des rapports');
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedAgent, typeRapport, periodeDu, periodeAu]);
+
+  useEffect(() => {
+    loadRapports();
+  }, [loadRapports]);
 
   const genererRapport = async () => {
     if (!selectedAgent) {
@@ -77,33 +86,64 @@ export default function AgentRapports({ agentId }: { agentId?: string }) {
 
     setGenerating(true);
     try {
-      const [visites, paiements] = await Promise.all([
-        requestAllPages('/visites-terrain', { agent_id: selectedAgent, date_debut: periodeDu, date_fin: periodeAu }),
-        requestAllPages('/paiements-terrain', { agent_id: selectedAgent, date_debut: periodeDu, date_fin: periodeAu })
+      // Fetch real operations from caisse-agent system
+      // After approval: COLLECT_CASH → PENDING_SETTLEMENT, SETTLEMENT_CASH → SETTLED
+      const [collectesPending, collectesSettled, remises] = await Promise.all([
+        caisseAgentApi.listOperations({
+          agentId: selectedAgent,
+          type: 'COLLECT_CASH',
+          statut: 'PENDING_SETTLEMENT',
+          dateFrom: `${periodeDu}T00:00:00Z`,
+          dateTo: `${periodeAu}T23:59:59Z`,
+          limit: 100,
+        }),
+        caisseAgentApi.listOperations({
+          agentId: selectedAgent,
+          type: 'COLLECT_CASH',
+          statut: 'SETTLED',
+          dateFrom: `${periodeDu}T00:00:00Z`,
+          dateTo: `${periodeAu}T23:59:59Z`,
+          limit: 100,
+        }),
+        caisseAgentApi.listOperations({
+          agentId: selectedAgent,
+          type: 'SETTLEMENT_CASH',
+          statut: 'SETTLED',
+          dateFrom: `${periodeDu}T00:00:00Z`,
+          dateTo: `${periodeAu}T23:59:59Z`,
+          limit: 100,
+        }),
       ]);
 
-      const nombre_visites = visites?.length || 0;
-      const nombre_collectes = paiements?.length || 0;
-      const montant_total_collecte = paiements?.reduce((sum: number, p: any) => sum + (p.montant || 0), 0) || 0;
-      const taux_reussite = nombre_visites > 0 ? (nombre_collectes / nombre_visites) * 100 : 0;
+      const allCollectes = [
+        ...(collectesPending.operations || []),
+        ...(collectesSettled.operations || []),
+      ];
+      const nombreCollectes = allCollectes.length;
+      const nombreVisites = nombreCollectes + (remises.operations?.length || 0);
+      const montantTotalCollecte = allCollectes.reduce(
+        (sum: number, op: any) => sum + (Number(op.montant) || 0), 0
+      );
+      const tauxReussite = nombreVisites > 0 ? (nombreCollectes / nombreVisites) * 100 : 0;
 
       const response = await fetch('/api/agent-rapports', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
-          agent_id: selectedAgent,
-          periode_debut: periodeDu,
-          periode_fin: periodeAu,
-          type_rapport: typeRapport,
-          nombre_visites,
-          nombre_collectes,
-          montant_total_collecte,
-          taux_reussite,
-          clients_nouveaux: 0,
+          agentId: selectedAgent,
+          periodeDebut: periodeDu,
+          periodeFin: periodeAu,
+          typeRapport,
+          nombreVisites,
+          nombreCollectes,
+          montantTotalCollecte: String(montantTotalCollecte),
+          tauxReussite: String(tauxReussite),
+          clientsNouveaux: 0,
           incidents: 0,
-          kmParcourus: 0,
-          notes: `Rapport généré automatiquement`
-        })
+          kmParcourus: '0',
+          notes: 'Rapport généré automatiquement',
+        }),
       });
 
       if (!response.ok) throw new Error('Erreur lors de la création du rapport');
@@ -130,19 +170,19 @@ export default function AgentRapports({ agentId }: { agentId?: string }) {
 
     doc.setFontSize(10);
     doc.setTextColor(51, 65, 85);
-    doc.text(`Visites: ${totalVisites} | Collectes: ${totalCollectes} | Montant: ${totalMontant.toLocaleString()} FCFA | Taux: ${tauxMoyen.toFixed(1)}%`, 14, startY);
+    doc.text(`Visites: ${totalVisites} | Collectes: ${totalCollectes} | Montant: ${fmt(totalMontant)} | Taux: ${tauxMoyen.toFixed(1)}%`, 14, startY);
 
     autoTable(doc, {
       startY: startY + 8,
-      head: [['Période', 'Type', 'Visites', 'Collectes', 'Montant (FCFA)', 'Taux (%)', 'KM']],
+      head: [['Période', 'Type', 'Visites', 'Collectes', currencyLabel('Montant'), 'Taux (%)', 'KM']],
       body: rapports.map(r => [
         `${new Date(r.periodeDebut).toLocaleDateString('fr-FR')} - ${new Date(r.periodeFin).toLocaleDateString('fr-FR')}`,
         r.typeRapport,
         r.nombreVisites,
         r.nombreCollectes,
-        r.montantTotalCollecte.toLocaleString(),
-        r.tauxReussite.toFixed(1),
-        r.kmParcourus.toFixed(1)
+        fmt(Number(r.montantTotalCollecte)),
+        Number(r.tauxReussite).toFixed(1),
+        Number(r.kmParcourus).toFixed(1)
       ]),
       styles: { fontSize: 8 },
       headStyles: { fillColor: [37, 99, 235] },
@@ -153,9 +193,9 @@ export default function AgentRapports({ agentId }: { agentId?: string }) {
 
   const totalVisites = rapports.reduce((sum, r) => sum + r.nombreVisites, 0);
   const totalCollectes = rapports.reduce((sum, r) => sum + r.nombreCollectes, 0);
-  const totalMontant = rapports.reduce((sum, r) => sum + r.montantTotalCollecte, 0);
+  const totalMontant = rapports.reduce((sum, r) => sum + Number(r.montantTotalCollecte), 0);
   const tauxMoyen = rapports.length > 0
-    ? rapports.reduce((sum, r) => sum + r.tauxReussite, 0) / rapports.length
+    ? rapports.reduce((sum, r) => sum + Number(r.tauxReussite), 0) / rapports.length
     : 0;
 
   // Pagination Logic
@@ -168,7 +208,7 @@ export default function AgentRapports({ agentId }: { agentId?: string }) {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
         <StatCard icon={<Users size={14} />} label="Visites" value={totalVisites.toString()} color="blue" />
         <StatCard icon={<Activity size={14} />} label="Collectes" value={totalCollectes.toString()} color="green" />
-        <StatCard icon={<DollarSign size={14} />} label="Montant" value={`${totalMontant.toLocaleString()} FC`} color="emerald" />
+        <StatCard icon={<DollarSign size={14} />} label="Montant" value={fmt(totalMontant)} color="emerald" />
         <StatCard icon={<BarChart3 size={14} />} label="Taux Moyen" value={`${tauxMoyen.toFixed(1)}%`} color="cyan" />
       </div>
 
@@ -281,14 +321,14 @@ export default function AgentRapports({ agentId }: { agentId?: string }) {
                     </td>
                     <td className="px-3 py-2 text-right text-xs text-content-secondary hidden sm:table-cell">{rapport.nombreVisites}</td>
                     <td className="px-3 py-2 text-right text-xs text-status-success hidden md:table-cell">{rapport.nombreCollectes}</td>
-                    <td className="px-3 py-2 text-right text-xs text-content-primary font-bold">{rapport.montantTotalCollecte.toLocaleString()}</td>
+                    <td className="px-3 py-2 text-right text-xs text-content-primary font-bold">{fmt(Number(rapport.montantTotalCollecte))}</td>
                     <td className="px-3 py-2 text-right text-xs hidden lg:table-cell">
                       <span className={`font-bold ${
-                        rapport.tauxReussite >= 80 ? 'text-status-success' :
-                        rapport.tauxReussite >= 60 ? 'text-accent' :
+                        Number(rapport.tauxReussite) >= 80 ? 'text-status-success' :
+                        Number(rapport.tauxReussite) >= 60 ? 'text-accent' :
                         'text-status-warning'
                       }`}>
-                        {rapport.tauxReussite.toFixed(1)}%
+                        {Number(rapport.tauxReussite).toFixed(1)}%
                       </span>
                     </td>
                     <td className="px-3 py-2 text-right">
@@ -344,15 +384,15 @@ export default function AgentRapports({ agentId }: { agentId?: string }) {
                 {/* Main Summary Card */}
                 <div className="bg-surface-base/50 border border-edge rounded-xl p-4 text-center">
                   <div className="text-xs text-content-muted uppercase font-bold mb-1">Montant Total Collecté</div>
-                  <div className="text-2xl font-bold text-content-primary">{selectedRapport.montantTotalCollecte.toLocaleString()} FCFA</div>
+                  <div className="text-2xl font-bold text-content-primary">{fmt(Number(selectedRapport.montantTotalCollecte))}</div>
                 </div>
 
                 {/* Stats Grid */}
                 <div className="grid grid-cols-2 gap-3">
                   <InfoItem label="Visites" value={selectedRapport.nombreVisites.toString()} />
                   <InfoItem label="Collectes" value={selectedRapport.nombreCollectes.toString()} />
-                  <InfoItem label="Taux Réussite" value={`${selectedRapport.tauxReussite.toFixed(1)}%`} />
-                  <InfoItem label="KM Parcourus" value={`${selectedRapport.kmParcourus.toFixed(1)} km`} />
+                  <InfoItem label="Taux Réussite" value={`${Number(selectedRapport.tauxReussite).toFixed(1)}%`} />
+                  <InfoItem label="KM Parcourus" value={`${Number(selectedRapport.kmParcourus).toFixed(1)} km`} />
                   <InfoItem label="Nouveaux Clients" value={selectedRapport.clientsNouveaux.toString()} />
                   <InfoItem label="Incidents" value={selectedRapport.incidents.toString()} />
                 </div>

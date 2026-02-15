@@ -34,7 +34,7 @@ import {
   insertFormationSchema,
 } from "@shared/schema";
 import { SystemRole } from "@shared/types/roles";
-import { eq, and, isNull, desc, sql, gte, lt, ne } from "drizzle-orm";
+import { eq, and, isNull, desc, sql, gte, lte, lt, ne } from "drizzle-orm";
 import { z } from "zod";
 import {
   paiementsTerrain,
@@ -1093,7 +1093,7 @@ export function registerAgentModulesRoutes(app: Express) {
 
   app.get("/api/agent-rapports", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { agent_id, type_rapport } = req.query;
+      const { agent_id, type_rapport, periode_du, periode_au } = req.query;
       const conditions = [isNull(agentRapports.deletedAt)];
 
       if (agent_id && typeof agent_id === "string") {
@@ -1101,6 +1101,12 @@ export function registerAgentModulesRoutes(app: Express) {
       }
       if (type_rapport && typeof type_rapport === "string" && type_rapport !== "all") {
         conditions.push(eq(agentRapports.typeRapport, type_rapport));
+      }
+      if (periode_du && typeof periode_du === "string") {
+        conditions.push(gte(agentRapports.periodeDebut, periode_du));
+      }
+      if (periode_au && typeof periode_au === "string") {
+        conditions.push(lte(agentRapports.periodeFin, periode_au));
       }
 
       const rows = await db.select().from(agentRapports)
@@ -1115,7 +1121,12 @@ export function registerAgentModulesRoutes(app: Express) {
 
   app.post("/api/agent-rapports", requireAuth, async (req: Request, res: Response) => {
     try {
-      const parsed = insertAgentRapportSchema.parse(req.body);
+      const body = { ...req.body };
+      // Coerce numeric fields to strings (Drizzle numeric columns map to z.string())
+      if (typeof body.montantTotalCollecte === 'number') body.montantTotalCollecte = String(body.montantTotalCollecte);
+      if (typeof body.tauxReussite === 'number') body.tauxReussite = String(body.tauxReussite);
+      if (typeof body.kmParcourus === 'number') body.kmParcourus = String(body.kmParcourus);
+      const parsed = insertAgentRapportSchema.parse(body);
       const [row] = await db.insert(agentRapports).values(parsed).returning();
 
       logAudit(req, "CREATE", "agent_rapport", row.id, { agentId: parsed.agentId, type: parsed.typeRapport });
