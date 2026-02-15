@@ -35,7 +35,15 @@ x-app-env: &app-env
   ENABLE_BALANCE_AUTO_CORRECTION: ${ENABLE_BALANCE_AUTO_CORRECTION:-false}
 
 x-healthcheck-app: &healthcheck-app
-  test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5000/api/health"]
+  test:
+    [
+      "CMD",
+      "wget",
+      "--no-verbose",
+      "--tries=1",
+      "--spider",
+      "http://localhost:5000/api/health",
+    ]
   interval: 30s
   timeout: 5s
   start_period: 15s
@@ -169,6 +177,41 @@ services:
           cpus: "0.5"
 
   # ==========================================
+  # MOBILE — web build (Nginx)
+  # ==========================================
+  mobile:
+    container_name: cofinco-mobile
+    build:
+      context: ./mobile
+      dockerfile: Dockerfile
+      target: runtime
+      args:
+        EXPO_PUBLIC_API_URL: https://${DOMAIN:?DOMAIN is required}
+    restart: unless-stopped
+    expose:
+      - "80"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:80/",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - cofinco_internal
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.25"
+
+  # ==========================================
   # INFRA — production overrides
   # ==========================================
   db:
@@ -203,10 +246,10 @@ services:
 
   prometheus:
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention.time=30d'
-      - '--web.enable-lifecycle'
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=30d"
+      - "--web.enable-lifecycle"
     deploy:
       resources:
         limits:
