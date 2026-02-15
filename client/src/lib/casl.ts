@@ -137,6 +137,7 @@ export const MODULE_TO_SUBJECT: Record<string, Subject> = {
   'Régularisation': Subjects.REGULARISATION,
   'Départements': Subjects.DEPARTMENT,
   'Agences': Subjects.AGENCE,
+  'KPI': Subjects.KPI,
 };
 
 /**

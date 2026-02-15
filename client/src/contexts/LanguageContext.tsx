@@ -350,6 +350,7 @@ const translations: Translations = {
   menuRH: { fr: 'RH', en: 'HR' },
   menuComptabilite: { fr: 'Comptabilité', en: 'Accounting' },
   menuRapports: { fr: 'Rapports', en: 'Reports' },
+  menuKPI: { fr: 'KPI & Pilotage', en: 'KPI & Dashboard' },
   menuTresorerieSupervision: { fr: 'Supervision Trésorerie', en: 'Treasury Supervision' },
   menuTresorerie: { fr: 'Trésorerie', en: 'Treasury' },
   menuReconciliation: { fr: 'Réconciliation MM', en: 'MM Reconciliation' },

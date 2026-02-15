@@ -35,6 +35,9 @@ const ValidationsCenter = lazy(() => import('./components/validations/Validation
 const AdminModuleComplet = lazy(() => import('./components/admin/AdminModuleComplet'));
 const AdminVirementsProgrammes = lazy(() => import('./components/admin/AdminVirementsProgrammes'));
 
+// KPI module
+const KpiDashboard = lazy(() => import('./components/kpi/KpiDashboard'));
+
 // Shared modules
 const ReportGenerator = lazy(() => import('./components/shared/ReportGenerator'));
 const MessagesModule = lazy(() => import('./components/shared/MessagesModule'));
@@ -385,6 +388,12 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
         return (
           <Suspense fallback={<ModuleLoadingFallback moduleName="Rapports" />}>
             <ReportGenerator />
+          </Suspense>
+        );
+      case 'kpi':
+        return (
+          <Suspense fallback={<ModuleLoadingFallback moduleName="KPI & Pilotage" />}>
+            <KpiDashboard />
           </Suspense>
         );
       case 'administrateur':

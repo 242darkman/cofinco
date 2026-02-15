@@ -19,6 +19,7 @@ import {
   Landmark,
   RefreshCcw,
   Briefcase,
+  BarChart3,
 } from 'lucide-react';
 import { MenuItem } from '../types/layout';
 
@@ -45,6 +46,7 @@ export const PLATFORM_MENU_ITEMS: MenuItem[] = [
   // Gestion
   { labelKey: 'menuComptabilite', icon: BookOpen, key: 'comptabilite', section: 'gestion' },
   { labelKey: 'menuRapports', icon: FileBarChart, key: 'rapports', section: 'gestion' },
+  { labelKey: 'menuKPI', icon: BarChart3, key: 'kpi', section: 'gestion' },
   { labelKey: 'menuRH', icon: UsersRound, key: 'rh', section: 'gestion' },
 
   // Système

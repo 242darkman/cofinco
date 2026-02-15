@@ -26,6 +26,7 @@ const CreditRefundsPage = lazy(() => import('@/pages/finance/CreditRefundsPage')
 const AdminVirementsProgrammes = lazy(() => import('@/components/admin/AdminVirementsProgrammes'));
 // const ReconciliationPage = lazy(() => import('@/pages/finance/ReconciliationPage')); // Masqué temporairement
 const TresoreriePage = lazy(() => import('@/pages/finance/TresoreriePage'));
+const KpiDashboard = lazy(() => import('@/components/kpi/KpiDashboard'));
 
 /**
  * Mapping sous-route URL → sous-module interne
@@ -286,6 +287,16 @@ export const ROUTES: RouteConfig[] = [
     requiredModule: 'Rapports',
     label: 'Rapports',
     labelKey: 'menuRapports',
+    group: 'Gestion',
+  },
+  {
+    key: 'kpi',
+    path: '/kpi',
+    component: KpiDashboard,
+    requiredModule: 'KPI',
+    requiredAbility: { action: Actions.VIEW, subject: Subjects.KPI },
+    label: 'KPI & Pilotage',
+    labelKey: 'menuKPI',
     group: 'Gestion',
   },
   {

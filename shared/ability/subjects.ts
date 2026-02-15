@@ -36,6 +36,7 @@ export const Subjects = {
   ACCOUNTING: 'accounting',
   BOURSE: 'bourse',
   LOGE: 'loge',
+  KPI: 'kpi',
 
   // Entities (for granular resource-level checks)
   USER: 'User',
@@ -142,6 +143,7 @@ export const MODULE_SUBJECTS = [
   Subjects.ACCOUNTING,
   Subjects.BOURSE,
   Subjects.LOGE,
+  Subjects.KPI,
 ] as const;
 
 // Entity subjects only (for CRUD operations)
@@ -288,6 +290,7 @@ export const SUBJECT_LABELS: Record<Subject, string> = {
   [Subjects.SYSTEM]: 'Système',
   [Subjects.BOURSE]: 'Portefeuille Boursier',
   [Subjects.LOGE]: 'Stockage Documents',
+  [Subjects.KPI]: 'Indicateurs KPI',
 };
 
 // Module to Entity mapping (which entities belong to which module)
@@ -316,4 +319,5 @@ export const MODULE_ENTITY_MAP: Record<string, Subject[]> = {
   [Subjects.ADMIN]: [Subjects.USER, Subjects.AGENCE, Subjects.SESSION, Subjects.AUDIT_LOG],
   [Subjects.RBAC]: [Subjects.ROLE, Subjects.PERMISSION],
   [Subjects.TERRAIN]: [Subjects.AGENT_TERRAIN, Subjects.OPERATION_TERRAIN, Subjects.PROSPECTION, Subjects.PROSPECTION_PRIME, Subjects.ARRONDISSEMENT, Subjects.MARCHE, Subjects.PROSPECTION_CONFIG],
+  [Subjects.KPI]: [],
 };

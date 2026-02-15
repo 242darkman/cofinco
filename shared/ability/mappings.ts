@@ -475,6 +475,13 @@ export const PERMISSION_MAPPINGS: Record<string, PermissionMapping> = {
   'loge.view': { action: Actions.VIEW, subject: Subjects.LOGE },
   'loge.upload': { action: Actions.UPLOAD, subject: Subjects.LOGE },
   'loge.delete': { action: Actions.DELETE, subject: Subjects.LOGE },
+
+  // =====================
+  // KPI
+  // =====================
+  'kpi.view': { action: Actions.VIEW, subject: Subjects.KPI },
+  'kpi.export': { action: Actions.EXPORT, subject: Subjects.KPI },
+  'kpi.manage': { action: Actions.MANAGE, subject: Subjects.KPI },
 };
 
 /**
@@ -950,6 +957,13 @@ export const MODULE_PERMISSION_BUNDLES: Record<string, string[]> = {
     'loge.view',
     'loge.upload',
     'loge.delete',
+  ],
+
+  // === KPI & PILOTAGE ===
+  'KPI': [
+    'kpi.view',
+    'kpi.export',
+    'kpi.manage',
   ],
 };
 

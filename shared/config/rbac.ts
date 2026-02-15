@@ -50,6 +50,7 @@ export const APP_MODULES = [
   'Départements',
   'Employés',
   'Agences',
+  'KPI',
 ] as const;
 
 export type AppModule = (typeof APP_MODULES)[number];
@@ -101,6 +102,7 @@ export const MODULES_DATA: ModuleSeed[] = [
   { name: 'Départements', description: 'Gestion des départements', icon: 'Building2', category: 'admin', orderIndex: 31 },
   { name: 'Employés', description: 'Gestion des employés', icon: 'Users', category: 'admin', orderIndex: 32 },
   { name: 'Agences', description: 'Gestion des agences', icon: 'Building', category: 'admin', orderIndex: 33 },
+  { name: 'KPI', description: 'Indicateurs clés de performance et pilotage', icon: 'BarChart3', category: 'general', orderIndex: 34 },
 ];
 
 /**

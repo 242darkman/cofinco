@@ -44,6 +44,7 @@ import { paymentsTestRouter } from "./routes/payments-test";
 import balancesRouter from "./routes/balances";
 import permissionAnalyticsRouter from "./routes/permission-analytics";
 import { registerMonitoringRoutes } from "./routes/monitoring";
+import { registerKpiRoutes } from "./routes/kpi";
 import syncRouter from "./routes/sync";
 import { syncJournalRouter } from "./routes/sync-journal";
 import { registerZoneManagementRoutes } from "./routes/zone-management";
@@ -138,6 +139,9 @@ export function registerRoutes(app: Express): Server {
 
   // Financial Monitoring Module (alerts, reconciliation, real-time monitoring)
   registerMonitoringRoutes(app);
+
+  // KPI Module (Indicateurs clés de performance et pilotage)
+  registerKpiRoutes(app);
 
   // Sync Heartbeat Module (real-time connection status)
   app.use("/api/sync", syncRouter);
