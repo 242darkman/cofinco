@@ -6,6 +6,8 @@ import { api } from '@/lib/api-client';
  * REQUESTING_FUNDS → ACTIVE → CLOSING → CLOSED
  */
 
+// ─── Types ───────────────────────────────────────────────────────────────────
+
 export interface AgentSession {
   id: string;
   agentId: string;
@@ -15,11 +17,13 @@ export interface AgentSession {
   montantProvisionne?: number;
   montantCollecte?: number;
   montantPhysique?: number;
+  montantTheorique?: number;
+  ecart?: number;
   nombreOperations?: number;
-  ecartMontant?: number;
   dateOuverture: string;
   dateFermeture?: string;
   observations?: string;
+  glAccountNumber?: string;
 }
 
 export interface CaisseAgent {
@@ -33,6 +37,16 @@ export interface CaisseAgent {
   statut: 'ACTIVE' | 'SUSPENDED';
 }
 
+export type TypeOperationTerrain =
+  | 'LOAN_REPAYMENT'
+  | 'SAVINGS_DEPOSIT'
+  | 'DEPOSIT_CURRENT'
+  | 'WITHDRAWAL_SAVINGS'
+  | 'WITHDRAWAL_CURRENT'
+  | 'TONTINE_CONTRIBUTION'
+  | 'ENGAGEMENT_FEE'
+  | 'MISC_COLLECTION';
+
 export interface OperationTerrain {
   id: string;
   type: 'COLLECT_CASH' | 'SETTLEMENT_CASH';
@@ -45,7 +59,81 @@ export interface OperationTerrain {
   createdAt: string;
   clientNom?: string;
   clientPrenom?: string;
+  metadata?: {
+    typePaiementClient?: TypeOperationTerrain;
+    creditId?: string;
+    compteId?: string;
+    tontineId?: string;
+    latitude?: number;
+    longitude?: number;
+  };
+  approvedAt?: string;
+  approvedBy?: string;
+  rejectedAt?: string;
+  rejectionReason?: string;
+  cancelledAt?: string;
 }
+
+export interface Billetage {
+  '10000': number;
+  '5000': number;
+  '2000': number;
+  '1000': number;
+  '500': number;
+  '100': number;
+  '50': number;
+  '25': number;
+  '10': number;
+  '5': number;
+}
+
+// ─── Payloads ────────────────────────────────────────────────────────────────
+
+export interface CollectCashData {
+  clientId: string;
+  montant: number;
+  typePaiementClient?: TypeOperationTerrain;
+  creditId?: string;
+  compteId?: string;
+  tontineId?: string;
+  numeroRecu?: string;
+  observations?: string;
+  latitude?: number;
+  longitude?: number;
+}
+
+export interface SettlementCashData {
+  destinationCaisseId: string;
+  montant: number;
+  billetage?: Partial<Billetage>;
+  observations?: string;
+}
+
+export interface InitiateCloseData {
+  montantPhysique: number;
+  destinationCaisseId: string;
+  billetage?: Partial<Billetage>;
+  observations?: string;
+}
+
+export interface CloseWithRemiseData {
+  montantPhysique: number;
+  destinationCaisseId: string;
+  billetage?: Partial<Billetage>;
+  observations?: string;
+  ecartJustification?: string;
+}
+
+export interface OperationsFilter {
+  statut?: string;
+  type?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  limit?: number;
+  offset?: number;
+}
+
+// ─── Store ───────────────────────────────────────────────────────────────────
 
 interface AgentState {
   session: AgentSession | null;
@@ -58,46 +146,11 @@ interface AgentState {
   getCaisseBalance: () => Promise<void>;
   requestSession: (data: { agenceId: string; montantDemande: number; observations?: string }) => Promise<void>;
   collectCash: (data: CollectCashData) => Promise<OperationTerrain>;
+  settlementCash: (data: SettlementCashData) => Promise<OperationTerrain>;
+  cancelOperation: (operationId: string) => Promise<void>;
   initiateClose: (data: InitiateCloseData) => Promise<void>;
   closeWithRemise: (data: CloseWithRemiseData) => Promise<void>;
   getOperations: (params?: OperationsFilter) => Promise<{ operations: OperationTerrain[]; total: number }>;
-}
-
-export interface CollectCashData {
-  clientId: string;
-  montant: number;
-  typePaiementClient?: string;
-  creditId?: string;
-  compteId?: string;
-  tontineId?: string;
-  numeroRecu?: string;
-  observations?: string;
-  latitude?: number;
-  longitude?: number;
-}
-
-export interface InitiateCloseData {
-  montantPhysique: number;
-  destinationCaisseId: string;
-  billetage?: Record<string, number>;
-  observations?: string;
-}
-
-export interface CloseWithRemiseData {
-  montantPhysique: number;
-  destinationCaisseId: string;
-  billetage?: Record<string, number>;
-  observations?: string;
-  ecartJustification?: string;
-}
-
-export interface OperationsFilter {
-  statut?: string;
-  type?: string;
-  dateFrom?: string;
-  dateTo?: string;
-  limit?: number;
-  offset?: number;
 }
 
 export const useAgentStore = create<AgentState>((set, get) => ({
@@ -138,7 +191,6 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   requestSession: async ({ agenceId, montantDemande, observations }) => {
     const agentId = get().employeId;
     if (!agentId) throw new Error('Agent ID manquant');
-
     const data = await api.post<{ success: boolean; session: AgentSession }>(
       '/api/caisse-agent/sessions',
       { agentId, agenceId, montantDemande, observations }
@@ -149,23 +201,38 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   collectCash: async (collectData) => {
     const agentId = get().employeId;
     if (!agentId) throw new Error('Agent ID manquant');
-
     const resp = await api.post<{ success: boolean; operation: OperationTerrain }>(
       '/api/caisse-agent/operations-terrain',
       {
         type: 'COLLECT_CASH',
         agentId,
         ...collectData,
-        typePaiementClient: collectData.typePaiementClient || 'CASH',
+        typePaiementClient: collectData.typePaiementClient || 'DEPOSIT_CURRENT',
       }
     );
+    get().getCaisseBalance();
     return resp.operation;
+  },
+
+  settlementCash: async (data) => {
+    const agentId = get().employeId;
+    if (!agentId) throw new Error('Agent ID manquant');
+    const resp = await api.post<{ success: boolean; operation: OperationTerrain }>(
+      '/api/caisse-agent/operations-terrain',
+      { type: 'SETTLEMENT_CASH', agentId, ...data }
+    );
+    get().getCaisseBalance();
+    return resp.operation;
+  },
+
+  cancelOperation: async (operationId: string) => {
+    await api.post(`/api/caisse-agent/operations-terrain/${operationId}/cancel`);
+    get().getCaisseBalance();
   },
 
   initiateClose: async (data) => {
     const session = get().session;
     if (!session) throw new Error('Aucune session active');
-
     const resp = await api.post<{ success: boolean; session: AgentSession }>(
       `/api/caisse-agent/sessions/${session.id}/initiate-close`,
       data
@@ -176,7 +243,6 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   closeWithRemise: async (data) => {
     const session = get().session;
     if (!session) throw new Error('Aucune session active');
-
     const resp = await api.post<{ success: boolean; session: AgentSession }>(
       `/api/caisse-agent/sessions/${session.id}/close-with-remise`,
       data
@@ -187,7 +253,6 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   getOperations: async (params = {}) => {
     const agentId = get().employeId;
     if (!agentId) return { operations: [], total: 0 };
-
     const qs = new URLSearchParams({ agentId, limit: '50', ...params as Record<string, string> });
     const data = await api.get<{ operations: OperationTerrain[]; total: number }>(
       `/api/caisse-agent/operations-terrain?${qs}`

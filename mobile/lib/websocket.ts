@@ -69,6 +69,12 @@ class MobileWebSocket {
     this.ws = null;
   }
 
+  send(data: unknown) {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(data));
+    }
+  }
+
   onMessage(handler: MessageHandler) {
     this.handlers.push(handler);
     return () => {
@@ -113,6 +119,24 @@ class MobileWebSocket {
         break;
       case 'CREDIT_UPDATE':
         queryClient.invalidateQueries({ queryKey: queryKeys.credits.all });
+        break;
+      case 'OPERATIONS_UPDATE':
+        queryClient.invalidateQueries({ queryKey: ['agent', 'operations'] });
+        queryClient.invalidateQueries({ queryKey: ['agent', 'prospections'] });
+        queryClient.invalidateQueries({ queryKey: ['agent', 'caisse'] });
+        break;
+      case 'AGENT_MODULES_UPDATE':
+        queryClient.invalidateQueries({ queryKey: ['agent', 'commissions'] });
+        queryClient.invalidateQueries({ queryKey: ['agent', 'objectifs'] });
+        queryClient.invalidateQueries({ queryKey: ['agent', 'planning'] });
+        queryClient.invalidateQueries({ queryKey: ['agent', 'incidents'] });
+        queryClient.invalidateQueries({ queryKey: ['agent', 'communications'] });
+        queryClient.invalidateQueries({ queryKey: ['agent', 'leaderboard'] });
+        break;
+      case 'SESSION_AGENT_UPDATE':
+        queryClient.invalidateQueries({ queryKey: ['agent', 'session'] });
+        queryClient.invalidateQueries({ queryKey: ['agent', 'caisse'] });
+        queryClient.invalidateQueries({ queryKey: ['agent', 'operations'] });
         break;
       case 'SESSION_FORCE_CLOSED':
       case 'FORCE_LOGOUT':
