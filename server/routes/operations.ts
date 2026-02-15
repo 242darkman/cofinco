@@ -1033,4 +1033,42 @@ export function registerOperationsRoutes(app: Express) {
 
     res.json(objectif);
   });
+
+  // ═══════════════════════════════════════════════════════════════
+  // GPS GEOLOCATION — Historical location logs
+  // ═══════════════════════════════════════════════════════════════
+
+  app.get("/api/agent-geolocations", requireAuth, async (req, res) => {
+    try {
+      const { agent_id, start, end } = req.query as Record<string, string>;
+      if (!agent_id || !start || !end) {
+        return res.status(400).json({ error: "agent_id, start, end requis" });
+      }
+
+      // Security: agents can only view their own positions
+      const currentUser = (req as any).user;
+      const userRole = normalizeRole(currentUser?.role);
+      const canSupervise = [SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR].includes(userRole);
+      if (!canSupervise && agent_id !== currentUser?.id) {
+        return res.status(403).json({ error: "Accès interdit" });
+      }
+
+      const logs = await storage.getAgentLocationLogs(agent_id, new Date(start), new Date(end));
+      res.json(logs.map((l: any) => ({
+        id: l.id,
+        agent_id: l.agentId,
+        latitude: Number(l.latitude),
+        longitude: Number(l.longitude),
+        accuracy: l.accuracy ? Number(l.accuracy) : null,
+        speed: l.speed ? Number(l.speed) : null,
+        heading: l.heading ? Number(l.heading) : null,
+        battery_level: l.batteryLevel,
+        timestamp: l.capturedAt?.toISOString(),
+        activity_type: 'GPS',
+      })));
+    } catch (error) {
+      logger.error({ err: error }, "Error fetching agent geolocations");
+      res.status(500).json({ error: "Erreur serveur" });
+    }
+  });
 }

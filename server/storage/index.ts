@@ -51,6 +51,8 @@ export interface IStorage {
 
     // Agent Location (GPS Tracking) - updates agents_terrain table
     updateAgentLocation(userId: string, latitude: string, longitude: string): Promise<void>;
+    insertAgentLocationLog(data: { agentId: string; latitude: string; longitude: string; accuracy?: string; altitude?: string; speed?: string; heading?: string; source?: string; batteryLevel?: number }): Promise<void>;
+    getAgentLocationLogs(agentId: string, start: Date, end: Date): Promise<any[]>;
 
     // Clients
     getClient(id: string): Promise<ClientFull | undefined>;

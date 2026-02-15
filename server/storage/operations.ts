@@ -1,8 +1,8 @@
-import { agentsTerrain, prospections, visitesTerrain, paiementsTerrain, employes, posDevices, notifications, otpValidations, zones, objectifsMensuels, clients, users, userAgences, userRoles } from "@shared/schema";
-import { type AgentTerrain, type InsertAgentTerrain, type Prospection, type InsertProspection, type VisiteTerrain, type InsertVisiteTerrain, type PaiementTerrain, type InsertPaiementTerrain, type Employe, type InsertEmploye, type PosDevice, type InsertPosDevice, type Notification, type InsertNotification, type OtpValidation, type InsertOtpValidation, type Zone, type InsertZone, type ObjectifMensuel, type InsertObjectifMensuel } from "@shared/schema";
+import { agentsTerrain, prospections, visitesTerrain, paiementsTerrain, employes, posDevices, notifications, otpValidations, zones, objectifsMensuels, clients, users, userAgences, userRoles, agentLocationLogs } from "@shared/schema";
+import { type AgentTerrain, type InsertAgentTerrain, type Prospection, type InsertProspection, type VisiteTerrain, type InsertVisiteTerrain, type PaiementTerrain, type InsertPaiementTerrain, type Employe, type InsertEmploye, type PosDevice, type InsertPosDevice, type Notification, type InsertNotification, type OtpValidation, type InsertOtpValidation, type Zone, type InsertZone, type ObjectifMensuel, type InsertObjectifMensuel, type AgentLocationLog } from "@shared/schema";
 import { db } from "../db";
 import { notDeleted } from "./query-helpers";
-import { eq, desc, and, or, sql, gte } from "drizzle-orm";
+import { eq, desc, asc, and, or, sql, gte, lte } from "drizzle-orm";
 import { StatutOtp, StatutPaiementTerrain } from "@shared/enum/status-constants";
 import { SystemRole } from "@shared/types/roles";
 
@@ -228,6 +228,51 @@ export async function updateAgentLocation(userId: string, latitude: string, long
       })
       .where(eq(agentsTerrain.id, agentResult.agentId));
   }
+}
+
+/**
+ * Insert a GPS position into agent_location_logs
+ * Called from ws-server for real-time location logging (throttled)
+ */
+export async function insertAgentLocationLog(data: {
+  agentId: string;
+  latitude: string;
+  longitude: string;
+  accuracy?: string;
+  altitude?: string;
+  speed?: string;
+  heading?: string;
+  source?: string;
+  batteryLevel?: number;
+}): Promise<void> {
+  await db.insert(agentLocationLogs).values({
+    agentId: data.agentId,
+    latitude: data.latitude,
+    longitude: data.longitude,
+    accuracy: data.accuracy,
+    altitude: data.altitude,
+    speed: data.speed,
+    heading: data.heading,
+    source: data.source || 'gps',
+    batteryLevel: data.batteryLevel,
+    capturedAt: new Date(),
+  });
+}
+
+/**
+ * Query agent location logs for a time range (used by GET /api/agent-geolocations)
+ */
+export async function getAgentLocationLogs(
+  agentId: string, start: Date, end: Date
+): Promise<AgentLocationLog[]> {
+  return db.select().from(agentLocationLogs)
+    .where(and(
+      eq(agentLocationLogs.agentId, agentId),
+      gte(agentLocationLogs.capturedAt, start),
+      lte(agentLocationLogs.capturedAt, end),
+    ))
+    .orderBy(asc(agentLocationLogs.capturedAt))
+    .limit(2000);
 }
 
 // Prospections

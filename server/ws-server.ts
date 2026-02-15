@@ -175,6 +175,10 @@ export type GlobalMessage = {
 // Map userId -> WebSocket[] (user can have multiple tabs open)
 const clients = new Map<string, WebSocket[]>();
 
+// Location log throttle: max 1 DB insert per 10s per user
+const locationLogThrottles = new Map<string, number>();
+const LOC_LOG_MIN_INTERVAL = 10_000;
+
 // Map channel -> Set<WebSocket> for aggregate subscriptions
 // Channels: client:{id}, compte:{id}, credit:{id}, tontine:{id}, session_caisse:{id}, agent:{id}
 const subscriptions = new Map<string, Set<WebSocket>>();
@@ -578,31 +582,41 @@ export function setupWebSocket(server: Server) {
          }
 
           if (data.type === 'LOCATION_UPDATE') {
-            const { latitude, longitude } = data.payload;
-            // Broadcast to Admins (or everyone for now for simplicity, filtered on client)
-            // Ideally we track role in clients map to only send to admins
+            const { latitude, longitude, accuracy, altitude, speed, heading, batteryLevel } = data.payload;
+
+            // Broadcast to all connected clients
             wss.clients.forEach((client) => {
-               // In a real app, check if client.user.role === 'admin'
                if (client.readyState === WebSocket.OPEN) {
                  client.send(JSON.stringify({
                    type: "USER_LOCATION",
-                   payload: { userId, latitude, longitude }
+                   payload: { userId, latitude, longitude, accuracy, speed, heading }
                  }));
                }
             });
-            
-            // Persist (Async, fire and forget)
-            // We need a way to update DB without circular dependency or importing 'storage' which might rely on 'routes'
-            // For now, we'll assume a helper or just emit an event if we had an event bus.
-            // Or simpler: We just don't persist in this MVP scope unless strictly required, 
-            // but the plan said "Persist (throttled)".
-            // Let's defer persistence code to keep ws-server clean or do a quick direct DB call if possible.
-            // Since `storage` is available in server/storage.ts, we can try to use it if we can import it.
-            // Note: updateAgentLocation updates the agents_terrain table (lastLatitude, lastLongitude, lastSeenAt)
+
+            // Persist last position to agentsTerrain
             try {
-               storage.updateAgentLocation(userId, latitude, longitude);
+               storage.updateAgentLocation(userId, String(latitude), String(longitude));
             } catch (err) {
-               logger.error({ err, userId, latitude, longitude }, 'Failed to persist agent location');
+               logger.error({ err, userId }, 'Failed to persist agent location');
+            }
+
+            // Insert into agent_location_logs (throttled: max 1 insert per 10s per user)
+            const now = Date.now();
+            const lastInsert = locationLogThrottles.get(userId) || 0;
+            if (now - lastInsert >= LOC_LOG_MIN_INTERVAL) {
+              locationLogThrottles.set(userId, now);
+              storage.insertAgentLocationLog({
+                agentId: userId,
+                latitude: String(latitude),
+                longitude: String(longitude),
+                accuracy: accuracy != null ? String(accuracy) : undefined,
+                altitude: altitude != null ? String(altitude) : undefined,
+                speed: speed != null ? String(speed) : undefined,
+                heading: heading != null ? String(heading) : undefined,
+                batteryLevel: batteryLevel != null ? Number(batteryLevel) : undefined,
+                source: 'gps',
+              }).catch(err => logger.error({ err, userId }, 'Failed to insert location log'));
             }
           }
        } catch (e) {

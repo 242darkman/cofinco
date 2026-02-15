@@ -522,15 +522,17 @@ export const agentLocationLogs = pgTable("agent_location_logs", {
   agentId: uuid("agent_id").notNull().references(() => users.id),
   latitude: numeric("latitude").notNull(),
   longitude: numeric("longitude").notNull(),
-  accuracy: numeric("accuracy"), 
+  accuracy: numeric("accuracy"),
   altitude: numeric("altitude"),
-  speed: numeric("speed"), 
-  heading: numeric("heading"), 
-  source: text("source").notNull().default("gps"), 
-  batteryLevel: integer("battery_level"), 
+  speed: numeric("speed"),
+  heading: numeric("heading"),
+  source: text("source").notNull().default("gps"),
+  batteryLevel: integer("battery_level"),
   capturedAt: timestamp("captured_at").notNull().defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => [
+  index("idx_agent_loc_agent_captured").on(t.agentId, t.capturedAt),
+]);
 
 export const insertAgentLocationLogSchema = createInsertSchema(agentLocationLogs).omit({ id: true, createdAt: true });
 export type InsertAgentLocationLog = z.infer<typeof insertAgentLocationLogSchema>;
