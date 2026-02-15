@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Trophy, Star, TrendingUp, Target, Users, Briefcase, ArrowUpRight } from 'lucide-react';
 import { Pagination } from '../ui';
 import { formatMoneyShort } from '@shared/config/currency';
@@ -29,12 +29,15 @@ interface Props {
 export default function AgentTeamLeaderboard({ agentId }: Props) {
   const targetAgentId = agentId;
   const [rankings, setRankings] = useState<AgentRanking[]>([]);
+  const [topThree, setTopThree] = useState<AgentRanking[]>([]);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<'semaine' | 'mois' | 'annee'>('mois');
   const [currentUserId, setCurrentUserId] = useState('');
 
   const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 5;
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
     const cofinUserStr = localStorage.getItem('cofin_user');
@@ -46,23 +49,43 @@ export default function AgentTeamLeaderboard({ agentId }: Props) {
   }, []);
 
   useEffect(() => {
-    loadRankings();
+    setCurrentPage(1);
+    loadRankings(1);
   }, [period]);
+
+  useEffect(() => {
+    loadRankings(currentPage);
+  }, [currentPage]);
 
   // Real-time refresh on agent module updates
   useEffect(() => {
-    const handler = () => loadRankings();
+    const handler = () => loadRankings(currentPage);
     window.addEventListener('agent-modules-update', handler);
     return () => window.removeEventListener('agent-modules-update', handler);
-  }, [period]);
+  }, [period, currentPage]);
 
-  const loadRankings = async () => {
+  const loadRankings = async (page: number) => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/agent-classement?period=${period}`, { credentials: 'include' });
+      const res = await fetch(
+        `/api/agent-classement?period=${period}&page=${page}&pageSize=${ITEMS_PER_PAGE}`,
+        { credentials: 'include' },
+      );
       if (!res.ok) throw new Error('Erreur API');
-      const data: AgentRanking[] = await res.json();
-      setRankings(data);
+      const result = await res.json();
+      // Support both new paginated format and legacy array
+      if (Array.isArray(result)) {
+        setRankings(result);
+        setTotalItems(result.length);
+        setTotalPages(1);
+        if (page === 1) setTopThree(result.slice(0, 3));
+      } else {
+        setRankings(result.data);
+        setTotalItems(result.total);
+        setTotalPages(result.totalPages);
+        // Load top 3 separately on first page for podium
+        if (page === 1) setTopThree(result.data.slice(0, 3));
+      }
     } catch (error) {
       console.error('Erreur chargement classement:', error);
       setRankings([]);
@@ -112,12 +135,7 @@ export default function AgentTeamLeaderboard({ agentId }: Props) {
     return labels[niveau] || `Niv. ${niveau}`;
   };
 
-  const paginatedRankings = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return rankings.slice(start, start + ITEMS_PER_PAGE);
-  }, [rankings, currentPage]);
-
-  const totalPages = Math.ceil(rankings.length / ITEMS_PER_PAGE);
+  const paginatedRankings = rankings;
 
   if (loading) {
     return (
@@ -201,18 +219,19 @@ export default function AgentTeamLeaderboard({ agentId }: Props) {
       </div>
 
       {/* Podium top 3 */}
-      {rankings.length >= 3 && (
+      {topThree.length >= 3 && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 mb-4">
-          <PodiumCard agent={rankings[1]} rank={2} />
-          <PodiumCard agent={rankings[0]} rank={1} />
-          <PodiumCard agent={rankings[2]} rank={3} />
+          <PodiumCard agent={topThree[1]} rank={2} />
+          <PodiumCard agent={topThree[0]} rank={1} />
+          <PodiumCard agent={topThree[2]} rank={3} />
         </div>
       )}
 
       {/* Full ranking list */}
       <div className="bg-surface rounded-lg shadow-sm border border-edge-subtle">
-        <div className="px-4 py-3 border-b border-edge-subtle">
+        <div className="px-4 py-3 border-b border-edge-subtle flex items-center justify-between">
           <h3 className="text-sm font-bold text-content-primary">Classement Complet</h3>
+          <span className="text-[10px] text-content-muted font-medium">{totalItems} agent{totalItems > 1 ? 's' : ''} de terrain</span>
         </div>
         <div className="divide-y divide-edge-subtle/50">
           {paginatedRankings.map((agent, index) => {
@@ -288,13 +307,13 @@ export default function AgentTeamLeaderboard({ agentId }: Props) {
               canGoNext={currentPage < totalPages}
               canGoPrevious={currentPage > 1}
               itemsPerPage={ITEMS_PER_PAGE}
-              totalItems={rankings.length}
+              totalItems={totalItems}
             />
           </div>
         )}
       </div>
 
-      {rankings.length === 0 && (
+      {totalItems === 0 && !loading && (
         <div className="text-center py-8 bg-surface rounded-lg border border-edge-subtle border-dashed">
           <Trophy className="mx-auto text-content-secondary mb-2" size={32} />
           <p className="text-sm text-content-muted">Aucune donnée de classement disponible</p>

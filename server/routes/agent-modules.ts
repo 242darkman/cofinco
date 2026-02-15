@@ -78,6 +78,8 @@ export function registerAgentModulesRoutes(app: Express) {
   app.get("/api/agent-classement", requireAuth, async (req: Request, res: Response) => {
     try {
       const period = (req.query.period as string) || "mois";
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const pageSize = Math.min(50, Math.max(1, parseInt(req.query.pageSize as string) || 10));
 
       // Compute date boundary
       const dateFrom = new Date();
@@ -249,7 +251,18 @@ export function registerAgentModulesRoutes(app: Express) {
       // Sort by score descending
       rankings.sort((a, b) => b.score - a.score);
 
-      res.json(rankings);
+      // Paginate
+      const total = rankings.length;
+      const totalPages = Math.ceil(total / pageSize);
+      const paginatedRankings = rankings.slice((page - 1) * pageSize, page * pageSize);
+
+      res.json({
+        data: paginatedRankings,
+        total,
+        page,
+        pageSize,
+        totalPages,
+      });
     } catch (error) {
       console.error("Erreur classement:", error);
       res.status(500).json({ error: "Erreur lors du calcul du classement" });
