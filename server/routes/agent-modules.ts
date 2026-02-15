@@ -1170,7 +1170,7 @@ export function registerAgentModulesRoutes(app: Express) {
       logAudit(req, "CREATE", "agent_incident", row.id, { agentId: parsed.agentId, type: parsed.typeIncident, gravite: parsed.gravite });
 
       const ws = getWsInstance();
-      if (ws) ws.broadcast({ type: "AGENT_MODULES_UPDATE", payload: { entity: "incident", action: "created", id: row.id } });
+      if (ws) ws.broadcast({ type: "AGENT_MODULES_UPDATE", payload: { entity: "incident", action: "created", id: row.id, gravite: parsed.gravite } });
 
       res.status(201).json(row);
     } catch (error: any) {
@@ -1191,6 +1191,13 @@ export function registerAgentModulesRoutes(app: Express) {
       if (!row) return res.status(404).json({ error: "Incident non trouvé" });
 
       logAudit(req, "UPDATE", "agent_incident", id, updates);
+
+      const ws = getWsInstance();
+      if (ws) ws.broadcast({
+        type: "AGENT_MODULES_UPDATE",
+        payload: { entity: "incident", action: updates.statut === "RESOLVED" ? "resolved" : "updated", id },
+      });
+
       res.json(row);
     } catch (error: any) {
       res.status(500).json({ error: error.message || "Erreur serveur" });

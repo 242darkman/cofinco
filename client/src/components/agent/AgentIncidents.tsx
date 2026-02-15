@@ -1,8 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AlertTriangle, Plus, CheckCircle, Clock, X, Upload, ArrowUpCircle, FileText, Image as ImageIcon, ChevronLeft, ChevronRight, Eye, Shield, AlertCircle } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { ALL_STATUS_LABELS } from '@/lib/status-labels';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../ui/sheet';
+import { toast } from '@/lib/toast';
+import { agentKeys } from '@/lib/query-keys';
+import { authService } from '@/lib/auth';
 
 // SLA thresholds in hours by severity
 const SLA_HOURS: Record<string, number> = {
@@ -61,13 +65,14 @@ export default function AgentIncidents({ agentId }: { agentId?: string }) {
   const canCreateIncidents = hasPermission('terrain', 'create') || hasPermission('incidents', 'create');
   const canResolveIncidents = hasPermission('terrain', 'edit') || hasPermission('incidents', 'edit') || hasPermission('terrain', 'manage');
 
-  const [incidents, setIncidents] = useState<Incident[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const currentUser = authService.getCurrentUser();
+
   const [showForm, setShowForm] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState(false);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 5;
@@ -84,46 +89,69 @@ export default function AgentIncidents({ agentId }: { agentId?: string }) {
     date_incident: new Date().toISOString().slice(0, 16)
   });
 
+  // Sync formData.agent_id when agentId prop changes
+  useEffect(() => {
+    setFormData(prev => ({ ...prev, agent_id: agentId || '' }));
+  }, [agentId]);
+
   // Action fields in Sheet
   const [resolutionNote, setResolutionNote] = useState('');
 
-  useEffect(() => {
-    loadIncidents();
-  }, [agentId]);
-
-  const loadIncidents = async () => {
-    try {
-      setLoading(true);
+  // ── React Query: load incidents ──────────────────────────────────
+  const { data: incidents = [], isLoading: loading } = useQuery<Incident[]>({
+    queryKey: agentKeys.incidents(agentId),
+    queryFn: async () => {
       let url = '/api/agent-incidents';
       if (agentId) url += `?agentId=${agentId}`;
-
       const response = await fetch(url, { credentials: 'include' });
-      if (response.ok) {
-        const data = await response.json();
-        setIncidents(data || []);
-      } else {
-        setIncidents([]);
-      }
-    } catch (error) {
-      console.error('Erreur:', error);
-      setIncidents([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+      if (!response.ok) return [];
+      return response.json();
+    },
+  });
 
+  // ── Real-time listener: toast notifications on incident changes ──
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.entity !== 'incident') return;
+
+      // Don't self-notify
+      if (detail?.userId === currentUser?.id) return;
+
+      switch (detail.action) {
+        case 'created':
+          if (detail.gravite === 'Critique' || detail.gravite === 'Grave') {
+            toast.warning('Nouvel incident critique signalé');
+          } else {
+            toast.info('Nouvel incident signalé');
+          }
+          break;
+        case 'escalated':
+          toast.warning('Un incident a été escaladé');
+          break;
+        case 'resolved':
+          toast.success('Un incident a été résolu');
+          break;
+      }
+    };
+
+    window.addEventListener('agent-modules-update', handler);
+    return () => window.removeEventListener('agent-modules-update', handler);
+  }, [currentUser?.id]);
+
+  // ── Mutations ────────────────────────────────────────────────────
   const uploadFiles = async (incidentId: string): Promise<string[]> => {
     const urls: string[] = [];
     for (const file of pendingFiles) {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('fileType', file.type.startsWith('image/') ? 'profile' : 'misc');
-      formData.append('entityType', 'incident');
-      formData.append('entityId', incidentId);
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('fileType', file.type.startsWith('image/') ? 'profile' : 'misc');
+      fd.append('entityType', 'incident');
+      fd.append('entityId', incidentId);
 
       const response = await fetch('/api/storage/entity/upload', {
         method: 'POST',
-        body: formData,
+        body: fd,
         credentials: 'include',
       });
 
@@ -135,11 +163,8 @@ export default function AgentIncidents({ agentId }: { agentId?: string }) {
     return urls;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    try {
+  const createMutation = useMutation({
+    mutationFn: async () => {
       const response = await fetch('/api/agent-incidents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -169,9 +194,13 @@ export default function AgentIncidents({ agentId }: { agentId?: string }) {
         setUploadingFiles(false);
       }
 
+      return created;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: agentKeys.incidents(agentId) });
+      toast.success('Incident signalé avec succès');
       setShowForm(false);
       setPendingFiles([]);
-      loadIncidents();
       setFormData({
         agent_id: agentId || '',
         type_incident: 'Sécurité',
@@ -180,17 +209,15 @@ export default function AgentIncidents({ agentId }: { agentId?: string }) {
         localisation: '',
         date_incident: new Date().toISOString().slice(0, 16)
       });
-    } catch (error: any) {
-      alert('Erreur: ' + error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
 
-  const resoudreIncident = async () => {
-    if (!selectedIncident || !resolutionNote) return;
-    try {
-      const response = await fetch(`/api/agent-incidents/${selectedIncident.id}`, {
+  const resolveMutation = useMutation({
+    mutationFn: async (incidentId: string) => {
+      const response = await fetch(`/api/agent-incidents/${incidentId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -200,29 +227,52 @@ export default function AgentIncidents({ agentId }: { agentId?: string }) {
           date_resolution: new Date().toISOString()
         })
       });
-
       if (!response.ok) throw new Error('Erreur lors de la mise à jour');
-      loadIncidents();
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: agentKeys.incidents(agentId) });
+      toast.success('Incident résolu');
       setSelectedIncident(null);
       setResolutionNote('');
-    } catch (error: any) {
-      alert('Erreur: ' + error.message);
-    }
-  };
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
 
-  const escaladerIncident = async () => {
-     if (!selectedIncident) return;
-    try {
-      const response = await fetch(`/api/agent-incidents/${selectedIncident.id}/escalate`, {
+  const escalateMutation = useMutation({
+    mutationFn: async (incidentId: string) => {
+      const response = await fetch(`/api/agent-incidents/${incidentId}/escalate`, {
         method: 'POST',
         credentials: 'include',
       });
-      if (!response.ok) throw new Error('Erreur lors de l\'escalade');
-      loadIncidents();
+      if (!response.ok) throw new Error("Erreur lors de l'escalade");
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: agentKeys.incidents(agentId) });
+      toast.warning('Incident escaladé');
       setSelectedIncident(null);
-    } catch (error: any) {
-      alert('Erreur: ' + error.message);
-    }
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    createMutation.mutate();
+  };
+
+  const resoudreIncident = () => {
+    if (!selectedIncident || !resolutionNote) return;
+    resolveMutation.mutate(selectedIncident.id);
+  };
+
+  const escaladerIncident = () => {
+    if (!selectedIncident) return;
+    escalateMutation.mutate(selectedIncident.id);
   };
 
   const removeFile = (index: number) => {
@@ -236,6 +286,8 @@ export default function AgentIncidents({ agentId }: { agentId?: string }) {
   // Pagination Logic
   const totalPages = Math.ceil(incidents.length / ITEMS_PER_PAGE);
   const paginatedIncidents = incidents.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
+  const isMutating = createMutation.isPending || resolveMutation.isPending || escalateMutation.isPending;
 
   return (
     <div className="space-y-3">
@@ -279,7 +331,7 @@ export default function AgentIncidents({ agentId }: { agentId?: string }) {
                 <input type="text" value={formData.localisation} onChange={(e) => setFormData({ ...formData, localisation: e.target.value })} className="w-full px-2 py-1.5 bg-surface border border-edge rounded-lg text-content-primary text-xs" placeholder="Lieu..." />
               </FormField>
             </div>
-            
+
             <FormField label="Description">
               <textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="w-full px-2 py-1.5 bg-surface border border-edge rounded-lg text-content-primary text-xs" rows={2} required />
             </FormField>
@@ -291,7 +343,7 @@ export default function AgentIncidents({ agentId }: { agentId?: string }) {
               </button>
               {pendingFiles.length > 0 && <span className="text-xs text-content-muted">{pendingFiles.length} fichier(s)</span>}
               <div className="flex-1" />
-              <button type="submit" disabled={loading || uploadingFiles} className="px-4 py-1.5 bg-status-danger hover:bg-status-danger/90 text-white rounded-lg font-bold text-xs">
+              <button type="submit" disabled={createMutation.isPending || uploadingFiles} className="px-4 py-1.5 bg-status-danger hover:bg-status-danger/90 text-white rounded-lg font-bold text-xs">
                 {uploadingFiles ? '...' : 'Signaler'}
               </button>
             </div>
@@ -435,7 +487,7 @@ export default function AgentIncidents({ agentId }: { agentId?: string }) {
                     {selectedIncident.description}
                   </div>
                 </div>
-                
+
                 {/* Location & Agent */}
                 <div className="grid grid-cols-2 gap-2">
                    {selectedIncident.localisation && (
@@ -485,11 +537,11 @@ export default function AgentIncidents({ agentId }: { agentId?: string }) {
                         rows={2}
                       />
                       <div className="flex gap-2">
-                        <button onClick={resoudreIncident} disabled={!resolutionNote.trim()} className="flex-1 py-2 bg-status-success hover:bg-status-success/90 disabled:opacity-50 text-white rounded-lg font-bold text-xs flex items-center justify-center gap-1.5">
+                        <button onClick={resoudreIncident} disabled={!resolutionNote.trim() || resolveMutation.isPending} className="flex-1 py-2 bg-status-success hover:bg-status-success/90 disabled:opacity-50 text-white rounded-lg font-bold text-xs flex items-center justify-center gap-1.5">
                           <CheckCircle size={14} /> Résoudre
                         </button>
                         {selectedIncident.statut !== 'ESCALATED' && (
-                          <button onClick={escaladerIncident} className="px-4 py-2 bg-status-warning hover:bg-status-warning/90 text-white rounded-lg font-bold text-xs flex items-center gap-1.5">
+                          <button onClick={escaladerIncident} disabled={escalateMutation.isPending} className="px-4 py-2 bg-status-warning hover:bg-status-warning/90 disabled:opacity-50 text-white rounded-lg font-bold text-xs flex items-center gap-1.5">
                             <ArrowUpCircle size={14} /> Escalader
                           </button>
                         )}

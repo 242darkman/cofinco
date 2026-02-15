@@ -260,6 +260,11 @@ export const agentKeys = {
 
   // Paiements terrain
   paiements: () => ['/api/paiements-terrain'] as const,
+
+  // Incidents
+  incidents: (agentId?: string) => agentId
+    ? ['/api/agent-incidents', agentId] as const
+    : ['/api/agent-incidents'] as const,
 };
 
 // ============================================
