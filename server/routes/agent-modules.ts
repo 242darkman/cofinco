@@ -132,6 +132,106 @@ export function registerAgentModulesRoutes(app: Express) {
   });
 
   // ────────────────────────────────────────────────────────────────────────────
+  // Commission payment endpoint
+  // ────────────────────────────────────────────────────────────────────────────
+
+  const payCommissionSchema = z.object({
+    method: z.enum(["CASH", "PAYROLL", "MOBILE_MONEY"]),
+    sessionCaisseId: z.string().uuid().optional(),
+    phone: z.string().optional(),
+    provider: z.string().optional(),
+  });
+
+  app.post("/api/agent-commissions/:id/pay", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const user = getUser(req);
+      if (!user) return res.status(401).json({ error: "Non authentifié" });
+
+      const parsed = payCommissionSchema.parse(req.body);
+
+      // 1. Find commission
+      const [commission] = await db.select().from(agentCommissions)
+        .where(and(eq(agentCommissions.id, id), isNull(agentCommissions.deletedAt)));
+
+      if (!commission) return res.status(404).json({ error: "Commission non trouvée" });
+
+      if (commission.statutPaiement === "PAID") {
+        return res.status(400).json({ error: "Commission déjà payée" });
+      }
+      if (commission.statutPaiement === "PROCESSING") {
+        return res.status(400).json({ error: "Paiement déjà en cours (Mobile Money)" });
+      }
+
+      const montantNet = Number(commission.montantNet || 0);
+      if (montantNet <= 0) {
+        return res.status(400).json({ error: "Montant net invalide (doit être > 0)" });
+      }
+
+      // Resolve agenceId
+      const [agent] = await db.select({ agenceId: agentsTerrain.agenceId })
+        .from(agentsTerrain)
+        .where(eq(agentsTerrain.id, commission.agentId))
+        .limit(1);
+
+      const agenceId = agent?.agenceId || commission.agenceId;
+      if (!agenceId) {
+        return res.status(400).json({ error: "Agence non trouvée pour cet agent" });
+      }
+
+      const { payCommissionCash, payCommissionPayroll, initiateCommissionMobileMoney } =
+        await import("../services/commission-payment-service");
+
+      let result;
+
+      switch (parsed.method) {
+        case "CASH": {
+          if (!parsed.sessionCaisseId) {
+            return res.status(400).json({ error: "sessionCaisseId requis pour paiement en espèces" });
+          }
+          result = await db.transaction(async (tx) => {
+            return payCommissionCash(tx, commission, parsed.sessionCaisseId!, agenceId, user.id);
+          });
+          break;
+        }
+
+        case "PAYROLL": {
+          result = await db.transaction(async (tx) => {
+            return payCommissionPayroll(tx, commission, agenceId, user.id);
+          });
+          break;
+        }
+
+        case "MOBILE_MONEY": {
+          if (!parsed.phone || !parsed.provider) {
+            return res.status(400).json({ error: "phone et provider requis pour Mobile Money" });
+          }
+          result = await initiateCommissionMobileMoney(
+            commission, parsed.phone, parsed.provider, agenceId, user.id
+          );
+          break;
+        }
+      }
+
+      logAudit(req, "PAY", "agent_commission", id, { method: parsed.method, montantNet, ...result });
+
+      // Broadcast update
+      const ws = getWsInstance();
+      if (ws) ws.broadcast({
+        type: "AGENT_MODULES_UPDATE",
+        payload: { entity: "commission", action: "paid", id, method: parsed.method },
+      });
+
+      // Return updated commission
+      const [updated] = await db.select().from(agentCommissions).where(eq(agentCommissions.id, id));
+      res.json({ commission: updated, payment: result });
+    } catch (error: any) {
+      if (error.name === "ZodError") return res.status(400).json({ error: "Données invalides", details: error.errors });
+      res.status(500).json({ error: error.message || "Erreur serveur" });
+    }
+  });
+
+  // ────────────────────────────────────────────────────────────────────────────
   // Commission auto-calculation helpers
   // ────────────────────────────────────────────────────────────────────────────
 

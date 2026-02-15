@@ -18,6 +18,7 @@ import { z } from "zod";
 import { agentsTerrain } from "./operations";
 import { agences } from "./agences";
 import { users } from "./auth";
+import { mouvementsFinanciers } from "./finance";
 import { relations } from "drizzle-orm";
 import { DEFAULT_CURRENCY } from "../config/currency";
 
@@ -39,6 +40,7 @@ export const agentCommissions = pgTable("agent_commissions", {
   statutPaiement: text("statut_paiement").notNull().default("En attente"),
   datePaiement: timestamp("date_paiement"),
   methodePaiement: text("methode_paiement"),
+  mouvementId: uuid("mouvement_id").references(() => mouvementsFinanciers.id),
   notes: text("notes").default(""),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

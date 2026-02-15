@@ -345,7 +345,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
     if (fetches[1].status === 'fulfilled') {
       const comms = Array.isArray(fetches[1].value) ? fetches[1].value : [];
       kpiState.commissionsNet = comms.reduce((sum: number, c: any) =>
-        sum + Number(c.net || c.commission_net || 0), 0);
+        sum + Number(c.montantNet || 0), 0);
     }
 
     // Planning today

@@ -49,6 +49,7 @@ import { eq, sql, and, isNull, asc, desc } from "drizzle-orm";
 import { generateReference, updateCreditSolde, updateSessionSolde, type MouvementFinancier } from "../ledger";
 import { postGlForMouvement } from "../accounting-posting-service";
 import { recalculateAgentObjectifs } from "../objectif-recalculation-service";
+import { recalculateAgentCommission } from "../commission-recalculation-service";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 
 // Type pour les résultats d'approbation
@@ -237,9 +238,10 @@ export class ApprovalService {
       return { success: true, operation: updatedOperation, mouvements };
     });
 
-    // 8. Fire-and-forget: recalculate agent objectives for current period
+    // 8. Fire-and-forget: recalculate agent objectives and commission for current period
     if (result.success && result.operation) {
       recalculateAgentObjectifs(result.operation.agentId).catch(() => {});
+      recalculateAgentCommission(result.operation.agentId).catch(() => {});
     }
 
     return result;

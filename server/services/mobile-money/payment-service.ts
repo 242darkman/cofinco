@@ -881,6 +881,20 @@ class PaymentService {
         logger.error({ intentId: intent.id, err: error }, 'Failed to finalize closure after payout');
       }
     }
+
+    // Post-payout hook: finalize commission payment
+    if (metadata?.useCase === "COMMISSION_PAYOUT" && metadata?.commissionId) {
+      try {
+        const { finalizeCommissionMobileMoney } = await import("../commission-payment-service");
+        await finalizeCommissionMobileMoney(
+          metadata.commissionId as string,
+          mouvement.id
+        );
+        logger.info({ intentId: intent.id, commissionId: metadata.commissionId }, 'Commission payout finalized');
+      } catch (error) {
+        logger.error({ intentId: intent.id, err: error }, 'Failed to finalize commission after payout');
+      }
+    }
   }
 
   /**

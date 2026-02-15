@@ -574,6 +574,47 @@ const ACCOUNTING_RULES_DATA = [
     priority: 100,
   },
 
+  // --- Commissions Agent Terrain ---
+  {
+    code: 'AGENT_COMMISSION_CASH',
+    name: 'Commission agent terrain — espèces',
+    description: 'Paiement commission agent de terrain en espèces via caisse',
+    sourceType: 'MOUVEMENT',
+    eventType: 'AGENT_COMMISSION',
+    paymentMethod: 'CASH',
+    journalCode: 'CAI',
+    debitAccount: '6615',   // Charges personnel - commissions/primes
+    creditAccount: '521',   // Caisse (argent sort)
+    descriptionTemplate: 'Commission agent — {employeNom} — {periode}',
+    priority: 100,
+  },
+  {
+    code: 'AGENT_COMMISSION_PAYROLL',
+    name: 'Commission agent terrain — fiche de paie',
+    description: 'Commission agent provisionnée pour paiement sur bulletin de paie',
+    sourceType: 'MOUVEMENT',
+    eventType: 'AGENT_COMMISSION',
+    paymentMethod: 'PAYROLL',
+    journalCode: 'OD',
+    debitAccount: '6615',   // Charges personnel - commissions/primes
+    creditAccount: '421',   // Personnel — rémunérations dues
+    descriptionTemplate: 'Commission agent (paie) — {employeNom} — {periode}',
+    priority: 100,
+  },
+  {
+    code: 'AGENT_COMMISSION_MM',
+    name: 'Commission agent terrain — Mobile Money',
+    description: 'Paiement commission agent via Mobile Money',
+    sourceType: 'MOUVEMENT',
+    eventType: 'AGENT_COMMISSION',
+    paymentMethod: 'MOBILE_MONEY',
+    journalCode: 'MM',
+    debitAccount: '6615',   // Charges personnel - commissions/primes
+    creditAccount: '5781',  // Mobile Money (résolu dynamiquement par opérateur)
+    descriptionTemplate: 'Commission agent MM — {employeNom} — {periode}',
+    priority: 100,
+  },
+
   // ============================================================================
   // DÉPÔTS ET RETRAITS PAR TYPE DE COMPTE
   // ============================================================================
