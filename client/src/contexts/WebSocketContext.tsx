@@ -501,30 +501,16 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          // Dispatch DOM event FIRST for any component listening directly
          window.dispatchEvent(new CustomEvent('credit-update', { detail: message.payload }));
 
-         const creditAction = message.payload?.type as string | undefined;
-
-         // Enquête/demande events: invalidate ALL credit keys immediately (0ms)
-         const isEnqueteEvent = creditAction && [
-           'investigation_assigned', 'investigation_reassigned', 'investigation_started',
-           'investigation_submitted', 'investigation_validated',
-           'enquete_new', 'demande_updated', 'demande_deleted', 'demande_cancelled',
-         ].includes(creditAction);
-
-         if (isEnqueteEvent) {
-           // Immediate invalidation — keys are disjoint, must invalidate each
-           queryClient.invalidateQueries({ queryKey: creditKeys.all });
-           queryClient.invalidateQueries({ queryKey: creditKeys.demandes() });
-           queryClient.invalidateQueries({ queryKey: creditKeys.demandesCounts() });
-           queryClient.invalidateQueries({ queryKey: creditKeys.enquetes() });
-         } else {
-           // Non-enquête credit events: debounced for bulk scenarios
-           debounceInvalidate(creditKeys.all);
-           debounceInvalidate(creditKeys.demandes());
-           debounceInvalidate(creditKeys.demandesCounts());
-           debounceInvalidate(creditKeys.enquetes());
-         }
+         // All credit workflow transitions trigger immediate invalidation (0ms)
+         // Each event represents a single user action, so debouncing is unnecessary
+         // and causes visible latency when navigating between workflow tabs
+         queryClient.invalidateQueries({ queryKey: creditKeys.all });
+         queryClient.invalidateQueries({ queryKey: creditKeys.demandes() });
+         queryClient.invalidateQueries({ queryKey: creditKeys.demandesCounts() });
+         queryClient.invalidateQueries({ queryKey: creditKeys.enquetes() });
 
          // Handle refund-related credit updates for sidebar badge
+         const creditAction = message.payload?.type as string | undefined;
          if (creditAction === 'refund_created' || creditAction === 'refund_approved') {
            window.dispatchEvent(new CustomEvent('refund-update', { detail: message.payload }));
            queryClient.invalidateQueries({ queryKey: ["/api/credit-refunds"] });

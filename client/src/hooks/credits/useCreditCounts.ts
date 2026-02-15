@@ -27,7 +27,7 @@ export function useCreditCounts() {
     // Update immediately when user focuses the window
     refetchOnWindowFocus: true,
     // Data is considered fresh for 15s to reduce unnecessary requests
-    staleTime: 15000,
+    staleTime: 0,
     refetchOnMount: true
   });
 
