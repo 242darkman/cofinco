@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { insertUserSchema, users, userPermissions, modules, permissions, userAgences, agences, userRoles, employes, activeSessions } from "@shared/schema";
 import { SystemRole, isAdminRole, normalizeRole } from "@shared/types/roles";
 import { storage } from "../storage";
+import { getClientByUserId } from "../storage/clients";
 import { loginUser, registerUser, requireAuth, hashPassword, comparePasswords, SESSION_CONFIG } from "../auth";
 import { attachAbility, requireAbility, requireResetPassword } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
@@ -26,6 +27,35 @@ import { createLogger } from "../lib/logger";
 import { caisseAdminService } from "../services/caisse-admin-service";
 
 const logger = createLogger('Auth');
+
+type AppContext = 'client' | 'employee';
+
+/**
+ * Détermine les contextes disponibles pour un utilisateur (client, employee, ou les deux).
+ * Un employé qui a aussi un dossier client peut basculer entre les deux modes dans l'app mobile.
+ */
+async function resolveUserContexts(userId: string, role: string): Promise<{
+  availableContexts: AppContext[];
+  defaultContext: AppContext;
+  hasClientRecord: boolean;
+}> {
+  const isEmployee = role !== SystemRole.CLIENT;
+  let hasClientRecord = false;
+  try {
+    const client = await getClientByUserId(userId);
+    hasClientRecord = !!client;
+  } catch {
+    // Pas de record client, ce n'est pas grave
+  }
+
+  const availableContexts: AppContext[] = [];
+  if (isEmployee) availableContexts.push('employee');
+  if (hasClientRecord || role === SystemRole.CLIENT) availableContexts.push('client');
+  if (availableContexts.length === 0) availableContexts.push('client');
+
+  const defaultContext: AppContext = isEmployee ? 'employee' : 'client';
+  return { availableContexts, defaultContext, hasClientRecord };
+}
 
 /**
  * Récupérer le caissePin d'un utilisateur depuis la table employes.
@@ -395,13 +425,17 @@ export function registerAuthRoutes(app: Express) {
         logger.info({ userId: user.id }, 'Created remember-me refresh token');
       }
 
-      // Step 8: Success - send response
+      // Step 8: Resolve user contexts (client/employee)
+      const contexts = await resolveUserContexts(user.id, effectiveRole);
+
+      // Step 9: Success - send response
       const totalDuration = Date.now() - loginStartTime;
       logger.info({
         username,
         userId: user.id,
         role: effectiveRole,
         agence: primaryAgence?.agenceNom,
+        contexts: contexts.availableContexts,
         durationMs: totalDuration,
         step: 'complete'
       }, `[Login] Success in ${totalDuration}ms`);
@@ -412,6 +446,8 @@ export function registerAuthRoutes(app: Express) {
         mustChangePassword: user.mustChangePassword || false,
         permissions: permissionsData,
         rememberMe: rememberMeInfo,
+        availableContexts: contexts.availableContexts,
+        defaultContext: contexts.defaultContext,
       });
     } catch (error) {
       const totalDuration = Date.now() - loginStartTime;
@@ -622,6 +658,9 @@ export function registerAuthRoutes(app: Express) {
         // Load permissions
         const permissionsData = await getPermissionsForUser(user.id, effectiveRole);
 
+        // Resolve contexts
+        const contexts = await resolveUserContexts(user.id, effectiveRole);
+
         logger.info({ userId: user.id }, 'Session refreshed via remember-me token');
 
         res.json({
@@ -629,6 +668,8 @@ export function registerAuthRoutes(app: Express) {
           message: "Session restaurée",
           permissions: permissionsData,
           rememberMe: { expiresAt: result.newExpiresAt },
+          availableContexts: contexts.availableContexts,
+          defaultContext: contexts.defaultContext,
         });
       });
     } catch (error) {
@@ -1201,11 +1242,19 @@ export function registerAuthRoutes(app: Express) {
       // Pas de données employé, c'est OK
     }
 
+    // Resolve available contexts (client / employee)
+    const contexts = await resolveUserContexts(
+      req.session.user.id,
+      req.session.user.role
+    );
+
     res.json({
       ...req.session.user,
       ...userData,
       ...employeData,
-      sessionValid: true // Explicit session validity indicator
+      sessionValid: true,
+      availableContexts: contexts.availableContexts,
+      defaultContext: contexts.defaultContext,
     });
   });
 
