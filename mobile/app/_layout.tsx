@@ -26,7 +26,7 @@ export default function RootLayout() {
   const segments = useSegments();
   const router = useRouter();
 
-  const { isAuthenticated, isLoading, activeContext, checkSession } = useAuthStore();
+  const { isAuthenticated, isLoading, activeContext, user, checkSession } = useAuthStore();
   const { loadBranding, loadSystemSettings } = useSettingsStore();
   const prevAuthenticated = useRef(false);
 
@@ -45,24 +45,26 @@ export default function RootLayout() {
     if (isLoading) return;
 
     const inAuthGroup = segments[0] === '(auth)';
-    const inTabsGroup = segments[0] === '(tabs)';
-    const inAgentGroup = segments[0] === '(agent)';
+    const onForcePasswordChange = segments[1] === 'force-password-change';
 
     if (!isAuthenticated && !inAuthGroup) {
       router.replace('/(auth)/login');
-    } else if (isAuthenticated && inAuthGroup) {
-      // Just authenticated — route to the appropriate context
+    } else if (isAuthenticated && user?.mustChangePassword && !onForcePasswordChange) {
+      // Must change password before accessing the app
+      router.replace('/(auth)/force-password-change');
+    } else if (isAuthenticated && !user?.mustChangePassword && inAuthGroup) {
+      // Authenticated and password OK — route to the appropriate context
       if (activeContext === 'employee') {
         router.replace('/(agent)');
       } else {
         router.replace('/(tabs)');
       }
     }
-  }, [isAuthenticated, isLoading, segments]);
+  }, [isAuthenticated, isLoading, segments, user?.mustChangePassword]);
 
   // When activeContext changes (user switched), navigate to the right group
   useEffect(() => {
-    if (!isAuthenticated || isLoading || !activeContext) return;
+    if (!isAuthenticated || isLoading || !activeContext || user?.mustChangePassword) return;
 
     const inTabsGroup = segments[0] === '(tabs)';
     const inAgentGroup = segments[0] === '(agent)';
