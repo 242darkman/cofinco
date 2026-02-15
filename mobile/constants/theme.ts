@@ -1,53 +1,91 @@
-/**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
- */
-
 import { Platform } from 'react-native';
 
-const tintColorLight = '#0a7ea4';
-const tintColorDark = '#fff';
-
+/**
+ * COFINCO Design Tokens
+ * Mirrors the CSS variables in global.css for programmatic access.
+ */
 export const Colors = {
   light: {
-    text: '#11181C',
-    background: '#fff',
-    tint: tintColorLight,
-    icon: '#687076',
-    tabIconDefault: '#687076',
-    tabIconSelected: tintColorLight,
+    bgBase: '#f8fafc',
+    bgSurface: '#ffffff',
+    bgElevated: '#ffffff',
+    bgMuted: '#f1f5f9',
+    bgSubtle: '#e2e8f0',
+    textPrimary: '#0f172a',
+    textSecondary: '#1e293b',
+    textMuted: '#475569',
+    textInverted: '#ffffff',
+    borderDefault: '#cbd5e1',
+    borderSubtle: '#e2e8f0',
+    borderStrong: '#94a3b8',
+    accent: '#047857',
+    accentHover: '#065f46',
+    success: '#047857',
+    successBg: '#ecfdf5',
+    warning: '#b45309',
+    warningBg: '#fffbeb',
+    danger: '#dc2626',
+    dangerBg: '#fef2f2',
+    info: '#1d4ed8',
+    infoBg: '#eff6ff',
+    cardBg: '#ffffff',
+    cardBorder: '#e2e8f0',
+    inputBg: '#ffffff',
+    inputBorder: '#94a3b8',
+    inputFocus: '#047857',
+    inputText: '#0f172a',
+    inputPlaceholder: '#64748b',
+    tabActive: '#047857',
+    tabInactive: '#64748b',
+    brandNavy: '#1B2A4A',
+    brandGreen: '#2D8B57',
+    brandAmber: '#E8A33D',
+    brandTeal: '#3AAA8C',
   },
   dark: {
-    text: '#ECEDEE',
-    background: '#151718',
-    tint: tintColorDark,
-    icon: '#9BA1A6',
-    tabIconDefault: '#9BA1A6',
-    tabIconSelected: tintColorDark,
+    bgBase: '#0f172a',
+    bgSurface: '#1e293b',
+    bgElevated: '#334155',
+    bgMuted: '#1e293b',
+    bgSubtle: '#334155',
+    textPrimary: '#f8fafc',
+    textSecondary: '#e2e8f0',
+    textMuted: '#94a3b8',
+    textInverted: '#0f172a',
+    borderDefault: '#334155',
+    borderSubtle: '#1e293b',
+    borderStrong: '#475569',
+    accent: '#22d3ee',
+    accentHover: '#67e8f9',
+    success: '#34d399',
+    successBg: '#064e3b',
+    warning: '#fbbf24',
+    warningBg: '#451a03',
+    danger: '#ef4444',
+    dangerBg: '#450a0a',
+    info: '#60a5fa',
+    infoBg: '#172554',
+    cardBg: '#1e293b',
+    cardBorder: '#334155',
+    inputBg: '#1e293b',
+    inputBorder: '#475569',
+    inputFocus: '#22d3ee',
+    inputText: '#f8fafc',
+    inputPlaceholder: '#94a3b8',
+    tabActive: '#22d3ee',
+    tabInactive: '#94a3b8',
+    brandNavy: '#1B2A4A',
+    brandGreen: '#2D8B57',
+    brandAmber: '#E8A33D',
+    brandTeal: '#3AAA8C',
   },
-};
+} as const;
 
 export const Fonts = Platform.select({
-  ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
-    rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
-    mono: 'ui-monospace',
-  },
-  default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
-    mono: 'monospace',
-  },
-  web: {
-    sans: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-    serif: "Georgia, 'Times New Roman', serif",
-    rounded: "'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif",
-    mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
-  },
+  ios: { sans: 'System', mono: 'Menlo' },
+  default: { sans: 'normal', mono: 'monospace' },
 });
+
+export function getColors(colorScheme: 'light' | 'dark') {
+  return Colors[colorScheme];
+}
