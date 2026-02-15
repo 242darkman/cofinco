@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
-import { View, Text, FlatList, RefreshControl } from 'react-native';
+import { View, Text, FlatList, RefreshControl, Pressable, ScrollView } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useAgentStore, type OperationTerrain } from '@/stores/agent-store';
@@ -28,13 +29,21 @@ const STATUS_LABEL: Record<string, string> = {
   CANCELLED: 'Annulee',
 };
 
-function OperationItem({ op }: { op: OperationTerrain }) {
+const FILTER_OPTIONS = [
+  { value: '', label: 'Toutes' },
+  { value: 'SUBMITTED', label: 'Soumises' },
+  { value: 'APPROVED', label: 'Approuvees' },
+  { value: 'REJECTED', label: 'Rejetees' },
+  { value: 'SETTLED', label: 'Reglees' },
+];
+
+function OperationItem({ op, onPress }: { op: OperationTerrain; onPress: () => void }) {
   const scheme = useColorScheme();
   const colors = Colors[scheme];
   const isCollect = op.type === 'COLLECT_CASH';
 
   return (
-    <View className="px-5 py-3">
+    <Pressable className="px-5 py-3 active:bg-bg-muted" onPress={onPress}>
       <View className="flex-row items-center justify-between mb-1">
         <View className="flex-row items-center flex-1">
           <View className={`w-8 h-8 rounded-full items-center justify-center mr-2 ${isCollect ? 'bg-success/10' : 'bg-warning/10'}`}>
@@ -69,22 +78,26 @@ function OperationItem({ op }: { op: OperationTerrain }) {
           {op.observations}
         </Text>
       )}
-    </View>
+    </Pressable>
   );
 }
 
 export default function HistoryScreen() {
+  const router = useRouter();
   const getOperations = useAgentStore((s) => s.getOperations);
   const [operations, setOperations] = useState<OperationTerrain[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [total, setTotal] = useState(0);
+  const [filterStatut, setFilterStatut] = useState('');
 
   const load = useCallback(async () => {
     setIsLoading(true);
     try {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const data = await getOperations({ dateFrom: today.toISOString() });
+      const params: Record<string, string> = { dateFrom: today.toISOString() };
+      if (filterStatut) params.statut = filterStatut;
+      const data = await getOperations(params);
       setOperations(data.operations);
       setTotal(data.total);
     } catch {
@@ -92,7 +105,7 @@ export default function HistoryScreen() {
     } finally {
       setIsLoading(false);
     }
-  }, [getOperations]);
+  }, [getOperations, filterStatut]);
 
   useEffect(() => {
     load();
@@ -104,7 +117,32 @@ export default function HistoryScreen() {
 
   return (
     <View className="flex-1 bg-bg-base">
-      <View className="px-5 pt-4 pb-2">
+      {/* Filter chips */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerClassName="px-5 py-3 gap-2"
+      >
+        {FILTER_OPTIONS.map((opt) => (
+          <Pressable
+            key={opt.value}
+            className={`px-3 py-1.5 rounded-full ${
+              filterStatut === opt.value ? 'bg-accent' : 'bg-bg-muted'
+            }`}
+            onPress={() => setFilterStatut(opt.value)}
+          >
+            <Text
+              className={`text-xs font-semibold ${
+                filterStatut === opt.value ? 'text-white' : 'text-text-muted'
+              }`}
+            >
+              {opt.label}
+            </Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+
+      <View className="px-5 pb-2">
         <Text className="text-text-muted text-sm">
           {total} operation{total > 1 ? 's' : ''} aujourd'hui
         </Text>
@@ -113,7 +151,12 @@ export default function HistoryScreen() {
       <FlatList
         data={operations}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <OperationItem op={item} />}
+        renderItem={({ item }) => (
+          <OperationItem
+            op={item}
+            onPress={() => router.push({ pathname: '/(agent)/operation-detail', params: { id: item.id } })}
+          />
+        )}
         ItemSeparatorComponent={() => <View className="h-px bg-border-subtle mx-5" />}
         refreshControl={<RefreshControl refreshing={false} onRefresh={load} />}
         contentContainerClassName="pb-6"
