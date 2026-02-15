@@ -231,7 +231,7 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
                 </select>
               </FormField>
               <FormField label="Cible">
-                <input type="number" value={formData.valeur_objectif} onChange={(e) => setFormData({ ...formData, valeur_objectif: Number(e.target.value) })} className="w-full px-2 py-1.5 bg-surface border border-edge rounded-lg text-content-primary text-xs" required />
+                <input type="text" inputMode="numeric" value={formData.valeur_objectif || ''} onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormData({ ...formData, valeur_objectif: v ? Number(v) : 0 }); }} className="w-full px-2 py-1.5 bg-surface border border-edge rounded-lg text-content-primary text-xs" placeholder="0" required />
               </FormField>
               <FormField label="Unité">
                 <select value={formData.unite} onChange={(e) => setFormData({ ...formData, unite: e.target.value })} className="w-full px-2 py-1.5 bg-surface border border-edge rounded-lg text-content-primary text-xs">
@@ -239,7 +239,7 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
                 </select>
               </FormField>
               <FormField label={`Prime (${currencySymbol()})`}>
-                <input type="number" value={formData.recompense} onChange={(e) => setFormData({ ...formData, recompense: Number(e.target.value) })} className="w-full px-2 py-1.5 bg-surface border border-edge rounded-lg text-content-primary text-xs" />
+                <input type="text" inputMode="numeric" value={formData.recompense || ''} onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormData({ ...formData, recompense: v ? Number(v) : 0 }); }} className="w-full px-2 py-1.5 bg-surface border border-edge rounded-lg text-content-primary text-xs" placeholder="0" />
               </FormField>
             </div>
             <button type="submit" disabled={loading} className="w-full py-2 bg-status-info hover:bg-status-info text-white rounded-lg font-bold text-xs mt-2 flex items-center justify-center gap-2">

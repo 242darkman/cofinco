@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Map, FileText, GraduationCap, Package, AlertTriangle, Target, BarChart3, TrendingUp, Trophy, Download, LayoutDashboard, UserCircle, ChevronDown, Search, X, UserPlus, Eye, Menu, ChevronLeft, ChevronRight, Activity } from 'lucide-react';
 import { Card } from '../ui';
 import AgentCommissions from './AgentCommissions';
@@ -29,8 +29,14 @@ interface AgentOption {
   zoneAffectation?: string;
 }
 
-export default function AgentTerrainPortail({ agentId }: { agentId?: string }) {
-  const [activeModule, setActiveModule] = useState<string>('dashboard');
+interface AgentTerrainPortailProps {
+  agentId?: string;
+  activeView?: string;
+  onModuleChange?: (module: string, subModule?: string) => void;
+}
+
+export default function AgentTerrainPortail({ agentId, activeView, onModuleChange }: AgentTerrainPortailProps) {
+  const [activeModule, setActiveModule] = useState<string>(activeView || 'dashboard');
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const scroll = (direction: 'left' | 'right') => {
@@ -80,12 +86,21 @@ export default function AgentTerrainPortail({ agentId }: { agentId?: string }) {
     (a.zoneAffectation || '').toLowerCase().includes(agentSearchQuery.toLowerCase())
   );
 
+  // Sync URL → internal state
+  useEffect(() => {
+    if (activeView && activeView !== activeModule) {
+      setActiveModule(activeView);
+    }
+  }, [activeView]);
+
   const handleModuleChange = (moduleName: string) => {
     setModuleLoading(true);
     setMobileMenuOpen(false);
     setTimeout(() => {
       setActiveModule(moduleName);
       setModuleLoading(false);
+      // Sync to URL: 'dashboard' = no sub-module
+      onModuleChange?.('agentModules', moduleName === 'dashboard' ? undefined : moduleName);
     }, 300);
   };
 

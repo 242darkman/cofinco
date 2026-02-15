@@ -330,7 +330,10 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
       case 'agentModules':
         return (
           <Suspense fallback={<ModuleLoadingFallback moduleName="Gestion Agent" />}>
-            <AgentTerrainPortail />
+            <AgentTerrainPortail
+              activeView={currentSubModule}
+              onModuleChange={handleModuleChange}
+            />
           </Suspense>
         );
       case 'caisse':
