@@ -585,6 +585,11 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
                break;
              case 'formation':
                debounceInvalidate(["/api/hr/formations"]);
+               // Cross-invalidate agent formation caches
+               debounceInvalidate(["/api/agent-formations"]);
+               debounceInvalidate(["/api/agent-formations-suivi"]);
+               debounceInvalidate(["/api/agent-formations-compliance"]);
+               window.dispatchEvent(new CustomEvent('agent-formation-update', { detail: message.payload }));
                break;
              case 'sanction':
                debounceInvalidate(["/api/hr/sanctions"]);
@@ -663,6 +668,12 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          const agentEntity = message.payload?.entity;
          if (agentEntity) {
            debounceInvalidate([`/api/agent-${agentEntity}s`]);
+           // Cross-invalidate HR formation cache when agent updates formation
+           if (agentEntity === 'formation') {
+             debounceInvalidate(["/api/hr/formations"]);
+             debounceInvalidate(["/api/agent-formations-suivi"]);
+             debounceInvalidate(["/api/agent-formations-compliance"]);
+           }
          } else {
            // Full invalidation of all agent module queries
            debounceInvalidate(["/api/agent-commissions"]);

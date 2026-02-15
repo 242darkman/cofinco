@@ -20,6 +20,7 @@ import {
   agentCommunications,
   formations,
   formationParticipants,
+  formationCertificates,
   employes,
   agentsTerrain,
   users,
@@ -1353,74 +1354,55 @@ export function registerAgentModulesRoutes(app: Express) {
   });
 
   // ════════════════════════════════════════════════════════════════════════════
-  // FORMATIONS CATALOGUE (Source: HR Module)
+  // FORMATIONS CATALOGUE (Source: HR Module — read-only for agents)
   // ════════════════════════════════════════════════════════════════════════════
 
   app.get("/api/agent-formations", requireAuth, async (req: Request, res: Response) => {
     try {
-      // Query HR formations table (Single Source of Truth)
-      const rows = await db.select({
-        id: formations.id,
-        titre: formations.titre,
-        description: formations.description,
-        type_formation: formations.typeFormation,
-        duree_heures: formations.dureeHeures,
-        contenu_url: formations.contenuUrl,
-        obligatoire: formations.obligatoire,
-        created_at: formations.createdAt,
-      })
-      .from(formations)
-      .where(isNull(formations.deletedAt))
-      .orderBy(desc(formations.createdAt));
+      const rows = await db
+        .select({
+          id: formations.id,
+          titre: formations.titre,
+          description: formations.description,
+          typeFormation: formations.typeFormation,
+          dureeHeures: formations.dureeHeures,
+          contenuUrl: formations.contenuUrl,
+          obligatoire: formations.obligatoire,
+          statut: formations.statut,
+          formateur: formations.formateur,
+          dateDebut: formations.dateDebut,
+          dateFin: formations.dateFin,
+          lieu: formations.lieu,
+          programme: formations.programme,
+          capaciteMax: formations.capaciteMax,
+          createdAt: formations.createdAt,
+          participants: sql<number>`coalesce(count(${formationParticipants.id}), 0)::int`,
+        })
+        .from(formations)
+        .leftJoin(formationParticipants, eq(formations.id, formationParticipants.formationId))
+        .where(and(
+          isNull(formations.deletedAt),
+          ne(formations.statut, "CANCELLED"),
+        ))
+        .groupBy(formations.id)
+        .orderBy(desc(formations.dateDebut));
 
-      // Cast IDs to string to match frontend expectations if necessary, 
-      // but JSON serialization handles numbers fine. Frontend interface might need update if it strictly expects string.
-      // We return as is, assuming frontend handles JSON numbers gracefully or we update frontend.
       res.json(rows);
     } catch (error: any) {
       res.status(500).json({ error: error.message || "Erreur serveur" });
     }
   });
 
-  app.post("/api/agent-formations", requireAuth, async (req: Request, res: Response) => {
-    try {
-      // Create in HR table directly
-      // Helper to validate input since we switched schemas
-      const { titre, description, type_formation, duree_heures, contenu_url, obligatoire } = req.body;
-
-      if (!titre) return res.status(400).json({ error: "Titre requis" });
-
-      const [row] = await db.insert(formations).values({
-        titre,
-        description,
-        typeFormation: type_formation,
-        dureeHeures: duree_heures,
-        contenuUrl: contenu_url,
-        obligatoire: obligatoire || false,
-        formateur: "Auto-Assignment", // Default or required field
-        duree: `${duree_heures} heures`, // Legacy/Display field
-        statut: "PLANNED",
-        dateDebut: new Date(), // Required by schema, defaulting to today
-      }).returning();
-
-      logAudit(req, "CREATE", "agent_formation", String(row.id), { titre });
-
-      res.status(201).json(row);
-    } catch (error: any) {
-       res.status(500).json({ error: error.message || "Erreur serveur" });
-    }
-  });
-
   // ════════════════════════════════════════════════════════════════════════════
-  // FORMATIONS SUIVI (Source: HR Module)
+  // FORMATIONS SUIVI (Enrollment + Progression + Evaluation + Certificates)
   // ════════════════════════════════════════════════════════════════════════════
 
   app.get("/api/agent-formations-suivi", requireAuth, async (req: Request, res: Response) => {
     try {
       const { agent_id } = req.query;
 
-      // Base query joining formationParticipants with Formations and Agents (to recover agentId)
-      const baseQuery = db.select({
+      const rows = await db.select({
+        // Participation core
         id: formationParticipants.id,
         agentId: agentsTerrain.id,
         formationId: formationParticipants.formationId,
@@ -1428,10 +1410,14 @@ export function registerAgentModulesRoutes(app: Express) {
         dateFin: formationParticipants.dateFin,
         progression: formationParticipants.progression,
         statut: formationParticipants.statut,
-        score: formationParticipants.scoreEvaluation,
-        certificatUrl: formationParticipants.certificatUrl,
+        presence: formationParticipants.presence,
         createdAt: formationParticipants.dateInscription,
-        
+        // Evaluation from HR
+        scoreEvaluation: formationParticipants.scoreEvaluation,
+        evaluation: formationParticipants.evaluation,
+        competencesAcquises: formationParticipants.competencesAcquises,
+        recommandation: formationParticipants.recommandation,
+        evaluatedAt: formationParticipants.evaluatedAt,
         // Formation details
         formationTitre: formations.titre,
         formationDescription: formations.description,
@@ -1439,41 +1425,61 @@ export function registerAgentModulesRoutes(app: Express) {
         formationDuree: formations.dureeHeures,
         formationObligatoire: formations.obligatoire,
         formationContenuUrl: formations.contenuUrl,
+        formationStatut: formations.statut,
+        formationDateFin: formations.dateFin,
+        // Certificate (LEFT JOIN — may be null)
+        certificateId: formationCertificates.id,
+        certificateNumero: formationCertificates.numeroCertificat,
+        certificateStatut: formationCertificates.statut,
+        certificateFichierUrl: formationCertificates.fichierUrl,
+        certificateDateExpiration: formationCertificates.dateExpiration,
       })
       .from(formationParticipants)
       .leftJoin(formations, eq(formationParticipants.formationId, formations.id))
-      .leftJoin(agentsTerrain, eq(formationParticipants.employeId, agentsTerrain.employeId));
+      .leftJoin(agentsTerrain, eq(formationParticipants.employeId, agentsTerrain.employeId))
+      .leftJoin(formationCertificates, and(
+        eq(formationCertificates.formationId, formationParticipants.formationId),
+        eq(formationCertificates.employeId, formationParticipants.employeId),
+      ))
+      .where(agent_id && typeof agent_id === "string" ? eq(agentsTerrain.id, agent_id) : sql`true`)
+      .orderBy(desc(formationParticipants.dateInscription));
 
-      const conditions = [];
-      
-      if (agent_id && typeof agent_id === "string") {
-        conditions.push(eq(agentsTerrain.id, agent_id));
-      }
-
-      const rows = await baseQuery.where(and(...conditions))
-        .orderBy(desc(formationParticipants.dateInscription));
-
-      // Transform to match frontend expected format
       const formatted = rows.map(r => ({
         id: r.id,
-        agent_id: r.agentId,
-        formation_id: r.formationId,
-        date_debut: r.dateDebut,
-        date_fin: r.dateFin,
+        agentId: r.agentId,
+        formationId: r.formationId,
+        dateDebut: r.dateDebut,
+        dateFin: r.dateFin,
         progression: r.progression,
         statut: r.statut,
-        score: r.score,
-        certificat_url: r.certificatUrl,
-        created_at: r.createdAt,
+        presence: r.presence,
+        createdAt: r.createdAt,
+        // Evaluation
+        scoreEvaluation: r.scoreEvaluation,
+        evaluation: r.evaluation,
+        competencesAcquises: r.competencesAcquises,
+        recommandation: r.recommandation,
+        evaluatedAt: r.evaluatedAt,
+        // Formation
         formation: r.formationTitre ? {
           id: r.formationId,
           titre: r.formationTitre,
           description: r.formationDescription,
-          type_formation: r.formationType,
-          duree_heures: r.formationDuree,
-          contenu_url: r.formationContenuUrl,
+          typeFormation: r.formationType,
+          dureeHeures: r.formationDuree,
+          contenuUrl: r.formationContenuUrl,
           obligatoire: r.formationObligatoire,
+          statut: r.formationStatut,
+          dateFin: r.formationDateFin,
         } : undefined,
+        // Certificate
+        certificate: r.certificateId ? {
+          id: r.certificateId,
+          numero: r.certificateNumero,
+          statut: r.certificateStatut,
+          fichierUrl: r.certificateFichierUrl,
+          dateExpiration: r.certificateDateExpiration,
+        } : null,
       }));
 
       res.json(formatted);
@@ -1496,23 +1502,31 @@ export function registerAgentModulesRoutes(app: Express) {
         return res.status(404).json({ error: "Agent ou Employé non trouvé" });
       }
 
-      // Get Employe Name (denormalized required for formationParticipants)
+      // Check capacity
+      const formId = Number(formation_id);
+      const [formation] = await db.select({ capaciteMax: formations.capaciteMax })
+        .from(formations).where(eq(formations.id, formId));
+      if (formation?.capaciteMax) {
+        const [{ count: enrolled }] = await db.select({ count: sql<number>`count(*)::int` })
+          .from(formationParticipants).where(eq(formationParticipants.formationId, formId));
+        if (enrolled >= formation.capaciteMax) {
+          return res.status(400).json({ error: "Formation complète — capacité maximale atteinte" });
+        }
+      }
+
+      // Get Employe Name
       const [userData] = await db
-        .select({
-          nom: users.nom,
-          prenom: users.prenom,
-        })
+        .select({ nom: users.nom, prenom: users.prenom })
         .from(employes)
         .innerJoin(users, eq(employes.userId, users.id))
         .where(eq(employes.id, agent.employeId));
 
       const employeNom = userData ? `${userData.nom} ${userData.prenom}` : "Inconnu";
 
-      // Insert into formationParticipants
       const [row] = await db.insert(formationParticipants).values({
-        formationId: Number(formation_id), // Cast to number for HR schema
+        formationId: formId,
         employeId: agent.employeId,
-        employeNom: employeNom,
+        employeNom,
         dateDebut: date_debut ? new Date(date_debut) : undefined,
         progression: progression || 0,
         statut: statut || "IN_PROGRESS",
@@ -1521,10 +1535,17 @@ export function registerAgentModulesRoutes(app: Express) {
 
       logAudit(req, "CREATE", "agent_formation_suivi_hr", row.id, { agentId: agent_id, formationId: formation_id });
 
+      // Cross-broadcast: HR + Agent
+      const ws = getWsInstance();
+      if (ws) {
+        ws.broadcast({ type: "HR_UPDATE", payload: { entity: "formation", action: "updated", id: formId, timestamp: new Date().toISOString() } });
+        ws.broadcast({ type: "AGENT_MODULES_UPDATE", payload: { entity: "formation", agentId: agent_id } });
+      }
+
       res.status(201).json(row);
     } catch (error: any) {
-       console.error("Error creating formation suivi:", error);
-       res.status(500).json({ error: error.message || "Erreur serveur" });
+      console.error("Error creating formation suivi:", error);
+      res.status(500).json({ error: error.message || "Erreur serveur" });
     }
   });
 
@@ -1533,7 +1554,6 @@ export function registerAgentModulesRoutes(app: Express) {
       const { id } = req.params;
       const updates = req.body;
 
-      // Extract relevant fields to update
       const updateData: any = {};
       if (updates.progression !== undefined) updateData.progression = updates.progression;
       if (updates.statut !== undefined) updateData.statut = updates.statut;
@@ -1542,13 +1562,121 @@ export function registerAgentModulesRoutes(app: Express) {
 
       const [row] = await db.update(formationParticipants)
         .set(updateData)
-        .where(eq(formationParticipants.id, id)) // UUID id we added
+        .where(eq(formationParticipants.id, id))
         .returning();
 
       if (!row) return res.status(404).json({ error: "Suivi non trouvé" });
 
       logAudit(req, "UPDATE", "agent_formation_suivi_hr", id, updates);
+
+      // Cross-broadcast: HR + Agent
+      const ws = getWsInstance();
+      if (ws) {
+        ws.broadcast({ type: "HR_UPDATE", payload: { entity: "formation", action: "updated", id: row.formationId, timestamp: new Date().toISOString() } });
+        // Resolve agentId from employeId
+        const [agentRow] = await db.select({ id: agentsTerrain.id })
+          .from(agentsTerrain).where(eq(agentsTerrain.employeId, row.employeId));
+        if (agentRow) {
+          ws.broadcast({ type: "AGENT_MODULES_UPDATE", payload: { entity: "formation", agentId: agentRow.id } });
+        }
+      }
+
       res.json(row);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Erreur serveur" });
+    }
+  });
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // FORMATIONS COMPLIANCE (Mandatory training tracking)
+  // ════════════════════════════════════════════════════════════════════════════
+
+  app.get("/api/agent-formations-compliance", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { agent_id } = req.query;
+      if (!agent_id || typeof agent_id !== "string") {
+        return res.status(400).json({ error: "agent_id requis" });
+      }
+
+      // Resolve employeId
+      const [agent] = await db.select({ employeId: agentsTerrain.employeId })
+        .from(agentsTerrain).where(eq(agentsTerrain.id, agent_id));
+      if (!agent?.employeId) {
+        return res.json({ mandatoryNotEnrolled: [], overdue: [], expiringCertificates: [], complianceScore: 100 });
+      }
+
+      const now = new Date();
+      const in90Days = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
+
+      // 1. All active mandatory formations
+      const mandatoryFormations = await db.select({
+        id: formations.id,
+        titre: formations.titre,
+        dateDebut: formations.dateDebut,
+        dateFin: formations.dateFin,
+        statut: formations.statut,
+      })
+      .from(formations)
+      .where(and(
+        isNull(formations.deletedAt),
+        eq(formations.obligatoire, true),
+        ne(formations.statut, "CANCELLED"),
+      ));
+
+      // 2. Agent's enrollments
+      const enrollments = await db.select({
+        formationId: formationParticipants.formationId,
+        statut: formationParticipants.statut,
+        progression: formationParticipants.progression,
+      })
+      .from(formationParticipants)
+      .where(eq(formationParticipants.employeId, agent.employeId));
+
+      const enrolledMap = new Map(enrollments.map(e => [e.formationId, e]));
+
+      // Mandatory not enrolled
+      const mandatoryNotEnrolled = mandatoryFormations
+        .filter(f => !enrolledMap.has(f.id))
+        .map(f => ({ id: f.id, titre: f.titre, dateDebut: f.dateDebut, dateFin: f.dateFin }));
+
+      // Overdue: enrolled but not completed and past dateFin
+      const overdue = mandatoryFormations
+        .filter(f => {
+          const enrollment = enrolledMap.get(f.id);
+          return enrollment && enrollment.statut !== "COMPLETED" && f.dateFin && new Date(f.dateFin) < now;
+        })
+        .map(f => ({
+          id: f.id,
+          titre: f.titre,
+          dateFin: f.dateFin,
+          progression: enrolledMap.get(f.id)?.progression || 0,
+        }));
+
+      // 3. Expiring certificates (within 90 days)
+      const expiringCertificates = await db.select({
+        id: formationCertificates.id,
+        titre: formationCertificates.titre,
+        numero: formationCertificates.numeroCertificat,
+        dateExpiration: formationCertificates.dateExpiration,
+      })
+      .from(formationCertificates)
+      .where(and(
+        eq(formationCertificates.employeId, agent.employeId),
+        eq(formationCertificates.statut, "ISSUED"),
+        sql`${formationCertificates.dateExpiration} IS NOT NULL`,
+        lte(formationCertificates.dateExpiration, in90Days.toISOString()),
+        gte(formationCertificates.dateExpiration, now.toISOString()),
+      ));
+
+      // Compliance score: % of mandatory formations completed
+      const totalMandatory = mandatoryFormations.length;
+      const completedMandatory = mandatoryFormations.filter(f => {
+        const e = enrolledMap.get(f.id);
+        return e && e.statut === "COMPLETED";
+      }).length;
+      const complianceScore = totalMandatory > 0 ? Math.round((completedMandatory / totalMandatory) * 100) : 100;
+
+      res.json({ mandatoryNotEnrolled, overdue, expiringCertificates, complianceScore });
     } catch (error: any) {
       res.status(500).json({ error: error.message || "Erreur serveur" });
     }

@@ -1,123 +1,132 @@
-import React, { useState, useEffect } from 'react';
-import { GraduationCap, Plus, Award, TrendingUp, CheckCircle, Clock, ExternalLink, Download, Star, ChevronLeft, ChevronRight, Eye, X } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  GraduationCap, Award, TrendingUp, CheckCircle, Clock,
+  ExternalLink, Download, Star, ChevronLeft, ChevronRight,
+  Eye, AlertTriangle, Shield, FileCheck, Users, MapPin, Calendar,
+} from 'lucide-react';
 import { StatutSuiviFormation, STATUT_SUIVI_FORMATION_LABELS } from '@shared/enum/status-constants';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../ui/sheet';
 
+// ═══════════════════════════════════════════════════════════════════════════
+// TYPES
+// ═══════════════════════════════════════════════════════════════════════════
+
 interface Formation {
-  id: string;
+  id: number;
   titre: string;
-  description: string;
-  type_formation: string;
-  duree_heures: number;
-  contenu_url: string;
-  obligatoire: boolean;
-  created_at: string;
+  description: string | null;
+  typeFormation: string | null;
+  dureeHeures: number | null;
+  contenuUrl: string | null;
+  obligatoire: boolean | null;
+  statut: string | null;
+  formateur: string | null;
+  dateDebut: string | null;
+  dateFin: string | null;
+  lieu: string | null;
+  programme: string | null;
+  capaciteMax: number | null;
+  participants: number;
+  createdAt: string;
 }
 
 interface FormationSuivi {
   id: string;
-  agent_id: string;
-  formation_id: string;
-  date_debut?: string;
-  date_fin?: string;
-  progression: number;
-  statut: string;
-  score?: number;
-  certificat_url: string;
-  formation?: Formation;
+  agentId: string | null;
+  formationId: number;
+  dateDebut: string | null;
+  dateFin: string | null;
+  progression: number | null;
+  statut: string | null;
+  presence: string | null;
+  createdAt: string | null;
+  scoreEvaluation: number | null;
+  evaluation: string | null;
+  competencesAcquises: string | null;
+  recommandation: string | null;
+  evaluatedAt: string | null;
+  formation?: {
+    id: number;
+    titre: string;
+    description: string | null;
+    typeFormation: string | null;
+    dureeHeures: number | null;
+    contenuUrl: string | null;
+    obligatoire: boolean | null;
+    statut: string | null;
+    dateFin: string | null;
+  };
+  certificate: {
+    id: string;
+    numero: string;
+    statut: string;
+    fichierUrl: string | null;
+    dateExpiration: string | null;
+  } | null;
 }
+
+interface ComplianceData {
+  mandatoryNotEnrolled: Array<{ id: number; titre: string; dateDebut: string | null; dateFin: string | null }>;
+  overdue: Array<{ id: number; titre: string; dateFin: string | null; progression: number }>;
+  expiringCertificates: Array<{ id: string; titre: string; numero: string; dateExpiration: string | null }>;
+  complianceScore: number;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// COMPONENT
+// ═══════════════════════════════════════════════════════════════════════════
 
 export default function AgentFormations({ agentId }: { agentId?: string }) {
   const [formations, setFormations] = useState<Formation[]>([]);
   const [suivis, setSuivis] = useState<FormationSuivi[]>([]);
+  const [compliance, setCompliance] = useState<ComplianceData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showNewFormation, setShowNewFormation] = useState(false);
-  const [completionScore, setCompletionScore] = useState<Record<string, number>>({});
 
-  // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 4;
+  const ITEMS_PER_PAGE = 6;
 
-  // Detail Sheet
   const [selectedFormation, setSelectedFormation] = useState<Formation | null>(null);
 
-  const [newFormation, setNewFormation] = useState({
-    titre: '',
-    description: '',
-    type_formation: 'Continue',
-    duree_heures: 1,
-    contenu_url: '',
-    obligatoire: false
-  });
+  const loadAll = useCallback(async () => {
+    try {
+      setLoading(true);
+      const [fRes, sRes] = await Promise.all([
+        fetch('/api/agent-formations', { credentials: 'include' }),
+        agentId ? fetch(`/api/agent-formations-suivi?agent_id=${agentId}`, { credentials: 'include' }) : null,
+      ]);
 
-  useEffect(() => {
-    loadFormations();
-    if (agentId) loadSuivis();
+      if (fRes.ok) setFormations(await fRes.json());
+      if (sRes?.ok) setSuivis(await sRes.json());
+
+      if (agentId) {
+        const cRes = await fetch(`/api/agent-formations-compliance?agent_id=${agentId}`, { credentials: 'include' });
+        if (cRes.ok) setCompliance(await cRes.json());
+      }
+    } catch (error) {
+      console.error('Erreur chargement formations:', error);
+    } finally {
+      setLoading(false);
+    }
   }, [agentId]);
 
-  const loadFormations = async () => {
-    try {
-      const response = await fetch('/api/agent-formations', { credentials: 'include' });
-      if (!response.ok) throw new Error('Erreur lors du chargement');
-      const data = await response.json();
-      setFormations(data || []);
-    } catch (error) {
-      console.error('Erreur:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => { loadAll(); }, [loadAll]);
 
-  const loadSuivis = async () => {
-    try {
-      const response = await fetch(`/api/agent-formations-suivi?agent_id=${agentId}`, { credentials: 'include' });
-      if (!response.ok) throw new Error('Erreur lors du chargement');
-      const data = await response.json();
-      setSuivis(data || []);
-    } catch (error) {
-      console.error('Erreur:', error);
-    }
-  };
+  // WebSocket: real-time sync with HR module
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent)?.detail;
+      if (!detail || detail.entity === 'formation') loadAll();
+    };
+    window.addEventListener('agent-modules-update', handler);
+    window.addEventListener('agent-formation-update', handler);
+    return () => {
+      window.removeEventListener('agent-modules-update', handler);
+      window.removeEventListener('agent-formation-update', handler);
+    };
+  }, [loadAll]);
 
-  const creerFormation = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    try {
-      const response = await fetch('/api/agent-formations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(newFormation)
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Erreur lors de la création');
-      }
-      setShowNewFormation(false);
-      loadFormations();
-      setNewFormation({
-        titre: '',
-        description: '',
-        type_formation: 'Continue',
-        duree_heures: 1,
-        contenu_url: '',
-        obligatoire: false
-      });
-    } catch (error: any) {
-      alert('Erreur: ' + error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const inscrireFormation = async (formationId: string) => {
-    if (!agentId) {
-      alert('Veuillez sélectionner un agent');
-      return;
-    }
-
+  const inscrireFormation = async (formationId: number) => {
+    if (!agentId) return;
     try {
       const response = await fetch('/api/agent-formations-suivi', {
         method: 'POST',
@@ -128,186 +137,176 @@ export default function AgentFormations({ agentId }: { agentId?: string }) {
           formation_id: formationId,
           date_debut: new Date().toISOString().slice(0, 10),
           progression: 0,
-          statut: 'IN_PROGRESS'
-        })
+          statut: 'IN_PROGRESS',
+        }),
       });
-
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Erreur lors de l\'inscription');
+        const err = await response.json();
+        throw new Error(err.error || 'Erreur inscription');
       }
-      loadSuivis();
+      loadAll();
     } catch (error: any) {
-      alert('Erreur: ' + error.message);
+      alert(error.message);
     }
   };
 
-  const updateProgression = async (suiviId: string, progression: number, score?: number) => {
+  const updateProgression = async (suiviId: string, progression: number) => {
     try {
       const statut = progression >= 100 ? 'COMPLETED' : 'IN_PROGRESS';
-
       const body: Record<string, unknown> = {
         progression,
         statut,
         ...(progression >= 100 && { date_fin: new Date().toISOString().slice(0, 10) }),
       };
-      if (score !== undefined) {
-        body.score = score;
-      }
-
       const response = await fetch(`/api/agent-formations-suivi/${suiviId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
       });
-
-      if (!response.ok) throw new Error('Erreur lors de la mise à jour');
-      loadSuivis();
+      if (!response.ok) throw new Error('Erreur mise à jour');
+      loadAll();
     } catch (error: any) {
-      alert('Erreur: ' + error.message);
+      alert(error.message);
     }
   };
 
+  // ── Derived state ──────────────────────────────────────────────────────
   const formationsCompletes = suivis.filter(s => s.statut === 'COMPLETED').length;
   const enCours = suivis.filter(s => s.statut === StatutSuiviFormation.IN_PROGRESS).length;
   const progressionMoyenne = suivis.length > 0
-    ? suivis.reduce((sum, s) => sum + s.progression, 0) / suivis.length
+    ? suivis.reduce((sum, s) => sum + (s.progression || 0), 0) / suivis.length
     : 0;
 
-  // Pagination Logic
   const totalPages = Math.ceil(formations.length / ITEMS_PER_PAGE);
   const paginatedFormations = formations.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
-  // Get suivi for selected formation
-  const selectedSuivi = selectedFormation ? suivis.find(s => s.formation_id === selectedFormation.id) : null;
+  const enrolledSet = new Set(suivis.map(s => s.formationId));
+  const selectedSuivi = selectedFormation ? suivis.find(s => s.formationId === selectedFormation.id) : null;
+
+  const hasComplianceIssues = compliance && (
+    compliance.mandatoryNotEnrolled.length > 0 ||
+    compliance.overdue.length > 0 ||
+    compliance.expiringCertificates.length > 0
+  );
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-12">
+        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3">
-      {/* Stats Compact */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-        <StatCard icon={<GraduationCap size={14} />} label="Disponibles" value={formations.length.toString()} color="blue" />
-        <StatCard icon={<CheckCircle size={14} />} label="Complétées" value={formationsCompletes.toString()} color="green" />
-        <StatCard icon={<Clock size={14} />} label="En Cours" value={enCours.toString()} color="emerald" />
-        <StatCard icon={<TrendingUp size={14} />} label="Progression" value={`${progressionMoyenne.toFixed(0)}%`} color="cyan" />
-      </div>
-
-      {/* New Formation Button */}
-      <button
-        onClick={() => setShowNewFormation(!showNewFormation)}
-        className="px-3 py-1.5 bg-status-info hover:bg-status-info text-white rounded-lg flex items-center gap-1.5 text-xs font-bold transition"
-      >
-        {showNewFormation ? <X size={14} /> : <Plus size={14} />}
-        {showNewFormation ? 'Annuler' : 'Nouvelle Formation'}
-      </button>
-
-      {/* New Formation Form (Compact) */}
-      {showNewFormation && (
-        <div className="bg-surface-base/50 rounded-xl p-4 border border-edge">
-          <form onSubmit={creerFormation} className="space-y-3">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              <div className="col-span-2">
-                <label className="block text-[10px] uppercase font-bold text-content-muted mb-1">Titre</label>
-                <input
-                  type="text"
-                  value={newFormation.titre}
-                  onChange={(e) => setNewFormation({ ...newFormation, titre: e.target.value })}
-                  className="w-full px-2 py-1.5 bg-surface border border-edge rounded-lg text-content-primary text-xs"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] uppercase font-bold text-content-muted mb-1">Type</label>
-                <select
-                  value={newFormation.type_formation}
-                  onChange={(e) => setNewFormation({ ...newFormation, type_formation: e.target.value })}
-                  className="w-full px-2 py-1.5 bg-surface border border-edge rounded-lg text-content-primary text-xs"
-                >
-                  <option value="Onboarding">Onboarding</option>
-                  <option value="Continue">Continue</option>
-                  <option value="Certification">Certification</option>
-                  <option value="Recyclage">Recyclage</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-[10px] uppercase font-bold text-content-muted mb-1">Durée (h)</label>
-                <input
-                  type="number"
-                  value={newFormation.duree_heures}
-                  onChange={(e) => setNewFormation({ ...newFormation, duree_heures: Number(e.target.value) })}
-                  className="w-full px-2 py-1.5 bg-surface border border-edge rounded-lg text-content-primary text-xs"
-                  min="1"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-[10px] uppercase font-bold text-content-muted mb-1">Description</label>
-              <textarea
-                value={newFormation.description}
-                onChange={(e) => setNewFormation({ ...newFormation, description: e.target.value })}
-                className="w-full px-2 py-1.5 bg-surface border border-edge rounded-lg text-content-primary text-xs"
-                rows={2}
-              />
-            </div>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <input
-                type="url"
-                value={newFormation.contenu_url}
-                onChange={(e) => setNewFormation({ ...newFormation, contenu_url: e.target.value })}
-                className="flex-1 px-2 py-1.5 bg-surface border border-edge rounded-lg text-content-primary text-xs"
-                placeholder="URL du contenu..."
-              />
-              <label className="flex items-center gap-1.5 text-xs text-content-muted shrink-0">
-                <input
-                  type="checkbox"
-                  checked={newFormation.obligatoire}
-                  onChange={(e) => setNewFormation({ ...newFormation, obligatoire: e.target.checked })}
-                  className="w-3 h-3"
-                />
-                Obligatoire
-              </label>
-              <button type="submit" disabled={loading} className="px-4 py-1.5 bg-status-info hover:bg-status-info text-white rounded-lg font-bold text-xs shrink-0">
-                Créer
-              </button>
-            </div>
-          </form>
+      {/* Compliance Banner */}
+      {hasComplianceIssues && (
+        <div className="rounded-lg border border-status-warning/30 bg-status-warning-bg p-3 space-y-1.5">
+          <div className="flex items-center gap-2">
+            <Shield size={14} className="text-status-warning shrink-0" />
+            <span className="text-xs font-bold text-status-warning">Conformité — Actions requises</span>
+            {compliance && (
+              <span className="ml-auto text-[10px] font-bold text-status-warning bg-status-warning/15 px-1.5 py-0.5 rounded">
+                {compliance.complianceScore}%
+              </span>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-content-secondary">
+            {compliance!.mandatoryNotEnrolled.length > 0 && (
+              <span>{compliance!.mandatoryNotEnrolled.length} formation{compliance!.mandatoryNotEnrolled.length > 1 ? 's' : ''} obligatoire{compliance!.mandatoryNotEnrolled.length > 1 ? 's' : ''} non inscrite{compliance!.mandatoryNotEnrolled.length > 1 ? 's' : ''}</span>
+            )}
+            {compliance!.overdue.length > 0 && (
+              <span className="text-status-danger">{compliance!.overdue.length} en retard</span>
+            )}
+            {compliance!.expiringCertificates.length > 0 && (
+              <span>{compliance!.expiringCertificates.length} certificat{compliance!.expiringCertificates.length > 1 ? 's' : ''} expire{compliance!.expiringCertificates.length > 1 ? 'nt' : ''} bientôt</span>
+            )}
+          </div>
         </div>
       )}
 
-      {/* My Formations (If agent has suivis) */}
+      {/* Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+        <StatCard icon={<GraduationCap size={14} />} label="Disponibles" value={formations.length.toString()} variant="info" />
+        <StatCard icon={<CheckCircle size={14} />} label="Complétées" value={formationsCompletes.toString()} variant="success" />
+        <StatCard icon={<Clock size={14} />} label="En Cours" value={enCours.toString()} variant="accent" />
+        <StatCard icon={<TrendingUp size={14} />} label="Progression" value={`${progressionMoyenne.toFixed(0)}%`} variant="accent" />
+      </div>
+
+      {/* Mes Formations (enrolled) */}
       {agentId && suivis.length > 0 && (
-        <div className="bg-surface rounded-xl border border-edge overflow-hidden">
-          <div className="px-4 py-3 border-b border-edge bg-surface-base/30">
+        <div className="bg-surface rounded-lg border border-edge-subtle overflow-hidden">
+          <div className="px-4 py-3 border-b border-edge-subtle">
             <h3 className="text-sm font-bold text-content-primary flex items-center gap-2">
               <Award size={16} className="text-status-success" />
               Mes Formations
             </h3>
           </div>
-          <div className="divide-y divide-edge/50">
+          <div className="divide-y divide-edge-subtle/50">
             {suivis.map((suivi) => (
-              <div key={suivi.id} className="p-3 hover:bg-surface-elevated/20 transition">
-                <div className="flex items-center justify-between gap-3">
+              <div key={suivi.id} className="p-3 hover:bg-surface-subtle/50 transition-colors">
+                <div className="flex items-center gap-3">
                   <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-bold text-content-primary truncate">{suivi.formation?.titre}</h4>
-                    <div className="flex items-center gap-2 mt-1">
-                      <div className="flex-1 h-1.5 bg-surface-elevated rounded-full max-w-32">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h4 className="text-sm font-bold text-content-primary truncate">{suivi.formation?.titre}</h4>
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase shrink-0 ${
+                        suivi.statut === 'COMPLETED' ? 'bg-status-success-bg text-status-success' :
+                        suivi.statut === StatutSuiviFormation.IN_PROGRESS ? 'bg-status-info-bg text-status-info' :
+                        'bg-surface-subtle text-content-muted'
+                      }`}>
+                        {STATUT_SUIVI_FORMATION_LABELS[suivi.statut as keyof typeof STATUT_SUIVI_FORMATION_LABELS] || suivi.statut}
+                      </span>
+                    </div>
+
+                    {/* Progress bar */}
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <div className="flex-1 h-1.5 bg-surface-elevated rounded-full max-w-48">
                         <div
-                          className="h-full bg-gradient-to-r from-status-info to-accent rounded-full transition-all"
-                          style={{ width: `${suivi.progression}%` }}
+                          className="h-full bg-accent rounded-full transition-all"
+                          style={{ width: `${suivi.progression || 0}%` }}
                         />
                       </div>
-                      <span className="text-[10px] text-content-muted font-bold">{suivi.progression}%</span>
+                      <span className="text-[10px] text-content-muted font-bold w-8">{suivi.progression || 0}%</span>
+                    </div>
+
+                    {/* Evaluation + Certificate badges */}
+                    <div className="flex flex-wrap gap-1.5">
+                      {suivi.scoreEvaluation != null && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-surface-subtle rounded text-[10px]">
+                          <Star size={10} className="text-status-warning" />
+                          <span className={`font-bold ${suivi.scoreEvaluation >= 70 ? 'text-status-success' : 'text-status-warning'}`}>
+                            {suivi.scoreEvaluation}/100
+                          </span>
+                        </span>
+                      )}
+                      {suivi.recommandation && (
+                        <span className="px-1.5 py-0.5 bg-surface-subtle rounded text-[10px] text-content-muted truncate max-w-32">
+                          {suivi.recommandation}
+                        </span>
+                      )}
+                      {suivi.certificate && (
+                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                          suivi.certificate.statut === 'ISSUED'
+                            ? 'bg-status-success-bg text-status-success'
+                            : 'bg-status-danger-bg text-status-danger'
+                        }`}>
+                          <FileCheck size={10} />
+                          {suivi.certificate.numero}
+                        </span>
+                      )}
                     </div>
                   </div>
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                    suivi.statut === StatutSuiviFormation.COMPLETED ? 'bg-status-success-bg text-status-success' :
-                    suivi.statut === StatutSuiviFormation.IN_PROGRESS ? 'bg-status-info-bg text-status-info' :
-                    'bg-surface-subtle/40 text-content-muted'
-                  }`}>
-                    {STATUT_SUIVI_FORMATION_LABELS[suivi.statut as keyof typeof STATUT_SUIVI_FORMATION_LABELS] || suivi.statut}
-                  </span>
-                  {suivi.statut === StatutSuiviFormation.COMPLETED && suivi.certificat_url && (
-                    <a href={suivi.certificat_url} target="_blank" rel="noopener noreferrer" className="p-1 text-status-success hover:bg-status-success-bg rounded">
+
+                  {/* Certificate download */}
+                  {suivi.certificate?.fichierUrl && suivi.certificate.statut === 'ISSUED' && (
+                    <a
+                      href={suivi.certificate.fichierUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-1.5 text-status-success hover:bg-status-success-bg rounded transition-colors shrink-0"
+                      title="Télécharger le certificat"
+                    >
                       <Download size={14} />
                     </a>
                   )}
@@ -318,19 +317,17 @@ export default function AgentFormations({ agentId }: { agentId?: string }) {
         </div>
       )}
 
-      {/* Catalogue */}
-      <div className="bg-surface rounded-xl border border-edge overflow-hidden">
-        <div className="px-4 py-3 border-b border-edge flex items-center justify-between bg-surface-base/30">
+      {/* Catalogue de Formations */}
+      <div className="bg-surface rounded-lg border border-edge-subtle overflow-hidden">
+        <div className="px-4 py-3 border-b border-edge-subtle flex items-center justify-between">
           <h3 className="text-sm font-bold text-content-primary flex items-center gap-2">
             <GraduationCap size={16} className="text-status-info" />
             Catalogue de Formations
           </h3>
           <span className="text-[10px] text-content-muted font-medium">{formations.length} formations</span>
         </div>
-        
-        {loading ? (
-          <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent" /></div>
-        ) : formations.length === 0 ? (
+
+        {formations.length === 0 ? (
           <div className="text-center py-12 opacity-50">
             <GraduationCap size={32} className="mx-auto mb-2 text-content-muted" />
             <p className="text-sm text-content-muted">Aucune formation disponible</p>
@@ -338,32 +335,60 @@ export default function AgentFormations({ agentId }: { agentId?: string }) {
         ) : (
           <div className="grid sm:grid-cols-2 gap-2 p-2">
             {paginatedFormations.map((formation) => {
-              const isEnrolled = suivis.find(s => s.formation_id === formation.id);
+              const isEnrolled = enrolledSet.has(formation.id);
+              const isFull = formation.capaciteMax != null && formation.participants >= formation.capaciteMax;
               return (
                 <div
                   key={formation.id}
                   onClick={() => setSelectedFormation(formation)}
-                  className="bg-surface-base/50 rounded-lg p-3 border border-edge-subtle hover:border-edge-strong transition cursor-pointer group"
+                  className={`rounded-lg p-3 border transition cursor-pointer group ${
+                    isEnrolled
+                      ? 'bg-status-success-bg/30 border-status-success/20'
+                      : 'bg-surface-subtle border-edge-subtle hover:border-edge'
+                  }`}
                 >
                   <div className="flex items-start gap-2 mb-2">
-                    <div className="p-1.5 bg-status-info-bg rounded-lg shrink-0">
-                      <GraduationCap size={14} className="text-status-info" />
+                    <div className={`p-1.5 rounded-lg shrink-0 ${
+                      isEnrolled ? 'bg-status-success-bg' : 'bg-status-info-bg'
+                    }`}>
+                      <GraduationCap size={14} className={isEnrolled ? 'text-status-success' : 'text-status-info'} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <h4 className="text-sm font-bold text-content-primary truncate">{formation.titre}</h4>
-                      <p className="text-[10px] text-content-muted line-clamp-1">{formation.description}</p>
+                      {formation.formateur && (
+                        <p className="text-[10px] text-content-muted truncate">{formation.formateur}</p>
+                      )}
                     </div>
-                    {formation.obligatoire && (
-                      <span className="px-1.5 py-0.5 bg-status-warning-bg text-status-warning rounded text-[8px] font-bold uppercase shrink-0">Requis</span>
-                    )}
+                    <div className="flex items-center gap-1 shrink-0">
+                      {formation.obligatoire && (
+                        <span className="px-1.5 py-0.5 bg-status-warning-bg text-status-warning rounded text-[8px] font-bold uppercase">Requis</span>
+                      )}
+                      {isEnrolled && (
+                        <CheckCircle size={14} className="text-status-success" />
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-[10px] text-content-muted">
-                      <span className="text-status-info font-bold">{formation.type_formation}</span>
+                  <div className="flex items-center justify-between text-[10px] text-content-muted">
+                    <div className="flex items-center gap-2">
+                      <span className="text-accent font-bold">{formation.typeFormation || 'Formation'}</span>
                       <span>•</span>
-                      <span>{formation.duree_heures}h</span>
+                      <span>{formation.dureeHeures || '?'}h</span>
+                      {formation.lieu && (
+                        <>
+                          <span>•</span>
+                          <span className="flex items-center gap-0.5"><MapPin size={9} />{formation.lieu}</span>
+                        </>
+                      )}
                     </div>
-                    <Eye size={12} className="text-content-muted group-hover:text-accent" />
+                    <div className="flex items-center gap-1.5">
+                      {formation.capaciteMax && (
+                        <span className={`flex items-center gap-0.5 ${isFull ? 'text-status-danger' : ''}`}>
+                          <Users size={9} />
+                          {formation.participants}/{formation.capaciteMax}
+                        </span>
+                      )}
+                      <Eye size={12} className="text-content-muted group-hover:text-accent" />
+                    </div>
                   </div>
                 </div>
               );
@@ -371,10 +396,10 @@ export default function AgentFormations({ agentId }: { agentId?: string }) {
           </div>
         )}
 
-        {/* Pagination Footer */}
+        {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-3 py-2 border-t border-edge-subtle bg-surface-base/20">
-            <span className="text-[10px] text-content-muted">Page {currentPage} sur {totalPages}</span>
+          <div className="flex items-center justify-between px-3 py-2 border-t border-edge-subtle">
+            <span className="text-[10px] text-content-muted">Page {currentPage}/{totalPages}</span>
             <div className="flex gap-1">
               <button
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
@@ -397,151 +422,18 @@ export default function AgentFormations({ agentId }: { agentId?: string }) {
 
       {/* Detail Sheet */}
       <Sheet open={!!selectedFormation} onOpenChange={(open) => !open && setSelectedFormation(null)}>
-        <SheetContent className="w-full sm:max-w-md bg-surface-base border-l-edge p-0 overflow-y-auto">
+        <SheetContent className="w-full sm:max-w-md bg-surface border-l border-edge p-0 overflow-y-auto">
           {selectedFormation && (
-            <>
-              <SheetHeader className="px-6 py-4 border-b border-edge bg-surface-base/50 backdrop-blur sticky top-0 z-10">
-                <SheetTitle className="text-content-primary flex items-center gap-2">
-                  <GraduationCap size={16} className="text-status-info" />
-                  {selectedFormation.titre}
-                </SheetTitle>
-                <SheetDescription className="text-content-muted">
-                  {selectedFormation.type_formation} • {selectedFormation.duree_heures} heures
-                </SheetDescription>
-              </SheetHeader>
-
-              <div className="p-6 space-y-6">
-                {/* Tags */}
-                <div className="flex flex-wrap gap-2">
-                  <span className="px-2 py-1 bg-status-info-bg text-status-info rounded text-xs font-bold">{selectedFormation.type_formation}</span>
-                  <span className="px-2 py-1 bg-surface-elevated text-content-secondary rounded text-xs">{selectedFormation.duree_heures}h</span>
-                  {selectedFormation.obligatoire && (
-                    <span className="px-2 py-1 bg-status-warning-bg text-status-warning rounded text-xs font-bold">Obligatoire</span>
-                  )}
-                </div>
-
-                {/* Description */}
-                <div className="space-y-2">
-                  <h4 className="text-xs font-bold text-content-muted uppercase">Description</h4>
-                  <p className="text-sm text-content-secondary leading-relaxed">{selectedFormation.description || 'Aucune description disponible.'}</p>
-                </div>
-
-                {/* Progression (if enrolled) */}
-                {selectedSuivi && (
-                  <div className="space-y-3 p-4 bg-surface-base border border-edge rounded-xl">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-xs font-bold text-content-muted uppercase">Ma progression</h4>
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                        selectedSuivi.statut === StatutSuiviFormation.COMPLETED ? 'bg-status-success-bg text-status-success' :
-                        'bg-status-info-bg text-status-info'
-                      }`}>
-                        {STATUT_SUIVI_FORMATION_LABELS[selectedSuivi.statut as keyof typeof STATUT_SUIVI_FORMATION_LABELS]}
-                      </span>
-                    </div>
-                    
-                    <div>
-                      <div className="flex justify-between text-xs text-content-muted mb-1">
-                        <span>Progression</span>
-                        <span className="font-bold text-content-primary">{selectedSuivi.progression}%</span>
-                      </div>
-                      <div className="w-full bg-surface-elevated rounded-full h-2">
-                        <div
-                          className="bg-gradient-to-r from-status-info to-accent h-full rounded-full transition-all"
-                          style={{ width: `${selectedSuivi.progression}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    {selectedSuivi.statut === StatutSuiviFormation.IN_PROGRESS && (
-                      <div className="space-y-2">
-                        <input
-                          type="range"
-                          min="0"
-                          max="100"
-                          value={selectedSuivi.progression}
-                          onChange={(e) => {
-                            const prog = Number(e.target.value);
-                            if (prog < 100) updateProgression(selectedSuivi.id, prog);
-                          }}
-                          className="w-full"
-                        />
-                        {selectedSuivi.progression >= 95 && (
-                          <div className="p-3 bg-status-success-bg border border-status-success/30 rounded-lg space-y-2">
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="number"
-                                min="0"
-                                max="100"
-                                value={completionScore[selectedSuivi.id] ?? ''}
-                                onChange={(e) => setCompletionScore(prev => ({ ...prev, [selectedSuivi.id]: Number(e.target.value) }))}
-                                className="flex-1 px-2 py-1.5 bg-surface border border-edge rounded text-content-primary text-xs"
-                                placeholder="Score (0-100)"
-                              />
-                              <button
-                                onClick={() => {
-                                  const score = completionScore[selectedSuivi.id];
-                                  updateProgression(selectedSuivi.id, 100, score);
-                                }}
-                                className="px-3 py-1.5 bg-status-success hover:bg-status-success text-white rounded text-xs font-bold flex items-center gap-1.5"
-                              >
-                                <Award size={12} />
-                                Terminer
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {selectedSuivi.statut === StatutSuiviFormation.COMPLETED && selectedSuivi.score != null && (
-                      <div className="flex items-center gap-2 p-2 bg-surface rounded-lg">
-                        <Star size={14} className="text-status-warning" />
-                        <span className="text-xs text-content-secondary">Score: <span className={`font-bold ${selectedSuivi.score >= 70 ? 'text-status-success' : 'text-status-warning'}`}>{selectedSuivi.score}/100</span></span>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Content URL */}
-                {selectedFormation.contenu_url && (
-                  <a
-                    href={selectedFormation.contenu_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block w-full py-3 bg-status-info hover:bg-status-info text-white rounded-xl font-bold text-sm text-center transition shadow-lg shadow-status-info/20 flex items-center justify-center gap-2"
-                  >
-                    <ExternalLink size={16} />
-                    Accéder au contenu
-                  </a>
-                )}
-
-                {/* Enroll Button */}
-                {agentId && !selectedSuivi && (
-                  <button
-                    onClick={() => {
-                      inscrireFormation(selectedFormation.id);
-                      setSelectedFormation(null);
-                    }}
-                    className="block w-full py-3 bg-status-success hover:bg-status-success text-white rounded-xl font-bold text-sm text-center transition"
-                  >
-                    S'inscrire à cette formation
-                  </button>
-                )}
-
-                {/* Certificate Download */}
-                {selectedSuivi?.statut === StatutSuiviFormation.COMPLETED && selectedSuivi.certificat_url && (
-                  <a
-                    href={selectedSuivi.certificat_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block w-full py-3 bg-status-success hover:bg-status-success text-white rounded-xl font-bold text-sm text-center transition flex items-center justify-center gap-2"
-                  >
-                    <Download size={16} />
-                    Télécharger le certificat
-                  </a>
-                )}
-              </div>
-            </>
+            <FormationDetailSheet
+              formation={selectedFormation}
+              suivi={selectedSuivi || undefined}
+              agentId={agentId}
+              onInscrire={() => {
+                inscrireFormation(selectedFormation.id);
+                setSelectedFormation(null);
+              }}
+              onUpdateProgression={updateProgression}
+            />
           )}
         </SheetContent>
       </Sheet>
@@ -550,24 +442,279 @@ export default function AgentFormations({ agentId }: { agentId?: string }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// DETAIL SHEET
+// ═══════════════════════════════════════════════════════════════════════════
+
+function FormationDetailSheet({
+  formation,
+  suivi,
+  agentId,
+  onInscrire,
+  onUpdateProgression,
+}: {
+  formation: Formation;
+  suivi?: FormationSuivi;
+  agentId?: string;
+  onInscrire: () => void;
+  onUpdateProgression: (suiviId: string, progression: number) => void;
+}) {
+  const isFull = formation.capaciteMax != null && formation.participants >= formation.capaciteMax;
+  const canEnroll = agentId && !suivi && !isFull;
+
+  return (
+    <>
+      <SheetHeader className="px-6 py-4 border-b border-edge sticky top-0 z-10 bg-surface">
+        <SheetTitle className="text-content-primary flex items-center gap-2">
+          <GraduationCap size={16} className="text-status-info" />
+          {formation.titre}
+        </SheetTitle>
+        <SheetDescription className="text-content-muted">
+          {formation.typeFormation || 'Formation'} • {formation.dureeHeures || '?'}h
+          {formation.formateur && ` • ${formation.formateur}`}
+        </SheetDescription>
+      </SheetHeader>
+
+      <div className="p-6 space-y-5">
+        {/* Tags */}
+        <div className="flex flex-wrap gap-1.5">
+          <span className="px-2 py-1 bg-status-info-bg text-status-info rounded text-xs font-bold">{formation.typeFormation || 'Formation'}</span>
+          <span className="px-2 py-1 bg-surface-elevated text-content-secondary rounded text-xs">{formation.dureeHeures || '?'}h</span>
+          {formation.obligatoire && (
+            <span className="px-2 py-1 bg-status-warning-bg text-status-warning rounded text-xs font-bold">Obligatoire</span>
+          )}
+          {formation.statut && (
+            <span className={`px-2 py-1 rounded text-xs font-bold ${
+              formation.statut === 'IN_PROGRESS' ? 'bg-status-info-bg text-status-info' :
+              formation.statut === 'COMPLETED' ? 'bg-status-success-bg text-status-success' :
+              formation.statut === 'PLANNED' ? 'bg-surface-subtle text-content-muted' :
+              'bg-surface-subtle text-content-muted'
+            }`}>
+              {formation.statut}
+            </span>
+          )}
+        </div>
+
+        {/* Formation info */}
+        <div className="space-y-2">
+          {(formation.dateDebut || formation.dateFin || formation.lieu) && (
+            <div className="flex flex-wrap gap-3 text-xs text-content-secondary">
+              {formation.dateDebut && (
+                <span className="flex items-center gap-1">
+                  <Calendar size={12} className="text-content-muted" />
+                  {new Date(formation.dateDebut).toLocaleDateString('fr-FR')}
+                  {formation.dateFin && ` – ${new Date(formation.dateFin).toLocaleDateString('fr-FR')}`}
+                </span>
+              )}
+              {formation.lieu && (
+                <span className="flex items-center gap-1">
+                  <MapPin size={12} className="text-content-muted" />
+                  {formation.lieu}
+                </span>
+              )}
+            </div>
+          )}
+          {formation.capaciteMax && (
+            <div className="flex items-center gap-1 text-xs text-content-muted">
+              <Users size={12} />
+              <span>{formation.participants}/{formation.capaciteMax} inscrits</span>
+              {isFull && <span className="text-status-danger font-bold ml-1">— Complet</span>}
+            </div>
+          )}
+        </div>
+
+        {/* Description */}
+        {formation.description && (
+          <div className="space-y-1.5">
+            <h4 className="text-xs font-bold text-content-muted uppercase">Description</h4>
+            <p className="text-sm text-content-secondary leading-relaxed">{formation.description}</p>
+          </div>
+        )}
+
+        {/* Programme */}
+        {formation.programme && (
+          <div className="space-y-1.5">
+            <h4 className="text-xs font-bold text-content-muted uppercase">Programme</h4>
+            <div className="text-sm text-content-secondary leading-relaxed whitespace-pre-wrap">{formation.programme}</div>
+          </div>
+        )}
+
+        {/* Progression (if enrolled) */}
+        {suivi && (
+          <div className="space-y-3 p-4 bg-surface-subtle border border-edge-subtle rounded-lg">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold text-content-muted uppercase">Ma progression</h4>
+              <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                suivi.statut === 'COMPLETED' ? 'bg-status-success-bg text-status-success' :
+                'bg-status-info-bg text-status-info'
+              }`}>
+                {STATUT_SUIVI_FORMATION_LABELS[suivi.statut as keyof typeof STATUT_SUIVI_FORMATION_LABELS] || suivi.statut}
+              </span>
+            </div>
+
+            <div>
+              <div className="flex justify-between text-xs text-content-muted mb-1">
+                <span>Avancement</span>
+                <span className="font-bold text-content-primary">{suivi.progression || 0}%</span>
+              </div>
+              <div className="w-full bg-surface-elevated rounded-full h-2">
+                <div
+                  className="bg-accent h-full rounded-full transition-all"
+                  style={{ width: `${suivi.progression || 0}%` }}
+                />
+              </div>
+            </div>
+
+            {suivi.statut === StatutSuiviFormation.IN_PROGRESS && (
+              <div className="space-y-2">
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="5"
+                  value={suivi.progression || 0}
+                  onChange={(e) => {
+                    const prog = Number(e.target.value);
+                    onUpdateProgression(suivi.id, prog);
+                  }}
+                  className="w-full"
+                />
+                {(suivi.progression || 0) >= 95 && (
+                  <button
+                    onClick={() => onUpdateProgression(suivi.id, 100)}
+                    className="w-full py-2 bg-status-success text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition hover:opacity-90"
+                  >
+                    <Award size={14} />
+                    Marquer comme terminée
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Evaluation from HR */}
+            {suivi.scoreEvaluation != null && (
+              <div className="p-3 bg-surface rounded-lg border border-edge-subtle space-y-2">
+                <div className="flex items-center justify-between">
+                  <h5 className="text-xs font-bold text-content-muted uppercase flex items-center gap-1">
+                    <Star size={12} className="text-status-warning" />
+                    Évaluation RH
+                  </h5>
+                  <span className={`text-lg font-bold ${suivi.scoreEvaluation >= 70 ? 'text-status-success' : suivi.scoreEvaluation >= 50 ? 'text-status-warning' : 'text-status-danger'}`}>
+                    {suivi.scoreEvaluation}/100
+                  </span>
+                </div>
+                {suivi.evaluation && (
+                  <p className="text-xs text-content-secondary">{suivi.evaluation}</p>
+                )}
+                {suivi.recommandation && (
+                  <p className="text-xs text-content-muted italic">Recommandation : {suivi.recommandation}</p>
+                )}
+                {suivi.competencesAcquises && (
+                  <div className="flex flex-wrap gap-1">
+                    {(typeof suivi.competencesAcquises === 'string'
+                      ? (() => { try { return JSON.parse(suivi.competencesAcquises); } catch { return [suivi.competencesAcquises]; } })()
+                      : [suivi.competencesAcquises]
+                    ).map((c: string, i: number) => (
+                      <span key={i} className="px-1.5 py-0.5 bg-accent/10 text-accent rounded text-[10px] font-medium">{c}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Certificate */}
+            {suivi.certificate && (
+              <div className={`p-3 rounded-lg border space-y-1.5 ${
+                suivi.certificate.statut === 'ISSUED'
+                  ? 'bg-status-success-bg/50 border-status-success/20'
+                  : 'bg-status-danger-bg/50 border-status-danger/20'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <FileCheck size={14} className={suivi.certificate.statut === 'ISSUED' ? 'text-status-success' : 'text-status-danger'} />
+                    <span className="text-xs font-bold text-content-primary">Certificat</span>
+                  </div>
+                  <span className={`text-[10px] font-bold uppercase ${
+                    suivi.certificate.statut === 'ISSUED' ? 'text-status-success' : 'text-status-danger'
+                  }`}>
+                    {suivi.certificate.statut === 'ISSUED' ? 'Valide' : suivi.certificate.statut}
+                  </span>
+                </div>
+                <p className="text-[10px] text-content-muted font-mono">{suivi.certificate.numero}</p>
+                {suivi.certificate.dateExpiration && (
+                  <p className="text-[10px] text-content-muted">
+                    Expire le {new Date(suivi.certificate.dateExpiration).toLocaleDateString('fr-FR')}
+                  </p>
+                )}
+                {suivi.certificate.fichierUrl && suivi.certificate.statut === 'ISSUED' && (
+                  <a
+                    href={suivi.certificate.fichierUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-1 inline-flex items-center gap-1 px-2 py-1 bg-status-success text-white rounded text-[10px] font-bold hover:opacity-90 transition"
+                  >
+                    <Download size={10} />
+                    Télécharger
+                  </a>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Content URL */}
+        {formation.contenuUrl && (
+          <a
+            href={formation.contenuUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 w-full py-2.5 bg-status-info text-white rounded-lg font-bold text-sm transition hover:opacity-90"
+          >
+            <ExternalLink size={16} />
+            Accéder au contenu
+          </a>
+        )}
+
+        {/* Enroll Button */}
+        {canEnroll && (
+          <button
+            onClick={onInscrire}
+            className="w-full py-2.5 bg-status-success text-white rounded-lg font-bold text-sm transition hover:opacity-90"
+          >
+            S'inscrire à cette formation
+          </button>
+        )}
+        {agentId && !suivi && isFull && (
+          <div className="text-center py-2 text-xs text-status-danger flex items-center justify-center gap-1">
+            <AlertTriangle size={12} />
+            Formation complète — aucune place disponible
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // SUB COMPONENTS
 // ═══════════════════════════════════════════════════════════════════════════
 
-function StatCard({ icon, label, value, color }: { icon: React.ReactNode, label: string, value: string, color: string }) {
-    const colorClasses: Record<string, string> = {
-        blue: 'from-status-info/20 to-status-info/5 border-status-info/20 text-status-info',
-        green: 'from-status-success/20 to-status-success/5 border-status-success/20 text-status-success',
-        emerald: 'from-status-success/20 to-status-success/5 border-status-success/20 text-status-success',
-        cyan: 'from-accent/20 to-accent/5 border-accent/20 text-accent',
-    };
-    
-    return (
-        <div className={`rounded-xl p-3 border bg-gradient-to-br ${colorClasses[color] || colorClasses.blue}`}>
-            <div className="flex justify-between items-start mb-1">
-                <div className="p-1.5 rounded-lg bg-white/5">{icon}</div>
-            </div>
-            <div className="text-lg font-bold text-content-primary truncate">{value}</div>
-            <div className="text-[10px] uppercase font-bold opacity-70 tracking-wide">{label}</div>
-        </div>
-    );
+function StatCard({ icon, label, value, variant }: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  variant: 'info' | 'success' | 'accent';
+}) {
+  const cls = {
+    info: 'from-status-info/15 to-status-info/5 border-status-info/20 text-status-info',
+    success: 'from-status-success/15 to-status-success/5 border-status-success/20 text-status-success',
+    accent: 'from-accent/15 to-accent/5 border-accent/20 text-accent',
+  }[variant];
+
+  return (
+    <div className={`rounded-lg p-3 border bg-gradient-to-br ${cls}`}>
+      <div className="mb-1">{icon}</div>
+      <div className="text-lg font-bold text-content-primary truncate">{value}</div>
+      <div className="text-[10px] uppercase font-bold opacity-70 tracking-wide">{label}</div>
+    </div>
+  );
 }

@@ -46,6 +46,7 @@ import {
   conventionsCollectives,
   qualificationCoefficients,
 } from "@shared/schema";
+import { agentsTerrain, agentPlannings } from "@shared/schema";
 import { systemSettings } from "@shared/schema/settings";
 import { agences } from "@shared/schema/agences";
 import { normalizeRole } from "@shared/types/roles";
@@ -1054,8 +1055,9 @@ hrRouter.post("/formations/:id/participants", getAuthUser, async (req, res) => {
       return res.status(400).json({ error: "employeId et employeNom requis" });
     }
 
+    const formationId = parseInt(id);
     await db.insert(formationParticipants).values({
-      formationId: parseInt(id),
+      formationId,
       employeId,
       employeNom
     });
@@ -1064,6 +1066,50 @@ hrRouter.post("/formations/:id/participants", getAuthUser, async (req, res) => {
     const wsInstance = getWsInstance();
     if (wsInstance) {
         wsInstance.broadcast({ type: "HR_UPDATE", payload: { type: 'formation_participant_added', formationId: id } });
+    }
+
+    // Cross-broadcast to agent + add to agent planning
+    try {
+      const [agentRow] = await db.select({ id: agentsTerrain.id, agenceId: agentsTerrain.agenceId })
+        .from(agentsTerrain).where(eq(agentsTerrain.employeId, employeId));
+      if (agentRow && wsInstance) {
+        wsInstance.broadcast({ type: "AGENT_MODULES_UPDATE", payload: { entity: "formation", agentId: agentRow.id } });
+
+        // Add formation to agent's planning/agenda
+        const [formation] = await db.select({
+          titre: formations.titre,
+          dateDebut: formations.dateDebut,
+          dateFin: formations.dateFin,
+          dureeHeures: formations.dureeHeures,
+          lieu: formations.lieu,
+        }).from(formations).where(eq(formations.id, formationId));
+
+        if (formation?.dateDebut) {
+          const startDate = new Date(formation.dateDebut);
+          const endDate = formation.dateFin ? new Date(formation.dateFin) : startDate;
+          // Create a planning entry for each day of the formation
+          const planningDays: Date[] = [];
+          for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+            planningDays.push(new Date(d));
+          }
+          for (const day of planningDays) {
+            const datePlanning = day.toISOString().slice(0, 10);
+            await db.insert(agentPlannings).values({
+              agentId: agentRow.id,
+              agenceId: agentRow.agenceId,
+              datePlanning,
+              heureDebut: "08:00",
+              heureFin: formation.dureeHeures && formation.dureeHeures <= 4 ? "12:00" : "17:00",
+              typeActivite: "Formation",
+              notes: `Formation : ${formation.titre}${formation.lieu ? ` — ${formation.lieu}` : ""}`,
+              statut: "PLANNED",
+            });
+          }
+          wsInstance.broadcast({ type: "AGENT_MODULES_UPDATE", payload: { entity: "planning", agentId: agentRow.id } });
+        }
+      }
+    } catch (crossErr) {
+      logger.warn({ err: crossErr }, "Cross-broadcast formation→agent failed (non-critical)");
     }
 
     res.status(201).json({ message: "Participant ajouté" });
@@ -1192,6 +1238,19 @@ hrRouter.patch("/formations/:id/participants/:employeId/evaluate", getAuthUser, 
             .returning();
 
         if (!updated) return res.status(404).json({ error: "Participant non trouvé" });
+
+        // Cross-broadcast to agent
+        try {
+          const [agentRow] = await db.select({ id: agentsTerrain.id })
+            .from(agentsTerrain).where(eq(agentsTerrain.employeId, employeId));
+          if (agentRow) {
+            const wsInstance = getWsInstance();
+            if (wsInstance) {
+              wsInstance.broadcast({ type: "AGENT_MODULES_UPDATE", payload: { entity: "formation", agentId: agentRow.id } });
+            }
+          }
+        } catch { /* non-critical */ }
+
         res.json(updated);
     } catch (error) {
         logger.error({ err: error }, 'Erreur évaluation participant');
@@ -1247,6 +1306,19 @@ hrRouter.post("/formations/:id/certificates", getAuthUser, attachAbility, requir
         }).returning();
 
         broadcastHrUpdate({ entity: 'formation', action: 'updated', id: formationId });
+
+        // Cross-broadcast to agent
+        try {
+          const [agentRow] = await db.select({ id: agentsTerrain.id })
+            .from(agentsTerrain).where(eq(agentsTerrain.employeId, employeId));
+          if (agentRow) {
+            const wsInstance = getWsInstance();
+            if (wsInstance) {
+              wsInstance.broadcast({ type: "AGENT_MODULES_UPDATE", payload: { entity: "formation", agentId: agentRow.id } });
+            }
+          }
+        } catch { /* non-critical */ }
+
         res.status(201).json(cert);
     } catch (error: any) {
         if (error.code === '23505') {
@@ -1304,6 +1376,20 @@ hrRouter.post("/formations/:id/certificates/batch", getAuthUser, attachAbility, 
         ).returning();
 
         broadcastHrUpdate({ entity: 'formation', action: 'updated', id: formationId });
+
+        // Cross-broadcast to all agents who received certificates
+        try {
+          const employeeIds = certs.map(c => c.employeId);
+          const agents = await db.select({ id: agentsTerrain.id, employeId: agentsTerrain.employeId })
+            .from(agentsTerrain).where(sql`${agentsTerrain.employeId} IN ${employeeIds}`);
+          const wsInstance = getWsInstance();
+          if (wsInstance && agents.length > 0) {
+            for (const agent of agents) {
+              wsInstance.broadcast({ type: "AGENT_MODULES_UPDATE", payload: { entity: "formation", agentId: agent.id } });
+            }
+          }
+        } catch { /* non-critical */ }
+
         res.status(201).json({ issued: certs.length, certificates: certs });
     } catch (error) {
         logger.error({ err: error }, 'Erreur émission batch certificats');

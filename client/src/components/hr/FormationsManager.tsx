@@ -502,6 +502,14 @@ export default function FormationsManager({
                                 Inscrit le {new Date(participant.dateInscription).toLocaleDateString('fr-FR')}
                               </p>
                             )}
+                            {participant.progression != null && (
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <div className="flex-1 h-1.5 bg-surface-elevated rounded-full max-w-24">
+                                  <div className="h-full bg-accent rounded-full transition-all" style={{ width: `${participant.progression}%` }} />
+                                </div>
+                                <span className="text-[10px] text-content-muted font-medium">{participant.progression}%</span>
+                              </div>
+                            )}
                           </div>
                           <div className="flex items-center gap-1.5">
                             {participant.presence && (

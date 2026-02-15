@@ -20,6 +20,8 @@ export interface FormationParticipant {
   employeId: string;
   employeNom: string;
   dateInscription: string;
+  progression?: number;
+  statut?: string;
   presence?: string;
   evaluation?: string;
   scoreEvaluation?: number | null;
