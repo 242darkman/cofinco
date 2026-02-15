@@ -41,6 +41,9 @@ const MessagesModule = lazy(() => import('./components/shared/MessagesModule'));
 const UserProfile = lazy(() => import('./components/shared/UserProfile'));
 const GlobalSearchModal = lazy(() => import('./components/shared/GlobalSearchModal'));
 
+// Register search providers (side-effect import — runs once at module load)
+import './search';
+
 // Dashboard - slightly larger but loads first
 const Dashboard = lazy(() => import('./components/dashboard/Dashboard'));
 
@@ -136,6 +139,18 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
   const [showSessionsModal, setShowSessionsModal] = useState(false);
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
   const [currentTime, setCurrentTime] = useState(new Date());
+
+  // Cmd+K / Ctrl+K to open search
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowGlobalSearch((prev: boolean) => !prev);
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
   const [selectedAgence, setSelectedAgence] = useState('centrale');
   const [breadcrumbs, setBreadcrumbs] = useState<string[]>(['Dashboard']);
   const [mustChangePassword, setMustChangePassword] = useState(false);
