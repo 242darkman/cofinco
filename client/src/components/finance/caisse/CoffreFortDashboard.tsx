@@ -32,6 +32,7 @@ import { Card, Button, Badge, StatCard, ResponsiveTable, TabGroup, ConfirmDialog
 import { coffreApi, sessionCaisseApi } from "@/lib/api-client";
 import { StatutTransfertCoffre, getMouvementCoffreLabel } from "@shared/enum/status-constants";
 import { ALL_STATUS_LABELS } from "@/lib/status-labels";
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { SkeletonCard } from '@/components/ui/Skeleton';
 import { CoffreAdminPanel } from './CoffreAdminPanel';
 import { ProvisionCoffreModal } from './ProvisionCoffreModal';
@@ -89,6 +90,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
 
   const queryClient = useQueryClient();
 
+  const { currency } = useCurrency();
   const { hasPermission } = usePermissions();
   const canValidate = hasPermission('coffre', 'transfert.validate');
   const canExecute = hasPermission('coffre', 'transfert.execute');
@@ -300,7 +302,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
         ? 'bg-status-warning-bg text-status-warning border border-status-warning/20'
         : 'bg-status-success-bg text-status-success border border-status-success/20'
     }`}>
-      {type === "COFFRE_VERS_CAISSE" ? <ArrowDownRight size={12} /> : <ArrowUpRight size={12} />}
+      {type === "COFFRE_VERS_CAISSE" ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
       {type === "COFFRE_VERS_CAISSE" ? "Coffre → Caisse" : "Caisse → Coffre"}
     </span>
   );
@@ -321,7 +323,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
           message: (
             <div className="space-y-3">
               <TransfertDetailCard accentColor="emerald" rows={[
-                { label: 'Montant', value: <>{montantFormatted} <span className="text-xs text-content-muted">FCFA</span></>, highlight: true },
+                { label: 'Montant', value: <>{montantFormatted} <span className="text-xs">{currency.symbol}</span></>, highlight: true },
                 { label: 'Caisse', value: caisse },
                 { label: 'Demandé par', value: transfert.requestedByNom },
               ]} />
@@ -339,7 +341,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
           message: (
             <div className="space-y-3">
               <TransfertDetailCard accentColor="red" rows={[
-                { label: 'Montant', value: <>{montantFormatted} <span className="text-xs text-content-muted">FCFA</span></>, highlight: true },
+                { label: 'Montant', value: <>{montantFormatted} <span className="text-xs">{currency.symbol}</span></>, highlight: true },
                 { label: 'Caisse', value: caisse },
                 { label: 'Demandé par', value: transfert.requestedByNom },
               ]} />
@@ -359,7 +361,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
             <div className="space-y-3">
               <div className="text-center py-1.5">
                 <span className="text-xl sm:text-2xl font-bold font-mono tabular-nums text-content-primary">{montantFormatted}</span>
-                <span className="text-xs sm:text-sm text-content-muted ml-1">FCFA</span>
+                <span className="text-xs sm:text-sm text-content-primary ml-1">{currency.symbol}</span>
               </div>
               <TransfertDetailCard accentColor="cyan" rows={[
                 { label: 'Caisse', value: caisse },
@@ -382,7 +384,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
             <div className="space-y-3">
               <div className="text-center py-1.5">
                 <span className="text-xl sm:text-2xl font-bold font-mono tabular-nums text-content-primary">{montantFormatted}</span>
-                <span className="text-xs sm:text-sm text-content-muted ml-1">FCFA</span>
+                <span className="text-xs sm:text-sm text-content-primary ml-1">{currency.symbol}</span>
               </div>
               <TransfertDetailCard accentColor="emerald" rows={[
                 { label: 'Caisse', value: transfert.caisseDestinationNom || caisse },
@@ -403,7 +405,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
           message: (
             <div className="space-y-3">
               <TransfertDetailCard accentColor="red" rows={[
-                { label: 'Montant demandé', value: <>{montantFormatted} <span className="text-xs text-content-muted">FCFA</span></>, highlight: true },
+                { label: 'Montant demandé', value: <>{montantFormatted} <span className="text-xs">{currency.symbol}</span></>, highlight: true },
                 { label: 'Caisse', value: transfert.caisseDestinationNom || caisse },
                 { label: 'Caissier', value: transfert.caissierNom || transfert.requestedByNom },
               ]} />
@@ -454,9 +456,9 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
       format: (_: any, row: any) => (
         <div className="flex items-center gap-1.5">
             {row.typeTransfert === "COFFRE_VERS_CAISSE" ? (
-                <Badge variant="warning" size="sm" icon={<ArrowDownRight size={10} />} value="Sortie" className="text-[10px] whitespace-nowrap" />
+                <Badge variant="warning" size="sm" icon={<ArrowUpRight size={10} />} value="Sortie" className="text-[10px] whitespace-nowrap" />
             ) : (
-                <Badge variant="success" size="sm" icon={<ArrowUpRight size={10} />} value="Entrée" className="text-[10px] whitespace-nowrap" />
+                <Badge variant="success" size="sm" icon={<ArrowDownRight size={10} />} value="Entrée" className="text-[10px] whitespace-nowrap" />
             )}
             <span className="text-[10px] text-content-muted hidden xl:inline">
                 {row.typeTransfert === "COFFRE_VERS_CAISSE" ? "Vers Caisse" : "De Caisse"}
@@ -466,13 +468,13 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
       mobileFormat: (_: any, row: any) => (
         <div className="flex items-center gap-2">
           {row.typeTransfert === "COFFRE_VERS_CAISSE" ? (
-            <Badge variant="warning" size="sm" icon={<ArrowDownRight size={10} />} value="Sortie" className="text-[10px]" />
+            <Badge variant="warning" size="sm" icon={<ArrowUpRight size={10} />} value="Sortie" className="text-[10px]" />
           ) : (
-            <Badge variant="success" size="sm" icon={<ArrowUpRight size={10} />} value="Entrée" className="text-[10px]" />
+            <Badge variant="success" size="sm" icon={<ArrowDownRight size={10} />} value="Entrée" className="text-[10px]" />
           )}
           <div className="flex flex-col min-w-0">
-            <span className="text-sm font-semibold text-content-primary truncate">
-              {Number(row.montant).toLocaleString()} FCFA
+            <span className={`text-sm font-semibold truncate ${row.typeTransfert === "COFFRE_VERS_CAISSE" ? 'text-status-warning' : 'text-status-success'}`}>
+              {row.typeTransfert === "COFFRE_VERS_CAISSE" ? '-' : '+'}{Number(row.montant).toLocaleString()} {currency.symbol}
             </span>
             <span className="text-[10px] text-content-muted truncate">
               {row.typeTransfert === "COFFRE_VERS_CAISSE" ? row.caisseDestinationNom : row.caisseSourceNom}
@@ -496,11 +498,14 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
       label: 'Montant',
       align: 'right' as const,
       hideOnMobile: true,
-      format: (val: any) => (
-        <span className="font-bold font-mono text-content-primary text-xs whitespace-nowrap tabular-nums">
-            {Number(val).toLocaleString()} <span className="text-[10px] text-content-muted">FCFA</span>
-        </span>
-      )
+      format: (val: any, row: any) => {
+        const isSortie = row.typeTransfert === "COFFRE_VERS_CAISSE";
+        return (
+          <span className={`font-bold font-mono text-xs whitespace-nowrap tabular-nums ${isSortie ? 'text-status-warning' : 'text-status-success'}`}>
+              {isSortie ? '-' : '+'}{Number(val).toLocaleString()} <span className="text-[10px]">{currency.symbol}</span>
+          </span>
+        );
+      }
     },
     {
       key: 'requestedByNom',
@@ -667,7 +672,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
           <span className="text-[11px] font-bold text-content-primary font-mono tabular-nums">
             {isLoadingStats ? '···' : (statsData?.solde || 0).toLocaleString()}
           </span>
-          <span className="text-[9px] text-content-muted">FCFA</span>
+          <span className="text-[9px] text-content-muted">{currency.symbol}</span>
         </div>
 
         {/* Tabs — underline style, scrollable */}
@@ -768,8 +773,8 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
                   <span className="text-[9px] sm:text-[10px] font-bold text-content-muted uppercase tracking-widest xs:mb-0.5">Solde Coffre</span>
                   <div className="flex items-center gap-1.5">
                      <Wallet className="text-status-info shrink-0" size={15} />
-                     <div className="text-sm sm:text-base lg:text-lg font-bold text-content-primary font-mono tabular-nums max-w-full truncate" title={isLoadingStats ? "..." : `${(statsData?.solde || 0).toLocaleString()} FCFA`}>
-                        {isLoadingStats ? "..." : <>{(statsData?.solde || 0).toLocaleString()} <span className="text-[10px] sm:text-xs text-content-muted font-sans">FCFA</span></>}
+                     <div className="text-sm sm:text-base lg:text-lg font-bold text-content-primary font-mono tabular-nums max-w-full truncate" title={isLoadingStats ? "..." : `${(statsData?.solde || 0).toLocaleString()} ${currency.symbol}`}>
+                        {isLoadingStats ? "..." : <>{(statsData?.solde || 0).toLocaleString()} <span className="text-[10px] sm:text-xs text-content-muted font-sans">{currency.symbol}</span></>}
                      </div>
                   </div>
                </div>
@@ -790,7 +795,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
                   <span className="text-[9px] sm:text-[10px] font-bold text-content-muted uppercase tracking-widest xs:mb-0.5">Mouvements du Jour</span>
                   <div className="flex items-center gap-1.5">
                      <ArrowRightLeft className="text-status-success shrink-0" size={15} />
-                     <div className="text-sm sm:text-base lg:text-lg font-bold text-content-primary font-mono tabular-nums max-w-full truncate">{todayVolume.toLocaleString()} <span className="text-[10px] sm:text-xs text-content-muted font-sans">FCFA</span></div>
+                     <div className="text-sm sm:text-base lg:text-lg font-bold text-content-primary font-mono tabular-nums max-w-full truncate">{todayVolume.toLocaleString()} <span className="text-[10px] sm:text-xs text-content-muted font-sans">{currency.symbol}</span></div>
                   </div>
                </div>
             </div>
@@ -859,7 +864,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
                               </div>
                               <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px]">
                                 <span className="text-status-warning font-bold">
-                                  {Number(request.montantDemande || request.transfert?.montant || 0).toLocaleString()} FCFA
+                                  {Number(request.montantDemande || request.transfert?.montant || 0).toLocaleString()} {currency.symbol}
                                 </span>
                                 {request.soldeVeille > 0 && (
                                   <span className="text-content-muted hidden xs:inline">
@@ -1071,7 +1076,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
               <div className="flex justify-between text-xs">
                 <span className="text-content-muted">Montant</span>
                 <span className="font-mono font-bold text-content-primary">
-                  {Number(transfertToCancel.montant).toLocaleString()} FCFA
+                  {Number(transfertToCancel.montant).toLocaleString()} {currency.symbol}
                 </span>
               </div>
               <div className="flex justify-between text-xs">
@@ -1154,6 +1159,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
 }
 
 function CoffreFortHistorique({ agenceId }: { agenceId: string }) {
+    const { currency } = useCurrency();
     const [selectedMouvement, setSelectedMouvement] = useState<any>(null);
 
     const { data, isLoading, refetch, isRefetching } = useQuery({
@@ -1220,7 +1226,7 @@ function CoffreFortHistorique({ agenceId }: { agenceId: string }) {
             align: 'right' as const,
             format: (val: any, row: any) => (
                 <span className={`font-bold font-mono text-xs ${row.sens === 'CREDIT' ? 'text-status-success' : 'text-status-warning'}`}>
-                    {row.sens === 'CREDIT' ? '+' : '-'} {Number(val).toLocaleString()} FCFA
+                    {row.sens === 'CREDIT' ? '+' : '-'} {Number(val).toLocaleString()} {currency.symbol}
                 </span>
             )
         }
@@ -1280,6 +1286,7 @@ function CoffreFortHistorique({ agenceId }: { agenceId: string }) {
 
 /** Slider de détails d'un mouvement coffre */
 function MouvementDetailPanel({ mouvement, onClose }: { mouvement: any; onClose: () => void }) {
+    const { currency } = useCurrency();
     const isCredit = mouvement.sens === 'CREDIT';
 
     return (
@@ -1325,7 +1332,7 @@ function MouvementDetailPanel({ mouvement, onClose }: { mouvement: any; onClose:
                     <div className="text-center py-3 sm:py-4 bg-surface/50 rounded-lg">
                         <span className="text-[10px] sm:text-xs text-content-muted uppercase tracking-wide">Montant</span>
                         <div className={`text-xl sm:text-2xl font-bold font-mono ${isCredit ? 'text-status-success' : 'text-status-warning'}`}>
-                            {isCredit ? '+' : '-'} {Number(mouvement.montant).toLocaleString()} FCFA
+                            {isCredit ? '+' : '-'} {Number(mouvement.montant).toLocaleString()} {currency.symbol}
                         </div>
                     </div>
 
@@ -1365,7 +1372,7 @@ function MouvementDetailPanel({ mouvement, onClose }: { mouvement: any; onClose:
                         {mouvement.soldeApres !== undefined && (
                             <DetailRow
                                 label="Solde après"
-                                value={`${Number(mouvement.soldeApres).toLocaleString()} FCFA`}
+                                value={`${Number(mouvement.soldeApres).toLocaleString()} ${currency.symbol}`}
                                 mono
                             />
                         )}
@@ -1389,6 +1396,7 @@ function MouvementDetailPanel({ mouvement, onClose }: { mouvement: any; onClose:
 
 /** Slider de détails d'un transfert coffre */
 function TransfertDetailPanel({ transfert, onClose }: { transfert: any; onClose: () => void }) {
+    const { currency } = useCurrency();
     const queryClient = useQueryClient();
     const [cancelReason, setCancelReason] = useState('');
     const [showCancelModal, setShowCancelModal] = useState(false);
@@ -1491,7 +1499,7 @@ function TransfertDetailPanel({ transfert, onClose }: { transfert: any; onClose:
                     <div className="text-center py-3 sm:py-4 bg-surface/50 rounded-lg">
                         <span className="text-[10px] sm:text-xs text-content-muted uppercase tracking-wide">Montant</span>
                         <div className={`text-xl sm:text-2xl font-bold font-mono ${isSortie ? 'text-status-warning' : 'text-status-success'}`}>
-                            {Number(transfert.montant).toLocaleString()} FCFA
+                            {Number(transfert.montant).toLocaleString()} {currency.symbol}
                         </div>
                     </div>
 
@@ -1607,7 +1615,7 @@ function TransfertDetailPanel({ transfert, onClose }: { transfert: any; onClose:
                             <div className="flex justify-between text-xs">
                                 <span className="text-content-muted">Montant</span>
                                 <span className="font-mono font-bold text-content-primary">
-                                    {Number(transfert.montant).toLocaleString()} FCFA
+                                    {Number(transfert.montant).toLocaleString()} {currency.symbol}
                                 </span>
                             </div>
                             <div className="flex justify-between text-xs">
