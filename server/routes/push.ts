@@ -17,6 +17,9 @@ import {
   generateVapidKeys,
 } from "../services/push-notification-service";
 import { z } from "zod";
+import { db } from "../db";
+import { expoPushTokens } from "@shared/schema/settings";
+import { eq, and } from "drizzle-orm";
 
 const subscriptionSchema = z.object({
   endpoint: z.string().url(),
@@ -213,6 +216,94 @@ export function registerPushRoutes(app: Express) {
     } catch (error) {
       logger.error({ err: error }, 'Error generating VAPID keys');
       res.status(500).json({ error: "Failed to generate VAPID keys" });
+    }
+  });
+
+  // ============================================
+  // Expo Push Token Management (Mobile)
+  // ============================================
+
+  const expoTokenSchema = z.object({
+    token: z.string().min(1),
+    platform: z.enum(['ios', 'android']),
+    deviceInfo: z.string().optional(),
+  });
+
+  /**
+   * POST /api/push/register-expo
+   * Register an Expo Push Token for the authenticated user.
+   * Upserts by token to avoid duplicates.
+   */
+  app.post("/api/push/register-expo", requireAuth, async (req, res) => {
+    try {
+      if (!req.session.user) return res.status(401).json({ error: "Non autorisé" });
+
+      const data = expoTokenSchema.parse(req.body);
+      const userId = req.session.user.id;
+
+      // Check if this token already exists
+      const [existing] = await db
+        .select()
+        .from(expoPushTokens)
+        .where(eq(expoPushTokens.token, data.token))
+        .limit(1);
+
+      if (existing) {
+        // Update: reactivate and reassign to current user
+        await db
+          .update(expoPushTokens)
+          .set({
+            userId,
+            platform: data.platform,
+            deviceInfo: data.deviceInfo ?? existing.deviceInfo,
+            isActive: true,
+            updatedAt: new Date(),
+          })
+          .where(eq(expoPushTokens.id, existing.id));
+      } else {
+        // Insert new token
+        await db.insert(expoPushTokens).values({
+          userId,
+          token: data.token,
+          platform: data.platform,
+          deviceInfo: data.deviceInfo ?? null,
+        });
+      }
+
+      logger.info({ userId, platform: data.platform }, 'Expo push token registered');
+      res.json({ success: true });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Données invalides", details: error.errors });
+      }
+      logger.error({ err: error }, 'Error registering Expo push token');
+      res.status(500).json({ error: "Erreur lors de l'enregistrement du token" });
+    }
+  });
+
+  /**
+   * DELETE /api/push/unregister-expo
+   * Deactivate all Expo push tokens for the current user.
+   */
+  app.delete("/api/push/unregister-expo", requireAuth, async (req, res) => {
+    try {
+      if (!req.session.user) return res.status(401).json({ error: "Non autorisé" });
+
+      await db
+        .update(expoPushTokens)
+        .set({ isActive: false, updatedAt: new Date() })
+        .where(
+          and(
+            eq(expoPushTokens.userId, req.session.user.id),
+            eq(expoPushTokens.isActive, true)
+          )
+        );
+
+      logger.info({ userId: req.session.user.id }, 'Expo push tokens unregistered');
+      res.json({ success: true });
+    } catch (error) {
+      logger.error({ err: error }, 'Error unregistering Expo push tokens');
+      res.status(500).json({ error: "Erreur lors de la désinscription" });
     }
   });
 }

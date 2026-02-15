@@ -175,6 +175,20 @@ export const insertPushSubscriptionSchema = createInsertSchema(pushSubscriptions
 export type InsertPushSubscription = z.infer<typeof insertPushSubscriptionSchema>;
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;
 
+// Expo Push Tokens (for mobile app push notifications)
+export const expoPushTokens = pgTable("expo_push_tokens", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  token: text("token").notNull(),
+  platform: text("platform").notNull(), // 'ios' | 'android'
+  deviceInfo: text("device_info"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type ExpoPushToken = typeof expoPushTokens.$inferSelect;
+
 // SMS Templates (from existing code in original file)
 export const smsTemplates = pgTable("sms_templates", {
   id: uuid("id").primaryKey().defaultRandom(),
