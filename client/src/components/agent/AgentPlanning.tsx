@@ -357,7 +357,7 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
 
         <button
           onClick={() => setShowForm(!showForm)}
-          className="w-full sm:w-auto px-3 py-1.5 bg-accent-secondary hover:bg-accent-secondary-hover text-content-primary rounded-lg flex items-center justify-center gap-1.5 text-xs font-bold transition shadow-lg shadow-accent/20"
+          className="w-full sm:w-auto px-3 py-1.5 bg-accent hover:bg-accent-primary-hover text-white rounded-lg flex items-center justify-center gap-1.5 text-xs font-bold transition shadow-lg shadow-accent/20"
         >
           <Plus size={14} />
           Nouveau
