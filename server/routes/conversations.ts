@@ -1253,13 +1253,26 @@ export function registerConversationsRoutes(app: Express): void {
           })
           .returning();
 
+        // Generate user-friendly preview based on contentType
+        const ct = (contentType as string) || "TEXT";
+        let preview: string;
+        if (ct === "IMAGE") {
+          preview = "📷 Photo";
+        } else if (ct === "FILE") {
+          preview = `📎 ${(metadata as any)?.filename || "Fichier"}`;
+        } else if (ct === "AUDIO") {
+          preview = "🎵 Audio";
+        } else {
+          preview = truncateMessagePreview(sanitizedContent);
+        }
+
         // Mettre à jour la conversation
         await db
           .update(conversations)
           .set({
             lastMessageId: newMessage.id,
             lastMessageAt: newMessage.createdAt,
-            lastMessagePreview: truncateMessagePreview(sanitizedContent),
+            lastMessagePreview: preview,
             updatedAt: new Date(),
           })
           .where(eq(conversations.id, conversationId));

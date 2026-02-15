@@ -10,6 +10,7 @@ import { resolveStorageUrl } from '@/lib/format';
 import { StatutUser } from '@shared/enum/status-constants';
 import { currencySymbol } from '@shared/config/currency';
 import EmployeeProfileDrawer from './EmployeeProfileDrawer';
+import TransferAgenceModal from './TransferAgenceModal';
 
 interface EmployesListProps {
   employes: Employe[];
@@ -51,6 +52,7 @@ export default function EmployesList({
   } | null>(null);
 
   const [selectedEmployee, setSelectedEmployee] = useState<Employe | null>(null);
+  const [transferEmployee, setTransferEmployee] = useState<Employe | null>(null);
   const ITEMS_PER_PAGE = 10;
   
   // ... (keeping existing filters logic) ...
@@ -409,6 +411,15 @@ export default function EmployesList({
         />
       )}
 
+      {/* TRANSFER MODAL */}
+      {transferEmployee && (
+        <TransferAgenceModal
+          employee={transferEmployee}
+          onClose={() => setTransferEmployee(null)}
+          onSuccess={() => { setTransferEmployee(null); onRefresh?.(); }}
+        />
+      )}
+
       {/* GLOBAL DROPDOWN MENU (Fixed Position) */}
       {menuState && (
         <>
@@ -436,16 +447,25 @@ export default function EmployesList({
                 setMenuState(null); 
               }} 
             />
-            <DropdownItem 
-              icon={FileText} 
-              label="Voir la fiche" 
-              onClick={(e) => { 
-                e.stopPropagation(); 
-                handleRowClick(menuState.emp); 
-                setMenuState(null); 
-              }} 
+            <DropdownItem
+              icon={FileText}
+              label="Voir la fiche"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleRowClick(menuState.emp);
+                setMenuState(null);
+              }}
             />
-            
+            <DropdownItem
+              icon={Building2}
+              label="Changer d'agence"
+              onClick={(e) => {
+                e.stopPropagation();
+                setTransferEmployee(menuState.emp);
+                setMenuState(null);
+              }}
+            />
+
             <div className="my-1 border-t border-edge" />
             
             {canDeleteEmployees && (

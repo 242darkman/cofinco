@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Users, Plus, Edit2, Trash2, Lock, Unlock, Eye, EyeOff, Shield, CheckCircle, XCircle, Search, Filter, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Upload, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { Users, Plus, Edit2, Trash2, Lock, Unlock, Eye, EyeOff, Shield, CheckCircle, XCircle, Search, Filter, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Upload, Image as ImageIcon, Loader2, User, Briefcase, Check, Save } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Card, Button, IconButton, ResponsiveTable } from '../ui';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import { usePermissions } from '../auth/ProtectedFeature';
@@ -60,6 +61,8 @@ export default function AdminGestionProfils() {
   const [permissions, setPermissions] = useState<ModulePermission[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [createStep, setCreateStep] = useState(1);
+  const [showCreateSuccess, setShowCreateSuccess] = useState(false);
   const [showPermissionsModal, setShowPermissionsModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
   const [userAccess, setUserAccess] = useState<Record<string, UserAccess>>({});
@@ -126,10 +129,13 @@ export default function AdminGestionProfils() {
     phone: '',
     password: '',
     confirmPassword: '',
-    role: SystemRole.CAISSIER,
+    roles: [] as SystemRole[],
     agenceId: '',
     photoProfile: '',
   });
+
+  // Defensive: ensure roles is always an array (HMR may preserve stale state)
+  const selectedRoles: SystemRole[] = Array.isArray(formData.roles) ? formData.roles : [];
 
   const roleMap: Record<SystemRole, string> = {
     [SystemRole.ADMIN]: 'admin',
@@ -155,11 +161,28 @@ export default function AdminGestionProfils() {
     };
   }, [formData.password, formData.confirmPassword]);
 
-  const isPasswordSecure = passwordValidation.length && 
-                          passwordValidation.uppercase && 
-                          passwordValidation.number && 
+  const isPasswordSecure = passwordValidation.length &&
+                          passwordValidation.uppercase &&
+                          passwordValidation.number &&
                           passwordValidation.special;
-  const isFormValid = isPasswordSecure && passwordValidation.match && formData.nom && formData.email;
+
+  const isCreateStepValid = (s: number): boolean => {
+    switch (s) {
+      case 1:
+        return formData.nom.trim().length > 0
+          && formData.prenom.trim().length > 0
+          && formData.email.trim().length > 0
+          && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email);
+      case 2:
+        return selectedRoles.length > 0;
+      case 3:
+        return !!(isPasswordSecure && passwordValidation.match);
+      default:
+        return true;
+    }
+  };
+
+  const isFormValid = isCreateStepValid(1) && isCreateStepValid(2) && isCreateStepValid(3);
 
   const modules = [
     'Caisse',
@@ -194,8 +217,8 @@ export default function AdminGestionProfils() {
     }
   }, []);
 
-  const handleCreateUser = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleCreateUser = useCallback(async (e?: React.FormEvent) => {
+    e?.preventDefault();
 
     if (!isPasswordSecure) {
       toast.warning('Le mot de passe ne respecte pas la politique de sécurité');
@@ -225,21 +248,23 @@ export default function AdminGestionProfils() {
         tempEntityId: tempUserIdRef.current,
       });
 
-      // Attribuer le rôle via l'API userRoles si le user a été créé
-      if (createdUser?.id && formData.role) {
-        try {
-          await fetch(`/api/users/${createdUser.id}/roles`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({
-              role: formData.role,
-              agenceId: formData.agenceId || null,
-              isPrimary: true,
-            }),
-          });
-        } catch (roleError) {
-          console.error('Erreur attribution rôle:', roleError);
+      // Attribuer les rôles via l'API userRoles si le user a été créé
+      if (createdUser?.id && selectedRoles.length > 0) {
+        for (let i = 0; i < selectedRoles.length; i++) {
+          try {
+            await fetch(`/api/users/${createdUser.id}/roles`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({
+                role: selectedRoles[i],
+                agenceId: formData.agenceId || null,
+                isPrimary: i === 0,
+              }),
+            });
+          } catch (roleError) {
+            console.error('Erreur attribution rôle:', roleError);
+          }
         }
       }
 
@@ -260,25 +285,30 @@ export default function AdminGestionProfils() {
         }
       }
 
+      // Show success animation then auto-close
+      setShowCreateSuccess(true);
       toast.success(
-        `Compte utilisateur ${formData.nom} ${formData.prenom} créé avec succès.\n` +
-        `⚠️ Les informations RH (contrat, salaire, matricule) doivent être complétées dans le module Ressources Humaines.`,
-        { duration: 6000 }
+        `Compte utilisateur ${formData.nom} ${formData.prenom} créé avec succès.`,
+        { duration: 4000 }
       );
 
-      setFormData({
-        nom: '',
-        prenom: '',
-        email: '',
-        phone: '',
-        password: '',
-        confirmPassword: '',
-        role: SystemRole.CAISSIER,
-        agenceId: '',
-        photoProfile: '',
-      });
-      setShowCreateForm(false);
-      loadUsers();
+      setTimeout(() => {
+        setShowCreateSuccess(false);
+        setCreateStep(1);
+        setFormData({
+          nom: '',
+          prenom: '',
+          email: '',
+          phone: '',
+          password: '',
+          confirmPassword: '',
+          roles: [],
+          agenceId: '',
+          photoProfile: '',
+        });
+        setShowCreateForm(false);
+        loadUsers();
+      }, 2000);
     } catch (error) {
       toast.error(handleApiError(error, 'Erreur lors de la création'));
     } finally {
@@ -409,11 +439,92 @@ export default function AdminGestionProfils() {
   const [permissionsLoading, setPermissionsLoading] = useState(false);
   const [savingPermissions, setSavingPermissions] = useState(false);
 
+  // Role management modal
+  const [showRolesModal, setShowRolesModal] = useState(false);
+  const [rolesModalUser, setRolesModalUser] = useState<any>(null);
+  const [userCurrentRoles, setUserCurrentRoles] = useState<Array<{ id: string; role: string; agenceId: string | null; isPrimary: boolean }>>([]);
+  const [loadingRoles, setLoadingRoles] = useState(false);
+  const [savingRole, setSavingRole] = useState(false);
+
   const openPermissionsModal = useCallback((emp: any) => {
     const user = emp.user || emp;
     setSelectedUser(user);
     setShowPermissionsModal(true);
   }, []);
+
+  const fetchUserRoles = useCallback(async (userId: string) => {
+    setLoadingRoles(true);
+    try {
+      const res = await fetch(`/api/users/${userId}/roles`, { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        setUserCurrentRoles(data);
+      }
+    } catch (err) {
+      console.error('Erreur chargement rôles:', err);
+    } finally {
+      setLoadingRoles(false);
+    }
+  }, []);
+
+  const openRolesModal = useCallback((emp: any) => {
+    const user = emp.user || emp;
+    setRolesModalUser({ ...user, empAgenceId: emp.agenceId });
+    setShowRolesModal(true);
+    fetchUserRoles(user.id);
+  }, [fetchUserRoles]);
+
+  const addRoleToUser = useCallback(async (role: SystemRole) => {
+    if (!rolesModalUser) return;
+    setSavingRole(true);
+    try {
+      const res = await fetch(`/api/users/${rolesModalUser.id}/roles`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          role,
+          agenceId: rolesModalUser.empAgenceId || null,
+          isPrimary: userCurrentRoles.length === 0,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        toast.error(err.error || 'Erreur ajout rôle');
+      } else {
+        toast.success(`Rôle ajouté`);
+        await fetchUserRoles(rolesModalUser.id);
+        loadUsers();
+      }
+    } catch (err) {
+      toast.error('Erreur ajout rôle');
+    } finally {
+      setSavingRole(false);
+    }
+  }, [rolesModalUser, userCurrentRoles, fetchUserRoles, loadUsers]);
+
+  const removeRoleFromUser = useCallback(async (roleId: string) => {
+    if (!rolesModalUser) return;
+    setSavingRole(true);
+    try {
+      const res = await fetch(`/api/users/${rolesModalUser.id}/roles/${roleId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        toast.error(err.error || 'Erreur retrait rôle');
+      } else {
+        toast.success(`Rôle retiré`);
+        await fetchUserRoles(rolesModalUser.id);
+        loadUsers();
+      }
+    } catch (err) {
+      toast.error('Erreur retrait rôle');
+    } finally {
+      setSavingRole(false);
+    }
+  }, [rolesModalUser, fetchUserRoles, loadUsers]);
 
   const filteredUsers = useMemo(() => {
     return users.filter(emp => {
@@ -477,10 +588,13 @@ export default function AdminGestionProfils() {
                 icon={Plus}
                 onClick={() => {
                   setFormData({
-                    nom: '', prenom: '', email: '', phone: '', password: '', confirmPassword: '', role: SystemRole.CAISSIER,
+                    nom: '', prenom: '', email: '', phone: '', password: '', confirmPassword: '',
+                    roles: [],
                     agenceId: (contextAgence && contextAgence.id !== 'all') ? contextAgence.id : '',
                     photoProfile: '',
                   });
+                  setCreateStep(1);
+                  setShowCreateSuccess(false);
                   setShowCreateForm(true);
                 }}
                 className="w-full sm:w-auto justify-center shadow-lg shadow-primary/20"
@@ -610,6 +724,17 @@ export default function AdminGestionProfils() {
                   const isActive = user.statut === StatutUser.ACTIVE;
                   return (
                     <div className="flex items-center gap-1">
+                      {canEditUsers && (
+                        <IconButton
+                          icon={Edit2}
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => { e.stopPropagation(); openRolesModal(emp); }}
+                          className="text-accent hover:bg-accent/10"
+                          title="Gérer les rôles"
+                          aria-label="Gérer les rôles"
+                        />
+                      )}
                       {canEditUsers && (
                         <IconButton
                           icon={isActive ? XCircle : CheckCircle}
@@ -749,233 +874,414 @@ export default function AdminGestionProfils() {
         )}
       </Card>
 
-      {/* Create User Modal - Improved UI */}
+      {/* Create User Modal - Stepper Wizard */}
       {showCreateForm && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-          <div className="bg-surface-base rounded-xl border border-edge w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]">
-            <div className="p-4 border-b border-edge flex justify-between items-center">
-              <h3 className="text-lg font-bold text-content-primary">Nouveau Profil</h3>
-              <button onClick={() => setShowCreateForm(false)} className="text-content-muted hover:text-content-primary">
-                <XCircle size={20} />
-              </button>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-surface-base rounded-xl sm:rounded-2xl border border-edge w-full max-w-2xl shadow-2xl flex flex-col max-h-[95vh] sm:max-h-[90vh] overflow-hidden">
+
+            {/* HEADER — Title + Stepper */}
+            <div className="bg-surface-base border-b border-edge px-3 sm:px-6 py-3 sm:py-4 flex-shrink-0">
+              <div className="flex justify-between items-center mb-4 sm:mb-5">
+                <h2 className="text-lg sm:text-xl font-bold text-content-primary">Nouveau Profil</h2>
+                <button
+                  onClick={() => { setShowCreateForm(false); setCreateStep(1); setShowCreateSuccess(false); }}
+                  className="p-1 text-content-muted hover:text-content-primary transition-colors"
+                >
+                  <XCircle className="w-5 h-5 sm:w-6 sm:h-6" />
+                </button>
+              </div>
+
+              {/* Progress Steps */}
+              <div className="flex justify-between relative px-2 sm:px-8">
+                <div className="absolute top-1/2 left-2 right-2 sm:left-8 sm:right-8 h-0.5 bg-surface -z-0" />
+                <CreateStepItem num={1} icon={User} label="Identité" current={createStep} />
+                <CreateStepItem num={2} icon={Briefcase} label="Affectation" current={createStep} />
+                <CreateStepItem num={3} icon={Shield} label="Sécurité" current={createStep} />
+              </div>
             </div>
-            
-            <form onSubmit={handleCreateUser} className="p-4 overflow-y-auto space-y-4 custom-scrollbar">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-content-secondary">Nom *</label>
-                  <input
-                    type="text"
-                    value={formData.nom}
-                    onChange={(e) => setFormData({...formData, nom: e.target.value})}
-                    className="w-full px-3 py-2 bg-surface-muted border border-edge rounded-lg text-sm text-content-primary focus:border-primary outline-none"
-                    required
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-content-secondary">Prénom *</label>
-                  <input
-                    type="text"
-                    value={formData.prenom}
-                    onChange={(e) => setFormData({...formData, prenom: e.target.value})}
-                    className="w-full px-3 py-2 bg-surface-muted border border-edge rounded-lg text-sm text-content-primary focus:border-primary outline-none"
-                    required
-                  />
-                </div>
-              </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-content-secondary">Email *</label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({...formData, email: e.target.value})}
-                  className="w-full px-3 py-2 bg-surface-muted border border-edge rounded-lg text-sm text-content-primary focus:border-primary outline-none"
-                  required
-                />
-              </div>
-
-              {/* Photo Section - Centered & Professional */}
-              <div className="flex flex-col items-center justify-center -mt-2 mb-6">
-                <div className="relative group">
-                  <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full border-4 border-surface-muted overflow-hidden shadow-lg bg-surface-muted flex items-center justify-center relative">
-                    {uploadingPhoto ? (
-                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10">
-                        <Loader2 className="w-8 h-8 text-primary animate-spin" />
-                      </div>
-                    ) : null}
-                    
-                    {formData.photoProfile ? (
-                      <img
-                        src={resolveStorageUrl(formData.photoProfile)}
-                        alt="Profil"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <ImageIcon size={40} className="text-content-muted opacity-50" />
-                    )}
-                  </div>
-                  
-                  {/* Overlay Actions */}
-                  <div className="absolute inset-x-0 bottom-0 bg-black/60 backdrop-blur-sm p-1.5 flex justify-center gap-3 translate-y-full group-hover:translate-y-0 transition-transform duration-200 rounded-b-full z-20">
-                    <button 
-                         type="button"
-                         onClick={() => fileInputRef.current?.click()}
-                         className="text-content-primary hover:text-primary transition-colors p-1 flex items-center justify-center"
-                         title="Changer la photo"
-                         disabled={uploadingPhoto}
-                       >
-                         <Upload size={16} />
-                    </button>
-
-                    {formData.photoProfile && (
-                       <button 
-                         type="button"
-                         onClick={() => setFormData({ ...formData, photoProfile: '' })}
-                         className="text-content-primary hover:text-status-danger transition-colors p-1 flex items-center justify-center"
-                         title="Supprimer la photo"
-                       >
-                         <Trash2 size={16} />
-                       </button>
-                    )}
-                  </div>
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    className="hidden"
-                    accept="image/png,image/jpeg,image/webp"
-                    onChange={handleFileUpload}
-                  />
-                </div>
-                <p className="text-[10px] text-content-muted mt-2">Format recommandé: carré, max 2Mo</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-content-secondary">Téléphone</label>
-                  <input
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                    className="w-full px-3 py-2 bg-surface-muted border border-edge rounded-lg text-sm text-content-primary focus:border-primary outline-none"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-content-secondary">Rôle *</label>
-                  <select
-                    value={formData.role}
-                    onChange={(e) => setFormData({...formData, role: e.target.value as SystemRole})}
-                    className="w-full px-3 py-2 bg-surface-muted border border-edge rounded-lg text-sm text-content-primary focus:border-primary outline-none"
-                    required
+            {/* BODY — Step Content or Success */}
+            <div className="flex-1 overflow-y-auto min-h-0 custom-scrollbar">
+              <AnimatePresence mode="wait">
+                {showCreateSuccess ? (
+                  <motion.div
+                    key="success"
+                    className="py-12 sm:py-16 flex flex-col items-center justify-center relative"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
                   >
-                    {roles.map((role) => (
-                      <option key={role.value} value={role.value}>{role.label}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+                    <CreateSuccessParticles />
+                    <CreateAnimatedCheckmark />
+                    <motion.p
+                      className="mt-6 text-lg font-bold text-status-success"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.5 }}
+                    >
+                      Profil créé avec succès !
+                    </motion.p>
+                    <motion.p
+                      className="mt-1.5 text-sm text-content-muted text-center px-4"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.7 }}
+                    >
+                      {formData.prenom} {formData.nom} peut maintenant se connecter
+                    </motion.p>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key={`step-${createStep}`}
+                    className="p-4 sm:p-6 space-y-5"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.25 }}
+                  >
+                    {/* STEP 1 — Identité */}
+                    {createStep === 1 && (
+                      <div className="space-y-5">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-lg bg-accent/10 flex items-center justify-center">
+                            <User size={14} className="text-accent" />
+                          </div>
+                          <h4 className="text-sm font-bold text-content-primary">Informations Personnelles</h4>
+                        </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-content-secondary">Agence d'affectation</label>
-                <select
-                  value={formData.agenceId}
-                  onChange={(e) => setFormData({...formData, agenceId: e.target.value})}
-                  className="w-full px-3 py-2 bg-surface-muted border border-edge rounded-lg text-sm text-content-primary focus:border-primary outline-none"
+                        {/* Photo */}
+                        <div className="flex flex-col items-center justify-center">
+                          <div className="relative group">
+                            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 border-surface-muted overflow-hidden shadow-lg bg-surface-muted flex items-center justify-center relative">
+                              {uploadingPhoto && (
+                                <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10">
+                                  <Loader2 className="w-6 h-6 text-accent animate-spin" />
+                                </div>
+                              )}
+                              {formData.photoProfile ? (
+                                <img src={resolveStorageUrl(formData.photoProfile)} alt="Profil" className="w-full h-full object-cover" />
+                              ) : (
+                                <ImageIcon size={32} className="text-content-muted opacity-50" />
+                              )}
+                            </div>
+                            <div className="absolute inset-x-0 bottom-0 bg-black/60 backdrop-blur-sm p-1.5 flex justify-center gap-3 translate-y-full group-hover:translate-y-0 transition-transform duration-200 rounded-b-full z-20">
+                              <button type="button" onClick={() => fileInputRef.current?.click()} className="text-content-primary hover:text-accent transition-colors p-1" title="Changer la photo" disabled={uploadingPhoto}>
+                                <Upload size={14} />
+                              </button>
+                              {formData.photoProfile && (
+                                <button type="button" onClick={() => setFormData({ ...formData, photoProfile: '' })} className="text-content-primary hover:text-status-danger transition-colors p-1" title="Supprimer">
+                                  <Trash2 size={14} />
+                                </button>
+                              )}
+                            </div>
+                            <input type="file" ref={fileInputRef} className="hidden" accept="image/png,image/jpeg,image/webp" onChange={handleFileUpload} />
+                          </div>
+                          <p className="text-[10px] text-content-muted mt-2">Photo optionnelle (max 2Mo)</p>
+                        </div>
+
+                        {/* Nom / Prénom */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                          <div className="space-y-1.5">
+                            <label className="text-[11px] sm:text-xs font-bold text-content-muted uppercase">Nom <span className="text-status-danger">*</span></label>
+                            <input
+                              type="text"
+                              value={formData.nom}
+                              onChange={(e) => setFormData({...formData, nom: e.target.value})}
+                              placeholder="Ex: Mbemba"
+                              className="w-full h-10 sm:h-11 px-3 sm:px-4 bg-surface-base border border-edge rounded-xl text-sm text-content-primary placeholder:text-content-muted focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-[11px] sm:text-xs font-bold text-content-muted uppercase">Prénom <span className="text-status-danger">*</span></label>
+                            <input
+                              type="text"
+                              value={formData.prenom}
+                              onChange={(e) => setFormData({...formData, prenom: e.target.value})}
+                              placeholder="Ex: Patrick"
+                              className="w-full h-10 sm:h-11 px-3 sm:px-4 bg-surface-base border border-edge rounded-xl text-sm text-content-primary placeholder:text-content-muted focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Email / Téléphone */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                          <div className="space-y-1.5">
+                            <label className="text-[11px] sm:text-xs font-bold text-content-muted uppercase">Email <span className="text-status-danger">*</span></label>
+                            <input
+                              type="email"
+                              value={formData.email}
+                              onChange={(e) => setFormData({...formData, email: e.target.value})}
+                              placeholder="email@exemple.com"
+                              className="w-full h-10 sm:h-11 px-3 sm:px-4 bg-surface-base border border-edge rounded-xl text-sm text-content-primary placeholder:text-content-muted focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-[11px] sm:text-xs font-bold text-content-muted uppercase">Téléphone</label>
+                            <input
+                              type="tel"
+                              value={formData.phone}
+                              onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                              placeholder="06 000 0000"
+                              className="w-full h-10 sm:h-11 px-3 sm:px-4 bg-surface-base border border-edge rounded-xl text-sm text-content-primary placeholder:text-content-muted focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* STEP 2 — Affectation */}
+                    {createStep === 2 && (
+                      <div className="space-y-5">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-lg bg-accent/10 flex items-center justify-center">
+                            <Briefcase size={14} className="text-accent" />
+                          </div>
+                          <h4 className="text-sm font-bold text-content-primary">Rôle & Affectation</h4>
+                        </div>
+
+                        {/* Role Chips */}
+                        <div className="space-y-2">
+                          <label className="text-[11px] sm:text-xs font-bold text-content-muted uppercase">
+                            Rôle{selectedRoles.length > 1 ? 's' : ''} <span className="text-status-danger">*</span>
+                            {selectedRoles.length > 0 && (
+                              <span className="ml-1.5 text-[10px] font-normal text-accent normal-case">
+                                {selectedRoles.length} sélectionné{selectedRoles.length > 1 ? 's' : ''}
+                              </span>
+                            )}
+                          </label>
+                          <div className="flex flex-wrap gap-2">
+                            {roles.map((role) => {
+                              const isSelected = selectedRoles.includes(role.value);
+                              const badge = getRoleBadgeStyle(role.value);
+                              return (
+                                <button
+                                  key={role.value}
+                                  type="button"
+                                  onClick={() => {
+                                    setFormData(prev => {
+                                      const current = Array.isArray(prev.roles) ? prev.roles : [];
+                                      return {
+                                        ...prev,
+                                        roles: isSelected
+                                          ? current.filter(r => r !== role.value)
+                                          : [...current, role.value],
+                                      };
+                                    });
+                                  }}
+                                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-all ${
+                                    isSelected
+                                      ? `${badge.classes} ring-1 ring-current/20 shadow-sm scale-[1.02]`
+                                      : 'bg-surface-muted border-edge text-content-muted hover:border-content-muted hover:text-content-secondary'
+                                  }`}
+                                >
+                                  {isSelected && <CheckCircle size={13} />}
+                                  {role.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {selectedRoles.length === 0 && (
+                            <p className="text-[10px] text-status-danger mt-0.5">Sélectionnez au moins un rôle</p>
+                          )}
+                          {selectedRoles.length > 0 && (
+                            <p className="text-[10px] text-content-muted">Le premier rôle sélectionné sera le rôle principal.</p>
+                          )}
+                        </div>
+
+                        {/* Separator */}
+                        <div className="border-t border-edge/50" />
+
+                        {/* Agence */}
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] sm:text-xs font-bold text-content-muted uppercase">Agence d'affectation</label>
+                          <select
+                            value={formData.agenceId}
+                            onChange={(e) => setFormData({...formData, agenceId: e.target.value})}
+                            className="w-full h-10 sm:h-11 px-3 sm:px-4 bg-surface-base border border-edge rounded-xl text-sm text-content-primary focus:ring-2 focus:ring-accent outline-none appearance-none cursor-pointer"
+                          >
+                            <option value="">-- Sélectionner une agence --</option>
+                            {availableAgences.map(agence => (
+                              <option key={agence.id} value={agence.id}>{agence.nom}</option>
+                            ))}
+                          </select>
+                          <p className="text-[10px] text-content-muted">L'employé sera rattaché à cette agence pour ses opérations.</p>
+                        </div>
+
+                        {/* RH Warning */}
+                        <div className="p-3 bg-status-warning-bg border border-status-warning/30 rounded-xl">
+                          <p className="text-xs text-status-warning flex items-start gap-2">
+                            <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                            <span>Les données RH (salaire, contrat, matricule) seront à compléter dans le module <strong>Ressources Humaines</strong>.</span>
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* STEP 3 — Sécurité */}
+                    {createStep === 3 && (
+                      <div className="space-y-5">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-lg bg-accent/10 flex items-center justify-center">
+                            <Shield size={14} className="text-accent" />
+                          </div>
+                          <h4 className="text-sm font-bold text-content-primary">Mot de Passe & Sécurité</h4>
+                        </div>
+
+                        {/* Password fields */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                          <div className="space-y-1.5">
+                            <label className="text-[11px] sm:text-xs font-bold text-content-muted uppercase">Mot de passe <span className="text-status-danger">*</span></label>
+                            <input
+                              type="password"
+                              value={formData.password}
+                              onChange={(e) => setFormData({...formData, password: e.target.value})}
+                              placeholder="Min. 8 caractères"
+                              className="w-full h-10 sm:h-11 px-3 sm:px-4 bg-surface-base border border-edge rounded-xl text-sm text-content-primary placeholder:text-content-muted focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-[11px] sm:text-xs font-bold text-content-muted uppercase">Confirmer <span className="text-status-danger">*</span></label>
+                            <input
+                              type="password"
+                              value={formData.confirmPassword}
+                              onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
+                              placeholder="Retapez le mot de passe"
+                              className={`w-full h-10 sm:h-11 px-3 sm:px-4 bg-surface-base border rounded-xl text-sm text-content-primary placeholder:text-content-muted outline-none transition-all focus:ring-2 ${
+                                formData.confirmPassword && !passwordValidation.match
+                                  ? 'border-status-danger focus:ring-status-danger'
+                                  : 'border-edge focus:ring-accent focus:border-accent'
+                              }`}
+                            />
+                            {formData.confirmPassword && !passwordValidation.match && (
+                              <p className="text-[10px] text-status-danger mt-1 flex items-center gap-1">
+                                <XCircle size={10} /> Les mots de passe ne correspondent pas
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Password Policy */}
+                        <div className="bg-surface-muted/50 rounded-xl p-3 sm:p-4 space-y-2.5 border border-edge/50">
+                          <p className="text-[10px] uppercase tracking-wider font-bold text-content-muted">Politique de sécurité</p>
+                          <div className="grid grid-cols-2 gap-2">
+                            {[
+                              { check: passwordValidation.length, label: 'Min. 8 caractères' },
+                              { check: passwordValidation.uppercase, label: 'Une majuscule' },
+                              { check: passwordValidation.number, label: 'Un chiffre' },
+                              { check: passwordValidation.special, label: 'Caractère spécial (@$!%*?&)' },
+                            ].map((item) => (
+                              <div key={item.label} className={`flex items-center gap-1.5 text-[10px] sm:text-[11px] ${item.check ? 'text-status-success' : 'text-content-muted'}`}>
+                                {item.check ? <CheckCircle size={11} /> : <div className="w-2.5 h-2.5 rounded-full border border-current opacity-30" />}
+                                <span>{item.label}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Recap Card */}
+                        <div className="bg-surface-muted/30 border border-edge/50 rounded-xl p-3 sm:p-4 space-y-2.5">
+                          <p className="text-[10px] uppercase tracking-wider font-bold text-content-muted">Récapitulatif</p>
+                          <div className="space-y-2 text-xs">
+                            <div className="flex justify-between items-center">
+                              <span className="text-content-muted">Nom complet</span>
+                              <span className="text-content-primary font-medium">{formData.prenom} {formData.nom}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-content-muted">Email</span>
+                              <span className="text-content-primary font-medium truncate ml-4">{formData.email}</span>
+                            </div>
+                            {formData.phone && (
+                              <div className="flex justify-between items-center">
+                                <span className="text-content-muted">Téléphone</span>
+                                <span className="text-content-primary">{formData.phone}</span>
+                              </div>
+                            )}
+                            <div className="flex justify-between items-start">
+                              <span className="text-content-muted mt-0.5">Rôle{selectedRoles.length > 1 ? 's' : ''}</span>
+                              <div className="flex flex-wrap justify-end gap-1 ml-4">
+                                {selectedRoles.map(r => {
+                                  const badge = getRoleBadgeStyle(r);
+                                  const roleLabel = roles.find(rl => rl.value === r)?.label || r;
+                                  return <span key={r} className={`px-2 py-0.5 rounded-md text-[10px] font-medium border ${badge.classes}`}>{roleLabel}</span>;
+                                })}
+                              </div>
+                            </div>
+                            {formData.agenceId && (
+                              <div className="flex justify-between items-center">
+                                <span className="text-content-muted">Agence</span>
+                                <span className="text-content-primary font-medium">{availableAgences.find(a => a.id === formData.agenceId)?.nom}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* FOOTER — Navigation (hidden during success) */}
+            {!showCreateSuccess && (
+              <div className="p-3 sm:p-4 bg-surface-base border-t border-edge flex justify-between items-center flex-shrink-0">
+                {/* Previous */}
+                <button
+                  type="button"
+                  onClick={() => createStep > 1 && setCreateStep(createStep - 1)}
+                  className={`px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl border border-edge text-content-secondary hover:text-content-primary hover:bg-surface transition-colors flex items-center gap-1.5 text-sm ${
+                    createStep === 1 ? 'invisible' : ''
+                  }`}
                 >
-                  <option value="">-- Sélectionner une agence --</option>
-                  {availableAgences.map(agence => (
-                    <option key={agence.id} value={agence.id}>{agence.nom}</option>
-                  ))}
-                </select>
-                <p className="text-[10px] text-content-muted">L'employé sera rattaché à cette agence pour ses opérations.</p>
-              </div>
+                  <ChevronLeft size={16} /> <span className="hidden sm:inline">Précédent</span><span className="sm:hidden">Retour</span>
+                </button>
 
-              {/* Note: Agent Terrain config et données RH seront gérées dans le module RH */}
-              <div className="p-3 bg-status-warning-bg border border-status-warning/30 rounded-lg">
-                <p className="text-xs text-status-warning flex items-center gap-2">
-                  <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                  </svg>
-                  <span>Les données RH (salaire, contrat, matricule) seront à compléter dans le module <strong>Ressources Humaines</strong>.</span>
-                </p>
-              </div>
+                {/* Right side: Cancel + Next/Create */}
+                <div className="flex gap-2 sm:gap-3">
+                  <button
+                    type="button"
+                    onClick={() => { setShowCreateForm(false); setCreateStep(1); setShowCreateSuccess(false); }}
+                    className="px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-content-muted hover:text-content-primary hover:bg-surface transition-colors text-sm font-medium"
+                  >
+                    Annuler
+                  </button>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-content-secondary">Mot de passe *</label>
-                  <input
-                    type="password"
-                    value={formData.password}
-                    onChange={(e) => setFormData({...formData, password: e.target.value})}
-                    className="w-full px-3 py-2 bg-surface-muted border border-edge rounded-lg text-sm text-content-primary focus:border-primary outline-none"
-                    required
-                    minLength={6}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-content-secondary">Confirmer *</label>
-                  <input
-                    type="password"
-                    value={formData.confirmPassword}
-                    onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
-                    className={`w-full px-3 py-2 bg-surface-muted border rounded-lg text-sm text-content-primary outline-none focus:ring-1 ${
-                      formData.confirmPassword && !passwordValidation.match ? 'border-status-danger focus:ring-status-danger' : 'border-edge focus:border-primary focus:ring-primary'
-                    }`}
-                    required
-                  />
-                  {formData.confirmPassword && !passwordValidation.match && (
-                    <p className="text-[10px] text-status-danger mt-1 flex items-center gap-1">
-                      <XCircle size={10} /> Les mots de passe ne correspondent pas
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Politique de sécurité */}
-              <div className="bg-surface-muted/50 rounded-lg p-3 space-y-2 border border-edge/50">
-                <p className="text-[10px] uppercase tracking-wider font-bold text-content-muted">Politique de sécurité</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className={`flex items-center gap-1.5 text-[10px] ${passwordValidation.length ? 'text-success' : 'text-content-muted'}`}>
-                    {passwordValidation.length ? <CheckCircle size={10} /> : <div className="w-2.5 h-2.5 rounded-full border border-current opacity-30" />}
-                    <span>Min. 8 caractères</span>
-                  </div>
-                  <div className={`flex items-center gap-1.5 text-[10px] ${passwordValidation.uppercase ? 'text-success' : 'text-content-muted'}`}>
-                    {passwordValidation.uppercase ? <CheckCircle size={10} /> : <div className="w-2.5 h-2.5 rounded-full border border-current opacity-30" />}
-                    <span>Une majuscule</span>
-                  </div>
-                  <div className={`flex items-center gap-1.5 text-[10px] ${passwordValidation.number ? 'text-success' : 'text-content-muted'}`}>
-                    {passwordValidation.number ? <CheckCircle size={10} /> : <div className="w-2.5 h-2.5 rounded-full border border-current opacity-30" />}
-                    <span>Un chiffre</span>
-                  </div>
-                  <div className={`flex items-center gap-1.5 text-[10px] ${passwordValidation.special ? 'text-success' : 'text-content-muted'}`}>
-                    {passwordValidation.special ? <CheckCircle size={10} /> : <div className="w-2.5 h-2.5 rounded-full border border-current opacity-30" />}
-                    <span>Caractère spécial (@$!%*?&)</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-2 flex gap-3">
-                <Button type="button" variant="secondary" className="flex-1" onClick={() => setShowCreateForm(false)}>
-                  Annuler
-                </Button>
-                <Button 
-                  type="submit" 
-                  variant="primary" 
-                  className="flex-1"
-                  disabled={isSubmitting || !isFormValid}
-                  icon={isSubmitting ? undefined : Plus}
-                >
-                  {isSubmitting ? (
-                    <div className="flex items-center gap-2">
-                      <Loader2 size={16} className="animate-spin" />
-                      <span>Création...</span>
-                    </div>
+                  {createStep < 3 ? (
+                    <button
+                      type="button"
+                      onClick={() => isCreateStepValid(createStep) && setCreateStep(createStep + 1)}
+                      disabled={!isCreateStepValid(createStep)}
+                      className={`px-5 sm:px-7 py-2 sm:py-2.5 rounded-xl font-bold transition-all flex items-center gap-1.5 shadow-lg text-sm ${
+                        isCreateStepValid(createStep)
+                          ? 'bg-accent text-white shadow-accent/20 hover:shadow-accent/30'
+                          : 'bg-surface-elevated text-content-muted cursor-not-allowed shadow-none'
+                      }`}
+                    >
+                      Suivant <ChevronRight size={16} />
+                    </button>
                   ) : (
-                    'Créer Profil'
+                    <button
+                      type="button"
+                      onClick={() => handleCreateUser()}
+                      disabled={isSubmitting || !isFormValid}
+                      className={`px-5 sm:px-7 py-2 sm:py-2.5 rounded-xl font-bold transition-all flex items-center gap-1.5 shadow-lg text-sm ${
+                        isFormValid && !isSubmitting
+                          ? 'bg-status-success text-white shadow-status-success/20 hover:shadow-status-success/30'
+                          : 'bg-surface-elevated text-content-muted cursor-not-allowed shadow-none'
+                      } ${isSubmitting ? 'opacity-60 cursor-wait' : ''}`}
+                    >
+                      {isSubmitting ? (
+                        <><Loader2 size={16} className="animate-spin" /> Création...</>
+                      ) : (
+                        <><Save size={16} /> Créer Profil</>
+                      )}
+                    </button>
                   )}
-                </Button>
+                </div>
               </div>
-            </form>
+            )}
+
           </div>
         </div>
       )}
@@ -991,6 +1297,85 @@ export default function AdminGestionProfils() {
         variant={confirmState.variant}
         confirmText={confirmState.confirmText}
       />
+      {/* Role Management Modal */}
+      {showRolesModal && rolesModalUser && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="bg-surface-base rounded-xl border border-edge w-full max-w-md shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="p-4 border-b border-edge flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-bold text-content-primary">Gestion des Rôles</h3>
+                <p className="text-xs text-content-muted">
+                  {rolesModalUser.prenom} {rolesModalUser.nom}
+                  {!loadingRoles && (
+                    <span className="ml-1.5">
+                      — {userCurrentRoles.length} rôle{userCurrentRoles.length > 1 ? 's' : ''}
+                    </span>
+                  )}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowRolesModal(false)}
+                className="text-content-muted hover:text-content-primary p-1 rounded-lg hover:bg-surface-muted transition-colors"
+              >
+                <XCircle size={24} />
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto">
+              {loadingRoles ? (
+                <div className="flex items-center justify-center gap-2 py-6">
+                  <Loader2 size={16} className="animate-spin text-accent" />
+                  <span className="text-xs text-content-muted">Chargement des rôles...</span>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-content-secondary">Cliquez pour activer ou retirer un rôle</label>
+                  <div className="flex flex-wrap gap-2">
+                    {roles.map((role) => {
+                      const existing = userCurrentRoles.find(ur => ur.role === role.value);
+                      const isSelected = !!existing;
+                      const badge = getRoleBadgeStyle(role.value);
+                      return (
+                        <button
+                          key={role.value}
+                          type="button"
+                          disabled={savingRole}
+                          onClick={() => {
+                            if (isSelected) {
+                              removeRoleFromUser(existing!.id);
+                            } else {
+                              addRoleToUser(role.value);
+                            }
+                          }}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all disabled:opacity-50 ${
+                            isSelected
+                              ? `${badge.classes} ring-1 ring-current/20 shadow-sm`
+                              : 'bg-surface-muted border-edge text-content-muted hover:border-content-muted hover:text-content-secondary'
+                          }`}
+                        >
+                          {isSelected && <CheckCircle size={12} />}
+                          {role.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t border-edge">
+              <Button
+                variant="secondary"
+                onClick={() => setShowRolesModal(false)}
+                className="w-full"
+              >
+                Fermer
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Permissions Modal - Embedded Manager */}
       {showPermissionsModal && selectedUser && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
@@ -1029,5 +1414,73 @@ export default function AdminGestionProfils() {
         </div>
       )}
     </div>
+  );
+}
+
+// --- Stepper Sub-Components ---
+
+function CreateStepItem({ num, icon: Icon, label, current }: { num: number; icon: React.ElementType; label: string; current: number }) {
+  const active = current >= num;
+  const isCurrent = current === num;
+  return (
+    <div className="relative z-10 flex flex-col items-center gap-1 sm:gap-2 w-14 sm:w-20">
+      <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
+        active
+          ? 'bg-accent text-white shadow-lg shadow-accent/30'
+          : 'bg-surface text-content-muted border border-edge'
+      } ${isCurrent ? 'ring-2 sm:ring-4 ring-accent/20 scale-105 sm:scale-110' : ''}`}>
+        <Icon className="w-4 h-4 sm:w-[18px] sm:h-[18px]" />
+      </div>
+      <span className={`text-[8px] sm:text-[10px] font-bold uppercase tracking-wider text-center leading-tight ${
+        active ? 'text-content-primary' : 'text-content-muted'
+      }`}>{label}</span>
+    </div>
+  );
+}
+
+function CreateSuccessParticles() {
+  const particles = React.useMemo(() =>
+    Array.from({ length: 30 }, (_, i) => ({
+      id: i,
+      x: Math.random() * 100,
+      delay: Math.random() * 0.3,
+      duration: 0.8 + Math.random() * 0.4,
+      size: 4 + Math.random() * 8,
+      color: ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0', '#14b8a6', '#5eead4'][Math.floor(Math.random() * 6)],
+    }))
+  , []);
+
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      {particles.map((p) => (
+        <motion.div
+          key={p.id}
+          className="absolute rounded-full"
+          style={{ left: `${p.x}%`, bottom: '50%', width: p.size, height: p.size, backgroundColor: p.color }}
+          initial={{ y: 0, opacity: 1, scale: 0 }}
+          animate={{ y: [-20, -150 - Math.random() * 100], x: [0, (Math.random() - 0.5) * 100], opacity: [1, 1, 0], scale: [0, 1, 0.5], rotate: [0, 360] }}
+          transition={{ duration: p.duration, delay: p.delay, ease: 'easeOut' }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function CreateAnimatedCheckmark() {
+  return (
+    <motion.div className="relative flex items-center justify-center" initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 200, damping: 15 }}>
+      <motion.div className="absolute w-24 h-24 rounded-full bg-status-success-bg" initial={{ scale: 0 }} animate={{ scale: [0, 1.5, 1] }} transition={{ duration: 0.6 }} />
+      <motion.div className="absolute w-20 h-20 rounded-full bg-status-success/30" initial={{ scale: 0 }} animate={{ scale: [0, 1.3, 1] }} transition={{ duration: 0.5, delay: 0.1 }} />
+      <motion.div
+        className="w-16 h-16 rounded-full bg-gradient-to-br from-status-success to-status-success flex items-center justify-center shadow-lg shadow-status-success/50"
+        initial={{ scale: 0, rotate: -180 }}
+        animate={{ scale: 1, rotate: 0 }}
+        transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.2 }}
+      >
+        <motion.div initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.4, delay: 0.4 }}>
+          <Check className="w-8 h-8 text-white" strokeWidth={3} />
+        </motion.div>
+      </motion.div>
+    </motion.div>
   );
 }

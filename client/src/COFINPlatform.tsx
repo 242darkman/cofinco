@@ -402,7 +402,7 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
       case 'messages':
         return (
           <Suspense fallback={<ModuleLoadingFallback moduleName="Messages" />}>
-            <MessagesModule initialChatUserId={moduleData?.chatUserId} initialChatUserName={moduleData?.chatUserName} initialChatUserPhoto={moduleData?.chatUserPhoto} />
+            <MessagesModule initialConversationId={moduleData?.conversationId} initialChatUserId={moduleData?.chatUserId} initialChatUserName={moduleData?.chatUserName} initialChatUserPhoto={moduleData?.chatUserPhoto} />
           </Suspense>
         );
       case 'validations':

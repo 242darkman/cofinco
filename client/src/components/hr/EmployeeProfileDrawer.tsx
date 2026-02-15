@@ -4,9 +4,10 @@ import {
   MoreVertical, CheckCircle, Ban, Calendar, MessageCircle,
   Loader2, FileText, KeyRound, LogOut, Archive, History, Shield,
   ChevronLeft, Upload, Download, Trash2, Clock, AlertTriangle,
-  Eye, File
+  Eye, File, Building2
 } from 'lucide-react';
 import { Employe } from '../../hooks/hr/useEmployes';
+import TransferAgenceModal from './TransferAgenceModal';
 import { resolveStorageUrl } from '@/lib/format';
 import { StatutUser } from '@shared/enum/status-constants';
 import { toast } from 'sonner';
@@ -100,6 +101,7 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
   const [uploadMeta, setUploadMeta] = useState({ nom: '', typeDocument: 'OTHER', dateExpiration: '' });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [previewDoc, setPreviewDoc] = useState<EmployeeDoc | null>(null);
+  const [showTransferModal, setShowTransferModal] = useState(false);
 
   // Helper to get initials
   const getInitials = (nom: string, prenom: string) => {
@@ -144,16 +146,37 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
     return `${(bytes / 1048576).toFixed(1)} Mo`;
   };
 
-  // Handle chat opening via cross-module navigation
-  const handleOpenChat = () => {
+  // Handle chat opening — create/get DM first, then navigate with conversationId
+  const handleOpenChat = async () => {
+    if (!employee.userId) return;
     setIsLoadingChat(true);
-    onClose();
-    window.dispatchEvent(new CustomEvent('navigate-module', {
-      detail: {
-        module: 'messages',
-        data: { chatUserId: employee.userId, chatUserName: `${employee.nom} ${employee.prenom}`, chatUserPhoto: employee.photoProfile || null }
-      }
-    }));
+    try {
+      const res = await fetch('/api/v2/conversations/dm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ userId: employee.userId }),
+      });
+      if (!res.ok) throw new Error('Erreur messagerie');
+      const data = await res.json();
+
+      onClose();
+      window.dispatchEvent(new CustomEvent('navigate-module', {
+        detail: {
+          module: 'messages',
+          data: {
+            conversationId: data.conversation.id,
+            chatUserId: employee.userId,
+            chatUserName: `${employee.nom} ${employee.prenom}`,
+            chatUserPhoto: employee.photoProfile || null,
+          }
+        }
+      }));
+    } catch {
+      toast.error("Impossible d'ouvrir la messagerie");
+    } finally {
+      setIsLoadingChat(false);
+    }
   };
 
   // ===== FETCH FUNCTIONS =====
@@ -568,6 +591,11 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
                           label="Historique d'activité"
                           onClick={() => { setActiveView('activity'); setMenuOpen(false); }}
                         />
+                        <MenuItem
+                          icon={Building2}
+                          label="Changer d'agence"
+                          onClick={() => { setShowTransferModal(true); setMenuOpen(false); }}
+                        />
 
                         <div className="my-1 border-t border-edge" />
 
@@ -916,6 +944,14 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
           documentName={previewDoc.nom || previewDoc.fileName}
           preloadedUrl={previewDoc.url || undefined}
           preloadedMimeType={previewDoc.mimeType || undefined}
+        />
+      )}
+
+      {showTransferModal && (
+        <TransferAgenceModal
+          employee={employee}
+          onClose={() => setShowTransferModal(false)}
+          onSuccess={() => { setShowTransferModal(false); onRefresh?.(); }}
         />
       )}
     </div>

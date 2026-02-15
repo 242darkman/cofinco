@@ -534,6 +534,103 @@ export function registerEmployesRoutes(app: Express) {
   });
 
   // ============================================
+  // POST - Transférer un employé vers une autre agence
+  // ============================================
+  const transferSchema = z.object({
+    targetAgenceId: z.string().uuid(),
+    reason: z.string().optional(),
+    managerId: z.string().uuid().nullable().optional(),
+    jobPositionId: z.string().uuid().nullable().optional(),
+    salaireBase: z.union([z.string(), z.number()]).optional().transform(v => v != null ? String(v) : undefined),
+    effectiveDate: z.string().optional(),
+  });
+
+  app.post("/api/employes/:id/transfer", attachAbility, requireAbility(Actions.MANAGE, Subjects.EMPLOYE), async (req, res) => {
+    try {
+      const employeId = req.params.id;
+
+      // Valider le body
+      const parsed = transferSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Données invalides", errors: parsed.error.errors });
+      }
+
+      const { targetAgenceId, reason, managerId, jobPositionId, salaireBase, effectiveDate } = parsed.data;
+
+      // Vérifier que l'employé existe
+      const existingEmploye = await storage.getEmployeWithUser(employeId);
+      if (!existingEmploye) {
+        return res.status(404).json({ message: "Employé non trouvé" });
+      }
+
+      // Vérifier que l'agence cible est différente
+      if (existingEmploye.agenceId === targetAgenceId) {
+        return res.status(400).json({ message: "L'employé est déjà dans cette agence" });
+      }
+
+      // Vérifier que l'agence cible existe et est active
+      const { agences: agencesTable } = await import("@shared/schema");
+      const [targetAgence] = await db.select().from(agencesTable).where(eq(agencesTable.id, targetAgenceId));
+      if (!targetAgence) {
+        return res.status(404).json({ message: "Agence cible non trouvée" });
+      }
+      if (targetAgence.statut !== 'ACTIVE') {
+        return res.status(400).json({ message: "L'agence cible n'est pas active" });
+      }
+
+      // Exécuter le transfert
+      const { transferEmployeToAgence } = await import("../storage/employes");
+      const result = await transferEmployeToAgence(
+        employeId,
+        targetAgenceId,
+        req.session.user!.id,
+        `${req.session.user!.nom} ${req.session.user!.prenom}`,
+        { managerId, jobPositionId, salaireBase, reason, effectiveDate }
+      );
+
+      if (!result) {
+        return res.status(500).json({ message: "Erreur lors du transfert" });
+      }
+
+      await logAudit(
+        req,
+        "TRANSFER_EMPLOYE",
+        "employe",
+        employeId,
+        { fromAgenceId: result.fromAgenceId, toAgenceId: targetAgenceId, reason },
+        "success",
+        "high"
+      );
+
+      // Notify via WebSocket
+      const { getWsInstance } = await import("../ws-server");
+      const wsInstance = getWsInstance();
+      if (wsInstance) {
+        wsInstance.broadcast({
+          type: "EMPLOYE_UPDATE",
+          payload: {
+            type: 'employe_transferred',
+            id: employeId,
+            fromAgenceId: result.fromAgenceId,
+            toAgenceId: targetAgenceId,
+          }
+        });
+      }
+
+      res.json(result.employee);
+
+    } catch (error: any) {
+      if (error?.message === 'OPEN_SESSION') {
+        return res.status(409).json({
+          message: "Impossible de transférer : l'employé a une session caisse ouverte. Veuillez la fermer d'abord."
+        });
+      }
+      logger.error({ err: error }, 'Error transferring employe');
+      res.status(500).json({ message: "Erreur lors du transfert de l'employé" });
+    }
+  });
+
+  // ============================================
   // DELETE - Supprimer un employé (soft delete)
   // ============================================
   app.delete("/api/employes/:id", attachAbility, requireAbility(Actions.MANAGE, Subjects.EMPLOYE), async (req, res) => {

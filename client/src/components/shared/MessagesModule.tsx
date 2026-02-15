@@ -24,6 +24,7 @@ import { useWebSocket } from '../../hooks/useWebSocket';
 import { resolveStorageUrl } from '../../lib/format';
 import { authService } from '../../lib/auth';
 import { ALLOWED_REACTION_EMOJIS } from '@shared/schema';
+import DocumentPreviewModal from '../ui/DocumentPreviewModal';
 
 // Emojis courants pour la composition de messages
 const MESSAGE_EMOJIS = [
@@ -42,6 +43,7 @@ const MESSAGE_EMOJIS = [
 ];
 
 interface MessagesModuleProps {
+  initialConversationId?: string;
   initialChatUserId?: string;
   initialChatUserName?: string;
   initialChatUserPhoto?: string | null;
@@ -70,7 +72,7 @@ function getInitials(name: string): string {
   return (parts[0]?.[0] || '?').toUpperCase();
 }
 
-export default function MessagesModule({ initialChatUserId, initialChatUserName, initialChatUserPhoto }: MessagesModuleProps) {
+export default function MessagesModule({ initialConversationId, initialChatUserId, initialChatUserName, initialChatUserPhoto }: MessagesModuleProps) {
   const currentUser = authService.getCurrentUser();
   const currentUserId = currentUser?.id || '';
 
@@ -86,6 +88,7 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
   const [groupParticipants, setGroupParticipants] = useState<string[]>([]);
   const [groupSearchQuery, setGroupSearchQuery] = useState('');
   const [menuOpenFor, setMenuOpenFor] = useState<string | null>(null);
+  const [previewFile, setPreviewFile] = useState<{ url: string; name: string; mimeType?: string } | null>(null);
 
   // V2 Hooks
   const { data: conversationsData, isLoading: loadingConversations } = useConversationsV2();
@@ -121,13 +124,23 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const messageInputRef = useRef<HTMLTextAreaElement>(null);
 
   // File upload state
   const [uploadingFile, setUploadingFile] = useState(false);
 
-  // Handle initial DM user ID (create/get DM when provided)
+  // Handle initial conversation — prefer direct conversationId, fallback to DM creation
   useEffect(() => {
-    if (initialChatUserId && !initialChatHandled.current) {
+    if (initialChatHandled.current) return;
+
+    if (initialConversationId) {
+      initialChatHandled.current = true;
+      setSelectedConversationId(initialConversationId);
+      setTimeout(() => messageInputRef.current?.focus(), 300);
+      return;
+    }
+
+    if (initialChatUserId) {
       initialChatHandled.current = true;
       createDM(
         { userId: initialChatUserId },
@@ -138,7 +151,7 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
         }
       );
     }
-  }, [initialChatUserId, createDM]);
+  }, [initialConversationId, initialChatUserId, createDM]);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -441,7 +454,7 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
                     </div>
                     <div className="flex justify-between items-center">
                       <span className={`text-xs truncate pr-2 ${conv.unreadCount > 0 ? 'text-content-secondary font-medium' : 'text-content-muted'}`}>
-                        {lastMsg || ''}
+                        {lastMsg && /^https?:\/\//.test(lastMsg) ? '📎 Fichier' : lastMsg || ''}
                       </span>
                       {conv.unreadCount > 0 && (
                         <span className="h-5 min-w-[20px] px-1.5 rounded-full bg-accent text-[10px] font-bold text-white flex items-center justify-center shrink-0">
@@ -568,105 +581,156 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
                         >
                           {/* Message bubble wrapper with relative positioning for actions */}
                           <div className="relative max-w-[85%] md:max-w-[75%] lg:max-w-[60%]">
-                            {/* iPhone-style chat bubble */}
-                            <div className={`
-                              relative px-4 py-2.5 text-[15px] leading-relaxed
-                              ${isMe
-                                ? 'bg-gradient-to-br from-status-info to-status-info text-white rounded-[20px] rounded-br-[4px]'
-                                : 'bg-surface-elevated/80 text-content-primary rounded-[20px] rounded-bl-[4px]'
-                              }
-                            `}>
-                              {/* Bubble tail */}
-                              <svg
-                                className={`absolute bottom-0 w-3 h-3 ${
-                                  isMe
-                                    ? '-right-1.5 text-status-info'
-                                    : '-left-1.5 text-content-secondary/80 -scale-x-100'
-                                }`}
-                                viewBox="0 0 12 12"
-                                fill="currentColor"
-                              >
-                                <path d="M0 0 L12 0 L12 12 Q6 12 0 6 Z" />
-                              </svg>
 
-                              {/* Sender name (groups only) */}
-                              {!isMe && activeConv?.type === 'GROUP' && (
-                                <p className="text-xs font-semibold text-status-info mb-1">
-                                  {msg.sender.prenom ? `${msg.sender.prenom} ${msg.sender.nom}` : msg.sender.nom}
-                                </p>
-                              )}
-
-                              {msg.contentType === 'IMAGE' ? (
-                                <div className="space-y-1">
+                            {msg.contentType === 'IMAGE' ? (
+                              /* ── Image message — clean card, no chat bubble ── */
+                              <div className="relative">
+                                {/* Sender name (groups only) */}
+                                {!isMe && activeConv?.type === 'GROUP' && (
+                                  <p className="text-xs font-semibold text-status-info mb-1">
+                                    {msg.sender.prenom ? `${msg.sender.prenom} ${msg.sender.nom}` : msg.sender.nom}
+                                  </p>
+                                )}
+                                <div
+                                  className="relative cursor-pointer overflow-hidden rounded-2xl border border-edge/40 shadow-sm hover:shadow-md transition-shadow"
+                                  onClick={() => setPreviewFile({
+                                    url: resolveStorageUrl((msg.metadata as any)?.url || msg.content || ''),
+                                    name: (msg.metadata as any)?.filename || 'Image',
+                                    mimeType: (msg.metadata as any)?.mimeType || 'image/jpeg',
+                                  })}
+                                >
                                   <img
                                     src={resolveStorageUrl((msg.metadata as any)?.url || msg.content || '')}
                                     alt={(msg.metadata as any)?.filename || 'Image'}
-                                    className="max-w-[280px] rounded-xl cursor-pointer"
-                                    onClick={() => window.open(resolveStorageUrl((msg.metadata as any)?.url || msg.content || ''), '_blank')}
+                                    className="max-w-[280px] sm:max-w-[320px] rounded-2xl object-cover"
                                   />
-                                  {(msg.metadata as any)?.filename && (
-                                    <p className={`text-xs ${isMe ? 'text-status-info-text' : 'text-content-muted'}`}>{(msg.metadata as any).filename}</p>
-                                  )}
-                                </div>
-                              ) : msg.contentType === 'FILE' ? (
-                                <a
-                                  href={resolveStorageUrl((msg.metadata as any)?.url || msg.content || '')}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className={`flex items-center gap-3 p-2.5 rounded-xl ${
-                                    isMe
-                                      ? 'bg-status-info-bg hover:bg-status-info/30'
-                                      : 'bg-surface-subtle/50 hover:bg-surface-subtle/70'
-                                  } transition-colors`}
-                                >
-                                  <div className={`p-2 rounded-lg ${isMe ? 'bg-status-info/30' : 'bg-surface-muted0/50'}`}>
-                                    <FileText size={20} className={isMe ? 'text-white' : 'text-status-info'} />
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <p className={`text-sm font-medium truncate ${isMe ? 'text-white' : 'text-content-secondary'}`}>
-                                      {(msg.metadata as any)?.filename || 'Fichier'}
-                                    </p>
-                                    {(msg.metadata as any)?.size && (
-                                      <p className={`text-xs ${isMe ? 'text-status-info-text' : 'text-content-muted'}`}>
-                                        {((msg.metadata as any).size / 1024).toFixed(0)} Ko
-                                      </p>
+                                  {/* Time overlay on image */}
+                                  <div className="absolute bottom-1.5 right-2 flex items-center gap-1 bg-black/50 backdrop-blur-sm rounded-full px-2 py-0.5">
+                                    <span className="text-[10px] text-white/90">{new Date(msg.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+                                    {isMe && (
+                                      isMessageRead(msg) ? (
+                                        <CheckCheck size={12} className="text-white/90" />
+                                      ) : (
+                                        <Check size={12} className="text-white/60" />
+                                      )
                                     )}
                                   </div>
-                                  <Download size={18} className={isMe ? 'text-status-info-text' : 'text-content-muted'} />
-                                </a>
-                              ) : (
-                                <p className="whitespace-pre-wrap">{msg.content}</p>
-                              )}
-
-                              {/* Time and read status - iPhone style */}
-                              <div className={`flex items-center gap-1.5 justify-end mt-1 text-[11px] ${isMe ? 'text-status-info-text' : 'text-content-muted'}`}>
-                                {msg.editedAt && <span className="italic">modifié</span>}
-                                <span>{new Date(msg.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
-                                {isMe && (
-                                  isMessageRead(msg) ? (
-                                    <CheckCheck size={14} className="text-white" />
-                                  ) : (
-                                    <Check size={14} className="text-status-info-text/70" />
-                                  )
+                                </div>
+                                {/* Reactions */}
+                                {msg.reactions.length > 0 && (
+                                  <div className={`absolute -bottom-4 ${isMe ? 'right-2' : 'left-2'} flex gap-0.5 bg-surface rounded-full px-1.5 py-0.5 shadow-lg border border-edge`}>
+                                    {msg.reactions.map((r) => (
+                                      <button key={r.emoji} onClick={() => handleToggleReaction(msg.id, r.emoji, r.hasReacted)} className={`text-sm transition-transform hover:scale-110 ${r.hasReacted ? 'opacity-100' : 'opacity-70'}`}>
+                                        {r.emoji}{r.count > 1 && <span className="text-[10px] text-content-muted ml-0.5">{r.count}</span>}
+                                      </button>
+                                    ))}
+                                  </div>
                                 )}
                               </div>
 
-                              {/* Reactions display - positioned below bubble */}
-                              {msg.reactions.length > 0 && (
-                                <div className={`absolute -bottom-4 ${isMe ? 'right-2' : 'left-2'} flex gap-0.5 bg-surface rounded-full px-1.5 py-0.5 shadow-lg border border-edge`}>
-                                  {msg.reactions.map((r) => (
-                                    <button
-                                      key={r.emoji}
-                                      onClick={() => handleToggleReaction(msg.id, r.emoji, r.hasReacted)}
-                                      className={`text-sm transition-transform hover:scale-110 ${r.hasReacted ? 'opacity-100' : 'opacity-70'}`}
-                                    >
-                                      {r.emoji}
-                                      {r.count > 1 && <span className="text-[10px] text-content-muted ml-0.5">{r.count}</span>}
-                                    </button>
-                                  ))}
+                            ) : msg.contentType === 'FILE' ? (
+                              /* ── File message — compact card, no raw URL ── */
+                              <div className="relative">
+                                {!isMe && activeConv?.type === 'GROUP' && (
+                                  <p className="text-xs font-semibold text-status-info mb-1">
+                                    {msg.sender.prenom ? `${msg.sender.prenom} ${msg.sender.nom}` : msg.sender.nom}
+                                  </p>
+                                )}
+                                <button
+                                  onClick={() => setPreviewFile({
+                                    url: resolveStorageUrl((msg.metadata as any)?.url || msg.content || ''),
+                                    name: (msg.metadata as any)?.filename || 'Fichier',
+                                    mimeType: (msg.metadata as any)?.mimeType,
+                                  })}
+                                  className={`flex items-center gap-3 p-3 rounded-2xl border transition-colors w-full text-left ${
+                                    isMe
+                                      ? 'bg-status-info/90 border-status-info/30 hover:bg-status-info'
+                                      : 'bg-surface-elevated/80 border-edge/40 hover:bg-surface-elevated'
+                                  }`}
+                                >
+                                  <div className={`p-2.5 rounded-xl ${isMe ? 'bg-white/15' : 'bg-accent/10'}`}>
+                                    <FileText size={20} className={isMe ? 'text-white' : 'text-accent'} />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className={`text-sm font-medium truncate ${isMe ? 'text-white' : 'text-content-primary'}`}>
+                                      {(msg.metadata as any)?.filename || 'Fichier'}
+                                    </p>
+                                    <p className={`text-[11px] ${isMe ? 'text-white/60' : 'text-content-muted'}`}>
+                                      {(msg.metadata as any)?.size ? `${((msg.metadata as any).size / 1024).toFixed(0)} Ko` : 'Fichier'}
+                                      {' · '}{new Date(msg.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                                      {isMe && (isMessageRead(msg) ? ' ✓✓' : ' ✓')}
+                                    </p>
+                                  </div>
+                                  <Download size={16} className={isMe ? 'text-white/50' : 'text-content-muted'} />
+                                </button>
+                                {/* Reactions */}
+                                {msg.reactions.length > 0 && (
+                                  <div className={`absolute -bottom-4 ${isMe ? 'right-2' : 'left-2'} flex gap-0.5 bg-surface rounded-full px-1.5 py-0.5 shadow-lg border border-edge`}>
+                                    {msg.reactions.map((r) => (
+                                      <button key={r.emoji} onClick={() => handleToggleReaction(msg.id, r.emoji, r.hasReacted)} className={`text-sm transition-transform hover:scale-110 ${r.hasReacted ? 'opacity-100' : 'opacity-70'}`}>
+                                        {r.emoji}{r.count > 1 && <span className="text-[10px] text-content-muted ml-0.5">{r.count}</span>}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+
+                            ) : (
+                              /* ── Text message — standard iPhone-style bubble ── */
+                              <div className={`
+                                relative px-4 py-2.5 text-[15px] leading-relaxed
+                                ${isMe
+                                  ? 'bg-gradient-to-br from-status-info to-status-info text-white rounded-[20px] rounded-br-[4px]'
+                                  : 'bg-surface-elevated/80 text-content-primary rounded-[20px] rounded-bl-[4px]'
+                                }
+                              `}>
+                                {/* Bubble tail */}
+                                <svg
+                                  className={`absolute bottom-0 w-3 h-3 ${
+                                    isMe
+                                      ? '-right-1.5 text-status-info'
+                                      : '-left-1.5 text-content-secondary/80 -scale-x-100'
+                                  }`}
+                                  viewBox="0 0 12 12"
+                                  fill="currentColor"
+                                >
+                                  <path d="M0 0 L12 0 L12 12 Q6 12 0 6 Z" />
+                                </svg>
+
+                                {/* Sender name (groups only) */}
+                                {!isMe && activeConv?.type === 'GROUP' && (
+                                  <p className="text-xs font-semibold text-status-info mb-1">
+                                    {msg.sender.prenom ? `${msg.sender.prenom} ${msg.sender.nom}` : msg.sender.nom}
+                                  </p>
+                                )}
+
+                                <p className="whitespace-pre-wrap">{msg.content}</p>
+
+                                {/* Time and read status */}
+                                <div className={`flex items-center gap-1.5 justify-end mt-1 text-[11px] ${isMe ? 'text-status-info-text' : 'text-content-muted'}`}>
+                                  {msg.editedAt && <span className="italic">modifié</span>}
+                                  <span>{new Date(msg.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+                                  {isMe && (
+                                    isMessageRead(msg) ? (
+                                      <CheckCheck size={14} className="text-white" />
+                                    ) : (
+                                      <Check size={14} className="text-status-info-text/70" />
+                                    )
+                                  )}
                                 </div>
-                              )}
-                            </div>
+
+                                {/* Reactions */}
+                                {msg.reactions.length > 0 && (
+                                  <div className={`absolute -bottom-4 ${isMe ? 'right-2' : 'left-2'} flex gap-0.5 bg-surface rounded-full px-1.5 py-0.5 shadow-lg border border-edge`}>
+                                    {msg.reactions.map((r) => (
+                                      <button key={r.emoji} onClick={() => handleToggleReaction(msg.id, r.emoji, r.hasReacted)} className={`text-sm transition-transform hover:scale-110 ${r.hasReacted ? 'opacity-100' : 'opacity-70'}`}>
+                                        {r.emoji}{r.count > 1 && <span className="text-[10px] text-content-muted ml-0.5">{r.count}</span>}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
 
                           {/* Hover actions - positioned close to the message bubble */}
                           <div className={`absolute ${isMe ? '-left-1 -translate-x-full' : '-right-1 translate-x-full'} top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-0.5 bg-surface-base/90 backdrop-blur-sm rounded-lg px-1 py-0.5 shadow-lg border border-edge-subtle`}>
@@ -783,6 +847,7 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
 
                   <div className="bg-surface-base border border-edge rounded-xl flex items-center px-3 sm:px-4 h-11 sm:h-12 focus-within:border-accent transition-colors">
                     <textarea
+                      ref={messageInputRef}
                       placeholder="Écrire un message..."
                       className="w-full bg-transparent border-none outline-none text-content-primary text-sm resize-none py-2.5 max-h-32 placeholder:text-content-muted custom-scrollbar leading-normal"
                       rows={1}
@@ -901,6 +966,18 @@ export default function MessagesModule({ initialChatUserId, initialChatUserName,
             </div>
           </div>
         </div>
+      )}
+
+      {/* FILE/IMAGE PREVIEW MODAL — conditional render so state resets each time */}
+      {previewFile && (
+        <DocumentPreviewModal
+          isOpen
+          onClose={() => setPreviewFile(null)}
+          documentId=""
+          documentName={previewFile.name}
+          preloadedUrl={previewFile.url}
+          preloadedMimeType={previewFile.mimeType}
+        />
       )}
     </div>
   );

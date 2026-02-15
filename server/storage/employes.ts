@@ -12,12 +12,12 @@
  * - deleteEmploye: soft delete user + suppression rôles
  */
 
-import { employes, users, userRoles, jobPositions, departments, agences, agentsTerrain } from "@shared/schema";
+import { employes, users, userRoles, jobPositions, departments, agences, agentsTerrain, userAgences, sessionsCaisse, hrAuditLog } from "@shared/schema";
 import { type Employe, type InsertEmploye, type User, type EmployeWithUser } from "@shared/schema";
 import { SystemRole } from "@shared/types/roles";
 import { StatutUser } from "@shared/enum/status-constants";
 import { db } from "../db";
-import { eq, desc, and, isNull, asc } from "drizzle-orm";
+import { eq, desc, and, isNull, asc, sql } from "drizzle-orm";
 import { StorageService } from "../services/storage-service";
 import crypto from "crypto";
 import { createLogger } from "../lib/logger";
@@ -621,6 +621,163 @@ export async function updateEmployeWithUser(
     return {
       ...result[0].employe,
       user: result[0].user
+    };
+  });
+}
+
+// ============================================
+// Transfert inter-agences
+// ============================================
+
+export interface TransferResult {
+  employee: EmployeWithUser;
+  fromAgenceId: string | null;
+  toAgenceId: string;
+  snapshot: Record<string, any>;
+}
+
+/**
+ * Transfère un employé vers une autre agence (transaction atomique)
+ *
+ * Actions:
+ * 1. Met à jour employes.agenceId (+ champs optionnels)
+ * 2. Désactive l'ancienne affectation userAgences (isPrimary)
+ * 3. Crée la nouvelle affectation userAgences
+ * 4. Met à jour userRoles.agenceId pour le rôle principal
+ * 5. Enregistre dans hrAuditLog
+ */
+export async function transferEmployeToAgence(
+  employeId: string,
+  targetAgenceId: string,
+  actorUserId: string,
+  actorName: string,
+  options?: {
+    managerId?: string | null;
+    jobPositionId?: string | null;
+    salaireBase?: string;
+    reason?: string;
+    effectiveDate?: string;
+  }
+): Promise<TransferResult | undefined> {
+  return await db.transaction(async (tx) => {
+    // 1. Récupérer l'employé avec ses données actuelles
+    const [currentEmploye] = await tx.select().from(employes).where(eq(employes.id, employeId));
+    if (!currentEmploye) return undefined;
+
+    const fromAgenceId = currentEmploye.agenceId;
+
+    // 2. Vérifier pas de session caisse ouverte
+    const [openSession] = await tx.select({ id: sessionsCaisse.id })
+      .from(sessionsCaisse)
+      .where(and(
+        eq(sessionsCaisse.caissierId, currentEmploye.userId),
+        sql`${sessionsCaisse.statut} NOT IN ('CLOSED', 'FORCE_CLOSED')`
+      ))
+      .limit(1);
+
+    if (openSession) {
+      throw new Error('OPEN_SESSION');
+    }
+
+    // 3. Snapshot des valeurs avant transfert
+    const snapshot: Record<string, any> = {
+      agenceId: fromAgenceId,
+      managerId: currentEmploye.managerId,
+      jobPositionId: currentEmploye.jobPositionId,
+      salaireBase: currentEmploye.salaireBase,
+    };
+
+    // 4. Préparer les champs à mettre à jour
+    const employeUpdates: Record<string, any> = {
+      agenceId: targetAgenceId,
+      updatedAt: new Date(),
+    };
+    if (options?.managerId !== undefined) employeUpdates.managerId = options.managerId;
+    if (options?.jobPositionId !== undefined) employeUpdates.jobPositionId = options.jobPositionId;
+    if (options?.salaireBase !== undefined) employeUpdates.salaireBase = options.salaireBase;
+
+    // 5. Mettre à jour l'employé
+    await tx.update(employes)
+      .set(employeUpdates)
+      .where(eq(employes.id, employeId));
+
+    // 6. Désactiver l'ancienne affectation principale dans userAgences
+    await tx.update(userAgences)
+      .set({ actif: false, dateFin: options?.effectiveDate || new Date().toISOString().slice(0, 10), updatedAt: new Date() })
+      .where(and(
+        eq(userAgences.userId, currentEmploye.userId),
+        eq(userAgences.isPrimary, true),
+        eq(userAgences.actif, true)
+      ));
+
+    // 7. Créer la nouvelle affectation principale
+    await tx.insert(userAgences).values({
+      userId: currentEmploye.userId,
+      agenceId: targetAgenceId,
+      isPrimary: true,
+      dateAffectation: options?.effectiveDate || new Date().toISOString().slice(0, 10),
+      actif: true,
+    });
+
+    // 8. Mettre à jour le rôle principal pour la nouvelle agence
+    await tx.update(userRoles)
+      .set({ agenceId: targetAgenceId, updatedAt: new Date() })
+      .where(and(
+        eq(userRoles.userId, currentEmploye.userId),
+        eq(userRoles.isPrimary, true)
+      ));
+
+    // 9. Enregistrer dans hrAuditLog
+    const newValues: Record<string, any> = { agenceId: targetAgenceId };
+    if (options?.managerId !== undefined) newValues.managerId = options.managerId;
+    if (options?.jobPositionId !== undefined) newValues.jobPositionId = options.jobPositionId;
+    if (options?.salaireBase !== undefined) newValues.salaireBase = options.salaireBase;
+
+    await tx.insert(hrAuditLog).values({
+      entityType: 'employe',
+      entityId: employeId,
+      action: 'transferred',
+      actorUserId,
+      actorName,
+      oldValues: snapshot,
+      newValues,
+      diff: Object.fromEntries(
+        Object.entries(newValues).map(([k, v]) => [k, { old: snapshot[k] ?? null, new: v }])
+      ),
+      reason: options?.reason || null,
+      severity: 'critical',
+      agenceId: targetAgenceId,
+    });
+
+    // 10. Retourner les données mises à jour
+    const result = await tx.select({
+      employe: employes,
+      user: {
+        id: users.id,
+        username: users.username,
+        nom: users.nom,
+        prenom: users.prenom,
+        email: users.email,
+        telephone: users.telephone,
+        sexe: users.sexe,
+        dateNaissance: users.dateNaissance,
+        adresse: users.adresse,
+        ville: users.ville,
+        photoProfile: users.photoProfile,
+        statut: users.statut,
+      }
+    })
+    .from(employes)
+    .innerJoin(users, eq(employes.userId, users.id))
+    .where(eq(employes.id, employeId));
+
+    if (result.length === 0) return undefined;
+
+    return {
+      employee: { ...result[0].employe, user: result[0].user },
+      fromAgenceId,
+      toAgenceId: targetAgenceId,
+      snapshot,
     };
   });
 }
