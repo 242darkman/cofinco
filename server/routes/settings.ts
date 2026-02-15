@@ -310,30 +310,255 @@ export function registerSettingsRoutes(app: Express) {
     }
   });
 
+  // ========== PREVIEW RÉINITIALISATION PAR AGENCE ==========
+  app.get("/api/admin/reset-agence/:agenceId/preview", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.SETTINGS), async (req, res) => {
+    const { agenceId } = req.params;
+
+    try {
+      // Verify agency exists
+      const agencyResult = await db.execute(sql`SELECT id, nom, code_agence FROM agences WHERE id = ${agenceId}`);
+      if (!agencyResult.rows || agencyResult.rows.length === 0) {
+        return res.status(404).json({ message: "Agence non trouvée." });
+      }
+      const agency = agencyResult.rows[0] as any;
+
+      // Helper: safe count that returns 0 if table doesn't exist
+      const safeCount = async (query: ReturnType<typeof sql>) => {
+        try {
+          const result = await db.execute(query);
+          const r = (result.rows?.[0] ?? {}) as any;
+          return Number(r?.count ?? r?.total ?? 0);
+        } catch {
+          return 0;
+        }
+      };
+
+      // Subquery for agents_terrain in this agency
+      const agentSubquery = `SELECT id FROM agents_terrain WHERE current_agence_id = '${agenceId}'`;
+
+      // Count per category
+      const [
+        tontinesCount,
+        caisseCount,
+        creditsCount,
+        comptabiliteCount,
+        agentsTerrainCount,
+        operationsTerrainCount,
+        mobileMoneyCount,
+        clientsCount,
+        epargneCount,
+        notificationsCount,
+        evacuationsCount,
+        conversationsCount,
+        offlineCount,
+        ecartsClosureCount,
+        caisseConfigCount,
+      ] = await Promise.all([
+        // Tontines
+        safeCount(sql`SELECT
+          (SELECT COUNT(*) FROM tontines WHERE agence_id = ${agenceId}) +
+          (SELECT COUNT(*) FROM membres_tontine WHERE tontine_id IN (SELECT id FROM tontines WHERE agence_id = ${agenceId})) +
+          (SELECT COUNT(*) FROM contributions_tontine WHERE membre_id IN (SELECT id FROM membres_tontine WHERE tontine_id IN (SELECT id FROM tontines WHERE agence_id = ${agenceId}))) +
+          (SELECT COUNT(*) FROM tontine_cycles WHERE agence_id = ${agenceId}) +
+          (SELECT COUNT(*) FROM tontine_turns WHERE cycle_id IN (SELECT id FROM tontine_cycles WHERE agence_id = ${agenceId})) +
+          (SELECT COUNT(*) FROM tontine_schedules WHERE agence_id = ${agenceId}) +
+          (SELECT COUNT(*) FROM tontine_distributions WHERE agence_id = ${agenceId}) +
+          (SELECT COUNT(*) FROM tontine_rulesets WHERE agence_id = ${agenceId})
+          AS count`),
+
+        // Caisse & Sessions
+        safeCount(sql`SELECT
+          (SELECT COUNT(*) FROM sessions_caisse WHERE agence_id = ${agenceId}) +
+          (SELECT COUNT(*) FROM operations_caisse WHERE session_id IN (SELECT id FROM sessions_caisse WHERE agence_id = ${agenceId})) +
+          (SELECT COUNT(*) FROM shifts_caisse WHERE session_id IN (SELECT id FROM sessions_caisse WHERE agence_id = ${agenceId})) +
+          (SELECT COUNT(*) FROM comptage_billets WHERE shift_id IN (SELECT id FROM shifts_caisse WHERE session_id IN (SELECT id FROM sessions_caisse WHERE agence_id = ${agenceId}))) +
+          (SELECT COUNT(*) FROM transferts_coffre_caisse WHERE agence_id = ${agenceId}) +
+          (SELECT COUNT(*) FROM caisses WHERE agence_id = ${agenceId})
+          AS count`),
+
+        // Crédits
+        safeCount(sql`SELECT
+          (SELECT COUNT(*) FROM credits WHERE agence_id = ${agenceId}) +
+          (SELECT COUNT(*) FROM remboursements WHERE credit_id IN (SELECT id FROM credits WHERE agence_id = ${agenceId})) +
+          (SELECT COUNT(*) FROM enquetes_credit WHERE credit_id IN (SELECT id FROM credits WHERE agence_id = ${agenceId})) +
+          (SELECT COUNT(*) FROM dossiers_credit WHERE agence_id = ${agenceId}) +
+          (SELECT COUNT(*) FROM demandes_credit WHERE agence_id = ${agenceId})
+          AS count`),
+
+        // Comptabilité (GL)
+        safeCount(sql`SELECT
+          (SELECT COUNT(*) FROM ecritures_comptables WHERE agence_id = ${agenceId}) +
+          (SELECT COUNT(*) FROM lignes_ecritures WHERE ecriture_id IN (SELECT id FROM ecritures_comptables WHERE agence_id = ${agenceId})) +
+          (SELECT COUNT(*) FROM gl_posting_links WHERE agence_id = ${agenceId}) +
+          (SELECT COUNT(*) FROM gl_periods WHERE agence_id = ${agenceId}) +
+          (SELECT COUNT(*) FROM gl_sequences WHERE agence_id = ${agenceId})
+          AS count`),
+
+        // Agents Terrain (modules)
+        safeCount(sql.raw(`SELECT
+          (SELECT COUNT(*) FROM agent_commissions WHERE agent_id IN (${agentSubquery})) +
+          (SELECT COUNT(*) FROM agent_objectifs WHERE agent_id IN (${agentSubquery})) +
+          (SELECT COUNT(*) FROM agent_plannings WHERE agent_id IN (${agentSubquery})) +
+          (SELECT COUNT(*) FROM agent_rapports WHERE agent_id IN (${agentSubquery})) +
+          (SELECT COUNT(*) FROM agent_incidents WHERE agent_id IN (${agentSubquery})) +
+          (SELECT COUNT(*) FROM agent_materiel WHERE agent_id IN (${agentSubquery})) +
+          (SELECT COUNT(*) FROM agent_communications WHERE agent_id IN (${agentSubquery}))
+          AS count`)),
+
+        // Opérations Terrain
+        safeCount(sql.raw(`SELECT
+          (SELECT COUNT(*) FROM paiements_terrain WHERE agent_id IN (${agentSubquery})) +
+          (SELECT COUNT(*) FROM operations_terrain WHERE agent_id IN (${agentSubquery})) +
+          (SELECT COUNT(*) FROM sessions_agent WHERE agent_id IN (${agentSubquery})) +
+          (SELECT COUNT(*) FROM caisses_agent WHERE agent_id IN (${agentSubquery})) +
+          (SELECT COUNT(*) FROM remises_terrain WHERE agent_id IN (${agentSubquery})) +
+          (SELECT COUNT(*) FROM remise_items WHERE remise_id IN (SELECT id FROM remises_terrain WHERE agent_id IN (${agentSubquery}))) +
+          (SELECT COUNT(*) FROM prospections WHERE agent_id IN (${agentSubquery})) +
+          (SELECT COUNT(*) FROM visites_terrain WHERE agent_id IN (${agentSubquery})) +
+          (SELECT COUNT(*) FROM agent_agency_history WHERE agent_id IN (${agentSubquery}))
+          AS count`)),
+
+        // Mobile Money
+        safeCount(sql`SELECT
+          (SELECT COUNT(*) FROM payment_intents WHERE agence_id = ${agenceId}) +
+          (SELECT COUNT(*) FROM provider_events WHERE payment_intent_id IN (SELECT id FROM payment_intents WHERE agence_id = ${agenceId})) +
+          (SELECT COUNT(*) FROM loan_payment_allocations WHERE payment_intent_id IN (SELECT id FROM payment_intents WHERE agence_id = ${agenceId})) +
+          (SELECT COUNT(*) FROM mm_reconciliation_reports WHERE agence_id = ${agenceId})
+          AS count`),
+
+        // Clients
+        safeCount(sql`SELECT COUNT(*) AS count FROM clients WHERE agence_id = ${agenceId}`),
+
+        // Épargne
+        safeCount(sql`SELECT
+          (SELECT COUNT(*) FROM comptes_epargne WHERE agence_id = ${agenceId}) +
+          (SELECT COUNT(*) FROM transactions_epargne WHERE compte_epargne_id IN (SELECT id FROM comptes_epargne WHERE agence_id = ${agenceId})) +
+          (SELECT COUNT(*) FROM plans_epargne WHERE compte_epargne_id IN (SELECT id FROM comptes_epargne WHERE agence_id = ${agenceId}))
+          AS count`),
+
+        // Notifications
+        safeCount(sql`SELECT
+          (SELECT COUNT(*) FROM notification_jobs WHERE agence_id = ${agenceId}) +
+          (SELECT COUNT(*) FROM notification_settings WHERE agence_id = ${agenceId}) +
+          (SELECT COUNT(*) FROM notification_schedules WHERE agence_id = ${agenceId})
+          AS count`),
+
+        // Évacuations
+        safeCount(sql`SELECT
+          (SELECT COUNT(*) FROM evacuations_coffre WHERE agence_id = ${agenceId}) +
+          (SELECT COUNT(*) FROM evacuations_coffre_audit_logs WHERE evacuation_id IN (SELECT id FROM evacuations_coffre WHERE agence_id = ${agenceId})) +
+          (SELECT COUNT(*) FROM config_evacuation_coffre WHERE agence_id = ${agenceId})
+          AS count`),
+
+        // Conversations
+        safeCount(sql`SELECT
+          (SELECT COUNT(*) FROM conversations WHERE agence_id = ${agenceId}) +
+          (SELECT COUNT(*) FROM conversation_participants WHERE conversation_id IN (SELECT id FROM conversations WHERE agence_id = ${agenceId})) +
+          (SELECT COUNT(*) FROM messages_v2 WHERE conversation_id IN (SELECT id FROM conversations WHERE agence_id = ${agenceId}))
+          AS count`),
+
+        // Offline
+        safeCount(sql`SELECT
+          (SELECT COUNT(*) FROM offline_journal_entries WHERE agence_id = ${agenceId}) +
+          (SELECT COUNT(*) FROM offline_day_sessions WHERE agence_id = ${agenceId})
+          AS count`),
+
+        // Écarts & Clôture
+        safeCount(sql`SELECT
+          (SELECT COUNT(*) FROM agency_daily_closure WHERE agence_id = ${agenceId}) +
+          (SELECT COUNT(*) FROM agency_closure_blockers WHERE closure_id IN (SELECT id FROM agency_daily_closure WHERE agence_id = ${agenceId})) +
+          (SELECT COUNT(*) FROM agency_closure_audit_log WHERE closure_id IN (SELECT id FROM agency_daily_closure WHERE agence_id = ${agenceId})) +
+          (SELECT COUNT(*) FROM config_ecart_caisse WHERE agence_id = ${agenceId}) +
+          (SELECT COUNT(*) FROM ecarts_approval_requests WHERE agence_id = ${agenceId}) +
+          (SELECT COUNT(*) FROM ecarts_approval_audit_log WHERE request_id IN (SELECT id FROM ecarts_approval_requests WHERE agence_id = ${agenceId}))
+          AS count`),
+
+        // Caisse Config & Audit
+        safeCount(sql`SELECT
+          (SELECT COUNT(*) FROM caisse_security_codes WHERE agence_id = ${agenceId}) +
+          (SELECT COUNT(*) FROM caisse_assignations WHERE caisse_id IN (SELECT id FROM caisses WHERE agence_id = ${agenceId})) +
+          (SELECT COUNT(*) FROM caisse_code_usages WHERE code_id IN (SELECT id FROM caisse_security_codes WHERE agence_id = ${agenceId})) +
+          (SELECT COUNT(*) FROM caisse_user_authorizations WHERE agence_id = ${agenceId}) +
+          (SELECT COUNT(*) FROM transferts_coffre_audit_logs WHERE transfert_id IN (SELECT id FROM transferts_coffre_caisse WHERE agence_id = ${agenceId})) +
+          (SELECT COUNT(*) FROM reconciliations_coffre_caisse WHERE agence_id = ${agenceId})
+          AS count`),
+      ]);
+
+      // Financial records (mouvements + virements + comptes)
+      const financeCount = await safeCount(sql`SELECT
+        (SELECT COUNT(*) FROM mouvements_financiers WHERE agence_id = ${agenceId}) +
+        (SELECT COUNT(*) FROM virements_programmes WHERE agence_id = ${agenceId}) +
+        (SELECT COUNT(*) FROM comptes WHERE agence_id = ${agenceId})
+        AS count`);
+
+      const categories = [
+        { label: "Tontines", icon: "Users", count: tontinesCount },
+        { label: "Caisse & Sessions", icon: "Wallet", count: caisseCount },
+        { label: "Crédits", icon: "CreditCard", count: creditsCount },
+        { label: "Comptabilité", icon: "Calculator", count: comptabiliteCount },
+        { label: "Agents Terrain", icon: "Award", count: agentsTerrainCount },
+        { label: "Opérations Terrain", icon: "Activity", count: operationsTerrainCount },
+        { label: "Mobile Money", icon: "Smartphone", count: mobileMoneyCount },
+        { label: "Clients", icon: "UserCheck", count: clientsCount },
+        { label: "Épargne", icon: "PiggyBank", count: epargneCount },
+        { label: "Finance", icon: "TrendingUp", count: financeCount },
+        { label: "Notifications", icon: "Bell", count: notificationsCount },
+        { label: "Évacuations", icon: "Truck", count: evacuationsCount },
+        { label: "Conversations", icon: "MessageSquare", count: conversationsCount },
+        { label: "Données Offline", icon: "WifiOff", count: offlineCount },
+        { label: "Écarts & Clôture", icon: "ShieldAlert", count: ecartsClosureCount },
+        { label: "Config Caisse", icon: "Settings", count: caisseConfigCount },
+      ].filter(c => c.count > 0);
+
+      const totalRows = categories.reduce((sum, c) => sum + c.count, 0);
+
+      // Count employees in this agency (for optional hard delete)
+      const employeesCount = await safeCount(sql`SELECT COUNT(*) AS count FROM employes WHERE agence_id = ${agenceId}`);
+
+      res.json({
+        agenceId,
+        agenceName: agency.nom,
+        agenceCode: agency.code_agence,
+        categories,
+        totalRows,
+        clientsDeleted: clientsCount,
+        employeesCount,
+        configReseeded: ["Caisse Principale", "Config Coffre-Fort", "Config Écart Caisse"],
+      });
+    } catch (error: any) {
+      logger.error({ err: error }, 'Agency reset preview error');
+      res.status(500).json({ error: error.message || "Erreur lors de la prévisualisation" });
+    }
+  });
+
   // ========== RÉINITIALISATION PAR AGENCE (Admin Only) ==========
   app.post("/api/admin/reset-agence/:agenceId", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.SETTINGS), async (req, res) => {
     const { agenceId } = req.params;
-    const { confirmation } = req.body;
+    const { confirmation, deleteEmployees } = req.body;
 
     try {
-      // Production guard — this endpoint is destructive and must never run in production
-      if (process.env.NODE_ENV === "production") {
-        return res.status(403).json({ message: "Opération interdite en production." });
-      }
-
-      // Validate confirmation
-      if (confirmation !== 'REINITIALISER_AGENCE') {
+      // Validate confirmation (code agence as confirmation token)
+      if (!confirmation || typeof confirmation !== 'string') {
         return res.status(400).json({
-          message: "Confirmation invalide. Tapez 'REINITIALISER_AGENCE' pour confirmer."
+          message: "Confirmation requise. Fournissez le code de l'agence pour confirmer."
         });
       }
 
       // Verify agency exists
-      const agencyResult = await db.execute(sql`SELECT id, nom FROM agences WHERE id = ${agenceId}`);
+      const agencyResult = await db.execute(sql`SELECT id, nom, code_agence FROM agences WHERE id = ${agenceId}`);
       if (!agencyResult.rows || agencyResult.rows.length === 0) {
         return res.status(404).json({ message: "Agence non trouvée." });
       }
-      const agencyName = (agencyResult.rows[0] as any).nom;
+      const agency = agencyResult.rows[0] as any;
+      const agencyName = agency.nom;
+      const agencyCode = agency.code_agence;
+
+      // Verify confirmation matches agency code
+      if (confirmation !== agencyCode) {
+        return res.status(400).json({
+          message: `Code de confirmation incorrect. Tapez "${agencyCode}" pour confirmer.`
+        });
+      }
 
       // Log the reset action before performing it
       await logAudit(
@@ -344,15 +569,109 @@ export function registerSettingsRoutes(app: Express) {
         {
           initiatedBy: req.session.user?.username,
           agenceName: agencyName,
+          agencyCode,
+          deleteEmployees: !!deleteEmployees,
           timestamp: new Date().toISOString()
         },
         'success',
         'critical'
       );
 
+      // Helper: safe delete that silently ignores missing tables
+      const safeDel = async (tx: any, query: ReturnType<typeof sql>) => {
+        try { await tx.execute(query); } catch { /* table may not exist */ }
+      };
+
+      // Subquery for agents in this agency
+      const agentSub = sql`SELECT id FROM agents_terrain WHERE current_agence_id = ${agenceId}`;
+
       // Atomic reset within a single transaction — FK-safe deletion order (children first)
       await db.transaction(async (tx) => {
-        // 1. Tontine sub-tables (deepest children first)
+        // ── Phase A: Écarts & Clôture agence ──
+        await safeDel(tx, sql`DELETE FROM ecarts_approval_audit_log WHERE request_id IN (SELECT id FROM ecarts_approval_requests WHERE agence_id = ${agenceId})`);
+        await safeDel(tx, sql`DELETE FROM ecarts_approval_requests WHERE agence_id = ${agenceId}`);
+        await safeDel(tx, sql`DELETE FROM agency_closure_audit_log WHERE closure_id IN (SELECT id FROM agency_daily_closure WHERE agence_id = ${agenceId})`);
+        await safeDel(tx, sql`DELETE FROM agency_closure_blockers WHERE closure_id IN (SELECT id FROM agency_daily_closure WHERE agence_id = ${agenceId})`);
+        await safeDel(tx, sql`DELETE FROM agency_daily_closure WHERE agence_id = ${agenceId}`);
+        await safeDel(tx, sql`DELETE FROM config_ecart_caisse WHERE agence_id = ${agenceId}`);
+
+        // ── Phase B: Évacuations ──
+        await safeDel(tx, sql`DELETE FROM evacuations_coffre_audit_logs WHERE evacuation_id IN (SELECT id FROM evacuations_coffre WHERE agence_id = ${agenceId})`);
+        await safeDel(tx, sql`DELETE FROM evacuations_coffre WHERE agence_id = ${agenceId}`);
+        await safeDel(tx, sql`DELETE FROM config_evacuation_coffre WHERE agence_id = ${agenceId}`);
+
+        // ── Phase C: Opérations Terrain audit ──
+        await safeDel(tx, sql`DELETE FROM operations_terrain_audit_logs WHERE operation_id IN (SELECT id FROM operations_terrain WHERE agent_id IN (${agentSub}))`);
+        await safeDel(tx, sql`DELETE FROM sessions_agent_audit_logs WHERE session_id IN (SELECT id FROM sessions_agent WHERE agent_id IN (${agentSub}))`);
+
+        // ── Phase D: Remises ──
+        await safeDel(tx, sql`DELETE FROM remise_audit_logs WHERE remise_id IN (SELECT id FROM remises_terrain WHERE agent_id IN (${agentSub}))`);
+        await safeDel(tx, sql`DELETE FROM remise_items WHERE remise_id IN (SELECT id FROM remises_terrain WHERE agent_id IN (${agentSub}))`);
+        await safeDel(tx, sql`DELETE FROM remises_terrain WHERE agent_id IN (${agentSub})`);
+
+        // ── Phase E: Opérations Terrain ──
+        await safeDel(tx, sql`DELETE FROM operations_terrain WHERE agent_id IN (${agentSub})`);
+        await safeDel(tx, sql`DELETE FROM sessions_agent WHERE agent_id IN (${agentSub})`);
+        await safeDel(tx, sql`DELETE FROM paiements_terrain WHERE agent_id IN (${agentSub})`);
+        await safeDel(tx, sql`DELETE FROM agent_mm_payments WHERE agent_id IN (${agentSub})`);
+        await safeDel(tx, sql`DELETE FROM caisses_agent WHERE agent_id IN (${agentSub})`);
+        await safeDel(tx, sql`DELETE FROM agent_agency_history WHERE agent_id IN (${agentSub})`);
+
+        // ── Phase F: Modules Agent ──
+        await safeDel(tx, sql`DELETE FROM agent_commissions WHERE agent_id IN (${agentSub})`);
+        await safeDel(tx, sql`DELETE FROM agent_objectifs WHERE agent_id IN (${agentSub})`);
+        await safeDel(tx, sql`DELETE FROM agent_plannings WHERE agent_id IN (${agentSub})`);
+        await safeDel(tx, sql`DELETE FROM agent_rapports WHERE agent_id IN (${agentSub})`);
+        await safeDel(tx, sql`DELETE FROM agent_incidents WHERE agent_id IN (${agentSub})`);
+        await safeDel(tx, sql`DELETE FROM agent_materiel WHERE agent_id IN (${agentSub})`);
+        await safeDel(tx, sql`DELETE FROM agent_communications WHERE agent_id IN (${agentSub})`);
+
+        // ── Phase G: Prospections & Visites ──
+        await safeDel(tx, sql`DELETE FROM prospection_primes WHERE prospection_id IN (SELECT id FROM prospections WHERE agent_id IN (${agentSub}))`);
+        await safeDel(tx, sql`DELETE FROM prospections WHERE agent_id IN (${agentSub})`);
+        await safeDel(tx, sql`DELETE FROM visites_terrain WHERE agent_id IN (${agentSub})`);
+        await safeDel(tx, sql`DELETE FROM prospection_prime_config WHERE agence_id = ${agenceId}`);
+
+        // ── Phase H: Caisse config & audit ──
+        await safeDel(tx, sql`DELETE FROM transferts_coffre_audit_logs WHERE transfert_id IN (SELECT id FROM transferts_coffre_caisse WHERE agence_id = ${agenceId})`);
+        await safeDel(tx, sql`DELETE FROM reconciliations_coffre_caisse WHERE agence_id = ${agenceId}`);
+        await safeDel(tx, sql`DELETE FROM caisse_code_usages WHERE code_id IN (SELECT id FROM caisse_security_codes WHERE agence_id = ${agenceId})`);
+        await safeDel(tx, sql`DELETE FROM caisse_security_codes WHERE agence_id = ${agenceId}`);
+        await safeDel(tx, sql`DELETE FROM caisse_user_authorizations WHERE agence_id = ${agenceId}`);
+        await safeDel(tx, sql`DELETE FROM caisse_assignations WHERE caisse_id IN (SELECT id FROM caisses WHERE agence_id = ${agenceId})`);
+        await safeDel(tx, sql`DELETE FROM dual_count_config WHERE agence_id = ${agenceId}`);
+        await safeDel(tx, sql`DELETE FROM agent_session_config WHERE agence_id = ${agenceId}`);
+
+        // ── Phase I: Mobile Money ──
+        await safeDel(tx, sql`DELETE FROM loan_payment_allocations WHERE payment_intent_id IN (SELECT id FROM payment_intents WHERE agence_id = ${agenceId})`);
+        await safeDel(tx, sql`DELETE FROM provider_events WHERE payment_intent_id IN (SELECT id FROM payment_intents WHERE agence_id = ${agenceId})`);
+        await safeDel(tx, sql`DELETE FROM payment_intents WHERE agence_id = ${agenceId}`);
+        await safeDel(tx, sql`DELETE FROM mm_reconciliation_reports WHERE agence_id = ${agenceId}`);
+
+        // ── Phase J: Comptabilité (GL) ──
+        await safeDel(tx, sql`DELETE FROM lignes_ecritures WHERE ecriture_id IN (SELECT id FROM ecritures_comptables WHERE agence_id = ${agenceId})`);
+        await safeDel(tx, sql`DELETE FROM gl_posting_links WHERE agence_id = ${agenceId}`);
+        await safeDel(tx, sql`DELETE FROM ecritures_comptables WHERE agence_id = ${agenceId}`);
+        await safeDel(tx, sql`DELETE FROM gl_periods WHERE agence_id = ${agenceId}`);
+        await safeDel(tx, sql`DELETE FROM gl_sequences WHERE agence_id = ${agenceId}`);
+
+        // ── Phase K: Notifications ──
+        await safeDel(tx, sql`DELETE FROM notification_delivery_receipts WHERE job_id IN (SELECT id FROM notification_jobs WHERE agence_id = ${agenceId})`);
+        await safeDel(tx, sql`DELETE FROM notification_schedules WHERE agence_id = ${agenceId}`);
+        await safeDel(tx, sql`DELETE FROM notification_jobs WHERE agence_id = ${agenceId}`);
+        await safeDel(tx, sql`DELETE FROM notification_settings WHERE agence_id = ${agenceId}`);
+
+        // ── Phase L: Conversations ──
+        await safeDel(tx, sql`DELETE FROM message_reactions WHERE message_id IN (SELECT id FROM messages_v2 WHERE conversation_id IN (SELECT id FROM conversations WHERE agence_id = ${agenceId}))`);
+        await safeDel(tx, sql`DELETE FROM messages_v2 WHERE conversation_id IN (SELECT id FROM conversations WHERE agence_id = ${agenceId})`);
+        await safeDel(tx, sql`DELETE FROM conversation_participants WHERE conversation_id IN (SELECT id FROM conversations WHERE agence_id = ${agenceId})`);
+        await safeDel(tx, sql`DELETE FROM conversations WHERE agence_id = ${agenceId}`);
+
+        // ── Phase M: Offline ──
+        await safeDel(tx, sql`DELETE FROM offline_journal_entries WHERE agence_id = ${agenceId}`);
+        await safeDel(tx, sql`DELETE FROM offline_day_sessions WHERE agence_id = ${agenceId}`);
+
+        // ── Phase 1: Tontine sub-tables (deepest children first) ──
         await tx.execute(sql`
           DELETE FROM tontine_distribution_requests WHERE turn_id IN (
             SELECT id FROM tontine_turns WHERE cycle_id IN (
@@ -400,7 +719,7 @@ export function registerSettingsRoutes(app: Express) {
         `);
         await tx.execute(sql`DELETE FROM tontines WHERE agence_id = ${agenceId}`);
 
-        // 2. Caisse-related (deepest children first)
+        // ── Phase 2: Caisse-related (deepest children first) ──
         await tx.execute(sql`
           DELETE FROM operations_caisse WHERE session_id IN (
             SELECT id FROM sessions_caisse WHERE agence_id = ${agenceId}
@@ -421,7 +740,8 @@ export function registerSettingsRoutes(app: Express) {
         await tx.execute(sql`DELETE FROM sessions_caisse WHERE agence_id = ${agenceId}`);
         await tx.execute(sql`DELETE FROM transferts_coffre_caisse WHERE agence_id = ${agenceId}`);
 
-        // 3. Credit-related (children first)
+        // ── Phase 3: Credit-related (children first) ──
+        await safeDel(tx, sql`DELETE FROM loan_payment_allocations WHERE credit_id IN (SELECT id FROM credits WHERE agence_id = ${agenceId})`);
         await tx.execute(sql`
           DELETE FROM remboursements WHERE credit_id IN (
             SELECT id FROM credits WHERE agence_id = ${agenceId}
@@ -436,7 +756,7 @@ export function registerSettingsRoutes(app: Express) {
         await tx.execute(sql`DELETE FROM credits WHERE agence_id = ${agenceId}`);
         await tx.execute(sql`DELETE FROM demandes_credit WHERE agence_id = ${agenceId}`);
 
-        // 4. Savings-related
+        // ── Phase 4: Savings-related ──
         await tx.execute(sql`
           DELETE FROM transactions_epargne WHERE compte_epargne_id IN (
             SELECT id FROM comptes_epargne WHERE agence_id = ${agenceId}
@@ -449,22 +769,110 @@ export function registerSettingsRoutes(app: Express) {
         `);
         await tx.execute(sql`DELETE FROM comptes_epargne WHERE agence_id = ${agenceId}`);
 
-        // 5. Financial records
+        // ── Phase 5: Financial records ──
         await tx.execute(sql`DELETE FROM virements_programmes WHERE agence_id = ${agenceId}`);
         await tx.execute(sql`DELETE FROM mouvements_financiers WHERE agence_id = ${agenceId}`);
 
-        // 6. Comptes (bank accounts) — after mouvements, before clients
+        // ── Phase 6: Comptes (bank accounts) ──
         await tx.execute(sql`DELETE FROM comptes WHERE agence_id = ${agenceId}`);
 
-        // 7. Clients
+        // ── Phase 7: Clients ──
         await tx.execute(sql`DELETE FROM clients WHERE agence_id = ${agenceId}`);
 
-        // 8. Reset coffre & caisse balances (don't delete, just zero out)
-        await tx.execute(sql`UPDATE coffres_forts SET solde = '0', updated_at = NOW() WHERE owner_id = ${agenceId}`);
-        await tx.execute(sql`UPDATE caisses SET solde = '0', updated_at = NOW() WHERE agence_id = ${agenceId}`);
+        // ── Phase 7b: Hard delete employees (optional) ──
+        if (deleteEmployees) {
+          // Capture user IDs before deleting employes (subquery won't work after DELETE)
+          const userIdsResult = await tx.execute(sql`SELECT user_id FROM employes WHERE agence_id = ${agenceId}`);
+          const userIds = (userIdsResult.rows || []).map((r: any) => r.user_id).filter(Boolean);
 
-        // 9. Unassign employees (don't delete them)
-        await tx.execute(sql`UPDATE employes SET agence_id = NULL, updated_at = NOW() WHERE agence_id = ${agenceId}`);
+          const empSub = sql`SELECT id FROM employes WHERE agence_id = ${agenceId}`;
+
+          // HR child tables (non-cascade FK — must delete manually)
+          await safeDel(tx, sql`DELETE FROM demandes_conges WHERE employe_id IN (${empSub})`);
+          await safeDel(tx, sql`DELETE FROM sanctions WHERE employe_id IN (${empSub})`);
+          await safeDel(tx, sql`DELETE FROM bulletins_paie WHERE employe_id IN (${empSub})`);
+          await safeDel(tx, sql`DELETE FROM avantages_employes WHERE employe_id IN (${empSub})`);
+          await safeDel(tx, sql`DELETE FROM presences WHERE employe_id IN (${empSub})`);
+          await safeDel(tx, sql`DELETE FROM horaires_travail WHERE employe_id IN (${empSub})`);
+
+          // SET NULL on clients from other agencies that reference these employees
+          await safeDel(tx, sql`UPDATE clients SET agent_referent_id = NULL WHERE agent_referent_id IN (${empSub})`);
+
+          // SET NULL on payroll_run_issues
+          await safeDel(tx, sql`UPDATE payroll_run_issues SET employe_id = NULL WHERE employe_id IN (${empSub})`);
+
+          // HR child tables (cascade FK — explicit for safety within transaction)
+          await safeDel(tx, sql`DELETE FROM formation_participants WHERE employe_id IN (${empSub})`);
+          await safeDel(tx, sql`DELETE FROM formation_certificates WHERE employe_id IN (${empSub})`);
+          await safeDel(tx, sql`DELETE FROM onboarding_instances WHERE employe_id IN (${empSub})`);
+          await safeDel(tx, sql`DELETE FROM salary_rate_history WHERE employe_id IN (${empSub})`);
+          await safeDel(tx, sql`DELETE FROM leave_balances WHERE employe_id IN (${empSub})`);
+          await safeDel(tx, sql`DELETE FROM avances_salaire WHERE employe_id IN (${empSub})`);
+          await safeDel(tx, sql`DELETE FROM employee_documents WHERE employe_id IN (${empSub})`);
+          await safeDel(tx, sql`DELETE FROM overtime_log WHERE employe_id IN (${empSub})`);
+
+          // Delete agents_terrain (cascade FK from employes, but children already deleted above)
+          await safeDel(tx, sql`DELETE FROM agents_terrain WHERE employe_id IN (${empSub})`);
+
+          // Delete employes themselves
+          await tx.execute(sql`DELETE FROM employes WHERE agence_id = ${agenceId}`);
+
+          // Delete associated user accounts (captured before employes deletion)
+          if (userIds.length > 0) {
+            for (const uid of userIds) {
+              await safeDel(tx, sql`DELETE FROM users WHERE id = ${uid}`);
+            }
+          }
+        }
+
+        // ── Phase 8: Config à supprimer ──
+        await safeDel(tx, sql`DELETE FROM config_coffre_fort WHERE agence_id = ${agenceId}`);
+        await safeDel(tx, sql`DELETE FROM config_transfert_inter_coffres WHERE agence_id = ${agenceId}`);
+
+        // ── Phase 9: Supprimer caisses, zero coffre ──
+        await tx.execute(sql`DELETE FROM caisses WHERE agence_id = ${agenceId}`);
+        await tx.execute(sql`UPDATE coffres_forts SET solde = '0', updated_at = NOW() WHERE owner_id = ${agenceId}`);
+
+        // ── Phase 10: Re-seed operational config ──
+        // Re-create Caisse Principale
+        await tx.execute(sql`
+          INSERT INTO caisses (nom, agence_id, type, solde, statut)
+          VALUES (${`Caisse Principale - ${agencyName}`}, ${agenceId}, 'PHYSICAL', '0', 'CLOSED')
+        `);
+
+        // Re-create Config Coffre-Fort
+        await tx.execute(sql`
+          INSERT INTO config_coffre_fort (agence_id, seuil_double_validation, separation_initiateur_valideur, actif, roles_initiateurs, roles_valideurs, roles_executeurs)
+          VALUES (
+            ${agenceId},
+            '10000000',
+            true,
+            true,
+            '{"CHEF_AGENCE","CAISSIER"}',
+            '{"CHEF_AGENCE","SUPERVISEUR"}',
+            '{"CHEF_AGENCE"}'
+          )
+        `);
+
+        // Re-create Config Écart Caisse (per-agency)
+        await tx.execute(sql`
+          INSERT INTO config_ecart_caisse (agence_id, seuil_auto_approve, seuil_n1_approval, seuil_n2_approval, roles_approbateurs_n1, roles_approbateurs_n2, block_close_until_approved, allow_self_approval_if_role, require_double_approval_n2, actif)
+          VALUES (
+            ${agenceId},
+            '100',
+            '5000',
+            '50000',
+            '{"SUPERVISEUR","CAISSIER"}',
+            '{"CHEF_AGENCE","ADMIN"}',
+            true,
+            false,
+            false,
+            true
+          )
+        `);
+
+        // Zero the compte de liaison for this agency
+        await safeDel(tx, sql`UPDATE comptes_liaison SET solde_courant = '0', updated_at = NOW() WHERE entite_id = ${agenceId} AND entite_type = 'AGENCE'`);
       });
 
       // Notify
@@ -475,7 +883,11 @@ export function registerSettingsRoutes(app: Express) {
 
       res.json({
         success: true,
-        message: `Agence "${agencyName}" réinitialisée avec succès.`
+        message: `Agence "${agencyName}" (${agencyCode}) réinitialisée avec succès.${deleteEmployees ? ' Employés et comptes utilisateurs supprimés.' : ''}`,
+        summary: {
+          configReseeded: ["Caisse Principale", "Config Coffre-Fort", "Config Écart Caisse"],
+          employeesDeleted: !!deleteEmployees,
+        }
       });
     } catch (error: any) {
       logger.error({ err: error }, 'Agency reset error');

@@ -54,6 +54,7 @@ export const ADMIN_TABS = [
   { id: 'zones-commerciales', label: 'Arrondissements & Marchés', icon: 'MapPin', permission: 'zones.view' },
   { id: 'currency', label: 'Devise', icon: 'Coins', permission: 'admin.settings' },
   { id: 'branding', label: 'Branding', icon: 'Palette', permission: 'admin.settings' },
+  { id: 'reset-agence', label: 'Reset Agence', icon: 'RotateCcw', permission: 'admin.manage' },
 ] as const;
 
 export type AdminTabId = typeof ADMIN_TABS[number]['id'];

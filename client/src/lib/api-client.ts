@@ -2504,11 +2504,22 @@ export const adminApi = {
     method: 'POST',
     body: JSON.stringify(data),
   }),
-  resetAgence: (agenceId: string, data: { confirmation: string }) =>
+  resetAgence: (agenceId: string, data: { confirmation: string; deleteEmployees?: boolean }) =>
     request<any>(`/admin/reset-agence/${agenceId}`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+  previewResetAgence: (agenceId: string) =>
+    request<{
+      agenceId: string;
+      agenceName: string;
+      agenceCode: string;
+      categories: Array<{ label: string; icon: string; count: number }>;
+      totalRows: number;
+      clientsDeleted: number;
+      employeesCount: number;
+      configReseeded: string[];
+    }>(`/admin/reset-agence/${agenceId}/preview`),
 };
 
 // Notifications API

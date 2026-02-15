@@ -423,18 +423,19 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg bg-surface-base h-full shadow-2xl border-l border-edge flex flex-col animate-in slide-in-from-right duration-300"
+        className="w-full max-w-lg bg-surface-base h-full shadow-2xl border-l border-edge overflow-y-auto animate-in slide-in-from-right duration-300"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* BOUTON FERMER (Absolute) */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 z-50 p-2 bg-black/20 hover:bg-black/40 text-content-primary rounded-full transition-colors backdrop-blur-md"
+        >
+          <X size={20} />
+        </button>
 
         {/* HEADER GRAPHIQUE */}
-        <div className="relative h-40 bg-gradient-to-br from-accent via-surface-base to-surface-base shrink-0">
-           <button
-             onClick={onClose}
-             className="absolute top-4 right-4 p-2 bg-black/20 hover:bg-black/40 text-content-primary rounded-full transition-colors backdrop-blur-md"
-           >
-             <X size={20} />
-           </button>
+        <div className="relative z-10 h-40 bg-gradient-to-br from-accent via-surface-base to-surface-base">
 
            <div className="absolute -bottom-10 left-8 flex items-end gap-4">
               <div className="w-24 h-24 rounded-2xl bg-surface-base border-4 border-edge overflow-hidden shadow-2xl">
@@ -500,7 +501,7 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
         )}
 
         {/* CONTENU DU DOSSIER */}
-        <div className="flex-1 overflow-y-auto pt-14 px-8 pb-8 space-y-8">
+        <div className="relative z-0 pt-20 px-8 pb-8 space-y-8">
 
           {/* Sub-view navigation */}
           {activeView !== 'profile' && (
