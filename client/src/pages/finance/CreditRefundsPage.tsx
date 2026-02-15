@@ -8,10 +8,8 @@ import {
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { toast, handleApiError } from '../../lib/toast';
-import { usePermissions } from '../../components/auth/ProtectedFeature';
 import { formatMoney, formatClientName } from '../../lib/format';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
-import { authService } from '../../lib/auth';
 
 type PaymentMethod = 'CASH' | 'ACCOUNT' | 'MOBILE_MONEY';
 
@@ -66,11 +64,8 @@ export default function CreditRefundsPage() {
   const [selectedRefund, setSelectedRefund] = useState<CreditRefundRequest | null>(null);
   const [showApproveDialog, setShowApproveDialog] = useState(false);
   const [showPayDialog, setShowPayDialog] = useState(false);
-  const [showValidateCaisseDialog, setShowValidateCaisseDialog] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('ACCOUNT');
   const [loadingAction, setLoadingAction] = useState(false);
-
-  const user = authService.getCurrentUser();
 
   // Listen for refund updates from other components to refresh data
   useEffect(() => {
@@ -146,49 +141,6 @@ export default function CreditRefundsPage() {
       }
       queryClient.invalidateQueries({ queryKey: ['credit-refunds'] });
       setShowPayDialog(false);
-      window.dispatchEvent(new CustomEvent('refund-update'));
-    } catch (err) {
-      toast.error(handleApiError(err));
-    } finally {
-      setLoadingAction(false);
-    }
-  };
-
-  // Validate Caisse handler
-  const handleValidateCaisse = async () => {
-    if (!selectedRefund) return;
-
-    // Check for active caisse session
-    let sessionCaisseId: string | undefined;
-    try {
-      const res = await fetch(`/api/sessions-caisse/active`);
-      if (res.ok) {
-        const session = await res.json();
-        if (session?.id) sessionCaisseId = session.id;
-      }
-    } catch (e) {
-      console.error("Failed to check active session", e);
-    }
-
-    if (!sessionCaisseId) {
-      toast.error("Vous devez avoir une caisse ouverte.");
-      return;
-    }
-
-    setLoadingAction(true);
-    try {
-      const res = await fetch(`/api/finance/credit-refunds/${selectedRefund.id}/validate-caisse`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionCaisseId })
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || 'Échec de la validation');
-      }
-      toast.success('Paiement validé');
-      queryClient.invalidateQueries({ queryKey: ['credit-refunds'] });
-      setShowValidateCaisseDialog(false);
       window.dispatchEvent(new CustomEvent('refund-update'));
     } catch (err) {
       toast.error(handleApiError(err));
@@ -357,13 +309,10 @@ export default function CreditRefundsPage() {
                             </button>
                           )}
                           {refund.statut === 'PENDING_CAISSE' && (
-                            <button
-                              onClick={() => { setSelectedRefund(refund); setShowValidateCaisseDialog(true); }}
-                              className="p-1.5 bg-status-warning-bg hover:bg-status-warning-bg text-status-warning rounded transition animate-pulse"
-                              title="Valider le paiement"
-                            >
-                              <DollarSign size={14} />
-                            </button>
+                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-status-warning-bg text-status-warning rounded text-[10px] font-medium" title="En attente de traitement côté caisse">
+                              <Clock size={10} className="animate-pulse" />
+                              <span className="hidden lg:inline">Attente caisse</span>
+                            </span>
                           )}
                         </div>
                       </td>
@@ -422,12 +371,10 @@ export default function CreditRefundsPage() {
                         </button>
                       )}
                       {refund.statut === 'PENDING_CAISSE' && (
-                        <button
-                          onClick={() => { setSelectedRefund(refund); setShowValidateCaisseDialog(true); }}
-                          className="px-2.5 py-1.5 bg-status-warning-bg hover:bg-status-warning-bg text-status-warning rounded-lg transition text-[10px] font-semibold flex items-center gap-1 animate-pulse"
-                        >
-                          <DollarSign size={12} /> Caisse
-                        </button>
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-status-warning-bg text-status-warning rounded-lg text-[10px] font-medium">
+                          <Clock size={10} className="animate-pulse" />
+                          Attente caisse
+                        </span>
                       )}
                     </div>
                   </div>
@@ -542,66 +489,6 @@ export default function CreditRefundsPage() {
         </div>
       )}
 
-      {/* Validate Caisse Dialog - Compact */}
-      {showValidateCaisseDialog && selectedRefund && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-           <div className="bg-surface rounded-xl border border-edge w-full max-w-sm p-4 space-y-4 shadow-2xl">
-              <div className="flex justify-between items-center">
-                 <h3 className="text-base font-bold text-content-primary">Validation Caisse</h3>
-                 <button onClick={() => setShowValidateCaisseDialog(false)} className="text-content-muted hover:text-content-primary"><XCircle size={20}/></button>
-              </div>
-
-              <div className="space-y-3">
-                 <div className="bg-status-warning-bg border border-status-warning/30 p-3 rounded-lg flex items-start gap-2">
-                    <AlertCircle className="text-status-warning flex-shrink-0 mt-0.5" size={16} />
-                    <div>
-                       <p className="text-status-warning font-medium text-xs">Paiement en attente</p>
-                       <p className="text-[10px] text-content-muted">Confirmez avoir remis le montant au client.</p>
-                    </div>
-                 </div>
-
-                 <div className="bg-surface-elevated/50 p-3 rounded-lg space-y-2 text-xs">
-                    <div className="flex justify-between">
-                       <span className="text-content-muted">Client</span>
-                       <span className="text-content-primary font-medium">
-                          {selectedRefund.clients ? formatClientName(selectedRefund.clients.nom, selectedRefund.clients.prenom) : '-'}
-                       </span>
-                    </div>
-                    <div className="flex justify-between">
-                       <span className="text-content-muted">Méthode</span>
-                       <span className={selectedRefund.paymentMethod === 'MOBILE_MONEY' ? 'text-status-warning' : 'text-status-success'}>
-                          {selectedRefund.paymentMethod === 'MOBILE_MONEY' ? 'Mobile Money' : 'Espèces'}
-                       </span>
-                    </div>
-                    <div className="flex justify-between pt-2 border-t border-edge-strong">
-                       <span className="text-content-muted">Montant</span>
-                       <span className="text-lg font-bold text-status-success">
-                          {formatMoney(Number(selectedRefund.montantRemboursable))}
-                       </span>
-                    </div>
-                 </div>
-              </div>
-
-              <div className="flex gap-2 justify-end pt-2 border-t border-edge">
-                 <button
-                   onClick={() => setShowValidateCaisseDialog(false)}
-                   className="px-3 py-1.5 text-xs text-content-muted hover:bg-surface-elevated rounded transition"
-                   disabled={loadingAction}
-                 >
-                   Annuler
-                 </button>
-                 <button
-                   onClick={handleValidateCaisse}
-                   disabled={loadingAction}
-                   className="px-4 py-1.5 bg-status-warning hover:bg-status-warning text-white text-xs font-medium rounded transition flex items-center gap-1.5"
-                 >
-                   {loadingAction ? <Clock className="animate-spin" size={12} /> : <CheckCircle size={12} />}
-                   Valider
-                 </button>
-              </div>
-           </div>
-        </div>
-      )}
     </div>
   );
 }
