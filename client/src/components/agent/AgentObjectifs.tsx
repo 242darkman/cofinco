@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Target, TrendingUp, Award, Plus, Check, BarChart3, DollarSign, RefreshCw, Loader2, Minus, ChevronLeft, ChevronRight, Eye, Calendar, UserCheck, X } from 'lucide-react';
+import { Target, TrendingUp, Award, Plus, Check, DollarSign, RefreshCw, Loader2, ChevronLeft, ChevronRight, Calendar, UserCheck, X, AlertTriangle } from 'lucide-react';
 import { StatutObjectif } from '@shared/enum/status-constants';
 import { ALL_STATUS_LABELS } from '@/lib/status-labels';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../ui/sheet';
 import { authService } from '../../lib/auth';
 import { currencySymbol, formatMoney } from '@shared/config/currency';
 import { useAvantages, type Avantage } from '../../hooks/hr/useAvantages';
+import { toast } from '../../lib/toast';
 
 interface Objectif {
   id: string;
@@ -91,13 +92,28 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
     }
   };
 
+  const effectiveAgentId = formData.agent_id || agentId;
+
   const handleSubmit = async (e: React.FormEvent) => {
     if (!canManage) return;
     e.preventDefault();
+
+    if (!effectiveAgentId) {
+      toast.warning('Veuillez sélectionner un agent avant d\'assigner un objectif.', {
+        description: 'Utilisez le sélecteur d\'agent en haut à droite de la barre d\'onglets.',
+      });
+      return;
+    }
+
+    if (!formData.valeur_objectif || formData.valeur_objectif <= 0) {
+      toast.warning('Veuillez définir une cible supérieure à 0.');
+      return;
+    }
+
     setLoading(true);
     try {
       const body = {
-        agentId: formData.agent_id || agentId,
+        agentId: effectiveAgentId,
         periode: formData.periode,
         typeObjectif: formData.type_objectif,
         valeurObjectif: String(formData.valeur_objectif),
@@ -115,6 +131,9 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
         const error = await response.json();
         throw new Error(error.error || 'Erreur lors de la création');
       }
+      toast.success('Objectif assigné avec succès.', {
+        description: `${formData.type_objectif} — ${formData.valeur_objectif.toLocaleString()} ${formData.unite}`,
+      });
       setShowForm(false);
       loadObjectifs();
       setFormData({
@@ -127,7 +146,7 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
         avantageId: null,
       });
     } catch (error: any) {
-      alert('Erreur: ' + error.message);
+      toast.error(error.message || 'Erreur lors de la création de l\'objectif.');
     } finally {
       setLoading(false);
     }
@@ -149,11 +168,12 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
         body: JSON.stringify({ valeur_realisee: val, statut })
       });
       if (!response.ok) throw new Error('Erreur mise à jour');
+      toast.success('Réalisation mise à jour.');
       loadObjectifs();
       setSelectedObjectif(null);
       setUpdateValue('');
     } catch (error: any) {
-      alert('Erreur: ' + error.message);
+      toast.error(error.message || 'Erreur lors de la mise à jour.');
     }
   };
 
@@ -165,9 +185,10 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
         credentials: 'include',
       });
       if (!response.ok) throw new Error('Erreur recalcul');
+      toast.success('Objectif recalculé.');
       await loadObjectifs();
     } catch (error: any) {
-      alert('Erreur: ' + error.message);
+      toast.error(error.message || 'Erreur lors du recalcul.');
     } finally {
       setRecalculating(null);
     }
@@ -184,9 +205,10 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
         body: JSON.stringify({ agentId, periode: selectedPeriode }),
       });
       if (!response.ok) throw new Error('Erreur recalcul global');
+      toast.success('Tous les objectifs ont été recalculés.');
       await loadObjectifs();
     } catch (error: any) {
-      alert('Erreur: ' + error.message);
+      toast.error(error.message || 'Erreur lors du recalcul global.');
     } finally {
       setRecalculating(null);
     }
@@ -246,6 +268,12 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
       {/* Form Compact (Admin/Supervisor Only) */}
       {canManage && showForm && (
         <div className="bg-surface-base/50 rounded-xl p-4 border border-edge">
+          {!effectiveAgentId && (
+            <div className="flex items-center gap-2 px-3 py-2 mb-3 rounded-lg bg-status-warning/10 border border-status-warning/30 text-status-warning text-xs font-medium">
+              <AlertTriangle size={14} className="shrink-0" />
+              <span>Aucun agent sélectionné. Utilisez le sélecteur en haut à droite pour choisir un agent.</span>
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="space-y-2">
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
               <FormField label="Période">
