@@ -11,8 +11,10 @@ import { getPermissionsForUser } from "../services/permissions-service";
 import refreshTokenService, { REFRESH_TOKEN_COOKIE_NAME } from "../services/refresh-token-service";
 import { requestOtp, verifyOtp, OtpRateLimitError } from "../services/notifications/otp/otp-service";
 import { z } from "zod";
-import { eq, and, asc, desc, sql } from "drizzle-orm";
+import { eq, and, asc, desc, gte, sql } from "drizzle-orm";
+import os from "os";
 import { db, withTimeout } from "../db";
+import { loginAttempts } from "@shared/schema";
 import { StatutUser } from "@shared/enum/status-constants";
 
 // Timeouts pour les opérations critiques (en ms)
@@ -1839,14 +1841,42 @@ export function registerAuthRoutes(app: Express) {
       });
 
       // System health info
-      const memoryUsage = process.memoryUsage();
-      const memoryPercent = Math.round((memoryUsage.heapUsed / memoryUsage.heapTotal) * 100);
+      // Memory: real system RAM via os module
+      const totalMem = os.totalmem();
+      const freeMem = os.freemem();
+      const memoryPercent = Math.round(((totalMem - freeMem) / totalMem) * 100);
+
       const uptimeSeconds = Math.floor(process.uptime());
       const uptimeFormatted = `${Math.floor(uptimeSeconds / 3600)}h ${Math.floor((uptimeSeconds % 3600) / 60)}m`;
 
+      // Security: real check — count failed login attempts in last 15 min
+      let securityStatus: 'secure' | 'warning' | 'critical' = 'secure';
+      let failedLoginsLast15m = 0;
+      try {
+        const windowStart = new Date(Date.now() - 15 * 60 * 1000);
+        const [result] = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(loginAttempts)
+          .where(
+            and(
+              eq(loginAttempts.success, false),
+              gte(loginAttempts.createdAt, windowStart)
+            )
+          );
+        failedLoginsLast15m = result?.count ?? 0;
+        if (failedLoginsLast15m >= 20) {
+          securityStatus = 'critical';
+        } else if (failedLoginsLast15m >= 5) {
+          securityStatus = 'warning';
+        }
+      } catch {
+        // If query fails, keep 'secure' as default
+      }
+
       const systemHealth = {
         database: dbHealthResult.healthy ? 'healthy' as const : 'error' as const,
-        security: 'secure' as const,
+        security: securityStatus,
+        failedLoginsLast15m,
         dbResponseTime: dbHealthResult.responseTime,
         serverUptime: uptimeFormatted,
         memoryPercent,

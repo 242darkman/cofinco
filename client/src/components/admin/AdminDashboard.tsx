@@ -16,7 +16,8 @@ interface DashboardStats {
   recentActivity: ActivityLog[];
   systemHealth: {
     database: 'healthy' | 'warning' | 'error';
-    security: 'secure' | 'attention';
+    security: 'secure' | 'warning' | 'critical';
+    failedLoginsLast15m?: number;
     dbResponseTime?: number;
     serverUptime?: string;
     memoryPercent?: number;
@@ -158,11 +159,13 @@ export default function AdminDashboard() {
                 value={`${stats.systemHealth.dbResponseTime}ms`}
                 icon={Database}
              />
-             <HealthTile 
+             <HealthTile
                 label="Sécurité"
                 status={stats.systemHealth.security === 'secure'}
-                value="Actif"
+                value={stats.systemHealth.security === 'secure' ? 'Actif' : `${stats.systemHealth.failedLoginsLast15m || 0} échecs`}
                 icon={Shield}
+                alert={stats.systemHealth.security === 'critical'}
+                warning={stats.systemHealth.security === 'warning'}
              />
              <HealthTile 
                 label="Serveur"
@@ -170,12 +173,13 @@ export default function AdminDashboard() {
                 value={stats.systemHealth.serverUptime}
                 icon={HardDrive}
              />
-             <HealthTile 
-                label="Mémoire"
+             <HealthTile
+                label="Mémoire RAM"
                 status={(stats.systemHealth.memoryPercent || 0) < 80}
                 value={`${stats.systemHealth.memoryPercent}%`}
                 icon={Activity}
-                alert={(stats.systemHealth.memoryPercent || 0) >= 80}
+                warning={(stats.systemHealth.memoryPercent || 0) >= 80 && (stats.systemHealth.memoryPercent || 0) < 90}
+                alert={(stats.systemHealth.memoryPercent || 0) >= 90}
              />
           </div>
         </Card>
@@ -351,25 +355,34 @@ const CompactStatBox = memo(function CompactStatBox({
 });
 
 // P4.1: Memoized to prevent re-renders on health/roles state changes
-const HealthTile = memo(function HealthTile({ label, status, value, icon: Icon, alert }: { label: string, status: boolean, value?: string, icon: any, alert?: boolean }) {
+const HealthTile = memo(function HealthTile({ label, status, value, icon: Icon, alert, warning }: { label: string, status: boolean, value?: string, icon: any, alert?: boolean, warning?: boolean }) {
+    const bgClass = alert ? 'bg-status-danger-bg border-status-danger/30'
+      : warning ? 'bg-status-warning-bg border-status-warning/30'
+      : 'bg-surface/40 border-edge-subtle';
+    const iconClass = alert ? 'bg-status-danger-bg text-status-danger'
+      : warning ? 'bg-status-warning-bg text-status-warning'
+      : status ? 'bg-status-success-bg text-status-success'
+      : 'bg-status-danger-bg text-status-danger';
+    const valueClass = alert ? 'text-status-danger'
+      : warning ? 'text-status-warning'
+      : 'text-content-secondary';
+    const dotClass = alert ? 'bg-status-danger shadow-[0_0_8px_rgba(239,68,68,0.6)] animate-pulse'
+      : warning ? 'bg-status-warning shadow-[0_0_8px_rgba(245,158,11,0.6)]'
+      : status ? 'bg-status-success shadow-[0_0_8px_rgba(16,185,129,0.6)]'
+      : 'bg-status-danger shadow-[0_0_8px_rgba(239,68,68,0.6)] animate-pulse';
+
     return (
-        <div className={`p-2.5 rounded-lg border flex items-center justify-between ${
-            alert ? 'bg-status-danger-bg border-status-danger/30' : 'bg-surface/40 border-edge-subtle'
-        }`}>
+        <div className={`p-2.5 rounded-lg border flex items-center justify-between ${bgClass}`}>
             <div className="flex items-center gap-2.5">
-                <div className={`p-1 rounded-md ${status ? 'bg-status-success-bg text-status-success' : 'bg-status-danger-bg text-status-danger'}`}>
+                <div className={`p-1 rounded-md ${iconClass}`}>
                     <Icon size={12} />
                 </div>
                 <div>
                     <p className="text-[9px] text-content-muted font-bold uppercase">{label}</p>
-                    <p className={`text-[11px] font-bold ${alert ? 'text-status-danger' : 'text-content-secondary'}`}>{value || (status ? 'OK' : 'Erreur')}</p>
+                    <p className={`text-[11px] font-bold ${valueClass}`}>{value || (status ? 'OK' : 'Erreur')}</p>
                 </div>
             </div>
-            {status ? (
-                <div className="w-1.5 h-1.5 rounded-full bg-status-success shadow-[0_0_8px_rgba(16,185,129,0.6)]"></div>
-            ) : (
-                <div className="w-1.5 h-1.5 rounded-full bg-status-danger shadow-[0_0_8px_rgba(239,68,68,0.6)] animate-pulse"></div>
-            )}
+            <div className={`w-1.5 h-1.5 rounded-full ${dotClass}`}></div>
         </div>
     );
 });
