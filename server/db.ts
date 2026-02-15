@@ -1747,26 +1747,26 @@ export async function ensureCustomFunctions(): Promise<void> {
         CREATE OR REPLACE FUNCTION sync_demande_reevaluation_status()
         RETURNS TRIGGER AS $$
         BEGIN
-            IF NEW.statut = 'Approuvée' THEN
+            IF NEW.statut = 'APPROVED' THEN
                 UPDATE demandes_credit
-                SET statut = 'Approuvée après réévaluation',
+                SET statut = 'APPROVED_AFTER_REEVALUATION',
                     montant_approuve = COALESCE(NEW.montant_approuve_comite, NEW.nouveau_montant_demande, montant_demande),
                     reevaluation_en_cours = false,
                     nombre_reevaluations = nombre_reevaluations + 1
                 WHERE id = NEW.demande_id;
-            ELSIF NEW.statut = 'Rejetée définitivement' THEN
+            ELSIF NEW.statut = 'DEFINITIVELY_REJECTED' THEN
                 UPDATE demandes_credit
-                SET statut = 'Rejetée définitivement',
+                SET statut = 'DEFINITIVELY_REJECTED',
                     reevaluation_en_cours = false,
                     nombre_reevaluations = nombre_reevaluations + 1
                 WHERE id = NEW.demande_id;
-            ELSIF NEW.statut IN ('Demandée', 'Autorisée', 'Enquête complémentaire', 'En comité') THEN
+            ELSIF NEW.statut IN ('REQUESTED', 'AUTHORIZED', 'ADDITIONAL_INVESTIGATION', 'IN_COMMITTEE') THEN
                 UPDATE demandes_credit
                 SET reevaluation_en_cours = true,
                     derniere_reevaluation_id = NEW.id,
                     date_derniere_reevaluation = NOW()
                 WHERE id = NEW.demande_id;
-            ELSIF NEW.statut IN ('Refusée', 'Annulée') THEN
+            ELSIF NEW.statut IN ('REFUSED', 'CANCELLED') THEN
                 UPDATE demandes_credit
                 SET reevaluation_en_cours = false
                 WHERE id = NEW.demande_id;
