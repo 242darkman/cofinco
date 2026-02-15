@@ -125,6 +125,10 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
   const [agendaPage, setAgendaPage] = useState(0);
   const [agendaPageSize, setAgendaPageSize] = useState(4);
 
+  // Recent transactions pagination
+  const [txPage, setTxPage] = useState(0);
+  const TX_PAGE_SIZE = 5;
+
   useEffect(() => {
     const update = () => {
       const w = window.innerWidth;
@@ -323,9 +327,10 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
         pendingIn: parseFloat(summary.pendingIn || '0')
       });
 
-      const ops = await caisseAgentApi.listOperations({ agentId, limit: 5 });
+      const ops = await caisseAgentApi.listOperations({ agentId, limit: 20 });
       const opsData = Array.isArray(ops) ? ops : ops.operations || [];
-      setRecentTransactions(opsData.slice(0, 5).map((op: any) => {
+      setTxPage(0);
+      setRecentTransactions(opsData.map((op: any) => {
         const typePaiement = op.metadata?.typePaiementClient as TypeOperationTerrainType | undefined;
         const isWithdrawal = typePaiement === 'WITHDRAWAL_CURRENT' || typePaiement === 'WITHDRAWAL_SAVINGS';
         const clientFullName = op.client ? `${op.client.prenom || ''} ${op.client.nom || ''}`.trim() : '';
@@ -977,60 +982,92 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
           </div>
         )}
 
-        {/* --- RECENT TRANSACTIONS --- */}
-        {!agentDisabled && recentTransactions.length > 0 && (
-           <div className="px-3 pb-3">
-              <div className="bg-surface-base border border-edge rounded-xl overflow-hidden">
-                <div className="px-3 py-2 border-b border-edge">
-                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-content-muted uppercase tracking-wider">
-                    <Clock size={11} /> Recemment
-                  </div>
-                </div>
-                <div className="divide-y divide-edge/60">
-                   {recentTransactions.map(op => {
-                     const indicatorColor =
-                       op.type === 'COLLECT_CASH' ? (op.isWithdrawal ? 'bg-status-warning' : 'bg-status-success')
-                       : op.type === 'PROVISIONING' ? 'bg-accent'
-                       : op.type === 'SETTLEMENT_CASH' ? 'bg-status-info'
-                       : 'bg-content-muted';
-                     const DirectionIcon = op.isWithdrawal || op.type === 'SETTLEMENT_CASH' ? ArrowUpRight : ArrowDownLeft;
-                     const amountColor = op.isWithdrawal || op.type === 'SETTLEMENT_CASH'
-                       ? 'text-status-warning' : 'text-status-success';
-                     const amountPrefix = op.isWithdrawal || op.type === 'SETTLEMENT_CASH' ? '-' : '+';
+        {/* --- OPÉRATIONS RÉCENTES --- */}
+        {!agentDisabled && recentTransactions.length > 0 && (() => {
+           const totalTxPages = Math.ceil(recentTransactions.length / TX_PAGE_SIZE);
+           const safeTxPage = Math.min(txPage, totalTxPages - 1);
+           const paginatedTx = recentTransactions.slice(safeTxPage * TX_PAGE_SIZE, (safeTxPage + 1) * TX_PAGE_SIZE);
 
-                     return (
-                       <div key={op.id} className="flex items-center gap-2 px-3 py-2">
-                         <div className={`w-1 h-8 rounded-full shrink-0 ${indicatorColor}`} />
-                         <DirectionIcon size={14} className={`shrink-0 ${amountColor}`} />
-                         <div className="min-w-0 flex-1">
-                           <div className="text-xs font-semibold text-content-primary truncate">{op.typeLabel}</div>
-                           <div className="text-[10px] text-content-muted truncate">{op.subLabel}</div>
-                         </div>
-                         <div className="text-right shrink-0">
-                           <div className={`text-xs font-bold tabular-nums ${amountColor}`}>
-                             {amountPrefix}{formatMoneyCurrency(op.montant)}
+           return (
+             <div className="px-3 pb-3">
+                <div className="bg-surface-base border border-edge rounded-xl overflow-hidden">
+                  <div className="px-3 py-2 border-b border-edge flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-content-muted uppercase tracking-wider">
+                      <Clock size={11} /> Opérations récentes
+                    </div>
+                    <span className="text-[10px] font-bold text-accent bg-accent/10 px-1.5 py-0.5 rounded">
+                      {recentTransactions.length}
+                    </span>
+                  </div>
+                  <div className="divide-y divide-edge/60">
+                     {paginatedTx.map(op => {
+                       const indicatorColor =
+                         op.type === 'COLLECT_CASH' ? (op.isWithdrawal ? 'bg-status-warning' : 'bg-status-success')
+                         : op.type === 'PROVISIONING' ? 'bg-accent'
+                         : op.type === 'SETTLEMENT_CASH' ? 'bg-status-info'
+                         : 'bg-content-muted';
+                       const DirectionIcon = op.isWithdrawal || op.type === 'SETTLEMENT_CASH' ? ArrowUpRight : ArrowDownLeft;
+                       const amountColor = op.isWithdrawal || op.type === 'SETTLEMENT_CASH'
+                         ? 'text-status-warning' : 'text-status-success';
+                       const amountPrefix = op.isWithdrawal || op.type === 'SETTLEMENT_CASH' ? '-' : '+';
+
+                       return (
+                         <div key={op.id} className="flex items-center gap-2 px-3 py-2">
+                           <div className={`w-1 h-8 rounded-full shrink-0 ${indicatorColor}`} />
+                           <DirectionIcon size={14} className={`shrink-0 ${amountColor}`} />
+                           <div className="min-w-0 flex-1">
+                             <div className="text-xs font-semibold text-content-primary truncate">{op.typeLabel}</div>
+                             <div className="text-[10px] text-content-muted truncate">{op.subLabel}</div>
                            </div>
-                           <div className="flex items-center justify-end gap-1 text-[10px] text-content-muted">
-                             <span>{formatDateTime(op.date)}</span>
-                             {op.statut === StatutOperationTerrain.APPROVED && <CheckCircle size={8} className="text-status-success" />}
+                           <div className="text-right shrink-0">
+                             <div className={`text-xs font-bold tabular-nums ${amountColor}`}>
+                               {amountPrefix}{formatMoneyCurrency(op.montant)}
+                             </div>
+                             <div className="flex items-center justify-end gap-1 text-[10px] text-content-muted">
+                               <span>{formatDateTime(op.date)}</span>
+                               {op.statut === StatutOperationTerrain.APPROVED && <CheckCircle size={8} className="text-status-success" />}
+                             </div>
                            </div>
+                           {op.type === 'COLLECT_CASH' && (
+                             <button
+                               onClick={() => handleReprintReceipt(op)}
+                               className="p-1.5 rounded-lg text-content-muted hover:text-accent hover:bg-surface transition-colors shrink-0"
+                               title="Réimprimer reçu"
+                             >
+                               <Printer size={13} />
+                             </button>
+                           )}
                          </div>
-                         {op.type === 'COLLECT_CASH' && (
-                           <button
-                             onClick={() => handleReprintReceipt(op)}
-                             className="p-1.5 rounded-lg text-content-muted hover:text-accent hover:bg-surface transition-colors shrink-0"
-                             title="Réimprimer reçu"
-                           >
-                             <Printer size={13} />
-                           </button>
-                         )}
-                       </div>
-                     );
-                   })}
+                       );
+                     })}
+                  </div>
+
+                  {/* Pagination */}
+                  {totalTxPages > 1 && (
+                    <div className="px-3 py-1.5 border-t border-edge flex items-center justify-between">
+                      <button
+                        onClick={() => setTxPage(p => Math.max(0, p - 1))}
+                        disabled={safeTxPage === 0}
+                        className="p-1.5 rounded-lg disabled:opacity-20 text-content-muted hover:text-content-primary hover:bg-surface active:bg-surface-elevated transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center"
+                      >
+                        <ChevronLeft size={14} />
+                      </button>
+                      <span className="text-[10px] text-content-muted font-medium tabular-nums">
+                        {safeTxPage + 1} / {totalTxPages}
+                      </span>
+                      <button
+                        onClick={() => setTxPage(p => Math.min(totalTxPages - 1, p + 1))}
+                        disabled={safeTxPage >= totalTxPages - 1}
+                        className="p-1.5 rounded-lg disabled:opacity-20 text-content-muted hover:text-content-primary hover:bg-surface active:bg-surface-elevated transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center"
+                      >
+                        <ChevronRight size={14} />
+                      </button>
+                    </div>
+                  )}
                 </div>
-              </div>
-           </div>
-        )}
+             </div>
+           );
+        })()}
 
       </div>{/* end scrollable */}
 

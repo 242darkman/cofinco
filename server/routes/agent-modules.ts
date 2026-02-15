@@ -23,6 +23,7 @@ import {
   employes,
   agentsTerrain,
   users,
+  userRoles,
   insertAgentCommissionSchema,
   insertAgentObjectifSchema,
   insertAgentPlanningSchema,
@@ -32,6 +33,7 @@ import {
   insertAgentCommunicationSchema,
   insertFormationSchema,
 } from "@shared/schema";
+import { SystemRole } from "@shared/types/roles";
 import { eq, and, isNull, desc, sql, gte, lt, ne } from "drizzle-orm";
 import { z } from "zod";
 import {
@@ -89,7 +91,7 @@ export function registerAgentModulesRoutes(app: Express) {
 
       const currentPeriode = new Date().toISOString().slice(0, 7); // YYYY-MM
 
-      // 1. Get all active agents with names
+      // 1. Get all active agents with role AGENT_TERRAIN
       const activeAgents = await db
         .select({
           agentId: agentsTerrain.id,
@@ -101,10 +103,12 @@ export function registerAgentModulesRoutes(app: Express) {
         .from(agentsTerrain)
         .innerJoin(employes, eq(agentsTerrain.employeId, employes.id))
         .innerJoin(users, eq(employes.userId, users.id))
+        .innerJoin(userRoles, eq(users.id, userRoles.userId))
         .where(
           and(
             isNull(agentsTerrain.deletedAt),
             eq(agentsTerrain.statut, "ACTIVE"),
+            eq(userRoles.role, SystemRole.AGENT_TERRAIN),
           )
         );
 
