@@ -72,6 +72,191 @@ async function withAgentName(rows: any[]) {
 export function registerAgentModulesRoutes(app: Express) {
 
   // ════════════════════════════════════════════════════════════════════════════
+  // CLASSEMENT — Server-computed agent rankings
+  // ════════════════════════════════════════════════════════════════════════════
+
+  app.get("/api/agent-classement", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const period = (req.query.period as string) || "mois";
+
+      // Compute date boundary
+      const dateFrom = new Date();
+      if (period === "semaine") dateFrom.setDate(dateFrom.getDate() - 7);
+      else if (period === "annee") dateFrom.setFullYear(dateFrom.getFullYear() - 1);
+      else dateFrom.setMonth(dateFrom.getMonth() - 1); // default: mois
+
+      const currentPeriode = new Date().toISOString().slice(0, 7); // YYYY-MM
+
+      // 1. Get all active agents with names
+      const activeAgents = await db
+        .select({
+          agentId: agentsTerrain.id,
+          userId: users.id,
+          nom: users.nom,
+          prenom: users.prenom,
+          photoUrl: users.photoProfile,
+        })
+        .from(agentsTerrain)
+        .innerJoin(employes, eq(agentsTerrain.employeId, employes.id))
+        .innerJoin(users, eq(employes.userId, users.id))
+        .where(
+          and(
+            isNull(agentsTerrain.deletedAt),
+            eq(agentsTerrain.statut, "ACTIVE"),
+          )
+        );
+
+      if (activeAgents.length === 0) {
+        return res.json([]);
+      }
+
+      const agentIds = activeAgents.map(a => a.agentId);
+
+      // 2. Collectes: count + montant per agent (approved paiements in period)
+      const collectesAgg = await db
+        .select({
+          agentId: paiementsTerrain.agentId,
+          count: sql<number>`count(*)::int`,
+          montant: sql<number>`coalesce(sum(${paiementsTerrain.montant}::numeric), 0)::numeric`,
+        })
+        .from(paiementsTerrain)
+        .where(
+          and(
+            sql`${paiementsTerrain.agentId} IN (${sql.join(agentIds.map(id => sql`${id}`), sql`, `)})`,
+            isNull(paiementsTerrain.deletedAt),
+            gte(paiementsTerrain.createdAt, dateFrom),
+            sql`${paiementsTerrain.statut} NOT IN ('CANCELLED', 'REVERSED')`,
+          )
+        )
+        .groupBy(paiementsTerrain.agentId);
+
+      // 3. Visites: count of completed visits in period
+      const visitesAgg = await db
+        .select({
+          agentId: visitesTerrain.agentId,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(visitesTerrain)
+        .where(
+          and(
+            sql`${visitesTerrain.agentId} IN (${sql.join(agentIds.map(id => sql`${id}`), sql`, `)})`,
+            isNull(visitesTerrain.deletedAt),
+            gte(visitesTerrain.dateVisite, dateFrom),
+            ne(visitesTerrain.statut, "PLANNED"),
+          )
+        )
+        .groupBy(visitesTerrain.agentId);
+
+      // 4. Prospections: count in period
+      const prospectionsAgg = await db
+        .select({
+          agentId: prospections.agentId,
+          count: sql<number>`count(*)::int`,
+          converted: sql<number>`count(*) FILTER (WHERE ${prospections.statut} = 'CONVERTED')::int`,
+        })
+        .from(prospections)
+        .where(
+          and(
+            sql`${prospections.agentId} IN (${sql.join(agentIds.map(id => sql`${id}`), sql`, `)})`,
+            isNull(prospections.deletedAt),
+            gte(prospections.createdAt, dateFrom),
+          )
+        )
+        .groupBy(prospections.agentId);
+
+      // 5. Objectifs: average completion % for current month
+      const objectifsAgg = await db
+        .select({
+          agentId: agentObjectifs.agentId,
+          avgPct: sql<number>`coalesce(avg(
+            CASE WHEN ${agentObjectifs.valeurObjectif}::numeric > 0
+              THEN (${agentObjectifs.valeurRealisee}::numeric / ${agentObjectifs.valeurObjectif}::numeric) * 100
+              ELSE 0
+            END
+          ), 0)::numeric`,
+        })
+        .from(agentObjectifs)
+        .where(
+          and(
+            sql`${agentObjectifs.agentId} IN (${sql.join(agentIds.map(id => sql`${id}`), sql`, `)})`,
+            isNull(agentObjectifs.deletedAt),
+            eq(agentObjectifs.periode, currentPeriode),
+          )
+        )
+        .groupBy(agentObjectifs.agentId);
+
+      // Build lookup maps
+      const collectesMap = new Map(collectesAgg.map(r => [r.agentId, r]));
+      const visitesMap = new Map(visitesAgg.map(r => [r.agentId, r]));
+      const prospectionsMap = new Map(prospectionsAgg.map(r => [r.agentId, r]));
+      const objectifsMap = new Map(objectifsAgg.map(r => [r.agentId, r]));
+
+      // 6. Compute composite score per agent
+      //
+      // Scoring weights:
+      //   - Collectes count × 10 pts each  (volume of activity)
+      //   - Collecte montant / 100,000      (financial volume, 1 pt per 100K FCFA)
+      //   - Visites count × 5 pts each      (field presence)
+      //   - Prospections × 8 pts each       (acquisition effort)
+      //   - Conversions × 20 pts each       (acquisition result)
+      //   - Objectif avg completion          (target alignment, 0-100+)
+      //
+      const rankings = activeAgents.map(agent => {
+        const col = collectesMap.get(agent.agentId);
+        const vis = visitesMap.get(agent.agentId);
+        const pros = prospectionsMap.get(agent.agentId);
+        const obj = objectifsMap.get(agent.agentId);
+
+        const collectesCount = col ? Number(col.count) : 0;
+        const collectesMontant = col ? Number(col.montant) : 0;
+        const visitesCount = vis ? Number(vis.count) : 0;
+        const prospectionsCount = pros ? Number(pros.count) : 0;
+        const conversionsCount = pros ? Number(pros.converted) : 0;
+        const objectifPct = obj ? Math.round(Number(obj.avgPct)) : 0;
+
+        const score =
+          collectesCount * 10 +
+          Math.round(collectesMontant / 100000) +
+          visitesCount * 5 +
+          prospectionsCount * 8 +
+          conversionsCount * 20 +
+          objectifPct;
+
+        // Derive level from score
+        let niveau = 1;
+        if (score >= 1000) niveau = 5;
+        else if (score >= 600) niveau = 4;
+        else if (score >= 300) niveau = 3;
+        else if (score >= 100) niveau = 2;
+
+        return {
+          agentId: agent.agentId,
+          userId: agent.userId,
+          nom: agent.nom || "Inconnu",
+          prenom: agent.prenom || "",
+          photoUrl: agent.photoUrl || null,
+          score,
+          niveau,
+          collectesCount,
+          collectesMontant,
+          visitesCount,
+          prospectionsCount,
+          conversionsCount,
+          objectifPct,
+        };
+      });
+
+      // Sort by score descending
+      rankings.sort((a, b) => b.score - a.score);
+
+      res.json(rankings);
+    } catch (error) {
+      console.error("Erreur classement:", error);
+      res.status(500).json({ error: "Erreur lors du calcul du classement" });
+    }
+  });
+
+  // ════════════════════════════════════════════════════════════════════════════
   // COMMISSIONS
   // ════════════════════════════════════════════════════════════════════════════
 
