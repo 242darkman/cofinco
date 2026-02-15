@@ -304,7 +304,7 @@ export default function PlatformSidebarContent({
 
     const isDisabled = route.key === 'bourse' || showMaintenanceLock;
 
-    const tooltipLabel = t(route.labelKey || route.key) + (showMaintenanceLock ? ' (En Maintenance)' : isDisabled ? ' (Bientôt)' : '');
+    const tooltipLabel = t(route.labelKey || route.key) + (showMaintenanceLock ? ' (En Maintenance)' : isDisabled ? ' (Bientôt)' : route.key === 'kpi' ? ' (Beta)' : '');
 
     return (
       <button
@@ -382,6 +382,12 @@ export default function PlatformSidebarContent({
             {pendingCaisseRequestsCount > 99 ? '99+' : pendingCaisseRequestsCount}
           </div>
         )}
+        {/* WIP badge for collapsed sidebar - KPI */}
+        {!sidebarOpen && route.key === 'kpi' && (
+          <div className="absolute top-0.5 right-1.5 bg-status-warning text-white text-[7px] font-bold w-3 h-3 rounded-full flex items-center justify-center ring-2 ring-sidebar-bg">
+            !
+          </div>
+        )}
 
         {sidebarOpen && (
           <>
@@ -416,6 +422,11 @@ export default function PlatformSidebarContent({
             {route.key === 'caisse' && pendingCaisseRequestsCount > 0 && (
               <span className="bg-status-success text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center animate-in zoom-in duration-300">
                 {pendingCaisseRequestsCount > 99 ? '99+' : pendingCaisseRequestsCount}
+              </span>
+            )}
+            {route.key === 'kpi' && (
+              <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold border bg-status-warning-bg text-status-warning border-status-warning/30">
+                Beta
               </span>
             )}
             {isDisabled && (
