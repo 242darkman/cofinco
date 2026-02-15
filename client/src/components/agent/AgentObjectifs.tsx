@@ -56,8 +56,16 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
     type_objectif: 'Collecte',
     valeur_objectif: 0,
     unite: currencySymbol(),
+    recompense: 0,
     avantageId: null as number | null,
   });
+
+  // Sync agentId prop into form when supervisor selects a different agent
+  useEffect(() => {
+    if (agentId) {
+      setFormData((prev: typeof formData) => ({ ...prev, agent_id: agentId }));
+    }
+  }, [agentId]);
 
   useEffect(() => {
     loadObjectifs();
@@ -89,11 +97,12 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
     setLoading(true);
     try {
       const body = {
-        agentId: formData.agent_id,
+        agentId: formData.agent_id || agentId,
         periode: formData.periode,
         typeObjectif: formData.type_objectif,
         valeurObjectif: String(formData.valeur_objectif),
         unite: formData.unite,
+        recompense: String(formData.recompense || 0),
         avantageId: formData.avantageId,
       };
       const response = await fetch('/api/agent-objectifs', {
@@ -114,6 +123,7 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
         type_objectif: 'Collecte',
         valeur_objectif: 0,
         unite: currencySymbol(),
+        recompense: 0,
         avantageId: null,
       });
     } catch (error: any) {

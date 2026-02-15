@@ -374,7 +374,13 @@ export function registerAgentModulesRoutes(app: Express) {
 
   app.post("/api/agent-objectifs", requireAuth, async (req: Request, res: Response) => {
     try {
-      const parsed = insertAgentObjectifSchema.parse(req.body);
+      // Coerce numeric fields to strings (Drizzle numeric columns expect string)
+      const body = { ...req.body };
+      if (typeof body.recompense === 'number') body.recompense = String(body.recompense);
+      if (typeof body.valeurObjectif === 'number') body.valeurObjectif = String(body.valeurObjectif);
+      if (typeof body.valeurRealisee === 'number') body.valeurRealisee = String(body.valeurRealisee);
+
+      const parsed = insertAgentObjectifSchema.parse(body);
 
       // Auto-calculate prize from linked avantage config
       let recompense = parsed.recompense || "0";
