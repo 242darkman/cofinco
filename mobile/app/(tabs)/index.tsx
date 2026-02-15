@@ -1,98 +1,157 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, RefreshControl, Pressable } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import { useAuthStore } from '@/stores/auth-store';
+import { useDashboardStats } from '@/hooks/use-dashboard';
+import { useAccounts } from '@/hooks/use-accounts';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Colors } from '@/constants/theme';
+import { StatsGrid } from '@/components/dashboard/stats-grid';
+import { AccountCard } from '@/components/accounts/account-card';
+import { Card } from '@/components/ui/card';
+import { Loading } from '@/components/ui/loading';
+import { formatMoney } from '@shared/types/mobile';
 
-export default function HomeScreen() {
+export default function DashboardScreen() {
+  const router = useRouter();
+  const scheme = useColorScheme();
+  const colors = Colors[scheme];
+
+  const user = useAuthStore((s) => s.user);
+  const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useDashboardStats();
+  const { data: accounts, isLoading: accountsLoading, refetch: refetchAccounts } = useAccounts();
+
+  const isRefreshing = false;
+  const onRefresh = () => {
+    refetchStats();
+    refetchAccounts();
+  };
+
+  const totalBalance = accounts?.reduce(
+    (sum, a) => sum + (a.solde ?? 0),
+    0
+  ) ?? 0;
+
+  const g = stats?.global;
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <SafeAreaView className="flex-1 bg-bg-base" edges={['top']}>
+      <ScrollView
+        className="flex-1"
+        contentContainerClassName="pb-6"
+        refreshControl={
+          <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />
+        }
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header */}
+        <View className="px-5 pt-4 pb-6">
+          <View className="flex-row items-center justify-between mb-6">
+            <View>
+              <Text className="text-text-muted text-sm">Bonjour,</Text>
+              <Text className="text-text-primary text-xl font-bold">
+                {user?.nom} {user?.prenom ?? ''}
+              </Text>
+            </View>
+            <Pressable
+              className="w-10 h-10 rounded-full bg-card-bg border border-card-border items-center justify-center"
+              onPress={() => router.push('/qr/scan')}
+              accessibilityLabel="Scanner un QR code"
+            >
+              <Ionicons name="qr-code" size={20} color={colors.accent} />
+            </Pressable>
+          </View>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+          {/* Main balance card — banking hero */}
+          <Card variant="elevated" className="bg-accent p-6 rounded-3xl">
+            <Text className="text-white/70 text-sm mb-1">Solde total</Text>
+            <Text className="text-white text-3xl font-bold">
+              {formatMoney(totalBalance)}
+            </Text>
+            <View className="flex-row mt-4 gap-4">
+              <Pressable
+                className="flex-row items-center bg-white/20 rounded-xl px-4 py-2.5"
+                onPress={() => router.push('/qr/generate')}
+              >
+                <Ionicons name="arrow-down" size={16} color="#ffffff" />
+                <Text className="text-white font-medium text-sm ml-1.5">Recevoir</Text>
+              </Pressable>
+              <Pressable
+                className="flex-row items-center bg-white/20 rounded-xl px-4 py-2.5"
+                onPress={() => router.push('/qr/scan')}
+              >
+                <Ionicons name="arrow-up" size={16} color="#ffffff" />
+                <Text className="text-white font-medium text-sm ml-1.5">Payer</Text>
+              </Pressable>
+            </View>
+          </Card>
+        </View>
+
+        {/* Quick stats */}
+        {statsLoading ? (
+          <Loading message="Chargement..." />
+        ) : g ? (
+          <View className="px-5 mb-6">
+            <StatsGrid
+              stats={[
+                {
+                  label: 'Comptes actifs',
+                  value: String(accounts?.length ?? 0),
+                  icon: 'wallet',
+                },
+                {
+                  label: 'Credits actifs',
+                  value: String(g.creditsEnCours ?? 0),
+                  icon: 'cash',
+                },
+                {
+                  label: 'Encaisse',
+                  value: formatMoney(g.encaisse ?? 0, { compact: true }),
+                  icon: 'trending-up',
+                  trend: 'up',
+                },
+                {
+                  label: 'Recouvrement',
+                  value: `${g.tauxRecouvrement ?? 0}%`,
+                  icon: 'pie-chart',
+                },
+              ]}
+            />
+          </View>
+        ) : null}
+
+        {/* Accounts preview */}
+        <View className="px-5">
+          <View className="flex-row items-center justify-between mb-3">
+            <Text className="text-text-primary text-lg font-bold">Mes comptes</Text>
+            <Pressable onPress={() => router.push('/(tabs)/accounts')}>
+              <Text className="text-accent text-sm font-medium">Voir tout</Text>
+            </Pressable>
+          </View>
+
+          {accountsLoading ? (
+            <Loading />
+          ) : accounts?.length ? (
+            <View className="gap-3">
+              {accounts.slice(0, 3).map((account) => (
+                <AccountCard
+                  key={account.id}
+                  account={account}
+                  onPress={() => router.push(`/account/${account.id}`)}
+                />
+              ))}
+            </View>
+          ) : (
+            <Card>
+              <Text className="text-text-muted text-center py-4">
+                Aucun compte pour le moment
+              </Text>
+            </Card>
+          )}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
-});
