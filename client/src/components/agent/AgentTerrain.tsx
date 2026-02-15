@@ -163,6 +163,81 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
     return () => clearInterval(interval);
   }, []);
 
+  /**
+   * Load KPIs from agent-modules APIs (non-blocking, best-effort)
+   */
+  const loadKPIs = useCallback(async (agentId: string) => {
+    const today = new Date().toISOString().slice(0, 10);
+    const kpiState: KPIData = {
+      objectifPct: 0, commissionsNet: 0, planningToday: 0,
+      incidentsOpen: 0, messagesUnread: 0, rank: 0,
+      collectesToday: 0, collectesMontant: 0,
+    };
+
+    const fetches = await Promise.allSettled([
+      // 0: Objectifs
+      fetch(`/api/agent-objectifs?agentId=${agentId}`, { credentials: 'include' }).then(r => r.ok ? r.json() : []),
+      // 1: Commissions (current month)
+      fetch(`/api/agent-commissions?agentId=${agentId}&limit=5`, { credentials: 'include' }).then(r => r.ok ? r.json() : []),
+      // 2: Planning today
+      fetch(`/api/agent-planning?agentId=${agentId}&date=${today}`, { credentials: 'include' }).then(r => r.ok ? r.json() : []),
+      // 3: Incidents open
+      fetch(`/api/agent-incidents?agentId=${agentId}&statut=OPEN`, { credentials: 'include' }).then(r => r.ok ? r.json() : []),
+      // 4: Communications unread
+      fetch(`/api/agent-communications?agentId=${agentId}&lu=false`, { credentials: 'include' }).then(r => r.ok ? r.json() : []),
+    ]);
+
+    // Objectifs: average progress % (current period only)
+    if (fetches[0].status === 'fulfilled') {
+      const allObjectifs = Array.isArray(fetches[0].value) ? fetches[0].value : [];
+      const currentPeriode = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+      const objectifs = allObjectifs.filter((o: any) => o.periode === currentPeriode);
+      if (objectifs.length > 0) {
+        const totalPct = objectifs.reduce((sum: number, o: any) => {
+          const target = Number(o.valeurObjectif || 1);
+          const current = Number(o.valeurRealisee || 0);
+          return sum + Math.min((current / target) * 100, 100);
+        }, 0);
+        kpiState.objectifPct = Math.round(totalPct / objectifs.length);
+      }
+    }
+
+    // Commissions: net total
+    if (fetches[1].status === 'fulfilled') {
+      const comms = Array.isArray(fetches[1].value) ? fetches[1].value : [];
+      kpiState.commissionsNet = comms.reduce((sum: number, c: any) =>
+        sum + Number(c.montantNet || 0), 0);
+    }
+
+    // Planning today
+    if (fetches[2].status === 'fulfilled') {
+      const plans = Array.isArray(fetches[2].value) ? fetches[2].value : [];
+      kpiState.planningToday = plans.length;
+      setTodayPlannings(plans.slice(0, 5).map((p: any) => ({
+        id: p.id,
+        heureDebut: p.heureDebut || '08:00',
+        heureFin: p.heureFin || '17:00',
+        typeActivite: p.typeActivite || 'Visite',
+        zone: p.zone || '',
+        statut: p.statut || 'PLANNED',
+      })));
+    }
+
+    // Incidents open
+    if (fetches[3].status === 'fulfilled') {
+      const incidents = Array.isArray(fetches[3].value) ? fetches[3].value : [];
+      kpiState.incidentsOpen = incidents.length;
+    }
+
+    // Communications unread
+    if (fetches[4].status === 'fulfilled') {
+      const msgs = Array.isArray(fetches[4].value) ? fetches[4].value : [];
+      kpiState.messagesUnread = msgs.length;
+    }
+
+    setKpis(kpiState);
+  }, []);
+
   useEffect(() => {
     loadAgents();
   }, []);
@@ -301,81 +376,6 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
       setLoading(false);
     }
   };
-
-  /**
-   * Load KPIs from agent-modules APIs (non-blocking, best-effort)
-   */
-  const loadKPIs = useCallback(async (agentId: string) => {
-    const today = new Date().toISOString().slice(0, 10);
-    const kpiState: KPIData = {
-      objectifPct: 0, commissionsNet: 0, planningToday: 0,
-      incidentsOpen: 0, messagesUnread: 0, rank: 0,
-      collectesToday: 0, collectesMontant: 0,
-    };
-
-    const fetches = await Promise.allSettled([
-      // 0: Objectifs
-      fetch(`/api/agent-objectifs?agentId=${agentId}`, { credentials: 'include' }).then(r => r.ok ? r.json() : []),
-      // 1: Commissions (current month)
-      fetch(`/api/agent-commissions?agentId=${agentId}&limit=5`, { credentials: 'include' }).then(r => r.ok ? r.json() : []),
-      // 2: Planning today
-      fetch(`/api/agent-planning?agentId=${agentId}&date=${today}`, { credentials: 'include' }).then(r => r.ok ? r.json() : []),
-      // 3: Incidents open
-      fetch(`/api/agent-incidents?agentId=${agentId}&statut=OPEN`, { credentials: 'include' }).then(r => r.ok ? r.json() : []),
-      // 4: Communications unread
-      fetch(`/api/agent-communications?agentId=${agentId}&lu=false`, { credentials: 'include' }).then(r => r.ok ? r.json() : []),
-    ]);
-
-    // Objectifs: average progress % (current period only)
-    if (fetches[0].status === 'fulfilled') {
-      const allObjectifs = Array.isArray(fetches[0].value) ? fetches[0].value : [];
-      const currentPeriode = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
-      const objectifs = allObjectifs.filter((o: any) => o.periode === currentPeriode);
-      if (objectifs.length > 0) {
-        const totalPct = objectifs.reduce((sum: number, o: any) => {
-          const target = Number(o.valeurObjectif || 1);
-          const current = Number(o.valeurRealisee || 0);
-          return sum + Math.min((current / target) * 100, 100);
-        }, 0);
-        kpiState.objectifPct = Math.round(totalPct / objectifs.length);
-      }
-    }
-
-    // Commissions: net total
-    if (fetches[1].status === 'fulfilled') {
-      const comms = Array.isArray(fetches[1].value) ? fetches[1].value : [];
-      kpiState.commissionsNet = comms.reduce((sum: number, c: any) =>
-        sum + Number(c.montantNet || 0), 0);
-    }
-
-    // Planning today
-    if (fetches[2].status === 'fulfilled') {
-      const plans = Array.isArray(fetches[2].value) ? fetches[2].value : [];
-      kpiState.planningToday = plans.length;
-      setTodayPlannings(plans.slice(0, 5).map((p: any) => ({
-        id: p.id,
-        heureDebut: p.heureDebut || '08:00',
-        heureFin: p.heureFin || '17:00',
-        typeActivite: p.typeActivite || 'Visite',
-        zone: p.zone || '',
-        statut: p.statut || 'PLANNED',
-      })));
-    }
-
-    // Incidents open
-    if (fetches[3].status === 'fulfilled') {
-      const incidents = Array.isArray(fetches[3].value) ? fetches[3].value : [];
-      kpiState.incidentsOpen = incidents.length;
-    }
-
-    // Communications unread
-    if (fetches[4].status === 'fulfilled') {
-      const msgs = Array.isArray(fetches[4].value) ? fetches[4].value : [];
-      kpiState.messagesUnread = msgs.length;
-    }
-
-    setKpis(kpiState);
-  }, []);
 
   // Load pending enquêtes assigned to the agent
   // Admin supervision: pass agentUserId to view a specific agent's investigations
