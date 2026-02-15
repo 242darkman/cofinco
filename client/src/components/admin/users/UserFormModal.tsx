@@ -715,7 +715,9 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
                       {/* Prénom / Nom */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                         <div className="space-y-1.5">
-                          <label className="text-[11px] sm:text-xs font-bold text-content-muted uppercase">Prénom</label>
+                          <label className="text-[11px] sm:text-xs font-bold text-content-muted uppercase">
+                            Prénom <span className="text-status-danger">*</span>
+                          </label>
                           <input
                             type="text"
                             value={formData.prenom}
@@ -742,7 +744,7 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
                       {/* Identifiant */}
                       <div className="space-y-1.5">
                         <label className="text-[11px] sm:text-xs font-bold text-content-muted uppercase">
-                          Identifiant <span className="text-status-danger">*</span>
+                          Identifiant
                         </label>
                         <div className="relative">
                           <input

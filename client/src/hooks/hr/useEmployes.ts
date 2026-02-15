@@ -38,6 +38,7 @@ export interface Employe {
   nombreEnfantsCharge?: number | null;
   niu?: string | null;
   // Sortie
+  typeCompte?: 'employe' | 'client' | 'both';
   dateSortie?: string | null;
   motifSortie?: 'DEMISSION' | 'LICENCIEMENT' | 'FIN_CDD' | 'RETRAITE' | 'DECES' | null;
   jobPosition?: {
@@ -130,6 +131,7 @@ export function useEmployes() {
         ville: item.user?.ville || null,
         statut: item.user?.statut || StatutUser.ACTIVE,
         photoProfile: item.user?.photoProfile || null,
+        typeCompte: item.user?.typeCompte || 'employe',
       }));
 
       // Dédupliquer par ID d'employé (un employé peut avoir plusieurs rôles mais ne doit apparaître qu'une fois)

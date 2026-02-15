@@ -88,6 +88,7 @@ export const ClientOrigin = {
   WALK_IN_AGENCY: "WALK_IN_AGENCY",
   REFERRAL: "REFERRAL",
   CAMPAIGN: "CAMPAIGN",
+  EMPLOYEE_CONVERSION: "EMPLOYEE_CONVERSION",
   OTHER: "OTHER",
 } as const;
 
@@ -99,6 +100,7 @@ export const CLIENT_ORIGIN_LABELS: Record<ClientOriginType, string> = {
   [ClientOrigin.WALK_IN_AGENCY]: "Visite agence",
   [ClientOrigin.REFERRAL]: "Parrainage",
   [ClientOrigin.CAMPAIGN]: "Campagne",
+  [ClientOrigin.EMPLOYEE_CONVERSION]: "Conversion employé",
   [ClientOrigin.OTHER]: "Autre",
 };
 

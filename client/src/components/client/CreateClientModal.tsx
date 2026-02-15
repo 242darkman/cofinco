@@ -32,46 +32,66 @@ async function uploadEntityFile(
   return data.key as string;
 }
 
+export interface EmployeeConversionData {
+  userId: string;
+  nom: string;
+  prenom: string;
+  email: string | null;
+  telephone: string | null;
+  sexe: 'M' | 'F' | null;
+  dateNaissance: string | null;
+  adresse: string | null;
+  ville: string | null;
+  agenceId: string | null;
+}
+
 interface CreateClientModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (data: any) => Promise<void>;
+  fromEmployee?: EmployeeConversionData;
 }
 
-export default function CreateClientModal({ isOpen, onClose, onSave }: CreateClientModalProps) {
-  const [step, setStep] = useState(1);
+export default function CreateClientModal({ isOpen, onClose, onSave, fromEmployee }: CreateClientModalProps) {
+  const isConversion = !!fromEmployee;
+  const [step, setStep] = useState(isConversion ? 3 : 1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const tempEntityId = useMemo(() => crypto.randomUUID(), []);
-  
-  // Data State
-  const [formData, setFormData] = useState({
-    // Step 1
-    nom: '', 
-    prenom: '', 
-    dateNaissance: '', 
-    sexe: 'M',
-    
-    // Step 2
-    telephoneRaw: '', // stored without prefix for input
-    telephone: '', // full phone with prefix
-    email: '',
-    ville: 'Brazzaville',
-    villeId: '',
-    adresse: '',
-    
-    // Step 3
-    profession: '', 
-    secteurId: '', // Type Marche ID
-    typeRevenu: 'Mensuel',
-    revenu: '', 
-    segment: 'Standard',
-    agenceId: '',
-    agentReferentId: '',
-    clientOrigin: 'OTHER',
-    
-    // Step 4 (Docs)
-    typePiece: 'CNI' as 'CNI' | 'PASSEPORT',
-    files: { photo: null, cniRecto: null, cniVerso: null } as any
+
+  // Data State - pre-fill from employee when converting
+  const [formData, setFormData] = useState(() => {
+    const phoneRaw = fromEmployee?.telephone
+      ? fromEmployee.telephone.replace(/^\+242/, '').replace(/[^\d]/g, '')
+      : '';
+    return {
+      // Step 1
+      nom: fromEmployee?.nom || '',
+      prenom: fromEmployee?.prenom || '',
+      dateNaissance: fromEmployee?.dateNaissance || '',
+      sexe: fromEmployee?.sexe || 'M',
+
+      // Step 2
+      telephoneRaw: phoneRaw,
+      telephone: fromEmployee?.telephone || (phoneRaw ? `+242${phoneRaw}` : ''),
+      email: fromEmployee?.email || '',
+      ville: fromEmployee?.ville || 'Brazzaville',
+      villeId: '',
+      adresse: fromEmployee?.adresse || '',
+
+      // Step 3
+      profession: '',
+      secteurId: '',
+      typeRevenu: 'Mensuel',
+      revenu: '',
+      segment: 'Standard',
+      agenceId: fromEmployee?.agenceId || '',
+      agentReferentId: '',
+      clientOrigin: isConversion ? 'EMPLOYEE_CONVERSION' : 'OTHER',
+
+      // Step 4 (Docs)
+      typePiece: 'CNI' as 'CNI' | 'PASSEPORT',
+      files: { photo: null, cniRecto: null, cniVerso: null } as any
+    };
   });
 
   // Reference Data State
@@ -139,6 +159,8 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
       case 2: return formData.telephoneRaw.trim().length > 0;
       case 3: return isAdmin ? formData.agenceId.trim().length > 0 : true;
       case 4:
+        // KYC optionnel pour la conversion employé (identité déjà vérifiée)
+        if (isConversion) return true;
         if (!formData.files.cniRecto) return false;
         if (formData.typePiece === 'CNI' && !formData.files.cniVerso) return false;
         return true;
@@ -191,36 +213,71 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
         }
       }
 
-      const payload = {
-        nom: formData.nom,
-        prenom: formData.prenom,
-        dateNaissance: formData.dateNaissance,
-        sexe: formData.sexe,
+      if (isConversion && fromEmployee) {
+        // Mode conversion : appeler l'endpoint from-user (données métier uniquement)
+        const conversionPayload = {
+          adresseDomicile: formData.adresse,
+          ville: formData.ville,
+          villeId: formData.villeId || undefined,
+          profession: formData.profession,
+          typeMarcheId: formData.secteurId || undefined,
+          typeRevenu: formData.typeRevenu,
+          revenuMensuel: formData.typeRevenu === 'Mensuel' ? formData.revenu : undefined,
+          revenuJournalier: formData.typeRevenu === 'Journalier' ? formData.revenu : undefined,
+          segment: formData.segment,
+          agenceId: formData.agenceId || user?.agenceId,
+          agentReferentId: formData.agentReferentId || undefined,
+          clientOrigin: 'EMPLOYEE_CONVERSION',
+          tempEntityId,
+          documents: documents.length > 0 ? documents : undefined,
+        };
 
-        telephone: formData.telephone,
-        email: formData.email,
-        ville: formData.ville,
-        villeId: formData.villeId || undefined,
-        adresseDomicile: formData.adresse,
+        const res = await fetch(`/api/clients/from-user/${fromEmployee.userId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(conversionPayload),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.message || 'Erreur lors de la conversion');
+        }
+        const result = await res.json();
+        await onSave(result);
+        onClose();
+      } else {
+        // Mode création normal
+        const payload = {
+          nom: formData.nom,
+          prenom: formData.prenom,
+          dateNaissance: formData.dateNaissance,
+          sexe: formData.sexe,
 
-        profession: formData.profession,
-        typeMarcheId: formData.secteurId,
-        typeRevenu: formData.typeRevenu,
-        revenuMensuel: formData.typeRevenu === 'Mensuel' ? formData.revenu : undefined,
-        revenuJournalier: formData.typeRevenu === 'Journalier' ? formData.revenu : undefined,
-        segment: formData.segment,
+          telephone: formData.telephone,
+          email: formData.email,
+          ville: formData.ville,
+          villeId: formData.villeId || undefined,
+          adresseDomicile: formData.adresse,
 
-        agenceId: formData.agenceId || user?.agenceId,
-        agentReferentId: formData.agentReferentId,
-        clientOrigin: formData.clientOrigin,
+          profession: formData.profession,
+          typeMarcheId: formData.secteurId,
+          typeRevenu: formData.typeRevenu,
+          revenuMensuel: formData.typeRevenu === 'Mensuel' ? formData.revenu : undefined,
+          revenuJournalier: formData.typeRevenu === 'Journalier' ? formData.revenu : undefined,
+          segment: formData.segment,
 
-        tempEntityId,
-        photoProfile: photoProfileKey || undefined,
-        documents: documents.length > 0 ? documents : undefined,
-      };
+          agenceId: formData.agenceId || user?.agenceId,
+          agentReferentId: formData.agentReferentId,
+          clientOrigin: formData.clientOrigin,
 
-      await onSave(payload);
-      onClose();
+          tempEntityId,
+          photoProfile: photoProfileKey || undefined,
+          documents: documents.length > 0 ? documents : undefined,
+        };
+
+        await onSave(payload);
+        onClose();
+      }
     } catch (e: any) {
       console.error(e);
       toast.error(e?.message || 'Erreur lors de la création du client');
@@ -239,7 +296,7 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
         {/* 1. HEADER (Stepper) */}
         <div className="bg-surface-base border-b border-edge px-3 sm:px-6 py-3 sm:py-4 flex-shrink-0">
            <div className="flex justify-between items-center mb-4 sm:mb-6">
-              <h2 className="text-lg sm:text-xl font-bold text-content-primary">Nouveau Client</h2>
+              <h2 className="text-lg sm:text-xl font-bold text-content-primary">{isConversion ? 'Convertir Employé en Client' : 'Nouveau Client'}</h2>
               <button onClick={onClose} className="p-1"><X className="text-content-muted hover:text-content-primary w-5 h-5 sm:w-6 sm:h-6" /></button>
            </div>
 
@@ -259,18 +316,28 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
            {/* STEP 1: IDENTITÉ */}
            {step === 1 && (
              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 animate-in slide-in-from-right fade-in duration-300">
-                <Input label="Nom" placeholder="Ex: Dupont" value={formData.nom} onChange={e => updatedField('nom', e.target.value)} required />
-                <Input label="Prénom" placeholder="Ex: Jean" value={formData.prenom} onChange={e => updatedField('prenom', e.target.value)} required />
+                <div className={isConversion ? 'opacity-60 cursor-not-allowed' : ''}>
+                  <Input label="Nom" placeholder="Ex: Dupont" value={formData.nom} onChange={e => updatedField('nom', e.target.value)} required disabled={isConversion} />
+                </div>
+                <div className={isConversion ? 'opacity-60 cursor-not-allowed' : ''}>
+                  <Input label="Prénom" placeholder="Ex: Jean" value={formData.prenom} onChange={e => updatedField('prenom', e.target.value)} required disabled={isConversion} />
+                </div>
 
-                <Input label="Date de Naissance" type="date" value={formData.dateNaissance} onChange={e => updatedField('dateNaissance', e.target.value)} />
-                <Select label="Sexe" value={formData.sexe} onChange={e => updatedField('sexe', e.target.value)}>
-                   <option value="M">Masculin</option>
-                   <option value="F">Féminin</option>
-                </Select>
+                <div className={isConversion ? 'opacity-60 cursor-not-allowed' : ''}>
+                  <Input label="Date de Naissance" type="date" value={formData.dateNaissance} onChange={e => updatedField('dateNaissance', e.target.value)} disabled={isConversion} />
+                </div>
+                <div className={isConversion ? 'opacity-60 cursor-not-allowed' : ''}>
+                  <Select label="Sexe" value={formData.sexe} onChange={e => updatedField('sexe', e.target.value)} disabled={isConversion}>
+                     <option value="M">Masculin</option>
+                     <option value="F">Féminin</option>
+                  </Select>
+                </div>
 
                 <div className="col-span-1 sm:col-span-2 mt-2 p-3 bg-accent/10 border border-accent/20 rounded-xl">
                    <p className="text-xs text-accent flex items-center gap-2">
-                     <Check size={14} /> Assurez-vous que les informations correspondent strictement à la pièce d'identité.
+                     <Check size={14} /> {isConversion
+                       ? "Les informations d'identité proviennent du profil employé et ne sont pas modifiables."
+                       : "Assurez-vous que les informations correspondent strictement à la pièce d'identité."}
                    </p>
                 </div>
              </div>
@@ -279,7 +346,7 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
            {/* STEP 2: CONTACT */}
            {step === 2 && (
              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5 animate-in slide-in-from-right fade-in duration-300">
-                <div className="col-span-1 sm:col-span-2">
+                <div className={`col-span-1 sm:col-span-2 ${isConversion ? 'opacity-60 cursor-not-allowed' : ''}`}>
                    <label className="text-xs font-bold text-content-muted uppercase mb-1.5 block">Téléphone<span className="text-status-danger ml-0.5">*</span></label>
                    <div className="flex h-11 sm:h-12">
                       <span className="bg-surface-base border border-edge border-r-0 rounded-l-xl px-3 sm:px-4 flex items-center text-content-muted text-sm font-mono">+242</span>
@@ -288,11 +355,14 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
                         placeholder="06 000 0000"
                         value={formData.telephoneRaw}
                         onChange={handlePhoneChange}
+                        disabled={isConversion}
                       />
                    </div>
                 </div>
 
-                <Input label="Email (Optionnel)" type="email" placeholder="client@email.com" value={formData.email} onChange={e => updatedField('email', e.target.value)} />
+                <div className={isConversion ? 'opacity-60 cursor-not-allowed' : ''}>
+                  <Input label="Email (Optionnel)" type="email" placeholder="client@email.com" value={formData.email} onChange={e => updatedField('email', e.target.value)} disabled={isConversion} />
+                </div>
                 <Select
                   label="Ville / Localité"
                   value={formData.villeId}
@@ -363,9 +433,11 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
                    <option value="VIP">VIP</option>
                    <option value="Entreprise">Entreprise</option>
                 </Select>
-                <Select label="Origine Client" value={formData.clientOrigin} onChange={e => updatedField('clientOrigin', e.target.value)}>
-                   {CLIENT_ORIGIN_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </Select>
+                <div className={isConversion ? 'opacity-60 cursor-not-allowed' : ''}>
+                  <Select label="Origine Client" value={formData.clientOrigin} onChange={e => updatedField('clientOrigin', e.target.value)} disabled={isConversion}>
+                     {CLIENT_ORIGIN_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </Select>
+                </div>
 
                 <div className="col-span-1 sm:col-span-2 pt-4 border-t border-edge mt-2">
                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
@@ -405,9 +477,12 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
                 {/* Info Box */}
                  <div className="col-span-1 flex flex-col justify-center order-first sm:order-none">
                     <div className="p-3 sm:p-4 bg-surface-base border border-edge rounded-xl">
-                       <h4 className="text-sm font-bold text-content-primary mb-2">Documents Requis</h4>
+                       <h4 className="text-sm font-bold text-content-primary mb-2">{isConversion ? 'Documents (Optionnels)' : 'Documents Requis'}</h4>
+                       {isConversion && (
+                         <p className="text-xs text-status-info mb-2">L'identité est déjà vérifiée via le profil employé. Les documents KYC peuvent être ajoutés plus tard.</p>
+                       )}
                        <ul className="text-xs text-content-muted space-y-1">
-                          <li className="flex gap-2"><Check size={12} className={formData.files.cniRecto ? "text-status-success" : "text-content-muted"}/> {formData.typePiece === 'CNI' ? 'CNI (Recto + Verso)' : 'Passeport'}</li>
+                          <li className="flex gap-2"><Check size={12} className={formData.files.cniRecto ? "text-status-success" : "text-content-muted"}/> {formData.typePiece === 'CNI' ? 'CNI (Recto + Verso)' : 'Passeport'}{isConversion ? ' (Opt.)' : ''}</li>
                           <li className="flex gap-2"><Check size={12} className={formData.files.photo ? "text-status-success" : "text-content-muted"}/> Photo claire et récente (Opt.)</li>
                           <li className="flex gap-2"><Check size={12} className="text-content-muted"/> Justificatif de domicile (Opt.)</li>
                        </ul>
@@ -512,7 +587,7 @@ export default function CreateClientModal({ isOpen, onClose, onSave }: CreateCli
                       : 'bg-surface-elevated text-content-muted cursor-not-allowed shadow-none'
                   } ${isSubmitting ? 'opacity-50 cursor-wait' : ''}`}
                 >
-                   {isSubmitting ? 'Enregistrement...' : <> <Save size={18} /> <span className="hidden sm:inline">Enregistrer Client</span><span className="sm:hidden">Enregistrer</span> </>}
+                   {isSubmitting ? 'Enregistrement...' : <> <Save size={18} /> <span className="hidden sm:inline">{isConversion ? 'Convertir en Client' : 'Enregistrer Client'}</span><span className="sm:hidden">{isConversion ? 'Convertir' : 'Enregistrer'}</span> </>}
                 </button>
               )}
            </div>

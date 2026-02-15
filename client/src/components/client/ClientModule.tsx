@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, Download, Upload, Users, MapPin, RefreshCw, List, Eye, Edit2, Trash2, ChevronRight, FileText, CreditCard, Shield, BarChart3, AlertCircle, Zap, Building2, Send, DollarSign } from 'lucide-react';
+import { Plus, Search, Filter, Download, Upload, Users, MapPin, RefreshCw, List, Eye, Edit2, Trash2, ChevronRight, FileText, CreditCard, Shield, BarChart3, AlertCircle, Zap, Building2, Send, DollarSign, UserPlus } from 'lucide-react';
 import { Button, IconButton, Card, ResponsiveTable, Badge, ConfirmDialog, FeatureHeader, FEATURE_DESCRIPTIONS, TabGroup } from '../ui';
 import { usePermissions, ProtectedFeature } from '../auth/ProtectedFeature';
 import ClientForm from './ClientForm';
@@ -18,6 +18,8 @@ import ClientAlerts from './ClientAlerts';
 import ClientActions from './ClientActions';
 import ClientBulkCommunication from './ClientBulkCommunication';
 import ClientSearch from './ClientSearch';
+import SelectEmployeeForConversionModal from './SelectEmployeeForConversionModal';
+import type { EmployeeConversionData } from './CreateClientModal';
 import { clientService } from '../../services/clientService';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import EmptyState from '../ui/EmptyState';
@@ -75,6 +77,8 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
   const [clientToDelete, setClientToDelete] = useState<string | null>(null);
   const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
   const [showBulkCommunication, setShowBulkCommunication] = useState(false);
+  const [showSelectEmployee, setShowSelectEmployee] = useState(false);
+  const [employeeToConvert, setEmployeeToConvert] = useState<EmployeeConversionData | null>(null);
   
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -403,6 +407,18 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
               >
                 <span className="hidden sm:inline">Nouveau</span>
                 <span className="sm:hidden">Nouveau</span>
+              </Button>
+            )}
+            {canCreateClients && (
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={UserPlus}
+                onClick={() => setShowSelectEmployee(true)}
+                className="h-7 text-xs px-2"
+              >
+                <span className="hidden sm:inline">Convertir employé</span>
+                <span className="sm:hidden">Conv.</span>
               </Button>
             )}
 
@@ -746,6 +762,31 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
         cancelText="Annuler"
         variant="danger"
       />
+
+      {/* Employee to Client Conversion Flow */}
+      {showSelectEmployee && (
+        <SelectEmployeeForConversionModal
+          isOpen={showSelectEmployee}
+          onClose={() => setShowSelectEmployee(false)}
+          onSelect={(emp) => {
+            setShowSelectEmployee(false);
+            setEmployeeToConvert(emp);
+          }}
+        />
+      )}
+
+      {employeeToConvert && (
+        <CreateClientModal
+          isOpen={!!employeeToConvert}
+          onClose={() => setEmployeeToConvert(null)}
+          onSave={async () => {
+            toast.success('Employé converti en client avec succès !');
+            setEmployeeToConvert(null);
+            loadClients();
+          }}
+          fromEmployee={employeeToConvert}
+        />
+      )}
     </div>
   );
 }

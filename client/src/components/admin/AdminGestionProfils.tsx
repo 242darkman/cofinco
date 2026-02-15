@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Users, Plus, Edit2, Trash2, Lock, Unlock, Eye, EyeOff, Shield, CheckCircle, XCircle, Search, Filter, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Upload, Image as ImageIcon, Loader2, User, Briefcase, Check, Save } from 'lucide-react';
+import { Users, Plus, Edit2, Trash2, Lock, Unlock, Eye, EyeOff, Shield, CheckCircle, XCircle, Search, Filter, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Upload, Image as ImageIcon, Loader2, User, Briefcase, Check, Save, CreditCard } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, Button, IconButton, ResponsiveTable } from '../ui';
 import ConfirmDialog from '../ui/ConfirmDialog';
@@ -18,6 +18,7 @@ import { usePermissions as useAdminPermissions } from '../../hooks/admin/usePerm
 import { useUserPermissions } from '../../hooks/admin/useUserPermissions';
 import { useAdminUsers } from '../../hooks/admin/useAdminUsers';
 import UserCustomPermissionsManager from './permissions/UserCustomPermissionsManager';
+import CreateClientModal from '../client/CreateClientModal';
 
 // Local types removed to use shared entities or any for flexibility
 
@@ -76,6 +77,7 @@ export default function AdminGestionProfils() {
   const [pageSize, setPageSize] = useState(8);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [convertToClientUser, setConvertToClientUser] = useState<any>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const tempUserIdRef = React.useRef(crypto.randomUUID());
 
@@ -757,6 +759,17 @@ export default function AdminGestionProfils() {
                           aria-label="Gérer les permissions"
                         />
                       )}
+                      {canEditUsers && (user.typeCompte === 'employe') && (
+                        <IconButton
+                          icon={CreditCard}
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => { e.stopPropagation(); setConvertToClientUser(emp); }}
+                          className="text-status-success hover:bg-status-success-bg"
+                          title="Convertir en client"
+                          aria-label="Convertir en client"
+                        />
+                      )}
                       {canDeleteUsers && (
                         <IconButton
                           icon={Trash2}
@@ -1412,6 +1425,31 @@ export default function AdminGestionProfils() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Convert Employee to Client Modal */}
+      {convertToClientUser && (
+        <CreateClientModal
+          isOpen={!!convertToClientUser}
+          onClose={() => setConvertToClientUser(null)}
+          onSave={async () => {
+            toast.success('Profil client créé avec succès');
+            setConvertToClientUser(null);
+            loadUsers();
+          }}
+          fromEmployee={{
+            userId: convertToClientUser.user?.id || convertToClientUser.userId,
+            nom: convertToClientUser.user?.nom || convertToClientUser.nom || '',
+            prenom: convertToClientUser.user?.prenom || convertToClientUser.prenom || '',
+            email: convertToClientUser.user?.email || convertToClientUser.email || null,
+            telephone: convertToClientUser.user?.telephone || convertToClientUser.phone || null,
+            sexe: (convertToClientUser.user?.sexe || convertToClientUser.sexe || null) as 'M' | 'F' | null,
+            dateNaissance: convertToClientUser.user?.dateNaissance || convertToClientUser.dateNaissance || null,
+            adresse: convertToClientUser.user?.adresse || convertToClientUser.adresse || null,
+            ville: convertToClientUser.user?.ville || convertToClientUser.ville || null,
+            agenceId: convertToClientUser.agenceId || null,
+          }}
+        />
       )}
     </div>
   );

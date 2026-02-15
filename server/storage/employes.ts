@@ -228,6 +228,7 @@ export async function getAllEmployesWithUsers(roleFilter?: string): Promise<Empl
       ville: users.ville,
       photoProfile: users.photoProfile,
       statut: users.statut,
+      typeCompte: users.typeCompte,
     },
     role: userRoles.role,
     jobPosition: {
@@ -307,6 +308,7 @@ export async function getEmployesByAgence(agenceId: string, roleFilter?: string)
       ville: users.ville,
       photoProfile: users.photoProfile,
       statut: users.statut,
+      typeCompte: users.typeCompte,
     },
     role: userRoles.role,
     jobPosition: {

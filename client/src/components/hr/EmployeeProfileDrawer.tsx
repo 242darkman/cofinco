@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { Employe } from '../../hooks/hr/useEmployes';
 import TransferAgenceModal from './TransferAgenceModal';
+import CreateClientModal from '../client/CreateClientModal';
 import { resolveStorageUrl } from '@/lib/format';
 import { StatutUser } from '@shared/enum/status-constants';
 import { toast } from 'sonner';
@@ -102,6 +103,7 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [previewDoc, setPreviewDoc] = useState<EmployeeDoc | null>(null);
   const [showTransferModal, setShowTransferModal] = useState(false);
+  const [showConvertToClient, setShowConvertToClient] = useState(false);
 
   // Helper to get initials
   const getInitials = (nom: string, prenom: string) => {
@@ -596,6 +598,14 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
                           label="Changer d'agence"
                           onClick={() => { setShowTransferModal(true); setMenuOpen(false); }}
                         />
+                        {employee.typeCompte !== 'both' && (
+                          <MenuItem
+                            icon={CreditCard}
+                            label="Convertir en client"
+                            color="text-status-info hover:bg-status-info-bg"
+                            onClick={() => { setShowConvertToClient(true); setMenuOpen(false); }}
+                          />
+                        )}
 
                         <div className="my-1 border-t border-edge" />
 
@@ -952,6 +962,32 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
           employee={employee}
           onClose={() => setShowTransferModal(false)}
           onSuccess={() => { setShowTransferModal(false); onRefresh?.(); }}
+        />
+      )}
+
+      {showConvertToClient && (
+        <CreateClientModal
+          isOpen={showConvertToClient}
+          onClose={() => setShowConvertToClient(false)}
+          onSave={async () => {
+            toast.success('Profil client créé avec succès !', {
+              description: `${employee.nom} ${employee.prenom} est maintenant aussi client.`,
+            });
+            setShowConvertToClient(false);
+            onRefresh?.();
+          }}
+          fromEmployee={{
+            userId: employee.userId,
+            nom: employee.nom || '',
+            prenom: employee.prenom || '',
+            email: employee.email || null,
+            telephone: employee.phone || null,
+            sexe: (employee.sexe as 'M' | 'F') || null,
+            dateNaissance: employee.dateNaissance || null,
+            adresse: employee.adresse || null,
+            ville: employee.ville || null,
+            agenceId: employee.agenceId || null,
+          }}
         />
       )}
     </div>

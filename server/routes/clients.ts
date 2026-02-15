@@ -1669,12 +1669,27 @@ export function registerClientRoutes(app: Express) {
 
       const client = await createClientForUser(userId, clientData);
 
+      // Auto-création d'un compte courant (même règle que POST /api/clients)
+      let compteCourant = null;
+      try {
+        compteCourant = await createClientAccount(client.id, {
+          typeCompte: TypeCompte.CURRENT,
+          soldeInitial: 0,
+          tauxInteret: 0,
+          statut: StatutCompte.ACTIVE,
+          agenceId: clientData.agenceId || client.agenceId,
+        }, req.session.user?.id);
+        logger.info({ numeroCompte: compteCourant.numeroCompte, clientId: client.id }, 'Compte courant created for employee-to-client conversion');
+      } catch (accountError) {
+        logger.error({ err: accountError, clientId: client.id }, 'Failed to create automatic current account for employee-to-client');
+      }
+
       await logAudit(
         req,
         "CREATE_CLIENT_FROM_USER",
         "client",
         client.id,
-        { userId },
+        { userId, compteCourantId: compteCourant?.id },
         "success",
         "medium"
       );
