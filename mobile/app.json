@@ -13,7 +13,11 @@
       "bundleIdentifier": "com.cofinco.mobile",
       "infoPlist": {
         "NSCameraUsageDescription": "Utilise la camera pour scanner les codes QR de paiement",
-        "NSFaceIDUsageDescription": "Utilise Face ID pour securiser votre connexion"
+        "NSFaceIDUsageDescription": "Utilise Face ID pour securiser votre connexion",
+        "NSLocationWhenInUseUsageDescription": "Utilise votre position pour le suivi des operations terrain",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Permet le suivi GPS continu pendant vos tournees terrain",
+        "NSLocationAlwaysUsageDescription": "Permet le suivi GPS en arriere-plan pendant vos tournees",
+        "UIBackgroundModes": ["location"]
       }
     },
     "android": {
@@ -30,7 +34,12 @@
         "USE_BIOMETRIC",
         "USE_FINGERPRINT",
         "VIBRATE",
-        "RECEIVE_BOOT_COMPLETED"
+        "RECEIVE_BOOT_COMPLETED",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION"
       ]
     },
     "web": {
@@ -52,6 +61,16 @@
         {
           "icon": "./assets/images/icon.png",
           "color": "#047857"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Permet le suivi GPS continu pendant vos tournees terrain",
+          "locationAlwaysPermission": "Permet le suivi GPS en arriere-plan pendant vos tournees",
+          "locationWhenInUsePermission": "Utilise votre position pour le suivi des operations terrain",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
         }
       ],
       [

@@ -75,6 +75,10 @@ class MobileWebSocket {
     }
   }
 
+  isConnected(): boolean {
+    return this.ws?.readyState === WebSocket.OPEN;
+  }
+
   onMessage(handler: MessageHandler) {
     this.handlers.push(handler);
     return () => {
