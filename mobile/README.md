@@ -1,50 +1,112 @@
-# Welcome to your Expo app 👋
+# COFINCO Mobile
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Application mobile COFINCO (Expo SDK 54 + React Native).
 
-## Get started
+## Stack
 
-1. Install dependencies
+- **Framework** : Expo SDK 54, Expo Router (file-based routing)
+- **UI** : NativeWind v4 (Tailwind CSS pour React Native)
+- **Data** : TanStack Query v5 (server state), Zustand v5 (local state)
+- **Auth** : Cookies de session (API existante) + biometrie (expo-local-authentication)
+- **Forms** : React Hook Form + Zod
+- **Push** : expo-notifications
+- **QR** : expo-camera + react-native-qrcode-svg
+- **Real-time** : WebSocket natif
 
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Dev local (Docker)
 
 ```bash
-npm run reset-project
+# Depuis la racine du projet
+docker compose up mobile
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Le serveur Expo est accessible sur `http://localhost:8081`.
 
-## Learn more
+## Dev local (sans Docker)
 
-To learn more about developing your project with Expo, look at the following resources:
+```bash
+cd mobile
+npm install
+npx expo start
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Configurer l'URL de l'API :
+```bash
+EXPO_PUBLIC_API_URL=http://localhost:5001 npx expo start
+```
 
-## Join the community
+## Connexion device physique
 
-Join our community of developers creating universal apps.
+1. Installer **Expo Go** sur le device
+2. Scanner le QR code affiche par Metro
+3. Ou utiliser `npx expo start --tunnel` en Docker
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## EAS Build
+
+```bash
+# Dev build (avec dev client)
+eas build --profile development --platform ios
+
+# Preview (distribution interne)
+eas build --profile preview --platform all
+
+# Production
+eas build --profile production --platform all
+```
+
+## Structure
+
+```
+app/                    # Expo Router (file-based)
+  (auth)/login.tsx      # Ecran de connexion
+  (tabs)/               # Navigation bottom tabs
+    index.tsx           # Dashboard (accueil)
+    accounts.tsx        # Liste des comptes
+    notifications.tsx   # Centre de notifications
+    profile.tsx         # Profil et preferences
+  account/[id].tsx      # Detail d'un compte
+  transaction/[id].tsx  # Detail d'une transaction
+  qr/generate.tsx       # Generer un QR de paiement
+  qr/scan.tsx           # Scanner un QR de paiement
+components/             # Composants reutilisables
+  ui/                   # Composants de base (Button, Card, Input...)
+  accounts/             # Composants comptes
+  transactions/         # Composants transactions
+  dashboard/            # Composants dashboard
+  notifications/        # Composants notifications
+hooks/                  # React Query hooks
+stores/                 # Zustand stores (auth, settings)
+lib/                    # Utilitaires (API client, WebSocket, push...)
+constants/              # Tokens de design, cles de query
+```
+
+## Imports partages
+
+Le mobile importe les types purs depuis `@shared/types/mobile` :
+
+```typescript
+import { formatMoney, SystemRole, getRoleLabel } from '@shared/types/mobile';
+```
+
+Les modules `@shared/schema/*` (Drizzle ORM) ne doivent PAS etre importes directement.
+
+## Checklist Store
+
+### iOS
+- [ ] Icone 1024x1024
+- [ ] Screenshots (6.7", 6.5", 5.5")
+- [ ] Privacy strings (camera, FaceID, notifications)
+- [ ] HTTPS/ATS ok
+- [ ] Pas de crash au launch
+
+### Android
+- [ ] Adaptive icon
+- [ ] Permissions minimales
+- [ ] versionCode increment
+- [ ] Back button fonctionne
+
+### General
+- [ ] Politique de confidentialite accessible
+- [ ] Dark mode fonctionne
+- [ ] Accessibilite (labels, contrastes)
+- [ ] Pas de secret en dur

@@ -105,6 +105,8 @@ services:
     volumes:
       # Source code mounted from host → hot reload
       - ./mobile:/app
+      # Shared types accessible to Metro bundler
+      - ./shared:/shared:ro
       # Preserve container's node_modules
       - /app/node_modules
     ports:
