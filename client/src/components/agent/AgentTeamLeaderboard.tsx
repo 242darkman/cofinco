@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Trophy, Medal, Star, TrendingUp, Target, Crown, Users, Briefcase, ArrowUpRight } from 'lucide-react';
+import { Trophy, Star, TrendingUp, Target, Users, Briefcase, ArrowUpRight } from 'lucide-react';
 import { Pagination } from '../ui';
 import { formatMoneyShort } from '@shared/config/currency';
 
@@ -74,17 +74,37 @@ export default function AgentTeamLeaderboard({ agentId }: Props) {
   const isHighlighted = (agent: AgentRanking) =>
     (targetAgentId && agent.agentId === targetAgentId) || agent.userId === currentUserId;
 
+  const MEDAL_COLORS = {
+    1: { bg: '#FFD700', text: '#7A5C00', border: '#DAA520', label: 'Or' },
+    2: { bg: '#C0C0C0', text: '#4A4A4A', border: '#A0A0A0', label: 'Argent' },
+    3: { bg: '#CD7F32', text: '#5C3A10', border: '#A0622A', label: 'Bronze' },
+  } as const;
+
+  const MedalIcon = ({ rank, size = 24 }: { rank: 1 | 2 | 3; size?: number }) => {
+    const c = MEDAL_COLORS[rank];
+    return (
+      <div
+        className="relative flex items-center justify-center rounded-full font-black shadow-sm shrink-0"
+        style={{
+          width: size,
+          height: size,
+          background: `linear-gradient(135deg, ${c.bg}, ${c.border})`,
+          color: c.text,
+          fontSize: size * 0.45,
+          border: `2px solid ${c.border}`,
+          boxShadow: `0 1px 3px ${c.border}40`,
+        }}
+      >
+        {rank}
+      </div>
+    );
+  };
+
   const getRankIcon = (rank: number) => {
-    switch (rank) {
-      case 1:
-        return <Crown className="text-accent" size={24} fill="currentColor" />;
-      case 2:
-        return <Medal className="text-content-muted" size={20} />;
-      case 3:
-        return <Medal className="text-status-success" size={18} />;
-      default:
-        return <span className="text-lg font-bold text-content-muted w-6 text-center">#{rank}</span>;
+    if (rank >= 1 && rank <= 3) {
+      return <MedalIcon rank={rank as 1 | 2 | 3} size={28} />;
     }
+    return <span className="text-lg font-bold text-content-muted w-7 text-center">#{rank}</span>;
   };
 
   const getNiveauLabel = (niveau: number) => {
@@ -111,19 +131,20 @@ export default function AgentTeamLeaderboard({ agentId }: Props) {
   const PodiumCard = ({ agent, rank }: { agent: AgentRanking; rank: number }) => {
     const isFirst = rank === 1;
     const highlighted = isHighlighted(agent);
+    const medalColor = MEDAL_COLORS[rank as 1 | 2 | 3];
     return (
       <div className={`flex flex-col items-center ${rank === 1 ? 'order-1 md:order-2' : rank === 2 ? 'order-2 md:order-1' : 'order-3'}`}>
         <div className={`relative rounded-lg p-3 w-full text-center border transition-all ${
           isFirst
-            ? 'bg-gradient-to-br from-accent/15 to-status-success/15 border-accent/30 shadow-lg shadow-accent/10 p-4'
+            ? 'border-edge shadow-lg p-4'
             : 'bg-surface-elevated border-edge hover:bg-surface-subtle transition-colors'
-        } ${highlighted ? 'ring-2 ring-accent/40' : ''}`}>
-          {isFirst && <div className="absolute top-0 inset-x-0 h-1 bg-accent rounded-t-lg" />}
+        } ${highlighted ? 'ring-2 ring-accent/40' : ''}`}
+          style={isFirst ? { background: `linear-gradient(135deg, ${medalColor.bg}10, ${medalColor.bg}05)`, borderColor: `${medalColor.bg}40` } : undefined}
+        >
+          {isFirst && <div className="absolute top-0 inset-x-0 h-1 rounded-t-lg" style={{ background: medalColor.bg }} />}
 
           <div className="mb-2 flex justify-center">
-            {rank === 1 && <Crown className="text-accent" size={36} fill="currentColor" />}
-            {rank === 2 && <Medal className="text-content-muted" size={28} />}
-            {rank === 3 && <Medal className="text-status-success" size={24} />}
+            <MedalIcon rank={rank as 1 | 2 | 3} size={isFirst ? 44 : 36} />
           </div>
 
           <div className={`font-bold text-content-primary truncate ${isFirst ? 'text-base' : 'text-sm'}`}>
@@ -135,12 +156,8 @@ export default function AgentTeamLeaderboard({ agentId }: Props) {
             </span>
           )}
 
-          <div className={`font-bold mb-1 ${isFirst ? 'text-2xl text-accent' : 'text-xl text-content-muted'}`}>
-            #{rank}
-          </div>
-
-          <div className="flex items-center justify-center gap-1.5 mb-2">
-            <Star className="text-accent" size={isFirst ? 14 : 12} fill="currentColor" />
+          <div className="flex items-center justify-center gap-1.5 my-2">
+            <Star size={isFirst ? 14 : 12} fill="currentColor" style={{ color: medalColor.bg }} />
             <span className={`font-bold text-content-primary ${isFirst ? 'text-2xl' : 'text-lg'}`}>{agent.score}</span>
           </div>
 
