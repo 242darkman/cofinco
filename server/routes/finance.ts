@@ -623,7 +623,8 @@ export function registerFinanceRoutes(app: Express) {
   app.get("/api/credits/pending-disbursements", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.CREDIT), requireAgenceAccess(), async (req, res) => {
     try {
       const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
-      const pendingDisbursements = await storage.getPendingLoanDisbursements(agenceFilter?.agenceId);
+      const caisseId = req.query.caisseId as string | undefined;
+      const pendingDisbursements = await storage.getPendingLoanDisbursements(agenceFilter?.agenceId, caisseId);
 
       res.json({
         success: true,

@@ -20,27 +20,43 @@ interface CollectCashModalProps {
 }
 
 const TYPE_PAIEMENT_OPTIONS = [
-  { 
-    value: TypeOperationTerrain.LOAN_REPAYMENT, 
-    label: TYPE_OPERATION_TERRAIN_LABELS[TypeOperationTerrain.LOAN_REPAYMENT] 
+  {
+    value: TypeOperationTerrain.LOAN_REPAYMENT,
+    label: TYPE_OPERATION_TERRAIN_LABELS[TypeOperationTerrain.LOAN_REPAYMENT]
   },
-  { 
-    value: TypeOperationTerrain.SAVINGS_DEPOSIT, 
-    label: TYPE_OPERATION_TERRAIN_LABELS[TypeOperationTerrain.SAVINGS_DEPOSIT] 
+  {
+    value: TypeOperationTerrain.SAVINGS_DEPOSIT,
+    label: TYPE_OPERATION_TERRAIN_LABELS[TypeOperationTerrain.SAVINGS_DEPOSIT]
   },
-  { 
-    value: TypeOperationTerrain.DEPOSIT_CURRENT, 
-    label: TYPE_OPERATION_TERRAIN_LABELS[TypeOperationTerrain.DEPOSIT_CURRENT] 
+  {
+    value: TypeOperationTerrain.DEPOSIT_CURRENT,
+    label: TYPE_OPERATION_TERRAIN_LABELS[TypeOperationTerrain.DEPOSIT_CURRENT]
   },
-  { 
-    value: TypeOperationTerrain.TONTINE_CONTRIBUTION, 
-    label: TYPE_OPERATION_TERRAIN_LABELS[TypeOperationTerrain.TONTINE_CONTRIBUTION] 
+  {
+    value: TypeOperationTerrain.WITHDRAWAL_SAVINGS,
+    label: TYPE_OPERATION_TERRAIN_LABELS[TypeOperationTerrain.WITHDRAWAL_SAVINGS]
   },
-  { 
-    value: TypeOperationTerrain.ENGAGEMENT_FEE, 
-    label: TYPE_OPERATION_TERRAIN_LABELS[TypeOperationTerrain.ENGAGEMENT_FEE] 
+  {
+    value: TypeOperationTerrain.WITHDRAWAL_CURRENT,
+    label: TYPE_OPERATION_TERRAIN_LABELS[TypeOperationTerrain.WITHDRAWAL_CURRENT]
+  },
+  {
+    value: TypeOperationTerrain.TONTINE_CONTRIBUTION,
+    label: TYPE_OPERATION_TERRAIN_LABELS[TypeOperationTerrain.TONTINE_CONTRIBUTION]
+  },
+  {
+    value: TypeOperationTerrain.ENGAGEMENT_FEE,
+    label: TYPE_OPERATION_TERRAIN_LABELS[TypeOperationTerrain.ENGAGEMENT_FEE]
   },
 ];
+
+const WITHDRAWAL_TYPES = [TypeOperationTerrain.WITHDRAWAL_CURRENT, TypeOperationTerrain.WITHDRAWAL_SAVINGS] as string[];
+const NEEDS_COMPTE_TYPES = [
+  TypeOperationTerrain.SAVINGS_DEPOSIT,
+  TypeOperationTerrain.DEPOSIT_CURRENT,
+  TypeOperationTerrain.WITHDRAWAL_SAVINGS,
+  TypeOperationTerrain.WITHDRAWAL_CURRENT,
+] as string[];
 
 export default function CollectCashModal({
   agentId,
@@ -141,7 +157,7 @@ export default function CollectCashModal({
       return;
     }
 
-    if ((typePaiement === TypeOperationTerrain.SAVINGS_DEPOSIT || typePaiement === TypeOperationTerrain.DEPOSIT_CURRENT) && !compteId) {
+    if (NEEDS_COMPTE_TYPES.includes(typePaiement) && !compteId) {
       toast.error('Veuillez sélectionner le compte');
       return;
     }
@@ -186,14 +202,35 @@ export default function CollectCashModal({
 
   const compteOptions = clientComptes.map((c) => ({
     value: c.id,
-    label: `${c.typeCompte || 'Épargne'} - ${c.numero || c.id.slice(0, 8)}`
+    label: `${c.typeCompte || 'Épargne'} - ${c.numero || c.id.slice(0, 8)}`,
+    typeCompte: c.typeCompte,
+    solde: c.soldeCourant,
   }));
+
+  // Filter accounts based on operation type
+  const filteredCompteOptions = compteOptions.filter((c) => {
+    if (typePaiement === TypeOperationTerrain.SAVINGS_DEPOSIT || typePaiement === TypeOperationTerrain.WITHDRAWAL_SAVINGS) {
+      return c.typeCompte === 'SAVINGS' || c.typeCompte === 'Épargne';
+    }
+    if (typePaiement === TypeOperationTerrain.DEPOSIT_CURRENT || typePaiement === TypeOperationTerrain.WITHDRAWAL_CURRENT) {
+      return c.typeCompte === 'CURRENT' || c.typeCompte === 'Courant';
+    }
+    return true;
+  }).map(({ typeCompte, solde, ...rest }) => {
+    // For withdrawals, show available balance
+    if (WITHDRAWAL_TYPES.includes(typePaiement) && solde != null) {
+      return { ...rest, label: `${rest.label} — Solde: ${new Intl.NumberFormat('fr-FR').format(Number(solde))} XOF` };
+    }
+    return rest;
+  });
+
+  const isWithdrawal = WITHDRAWAL_TYPES.includes(typePaiement);
 
   return (
     <Modal
       isOpen={true}
       onClose={onClose}
-      title="Nouvelle Collecte Cash"
+      title={isWithdrawal ? "Nouveau Retrait Espèces" : "Nouvelle Collecte Cash"}
       size="lg"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -241,8 +278,8 @@ export default function CollectCashModal({
           />
         )}
 
-        {/* Compte selection (si dépôt) */}
-        {(typePaiement === TypeOperationTerrain.SAVINGS_DEPOSIT || typePaiement === TypeOperationTerrain.DEPOSIT_CURRENT) && selectedClientId && (
+        {/* Compte selection (si dépôt ou retrait) */}
+        {NEEDS_COMPTE_TYPES.includes(typePaiement) && selectedClientId && (
           <SelectField
             label="Compte concerné"
             name="compteId"
@@ -250,17 +287,17 @@ export default function CollectCashModal({
             onChange={(e) => setCompteId(e.target.value)}
             options={[
               { value: '', label: 'Sélectionner un compte' },
-              ...compteOptions
+              ...filteredCompteOptions
             ]}
             required
             icon={PiggyBank}
-            helperText={clientComptes.length === 0 ? 'Aucun compte pour ce client' : undefined}
+            helperText={filteredCompteOptions.length === 0 ? 'Aucun compte de ce type pour ce client' : undefined}
           />
         )}
 
         {/* Montant */}
         <FormField
-          label="Montant collecté"
+          label={isWithdrawal ? "Montant à retirer" : "Montant collecté"}
           name="montant"
           type="number"
           value={montant}
@@ -314,8 +351,9 @@ export default function CollectCashModal({
         {/* Info box */}
         <div className="p-3 bg-status-warning-bg border border-status-warning/20 rounded-lg">
           <p className="text-xs text-status-warning">
-            Cette opération sera soumise pour validation par un superviseur.
-            Aucune écriture comptable ne sera effectuée avant l'approbation.
+            {isWithdrawal
+              ? "Ce retrait sera soumis pour validation. À l'approbation, le portefeuille agent sera débité et le compte client sera impacté."
+              : "Cette opération sera soumise pour validation par un superviseur. Aucune écriture comptable ne sera effectuée avant l'approbation."}
           </p>
         </div>
 
@@ -335,7 +373,7 @@ export default function CollectCashModal({
             isLoading={loading}
             disabled={!selectedClientId || !typePaiement || !montant}
           >
-            Soumettre la collecte
+            {isWithdrawal ? "Soumettre le retrait" : "Soumettre la collecte"}
           </Button>
         </div>
       </form>

@@ -10,6 +10,8 @@ export { OperationService, operationService } from "./operation-service";
 export { ApprovalService, approvalService } from "./approval-service";
 export { RemiseSettlementService, remiseSettlementService } from "./remise-settlement-service";
 export { agentMmPaymentService } from "./agent-mm-payment-service";
+export { SessionAgentService, sessionAgentService } from "./session-agent-service";
+export { AgentGlProvisioningService, agentGlProvisioningService } from "./agent-gl-provisioning-service";
 
 // Re-export des types utiles
 export type {
@@ -23,4 +25,7 @@ export type {
   RejectOperationInput,
   CancelOperationInput,
   OperationTerrainMetadata,
+  SessionAgent,
+  AgentAgencyHistory,
+  AgentSessionConfig,
 } from "@shared/schema";

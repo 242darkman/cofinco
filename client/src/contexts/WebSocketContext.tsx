@@ -55,6 +55,7 @@ type MessageType =
   // AGENT MODULES
   // =============================================
   | "AGENT_MODULES_UPDATE"
+  | "SESSION_AGENT_UPDATE"
 
   // =============================================
   // LOCALISATION (Agents terrain)
@@ -560,7 +561,20 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          debounceInvalidate(treasuryKeys.stats());
          // Filet de sécurité: rafraîchir aussi le dashboard principal
          debounceInvalidate(dashboardKeys.stats());
+         // Coffre-fort: les événements TRANSFER_* mappent vers CAISSE_UPDATE
+         if (message.payload?.domainEvent?.startsWith('TRANSFER_')) {
+           debounceInvalidate(coffreKeys.transferts());
+           debounceInvalidate(coffreKeys.stats());
+         }
          window.dispatchEvent(new CustomEvent('caisse-update', { detail: message.payload }));
+         break;
+
+      case "OPENING_REQUEST_CREATED":
+      case "OPENING_REQUEST_VALIDATED":
+      case "OPENING_REQUEST_REJECTED":
+         debounceInvalidate(coffreKeys.pendingOpeningRequests(message.payload?.agenceId || ''));
+         debounceInvalidate(coffreKeys.transferts());
+         debounceInvalidate(coffreKeys.stats());
          break;
 
       case "HR_UPDATE":
@@ -640,6 +654,23 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          queryClient.invalidateQueries({ queryKey: ["/api/paiements-terrain"] });
          window.dispatchEvent(new CustomEvent('operations-update', { detail: message.payload }));
          break;
+
+      case "SESSION_AGENT_UPDATE": {
+         // Invalidate session and caisse agent queries for real-time sync
+         const agentId = message.payload?.agentId;
+         if (agentId) {
+           debounceInvalidate(agentKeys.caisseAgent(agentId));
+         }
+         debounceInvalidate(agentKeys.all);
+         debounceInvalidate(["/api/caisse-agent/sessions"]);
+         debounceInvalidate(caisseKeys.all);
+         debounceInvalidate(dashboardKeys.stats());
+         // Notify agent session components
+         window.dispatchEvent(new CustomEvent('session-agent-update', { detail: message.payload }));
+         // Notify caisse demandes (provisioning requests badge + list)
+         window.dispatchEvent(new CustomEvent('agent-provisioning-update', { detail: message.payload }));
+         break;
+      }
 
       case "AGENT_MODULES_UPDATE": {
          // Invalidate all agent module queries

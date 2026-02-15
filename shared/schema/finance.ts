@@ -110,6 +110,7 @@ export const credits = pgTable(
     // Canal de décaissement (Multi-Canal)
     disbursementChannel: disbursementChannelEnum("disbursement_channel").default("ACCOUNT"),
     disbursementStatus: disbursementStatusEnum("disbursement_status"),
+    targetCaisseId: uuid("target_caisse_id").references(() => caisses.id, { onDelete: "set null" }), // Caisse cible pour décaissement CASH
     paymentReference: text("payment_reference"), // N° reçu caisse ou ID transaction MoMo
     disbursedAt: timestamp("disbursed_at"), // Date effective du décaissement physique
     disbursedBy: uuid("disbursed_by").references(() => users.id), // Caissier qui a effectué le décaissement
@@ -2010,6 +2011,9 @@ export const caissePaymentRequests = pgTable("caisse_payment_requests", {
   // Liens polymorphiques vers la source
   sourceType: text("source_type").notNull(),  // "demande_credit" | "credit_refund" | "bulletin_paie" | "compte"
   sourceId: text("source_id").notNull(),
+
+  // Caisse cible (si la demande est destinée à une caisse spécifique)
+  targetCaisseId: uuid("target_caisse_id").references(() => caisses.id, { onDelete: "set null" }),
 
   // Cible
   clientId: uuid("client_id").references(() => clients.id, { onDelete: "set null" }),

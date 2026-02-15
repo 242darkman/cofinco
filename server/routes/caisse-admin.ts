@@ -1738,13 +1738,14 @@ caisseAdminRouter.get(
       // Admins see all agencies (ignore agenceId param); regular users filter by their agency
       const agenceId = isAdmin ? undefined : (req.query.agenceId as string || req.session.user?.agenceId);
       const category = req.query.category as string | undefined;
+      const caisseId = req.query.caisseId as string | undefined;
 
       if (!isAdmin && !agenceId) {
         return res.status(400).json({ error: "Agence non spécifiée" });
       }
 
       const { getPendingRequests } = await import("../services/caisse-queue-service");
-      const requests = await getPendingRequests(agenceId, category);
+      const requests = await getPendingRequests(agenceId, category, caisseId);
 
       res.json(requests);
     } catch (error: any) {

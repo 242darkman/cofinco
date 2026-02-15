@@ -3,7 +3,7 @@
  * avec workflow d'approbation pour les opérations de collecte et remise
  */
 
-import { pgTable, text, numeric, boolean, timestamp, uuid, json, index, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, numeric, boolean, timestamp, uuid, json, integer, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -12,12 +12,15 @@ import { DEFAULT_CURRENCY } from "../config/currency";
 // Imports des tables existantes
 import { users } from "./auth";
 import { clients } from "./clients";
+import { agences } from "./agences";
 import { agentsTerrain, paiementsTerrain } from "./operations";
 import { mouvementsFinanciers, caisses } from "./finance";
+import { planComptable } from "./accounting";
 
 // Import des enums
 import {
   statutCaisseAgentEnum,
+  statutSessionAgentEnum,
   typeOperationTerrainEnum,
   statutOperationTerrainEnum,
   methodePaiementEnum,
@@ -180,6 +183,10 @@ export const operationsTerrain = pgTable(
     // Paiement terrain créé (pour COLLECT_CASH uniquement)
     postedPaiementTerrainId: uuid("posted_paiement_terrain_id")
       .references(() => paiementsTerrain.id, { onDelete: "set null" }),
+
+    // Session agent (optionnel — opérations existantes sans session continuent de fonctionner)
+    // Pas de FK ici car sessionsAgent est défini plus bas (circular ref). FK ajoutée via SQL.
+    sessionAgentId: uuid("session_agent_id"),
 
     // ========== MÉTADONNÉES ==========
     metadata: json("metadata").$type<OperationTerrainMetadata>(),
@@ -402,6 +409,10 @@ export interface OperationTerrainWithRelations extends OperationTerrain {
     id: string;
     nom: string;
   } | null;
+  sourceCaisse?: {
+    id: string;
+    nom: string;
+  } | null;
   submitter?: {
     id: string;
     nom?: string | null;
@@ -413,3 +424,237 @@ export interface OperationTerrainWithRelations extends OperationTerrain {
     prenom?: string | null;
   } | null;
 }
+
+// ============================================================================
+// TABLE: sessions_agent
+// Session de caisse mobile pour agents terrain (cycle de vie complet)
+// ============================================================================
+
+export const sessionsAgent = pgTable(
+  "sessions_agent",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    // Liens principaux
+    agentId: uuid("agent_id")
+      .notNull()
+      .references(() => agentsTerrain.id, { onDelete: "restrict" }),
+    caisseAgentId: uuid("caisse_agent_id")
+      .notNull()
+      .references(() => caissesAgent.id, { onDelete: "restrict" }),
+    agenceId: uuid("agence_id")
+      .notNull()
+      .references(() => agences.id, { onDelete: "restrict" }),
+
+    // Sous-compte GL utilisé pendant cette session
+    glAccountId: uuid("gl_account_id")
+      .references(() => planComptable.id, { onDelete: "set null" }),
+    glAccountNumber: text("gl_account_number"), // Dénormalisé (ex: 573BZV001)
+
+    // ========== WORKFLOW ==========
+    statut: statutSessionAgentEnum("statut").notNull().default("REQUESTING_FUNDS"),
+
+    // === Phase demande de fonds ===
+    montantDemande: numeric("montant_demande"),
+    montantProvisionne: numeric("montant_provisionne"),
+    fundRequestedAt: timestamp("fund_requested_at"),
+    fundDispatchedAt: timestamp("fund_dispatched_at"),
+    fundDispatchedBy: uuid("fund_dispatched_by")
+      .references(() => users.id, { onDelete: "set null" }),
+
+    // Source caisse pour provisioning
+    sourceCaisseId: uuid("source_caisse_id")
+      .references(() => caisses.id, { onDelete: "set null" }),
+    provisioningOperationId: uuid("provisioning_operation_id")
+      .references(() => operationsTerrain.id, { onDelete: "set null" }),
+
+    // === Phase active ===
+    openedAt: timestamp("opened_at"),
+
+    // Totaux courants (mis à jour après chaque opération approuvée)
+    totalCollected: numeric("total_collected").notNull().default("0"),
+    totalSettled: numeric("total_settled").notNull().default("0"),
+    operationCount: integer("operation_count").notNull().default(0),
+
+    // === Phase clôture ===
+    closingInitiatedAt: timestamp("closing_initiated_at"),
+
+    // Comptage physique à la clôture
+    montantPhysique: numeric("montant_physique"),
+    montantTheorique: numeric("montant_theorique"),
+    ecart: numeric("ecart"),
+    ecartJustification: text("ecart_justification"),
+
+    // Billetage à la clôture
+    billetageFermeture: json("billetage_fermeture").$type<Record<string, number>>(),
+
+    // Retour de fonds
+    destinationCaisseId: uuid("destination_caisse_id")
+      .references(() => caisses.id, { onDelete: "set null" }),
+    closingOperationId: uuid("closing_operation_id")
+      .references(() => operationsTerrain.id, { onDelete: "set null" }),
+    montantRetourne: numeric("montant_retourne"),
+
+    // Clôture finale
+    closedAt: timestamp("closed_at"),
+    closedBy: uuid("closed_by")
+      .references(() => users.id, { onDelete: "set null" }),
+    closureReason: text("closure_reason").default("manual"), // manual, timeout, admin
+
+    // Audit
+    observations: text("observations"),
+    createdBy: uuid("created_by")
+      .references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    // Un seul agent ne peut avoir qu'une session non-clôturée
+    uqAgentActive: uniqueIndex("uq_sessions_agent_active")
+      .on(t.agentId)
+      .where(sql`statut != 'CLOSED'`),
+
+    idxAgentStatut: index("idx_sessions_agent_agent_statut").on(t.agentId, t.statut),
+    idxAgence: index("idx_sessions_agent_agence").on(t.agenceId),
+    idxStatut: index("idx_sessions_agent_statut").on(t.statut),
+    idxCreatedAt: index("idx_sessions_agent_created_at").on(t.createdAt),
+  }),
+);
+
+export const insertSessionAgentSchema = createInsertSchema(sessionsAgent).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertSessionAgent = z.infer<typeof insertSessionAgentSchema>;
+export type SessionAgent = typeof sessionsAgent.$inferSelect;
+
+// ============================================================================
+// TABLE: agent_agency_history
+// Historique des assignations agence des agents (pour mobilité & audit)
+// ============================================================================
+
+export const agentAgencyHistory = pgTable(
+  "agent_agency_history",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    agentId: uuid("agent_id")
+      .notNull()
+      .references(() => agentsTerrain.id, { onDelete: "cascade" }),
+    agenceId: uuid("agence_id")
+      .notNull()
+      .references(() => agences.id, { onDelete: "restrict" }),
+
+    // Sous-compte GL rattaché à cette assignation
+    glAccountId: uuid("gl_account_id")
+      .references(() => planComptable.id, { onDelete: "set null" }),
+    glAccountNumber: text("gl_account_number"),
+
+    // Période
+    dateFrom: timestamp("date_from").notNull().defaultNow(),
+    dateTo: timestamp("date_to"), // NULL = assignation courante
+
+    // Traçabilité du transfert
+    reason: text("reason"), // "Initial", "Transfert", etc.
+    transferredBy: uuid("transferred_by")
+      .references(() => users.id, { onDelete: "set null" }),
+
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    idxAgent: index("idx_agent_agency_history_agent").on(t.agentId),
+    idxAgence: index("idx_agent_agency_history_agence").on(t.agenceId),
+    idxCurrent: index("idx_agent_agency_history_current")
+      .on(t.agentId)
+      .where(sql`date_to IS NULL`),
+  }),
+);
+
+export const insertAgentAgencyHistorySchema = createInsertSchema(agentAgencyHistory).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertAgentAgencyHistory = z.infer<typeof insertAgentAgencyHistorySchema>;
+export type AgentAgencyHistory = typeof agentAgencyHistory.$inferSelect;
+
+// ============================================================================
+// TABLE: sessions_agent_audit_logs
+// Logs d'audit immuables pour les transitions d'état des sessions
+// ============================================================================
+
+export const sessionsAgentAuditLogs = pgTable(
+  "sessions_agent_audit_logs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => sessionsAgent.id, { onDelete: "cascade" }),
+
+    action: text("action").notNull(), // REQUESTED, PROVISIONED, OPENED, CLOSING, CLOSED, FORCE_CLOSED
+
+    statutAvant: text("statut_avant"),
+    statutApres: text("statut_apres").notNull(),
+
+    details: json("details").$type<Record<string, unknown>>(),
+
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+
+    timestamp: timestamp("timestamp").notNull().defaultNow(),
+  },
+  (t) => ({
+    idxSession: index("idx_sessions_agent_audit_session").on(t.sessionId),
+    idxTimestamp: index("idx_sessions_agent_audit_timestamp").on(t.timestamp),
+  }),
+);
+
+export const insertSessionAgentAuditLogSchema = createInsertSchema(sessionsAgentAuditLogs).omit({
+  id: true,
+  timestamp: true,
+});
+export type InsertSessionAgentAuditLog = z.infer<typeof insertSessionAgentAuditLogSchema>;
+export type SessionAgentAuditLog = typeof sessionsAgentAuditLogs.$inferSelect;
+
+// ============================================================================
+// TABLE: agent_session_config
+// Configuration par agence pour les sessions agent terrain
+// ============================================================================
+
+export const agentSessionConfig = pgTable(
+  "agent_session_config",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    agenceId: uuid("agence_id")
+      .notNull()
+      .references(() => agences.id, { onDelete: "cascade" }),
+
+    // Si true, le dispatch de fonds nécessite une approbation séparée
+    requireProvisioningApproval: boolean("require_provisioning_approval").notNull().default(false),
+
+    // Durée max d'une session avant alerte (heures)
+    maxSessionDurationHours: integer("max_session_duration_hours").notNull().default(24),
+
+    // Plafond de provisioning par session (null = pas de plafond)
+    maxProvisioningAmount: numeric("max_provisioning_amount"),
+
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    uqAgence: uniqueIndex("uq_agent_session_config_agence").on(t.agenceId),
+  }),
+);
+
+export const insertAgentSessionConfigSchema = createInsertSchema(agentSessionConfig).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertAgentSessionConfig = z.infer<typeof insertAgentSessionConfigSchema>;
+export type AgentSessionConfig = typeof agentSessionConfig.$inferSelect;

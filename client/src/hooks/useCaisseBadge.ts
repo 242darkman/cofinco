@@ -1,8 +1,8 @@
 /**
  * useCaisseBadge - Real-time badge counter for all pending caisse demands
  *
- * Counts: caisse payment requests + pending loan disbursements.
- * Listens to `caisse-request-update` DOM events and WebSocket loan events.
+ * Counts: caisse payment requests + pending loan disbursements + agent provisioning sessions.
+ * Listens to `caisse-request-update` and `agent-provisioning-update` DOM events and WebSocket loan events.
  *
  * Badge only shows when:
  * - The user has an active caisse session (OPEN / CLOSING_COUNT / CLOSING_VALIDATION)
@@ -55,9 +55,10 @@ export function useCaisseBadge(userRole?: string) {
     }
 
     try {
-      const [reqRes, loanRes] = await Promise.all([
+      const [reqRes, loanRes, agentRes] = await Promise.all([
         fetch('/api/caisses/payment-requests/count', { credentials: 'include' }),
         fetch('/api/credits/pending-disbursements', { credentials: 'include' }),
+        fetch('/api/caisse-agent/sessions?statut=REQUESTING_FUNDS', { credentials: 'include' }),
       ]);
 
       let total = 0;
@@ -70,6 +71,11 @@ export function useCaisseBadge(userRole?: string) {
       if (loanRes.ok) {
         const data = await loanRes.json();
         total += data.count || data.data?.length || 0;
+      }
+
+      if (agentRes.ok) {
+        const data = await agentRes.json();
+        total += data.sessions?.length || 0;
       }
 
       setPendingCount(total);
@@ -99,6 +105,13 @@ export function useCaisseBadge(userRole?: string) {
     const handler = () => loadCount();
     window.addEventListener('caisse-request-update', handler);
     return () => window.removeEventListener('caisse-request-update', handler);
+  }, [loadCount]);
+
+  // Listen for agent provisioning updates (from WebSocket bridge)
+  useEffect(() => {
+    const handler = () => loadCount();
+    window.addEventListener('agent-provisioning-update', handler);
+    return () => window.removeEventListener('agent-provisioning-update', handler);
   }, [loadCount]);
 
   // Listen for WebSocket events

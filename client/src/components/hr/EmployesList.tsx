@@ -8,6 +8,7 @@ import { Employe } from '../../hooks/hr/useEmployes';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { resolveStorageUrl } from '@/lib/format';
 import { StatutUser } from '@shared/enum/status-constants';
+import { currencySymbol } from '@shared/config/currency';
 import EmployeeProfileDrawer from './EmployeeProfileDrawer';
 
 interface EmployesListProps {
@@ -276,7 +277,7 @@ export default function EmployesList({
                           {emp.typeContrat}
                         </span>
                         <span className={`text-xs font-medium transition-all ${showSalaries ? 'text-status-success' : 'text-content-muted blur-sm select-none'}`}>
-                          {parseFloat(emp.salaireBase || '0').toLocaleString()}
+                          {parseFloat(emp.salaireBase || '0').toLocaleString()} {currencySymbol()}
                         </span>
                      </div>
                   </td>

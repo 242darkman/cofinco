@@ -244,6 +244,11 @@ export const agentKeys = {
   // Caisse agent
   caisseAgent: (agentId: string) => ['caisse-agent', agentId] as const,
 
+  // Sessions GL agent
+  sessions: () => ['/api/caisse-agent/sessions'] as const,
+  sessionActive: (agentId: string) => ['/api/caisse-agent/sessions', 'active', agentId] as const,
+  sessionDetail: (sessionId: string) => ['/api/caisse-agent/sessions', sessionId] as const,
+
   // Prospections
   prospections: () => ['/api/prospections'] as const,
 

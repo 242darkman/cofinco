@@ -67,6 +67,9 @@ export const CAISSE_OUT_OPERATIONS = [
   // Transferts sortants
   "SAFE_DEPOSIT",
   "TRANSFER_OUT",
+
+  // Agent terrain
+  "AGENT_PROVISIONING",
 ] as const;
 
 /**

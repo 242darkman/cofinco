@@ -44,8 +44,8 @@ import {
   remboursements,
   transactionsCompte,
 } from "@shared/schema";
-import { StatutTransaction, TypeCompte, TypeOperationCaisse, type TypeOperationCaisseType } from "@shared/enum/status-constants";
-import { eq, sql, and, isNull } from "drizzle-orm";
+import { StatutTransaction, TypeCompte, TypeOperationCaisse, TypeOperationTerrain, type TypeOperationCaisseType } from "@shared/enum/status-constants";
+import { eq, sql, and, isNull, asc, desc } from "drizzle-orm";
 import { generateReference, updateCreditSolde, updateSessionSolde, type MouvementFinancier } from "../ledger";
 import { postGlForMouvement } from "../accounting-posting-service";
 import type { PgTransaction } from "drizzle-orm/pg-core";
@@ -158,8 +158,25 @@ export class ApprovalService {
       let mouvements: MouvementFinancier[] = [];
       let paiementTerrainId: string | null = null;
 
-      if (operation.type === "COLLECT_CASH") {
-        // NOUVEAU WORKFLOW: N'impacte PAS les comptes clients
+      // Détecter si c'est un retrait (WITHDRAWAL_CURRENT ou WITHDRAWAL_SAVINGS)
+      const metadata = operation.metadata as OperationTerrainMetadata | null;
+      const isWithdrawal = metadata?.typePaiementClient === TypeOperationTerrain.WITHDRAWAL_CURRENT
+        || metadata?.typePaiementClient === TypeOperationTerrain.WITHDRAWAL_SAVINGS;
+
+      if (operation.type === "COLLECT_CASH" && isWithdrawal) {
+        // RETRAIT: L'agent donne du cash au client
+        // - Solde agent DIMINUE
+        // - Compte client DÉBITÉ
+        // - Écritures GL postées immédiatement
+        // - Passe directement à SETTLED (pas de PENDING_SETTLEMENT)
+        const result = await this.postWithdrawalEntries(tx, operation, params.approvedBy);
+        if (!result.success) {
+          return result;
+        }
+        mouvements = result.mouvements || [];
+        paiementTerrainId = result.paiementTerrainId || null;
+      } else if (operation.type === "COLLECT_CASH") {
+        // COLLECTE: N'impacte PAS les comptes clients
         // - Seul le solde de l'agent est incrémenté
         // - Un paiement terrain est créé avec statut PENDING_SETTLEMENT
         // - Les comptes clients seront impactés à la validation de la REMISE
@@ -178,9 +195,10 @@ export class ApprovalService {
       }
 
       // 5. Mettre à jour l'opération
-      // COLLECT_CASH → PENDING_SETTLEMENT (attend la remise)
+      // COLLECT_CASH (collecte) → PENDING_SETTLEMENT (attend la remise)
+      // COLLECT_CASH (retrait) → SETTLED (règlement immédiat, même mécanisme que caisse)
       // SETTLEMENT_CASH → SETTLED (règlement immédiat)
-      const finalStatut = operation.type === "SETTLEMENT_CASH" ? "SETTLED" : "PENDING_SETTLEMENT";
+      const finalStatut = (operation.type === "SETTLEMENT_CASH" || isWithdrawal) ? "SETTLED" : "PENDING_SETTLEMENT";
       const [updatedOperation] = await tx
         .update(operationsTerrain)
         .set({
@@ -331,6 +349,225 @@ export class ApprovalService {
       .returning();
 
     return { success: true, mouvements, paiementTerrainId: paiement.id };
+  }
+
+  /**
+   * Poste les écritures pour un RETRAIT (agent donne du cash au client)
+   *
+   * Même mécanisme que les retraits en caisse:
+   * - Solde agent DIMINUE (agent remet les espèces au client)
+   * - Compte client DÉBITÉ (retrait du compte bancaire)
+   * - Écritures GL postées immédiatement
+   * - Passe directement à SETTLED
+   */
+  private async postWithdrawalEntries(
+    tx: PgTransaction<any, any, any>,
+    operation: OperationTerrain,
+    approvedBy: string
+  ): Promise<ApprovalResult & { paiementTerrainId?: string }> {
+    const montant = parseFloat(operation.montant);
+    const metadata = operation.metadata as OperationTerrainMetadata | null;
+
+    if (!operation.caisseAgentId) {
+      logger.error({ operationId: operation.id }, 'CRITICAL: Withdrawal operation has no caisseAgentId');
+      return {
+        success: false,
+        error: "Opération sans caisse agent associée",
+        errorCode: "MISSING_CAISSE_AGENT",
+      };
+    }
+
+    if (!metadata?.compteId) {
+      return {
+        success: false,
+        error: "Compte client non spécifié pour le retrait",
+        errorCode: "MISSING_COMPTE",
+      };
+    }
+
+    // 1. Vérifier que l'agent a un solde suffisant (re-vérification dans transaction)
+    const [caisseAgent] = await tx
+      .select()
+      .from(caissesAgent)
+      .where(eq(caissesAgent.id, operation.caisseAgentId))
+      .for("update");
+
+    if (parseFloat(caisseAgent.soldeValide) < montant) {
+      return {
+        success: false,
+        error: `Solde agent insuffisant pour le retrait: ${caisseAgent.soldeValide} < ${montant}`,
+        errorCode: "INSUFFICIENT_BALANCE",
+      };
+    }
+
+    // 2. Vérifier le compte client et son solde
+    const [compte] = await tx
+      .select()
+      .from(comptes)
+      .where(eq(comptes.id, metadata.compteId))
+      .for("update");
+
+    if (!compte) {
+      return {
+        success: false,
+        error: "Compte client non trouvé",
+        errorCode: "ACCOUNT_NOT_FOUND",
+      };
+    }
+
+    if (parseFloat(compte.soldeCourant) < montant) {
+      return {
+        success: false,
+        error: `Solde compte client insuffisant: ${compte.soldeCourant} < ${montant}`,
+        errorCode: "INSUFFICIENT_ACCOUNT_BALANCE",
+      };
+    }
+
+    // Déterminer les types de paiement
+    // typePaiement: pour affichage et identification (WITHDRAWAL_CURRENT / WITHDRAWAL_SAVINGS)
+    // glTypePaiement: pour le routing GL avec les règles AGENT_WITHDRAWAL_* (Débit 4111/4112, Crédit 573)
+    const typePaiement: TypeOperationCaisseType =
+      metadata.typePaiementClient === TypeOperationTerrain.WITHDRAWAL_CURRENT
+        ? TypeOperationCaisse.WITHDRAWAL_CURRENT
+        : TypeOperationCaisse.WITHDRAWAL_SAVINGS;
+
+    const glTypePaiement =
+      metadata.typePaiementClient === TypeOperationTerrain.WITHDRAWAL_CURRENT
+        ? "AGENT_WITHDRAWAL_CURRENT"
+        : "AGENT_WITHDRAWAL_SAVINGS";
+
+    // 3. Créer mouvement CaisseAgent (CREDIT = diminue la créance / solde agent)
+    const refCaisseAgent = generateReference("CAISSE_AGENT" as any);
+    const [mouvementCaisseAgent] = await tx
+      .insert(mouvementsFinanciers)
+      .values({
+        dateOperation: new Date(),
+        montant: operation.montant,
+        sens: "CREDIT", // Crédit = Réduit le solde de l'agent (agent donne du cash)
+        statut: StatutTransaction.POSTED,
+        methodePaiement: "CASH",
+        reference: refCaisseAgent,
+        agentId: operation.agentId,
+        clientId: operation.clientId,
+        typePaiement: typePaiement as any,
+        sourceModule: "CAISSE_AGENT" as any,
+        sourceTable: "operations_terrain",
+        sourceId: operation.id,
+        createdBy: approvedBy,
+        metadata: {
+          operationType: "WITHDRAWAL",
+          caisseAgentId: operation.caisseAgentId,
+          compteId: metadata.compteId,
+        },
+      })
+      .returning();
+
+    // 4. Débiter solde CaisseAgent (atomique)
+    const [updatedCaisse] = await tx
+      .update(caissesAgent)
+      .set({
+        soldeValide: sql`${caissesAgent.soldeValide} - ${montant}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(caissesAgent.id, operation.caisseAgentId))
+      .returning({ id: caissesAgent.id, soldeValide: caissesAgent.soldeValide });
+
+    if (!updatedCaisse) {
+      throw new Error(`Caisse agent ${operation.caisseAgentId} introuvable pour mise à jour du solde`);
+    }
+
+    logger.info({
+      operationId: operation.id,
+      caisseAgentId: operation.caisseAgentId,
+      montant,
+      nouveauSolde: updatedCaisse.soldeValide,
+    }, 'Caisse agent solde decreased after withdrawal approval');
+
+    // 4b. Skip GL on agent mouvement — the combined entry (Debit 4111/4112, Credit 573)
+    // is posted on the client mouvement (step 7b) to avoid double-counting.
+    await tx
+      .update(mouvementsFinanciers)
+      .set({ glPostingStatus: "SKIPPED" })
+      .where(eq(mouvementsFinanciers.id, mouvementCaisseAgent.id));
+
+    const agenceId = await getAgenceIdFromAgent(tx, operation.agentId);
+
+    // 5. Créer mouvement sur le compte client (DEBIT = retrait du compte)
+    // typePaiement = AGENT_WITHDRAWAL_* pour GL routing (Debit 4111/4112, Credit 573)
+    const refCompte = generateReference("EPARGNE");
+    const [mouvementCompte] = await tx
+      .insert(mouvementsFinanciers)
+      .values({
+        dateOperation: new Date(),
+        montant: operation.montant,
+        sens: "DEBIT", // Débit = argent sort du compte client
+        statut: StatutTransaction.POSTED,
+        methodePaiement: "CASH",
+        reference: refCompte,
+        agentId: operation.agentId,
+        clientId: operation.clientId,
+        compteId: metadata.compteId,
+        typePaiement: glTypePaiement as any, // AGENT_WITHDRAWAL_* pour GL
+        sourceModule: "EPARGNE",
+        sourceTable: "operations_terrain",
+        sourceId: operation.id,
+        createdBy: approvedBy,
+        metadata: { fromCaisseAgent: true, operationType: "WITHDRAWAL" },
+      })
+      .returning();
+
+    // 6. Débiter le solde du compte client
+    await tx
+      .update(comptes)
+      .set({
+        soldeCourant: sql`${comptes.soldeCourant} - ${montant}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(comptes.id, metadata.compteId));
+
+    // 7. Créer l'entrée dans transactionsCompte
+    await tx.insert(transactionsCompte).values({
+      compteId: metadata.compteId,
+      mouvementId: mouvementCompte.id,
+      typePaiement: glTypePaiement as any,
+      sens: "DEBIT", // Retrait = argent sort du compte
+      statut: StatutTransaction.POSTED,
+      montant: operation.montant,
+      methodePaiement: "CASH",
+      observations: metadata.observations,
+      createdBy: approvedBy,
+    });
+
+    // 7b. Post GL entry for client account mouvement
+    // Combined GL: Debit 4111/4112 (compte client) / Credit 573 (caisse agent)
+    await tryPostGl(tx, mouvementCompte, agenceId, approvedBy, {
+      operationType: "WITHDRAWAL",
+      fromCaisseAgent: operation.caisseAgentId,
+      compteId: metadata.compteId,
+    });
+
+    // 8. Créer le paiement terrain avec statut POSTED (règlement immédiat)
+    const refPaiement = `PAY-${generateReference("TERRAIN")}`;
+    const [paiement] = await tx
+      .insert(paiementsTerrain)
+      .values({
+        agentId: operation.agentId,
+        clientId: operation.clientId!,
+        typePaiement: typePaiement as any,
+        montant: operation.montant,
+        methodePaiement: "CASH",
+        reference: refPaiement,
+        mouvementId: mouvementCompte.id,
+        compteId: metadata.compteId,
+        statut: StatutTransaction.POSTED, // Settled immédiatement
+        observations: metadata.observations,
+        latitude: metadata.latitude?.toString(),
+        longitude: metadata.longitude?.toString(),
+        createdBy: approvedBy,
+      })
+      .returning();
+
+    return { success: true, mouvements: [mouvementCaisseAgent, mouvementCompte], paiementTerrainId: paiement.id };
   }
 
   /**
@@ -790,6 +1027,172 @@ export class ApprovalService {
           updatedAt: new Date(),
         })
         .where(eq(caisses.id, operation.destinationCaisseId!));
+    }
+
+    // 6. FIFO settlement: valider les opérations PENDING jusqu'à épuiser le montant remis
+    //    Garantit que chaque remise partielle impacte les comptes clients
+    const pendingPaiements = await tx
+      .select({ paiement: paiementsTerrain })
+      .from(operationsTerrain)
+      .innerJoin(
+        paiementsTerrain,
+        eq(operationsTerrain.postedPaiementTerrainId, paiementsTerrain.id),
+      )
+      .where(
+        and(
+          eq(operationsTerrain.agentId, operation.agentId),
+          eq(paiementsTerrain.statut, "PENDING"),
+          isNull(paiementsTerrain.deletedAt),
+        ),
+      )
+      .orderBy(asc(paiementsTerrain.createdAt)) // FIFO: les plus anciennes d'abord
+      .for("update", { of: paiementsTerrain });
+
+    let remainingBudget = montant;
+    let settledCount = 0;
+
+    for (const { paiement } of pendingPaiements) {
+      const paiementMontant = parseFloat(paiement.montant);
+      if (paiementMontant > remainingBudget) break; // pas assez pour couvrir cette opération
+
+      let clientMvt: any = null;
+      const agenceId = await getAgenceIdFromCaisse(tx, operation.destinationCaisseId!);
+
+      // --- Credit repayment ---
+      if (paiement.creditId) {
+        const [credit] = await tx.select().from(credits).where(eq(credits.id, paiement.creditId));
+        if (credit) {
+          const ref = generateReference("CREDIT");
+          const [mvt] = await tx.insert(mouvementsFinanciers).values({
+            dateOperation: new Date(),
+            montant: paiement.montant,
+            sens: "CREDIT",
+            statut: StatutTransaction.POSTED,
+            methodePaiement: "CASH",
+            reference: ref,
+            agentId: paiement.agentId,
+            clientId: paiement.clientId,
+            creditId: paiement.creditId,
+            typePaiement: TypeOperationCaisse.CREDIT_REPAYMENT,
+            sourceModule: "CREDIT",
+            sourceTable: "paiements_terrain",
+            sourceId: paiement.id,
+            createdBy: approvedBy,
+            metadata: { settledFromPartialRemise: true, operationId: operation.id },
+          }).returning();
+          clientMvt = mvt;
+          await updateCreditSolde(tx, paiement.creditId, -paiementMontant);
+          await tx.insert(remboursements).values({
+            creditId: paiement.creditId,
+            mouvementId: mvt.id,
+            montant: paiement.montant,
+            dateRemboursement: new Date(),
+            statut: StatutTransaction.POSTED,
+            methodePaiement: "CASH",
+            observations: paiement.observations,
+            createdBy: approvedBy,
+          });
+        }
+      // --- Account deposit ---
+      } else if (paiement.compteId) {
+        const [compte] = await tx.select().from(comptes).where(eq(comptes.id, paiement.compteId));
+        if (compte) {
+          const ref = generateReference("EPARGNE");
+          const [mvt] = await tx.insert(mouvementsFinanciers).values({
+            dateOperation: new Date(),
+            montant: paiement.montant,
+            sens: "CREDIT",
+            statut: StatutTransaction.POSTED,
+            methodePaiement: "CASH",
+            reference: ref,
+            agentId: paiement.agentId,
+            clientId: paiement.clientId,
+            compteId: paiement.compteId,
+            typePaiement: paiement.typePaiement,
+            sourceModule: "EPARGNE",
+            sourceTable: "paiements_terrain",
+            sourceId: paiement.id,
+            createdBy: approvedBy,
+            metadata: { settledFromPartialRemise: true, operationId: operation.id },
+          }).returning();
+          clientMvt = mvt;
+          await tx.update(comptes).set({
+            soldeCourant: sql`${comptes.soldeCourant} + ${paiementMontant}`,
+            updatedAt: new Date(),
+          }).where(eq(comptes.id, paiement.compteId));
+          await tx.insert(transactionsCompte).values({
+            compteId: paiement.compteId,
+            mouvementId: mvt.id,
+            typePaiement: paiement.typePaiement,
+            sens: "CREDIT",
+            statut: StatutTransaction.POSTED,
+            montant: paiement.montant,
+            methodePaiement: "CASH",
+            observations: paiement.observations,
+            createdBy: approvedBy,
+          });
+        }
+      // --- Tontine contribution ---
+      } else if (paiement.tontineId) {
+        const refTontine = generateReference("TONTINE");
+        const [mvt] = await tx.insert(mouvementsFinanciers).values({
+          dateOperation: new Date(),
+          montant: paiement.montant,
+          sens: "CREDIT",
+          statut: StatutTransaction.POSTED,
+          methodePaiement: "CASH",
+          reference: refTontine,
+          agentId: paiement.agentId,
+          clientId: paiement.clientId,
+          tontineId: paiement.tontineId,
+          typePaiement: TypeOperationCaisse.TONTINE_CONTRIBUTION,
+          sourceModule: "TONTINE",
+          sourceTable: "paiements_terrain",
+          sourceId: paiement.id,
+          createdBy: approvedBy,
+          metadata: { settledFromPartialRemise: true, operationId: operation.id },
+        }).returning();
+        clientMvt = mvt;
+        const refContrib = generateReference("CONTRIBUTION" as any);
+        await tx.insert(contributionsTontine).values({
+          tontineId: paiement.tontineId,
+          clientId: paiement.clientId,
+          mouvementId: mvt.id,
+          typeOperation: TypeOperationCaisse.TONTINE_CONTRIBUTION,
+          montant: paiement.montant,
+          methodePaiement: "CASH",
+          statutTransaction: StatutTransaction.POSTED,
+          reference: refContrib,
+          observations: paiement.observations,
+          createdBy: approvedBy,
+        });
+      }
+
+      // Update paiement → POSTED
+      await tx.update(paiementsTerrain).set({
+        statut: StatutTransaction.POSTED,
+        settledAt: new Date(),
+        postedMouvementClientId: clientMvt?.id || null,
+        updatedAt: new Date(),
+      }).where(eq(paiementsTerrain.id, paiement.id));
+
+      // GL posting for client movement
+      if (clientMvt && agenceId) {
+        await postGlForMouvement(tx, clientMvt, agenceId, approvedBy, {
+          source: "partial_remise",
+          typePaiement: paiement.typePaiement,
+        });
+      }
+
+      remainingBudget -= paiementMontant;
+      settledCount++;
+    }
+
+    if (settledCount > 0) {
+      logger.info(
+        { operationId: operation.id, settledCount, montant, remainingBudget },
+        'FIFO settled pending payments during partial remise',
+      );
     }
 
     return { success: true, mouvements: [mouvementCaisseAgent, mouvementCaisse] };

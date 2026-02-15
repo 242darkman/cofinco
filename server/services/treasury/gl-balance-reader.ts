@@ -23,6 +23,7 @@ import {
 } from "@shared/schema/accounting";
 import { caisses } from "@shared/schema/finance";
 import { coffresForts } from "@shared/schema/coffres-forts";
+import { agentsTerrain } from "@shared/schema/operations";
 import { createLogger } from "../../lib/logger";
 
 const logger = createLogger("Treasury:GlBalanceReader");
@@ -555,6 +556,69 @@ class GlBalanceReaderService {
       .limit(1);
 
     return result[0]?.createdAt || null;
+  }
+
+  /**
+   * Get GL balance for a field agent's dedicated sub-account (573xxx).
+   */
+  async getGlBalanceForAgent(
+    agentId: string,
+    tx: Tx = db
+  ): Promise<GlAccountBalanceResult> {
+    try {
+      // 1. Get agent's current GL account
+      const [agent] = await tx
+        .select({
+          currentGlAccountId: agentsTerrain.currentGlAccountId,
+          currentAgenceId: agentsTerrain.currentAgenceId,
+        })
+        .from(agentsTerrain)
+        .where(eq(agentsTerrain.id, agentId))
+        .limit(1);
+
+      if (!agent?.currentGlAccountId || !agent.currentAgenceId) {
+        return {
+          success: false,
+          balance: null,
+          error: "Agent has no GL sub-account or agency assigned",
+        };
+      }
+
+      // 2. Get account number
+      const [glAccount] = await tx
+        .select({ numeroCompte: planComptable.numeroCompte })
+        .from(planComptable)
+        .where(eq(planComptable.id, agent.currentGlAccountId))
+        .limit(1);
+
+      if (!glAccount) {
+        return {
+          success: false,
+          balance: null,
+          error: `GL account not found for id: ${agent.currentGlAccountId}`,
+        };
+      }
+
+      // 3. Compute balance
+      const glBalance = await this._getAccountBalance(glAccount.numeroCompte, agent.currentAgenceId, tx);
+
+      return {
+        success: true,
+        balance: {
+          glBalance,
+          glAccountNumber: glAccount.numeroCompte,
+          source: "DEDICATED_ACCOUNT",
+          agenceId: agent.currentAgenceId,
+        },
+      };
+    } catch (error: any) {
+      logger.error({ err: error, agentId }, "Error reading GL balance for agent");
+      return {
+        success: false,
+        balance: null,
+        error: error.message,
+      };
+    }
   }
 }
 

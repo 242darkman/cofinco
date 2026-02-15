@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Menu, X, LogOut, Lock } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { maintenanceApi, creditRefundsApi } from '../../lib/api-client';
@@ -155,6 +156,19 @@ export default function PlatformSidebarContent({
     // Add others if needed
   };
 
+  // Portal tooltip for collapsed sidebar (escapes overflow-hidden)
+  const [tooltip, setTooltip] = useState<{ text: string; top: number; left: number } | null>(null);
+
+  const showTooltipAt = useCallback((e: React.MouseEvent<HTMLElement>, text: string) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setTooltip({ text, top: rect.top + rect.height / 2, left: rect.right + 8 });
+  }, []);
+
+  const hideTooltip = useCallback(() => setTooltip(null), []);
+
+  // Clear tooltip when sidebar expands
+  useEffect(() => { if (sidebarOpen) setTooltip(null); }, [sidebarOpen]);
+
   const getMenuIcon = (key: string) => {
     const item = PLATFORM_MENU_ITEMS.find(m => m.key === key);
     return item?.icon;
@@ -244,6 +258,8 @@ export default function PlatformSidebarContent({
       <div className="border-t border-sidebar-border flex-shrink-0 p-3">
         <button
           onClick={onLogout}
+          onMouseEnter={(e) => !sidebarOpen && showTooltipAt(e, t('deconnexion'))}
+          onMouseLeave={hideTooltip}
           className={`
             w-full flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer
             text-status-danger hover:text-status-danger hover:bg-status-danger-bg
@@ -258,6 +274,17 @@ export default function PlatformSidebarContent({
           )}
         </button>
       </div>
+
+      {/* Portal tooltip for collapsed sidebar */}
+      {tooltip && createPortal(
+        <div
+          className="fixed z-[9999] px-2.5 py-1.5 rounded-lg bg-surface-elevated text-content-primary text-xs font-medium whitespace-nowrap shadow-lg border border-edge-subtle pointer-events-none animate-in fade-in duration-100"
+          style={{ top: tooltip.top, left: tooltip.left, transform: 'translateY(-50%)' }}
+        >
+          {tooltip.text}
+        </div>,
+        document.body
+      )}
     </div>
   );
 
@@ -277,6 +304,8 @@ export default function PlatformSidebarContent({
 
     const isDisabled = route.key === 'bourse' || showMaintenanceLock;
 
+    const tooltipLabel = t(route.labelKey || route.key) + (showMaintenanceLock ? ' (En Maintenance)' : isDisabled ? ' (Bientôt)' : '');
+
     return (
       <button
         key={route.key}
@@ -286,6 +315,8 @@ export default function PlatformSidebarContent({
         }}
         disabled={isDisabled}
         aria-current={isActive ? 'page' : undefined}
+        onMouseEnter={(e) => !sidebarOpen && showTooltipAt(e, tooltipLabel)}
+        onMouseLeave={hideTooltip}
         className={`
           group relative w-full flex items-center gap-3 px-3 py-2.5 rounded-lg
           transition-all duration-300 text-sm overflow-hidden
@@ -399,19 +430,6 @@ export default function PlatformSidebarContent({
           </>
         )}
 
-        {/* Tooltip for collapsed sidebar */}
-        {!sidebarOpen && (
-          <div className="
-            absolute left-full ml-2 px-2 py-1 rounded-md
-            bg-surface-elevated text-content-primary text-xs font-medium
-            opacity-0 invisible group-hover:opacity-100 group-hover:visible
-            transition-all duration-200 whitespace-nowrap z-50
-            shadow-lg border border-edge-subtle
-          ">
-            {t(route.labelKey || route.key)}
-            {showMaintenanceLock ? ' (En Maintenance)' : isDisabled ? ' (Bientôt)' : ''}
-          </div>
-        )}
       </button>
     );
   }

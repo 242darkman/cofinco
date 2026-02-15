@@ -21,7 +21,8 @@ import OperationDetailModal from './OperationDetailModal';
 import { formatClientName } from '../../../lib/format';
 import {
   StatutCaisseAgent,
-  StatutOperationTerrain
+  StatutOperationTerrain,
+  TypeOperationTerrain,
 } from '@shared/enum/status-constants';
 
 interface CaisseAgentDashboardProps {
@@ -62,7 +63,14 @@ const getStatutBadge = (statut: string) => {
   }
 };
 
-const getTypeLabel = (type: string) => {
+const isWithdrawalOp = (op: OperationTerrainWithRelations) => {
+  const meta = op.metadata as any;
+  const tpc = meta?.typePaiementClient;
+  return tpc === TypeOperationTerrain.WITHDRAWAL_CURRENT || tpc === TypeOperationTerrain.WITHDRAWAL_SAVINGS;
+};
+
+const getTypeLabel = (type: string, op?: OperationTerrainWithRelations) => {
+  if (type === 'COLLECT_CASH' && op && isWithdrawalOp(op)) return 'Retrait';
   switch (type) {
     case 'COLLECT_CASH':
       return 'Collecte';
@@ -72,6 +80,10 @@ const getTypeLabel = (type: string) => {
       return type;
   }
 };
+
+/** Is this a cash inflow for the agent? (collecte = yes, retrait/remise = no) */
+const isAgentInflow = (op: OperationTerrainWithRelations) =>
+  op.type === 'COLLECT_CASH' && !isWithdrawalOp(op);
 
 export default function CaisseAgentDashboard({ agentId, onModuleChange }: CaisseAgentDashboardProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('dashboard');
@@ -133,6 +145,18 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Real-time: refresh when session is provisioned or updated via WebSocket
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.agentId === agentId) {
+        loadData(false);
+      }
+    };
+    window.addEventListener('session-agent-update', handler);
+    return () => window.removeEventListener('session-agent-update', handler);
+  }, [agentId, loadData]);
 
   const handleRefresh = () => {
     loadData(false);
@@ -346,15 +370,16 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
               >
                 <div className="flex items-center gap-3">
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                    op.type === 'COLLECT_CASH'
+                    isAgentInflow(op)
                       ? 'bg-accent/10 text-accent'
+                      : isWithdrawalOp(op) ? 'bg-status-danger-bg text-status-danger'
                       : 'bg-status-success-bg text-status-success'
                   }`}>
-                    {op.type === 'COLLECT_CASH' ? <ArrowDownRight size={14} /> : <ArrowUpRight size={14} />}
+                    {isAgentInflow(op) ? <ArrowDownRight size={14} /> : <ArrowUpRight size={14} />}
                   </div>
                   <div>
                     <p className="text-sm font-medium text-content-primary group-hover:text-accent transition-colors line-clamp-1">
-                      {getTypeLabel(op.type)}
+                      {getTypeLabel(op.type, op)}
                       {op.client && ` - ${formatClientName(op.client.nom, op.client.prenom)}`}
                     </p>
                     <div className="flex items-center gap-2 text-[10px] text-content-muted">
@@ -365,9 +390,9 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
                   </div>
                 </div>
                 <span className={`text-sm font-bold whitespace-nowrap ${
-                  op.type === 'COLLECT_CASH' ? 'text-accent' : 'text-status-success'
+                  isAgentInflow(op) ? 'text-accent' : isWithdrawalOp(op) ? 'text-status-danger' : 'text-status-success'
                 }`}>
-                  {op.type === 'COLLECT_CASH' ? '+' : '-'}{formatMoney(op.montant as unknown as string)}
+                  {isAgentInflow(op) ? '+' : '-'}{formatMoney(op.montant as unknown as string)}
                 </span>
               </div>
             ))
@@ -403,15 +428,16 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                    op.type === 'COLLECT_CASH'
+                    isAgentInflow(op)
                       ? 'bg-accent/10 text-accent'
+                      : isWithdrawalOp(op) ? 'bg-status-danger-bg text-status-danger'
                       : 'bg-status-success-bg text-status-success'
                   }`}>
-                    {op.type === 'COLLECT_CASH' ? <ArrowDownRight size={20} /> : <ArrowUpRight size={20} />}
+                    {isAgentInflow(op) ? <ArrowDownRight size={20} /> : <ArrowUpRight size={20} />}
                   </div>
                   <div>
                     <p className="text-sm font-medium text-content-primary">
-                      {getTypeLabel(op.type)}
+                      {getTypeLabel(op.type, op)}
                     </p>
                     {op.client && (
                       <p className="text-xs text-content-muted">
@@ -425,9 +451,9 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
                 </div>
                 <div className="text-right">
                   <p className={`text-lg font-bold ${
-                    op.type === 'COLLECT_CASH' ? 'text-accent' : 'text-status-success'
+                    isAgentInflow(op) ? 'text-accent' : isWithdrawalOp(op) ? 'text-status-danger' : 'text-status-success'
                   }`}>
-                    {op.type === 'COLLECT_CASH' ? '+' : '-'}{formatMoney(op.montant as unknown as string)}
+                    {isAgentInflow(op) ? '+' : '-'}{formatMoney(op.montant as unknown as string)}
                   </p>
                   <Badge variant="warning" size="sm" value="En attente" />
                 </div>
@@ -497,15 +523,16 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                    op.type === 'COLLECT_CASH'
+                    isAgentInflow(op)
                       ? 'bg-accent/10 text-accent'
+                      : isWithdrawalOp(op) ? 'bg-status-danger-bg text-status-danger'
                       : 'bg-status-success-bg text-status-success'
                   }`}>
-                    {op.type === 'COLLECT_CASH' ? <ArrowDownRight size={16} /> : <ArrowUpRight size={16} />}
+                    {isAgentInflow(op) ? <ArrowDownRight size={16} /> : <ArrowUpRight size={16} />}
                   </div>
                   <div>
                     <p className="text-sm font-medium text-content-primary">
-                      {getTypeLabel(op.type)}
+                      {getTypeLabel(op.type, op)}
                       {op.client && ` - ${formatClientName(op.client.nom, op.client.prenom)}`}
                     </p>
                     <p className="text-xs text-content-muted">
@@ -516,9 +543,9 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
                 <div className="flex items-center gap-3">
                   {getStatutBadge(op.statut)}
                   <span className={`text-sm font-bold ${
-                    op.type === 'COLLECT_CASH' ? 'text-accent' : 'text-status-success'
+                    isAgentInflow(op) ? 'text-accent' : isWithdrawalOp(op) ? 'text-status-danger' : 'text-status-success'
                   }`}>
-                    {op.type === 'COLLECT_CASH' ? '+' : '-'}{formatMoney(op.montant as unknown as string)}
+                    {isAgentInflow(op) ? '+' : '-'}{formatMoney(op.montant as unknown as string)}
                   </span>
                 </div>
               </div>

@@ -13,16 +13,17 @@ import {
   users,
   employes,
   evenementsOutbox,
+  paiementsTerrain,
   type OperationTerrain,
   type CreateCollectCashInput,
   type CreateSettlementCashInput,
   type CancelOperationInput,
   type OperationTerrainWithRelations,
 } from "@shared/schema";
-import { eq, and, isNull, desc, gte, lte, sql, count } from "drizzle-orm";
+import { eq, and, isNull, desc, gte, lte, sql, count, asc, min } from "drizzle-orm";
 import { randomInt } from "crypto";
 import { caisseAgentService } from "./caisse-agent-service";
-import { StatutCaisseAgent } from "@shared/enum/status-constants";
+import { StatutCaisseAgent, TypeOperationTerrain } from "@shared/enum/status-constants";
 import { normalizeRole, SystemRole } from "@shared/types/roles";
 
 /**
@@ -92,6 +93,24 @@ export class OperationService {
           error: "Caisse agent inactive",
           errorCode: "CAISSE_INACTIVE",
         };
+      }
+
+      // 2b. Pour les retraits, vérifier que l'agent a un solde suffisant
+      const isWithdrawal = params.typePaiementClient === TypeOperationTerrain.WITHDRAWAL_CURRENT
+        || params.typePaiementClient === TypeOperationTerrain.WITHDRAWAL_SAVINGS;
+
+      if (isWithdrawal) {
+        const balanceCheck = await caisseAgentService.hasSufficientBalance(
+          params.agentId,
+          params.montant
+        );
+        if (!balanceCheck.sufficient) {
+          return {
+            success: false,
+            error: `Solde agent insuffisant pour le retrait: disponible ${balanceCheck.disponible} XOF`,
+            errorCode: "INSUFFICIENT_BALANCE",
+          };
+        }
       }
 
       // 3. Vérifier le client
@@ -241,6 +260,34 @@ export class OperationService {
           error: "Caisse destination non trouvée",
           errorCode: "DESTINATION_NOT_FOUND",
         };
+      }
+
+      // 4b. Vérifier que le montant couvre au moins une opération PENDING
+      // La remise partielle doit valider au moins une opération client
+      const [smallestPending] = await tx
+        .select({ minMontant: min(paiementsTerrain.montant) })
+        .from(operationsTerrain)
+        .innerJoin(
+          paiementsTerrain,
+          eq(operationsTerrain.postedPaiementTerrainId, paiementsTerrain.id),
+        )
+        .where(
+          and(
+            eq(operationsTerrain.agentId, params.agentId),
+            eq(paiementsTerrain.statut, "PENDING"),
+            isNull(paiementsTerrain.deletedAt),
+          ),
+        );
+
+      if (smallestPending?.minMontant) {
+        const minAmount = parseFloat(smallestPending.minMontant);
+        if (params.montant < minAmount) {
+          return {
+            success: false,
+            error: `Le montant doit couvrir au moins une opération en attente (minimum ${minAmount} FCFA)`,
+            errorCode: "AMOUNT_TOO_LOW_FOR_SETTLEMENT",
+          };
+        }
       }
 
       // 5. Générer la référence
@@ -499,7 +546,7 @@ export class OperationService {
       clientId?: string;
       caisseAgentId?: string;
       statut?: "SUBMITTED" | "APPROVED" | "SETTLED" | "REJECTED" | "CANCELLED";
-      type?: "COLLECT_CASH" | "SETTLEMENT_CASH";
+      type?: "COLLECT_CASH" | "SETTLEMENT_CASH" | "PROVISIONING" | "SESSION_CLOSE";
       dateFrom?: Date;
       dateTo?: Date;
       limit?: number;
@@ -649,6 +696,17 @@ export class OperationService {
           destinationCaisse = caisseData || null;
         }
 
+        // For PROVISIONING ops, resolve source caisse from metadata.sessionCaisseId
+        let sourceCaisse = null;
+        const metaSessionCaisseId = (op.metadata as any)?.sessionCaisseId;
+        if (op.type === 'PROVISIONING' && metaSessionCaisseId) {
+          const [caisseData] = await db
+            .select({ id: caisses.id, nom: caisses.nom })
+            .from(caisses)
+            .where(eq(caisses.id, metaSessionCaisseId));
+          sourceCaisse = caisseData || null;
+        }
+
         const [submitterData] = await db
           .select({
             id: users.id,
@@ -669,6 +727,7 @@ export class OperationService {
           agent,
           client,
           destinationCaisse,
+          sourceCaisse,
           submitter,
         } as OperationTerrainWithRelations;
       })

@@ -323,29 +323,29 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRe
                      </div>
                    ) : (
                      // ACTIVE: Standard balance card - Compact & Responsive
-                     <div className={`rounded-xl sm:rounded-2xl p-4 sm:p-5 text-content-primary shadow-xl relative overflow-hidden ${getGradient()}`}>
+                     <div className={`rounded-xl sm:rounded-2xl p-4 sm:p-5 text-white shadow-xl relative overflow-hidden ${getGradient()}`}>
                         <div className="absolute top-0 right-0 p-32 bg-white/5 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
 
                         <div className="relative z-10">
                            <div className="flex justify-between items-start mb-3 sm:mb-4">
-                              <p className="opacity-80 text-xs sm:text-sm font-medium">Solde Disponible</p>
+                              <p className="text-white/80 text-xs sm:text-sm font-medium">Solde Disponible</p>
                               {(() => {
                                  const Icon = uiConfig.icon;
-                                 return <Icon className="text-content-primary/80 w-5 h-5 sm:w-6 sm:h-6" />;
+                                 return <Icon className="text-white/70 w-5 h-5 sm:w-6 sm:h-6" />;
                               })()}
                            </div>
 
                            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold font-mono tracking-tight mb-4 sm:mb-6">
-                              {realBalance.toLocaleString('fr-FR')} <span className="text-sm sm:text-lg opacity-60 font-sans">FCFA</span>
+                              {realBalance.toLocaleString('fr-FR')} <span className="text-sm sm:text-lg text-white/60 font-sans">FCFA</span>
                            </h1>
 
-                           <div className="flex justify-between items-end text-xs sm:text-sm opacity-90 font-medium">
+                           <div className="flex justify-between items-end text-xs sm:text-sm text-white/90 font-medium">
                               <div className="min-w-0 flex-1 mr-3">
-                                 <div className="text-[10px] sm:text-xs opacity-60 uppercase tracking-wider mb-0.5">Titulaire</div>
+                                 <div className="text-[10px] sm:text-xs text-white/60 uppercase tracking-wider mb-0.5">Titulaire</div>
                                  <div className="truncate">{formatClientName(compte.clients?.nom, compte.clients?.prenom) || '—'}</div>
                               </div>
                               <div className="text-right shrink-0">
-                                 <div className="text-[10px] sm:text-xs opacity-60 uppercase tracking-wider mb-0.5">Ouverture</div>
+                                 <div className="text-[10px] sm:text-xs text-white/60 uppercase tracking-wider mb-0.5">Ouverture</div>
                                  <div>{formatDateSafe(compte.dateOuverture || compte.createdAt)}</div>
                               </div>
                            </div>

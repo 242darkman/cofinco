@@ -298,7 +298,7 @@ function registerAuditReactor(): UnsubscribeFn {
       const auditLog = (await getMetadata<Array<{
         timestamp: number;
         action: string;
-        agentId: number;
+        agentId: string;
         ref: string;
         deviceId: string;
       }>>('audit_log')) || [];

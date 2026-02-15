@@ -249,12 +249,34 @@ export default function CaisseDashboard({
   });
   const pendingCaisseRequestsCount = caisseRequestsCountData?.count || 0;
 
+  // Pending agent provisioning sessions count - for badge on Demandes tab
+  const { data: pendingAgentSessionsCount = 0, refetch: refetchAgentSessions } = useQuery({
+    queryKey: ['agent-sessions-requesting', sessionAgenceId],
+    queryFn: async () => {
+      const params = new URLSearchParams({ statut: 'REQUESTING_FUNDS' });
+      if (sessionAgenceId) params.set('agenceId', sessionAgenceId);
+      const res = await fetch(`/api/caisse-agent/sessions?${params}`, { credentials: 'include' });
+      if (!res.ok) return 0;
+      const data = await res.json();
+      return data.sessions?.length || 0;
+    },
+    enabled: !!currentSession,
+    staleTime: 30000,
+  });
+
   // Listen for caisse request updates (WebSocket → DOM event)
   useEffect(() => {
     const handler = () => refetchCaisseRequestsCount();
     window.addEventListener('caisse-request-update', handler);
     return () => window.removeEventListener('caisse-request-update', handler);
   }, [refetchCaisseRequestsCount]);
+
+  // Listen for agent provisioning updates (WebSocket → DOM event)
+  useEffect(() => {
+    const handler = () => refetchAgentSessions();
+    window.addEventListener('agent-provisioning-update', handler);
+    return () => window.removeEventListener('agent-provisioning-update', handler);
+  }, [refetchAgentSessions]);
 
   // WebSocket listener for real-time loan disbursement updates
   const { socket } = useWebSocket();
@@ -595,7 +617,7 @@ export default function CaisseDashboard({
 
   const tabs = [
     { key: 'dashboard', label: 'Dashboard', icon: Activity, disabled: false },
-    { key: 'demandes', label: 'Demandes', icon: ClipboardList, disabled: !isSessionOpen, badge: (pendingCaisseRequestsCount + pendingDisbursementsCount) > 0 ? (pendingCaisseRequestsCount + pendingDisbursementsCount) : undefined, badgeClassName: 'bg-accent-secondary text-white animate-pulse' },
+    { key: 'demandes', label: 'Demandes', icon: ClipboardList, disabled: !isSessionOpen, badge: (pendingCaisseRequestsCount + pendingDisbursementsCount + pendingAgentSessionsCount) > 0 ? (pendingCaisseRequestsCount + pendingDisbursementsCount + pendingAgentSessionsCount) : undefined, badgeClassName: 'bg-accent-secondary text-white animate-pulse' },
     { key: 'operations', label: 'Opérations', icon: ArrowRightLeft, disabled: !isSessionOpen || isClosingWorkflow },
     { key: 'historique', label: 'Historique', icon: Clock, disabled: !isSessionOpen },
     { key: 'transferts', label: 'Transferts', icon: ArrowRightLeft, disabled: !isSessionOpen || isClosingWorkflow },
@@ -629,12 +651,14 @@ export default function CaisseDashboard({
             <Suspense fallback={<TabLoadingFallback />}>
               <CaisseDemandesTab
                 sessionCaisseId={currentSession.id}
+                caisseId={currentSession.caisseId}
                 agenceId={currentSession.agenceId || undefined}
                 onRequestProcessed={() => {
                   refetchSession();
                   refetchTransactions();
                   refetchCaisseRequestsCount();
                   refetchPendingDisbursements();
+                  refetchAgentSessions();
                 }}
               />
             </Suspense>

@@ -261,7 +261,7 @@ export interface JournalEntry {
   sequence: number;               // Monotonically increasing, gap-free
   uuid: string;                   // UUIDv7 (timestamp-ordered)
   type: JournalEventType;
-  agentId: number;
+  agentId: string;
   deviceId: string;               // Device fingerprint
   agenceId: string;
 
@@ -307,7 +307,7 @@ export interface DeviceKey {
   createdAt: number;
   expiresAt: number;              // 90-day rotation
   status: DeviceKeyStatus;
-  agentId: number;
+  agentId: string;
   deviceFingerprint: string;
   serverRegistered: boolean;      // Public key sent to server
 }
@@ -319,7 +319,7 @@ export type DaySessionSyncStatus = 'open' | 'closed' | 'synced' | 'reconciled';
 export interface AgentDaySession {
   id?: number;
   date: string;                   // YYYY-MM-DD
-  agentId: number;
+  agentId: string;
   deviceId: string;
 
   // Opening

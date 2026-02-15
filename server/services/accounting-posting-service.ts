@@ -36,6 +36,7 @@ import {
   PeriodStatus,
 } from "@shared/schema";
 import { mouvementsFinanciers, type MouvementFinancier } from "@shared/schema/finance";
+import { agentsTerrain } from "@shared/schema/operations";
 import { getWsInstance } from "../ws-server";
 import { createLogger } from "../lib/logger";
 
@@ -391,12 +392,58 @@ async function getJournalByCode(
 // ============================================================================
 
 /**
+ * Resolve generic GL account number (e.g. "573") to agent-specific sub-account
+ * (e.g. "573BZV001") if the mouvement is agent-related.
+ *
+ * For non-agent operations, returns the original account number unchanged.
+ */
+async function resolveAgentGlAccount(
+  tx: PgTransaction<any, any, any>,
+  accountNumber: string,
+  mouvement: MouvementFinancier,
+): Promise<string> {
+  // Only resolve the generic agent parent account
+  if (accountNumber !== "573" || !mouvement.agentId) return accountNumber;
+
+  const [agent] = await tx
+    .select({ currentGlAccountId: agentsTerrain.currentGlAccountId })
+    .from(agentsTerrain)
+    .where(eq(agentsTerrain.id, mouvement.agentId))
+    .limit(1);
+
+  if (!agent?.currentGlAccountId) {
+    logger.warn(
+      { agentId: mouvement.agentId, mouvementId: mouvement.id },
+      'Agent has no GL sub-account, falling back to generic 573',
+    );
+    return accountNumber;
+  }
+
+  const [glAccount] = await tx
+    .select({ numeroCompte: planComptable.numeroCompte })
+    .from(planComptable)
+    .where(eq(planComptable.id, agent.currentGlAccountId))
+    .limit(1);
+
+  if (!glAccount) {
+    logger.warn(
+      { agentId: mouvement.agentId, glAccountId: agent.currentGlAccountId },
+      'GL sub-account not found in planComptable, falling back to generic 573',
+    );
+    return accountNumber;
+  }
+
+  return glAccount.numeroCompte;
+}
+
+/**
  * Post a GL entry for a mouvement within an existing transaction.
  *
  * This is the preferred entry point for all automated GL posting from
  * business flows. It:
  * - Checks idempotency (returns null if already posted)
  * - Finds matching accounting rule (throws AccountingRuleNotFoundError if none)
+ * - Resolves dynamic GL sub-accounts (e.g. agent-specific 573xxx)
  * - Creates ecriture + lines + gl_posting_links
  *
  * @throws AccountingRuleNotFoundError — no rule matches
@@ -434,14 +481,18 @@ export async function postGlForMouvement(
     throw new AccountingRuleNotFoundError(mouvement);
   }
 
-  // 3. Get accounts — THROWS if not found
-  const debitAccount = await getAccountByNumber(tx, rule.debitAccount, agenceId);
+  // 3. Resolve dynamic GL sub-accounts (e.g. agent 573 → 573BZV001)
+  const resolvedDebitNum = await resolveAgentGlAccount(tx, rule.debitAccount, mouvement);
+  const resolvedCreditNum = await resolveAgentGlAccount(tx, rule.creditAccount, mouvement);
+
+  // 4. Get accounts — THROWS if not found
+  const debitAccount = await getAccountByNumber(tx, resolvedDebitNum, agenceId);
   if (!debitAccount) {
-    throw new GlAccountNotFoundError(rule.debitAccount, "debit");
+    throw new GlAccountNotFoundError(resolvedDebitNum, "debit");
   }
-  const creditAccount = await getAccountByNumber(tx, rule.creditAccount, agenceId);
+  const creditAccount = await getAccountByNumber(tx, resolvedCreditNum, agenceId);
   if (!creditAccount) {
-    throw new GlAccountNotFoundError(rule.creditAccount, "credit");
+    throw new GlAccountNotFoundError(resolvedCreditNum, "credit");
   }
 
   // 4. Get journal

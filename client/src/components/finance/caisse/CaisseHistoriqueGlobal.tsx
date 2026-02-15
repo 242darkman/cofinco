@@ -5,7 +5,7 @@
  * pour afficher l'historique complet des opérations d'une caisse,
  * avec filtres et pagination côté serveur.
  */
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   Calendar,
   Filter,
@@ -21,8 +21,8 @@ import {
 } from 'lucide-react';
 import { Button, Card, StatCard, Pagination } from '../../ui';
 import { useCaisseHistorique } from '../../../hooks/caisse/useCaisseHistorique';
-import { TransactionsList } from '../transactions';
-import type { TransactionItem } from '../transactions';
+import { TransactionsList, TransactionDetailDrawer } from '../transactions';
+import type { TransactionItem, TransactionDetails } from '../transactions';
 import { isIncomingOperation } from '@shared/config/caisse-operations';
 import {
   getOperationCaisseLabel,
@@ -51,6 +51,27 @@ export default function CaisseHistoriqueGlobal({
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+
+  // Transaction detail drawer
+  const [selectedTx, setSelectedTx] = useState<TransactionDetails | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  const handleTransactionClick = useCallback((tx: TransactionItem) => {
+    setSelectedTx({
+      id: tx.id,
+      reference: tx.reference,
+      amount: tx.amount,
+      type: tx.typeOperation || tx.type,
+      typeOperation: tx.typeOperation,
+      status: tx.status,
+      date: tx.date,
+      description: tx.description,
+      client: tx.client,
+      agent: tx.agent,
+      modePaiement: tx.modePaiement,
+    });
+    setIsDrawerOpen(true);
+  }, []);
 
   // Hook personnalisé pour l'historique
   const {
@@ -129,9 +150,11 @@ export default function CaisseHistoriqueGlobal({
     if (!summary) return null;
     return {
       totalOperations: summary.totalOperations,
-      totalEntrees: parseFloat(summary.totalEntrees),
-      totalSorties: parseFloat(summary.totalSorties),
-      soldeNet: parseFloat(summary.soldeNet)
+      nbEntrees: summary.totalEntrees,
+      nbSorties: summary.totalSorties,
+      montantEntrees: Number(summary.montantEntrees) || 0,
+      montantSorties: Number(summary.montantSorties) || 0,
+      soldeNet: Number(summary.soldeNet) || 0,
     };
   }, [summary]);
 
@@ -211,14 +234,16 @@ export default function CaisseHistoriqueGlobal({
                <div className="bg-surface-base/50 border border-edge rounded-lg p-2.5 flex items-center justify-between">
                    <div>
                        <p className="text-[10px] text-content-muted uppercase font-bold tracking-wider">Entrées</p>
-                       <p className="text-lg font-black text-status-success leading-none">{formatCompactMoney(stats.totalEntrees)}</p>
+                       <p className="text-lg font-black text-status-success leading-none">{formatMoney(stats.montantEntrees, { compact: true })}</p>
+                       {stats.nbEntrees > 0 && <p className="text-[9px] text-content-muted mt-0.5">{stats.nbEntrees} op.</p>}
                    </div>
                    <TrendingDown size={18} className="text-status-success opacity-80" />
                </div>
                <div className="bg-surface-base/50 border border-edge rounded-lg p-2.5 flex items-center justify-between">
                    <div>
                        <p className="text-[10px] text-content-muted uppercase font-bold tracking-wider">Sorties</p>
-                       <p className="text-lg font-black text-status-danger leading-none">{formatCompactMoney(stats.totalSorties)}</p>
+                       <p className="text-lg font-black text-status-danger leading-none">{formatMoney(stats.montantSorties, { compact: true })}</p>
+                       {stats.nbSorties > 0 && <p className="text-[9px] text-content-muted mt-0.5">{stats.nbSorties} op.</p>}
                    </div>
                    <TrendingUp size={18} className="text-status-danger opacity-80" />
                </div>
@@ -226,7 +251,7 @@ export default function CaisseHistoriqueGlobal({
                    <div>
                        <p className="text-[10px] text-content-muted uppercase font-bold tracking-wider">Solde Net</p>
                        <p className={`text-lg font-black leading-none ${stats.soldeNet >= 0 ? 'text-status-success' : 'text-status-danger'}`}>
-                           {stats.soldeNet > 0 ? '+' : ''}{formatCompactMoney(stats.soldeNet)}
+                           {stats.soldeNet > 0 ? '+' : ''}{formatMoney(stats.soldeNet, { compact: true })}
                        </p>
                    </div>
                    <FileSpreadsheet size={18} className={stats.soldeNet >= 0 ? 'text-status-success opacity-80' : 'text-status-danger opacity-80'} />
@@ -285,6 +310,7 @@ export default function CaisseHistoriqueGlobal({
           ) : (
             <TransactionsList
                 transactions={transactions}
+                onTransactionClick={handleTransactionClick}
                 isLoading={isLoading}
                 emptyMessage="Aucune opération trouvée"
                 headerTitle=""
@@ -330,10 +356,16 @@ export default function CaisseHistoriqueGlobal({
             </div>
            )}
       </div>
+      {/* Transaction Detail Drawer */}
+      <TransactionDetailDrawer
+        transaction={selectedTx}
+        isOpen={isDrawerOpen}
+        onClose={() => {
+          setIsDrawerOpen(false);
+          setTimeout(() => setSelectedTx(null), 300);
+        }}
+      />
     </div>
   );
 
-  function formatCompactMoney(amount: number) {
-      return new Intl.NumberFormat('fr-FR', { notation: 'compact', maximumFractionDigits: 1 }).format(amount);
-  }
 }

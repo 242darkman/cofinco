@@ -936,7 +936,7 @@ class SyncService {
     uuid: string;
     sequence: number;
     type: string;
-    agentId: number;
+    agentId: string;
     deviceId: string;
     agenceId: string;
     payloadHash: string;

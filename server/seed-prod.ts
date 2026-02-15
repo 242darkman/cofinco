@@ -348,6 +348,7 @@ const PLAN_COMPTABLE_DATA = [
   { num: '661', label: 'Rémunérations du personnel', classe: 6, type: 'Charge', sens: 'Débit', isSystem: true },
   { num: '664', label: 'Charges sociales', classe: 6, type: 'Charge', sens: 'Débit', isSystem: false },
   { num: '658', label: 'Charges diverses', classe: 6, type: 'Charge', sens: 'Débit', isSystem: false },
+  { num: '6588', label: 'Écarts de caisse agent - déficit', classe: 6, type: 'Charge', sens: 'Débit', isSystem: true },
   { num: '6611', label: 'Intérêts versés sur dépôts', classe: 6, type: 'Charge', sens: 'Débit', isSystem: true },
   { num: '6615', label: 'Charges de personnel — primes', classe: 6, type: 'Charge', sens: 'Débit', isSystem: true },
   { num: '669', label: 'Autres charges financières', classe: 6, type: 'Charge', sens: 'Débit', isSystem: true },
@@ -373,6 +374,7 @@ const PLAN_COMPTABLE_DATA = [
   { num: '708600', label: 'Frais de clôture de compte', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
   { num: '708700', label: 'Frais services Mobile Money', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
   { num: '758', label: 'Produits divers de gestion courante', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: false },
+  { num: '7588', label: 'Écarts de caisse agent - surplus', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
   { num: '772', label: 'Produits sur transit', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
   { num: '76', label: 'Produits financiers', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
   { num: '79', label: 'Reprises provisions', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
@@ -1247,6 +1249,98 @@ const ACCOUNTING_RULES_DATA = [
     debitAccount: '531',   // Coffre-fort
     creditAccount: '521',  // Caisse centrale
     descriptionTemplate: 'Restitution fonds au coffre',
+    priority: 10,
+  },
+
+  // ============================================================================
+  // SESSIONS AGENT TERRAIN
+  // ============================================================================
+
+  // Provisionnement agent terrain (Caisse agence → Agent)
+  {
+    code: 'AGENT_PROVISIONING',
+    name: 'Provisionnement agent terrain',
+    description: 'Transfert de fonds de la caisse agence vers agent terrain (ouverture session)',
+    sourceType: 'MOUVEMENT',
+    eventType: 'AGENT_PROVISIONING',
+    paymentMethod: 'CASH',
+    journalCode: 'CAI',
+    debitAccount: '573',   // Caisse agent terrain (résolu dynamiquement en sous-compte)
+    creditAccount: '521',  // Caisse agence
+    descriptionTemplate: 'Provisionnement agent terrain - ouverture session',
+    priority: 10,
+  },
+
+  // Clôture session agent terrain (Agent → Caisse agence)
+  {
+    code: 'AGENT_SESSION_CLOSE',
+    name: 'Clôture session agent terrain',
+    description: 'Retour de fonds de l\'agent terrain vers caisse agence (clôture session)',
+    sourceType: 'MOUVEMENT',
+    eventType: 'AGENT_SESSION_CLOSE',
+    paymentMethod: 'CASH',
+    journalCode: 'CAI',
+    debitAccount: '521',   // Caisse agence
+    creditAccount: '573',  // Caisse agent terrain (résolu dynamiquement en sous-compte)
+    descriptionTemplate: 'Clôture session agent terrain - retour fonds',
+    priority: 10,
+  },
+
+  // Écart de caisse agent - surplus (agent a plus que prévu)
+  {
+    code: 'AGENT_ECART_SURPLUS',
+    name: 'Écart de caisse agent - surplus',
+    description: 'Excédent constaté lors du rapprochement de session agent',
+    sourceType: 'MOUVEMENT',
+    eventType: 'AGENT_ECART_SURPLUS',
+    journalCode: 'OD',
+    debitAccount: '573',   // Caisse agent terrain (résolu en sous-compte)
+    creditAccount: '7588', // Produits divers - surplus de caisse
+    descriptionTemplate: 'Écart de caisse agent - surplus constaté',
+    priority: 10,
+  },
+
+  // Écart de caisse agent - déficit (agent a moins que prévu)
+  {
+    code: 'AGENT_ECART_DEFICIT',
+    name: 'Écart de caisse agent - déficit',
+    description: 'Déficit constaté lors du rapprochement de session agent',
+    sourceType: 'MOUVEMENT',
+    eventType: 'AGENT_ECART_DEFICIT',
+    journalCode: 'OD',
+    debitAccount: '6588',  // Charges diverses - déficit de caisse
+    creditAccount: '573',  // Caisse agent terrain (résolu en sous-compte)
+    descriptionTemplate: 'Écart de caisse agent - déficit constaté',
+    priority: 10,
+  },
+
+  // Retrait agent terrain - Compte épargne (Agent remet espèces au client)
+  {
+    code: 'AGENT_WITHDRAWAL_SAVINGS',
+    name: 'Retrait agent terrain - Compte épargne',
+    description: 'Retrait espèces effectué par agent terrain sur compte épargne client',
+    sourceType: 'MOUVEMENT',
+    eventType: 'AGENT_WITHDRAWAL_SAVINGS',
+    paymentMethod: 'CASH',
+    journalCode: 'CAI',
+    debitAccount: '4112',  // Dépôts clients - Comptes épargne (compte client débité)
+    creditAccount: '573',  // Caisse agent terrain (agent remet les espèces)
+    descriptionTemplate: 'Retrait épargne via agent terrain',
+    priority: 10,
+  },
+
+  // Retrait agent terrain - Compte courant (Agent remet espèces au client)
+  {
+    code: 'AGENT_WITHDRAWAL_CURRENT',
+    name: 'Retrait agent terrain - Compte courant',
+    description: 'Retrait espèces effectué par agent terrain sur compte courant client',
+    sourceType: 'MOUVEMENT',
+    eventType: 'AGENT_WITHDRAWAL_CURRENT',
+    paymentMethod: 'CASH',
+    journalCode: 'CAI',
+    debitAccount: '4111',  // Dépôts clients - Comptes courants (compte client débité)
+    creditAccount: '573',  // Caisse agent terrain (agent remet les espèces)
+    descriptionTemplate: 'Retrait compte courant via agent terrain',
     priority: 10,
   },
 

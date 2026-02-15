@@ -155,7 +155,7 @@ export default function AgentTeamLeaderboard() {
               onClick={() => setPeriod(p)}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
                 period === p
-                  ? 'bg-accent-secondary text-content-primary shadow-sm'
+                  ? 'bg-accent-secondary text-white shadow-sm'
                   : 'text-content-muted hover:text-accent'
               }`}
             >

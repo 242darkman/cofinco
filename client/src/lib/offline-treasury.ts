@@ -56,7 +56,7 @@ function getCashImpact(type: JournalEventType, amount: number): number {
  * Must be called at the start of each working day before any operation.
  */
 export async function openDaySession(params: {
-  agentId: number;
+  agentId: string;
   deviceId: string;
   openingBalance: number;
   billetage: Record<string, number>; // { "10000": 5, "5000": 10, ... }
@@ -115,7 +115,7 @@ export async function openDaySession(params: {
 /**
  * Get the current open session for an agent.
  */
-export async function getCurrentSession(agentId: number): Promise<AgentDaySession | null> {
+export async function getCurrentSession(agentId: string): Promise<AgentDaySession | null> {
   const today = new Date().toISOString().slice(0, 10);
   return db.agentDaySessions
     .where('[agentId+date]')
@@ -127,7 +127,7 @@ export async function getCurrentSession(agentId: number): Promise<AgentDaySessio
  * Close the day session with physical cash count.
  */
 export async function closeDaySession(params: {
-  agentId: number;
+  agentId: string;
   closingBalance: number;
   billetage: Record<string, number>;
   agenceId: string;
@@ -197,7 +197,7 @@ export interface LimitCheckResult {
 export async function canExecuteOffline(
   type: JournalEventType,
   amount: number,
-  agentId: number
+  agentId: string
 ): Promise<LimitCheckResult> {
   const limits = await db.offlineLimits.get('current');
 
@@ -305,7 +305,7 @@ export async function canExecuteOffline(
 export async function executeOfflineOperation(params: {
   type: JournalEventType;
   amount: number;
-  agentId: number;
+  agentId: string;
   agenceId: string;
   payload: Record<string, unknown>;
   metadata?: Record<string, unknown>;
@@ -370,7 +370,7 @@ export async function executeOfflineOperation(params: {
  * Get reconciliation summary for the current day.
  * Compares computed cash balance with actual operations.
  */
-export async function getReconciliationSummary(agentId: number): Promise<{
+export async function getReconciliationSummary(agentId: string): Promise<{
   session: AgentDaySession | null;
   computedBalance: number;
   operationCount: number;
@@ -465,7 +465,7 @@ export async function getOfflineLimits(): Promise<OfflineLimits | null> {
  * Get all day sessions for an agent, ordered by date descending.
  */
 export async function getSessionHistory(
-  agentId: number,
+  agentId: string,
   limit: number = 30
 ): Promise<AgentDaySession[]> {
   const sessions = await db.agentDaySessions
@@ -480,7 +480,7 @@ export async function getSessionHistory(
 /**
  * Get the last sync timestamp across all sessions.
  */
-export async function getLastSyncTimestamp(agentId: number): Promise<number> {
+export async function getLastSyncTimestamp(agentId: string): Promise<number> {
   const sessions = await db.agentDaySessions
     .where('agentId')
     .equals(agentId)
@@ -494,7 +494,7 @@ export async function getLastSyncTimestamp(agentId: number): Promise<number> {
  * Mark a session as synced (called after successful journal sync).
  */
 export async function markSessionSynced(
-  agentId: number,
+  agentId: string,
   date: string
 ): Promise<void> {
   const session = await db.agentDaySessions

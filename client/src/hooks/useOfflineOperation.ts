@@ -52,7 +52,7 @@ export interface OfflineOperationResult {
 
 interface UseOfflineOperationOptions<TData> {
   /** Agent ID */
-  agentId: number;
+  agentId: string;
   /** Agency ID */
   agenceId: string;
   /** Online mutation function (called when network is available) */

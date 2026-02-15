@@ -16,7 +16,7 @@ import {
   users,
   type CaissePaymentRequest,
 } from "@shared/schema";
-import { eq, and, sql, desc, aliasedTable } from "drizzle-orm";
+import { eq, and, or, sql, desc, aliasedTable, isNull } from "drizzle-orm";
 import { createLogger } from "../lib/logger";
 import { getWsInstance } from "../ws-server";
 
@@ -30,6 +30,7 @@ export interface CreateCaisseRequestData {
   category: "ENGAGEMENT_FEE" | "FEE_REFUND" | "SALARY_PAYMENT" | "ACCOUNT_ACTIVATION";
   direction: "IN" | "OUT";
   agenceId: string;
+  targetCaisseId?: string;
   sourceType: string;
   sourceId: string;
   clientId?: string;
@@ -60,6 +61,7 @@ export async function createCaisseRequest(
       category: data.category,
       direction: data.direction,
       agenceId: data.agenceId,
+      targetCaisseId: data.targetCaisseId || null,
       sourceType: data.sourceType,
       sourceId: data.sourceId,
       clientId: data.clientId || null,
@@ -103,7 +105,8 @@ export async function createCaisseRequest(
 
 export async function getPendingRequests(
   agenceId?: string,
-  category?: string
+  category?: string,
+  caisseId?: string,
 ): Promise<EnrichedCaisseRequest[]> {
   const clientUserAlias = aliasedTable(users, "client_user");
   const creatorAlias = aliasedTable(users, "creator");
@@ -118,6 +121,15 @@ export async function getPendingRequests(
 
   if (category) {
     conditions.push(eq(caissePaymentRequests.category, category as any));
+  }
+
+  if (caisseId) {
+    conditions.push(
+      or(
+        eq(caissePaymentRequests.targetCaisseId, caisseId),
+        isNull(caissePaymentRequests.targetCaisseId),
+      )!
+    );
   }
 
   const rows = await db

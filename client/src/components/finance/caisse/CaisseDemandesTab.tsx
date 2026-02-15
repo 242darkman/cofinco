@@ -13,7 +13,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   CheckCircle, XCircle, Loader2, Search, RefreshCw,
   ChevronLeft, ChevronRight, ChevronDown,
-  User, FileText, Shield,
+  User, FileText, Shield, Send,
   ArrowDownRight, ArrowUpRight,
   ClipboardList, Wallet, Users, CreditCard,
   AlertCircle,
@@ -21,6 +21,7 @@ import {
 import { ConfirmDialog } from '../../ui';
 import { toast } from 'sonner';
 import { formatMoney, formatClientName, resolveStorageUrl } from '../../../lib/format';
+import { caisseAgentApi } from '../../../lib/api-client';
 import { useWebSocket } from '../../../hooks/useWebSocket';
 import { formatDistance } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -67,11 +68,22 @@ interface PendingCredit {
   };
 }
 
-type CategoryKey = 'ENGAGEMENT_FEE' | 'FEE_REFUND' | 'LOAN_DISBURSEMENT' | 'SALARY_PAYMENT' | 'ACCOUNT_ACTIVATION';
+type CategoryKey = 'ENGAGEMENT_FEE' | 'FEE_REFUND' | 'LOAN_DISBURSEMENT' | 'SALARY_PAYMENT' | 'ACCOUNT_ACTIVATION' | 'AGENT_PROVISIONING';
+
+interface PendingAgentSession {
+  id: string;
+  agentId: string;
+  agentNom?: string;
+  agentPrenom?: string;
+  montantDemande: string;
+  observations?: string;
+  createdAt: string;
+  glAccountNumber?: string;
+}
 
 interface UnifiedDemande {
   id: string;
-  source: 'payment-request' | 'loan-disbursement';
+  source: 'payment-request' | 'loan-disbursement' | 'agent-session';
   category: CategoryKey;
   direction: 'IN' | 'OUT';
   montant: number;
@@ -83,10 +95,12 @@ interface UnifiedDemande {
   metadata?: Record<string, any>;
   creditData?: PendingCredit;
   requestData?: CaissePaymentRequest;
+  agentSessionData?: PendingAgentSession;
 }
 
 interface CaisseDemandesTabProps {
   sessionCaisseId: string;
+  caisseId: string;
   agenceId?: string;
   onRequestProcessed?: () => void;
 }
@@ -163,6 +177,17 @@ const CATEGORY_CONFIG: Record<CategoryKey, {
     tagText: 'text-status-info',
     tagBorder: 'border-status-info/20',
   },
+  AGENT_PROVISIONING: {
+    label: 'Appro. Agent',
+    icon: Send,
+    bgActive: 'bg-accent',
+    shadowActive: 'shadow-accent/20',
+    bgBadge: 'bg-accent/10',
+    textBadge: 'text-accent',
+    tagBg: 'bg-accent/10',
+    tagText: 'text-accent',
+    tagBorder: 'border-accent/20',
+  },
 };
 
 function timeSince(dateStr: string): string {
@@ -175,6 +200,7 @@ function timeSince(dateStr: string): string {
 
 export default function CaisseDemandesTab({
   sessionCaisseId,
+  caisseId,
   agenceId,
   onRequestProcessed,
 }: CaisseDemandesTabProps) {
@@ -183,6 +209,7 @@ export default function CaisseDemandesTab({
   // Data
   const [paymentRequests, setPaymentRequests] = useState<CaissePaymentRequest[]>([]);
   const [pendingCredits, setPendingCredits] = useState<PendingCredit[]>([]);
+  const [pendingAgentSessions, setPendingAgentSessions] = useState<PendingAgentSession[]>([]);
   const [loading, setLoading] = useState(true);
 
   // UI
@@ -209,10 +236,19 @@ export default function CaisseDemandesTab({
       setLoading(true);
       const params = new URLSearchParams();
       if (agenceId) params.set('agenceId', agenceId);
+      if (caisseId) params.set('caisseId', caisseId);
 
-      const [reqRes, loanRes] = await Promise.all([
+      const loanParams = new URLSearchParams();
+      if (caisseId) loanParams.set('caisseId', caisseId);
+
+      const agentSessionParams = new URLSearchParams({ statut: 'REQUESTING_FUNDS' });
+      if (agenceId) agentSessionParams.set('agenceId', agenceId);
+      if (caisseId) agentSessionParams.set('sourceCaisseId', caisseId);
+
+      const [reqRes, loanRes, agentRes] = await Promise.all([
         fetch(`/api/caisses/payment-requests?${params}`, { credentials: 'include' }),
-        fetch('/api/credits/pending-disbursements', { credentials: 'include' }),
+        fetch(`/api/credits/pending-disbursements?${loanParams}`, { credentials: 'include' }),
+        fetch(`/api/caisse-agent/sessions?${agentSessionParams}`, { credentials: 'include' }),
       ]);
 
       if (reqRes.ok) setPaymentRequests(await reqRes.json());
@@ -220,12 +256,16 @@ export default function CaisseDemandesTab({
         const data = await loanRes.json();
         setPendingCredits(data.data || []);
       }
+      if (agentRes.ok) {
+        const data = await agentRes.json();
+        setPendingAgentSessions(data.sessions || []);
+      }
     } catch (err) {
       console.error('[CaisseDemandesTab] Fetch error:', err);
     } finally {
       setLoading(false);
     }
-  }, [agenceId]);
+  }, [agenceId, caisseId]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
@@ -234,6 +274,13 @@ export default function CaisseDemandesTab({
     const handler = () => fetchAll();
     window.addEventListener('caisse-request-update', handler);
     return () => window.removeEventListener('caisse-request-update', handler);
+  }, [fetchAll]);
+
+  // Listen for agent provisioning updates (real-time session requests)
+  useEffect(() => {
+    const handler = () => fetchAll();
+    window.addEventListener('agent-provisioning-update', handler);
+    return () => window.removeEventListener('agent-provisioning-update', handler);
   }, [fetchAll]);
 
   // Listen for loan disbursement WebSocket events
@@ -297,9 +344,25 @@ export default function CaisseDemandesTab({
       });
     }
 
+    for (const session of pendingAgentSessions) {
+      const agentName = [session.agentPrenom, session.agentNom].filter(Boolean).join(' ');
+      items.push({
+        id: `agent-session-${session.id}`,
+        source: 'agent-session',
+        category: 'AGENT_PROVISIONING',
+        direction: 'OUT',
+        montant: Number(session.montantDemande),
+        label: `Appro. agent ${agentName}`.trim(),
+        description: session.observations || (session.glAccountNumber ? `Compte GL: ${session.glAccountNumber}` : undefined),
+        displayName: agentName || 'Agent',
+        createdAt: session.createdAt,
+        agentSessionData: session,
+      });
+    }
+
     items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     return items;
-  }, [paymentRequests, pendingCredits]);
+  }, [paymentRequests, pendingCredits, pendingAgentSessions]);
 
   // ─── Category counts ────────────────────────────────────
 
@@ -340,7 +403,15 @@ export default function CaisseDemandesTab({
     if (!processTarget) return;
     setActionLoading(processTarget.id);
     try {
-      if (processTarget.source === 'payment-request' && processTarget.requestData) {
+      if (processTarget.source === 'agent-session' && processTarget.agentSessionData) {
+        await caisseAgentApi.dispatchFunds(processTarget.agentSessionData.id, {
+          montantProvisionne: processTarget.montant,
+          sourceCaisseId: caisseId,
+        });
+        toast.success('Fonds dispatchés', {
+          description: `${processTarget.displayName} — ${formatMoney(processTarget.montant)}`,
+        });
+      } else if (processTarget.source === 'payment-request' && processTarget.requestData) {
         const res = await fetch(`/api/caisses/payment-requests/${processTarget.requestData.id}/process`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -691,14 +762,16 @@ export default function CaisseDemandesTab({
                         {/* Non-loan actions — always visible mobile */}
                         {!isLoan && (
                           <div className="flex items-center gap-1.5">
-                            <button
-                              onClick={(e) => { e.stopPropagation(); setCancelTarget(item); }}
-                              disabled={!!actionLoading}
-                              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-surface hover:bg-status-danger-bg text-content-muted hover:text-status-danger transition-all"
-                              title="Rejeter la demande"
-                            >
-                              <XCircle size={14} className="inline mr-1" />Rejeter
-                            </button>
+                            {item.source !== 'agent-session' && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setCancelTarget(item); }}
+                                disabled={!!actionLoading}
+                                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-surface hover:bg-status-danger-bg text-content-muted hover:text-status-danger transition-all"
+                                title="Rejeter la demande"
+                              >
+                                <XCircle size={14} className="inline mr-1" />Rejeter
+                              </button>
+                            )}
                             <button
                               onClick={(e) => { e.stopPropagation(); setProcessTarget(item); }}
                               disabled={!!actionLoading}

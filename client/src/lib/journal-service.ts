@@ -127,7 +127,7 @@ export function getNtpOffset(): number | undefined {
 
 export interface AppendEntryOptions {
   type: JournalEventType;
-  agentId: number;
+  agentId: string;
   agenceId: string;
   sessionId: string;
   operationRef: string;
@@ -428,7 +428,7 @@ export async function storeDeviceKey(
   keyId: string,
   publicKeyJwk: JsonWebKey,
   privateKey: CryptoKey,
-  agentId: number
+  agentId: string
 ): Promise<void> {
   const { full: deviceFingerprint } = getOrCreateFingerprint();
 
@@ -448,7 +448,7 @@ export async function storeDeviceKey(
 /**
  * Get the active device key for the current agent.
  */
-export async function getActiveDeviceKey(agentId: number): Promise<{
+export async function getActiveDeviceKey(agentId: string): Promise<{
   keyId: string;
   privateKey: CryptoKey;
   publicKeyJwk: JsonWebKey;
@@ -483,7 +483,7 @@ export async function rotateDeviceKey(
   newKeyId: string,
   newPublicKeyJwk: JsonWebKey,
   newPrivateKey: CryptoKey,
-  agentId: number
+  agentId: string
 ): Promise<void> {
   await db.transaction('rw', db.deviceKeys, async () => {
     // Mark old key as rotated
@@ -497,7 +497,7 @@ export async function rotateDeviceKey(
 /**
  * Check if the active key needs rotation (approaching expiry).
  */
-export async function needsKeyRotation(agentId: number): Promise<boolean> {
+export async function needsKeyRotation(agentId: string): Promise<boolean> {
   const key = await db.deviceKeys
     .where('agentId')
     .equals(agentId)

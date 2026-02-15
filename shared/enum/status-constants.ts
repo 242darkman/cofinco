@@ -685,6 +685,8 @@ export const TypeOperationTerrain = {
   DEPOSIT_CURRENT: "DEPOSIT_CURRENT",
   ENGAGEMENT_FEE: "ENGAGEMENT_FEE",
   MISC_COLLECTION: "MISC_COLLECTION",
+  WITHDRAWAL_CURRENT: "WITHDRAWAL_CURRENT",
+  WITHDRAWAL_SAVINGS: "WITHDRAWAL_SAVINGS",
 } as const;
 
 export type TypeOperationTerrainType = (typeof TypeOperationTerrain)[keyof typeof TypeOperationTerrain];
@@ -697,6 +699,8 @@ export const TYPE_OPERATION_TERRAIN_LABELS: Record<TypeOperationTerrainType, str
   [TypeOperationTerrain.DEPOSIT_CURRENT]: "Dépôt Compte Courant",
   [TypeOperationTerrain.ENGAGEMENT_FEE]: "Frais Engagement Crédit",
   [TypeOperationTerrain.MISC_COLLECTION]: "Encaissement Divers",
+  [TypeOperationTerrain.WITHDRAWAL_CURRENT]: "Retrait Compte Courant",
+  [TypeOperationTerrain.WITHDRAWAL_SAVINGS]: "Retrait Compte Épargne",
 };
 
 /** Labels FR pour l'UI des statuts d'opération terrain */

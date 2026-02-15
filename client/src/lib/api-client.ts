@@ -602,9 +602,11 @@ export interface CaisseHistoriqueOperation {
 
 export interface CaisseHistoriqueSummary {
   totalOperations: number;
-  totalEntrees: string;
-  totalSorties: string;
-  soldeNet: string;
+  totalEntrees: number;
+  totalSorties: number;
+  montantEntrees: number;
+  montantSorties: number;
+  soldeNet: number;
   operationsParType: Record<string, number>;
   operationsParMode: Record<string, number>;
 }
@@ -3014,6 +3016,94 @@ export const caisseAgentApi = {
       tauxApprobation: number;
     }>(`/caisse-agent/agents/${agentId}/stats${query ? `?${query}` : ''}`);
   },
+
+  // ============ Sessions GL Agent ============
+
+  getActiveSession: (agentId: string) =>
+    request<{ session: any }>(`/caisse-agent/sessions/active?agentId=${agentId}`)
+      .then(r => r?.session ?? null),
+
+  getSessions: (filters?: { agentId?: string; statut?: string; agenceId?: string; limit?: number }) => {
+    const queryParams = new URLSearchParams();
+    if (filters?.agentId) queryParams.append('agentId', filters.agentId);
+    if (filters?.statut) queryParams.append('statut', filters.statut);
+    if (filters?.agenceId) queryParams.append('agenceId', filters.agenceId);
+    if (filters?.limit) queryParams.append('limit', String(filters.limit));
+    const query = queryParams.toString();
+    return request<{ sessions: any[] }>(`/caisse-agent/sessions${query ? `?${query}` : ''}`);
+  },
+
+  getSessionDetail: (sessionId: string) =>
+    request<any>(`/caisse-agent/sessions/${sessionId}`),
+
+  getSessionAudit: (sessionId: string) =>
+    request<any[]>(`/caisse-agent/sessions/${sessionId}/audit`),
+
+  requestSession: (data: {
+    agentId: string;
+    agenceId: string;
+    montantDemande: number;
+    sourceCaisseId?: string;
+    observations?: string;
+  }) =>
+    request<any>('/caisse-agent/sessions', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  dispatchFunds: (sessionId: string, data: {
+    montantProvisionne: number;
+    sourceCaisseId: string;
+  }) =>
+    request<any>(`/caisse-agent/sessions/${sessionId}/dispatch`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  initiateClose: (sessionId: string, data: {
+    montantPhysique: number;
+    billetage?: Record<string, number>;
+    destinationCaisseId: string;
+  }) =>
+    request<any>(`/caisse-agent/sessions/${sessionId}/initiate-close`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  finalizeClose: (sessionId: string, data: {
+    montantRetourne: number;
+    ecartJustification?: string;
+  }) =>
+    request<any>(`/caisse-agent/sessions/${sessionId}/finalize-close`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  closeWithRemise: (sessionId: string, data: {
+    montantPhysique: number;
+    billetage?: Record<string, number>;
+    destinationCaisseId: string;
+    observations?: string;
+    ecartJustification?: string;
+  }) =>
+    request<any>(`/caisse-agent/sessions/${sessionId}/close-with-remise`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  // ============ Agent GL & Agence ============
+
+  getAgentGlAccount: (agentId: string) =>
+    request<{ glAccountId: string; glAccountNumber: string } | null>(`/caisse-agent/agents/${agentId}/gl-account`),
+
+  getAgentAgencyHistory: (agentId: string) =>
+    request<any[]>(`/caisse-agent/agents/${agentId}/agency-history`),
+
+  transferAgency: (agentId: string, data: { newAgenceId: string; reason: string }) =>
+    request<any>(`/caisse-agent/agents/${agentId}/transfer-agency`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 };
 
 /**

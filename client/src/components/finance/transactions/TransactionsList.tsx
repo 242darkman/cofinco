@@ -182,7 +182,7 @@ function MobileTransactionRow({
             </div>
             <div className="text-right shrink-0">
               <p className={`text-base font-bold font-mono ${isCredit ? 'text-status-success' : 'text-status-danger'}`}>
-                {isCredit ? '+' : '-'}{formatMoney(tx.amount, { showCurrency: false })}
+                {isCredit ? '+' : '-'}{formatMoney(tx.amount)}
               </p>
               {normalizeStatus(tx.status) !== 'SUCCESS' && (
                 <div className={`inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded text-[10px] font-semibold ${statusConfig.bg} ${statusConfig.color}`}>
@@ -354,7 +354,7 @@ export default function TransactionsList({
                         </div>
                         <div className="text-right shrink-0">
                           <p className={`text-base font-bold font-mono ${isCredit ? 'text-status-success' : 'text-status-danger'}`}>
-                            {isCredit ? '+' : '-'}{formatMoney(tx.amount, { showCurrency: false })}
+                            {isCredit ? '+' : '-'}{formatMoney(tx.amount)}
                           </p>
                           {normalizeStatus(tx.status) !== 'SUCCESS' && (
                             <div className={`inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded text-[10px] font-semibold ${statusConfig.bg} ${statusConfig.color}`}>
@@ -429,7 +429,7 @@ export default function TransactionsList({
                   </td>
                   <td className={`${compactMode ? 'py-1' : 'py-2'} px-3 text-right`}>
                     <span className={`text-xs font-bold font-mono ${isCredit ? 'text-status-success' : 'text-status-danger'}`}>
-                      {isCredit ? '+' : '-'}{formatMoney(tx.amount, { showCurrency: false })}
+                      {isCredit ? '+' : '-'}{formatMoney(tx.amount)}
                     </span>
                   </td>
                   <td className={`${compactMode ? 'py-1' : 'py-2'} px-3 text-center`}>

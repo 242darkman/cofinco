@@ -16,7 +16,7 @@ import type { OperationTerrainWithRelations } from '@shared/schema';
 import OperationDetailModal from './OperationDetailModal';
 import RejectOperationModal from './RejectOperationModal';
 import { formatClientName } from '../../../lib/format';
-import { StatutOperationTerrain } from '@shared/enum/status-constants';
+import { StatutOperationTerrain, TypeOperationTerrain } from '@shared/enum/status-constants';
 
 interface OperationsApprovalListProps {
   onModuleChange?: (module: string) => void;
@@ -37,6 +37,18 @@ const formatDate = (date: string) => {
     hour: '2-digit',
     minute: '2-digit'
   });
+};
+
+const isWithdrawalOp = (op: OperationTerrainWithRelations) => {
+  const meta = op.metadata as any;
+  const tpc = meta?.typePaiementClient;
+  return tpc === TypeOperationTerrain.WITHDRAWAL_CURRENT || tpc === TypeOperationTerrain.WITHDRAWAL_SAVINGS;
+};
+
+const getOperationLabel = (op: OperationTerrainWithRelations) => {
+  if (op.type === 'SETTLEMENT_CASH') return 'Remise';
+  if (isWithdrawalOp(op)) return 'Retrait';
+  return 'Collecte';
 };
 
 const getStatutBadge = (statut: string) => {
@@ -354,16 +366,18 @@ export default function OperationsApprovalList({ onModuleChange }: OperationsApp
                 <div className="flex items-start justify-between">
                   <div className="flex items-start gap-3">
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                      op.type === 'COLLECT_CASH'
+                      op.type === 'COLLECT_CASH' && !isWithdrawalOp(op)
                         ? 'bg-accent/10 text-accent'
+                        : op.type === 'COLLECT_CASH' && isWithdrawalOp(op)
+                        ? 'bg-status-danger-bg text-status-danger'
                         : 'bg-status-success-bg text-status-success'
                     }`}>
-                      {op.type === 'COLLECT_CASH' ? <ArrowDownRight size={20} /> : <ArrowUpRight size={20} />}
+                      {op.type === 'COLLECT_CASH' && !isWithdrawalOp(op) ? <ArrowDownRight size={20} /> : <ArrowUpRight size={20} />}
                     </div>
                     <div>
                       <div className="flex items-center gap-2 mb-1">
                         <p className="text-sm font-medium text-content-primary">
-                          {op.type === 'COLLECT_CASH' ? 'Collecte' : 'Remise'}
+                          {getOperationLabel(op)}
                         </p>
                         {getStatutBadge(op.statut)}
                       </div>
@@ -391,9 +405,10 @@ export default function OperationsApprovalList({ onModuleChange }: OperationsApp
 
                   <div className="text-right">
                     <p className={`text-lg font-bold ${
-                      op.type === 'COLLECT_CASH' ? 'text-accent' : 'text-status-success'
+                      op.type === 'COLLECT_CASH' && !isWithdrawalOp(op) ? 'text-accent' :
+                      isWithdrawalOp(op) ? 'text-status-danger' : 'text-status-success'
                     }`}>
-                      {op.type === 'COLLECT_CASH' ? '+' : '-'}{formatMoney(op.montant as unknown as string)} XOF
+                      {op.type === 'COLLECT_CASH' && !isWithdrawalOp(op) ? '+' : '-'}{formatMoney(op.montant as unknown as string)} XOF
                     </p>
                   </div>
                 </div>

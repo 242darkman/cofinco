@@ -25,9 +25,10 @@ interface SettlementModalProps {
   onClose: () => void;
   onSuccess: () => void;
   agentId: string;
+  agenceId?: string;
 }
 
-export default function SettlementModal({ isOpen, onClose, onSuccess, agentId }: SettlementModalProps) {
+export default function SettlementModal({ isOpen, onClose, onSuccess, agentId, agenceId }: SettlementModalProps) {
   const { t } = useLanguage();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -52,7 +53,7 @@ export default function SettlementModal({ isOpen, onClose, onSuccess, agentId }:
     setLoading(true);
     try {
       const [caissesData, summary] = await Promise.all([
-        caisseApi.getStatus(),
+        caisseApi.getStatus(agenceId),
         caisseAgentApi.getCaisseSummary(agentId)
       ]);
       setCaisses(caissesData.filter((c: any) => c.statut === StatutCaisse.OPEN));

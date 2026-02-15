@@ -25,7 +25,6 @@ import {
 } from 'lucide-react';
 import { toast } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
-import { currencySymbol } from '@shared/config/currency';
 import {
   openDaySession,
   closeDaySession,
@@ -36,29 +35,16 @@ import {
 import { getOrCreateFingerprint } from '../../../lib/device-fingerprint';
 import type { AgentDaySession } from '../../../lib/offline-db';
 import { useJournalSync, useOfflinePendingCount } from '../../../hooks/useJournalSync';
+import BilletageInput from './BilletageInput';
 
 // ============================================================================
 // Types
 // ============================================================================
 
 interface OfflineDaySessionProps {
-  agentId: number;
+  agentId: string;
   agenceId: string;
 }
-
-// Cash denomination structure
-const DENOMINATIONS = [
-  { value: 10000, label: '10 000' },
-  { value: 5000, label: '5 000' },
-  { value: 2000, label: '2 000' },
-  { value: 1000, label: '1 000' },
-  { value: 500, label: '500' },
-  { value: 100, label: '100' },
-  { value: 50, label: '50' },
-  { value: 25, label: '25' },
-  { value: 10, label: '10' },
-  { value: 5, label: '5' },
-];
 
 // ============================================================================
 // Component
@@ -461,53 +447,4 @@ export default function OfflineDaySession({ agentId, agenceId }: OfflineDaySessi
   );
 }
 
-// ============================================================================
-// Billetage Input Sub-component
-// ============================================================================
-
-function BilletageInput({
-  billetage,
-  onChange,
-  total,
-}: {
-  billetage: Record<string, number>;
-  onChange: (denomination: string, count: number) => void;
-  total: number;
-}) {
-  return (
-    <div className="space-y-2">
-      <div className="grid grid-cols-3 gap-2 text-xs text-content-muted px-1">
-        <span>Coupure</span>
-        <span>Nombre</span>
-        <span className="text-right">Sous-total</span>
-      </div>
-
-      {DENOMINATIONS.map(({ value, label }) => {
-        const count = billetage[String(value)] || 0;
-        const subtotal = value * count;
-
-        return (
-          <div key={value} className="grid grid-cols-3 gap-2 items-center">
-            <span className="text-sm text-content-secondary font-medium">{label} {currencySymbol()}</span>
-            <input
-              type="number"
-              min={0}
-              value={count || ''}
-              onChange={(e) => onChange(String(value), parseInt(e.target.value) || 0)}
-              className="bg-surface-elevated border border-edge-strong rounded px-2 py-1.5 text-content-primary text-sm text-center w-full"
-              placeholder="0"
-            />
-            <span className="text-sm text-content-muted text-right">
-              {subtotal > 0 ? formatMoney(subtotal) : '-'}
-            </span>
-          </div>
-        );
-      })}
-
-      <div className="border-t border-edge-strong pt-2 flex justify-between items-center">
-        <span className="text-sm font-semibold text-content-secondary">Total</span>
-        <span className="text-lg font-bold text-content-primary">{formatMoney(total)}</span>
-      </div>
-    </div>
-  );
-}
+// BilletageInput is now imported from ./BilletageInput.tsx

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { TabGroup, ConfirmDialog, PageHeader, FeatureHeader, FEATURE_DESCRIPTIONS } from '../ui';
 import { Users, Calendar, UserPlus, AlertTriangle, Gift, GraduationCap, ClipboardCheck, Building2, FileText, Upload, BarChart3 } from 'lucide-react';
 import { usePermissions } from '../auth/ProtectedFeature';
@@ -61,6 +61,14 @@ export default function RessourcesHumaines() {
   const setActiveTab = useCallback((tab: string) => {
     navigateToModule('rh', tab as TabKey);
   }, [navigateToModule]);
+
+  // Redirect bare /ressources-humaines to /ressources-humaines/employes
+  useEffect(() => {
+    if (!currentSubModule || !VALID_TABS.includes(currentSubModule)) {
+      navigateToModule('rh', 'list');
+    }
+  }, [currentSubModule]);
+
   const [showForm, setShowForm] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -327,7 +335,7 @@ export default function RessourcesHumaines() {
                     setEditingEmploye(null);
                     setShowForm(true);
                   }}
-                  className="px-3 py-1.5 bg-accent-secondary hover:bg-accent-secondary-hover text-content-primary rounded-lg text-xs font-bold shadow-lg shadow-accent/20 transition flex items-center gap-1.5 self-start sm:self-auto"
+                  className="px-3 py-1.5 bg-accent-secondary hover:bg-accent-secondary-hover text-white rounded-lg text-xs font-bold shadow-lg shadow-accent/20 transition flex items-center gap-1.5 self-start sm:self-auto"
                 >
                   <UserPlus size={14} />
                   <span>Nouvel Employé</span>

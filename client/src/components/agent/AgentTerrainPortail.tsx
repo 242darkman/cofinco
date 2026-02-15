@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { Map, FileText, GraduationCap, Package, AlertTriangle, Target, BarChart3, TrendingUp, Trophy, Download, LayoutDashboard, UserCircle, ChevronDown, Search, X, UserPlus, Eye, Menu, ChevronLeft, ChevronRight, WifiOff } from 'lucide-react';
+import { Map, FileText, GraduationCap, Package, AlertTriangle, Target, BarChart3, TrendingUp, Trophy, Download, LayoutDashboard, UserCircle, ChevronDown, Search, X, UserPlus, Eye, Menu, ChevronLeft, ChevronRight, Activity } from 'lucide-react';
 import { Card } from '../ui';
 import AgentCommissions from './AgentCommissions';
 import AgentPlanning from './AgentPlanning';
@@ -14,12 +14,11 @@ import AgentReportsGenerator from './AgentReportsGenerator';
 import AgentTeamLeaderboard from './AgentTeamLeaderboard';
 import ProspectionList from './ProspectionList';
 import ProspectionSupervisionPanel from './ProspectionSupervisionPanel';
-import OfflineDaySession from './offline/OfflineDaySession';
+import AgentSessionManager from './sessions/AgentSessionManager';
 import LoadingScreen from '../ui/LoadingScreen';
 import { authService } from '../../lib/auth';
 import { agentTerrainApi } from '../../lib/api-client';
 import { useProspectionBadge } from '../../hooks/useProspectionBadge';
-import { useOfflinePendingCount } from '../../hooks/useJournalSync';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '../ui/sheet';
 
@@ -48,7 +47,6 @@ export default function AgentTerrainPortail({ agentId }: { agentId?: string }) {
 
   // Prospection badge counts - only show badge for new (REGISTERED) prospects
   const { newCount: prospectionCount } = useProspectionBadge();
-  const pendingOffline = useOfflinePendingCount();
   const { user } = useUserProfile();
 
   // Admin / Supervisor shared state
@@ -91,17 +89,33 @@ export default function AgentTerrainPortail({ agentId }: { agentId?: string }) {
     }, 300);
   };
 
-  // Wrapper component to pass agentId/agenceId to OfflineDaySession
-  const OfflineDaySessionWrapper = useCallback(({ agentId: _agentId }: any) => {
-    const numericAgentId = user?.id ? parseInt(user.id, 10) : 0;
+  // Wrapper component for unified GL + Offline session management
+  const SessionManagerWrapper = useCallback(({ agentId: propAgentId }: any) => {
+    const effectiveAgentId = isAdminOrSupervisor ? propAgentId : user?.id;
     const agencyId = user?.agenceId || '';
-    if (!numericAgentId) return <div className="text-center py-12 text-content-muted">Chargement du profil...</div>;
-    return <OfflineDaySession agentId={numericAgentId} agenceId={agencyId} />;
-  }, [user]);
+    if (!effectiveAgentId) {
+      if (isAdminOrSupervisor) {
+        return (
+          <div className="flex flex-col items-center justify-center py-20 text-content-muted gap-3">
+            <UserCircle size={48} className="opacity-30" />
+            <p className="text-sm font-medium">Veuillez sélectionner un agent pour afficher sa session</p>
+          </div>
+        );
+      }
+      return <div className="text-center py-12 text-content-muted">Chargement du profil...</div>;
+    }
+    return (
+      <AgentSessionManager
+        agentId={effectiveAgentId}
+        agenceId={agencyId}
+        mode={isAdminOrSupervisor ? 'supervisor' : 'agent'}
+      />
+    );
+  }, [user, isAdminOrSupervisor]);
 
   const modules = [
     { id: 'dashboard', name: 'Tableau de Bord', icon: LayoutDashboard, component: AgentDashboard },
-    { id: 'offline-session', name: 'Session Offline', icon: WifiOff, component: OfflineDaySessionWrapper, badge: pendingOffline > 0 ? pendingOffline : undefined },
+    { id: 'session', name: 'Session', icon: Activity, component: SessionManagerWrapper },
     { id: 'reports', name: 'Rapports', icon: Download, component: AgentReportsGenerator },
     { id: 'leaderboard', name: 'Classement', icon: Trophy, component: AgentTeamLeaderboard },
     { id: 'prospections', name: 'Prospections', icon: UserPlus, component: ProspectionList, badge: prospectionCount },

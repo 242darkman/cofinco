@@ -95,6 +95,7 @@ export type GlobalMessage = {
     | "ACCOUNTING_UPDATE" | "LIQUIDITY_CHANGED" | "LOYALTY_UPDATE"
     | "SETTINGS_UPDATE" | "RBAC_UPDATE"
     | "AGENT_MODULES_UPDATE"
+    | "SESSION_AGENT_UPDATE"
 
     // =============================================
     // LOCALISATION (Agents terrain)

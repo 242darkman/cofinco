@@ -3,12 +3,15 @@ import {
   Users, Wallet, ArrowRightLeft, UserPlus, RefreshCw,
   Wifi, Search, MapPin, ChevronDown, Clock, CheckCircle,
   Target, Banknote, Calendar, AlertTriangle, MessageSquare,
-  ClipboardCheck, ChevronLeft, ChevronRight, User, Play, Loader2
+  ClipboardCheck, ChevronLeft, ChevronRight, User, Play, Loader2,
+  ShieldCheck, Printer, ArrowDownLeft, ArrowUpRight
 } from 'lucide-react';
 import { agentTerrainApi, caisseAgentApi } from '../../lib/api-client';
 import { authService } from '../../lib/auth';
 import AgentTerrainPaiement from './AgentTerrainPaiement';
 import SettlementModal from './SettlementModal';
+import CloseSessionModal from './CloseSessionModal';
+import { useAgentGlSession } from '../../hooks/useAgentGlSession';
 import ProspectionFormModal from './ProspectionFormModal';
 import AgentPlanning from './AgentPlanning';
 import EnqueteCreditForm from '../finance/credits/EnqueteCreditForm';
@@ -16,8 +19,9 @@ import { UniversalPaymentSuccessModal } from '../finance/caisse/shared/Universal
 import { ReceiptData } from '../ui/printable/ReceiptTemplate';
 import { useIsOnline } from '@/contexts/NetworkContext';
 import { getOperationStats } from '@/lib/offline-db';
-import { StatutUser, StatutOperationTerrain } from '@shared/enum/status-constants';
+import { StatutUser, StatutOperationTerrain, TYPE_OPERATION_TERRAIN_LABELS, TypeOperationTerrainType } from '@shared/enum/status-constants';
 import { SystemRole, normalizeRole } from '@shared/types/roles';
+import { currencySymbol } from '@shared/config/currency';
 import { resolveStorageUrl } from '../../lib/format';
 
 interface Agent {
@@ -29,15 +33,20 @@ interface Agent {
   zone_affectation: string;
   statut: string;
   photo_url?: string;
+  currentAgenceId?: string;
 }
 
 interface Transaction {
   id: string;
-  type: string;
+  type: string;        // raw type: COLLECT_CASH, SETTLEMENT_CASH, PROVISIONING, SESSION_CLOSE
+  typeLabel: string;    // display label (e.g. "Dépôt Épargne", "Remise", "Approvisionnement")
+  subLabel: string;     // secondary info (client name, caisse name)
   montant: number;
-  clientNom?: string;
+  isWithdrawal: boolean;
   date: string;
   statut: string;
+  reference?: string;
+  rawData?: any;        // original API data for receipt generation
 }
 
 interface PlanningEntry {
@@ -92,6 +101,11 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
 
   // Target agent: supervisor uses selected agent, normal agent uses themselves
   const targetAgentId = canSupervise ? selectedAgentId : currentAgent?.id;
+  const targetAgent = canSupervise ? allAgents.find(a => a.id === selectedAgentId) : currentAgent;
+  const targetAgenceId = targetAgent?.currentAgenceId || currentUser?.agenceId;
+
+  // GL session
+  const { session: glSession, hasActiveSession: hasGlSession } = useAgentGlSession(targetAgentId);
 
   // Modals
   const [showPaiementForm, setShowPaiementForm] = useState(false);
@@ -101,6 +115,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
   const [receiptData, setReceiptData] = useState<ReceiptData | undefined>();
   const [showFullPlanning, setShowFullPlanning] = useState(false);
   const [enqueteFormData, setEnqueteFormData] = useState<any>(null);
+  const [showCloseSessionModal, setShowCloseSessionModal] = useState(false);
 
   // Agent dropdown search
   const [agentDropdownOpen, setAgentDropdownOpen] = useState(false);
@@ -167,6 +182,18 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
     }
   }, [targetAgentId]);
 
+  // Real-time: refresh balance when session is provisioned via WebSocket
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (targetAgentId && detail?.agentId === targetAgentId) {
+        loadAgentData(targetAgentId);
+      }
+    };
+    window.addEventListener('session-agent-update', handler);
+    return () => window.removeEventListener('session-agent-update', handler);
+  }, [targetAgentId]);
+
   const loadAgents = async () => {
     try {
       // For non-admin users, first try to get their own agent profile
@@ -214,14 +241,51 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
 
       const ops = await caisseAgentApi.listOperations({ agentId, limit: 5 });
       const opsData = Array.isArray(ops) ? ops : ops.operations || [];
-      setRecentTransactions(opsData.slice(0, 5).map((op: any) => ({
-        id: op.id,
-        type: op.type === 'COLLECT_CASH' ? 'Collecte' : 'Remise',
-        montant: parseFloat(op.montant),
-        clientNom: op.client?.nom || 'N/A',
-        date: op.submittedAt || op.createdAt,
-        statut: op.statut
-      })));
+      setRecentTransactions(opsData.slice(0, 5).map((op: any) => {
+        const typePaiement = op.metadata?.typePaiementClient as TypeOperationTerrainType | undefined;
+        const isWithdrawal = typePaiement === 'WITHDRAWAL_CURRENT' || typePaiement === 'WITHDRAWAL_SAVINGS';
+        const clientFullName = op.client ? `${op.client.prenom || ''} ${op.client.nom || ''}`.trim() : '';
+
+        let typeLabel: string;
+        let subLabel: string;
+
+        switch (op.type) {
+          case 'COLLECT_CASH':
+            typeLabel = typePaiement
+              ? (TYPE_OPERATION_TERRAIN_LABELS[typePaiement] || 'Collecte')
+              : 'Collecte';
+            subLabel = clientFullName || 'Client';
+            break;
+          case 'SETTLEMENT_CASH':
+            typeLabel = 'Remise';
+            subLabel = op.destinationCaisse?.nom || 'Caisse';
+            break;
+          case 'PROVISIONING':
+            typeLabel = 'Approvisionnement';
+            subLabel = op.sourceCaisse?.nom || 'Caisse';
+            break;
+          case 'SESSION_CLOSE':
+            typeLabel = 'Clôture Session';
+            subLabel = op.destinationCaisse?.nom || '';
+            break;
+          default:
+            typeLabel = op.type;
+            subLabel = clientFullName || '';
+        }
+
+        return {
+          id: op.id,
+          type: op.type,
+          typeLabel,
+          subLabel,
+          montant: parseFloat(op.montant),
+          isWithdrawal,
+          date: op.submittedAt || op.createdAt,
+          statut: op.statut,
+          reference: op.reference,
+          rawData: op,
+        };
+      }));
     } catch (error) {
       console.error('Error loading agent data:', error);
     } finally {
@@ -368,15 +432,59 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
     loadData();
   };
 
+  const handleReprintReceipt = (op: Transaction) => {
+    const raw = op.rawData;
+    if (!raw) return;
+
+    const clientName = raw.client ? `${raw.client.prenom || ''} ${raw.client.nom || ''}`.trim() : '';
+    const agentName = raw.agent ? `${raw.agent.prenom || ''} ${raw.agent.nom || ''}`.trim() : '';
+    const montant = parseFloat(raw.montant);
+
+    const rData: ReceiptData = {
+      title: op.type === 'COLLECT_CASH' ? 'REÇU PROVISOIRE' : 'REÇU OPÉRATION',
+      reference: raw.reference || op.id,
+      date: new Date(raw.submittedAt || raw.createdAt),
+      type: op.typeLabel,
+      transaction: {
+        id: raw.reference || op.id,
+        date: new Date(raw.submittedAt || raw.createdAt),
+        type: op.isWithdrawal ? 'RETRAIT' : 'DEPOT',
+        amount: montant,
+        cashierName: agentName,
+      },
+      ...(raw.client && {
+        client: {
+          nom: raw.client.nom || '',
+          prenom: raw.client.prenom || '',
+        },
+      }),
+      agent: { nom: agentName, prenom: '' },
+      items: [{
+        description: op.typeLabel,
+        details: raw.metadata?.observations || '',
+        montant,
+        quantite: 1,
+      }],
+      total: montant,
+      modePaiement: 'Espèces',
+      devise: currencySymbol(),
+    };
+
+    setReceiptData(rData);
+    setShowSuccessModal(true);
+  };
+
   const formatMoney = (amount: number) => amount.toLocaleString('fr-FR');
+  const formatMoneyCurrency = (amount: number) => `${amount.toLocaleString('fr-FR')} ${currencySymbol()}`;
   const formatMoneyK = (amount: number) => {
     if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(1)}M`;
     if (amount >= 1_000) return `${(amount / 1_000).toFixed(0)}K`;
     return amount.toString();
   };
-  const formatTime = (dateStr: string) => {
+  const formatDateTime = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }) + ' ' +
+      date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
   };
 
   // Start an investigation (ASSIGNED → IN_PROGRESS)
@@ -626,12 +734,6 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                 pulse={kpis.incidentsOpen > 0}
               />
               <KPIChip
-                icon={MessageSquare}
-                value={String(kpis.messagesUnread)}
-                label="Messages"
-                color={kpis.messagesUnread > 0 ? 'purple' : 'slate'}
-              />
-              <KPIChip
                 icon={ClipboardCheck}
                 value={String(pendingEnquetes.length)}
                 label="Enquêtes"
@@ -644,18 +746,18 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
 
         {/* --- ACTION GRID --- */}
         <div className={`px-3 pb-2 ${agentDisabled ? 'opacity-40 pointer-events-none grayscale' : ''}`}>
-           <div className="grid grid-cols-2 gap-2">
+           <div className={`grid gap-2 ${hasGlSession ? 'grid-cols-3' : 'grid-cols-2'}`}>
               <ActionTile
                  title="COLLECTE"
                  subtitle="Tontine"
                  icon={Wallet}
                  color="emerald"
-                 className="col-span-2"
+                 className={hasGlSession ? 'col-span-3' : 'col-span-2'}
                  onClick={() => setShowPaiementForm(true)}
               />
               <ActionTile
-                 title={canSupervise ? "ENCAISSER" : "REMISE"}
-                 subtitle="Operation"
+                 title="REMISE"
+                 subtitle="Caisse Agence"
                  icon={ArrowRightLeft}
                  color="blue"
                  onClick={() => setShowSettlementModal(true)}
@@ -667,6 +769,15 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                  color="purple"
                  onClick={() => setShowProspectionForm(true)}
               />
+              {hasGlSession && (
+                <ActionTile
+                  title="CLÔTURER"
+                  subtitle="Fin de journée"
+                  icon={ShieldCheck}
+                  color="amber"
+                  onClick={() => setShowCloseSessionModal(true)}
+                />
+              )}
            </div>
         </div>
 
@@ -865,24 +976,46 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                   </div>
                 </div>
                 <div className="divide-y divide-edge/60">
-                   {recentTransactions.map(op => (
-                      <div key={op.id} className="flex items-center justify-between px-3 py-2">
-                         <div className="flex items-center gap-2 min-w-0">
-                            <div className={`w-1 h-6 rounded-full shrink-0 ${op.type === 'Collecte' ? 'bg-status-success' : 'bg-status-info'}`} />
-                            <div className="min-w-0">
-                               <div className="text-xs font-semibold text-content-primary truncate">{op.type}</div>
-                               <div className="text-[10px] text-content-muted truncate">{op.clientNom}</div>
-                            </div>
+                   {recentTransactions.map(op => {
+                     const indicatorColor =
+                       op.type === 'COLLECT_CASH' ? (op.isWithdrawal ? 'bg-status-warning' : 'bg-status-success')
+                       : op.type === 'PROVISIONING' ? 'bg-accent'
+                       : op.type === 'SETTLEMENT_CASH' ? 'bg-status-info'
+                       : 'bg-content-muted';
+                     const DirectionIcon = op.isWithdrawal || op.type === 'SETTLEMENT_CASH' ? ArrowUpRight : ArrowDownLeft;
+                     const amountColor = op.isWithdrawal || op.type === 'SETTLEMENT_CASH'
+                       ? 'text-status-warning' : 'text-status-success';
+                     const amountPrefix = op.isWithdrawal || op.type === 'SETTLEMENT_CASH' ? '-' : '+';
+
+                     return (
+                       <div key={op.id} className="flex items-center gap-2 px-3 py-2">
+                         <div className={`w-1 h-8 rounded-full shrink-0 ${indicatorColor}`} />
+                         <DirectionIcon size={14} className={`shrink-0 ${amountColor}`} />
+                         <div className="min-w-0 flex-1">
+                           <div className="text-xs font-semibold text-content-primary truncate">{op.typeLabel}</div>
+                           <div className="text-[10px] text-content-muted truncate">{op.subLabel}</div>
                          </div>
-                         <div className="text-right shrink-0 pl-2">
-                            <div className="text-xs font-bold text-content-primary">{formatMoney(op.montant)}</div>
-                            <div className="flex items-center justify-end gap-1 text-[10px] text-content-muted">
-                              <span>{formatTime(op.date)}</span>
-                              {op.statut === StatutOperationTerrain.APPROVED && <CheckCircle size={8} className="text-status-success" />}
-                            </div>
+                         <div className="text-right shrink-0">
+                           <div className={`text-xs font-bold tabular-nums ${amountColor}`}>
+                             {amountPrefix}{formatMoneyCurrency(op.montant)}
+                           </div>
+                           <div className="flex items-center justify-end gap-1 text-[10px] text-content-muted">
+                             <span>{formatDateTime(op.date)}</span>
+                             {op.statut === StatutOperationTerrain.APPROVED && <CheckCircle size={8} className="text-status-success" />}
+                           </div>
                          </div>
-                      </div>
-                   ))}
+                         {op.type === 'COLLECT_CASH' && (
+                           <button
+                             onClick={() => handleReprintReceipt(op)}
+                             className="p-1.5 rounded-lg text-content-muted hover:text-accent hover:bg-surface transition-colors shrink-0"
+                             title="Réimprimer reçu"
+                           >
+                             <Printer size={13} />
+                           </button>
+                         )}
+                       </div>
+                     );
+                   })}
                 </div>
               </div>
            </div>
@@ -903,8 +1036,24 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
         <SettlementModal
           isOpen={showSettlementModal}
           agentId={targetAgentId || ''}
+          agenceId={targetAgenceId}
           onClose={() => setShowSettlementModal(false)}
           onSuccess={handleSettlementSuccess}
+        />
+      )}
+
+      {showCloseSessionModal && glSession && (
+        <CloseSessionModal
+          isOpen={showCloseSessionModal}
+          agentId={targetAgentId || ''}
+          agenceId={targetAgenceId}
+          sessionId={glSession.id}
+          soldeTheorique={parseFloat(agentSummary?.valide?.toString() || '0')}
+          onClose={() => setShowCloseSessionModal(false)}
+          onSuccess={() => {
+            setShowCloseSessionModal(false);
+            loadData();
+          }}
         />
       )}
 
@@ -1158,7 +1307,7 @@ interface ActionTileProps {
   title: string;
   subtitle: string;
   icon: React.ElementType;
-  color: 'emerald' | 'blue' | 'purple';
+  color: 'emerald' | 'blue' | 'purple' | 'amber';
   className?: string;
   onClick: () => void;
 }
@@ -1168,6 +1317,7 @@ function ActionTile({ title, subtitle, icon: Icon, color, className = '', onClic
     emerald: 'bg-status-success hover:bg-status-success border-status-success shadow-status-success/20',
     blue: 'bg-status-info hover:bg-status-info border-status-info shadow-status-info/20',
     purple: 'bg-accent hover:bg-accent border-accent shadow-accent/20',
+    amber: 'bg-status-warning hover:bg-status-warning border-status-warning shadow-status-warning/20',
   };
 
   const isWide = className.includes('col-span-2');
@@ -1179,18 +1329,18 @@ function ActionTile({ title, subtitle, icon: Icon, color, className = '', onClic
         ${className} relative group overflow-hidden rounded-2xl border-t border-l border-white/20 shadow-xl
         transition-all active:scale-[0.97] text-white
         ${colors[color]}
-        ${isWide ? 'py-5' : 'py-4'}
-        flex flex-col items-center justify-center gap-1
+        ${isWide ? 'py-4' : 'py-3'}
+        flex flex-col items-center justify-center gap-0.5
       `}
     >
-       <Icon size={isWide ? 80 : 60} className="absolute -bottom-3 -right-3 opacity-15 rotate-12 pointer-events-none" />
+       <Icon size={isWide ? 60 : 48} className="absolute -bottom-2 -right-2 opacity-15 rotate-12 pointer-events-none" />
 
-       <div className="relative z-10 p-2.5 bg-black/20 rounded-full group-hover:bg-black/10 transition-colors">
-          <Icon size={isWide ? 28 : 22} />
+       <div className="relative z-10 p-2 bg-black/20 rounded-full group-hover:bg-black/10 transition-colors">
+          <Icon size={isWide ? 24 : 20} />
        </div>
        <div className="relative z-10 text-center">
-          <div className={`font-black tracking-tight ${isWide ? 'text-xl' : 'text-base'}`}>{title}</div>
-          <div className="text-[9px] font-medium opacity-70 uppercase tracking-wider">{subtitle}</div>
+          <div className={`font-black tracking-tight ${isWide ? 'text-lg' : 'text-sm'}`}>{title}</div>
+          <div className="text-[8px] font-medium opacity-70 uppercase tracking-wider">{subtitle}</div>
        </div>
     </button>
   );

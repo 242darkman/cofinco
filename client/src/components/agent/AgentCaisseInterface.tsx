@@ -3,12 +3,12 @@ import { DollarSign, CheckCircle, AlertCircle, Search, CreditCard, Banknote, Arr
 import AppShell from '../layout/AppShell';
 import AgentSidebarContent from '../layout/AgentSidebarContent';
 import AgentHeader from '../layout/AgentHeader';
-import OfflineDaySession from './offline/OfflineDaySession';
+import AgentSessionManager from './sessions/AgentSessionManager';
 import { ALL_STATUS_LABELS } from '@/lib/status-labels';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useNetworkStatus } from '@/contexts/NetworkContext';
 import { useOfflinePendingCount } from '@/hooks/useJournalSync';
-import { executeOfflineOperation } from '@/lib/offline-treasury';
+
 
 interface AgentCaisseInterfaceProps {
   agentId: string;
@@ -275,9 +275,10 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
         {activeTab === 'offline' && (
           <div className="animate-slide-up">
             {user?.id ? (
-              <OfflineDaySession
-                agentId={parseInt(user.id, 10)}
+              <AgentSessionManager
+                agentId={user.id}
                 agenceId={user.agenceId || ''}
+                mode="agent"
               />
             ) : (
               <div className="text-center py-12 text-content-muted">Chargement du profil...</div>

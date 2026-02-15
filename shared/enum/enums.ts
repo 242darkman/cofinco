@@ -200,6 +200,8 @@ export const typeOperationCaisseEnum = pgEnum("type_operation_caisse", [
   "CLOSING_FEE",
   // Restitution de frais
   "FEE_REFUND",
+  // Provisionnement agent terrain
+  "AGENT_PROVISIONING",
 ]);
 
 export const statutTransfertCaisseEnum = pgEnum("statut_transfert_caisse_enum", [
@@ -358,6 +360,11 @@ export const typePaiementTerrainEnum = pgEnum("type_paiement_terrain_enum", [
   "CLOSURE_PAYOUT_SAVINGS",
   "CLOSURE_PAYOUT_CURRENT",
   "CLOSURE_PAYOUT_BLOCKED",
+  // Retraits agent terrain (GL routing: Débit 4111/4112, Crédit 573)
+  "AGENT_WITHDRAWAL_SAVINGS",
+  "AGENT_WITHDRAWAL_CURRENT",
+  // Provisionnement agent terrain (GL routing: Débit 573, Crédit 571)
+  "AGENT_PROVISIONING",
 ]);
 
 // ============================================
@@ -463,6 +470,15 @@ export const statutCaisseAgentEnum = pgEnum("statut_caisse_agent_enum", [
 export const typeOperationTerrainEnum = pgEnum("type_operation_terrain_enum", [
   "COLLECT_CASH",
   "SETTLEMENT_CASH",
+  "PROVISIONING",
+  "SESSION_CLOSE",
+]);
+
+export const statutSessionAgentEnum = pgEnum("statut_session_agent_enum", [
+  "REQUESTING_FUNDS",
+  "ACTIVE",
+  "CLOSING",
+  "CLOSED",
 ]);
 
 export const statutOperationTerrainEnum = pgEnum("statut_operation_terrain_enum", [

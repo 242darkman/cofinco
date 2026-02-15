@@ -287,7 +287,7 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
         {canCreateAccounts && (
           <button
             onClick={() => setShowForm(true)}
-            className="px-3 py-1.5 bg-accent-secondary hover:bg-accent-secondary-hover text-content-primary rounded-lg transition flex items-center gap-1.5 text-sm shadow-lg shadow-accent/20"
+            className="px-3 py-1.5 bg-accent-secondary hover:bg-accent-secondary-hover text-white rounded-lg transition flex items-center gap-1.5 text-sm shadow-lg shadow-accent/20"
           >
             <Plus size={16} />
             <span className="hidden sm:inline">Nouveau Compte</span>

@@ -3063,7 +3063,7 @@ export async function processLoanCashPayout(data: {
  * Get pending loan disbursements for a specific agency
  * Used by the cashier dashboard to see which loans need to be paid out
  */
-export async function getPendingLoanDisbursements(agenceId?: string): Promise<Array<{
+export async function getPendingLoanDisbursements(agenceId?: string, caisseId?: string): Promise<Array<{
     credit: Credit;
     client: { id: string; nom: string; prenom: string | null; photoUrl?: string | null };
     demande?: any;
@@ -3073,7 +3073,8 @@ export async function getPendingLoanDisbursements(agenceId?: string): Promise<Ar
         eq(credits.statut, 'WAITING_DISBURSEMENT' as any),
         eq(credits.disbursementChannel, 'CASH' as any),
         eq(credits.disbursementStatus, 'PENDING' as any),
-        agenceId ? eq(credits.agenceId, agenceId) : undefined
+        agenceId ? eq(credits.agenceId, agenceId) : undefined,
+        caisseId ? or(eq(credits.targetCaisseId, caisseId), isNull(credits.targetCaisseId)) : undefined,
     );
 
     const results = await db.select({

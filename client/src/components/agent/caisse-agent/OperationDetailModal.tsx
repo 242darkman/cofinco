@@ -11,7 +11,7 @@ import {
 import { Modal, Button, Badge } from '../../ui';
 import type { OperationTerrainWithRelations } from '@shared/schema';
 import { formatClientName } from '../../../lib/format';
-import { StatutOperationTerrain } from '@shared/enum/status-constants';
+import { StatutOperationTerrain, TypeOperationTerrain, TYPE_OPERATION_TERRAIN_LABELS, type TypeOperationTerrainType } from '@shared/enum/status-constants';
 
 interface OperationDetailModalProps {
   operation: OperationTerrainWithRelations;
@@ -85,8 +85,10 @@ export default function OperationDetailModal({
 }: OperationDetailModalProps) {
   const statutInfo = getStatutInfo(operation.statut);
   const StatutIcon = statutInfo.icon;
-  const isCollect = operation.type === 'COLLECT_CASH';
   const metadata = operation.metadata as any;
+  const isWithdrawal = metadata?.typePaiementClient === TypeOperationTerrain.WITHDRAWAL_CURRENT
+    || metadata?.typePaiementClient === TypeOperationTerrain.WITHDRAWAL_SAVINGS;
+  const isCollect = operation.type === 'COLLECT_CASH' && !isWithdrawal;
 
   return (
     <Modal
@@ -100,13 +102,15 @@ export default function OperationDetailModal({
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
             <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-              isCollect ? 'bg-accent/10 text-accent' : 'bg-status-success-bg text-status-success'
+              isCollect ? 'bg-accent/10 text-accent' :
+              isWithdrawal ? 'bg-status-danger-bg text-status-danger' :
+              'bg-status-success-bg text-status-success'
             }`}>
               {isCollect ? <ArrowDownRight size={24} /> : <ArrowUpRight size={24} />}
             </div>
             <div>
               <h3 className="text-lg font-bold text-content-primary">
-                {isCollect ? 'Collecte Cash' : 'Remise Cash'}
+                {isWithdrawal ? 'Retrait Espèces' : isCollect ? 'Collecte Cash' : 'Remise Cash'}
               </h3>
               <p className="text-sm text-content-muted">
                 Réf: {operation.reference}
@@ -119,7 +123,9 @@ export default function OperationDetailModal({
         {/* Montant */}
         <div className="p-4 bg-surface-elevated rounded-xl border border-edge">
           <p className="text-xs text-content-muted uppercase tracking-wider mb-1">Montant</p>
-          <p className={`text-3xl font-bold ${isCollect ? 'text-accent' : 'text-status-success'}`}>
+          <p className={`text-3xl font-bold ${
+            isCollect ? 'text-accent' : isWithdrawal ? 'text-status-danger' : 'text-status-success'
+          }`}>
             {isCollect ? '+' : '-'}{formatMoney(operation.montant as unknown as string)} {operation.devise}
           </p>
         </div>
@@ -177,7 +183,7 @@ export default function OperationDetailModal({
                 <p className="text-xs text-content-muted">Type de paiement</p>
               </div>
               <p className="text-sm font-medium text-content-primary">
-                {metadata.typePaiementClient}
+                {TYPE_OPERATION_TERRAIN_LABELS[metadata.typePaiementClient as TypeOperationTerrainType] || metadata.typePaiementClient}
               </p>
             </div>
           )}

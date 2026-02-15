@@ -6,6 +6,7 @@ import { clients } from "./clients";
 import { agences } from "./agences";
 import { sessionsCaisse, operationsCaisse, mouvementsFinanciers, credits, comptes, caisses } from "./finance";
 import { employes } from "./employes";
+import { planComptable } from "./accounting";
 import { methodePaiementEnum, statutTransactionEnum, typePaiementTerrainEnum } from "@shared/enum/enums";
 import { sql } from "drizzle-orm";
 
@@ -20,6 +21,13 @@ export const agentsTerrain = pgTable("agents_terrain", {
   // Lien vers la table employes (source de vérité pour l'identité RH)
   employeId: uuid("employe_id").references(() => employes.id, { onDelete: "cascade" }),
 
+  // Rattachement financier courant (peut différer du RH pendant un transfert)
+  currentAgenceId: uuid("current_agence_id")
+    .references(() => agences.id, { onDelete: "set null" }),
+
+  // Sous-compte GL auto-provisionné (ex: 573BZV001)
+  currentGlAccountId: uuid("current_gl_account_id")
+    .references(() => planComptable.id, { onDelete: "set null" }),
 
   // Zone d'affectation
   zoneAffectation: text("zone_affectation"),

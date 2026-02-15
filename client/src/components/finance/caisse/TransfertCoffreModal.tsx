@@ -138,10 +138,15 @@ export function TransfertCoffreModal({
 
             <FormField
               label="Montant (FCFA)"
-              type="number"
+              type="text"
+              inputMode="numeric"
               placeholder="0"
               required
-              {...register('montant')}
+              {...register('montant', {
+                onChange: (e) => {
+                  e.target.value = e.target.value.replace(/[^0-9]/g, '');
+                },
+              })}
               error={errors.montant?.message}
             />
 
