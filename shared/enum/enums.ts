@@ -365,6 +365,10 @@ export const typePaiementTerrainEnum = pgEnum("type_paiement_terrain_enum", [
   "AGENT_WITHDRAWAL_CURRENT",
   // Provisionnement agent terrain (GL routing: Débit 573, Crédit 571)
   "AGENT_PROVISIONING",
+  // Restitution de frais (Caisse Queue)
+  "FEE_REFUND",
+  // Paiement salaire (Caisse Queue)
+  "SALARY_PAYMENT",
 ]);
 
 // ============================================
