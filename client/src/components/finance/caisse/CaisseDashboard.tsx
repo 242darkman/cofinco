@@ -623,7 +623,7 @@ export default function CaisseDashboard({
     { key: 'transferts', label: 'Transferts', icon: ArrowRightLeft, disabled: !isSessionOpen || isClosingWorkflow },
     { key: 'etats', label: 'États', icon: FileText, disabled: !isSessionOpen },
     { key: 'supervision', label: 'Supervision', icon: Shield, disabled: false },
-    { key: 'audit', label: 'Audit', icon: ScrollText, disabled: false },
+    { key: 'audit', label: 'Audit', icon: ScrollText, disabled: !isSessionOpen },
   ];
 
   if (!accessGranted) {
@@ -1092,6 +1092,7 @@ export default function CaisseDashboard({
       <PendingActivationDrawer
         open={showActivationDrawer}
         onClose={() => setShowActivationDrawer(false)}
+        sessionId={currentSession?.id || ''}
         onActivate={(account) => {
            setShowActivationDrawer(false);
            // Ouvrir le modal d'activation dédié avec le compte complet
