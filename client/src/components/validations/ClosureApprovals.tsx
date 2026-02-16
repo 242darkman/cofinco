@@ -263,7 +263,7 @@ export default function ClosureApprovals({ agenceId }: ClosureApprovalsProps) {
                   </div>
                   <div>
                     <p className="text-[10px] uppercase tracking-wider text-content-muted mb-0.5">Frais de clôture</p>
-                    <p className="text-sm font-semibold text-status-danger">
+                    <p className={`text-sm font-semibold ${fee > 0 ? 'text-status-danger' : 'text-content-secondary'}`}>
                       {fee > 0 ? `- ${formatMoney(fee)}` : '0'} <span className="text-[10px] text-content-muted">FCFA</span>
                     </p>
                   </div>
@@ -375,6 +375,7 @@ export default function ClosureApprovals({ agenceId }: ClosureApprovalsProps) {
         onClose={() => setApproveTarget(null)}
         onConfirm={handleApprove}
         title="Approuver la clôture"
+        size="md"
         message={
           approveTarget ? (
             <div className="space-y-3">
@@ -394,7 +395,9 @@ export default function ClosureApprovals({ agenceId }: ClosureApprovalsProps) {
                 </div>
                 <div>
                   <p className="text-[10px] text-content-muted uppercase">Frais</p>
-                  <p className="text-sm font-semibold text-status-danger">- {formatMoney(approveTarget.closingFeeAmount)}</p>
+                  <p className={`text-sm font-semibold ${Number(approveTarget.closingFeeAmount) > 0 ? 'text-status-danger' : 'text-content-secondary'}`}>
+                    {Number(approveTarget.closingFeeAmount) > 0 ? `- ${formatMoney(approveTarget.closingFeeAmount)}` : '0'}
+                  </p>
                 </div>
                 <div>
                   <p className="text-[10px] text-content-muted uppercase">Net</p>
@@ -437,6 +440,7 @@ export default function ClosureApprovals({ agenceId }: ClosureApprovalsProps) {
         onClose={() => { setCancelTarget(null); setCancelReason(''); }}
         onConfirm={handleCancel}
         title="Rejeter la clôture"
+        size="md"
         message={
           <div className="space-y-3">
             <p>

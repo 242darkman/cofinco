@@ -1716,10 +1716,12 @@ export async function createCompteWithInitialDeposit(
     }
 
     // 1. Allocate initial payment (if any) — fee first, then deposit
+    //    ONLY for TRANSFER (atomic debit from source account).
+    //    CASH/MOBILE_MONEY: payment collected later (caisse or pawaPay webhook).
     let paidOpeningFee = 0;
     let paidInitialDeposit = 0;
 
-    if (data.montantInitial > 0) {
+    if (data.modePaiement === 'TRANSFER' && data.montantInitial > 0) {
       const alloc = allocateOpeningPayment(data.montantInitial, snapshot, 0, 0);
       paidOpeningFee = alloc.feePayment;
       paidInitialDeposit = alloc.depositPayment;

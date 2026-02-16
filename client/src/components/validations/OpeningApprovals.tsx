@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Card, Badge, ConfirmDialog } from '../ui';
 import { toast, handleApiError } from '../../lib/toast';
+import { formatMoney } from '../../lib/format';
 
 interface OpeningRequest {
   id: string;
@@ -31,9 +32,6 @@ interface OpeningApprovalsProps {
 
 const PAGE_SIZE = 10;
 
-function formatMoney(value: string | number): string {
-  return Number(value).toLocaleString('fr-FR');
-}
 
 const TYPE_LABEL: Record<string, { label: string; icon: React.ElementType; className: string }> = {
   SAVINGS: { label: 'Épargne', icon: PiggyBank, className: 'bg-status-success-bg border-status-success/20 text-status-success' },
@@ -233,7 +231,8 @@ export default function OpeningApprovals({ agenceId }: OpeningApprovalsProps) {
         paginated.map((req) => {
           const fee = Number(req.openingFeeAmount);
           const deposit = Number(req.initialDepositAmount);
-          const total = fee + deposit;
+          const total = deposit; // deposit already includes fees
+          const netDeposit = deposit - fee; // amount actually credited to account
 
           return (
             <Card key={req.id} variant="default" padding="md" className="border-status-info/20">
@@ -266,20 +265,23 @@ export default function OpeningApprovals({ agenceId }: OpeningApprovalsProps) {
                   <div>
                     <p className="text-[10px] uppercase tracking-wider text-content-muted mb-0.5">Frais d'ouverture</p>
                     <p className="text-sm font-semibold text-status-danger">
-                      {fee > 0 ? `${formatMoney(fee)}` : 'Offerts'} <span className="text-[10px] text-content-muted">FCFA</span>
+                      {fee > 0 ? formatMoney(fee) : 'Offerts'}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[10px] uppercase tracking-wider text-content-muted mb-0.5">Dépôt initial</p>
+                    <p className="text-[10px] uppercase tracking-wider text-content-muted mb-0.5">Dépôt sur compte</p>
                     <p className="text-sm font-semibold text-content-secondary">
-                      {formatMoney(deposit)} <span className="text-[10px] text-content-muted">FCFA</span>
+                      {formatMoney(netDeposit)}
                     </p>
                   </div>
                   <div>
                     <p className="text-[10px] uppercase tracking-wider text-content-muted mb-0.5">Total à verser</p>
                     <p className="text-sm font-bold text-status-success">
-                      {formatMoney(total)} <span className="text-[10px] text-content-muted">FCFA</span>
+                      {formatMoney(total)}
                     </p>
+                    {fee > 0 && (
+                      <p className="text-[10px] text-content-muted mt-0.5">dont {formatMoney(fee)} de frais</p>
+                    )}
                   </div>
                 </div>
 
@@ -287,7 +289,7 @@ export default function OpeningApprovals({ agenceId }: OpeningApprovalsProps) {
                 <div className="flex items-start gap-2 px-3 py-2 bg-status-info/5 border border-status-info/15 rounded-lg">
                   <Banknote size={14} className="text-status-info mt-0.5 shrink-0" />
                   <p className="text-xs text-status-info/90">
-                    Après approbation, le caissier pourra encaisser le dépôt initial de {formatMoney(total)} FCFA.
+                    Après approbation, le caissier pourra encaisser le dépôt initial de {formatMoney(total)}.
                   </p>
                 </div>
 
@@ -377,6 +379,7 @@ export default function OpeningApprovals({ agenceId }: OpeningApprovalsProps) {
         onClose={() => setApproveTarget(null)}
         onConfirm={handleApprove}
         title="Approuver l'ouverture de compte"
+        size="md"
         message={
           approveTarget ? (
             <div className="space-y-3">
@@ -399,14 +402,17 @@ export default function OpeningApprovals({ agenceId }: OpeningApprovalsProps) {
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-content-muted uppercase">Dépôt initial</p>
-                  <p className="text-sm font-semibold text-content-secondary">{formatMoney(approveTarget.initialDepositAmount)}</p>
+                  <p className="text-[10px] text-content-muted uppercase">Dépôt sur compte</p>
+                  <p className="text-sm font-semibold text-content-secondary">{formatMoney(Number(approveTarget.initialDepositAmount) - Number(approveTarget.openingFeeAmount))}</p>
                 </div>
                 <div>
                   <p className="text-[10px] text-content-muted uppercase">Total</p>
                   <p className="text-sm font-bold text-status-success">
-                    {formatMoney(Number(approveTarget.openingFeeAmount) + Number(approveTarget.initialDepositAmount))}
+                    {formatMoney(approveTarget.initialDepositAmount)}
                   </p>
+                  {Number(approveTarget.openingFeeAmount) > 0 && (
+                    <p className="text-[10px] text-content-muted mt-0.5">dont {formatMoney(approveTarget.openingFeeAmount)} de frais</p>
+                  )}
                 </div>
               </div>
 
@@ -434,6 +440,7 @@ export default function OpeningApprovals({ agenceId }: OpeningApprovalsProps) {
         onClose={() => { setRejectTarget(null); setRejectReason(''); }}
         onConfirm={handleReject}
         title="Rejeter l'ouverture de compte"
+        size="md"
         message={
           <div className="space-y-3">
             <p>

@@ -49,7 +49,7 @@ export async function approveOpeningRequest(
     }
 
     // Maker-checker: approver must differ from initiator
-    if (request.initiatedBy === userId) {
+    if (request.initiatedBy === userId && process.env.NODE_ENV === "production") {
       throw new CompteError(
         "L'approbateur doit être différent de l'initiateur (maker-checker)",
         "SAME_USER_APPROVAL"

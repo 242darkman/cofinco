@@ -18,7 +18,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { UniversalPaymentSuccessModal } from '../caisse/shared/UniversalPaymentSuccessModal';
 import type { ReceiptData } from '../../ui/printable/ReceiptTemplate';
 
-const BILLETS_FCFA = [10000, 5000, 2000, 1000, 500] as const;
 
 interface Client {
   id: string;
@@ -101,13 +100,8 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
 
   // Modals Logic
   const [showMobileMoneyModal, setShowMobileMoneyModal] = useState(false);
-  const [showCaisseModal, setShowCaisseModal] = useState(false);
   const [mobileMoneyData, setMobileMoneyData] = useState({
     numero_telephone: '',
-  });
-  const [caisseData, setCaisseData] = useState({
-    billets: {} as Record<number, number>,
-    reference_recu: ''
   });
   const [selectedOperator, setSelectedOperator] = useState<string>('');
   const [mmFeeEstimate, setMmFeeEstimate] = useState<{ feeAmount: number; feeRate: number; montantBrut: number; montantNet: number } | null>(null);
@@ -342,14 +336,13 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
 
      const soldeInitial = parseFloat(formData.solde_initial) || 0;
 
-     if (formData.mode_ouverture === 'CASH' && soldeInitial > 0) {
-        setShowCaisseModal(true);
-     } else if (isMobileMoneyMode && soldeInitial > 0) {
+     if (isMobileMoneyMode && soldeInitial > 0) {
         setSelectedOperator(formData.mode_ouverture);
         setMmStep('idle');
         setMmError(null);
         setShowMobileMoneyModal(true);
      } else {
+        // CASH & TRANSFER: create account directly (PENDING_PAYMENT → caisse queue)
         performAccountCreation();
      }
   };
@@ -399,7 +392,6 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
       toast.error(handleApiError(error, 'Erreur création compte'));
     } finally {
       setLoading(false);
-      setShowCaisseModal(false);
     }
   };
 
@@ -519,17 +511,6 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
   const handleMmRetry = () => {
     setMmStep('idle');
     setMmError(null);
-  };
-
-  // --- Caisse Logic ---
-  const handleCaisseValidation = () => {
-    const totalBillets = Object.entries(caisseData.billets).reduce((sum, [billet, count]) => sum + (parseInt(billet) * count), 0);
-    const initialAmount = parseFloat(formData.solde_initial) || 0;
-    if (totalBillets !== initialAmount) {
-        toast.error(`Le montant compté (${formatMoney(totalBillets)}) ne correspond pas au montant attendu`);
-        return;
-    }
-    performAccountCreation();
   };
 
   // --- Sub-components (Inline for access to state) ---
@@ -1134,90 +1115,6 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
         </div>
 
       </div>
-
-      {/* --- Caisse Confirmation Modal --- */}
-      <AnimatePresence>
-        {showCaisseModal && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-            <motion.div 
-               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-               className="absolute inset-0 bg-black/90 backdrop-blur-md"
-               onClick={() => setShowCaisseModal(false)}
-            />
-            <motion.div 
-               initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
-               className="bg-surface-base border border-edge rounded-2xl p-6 w-full max-w-lg z-10 relative shadow-2xl"
-            >
-               <h3 className="text-xl font-bold text-content-primary mb-2 flex items-center gap-2">
-                  <Banknote className="text-status-success" /> Validation Caisse
-               </h3>
-               <p className="text-content-muted mb-6">Confirmez le comptage physique des espèces pour le dépôt initial.</p>
-
-               {/* Summary */}
-               <div className="bg-surface p-4 rounded-xl mb-6 space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-content-muted">Montant Total Attendu</span>
-                    <span className="text-2xl font-bold text-content-primary">{formatMoney(parseFloat(formData.solde_initial))}</span>
-                  </div>
-                  {openingFee > 0 && (
-                    <div className="border-t border-edge pt-2 space-y-1">
-                      <div className="flex justify-between text-xs">
-                        <span className="text-content-muted">Dont frais d'ouverture</span>
-                        <span className="text-status-danger">{formatMoney(openingFee)}</span>
-                      </div>
-                      <div className="flex justify-between text-xs">
-                        <span className="text-content-muted">Dont dépôt sur compte</span>
-                        <span className="text-status-success">{formatMoney(parseFloat(formData.solde_initial) - openingFee)}</span>
-                      </div>
-                    </div>
-                  )}
-               </div>
-
-               {/* Billetage Forms */}
-               <div className="space-y-2 mb-6 max-h-60 overflow-y-auto pr-2">
-                  {BILLETS_FCFA.map(billet => (
-                     <div key={billet} className="flex items-center gap-4">
-                        <span className="w-16 text-right font-mono text-content-muted">{billet}</span>
-                        <input 
-                           type="number" 
-                           placeholder="0"
-                           value={caisseData.billets[billet] || ''}
-                           onChange={(e) => setCaisseData(p => ({
-                              ...p, 
-                              billets: { ...p.billets, [billet]: parseInt(e.target.value) || 0}
-                           }))}
-                           className="flex-1 bg-surface-base border border-edge rounded-lg px-3 py-2 text-content-primary text-right focus:border-status-success outline-none"
-                        />
-                     </div>
-                  ))}
-               </div>
-               
-               {/* Computed Total */}
-               <div className="flex justify-between items-center py-4 border-t border-edge mb-6">
-                  <span className="font-bold text-content-secondary">Total Compté</span>
-                  <span className={`text-xl font-bold ${
-                     Object.entries(caisseData.billets).reduce((s, [b, c]) => s + (parseInt(b) * c), 0) === parseFloat(formData.solde_initial)
-                        ? 'text-status-success' 
-                        : 'text-status-danger'
-                  }`}>
-                     {formatMoney(Object.entries(caisseData.billets).reduce((s, [b, c]) => s + (parseInt(b) * c), 0))}
-                  </span>
-               </div>
-
-               <div className="flex gap-3">
-                  <Button onClick={() => setShowCaisseModal(false)} variant="ghost" fullWidth>Annuler</Button>
-                  <Button 
-                     onClick={handleCaisseValidation}
-                     variant="success"
-                     fullWidth
-                  >
-                     Valider le Dépôt
-                  </Button>
-               </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       {/* --- Mobile Money Live Payment Modal --- */}
       <AnimatePresence>

@@ -29,6 +29,7 @@ export interface ConfirmDialogProps {
   title: string;
   message: string | React.ReactNode;
   variant?: ConfirmDialogVariant;
+  size?: 'sm' | 'md' | 'lg';
   confirmText?: string;
   cancelText?: string;
   isLoading?: boolean;
@@ -43,6 +44,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   title,
   message,
   variant = 'danger',
+  size = 'sm',
   confirmText = 'Confirmer',
   cancelText = 'Annuler',
   isLoading = false,
@@ -96,7 +98,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title={title}
-      size="sm"
+      size={size}
       variant={config.modalVariant}
       closeOnBackdrop={!isLoading}
       closeOnEsc={!isLoading}
