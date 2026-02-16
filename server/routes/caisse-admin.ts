@@ -20,6 +20,7 @@ import { caisseSecurityCodes } from "@shared/schema/operations";
 import { users, userRoles, coffresForts, agences } from "@shared/schema";
 import { eq, desc, and, gte, lte, sql, count, isNull, isNotNull, or } from "drizzle-orm";
 import { isAdminRole } from "@shared/types/roles";
+import { createMouvementFinancier } from "../services/ledger";
 
 export const caisseAdminRouter = Router();
 
@@ -1851,6 +1852,168 @@ caisseAdminRouter.post(
     } catch (error: any) {
       logger.error({ err: error, requestId: req.params.id }, "Erreur annulation payment request");
       res.status(400).json({ error: error.message || "Erreur lors de l'annulation" });
+    }
+  }
+);
+
+// ============================================================================
+// ROUTES - CORRECTION DE SOLDE CAISSE (Admin/Supervision)
+// ============================================================================
+
+const balanceCorrectionSchema = z.object({
+  newBalance: z.number().min(0, "Le nouveau solde doit être >= 0"),
+  motif: z.string().min(10, "Le motif doit contenir au moins 10 caractères"),
+});
+
+/**
+ * POST /api/caisses/:id/balance-correction
+ * Corrige le solde d'une caisse (ex: solde négatif suite à une incohérence).
+ * Réservé aux admins/supervision. Crée un log d'audit détaillé.
+ */
+caisseAdminRouter.post(
+  "/:id/balance-correction",
+  attachAbility,
+  requireAbility(Actions.MANAGE, Subjects.CAISSE),
+  async (req, res) => {
+    try {
+      const caisseId = req.params.id;
+      const userId = (req as any).user?.id;
+      const parsed = balanceCorrectionSchema.safeParse(req.body);
+
+      if (!parsed.success) {
+        return res.status(400).json({
+          error: parsed.error.errors.map((e) => e.message).join("; "),
+        });
+      }
+
+      const { newBalance, motif } = parsed.data;
+
+      // 1. Récupérer la caisse actuelle (avec agenceId pour le mouvement financier)
+      const [caisse] = await db
+        .select({
+          id: caisses.id,
+          nom: caisses.nom,
+          solde: caisses.solde,
+          statut: caisses.statut,
+          agenceId: caisses.agenceId,
+        })
+        .from(caisses)
+        .where(eq(caisses.id, caisseId));
+
+      if (!caisse) {
+        return res.status(404).json({ error: "Caisse introuvable" });
+      }
+
+      const oldBalance = Number(caisse.solde || 0);
+
+      // 2. Vérifier qu'il n'y a pas de session active sur cette caisse
+      const { sessionsCaisse, agences: agencesTable } = await import("@shared/schema");
+      const [activeSession] = await db
+        .select({ id: sessionsCaisse.id })
+        .from(sessionsCaisse)
+        .where(
+          and(
+            eq(sessionsCaisse.caisseId, caisseId),
+            isNull(sessionsCaisse.closedAt),
+            sql`${sessionsCaisse.statut} IN ('OPEN', 'CLOSING_COUNT', 'CLOSING_VALIDATION')`
+          )
+        )
+        .limit(1);
+
+      if (activeSession) {
+        return res.status(409).json({
+          error: "Impossible de corriger le solde : une session est active sur cette caisse. Fermez-la d'abord.",
+        });
+      }
+
+      // 3. Récupérer l'agenceId de la caisse
+      const agenceId = caisse.agenceId;
+
+      // 4. Appliquer la correction dans une transaction (avec mouvement financier pour satisfaire BALANCE_GUARD)
+      const delta = newBalance - oldBalance;
+      await db.transaction(async (tx) => {
+        // Créer un mouvement financier d'ajustement (requis par le trigger BALANCE_GUARD)
+        if (Math.abs(delta) > 0) {
+          await createMouvementFinancier(
+            tx,
+            {
+              agenceId: agenceId || undefined,
+              sens: delta > 0 ? "CREDIT" : "DEBIT",
+              montant: Math.abs(delta).toString(),
+              sourceModule: "CAISSE",
+              typePaiement: "ADJUSTMENT",
+              requiresGlPosting: false,
+              metadata: {
+                type: "ADMIN_BALANCE_CORRECTION",
+                caisseId,
+                caisseName: caisse.nom,
+                oldBalance,
+                newBalance,
+                motif,
+                correctedBy: userId,
+              },
+            },
+            userId
+          );
+        } else {
+          // Pas de delta — bypass le guard manuellement
+          await tx.execute(sql`SELECT set_config('app.mouvement_created', 'true', true)`);
+        }
+
+        // Mettre à jour le solde
+        await tx
+          .update(caisses)
+          .set({
+            solde: newBalance.toString(),
+            updatedAt: new Date(),
+          })
+          .where(eq(caisses.id, caisseId));
+
+        // Log d'audit — sessionId requis (NOT NULL), utiliser la dernière session fermée
+        const [lastSession] = await tx
+          .select({ id: sessionsCaisse.id })
+          .from(sessionsCaisse)
+          .where(eq(sessionsCaisse.caisseId, caisseId))
+          .orderBy(desc(sessionsCaisse.createdAt))
+          .limit(1);
+
+        if (lastSession) {
+          await tx.insert(sessionsCaisseAuditLogs).values({
+            sessionId: lastSession.id,
+            caisseId,
+            action: "BALANCE_CORRECTION",
+            userId,
+            details: {
+              oldBalance,
+              newBalance,
+              delta,
+              motif,
+              caisseName: caisse.nom,
+              correctedBy: userId,
+            },
+            ipAddress: req.ip,
+          });
+        }
+      });
+
+      logger.warn(
+        { caisseId, caisseName: caisse.nom, oldBalance, newBalance, userId, motif },
+        "[BALANCE_CORRECTION] Solde caisse corrigé par supervision"
+      );
+
+      res.json({
+        success: true,
+        caisse: {
+          id: caisseId,
+          nom: caisse.nom,
+          oldBalance,
+          newBalance,
+        },
+        message: `Solde corrigé de ${oldBalance.toLocaleString('fr-FR')} à ${newBalance.toLocaleString('fr-FR')} FCFA`,
+      });
+    } catch (error: any) {
+      logger.error({ err: error, caisseId: req.params.id }, "Erreur correction solde caisse");
+      res.status(500).json({ error: error.message || "Erreur lors de la correction" });
     }
   }
 );

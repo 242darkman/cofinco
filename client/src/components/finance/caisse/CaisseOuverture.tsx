@@ -8,6 +8,7 @@ import { api } from '../../../lib/api';
 import { sessionCaisseApi, caisseAccessControlApi, authApi } from '../../../lib/api-client';
 import { SystemRole, isAdminRole, normalizeRole } from '@shared/types/roles';
 import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 interface CaisseOuvertureProps {
   onClose: () => void;
@@ -333,7 +334,11 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
       }, 1500);
 
     } catch (err: any) {
-      setError(err.message || "Erreur lors de la soumission de la demande.");
+      const msg = err.message || "Erreur lors de la soumission de la demande.";
+      setError(msg);
+      if (msg.includes('négatif') || msg.includes('NEGATIVE')) {
+        setBackendNegativeBalance(true);
+      }
     } finally {
       setLoading(false);
     }
@@ -438,6 +443,44 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
   // La caisse a-t-elle des fonds reportés ?
   const hasFondsReporte = soldeExistant > 0;
 
+  // Détection de solde négatif pour permettre la correction admin
+  // Double détection : via le solde local OU via l'erreur backend
+  const [backendNegativeBalance, setBackendNegativeBalance] = useState(false);
+  const hasNegativeBalance = soldeExistant < 0 || backendNegativeBalance;
+  const [correcting, setCorrecting] = useState(false);
+
+  const handleBalanceCorrection = async () => {
+    if (!selectedCaisseId || !isAdmin) return;
+    setCorrecting(true);
+    setError('');
+    try {
+      const res = await fetch(`/api/caisses/${selectedCaisseId}/balance-correction`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          newBalance: 0,
+          motif: `Correction automatique du solde négatif (${soldeExistant} FCFA) détecté à l'ouverture de session`,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erreur lors de la correction');
+      toast.success('Solde corrigé', { description: data.message });
+      // Recharger les caisses pour mettre à jour le solde affiché
+      if (selectedCaisse) {
+        selectedCaisse.solde = '0';
+      }
+      queryClient.invalidateQueries({ queryKey: ['session-caisse'] });
+      setBackendNegativeBalance(false);
+      setError('');
+      setSuccessMessage(`Solde remis à 0 FCFA. Vous pouvez maintenant ouvrir la session.`);
+    } catch (err: any) {
+      setError(err.message || 'Erreur lors de la correction du solde');
+    } finally {
+      setCorrecting(false);
+    }
+  };
+
   // ========== OUVERTURE DIRECTE (avec fonds existants) ==========
   const handleDirectOpening = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -504,7 +547,12 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
       }, 1500);
 
     } catch (err: any) {
-      setError(err.message || "Erreur lors de l'ouverture directe.");
+      const msg = err.message || "Erreur lors de l'ouverture directe.";
+      setError(msg);
+      // Détecter l'erreur de solde négatif du backend
+      if (msg.includes('négatif') || msg.includes('NEGATIVE')) {
+        setBackendNegativeBalance(true);
+      }
     } finally {
       setLoading(false);
     }
@@ -592,9 +640,29 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
 
            {/* Messages d'erreur/succès */}
            {error && (
-             <div className="mb-4 p-3 bg-status-danger-bg border border-status-danger/50 rounded-xl flex items-center gap-3 text-status-danger-text text-sm animate-in slide-in-from-top-2">
-               <AlertCircle className="h-5 w-5 flex-shrink-0 text-status-danger" />
-               <span>{error}</span>
+             <div className="mb-4 p-3 bg-status-danger-bg border border-status-danger/50 rounded-xl text-sm animate-in slide-in-from-top-2">
+               <div className="flex items-center gap-3 text-status-danger-text">
+                 <AlertCircle className="h-5 w-5 flex-shrink-0 text-status-danger" />
+                 <span>{error}</span>
+               </div>
+               {/* Bouton de correction pour admins quand solde négatif */}
+               {hasNegativeBalance && isAdmin && selectedCaisseId && (
+                 <div className="mt-3 pt-3 border-t border-status-danger/20">
+                   <p className="text-xs text-content-muted mb-2">
+                     En tant que superviseur, vous pouvez remettre le solde à 0 FCFA pour débloquer l'ouverture.
+                   </p>
+                   <Button
+                     size="sm"
+                     variant="outline"
+                     onClick={handleBalanceCorrection}
+                     disabled={correcting}
+                     className="border-status-danger/50 text-status-danger hover:bg-status-danger-bg"
+                   >
+                     {correcting ? <Loader2 size={14} className="mr-1.5 animate-spin" /> : <Shield size={14} className="mr-1.5" />}
+                     {correcting ? 'Correction en cours...' : 'Corriger le solde à 0 FCFA'}
+                   </Button>
+                 </div>
+               )}
              </div>
            )}
 

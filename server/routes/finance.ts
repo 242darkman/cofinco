@@ -2861,18 +2861,19 @@ export function registerFinanceRoutes(app: Express) {
                // Priority: montantReporte (funds kept for next day) > caisse.solde > declared amount
                // montantReporte is set during the closing workflow when cashier decides to keep funds
                // IMPORTANT: Use Number() to check actual value, not string truthiness ("0" is truthy!)
+               // IMPORTANT: Exposer les valeurs négatives pour que le frontend puisse les détecter et proposer une correction
                const montantReporte = Number(lastClosedSession.montantReporte || 0);
                const soldeCaisse = Number(c.solde || 0);
                const montantDeclare = Number(lastClosedSession.montantFermetureDeclare || 0);
                const montantTheorique = Number(lastClosedSession.montantFermetureTheorique || 0);
 
-               if (montantReporte > 0) {
+               if (montantReporte !== 0) {
                   currentSolde = montantReporte.toString();
-               } else if (soldeCaisse > 0) {
+               } else if (soldeCaisse !== 0) {
                   currentSolde = soldeCaisse.toString();
-               } else if (montantDeclare > 0) {
+               } else if (montantDeclare !== 0) {
                   currentSolde = montantDeclare.toString();
-               } else if (montantTheorique > 0) {
+               } else if (montantTheorique !== 0) {
                   currentSolde = montantTheorique.toString();
                } else {
                   currentSolde = "0";
@@ -2933,18 +2934,19 @@ export function registerFinanceRoutes(app: Express) {
             if (lastClosedSession) {
                // Priority: montantReporte (funds kept for next day) > caisse.solde > declared amount
                // IMPORTANT: Use Number() to check actual value, not string truthiness ("0" is truthy!)
+               // IMPORTANT: Exposer les valeurs négatives pour détection frontend
                const montantReporte = Number(lastClosedSession.montantReporte || 0);
                const soldeCaisse = Number(c.solde || 0);
                const montantDeclare = Number(lastClosedSession.montantFermetureDeclare || 0);
                const montantTheorique = Number(lastClosedSession.montantFermetureTheorique || 0);
 
-               if (montantReporte > 0) {
+               if (montantReporte !== 0) {
                   currentSolde = montantReporte.toString();
-               } else if (soldeCaisse > 0) {
+               } else if (soldeCaisse !== 0) {
                   currentSolde = soldeCaisse.toString();
-               } else if (montantDeclare > 0) {
+               } else if (montantDeclare !== 0) {
                   currentSolde = montantDeclare.toString();
-               } else if (montantTheorique > 0) {
+               } else if (montantTheorique !== 0) {
                   currentSolde = montantTheorique.toString();
                } else {
                   currentSolde = "0";
