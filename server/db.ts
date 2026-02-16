@@ -1718,7 +1718,7 @@ export async function ensureCustomFunctions(): Promise<void> {
         CREATE OR REPLACE FUNCTION lock_reevaluation_on_final()
         RETURNS TRIGGER AS $$
         BEGIN
-            IF NEW.statut IN ('Approuvée', 'Rejetée définitivement', 'Annulée')
+            IF NEW.statut IN ('APPROVED', 'DEFINITIVELY_REJECTED', 'CANCELLED')
                AND OLD.statut != NEW.statut THEN
                 NEW.verrouille := true;
                 NEW.date_verrouillage := NOW();
