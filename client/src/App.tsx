@@ -7,7 +7,8 @@ import ErrorBoundary from './components/shared/ErrorBoundary';
 import LoadingScreen from './components/ui/LoadingScreen';
 import AppShell from './components/layout/AppShell';
 import { authService } from './lib/auth';
-import { getReturnTo, getPostLoginDestination } from './lib/navigation';
+import { getReturnTo, getPostLoginDestination, buildLoginUrl } from './lib/navigation';
+import { getSyncMonitor } from './services/SyncMonitorService';
 import LocationTracker from '@/components/agent/LocationTracker';
 import { FeatureFlagsProvider } from './contexts/FeatureFlagsContext';
 import { WebSocketProvider } from './contexts/WebSocketContext';
@@ -81,13 +82,16 @@ function App() {
     // Sauvegarder le message pour l'afficher sur la page de login
     setSessionExpiredMessage(message);
 
+    // Arrêter le SyncMonitor pour éviter les heartbeats 401 sur la page de login
+    getSyncMonitor().stop();
+
     // Nettoyer l'état et le cache
     setCurrentUser(null);
     setIsAuthenticated(false);
     setShowSeasonalWelcome(false);
     setShowLoadingAfterLogin(false);
     setShowConnectedSuccess(false);
-    
+
     // Clear all React Query cache to prevent stale data
     queryClient.removeQueries();
     queryClient.clear();
@@ -158,15 +162,22 @@ function App() {
     }, 1500);
   };
   
-  // Rediriger /login vers / si déjà authentifié (évite URL incohérente)
+  // Sync URL avec l'état d'authentification
   useEffect(() => {
-    if (isAuthenticated && location === '/login') {
+    const isOnLoginPage = location === '/login' || location.startsWith('/login?');
+    if (isAuthenticated && isOnLoginPage) {
+      // Rediriger /login vers / si déjà authentifié
       setLocation('/', { replace: true });
+    } else if (!isAuthenticated && !isLoading && !isOnLoginPage) {
+      // Rediriger vers /login si non authentifié (avec returnTo pour revenir après login)
+      const loginUrl = buildLoginUrl(location !== '/' ? location : undefined);
+      setLocation(loginUrl, { replace: true });
     }
-  }, [isAuthenticated, location, setLocation]);
+  }, [isAuthenticated, isLoading, location, setLocation]);
 
   const handleLogout = () => {
     authService.logout();
+    getSyncMonitor().stop();
     setCurrentUser(null);
     setIsAuthenticated(false);
     queryClient.removeQueries();
