@@ -89,12 +89,12 @@ export default function AdminTontinePlansGestion({ showForm: externalShowForm, o
     setFormData({
       nom: plan.nom,
       description: plan.description || '',
-      montant_cotisation: plan.montant_cotisation.toString(),
-      nombre_membres: plan.nombre_membres.toString(),
+      montant_cotisation: (plan.montant_cotisation ?? 0).toString(),
+      nombre_membres: (plan.nombre_membres ?? 12).toString(),
       frequence: plan.frequence,
       type_distribution: plan.type_distribution,
-      taux_plateforme: plan.taux_plateforme.toString(),
-      intervalle_cotisation: plan.intervalle_cotisation.toString(),
+      taux_plateforme: (plan.taux_plateforme ?? 5).toString(),
+      intervalle_cotisation: (plan.intervalle_cotisation ?? 1).toString(),
       actif: plan.actif
     });
     setSelectedPlanId(plan.id);
@@ -187,7 +187,7 @@ export default function AdminTontinePlansGestion({ showForm: externalShowForm, o
               <div className="space-y-3 mb-6 bg-surface/30 p-3 rounded-lg border border-edge/50">
                 <div className="flex justify-between text-sm items-baseline">
                   <span className="text-content-muted font-medium">Cotisation:</span>
-                  <span className="font-bold text-accent text-base">{plan.montant_cotisation.toLocaleString()} {currency.symbol}</span>
+                  <span className="font-bold text-accent text-base">{(plan.montant_cotisation ?? 0).toLocaleString()} {currency.symbol}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-content-muted font-medium">Membres:</span>
