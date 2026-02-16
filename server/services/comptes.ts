@@ -1751,10 +1751,10 @@ export async function createCompteWithInitialDeposit(
       paidOpeningFee: paidOpeningFee.toString(),
       paidInitialDeposit: paidInitialDeposit.toString(),
       isApproved: false,
-      blocageActif: data.blocageActif || false,
+      blocageActif: data.blocageActif || data.typeCompte === TypeCompteEnum.BLOCKED,
       blocageMotif: data.blocageMotif,
       blocageReference: data.blocageReference,
-      blocageDebut: data.blocageActif ? new Date() : null,
+      blocageDebut: (data.blocageActif || data.typeCompte === TypeCompteEnum.BLOCKED) ? new Date() : null,
       blocageFin: data.blocageFin ? new Date(data.blocageFin) : null,
       createdBy: userId,
     } as any).returning();
