@@ -231,34 +231,34 @@ export default function AdminProductRates() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-white/20 rounded-lg">
-              <Percent size={20} className="text-content-primary" />
+              <Percent size={20} className="text-white" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-content-primary">Gestion des Taux</h2>
-              <p className="text-[11px] text-accent/80">Configuration produits</p>
+              <h2 className="text-base font-bold text-white">Gestion des Taux</h2>
+              <p className="text-[11px] text-white/70">Configuration produits</p>
             </div>
           </div>
 
           {/* Inline Stats */}
           <div className="hidden sm:flex items-center gap-4">
             <div className="text-center px-3">
-              <p className="text-lg font-bold text-content-primary">{stats.total}</p>
-              <p className="text-[9px] text-accent/70 uppercase">Produits</p>
+              <p className="text-lg font-bold text-white">{stats.total}</p>
+              <p className="text-[9px] text-white/60 uppercase">Produits</p>
             </div>
             <div className="w-px h-8 bg-white/20" />
             <div className="text-center px-3">
-              <p className="text-lg font-bold text-status-success">{stats.active}</p>
-              <p className="text-[9px] text-accent/70 uppercase">Actifs</p>
+              <p className="text-lg font-bold text-white">{stats.active}</p>
+              <p className="text-[9px] text-white/60 uppercase">Actifs</p>
             </div>
             <div className="w-px h-8 bg-white/20" />
             <div className="text-center px-3">
-              <p className="text-lg font-bold text-status-warning">{stats.avgRate}%</p>
-              <p className="text-[9px] text-accent/70 uppercase">Taux Moy.</p>
+              <p className="text-lg font-bold text-yellow-200">{stats.avgRate}%</p>
+              <p className="text-[9px] text-white/60 uppercase">Taux Moy.</p>
             </div>
             <div className="w-px h-8 bg-white/20" />
             <div className="text-center px-3">
-              <p className="text-lg font-bold text-accent">{stats.withRates}</p>
-              <p className="text-[9px] text-accent/70 uppercase">Avec Taux</p>
+              <p className="text-lg font-bold text-white">{stats.withRates}</p>
+              <p className="text-[9px] text-white/60 uppercase">Avec Taux</p>
             </div>
           </div>
 
@@ -267,7 +267,7 @@ export default function AdminProductRates() {
             disabled={isLoading}
             className="p-2 bg-white/10 hover:bg-white/20 rounded-lg transition"
           >
-            <RefreshCw size={16} className={cn("text-content-primary", isLoading && "animate-spin")} />
+            <RefreshCw size={16} className={cn("text-white", isLoading && "animate-spin")} />
           </button>
         </div>
       </div>
