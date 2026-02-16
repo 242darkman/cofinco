@@ -398,7 +398,8 @@ export type TypeOperationCaisseType =
   | 'MISC_COLLECTION' | 'MISC_DISBURSEMENT' | 'BANK_FEE'
   | 'TONTINE_CONTRIBUTION' | 'TONTINE_WITHDRAWAL'
   | 'LOAN_REPAYMENT' | 'LOAN_DISBURSEMENT' | 'WITHDRAWAL_SAVINGS'
-  | 'INITIAL_DEPOSIT' | 'OPENING_FEE';
+  | 'INITIAL_DEPOSIT' | 'OPENING_FEE'
+  | 'FEE_REFUND' | 'SALARY_PAYMENT' | 'ACCOUNT_ACTIVATION';
 
 export const TYPE_OPERATION_CAISSE_LABELS: Record<TypeOperationCaisseType, string> = {
   SAVINGS_DEPOSIT: "Dépôt épargne",
@@ -426,6 +427,9 @@ export const TYPE_OPERATION_CAISSE_LABELS: Record<TypeOperationCaisseType, strin
   WITHDRAWAL_SAVINGS: "Retrait Épargne",
   INITIAL_DEPOSIT: "Dépôt Initial",
   OPENING_FEE: "Frais d'ouverture",
+  FEE_REFUND: "Remboursement de frais",
+  SALARY_PAYMENT: "Paiement de salaire",
+  ACCOUNT_ACTIVATION: "Activation de compte",
 };
 
 export const TYPE_OPERATION_CAISSE_COLORS: Record<TypeOperationCaisseType, string> = {
@@ -454,6 +458,9 @@ export const TYPE_OPERATION_CAISSE_COLORS: Record<TypeOperationCaisseType, strin
   WITHDRAWAL_SAVINGS: "bg-status-danger-bg text-status-danger border-status-danger/30",
   INITIAL_DEPOSIT: "bg-status-success-bg text-status-success border-status-success/30",
   OPENING_FEE: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  FEE_REFUND: "bg-status-success-bg text-status-success border-status-success/30",
+  SALARY_PAYMENT: "bg-accent/10 text-accent border-accent/30",
+  ACCOUNT_ACTIVATION: "bg-status-info-bg text-status-info border-status-info/30",
 };
 
 // --- Type Paiement Terrain ---
@@ -890,6 +897,17 @@ export const ALL_STATUS_LABELS: Record<string, string> = {
   ...MODE_CALCUL_PAIE_LABELS,
   ...PRIORITE_ALERTE_TONTINE_LABELS,
   ...SC_METHODE_PAIEMENT_LABELS,
+
+  // --- Labels mouvements financiers (clôture, agent, etc.) ---
+  CLOSURE_PAYOUT_SAVINGS: "Remboursement clôture épargne",
+  CLOSURE_PAYOUT_CURRENT: "Remboursement clôture courant",
+  CLOSURE_PAYOUT_BLOCKED: "Remboursement clôture bloqué",
+  CLOSING_FEE_SAVINGS: "Frais de clôture épargne",
+  CLOSING_FEE_CURRENT: "Frais de clôture courant",
+  CLOSING_FEE_BLOCKED: "Frais de clôture bloqué",
+  AGENT_WITHDRAWAL_SAVINGS: "Retrait agent (épargne)",
+  AGENT_WITHDRAWAL_CURRENT: "Retrait agent (courant)",
+  AGENT_PROVISIONING: "Approvisionnement agent",
 
   // --- Labels lowercase (alertes sécurité, audit, etc.) ---
   active: "Actif",
