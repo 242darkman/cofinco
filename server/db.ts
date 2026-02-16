@@ -673,17 +673,17 @@ export async function ensureCustomFunctions(): Promise<void> {
               RETURN;
           END IF;
 
-          IF v_compte.statut = 'Suspendu' THEN
+          IF v_compte.statut = 'SUSPENDED' THEN
               RETURN QUERY SELECT FALSE, 'Compte suspendu'::TEXT;
               RETURN;
           END IF;
 
-          IF v_compte.statut = 'Clôturé' THEN
+          IF v_compte.statut = 'CLOSED' THEN
               RETURN QUERY SELECT FALSE, 'Compte clôturé'::TEXT;
               RETURN;
           END IF;
 
-          IF v_compte.type_compte = 'Bloqué' AND v_compte.blocage_actif = TRUE THEN
+          IF v_compte.type_compte = 'BLOCKED' AND v_compte.blocage_actif = TRUE THEN
               RETURN QUERY SELECT FALSE, ('Compte bloqué: ' || COALESCE(v_compte.blocage_motif::TEXT, 'Raison non spécifiée'))::TEXT;
               RETURN;
           END IF;
@@ -832,9 +832,9 @@ export async function ensureCustomFunctions(): Promise<void> {
             SELECT
               COALESCE(SUM(
                 CASE
-                  WHEN o.type_operation IN ('Versement', 'Depot', 'Encaissement', 'Dépôt épargne', 'Remboursement crédit', 'Approvisionnement coffre')
+                  WHEN o.type_operation IN ('SAVINGS_DEPOSIT', 'DEPOSIT_SAVINGS', 'DEPOSIT_CURRENT', 'DEPOSIT_BLOCKED', 'MISC_COLLECTION', 'CREDIT_REPAYMENT', 'LOAN_REPAYMENT', 'ENGAGEMENT_FEE', 'SAFE_SUPPLY', 'INITIAL_DEPOSIT')
                   THEN CAST(o.montant AS NUMERIC)
-                  WHEN o.type_operation IN ('Retrait', 'Decaissement', 'Retrait épargne', 'Décaissement crédit', 'Frais', 'Versement coffre')
+                  WHEN o.type_operation IN ('SAVINGS_WITHDRAWAL', 'WITHDRAWAL_SAVINGS', 'WITHDRAWAL_CURRENT', 'WITHDRAWAL_BLOCKED', 'MISC_DISBURSEMENT', 'CREDIT_DISBURSEMENT', 'LOAN_DISBURSEMENT', 'FEE', 'SAFE_DEPOSIT', 'FEE_REFUND')
                   THEN -CAST(o.montant AS NUMERIC)
                   ELSE 0
                 END
@@ -966,9 +966,9 @@ export async function ensureCustomFunctions(): Promise<void> {
             CAST(s.montant_ouverture AS NUMERIC) + COALESCE(
               (SELECT SUM(
                 CASE
-                  WHEN o.type_operation IN ('Versement', 'Depot', 'Encaissement', 'Dépôt épargne', 'Remboursement crédit', 'Approvisionnement coffre')
+                  WHEN o.type_operation IN ('SAVINGS_DEPOSIT', 'DEPOSIT_SAVINGS', 'DEPOSIT_CURRENT', 'DEPOSIT_BLOCKED', 'MISC_COLLECTION', 'CREDIT_REPAYMENT', 'LOAN_REPAYMENT', 'ENGAGEMENT_FEE', 'SAFE_SUPPLY', 'INITIAL_DEPOSIT')
                   THEN CAST(o.montant AS NUMERIC)
-                  WHEN o.type_operation IN ('Retrait', 'Decaissement', 'Retrait épargne', 'Décaissement crédit', 'Frais', 'Versement coffre')
+                  WHEN o.type_operation IN ('SAVINGS_WITHDRAWAL', 'WITHDRAWAL_SAVINGS', 'WITHDRAWAL_CURRENT', 'WITHDRAWAL_BLOCKED', 'MISC_DISBURSEMENT', 'CREDIT_DISBURSEMENT', 'LOAN_DISBURSEMENT', 'FEE', 'SAFE_DEPOSIT', 'FEE_REFUND')
                   THEN -CAST(o.montant AS NUMERIC)
                   ELSE 0
                 END
@@ -1818,12 +1818,12 @@ export async function ensureCustomFunctions(): Promise<void> {
           (SELECT COALESCE(SUM(CAST(o.montant AS NUMERIC)), 0)
            FROM operations_caisse o
            WHERE o.session_id = s.id
-           AND o.type_operation::text IN ('Versement', 'Depot', 'Encaissement', 'Dépôt épargne', 'Remboursement crédit', 'Approvisionnement coffre')
+           AND o.type_operation::text IN ('SAVINGS_DEPOSIT', 'DEPOSIT_SAVINGS', 'DEPOSIT_CURRENT', 'DEPOSIT_BLOCKED', 'MISC_COLLECTION', 'CREDIT_REPAYMENT', 'LOAN_REPAYMENT', 'ENGAGEMENT_FEE', 'SAFE_SUPPLY', 'INITIAL_DEPOSIT')
           ) AS total_entrees,
           (SELECT COALESCE(SUM(CAST(o.montant AS NUMERIC)), 0)
            FROM operations_caisse o
            WHERE o.session_id = s.id
-           AND o.type_operation::text IN ('Retrait', 'Decaissement', 'Retrait épargne', 'Décaissement crédit', 'Frais', 'Versement coffre')
+           AND o.type_operation::text IN ('SAVINGS_WITHDRAWAL', 'WITHDRAWAL_SAVINGS', 'WITHDRAWAL_CURRENT', 'WITHDRAWAL_BLOCKED', 'MISC_DISBURSEMENT', 'CREDIT_DISBURSEMENT', 'LOAN_DISBURSEMENT', 'FEE', 'SAFE_DEPOSIT', 'FEE_REFUND')
           ) AS total_sorties,
           c.nom AS caisse_nom,
           u.nom AS caissier_nom,
