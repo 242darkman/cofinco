@@ -664,6 +664,15 @@ export class SessionOpeningService {
         const soldeVeille = Number(session.soldeVeille || 0);
         const soldeOuverture = soldeVeille + montantRecu;
 
+        // GUARD: Une caisse ne doit JAMAIS ouvrir avec un solde négatif
+        if (soldeOuverture < 0) {
+          return {
+            success: false,
+            error: `Impossible d'ouvrir la session : le solde d'ouverture serait négatif (${soldeOuverture.toLocaleString('fr-FR')} FCFA). Le solde résiduel de la veille (${soldeVeille.toLocaleString('fr-FR')} FCFA) est incohérent. Contactez la supervision.`,
+            errorCode: "NEGATIVE_OPENING_BALANCE",
+          };
+        }
+
         // 4. Exécuter le transfert du coffre (si pas déjà exécuté)
         if (session.openingTransfertId) {
           // Vérifier le statut actuel du transfert
@@ -1322,6 +1331,15 @@ export class SessionOpeningService {
         }
 
         const soldeExistant = Number(caisse.solde || 0);
+
+        // GUARD: Une caisse ne doit JAMAIS ouvrir avec un solde négatif
+        if (soldeExistant < 0) {
+          return {
+            success: false,
+            error: `Impossible d'ouvrir la session : le solde de la caisse est négatif (${soldeExistant.toLocaleString('fr-FR')} FCFA). Contactez la supervision pour corriger le solde avant de réouvrir.`,
+            errorCode: "NEGATIVE_OPENING_BALANCE",
+          };
+        }
 
         // 2. Vérifier qu'aucune session n'est ouverte sur cette caisse
         const existingCaisseSession = await tx

@@ -348,5 +348,14 @@ export async function updateCaisseBalance(
   if (!result) {
     throw new Error(`Caisse ${caisseId} not found during balance update`);
   }
+
+  // GUARD: Le solde d'une caisse ne doit JAMAIS devenir négatif
+  const newSolde = Number(result.solde);
+  if (newSolde < 0) {
+    throw new Error(
+      `Opération refusée : le solde de la caisse ${caisseId} deviendrait négatif (${newSolde.toLocaleString('fr-FR')} FCFA). Delta demandé: ${delta.toLocaleString('fr-FR')} FCFA.`
+    );
+  }
+
   return result;
 }

@@ -337,6 +337,15 @@ export async function openSessionAtomic(params: OpenSessionParams): Promise<Open
     };
   }
 
+  // GUARD: Le montant calculé du billetage ne doit jamais être négatif
+  if (billetageValidation.calculatedTotal < 0) {
+    return {
+      success: false,
+      error: `Le total du billetage est négatif (${billetageValidation.calculatedTotal.toLocaleString('fr-FR')} FCFA). Vérifiez les quantités saisies.`,
+      errorCode: "NEGATIVE_OPENING_BALANCE",
+    };
+  }
+
   // 2. Lecture du solde GL pour cette caisse (avant transaction pour ne pas bloquer)
   const glResult = await glBalanceReader.getGlBalanceForCaisseIsolated(caisseId);
 
@@ -881,11 +890,13 @@ export async function closeSessionAtomic(params: CloseSessionParams): Promise<Cl
         }
 
         // 6. Mettre à jour le solde de la caisse physique avec le solde réel compté
+        // GUARD: Ne jamais écrire un solde négatif sur la caisse
         const caisseSoldeAvant = Number(caisse.solde || 0);
+        const soldeFinal = Math.max(0, soldeReelNum);
         await tx
           .update(caisses)
           .set({
-            solde: soldeReelNum.toString(),
+            solde: soldeFinal.toString(),
             updatedAt: new Date(),
           })
           .where(eq(caisses.id, caisse.id));
@@ -1135,10 +1146,12 @@ export async function closeExpiredSessions(
 
     // CRITIQUE: Mettre à jour la caisse physique avec le solde théorique comme fond reporté
     // Sans cela, le fond reporté affiché à la prochaine ouverture est erroné
+    // GUARD: Ne jamais écrire un solde négatif — clamper à 0 minimum
+    const soldeReporte = Math.max(0, soldeTheorique);
     await db
       .update(caisses)
       .set({
-        solde: soldeTheorique.toString(),
+        solde: soldeReporte.toString(),
         statut: StatutCaisse.CLOSED,
         updatedAt: now,
       })

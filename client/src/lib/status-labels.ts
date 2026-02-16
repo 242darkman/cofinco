@@ -398,7 +398,7 @@ export type TypeOperationCaisseType =
   | 'MISC_COLLECTION' | 'MISC_DISBURSEMENT' | 'BANK_FEE'
   | 'TONTINE_CONTRIBUTION' | 'TONTINE_WITHDRAWAL'
   | 'LOAN_REPAYMENT' | 'LOAN_DISBURSEMENT' | 'WITHDRAWAL_SAVINGS'
-  | 'INITIAL_DEPOSIT';
+  | 'INITIAL_DEPOSIT' | 'OPENING_FEE';
 
 export const TYPE_OPERATION_CAISSE_LABELS: Record<TypeOperationCaisseType, string> = {
   SAVINGS_DEPOSIT: "Dépôt épargne",
@@ -425,6 +425,7 @@ export const TYPE_OPERATION_CAISSE_LABELS: Record<TypeOperationCaisseType, strin
   LOAN_DISBURSEMENT: "Décaissement Prêt",
   WITHDRAWAL_SAVINGS: "Retrait Épargne",
   INITIAL_DEPOSIT: "Dépôt Initial",
+  OPENING_FEE: "Frais d'ouverture",
 };
 
 export const TYPE_OPERATION_CAISSE_COLORS: Record<TypeOperationCaisseType, string> = {
@@ -452,6 +453,7 @@ export const TYPE_OPERATION_CAISSE_COLORS: Record<TypeOperationCaisseType, strin
   LOAN_DISBURSEMENT: "bg-status-info-bg text-status-info border-status-info/30",
   WITHDRAWAL_SAVINGS: "bg-status-danger-bg text-status-danger border-status-danger/30",
   INITIAL_DEPOSIT: "bg-status-success-bg text-status-success border-status-success/30",
+  OPENING_FEE: "bg-status-warning-bg text-status-warning border-status-warning/30",
 };
 
 // --- Type Paiement Terrain ---

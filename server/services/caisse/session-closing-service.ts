@@ -772,7 +772,16 @@ export class SessionClosingService {
           };
         }
 
-        // 4. Vérifier la cohérence des montants
+        // 4a. GUARD: Les montants ne doivent jamais être négatifs (défense en profondeur)
+        if (montantVersCoffre < 0 || montantReporte < 0) {
+          return {
+            success: false,
+            error: "Les montants de transfert et de report ne peuvent pas être négatifs",
+            errorCode: "NEGATIVE_AMOUNT" as const,
+          };
+        }
+
+        // 4b. Vérifier la cohérence des montants
         // MontantVersCoffre + MontantReporte DOIT = MontantPhysique
         const montantPhysique = Number(session.montantPhysique || 0);
         const totalDecision = montantVersCoffre + montantReporte;
