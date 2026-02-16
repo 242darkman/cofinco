@@ -1091,7 +1091,7 @@ export const compteEpargneApi = {
     }>('/comptes/transferts-programmes/health'),
 
   // Batch activation of pending accounts
-  batchActivate: (accountIds: string[]) =>
+  batchActivate: (accountIds: string[], sessionCaisseId: string) =>
     request<{
       success: boolean;
       activated: number;
@@ -1099,7 +1099,7 @@ export const compteEpargneApi = {
       results: Array<{ id: string; success: boolean; error?: string }>;
     }>('/comptes/batch-activate', {
       method: 'POST',
-      body: JSON.stringify({ accountIds }),
+      body: JSON.stringify({ accountIds, sessionCaisseId }),
     }),
 };
 

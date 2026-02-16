@@ -28,11 +28,13 @@ export interface PendingAccount {
 interface PendingActivationDrawerProps {
   open: boolean;
   onClose: () => void;
+  /** ID de la session de caisse active (requis pour batch activate) */
+  sessionId: string;
   /** Callback avec le compte complet pour le modal d'activation dédié */
   onActivate: (account: PendingAccount) => void;
 }
 
-export function PendingActivationDrawer({ open, onClose, onActivate }: PendingActivationDrawerProps) {
+export function PendingActivationDrawer({ open, onClose, sessionId, onActivate }: PendingActivationDrawerProps) {
   const [search, setSearch] = useState('');
   const queryClient = useQueryClient();
 
@@ -99,7 +101,7 @@ export function PendingActivationDrawer({ open, onClose, onActivate }: PendingAc
 
     setBatchActivating(true);
     try {
-      const result = await compteEpargneApi.batchActivate(Array.from(selectedIds));
+      const result = await compteEpargneApi.batchActivate(Array.from(selectedIds), sessionId);
 
       if (result.activated > 0) {
         toast.success(`${result.activated} compte(s) activé(s) avec succès`);

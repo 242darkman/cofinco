@@ -1,18 +1,18 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  X, User, DollarSign, Calendar, CreditCard, Building, Smartphone, ArrowRight, AlertCircle, 
-  CheckCircle, Clock, Banknote, FileCheck, RefreshCw, Phone, Hash, Wallet, AlertTriangle, 
-  Loader2, Search, Percent, ShieldCheck, Lock, Building2, ChevronRight, ChevronLeft, FileText, Check
+import {
+  X, User, Smartphone, AlertCircle, CheckCircle, Banknote, Phone, Hash, Wallet,
+  ShieldCheck, Lock, Building2, ChevronRight, ChevronLeft
 } from 'lucide-react';
 import { clientApi, compteEpargneApi, transactionEpargneApi } from '../../../lib/api-client';
 import { useFeatureFlags } from '../../../contexts/FeatureFlagsContext';
 import { toast, handleApiError } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
 import { validateAmount, validateRequired, VALIDATION_LIMITS } from '../../../lib/validation';
-import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
+import { sanitizeInput } from '../../../lib/sanitize';
 import { Button } from '../../ui';
 import { StatutClient, StatutCompte, TypeCompte as TypeCompteEnum, FrequenceVirement, FREQUENCE_VIREMENT_LABELS, type FrequenceVirementType } from '@shared/enum/status-constants';
+import { currencySymbol } from '@shared/config/currency';
 
 const MOBILE_OPERATORS = [
   { id: 'mtn', name: 'MTN Mobile Money', color: 'bg-status-warning-bg0', textColor: 'text-status-warning', prefix: '+242 05/06' },
@@ -106,7 +106,6 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
   const [mobileMoneyData, setMobileMoneyData] = useState({
     numero_telephone: '',
     numero_transaction: '',
-    code_otp: ''
   });
   const [caisseData, setCaisseData] = useState({
     billets: {} as Record<number, number>,
@@ -327,7 +326,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
         compteSourceId: formData.mode_ouverture === 'TRANSFER' ? formData.compte_source_id : undefined,
         blocageActif: formData.type_compte === 'BLOCKED',
         blocageMotif: formData.type_compte === 'BLOCKED' ? sanitizedMotif : undefined,
-        blocageReference: formData.type_compte === 'BLOCKED' ? formData.date_echeance : undefined,
+        blocageFin: formData.type_compte === 'BLOCKED' ? formData.date_echeance : undefined,
         versementAutoActif: formData.versement_auto_active,
         versementAutoMontant: formData.versement_auto_active ? parseFloat(formData.versement_auto_montant) : undefined,
         versementAutoFrequence: formData.versement_auto_active ? formData.versement_auto_frequence : undefined,
@@ -604,6 +603,62 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                    </div>
                    {errors.produit_id && <p className="text-xs text-status-danger ml-1">{errors.produit_id}</p>}
                 </div>
+
+                {/* Frais & Conditions (shown after product selection) */}
+                {selectedProduct && (
+                  <div className="space-y-2 animate-in fade-in duration-300">
+                    <label className="text-xs font-bold text-content-muted uppercase tracking-wider ml-1">
+                      Frais & Conditions
+                    </label>
+                    <div className="bg-surface-subtle border border-edge-subtle rounded-xl p-4 space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-content-muted">Frais d'ouverture</span>
+                        {openingFee > 0 ? (
+                          <span className="text-sm font-bold text-status-danger">{formatMoney(openingFee)} F</span>
+                        ) : (
+                          <span className="text-sm font-medium text-status-success">Gratuit</span>
+                        )}
+                      </div>
+
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-content-muted">Dépôt initial minimum</span>
+                        {depotMinimum > 0 ? (
+                          <span className="text-sm font-bold text-content-secondary">{formatMoney(depotMinimum)} F</span>
+                        ) : (
+                          <span className="text-sm font-medium text-content-muted">Aucun</span>
+                        )}
+                      </div>
+
+                      {(selectedProduct.frais?.tenue ?? 0) > 0 && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-content-muted">Frais de tenue / mois</span>
+                          <span className="text-sm font-medium text-content-secondary">{formatMoney(selectedProduct.frais!.tenue!)} F</span>
+                        </div>
+                      )}
+
+                      {(selectedProduct.frais?.cloture ?? 0) > 0 && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-content-muted">Frais de clôture</span>
+                          <span className="text-sm font-medium text-content-secondary">{formatMoney(selectedProduct.frais!.cloture!)} F</span>
+                        </div>
+                      )}
+
+                      {validationRequise && (
+                        <div className="flex items-center gap-2 pt-2 border-t border-edge-subtle">
+                          <ShieldCheck size={14} className="text-status-warning" />
+                          <span className="text-xs text-status-warning">Validation du chef d'agence requise</span>
+                        </div>
+                      )}
+
+                      {(openingFee + depotMinimum) > 0 && (
+                        <div className="border-t border-edge-subtle pt-2 flex justify-between items-center">
+                          <span className="text-sm font-semibold text-content-primary">Minimum à verser</span>
+                          <span className="text-sm font-bold text-accent">{formatMoney(openingFee + depotMinimum)} F</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
              </div>
            )}
 
@@ -644,7 +699,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                              className="w-full h-10 bg-surface-base border border-edge rounded-lg text-sm text-content-primary px-3 focus:border-accent outline-none"
                           >
                              <option value="">Sélectionner le compte source</option>
-                             {comptesExistants.filter(c => normalizeTypeCompte(c.typeCompte || '') === 'CURRENT').map(c => (
+                             {comptesExistants.filter(c => normalizeTypeCompte(c.typeCompte || '') === 'CURRENT' && (typeof c.solde === 'number' ? c.solde : parseFloat(String(c.solde || 0))) > 0).map(c => (
                                 <option key={c.id} value={c.id}>{c.numeroCompte} ({formatMoney(parseFloat(String(c.solde)))})</option>
                              ))}
                           </select>
@@ -657,7 +712,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                 <div className="space-y-2">
                    <label className="text-xs font-bold text-content-muted uppercase ml-1">Montant Initial (FCFA)</label>
                    <div className="relative group">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-content-muted font-bold text-xl">$</span>
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-content-muted font-bold text-xl">{currencySymbol()}</span>
                       <input
                         type="number"
                         value={formData.solde_initial}

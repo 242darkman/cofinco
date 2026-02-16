@@ -23,7 +23,7 @@ interface CompteBancaire {
 interface AccountCardProps {
   compte: CompteBancaire;
   onEdit?: (compte: CompteBancaire) => void;
-  onAction?: (action: 'suspend' | 'unsuspend' | 'close' | 'cancel_closure' | 'history', compte: CompteBancaire) => void;
+  onAction?: (action: 'suspend' | 'unsuspend' | 'close' | 'cancel_closure' | 'history' | 'activate', compte: CompteBancaire) => void;
   canSuspend?: boolean;
   canUnsuspend?: boolean;
   canCloseInitiate?: boolean;
@@ -61,13 +61,16 @@ export default function AccountCard({ compte, onEdit, onAction, canSuspend = tru
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const isPendingPayment = compte.statut === StatutCompte.PENDING_PAYMENT
+    || compte.statut === StatutCompte.PENDING_PAYMENT_AND_APPROVAL
+    || compte.statut === StatutCompte.PENDING_ACTIVATION;
   const isSuspended = compte.statut === StatutCompte.SUSPENDED;
   const isClosurePending = compte.statut === StatutCompte.CLOSURE_PENDING;
   const isClosed = compte.statut === StatutCompte.CLOSED;
   const isCancelled = compte.statut === StatutCompte.CANCELLED;
   const isTerminal = isClosed || isCancelled;
 
-  const handleMenuAction = (action: 'suspend' | 'unsuspend' | 'close' | 'cancel_closure' | 'history', e: React.MouseEvent) => {
+  const handleMenuAction = (action: 'suspend' | 'unsuspend' | 'close' | 'cancel_closure' | 'history' | 'activate', e: React.MouseEvent) => {
     e.stopPropagation();
     setShowMenu(false);
     onAction?.(action, compte);
@@ -81,7 +84,9 @@ export default function AccountCard({ compte, onEdit, onAction, canSuspend = tru
       onClick={() => onAction?.('history', compte)}
     >
         {/* Decorative background gradient */}
-        {isBloque ? (
+        {isPendingPayment ? (
+            <div className="absolute top-0 right-0 w-24 h-24 bg-status-info/5 rounded-full blur-2xl -mr-12 -mt-12 pointer-events-none transition-opacity group-hover:opacity-100 opacity-50"></div>
+        ) : isBloque ? (
             <div className="absolute top-0 right-0 w-24 h-24 bg-status-warning/5 rounded-full blur-2xl -mr-12 -mt-12 pointer-events-none transition-opacity group-hover:opacity-100 opacity-50"></div>
         ) : isEpargne ? (
             <div className="absolute top-0 right-0 w-24 h-24 bg-status-success/5 rounded-full blur-2xl -mr-12 -mt-12 pointer-events-none transition-opacity group-hover:opacity-100 opacity-50"></div>
@@ -122,7 +127,15 @@ export default function AccountCard({ compte, onEdit, onAction, canSuspend = tru
                     <button onClick={(e) => handleMenuAction('history', e)} className="w-full text-left px-4 py-2 text-sm text-content-secondary hover:bg-surface hover:text-content-primary flex items-center gap-2">
                         <TrendingUp size={14} /> Historique
                     </button>
-                    {!isTerminal && !isClosurePending && (
+                    {isPendingPayment && (
+                      <>
+                        <div className="h-px bg-surface my-1"></div>
+                        <button onClick={(e) => handleMenuAction('activate', e)} className="w-full text-left px-4 py-2 text-sm text-status-info hover:bg-status-info-bg flex items-center gap-2">
+                          <Wallet size={14} /> Payer & Activer
+                        </button>
+                      </>
+                    )}
+                    {!isTerminal && !isClosurePending && !isPendingPayment && (
                       <>
                         <div className="h-px bg-surface my-1"></div>
                         {isSuspended ? (

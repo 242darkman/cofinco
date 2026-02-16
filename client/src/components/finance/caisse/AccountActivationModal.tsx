@@ -1,7 +1,7 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { X, Wallet, AlertTriangle, Loader2, UserCheck, Banknote } from 'lucide-react';
+import { X, Wallet, AlertTriangle, Loader2, UserCheck, Banknote, Smartphone, Building2 } from 'lucide-react';
 import { compteEpargneApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
@@ -10,6 +10,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { UniversalPaymentSuccessModal } from './shared/UniversalPaymentSuccessModal';
 import { ReceiptData } from '../../ui/printable/ReceiptTemplate';
 import { currencySymbol } from '@shared/config/currency';
+import { useFeatureFlags } from '../../../contexts/FeatureFlagsContext';
 
 interface AccountInfo {
   id: string;
@@ -53,10 +54,50 @@ export function AccountActivationModal({
   // Idempotency key to prevent duplicate transactions
   const idempotencyKey = useMemo(() => uuidv4(), []);
 
+  // Payment method state
+  type ModePaiement = 'CASH' | 'MTN' | 'AIRTEL' | 'TRANSFER';
+  const [modePaiement, setModePaiement] = useState<ModePaiement>('CASH');
+  const [compteSourceId, setCompteSourceId] = useState('');
+  const [clientAccounts, setClientAccounts] = useState<Array<{ id: string; numeroCompte: string; soldeCourant: string; typeCompte: string }>>([]);
+
+  // Feature flags
+  const { mobileMoneyEnabled } = useFeatureFlags();
+
+  // Fetch client accounts for internal transfer
+  const [transferFetchFailed, setTransferFetchFailed] = useState(false);
+  useEffect(() => {
+    if (account.client.id) {
+      setTransferFetchFailed(false);
+      fetch(`/api/clients/${account.client.id}/portfolio`, { credentials: 'include' })
+        .then(res => res.ok ? res.json() : { comptes: [] })
+        .then(data => {
+          const comptes = (data.comptes || []).filter((c: any) =>
+            c.id !== account.id &&
+            c.statut === 'ACTIVE' &&
+            parseFloat(c.soldeCourant || '0') > 0
+          );
+          setClientAccounts(comptes);
+        })
+        .catch(() => setTransferFetchFailed(true));
+    }
+  }, [account.client.id, account.id]);
+
+  const eligibleForTransfer = clientAccounts.length > 0;
+
+  // Payment mode labels
+  const modeLabels: Record<string, string> = {
+    'CASH': 'Espèces',
+    'MTN': 'MTN Mobile Money',
+    'AIRTEL': 'Airtel Money',
+    'TRANSFER': 'Virement Interne',
+  };
+
   // Validate amount
   const parsedMontant = parseFloat(montant);
   const isValidAmount = !isNaN(parsedMontant) && parsedMontant > 0;
   const amountDifference = isValidAmount ? parsedMontant - account.montantInitial : 0;
+  const isTransferValid = modePaiement !== 'TRANSFER' || !!compteSourceId;
+  const canSubmit = isValidAmount && isTransferValid;
 
   // Handle receipt close
   const handleReceiptClose = useCallback(() => {
@@ -93,8 +134,13 @@ export function AccountActivationModal({
       return;
     }
 
-    if (!sessionId) {
+    if (modePaiement !== 'TRANSFER' && !sessionId) {
       setError('Aucune session de caisse active');
+      return;
+    }
+
+    if (modePaiement === 'TRANSFER' && !compteSourceId) {
+      setError('Veuillez sélectionner un compte source pour le virement');
       return;
     }
 
@@ -102,12 +148,21 @@ export function AccountActivationModal({
     setError(null);
 
     try {
-      const response = await compteEpargneApi.depotInitial(account.id, {
+      const backendMode = (modePaiement === 'MTN' || modePaiement === 'AIRTEL') ? 'MOBILE_MONEY' : modePaiement;
+      const payload: Record<string, any> = {
         montant: parsedMontant,
         sessionCaisseId: sessionId,
-        modePaiement: 'Espèces',
-        idempotencyKey
-      });
+        methodePaiement: backendMode,
+        idempotencyKey,
+      };
+      if (backendMode === 'MOBILE_MONEY') {
+        payload.operateurMobile = modePaiement;
+      }
+      if (modePaiement === 'TRANSFER') {
+        payload.compteSourceId = compteSourceId;
+      }
+
+      const response = await compteEpargneApi.depotInitial(account.id, payload);
 
       // Invalidate queries to refresh UI
       queryClient.invalidateQueries({ queryKey: ['comptes'] });
@@ -133,7 +188,7 @@ export function AccountActivationModal({
           }
         ],
         total: parsedMontant,
-        modePaiement: 'Espèces',
+        modePaiement: modeLabels[modePaiement],
         devise: currencySymbol(),
         notes: `Compte ${getStatusLabel(account.typeCompte, ACCOUNT_TYPE_LABELS)} activé`
       };
@@ -149,7 +204,7 @@ export function AccountActivationModal({
     } finally {
       setLoading(false);
     }
-  }, [account, sessionId, parsedMontant, isValidAmount, idempotencyKey, queryClient]);
+  }, [account, sessionId, parsedMontant, isValidAmount, idempotencyKey, queryClient, modePaiement, compteSourceId, modeLabels]);
 
   // Show receipt modal after success
   if (showReceipt && receiptData) {
@@ -182,7 +237,9 @@ export function AccountActivationModal({
             </div>
             <div>
               <h2 className="text-lg font-bold text-content-primary">Activation de Compte</h2>
-              <p className="text-xs text-content-muted">Encaisser le dépôt initial</p>
+              <p className="text-xs text-content-muted">
+                {modePaiement === 'TRANSFER' ? 'Virement du dépôt initial' : 'Encaisser le dépôt initial'}
+              </p>
             </div>
           </div>
           <button
@@ -257,6 +314,66 @@ export function AccountActivationModal({
             )}
           </div>
 
+          {/* Payment Method Selection */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-content-muted uppercase">Mode de Paiement</label>
+            <div className="grid grid-cols-4 gap-2">
+              {([
+                { id: 'CASH' as const, label: 'Espèces', icon: Banknote, color: 'success' },
+                { id: 'MTN' as const, label: 'MTN MoMo', icon: Smartphone, color: 'warning' },
+                { id: 'AIRTEL' as const, label: 'Airtel', icon: Smartphone, color: 'danger' },
+                { id: 'TRANSFER' as const, label: 'Virement', icon: Building2, color: 'info' },
+              ] as const).map(({ id, label, icon: Icon, color }) => {
+                const isSelected = modePaiement === id;
+                const isMM = id === 'MTN' || id === 'AIRTEL';
+                const isTransferDisabled = id === 'TRANSFER' && (!eligibleForTransfer || transferFetchFailed);
+                const isDisabled = isTransferDisabled || (isMM && !mobileMoneyEnabled);
+                const colorMap: Record<string, string> = {
+                  success: 'border-status-success bg-status-success-bg text-status-success',
+                  warning: 'border-status-warning bg-status-warning-bg text-status-warning',
+                  danger: 'border-status-danger bg-status-danger-bg text-status-danger',
+                  info: 'border-status-info bg-status-info-bg text-status-info',
+                };
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => { setModePaiement(id); setCompteSourceId(''); }}
+                    disabled={isDisabled}
+                    className={`h-16 rounded-xl border-2 flex flex-col items-center justify-center gap-0.5 transition-all
+                      ${isDisabled ? 'opacity-40 grayscale cursor-not-allowed border-edge bg-surface' :
+                        isSelected ? colorMap[color] : 'border-edge bg-surface text-content-muted hover:border-content-muted'
+                      }`}
+                  >
+                    <Icon size={18} />
+                    <span className="text-[10px] font-bold leading-tight">{label}</span>
+                    {isMM && !mobileMoneyEnabled && <span className="text-[7px] text-content-muted">Bientôt</span>}
+                    {id === 'TRANSFER' && transferFetchFailed && <span className="text-[7px] text-content-muted">Erreur</span>}
+                    {id === 'TRANSFER' && !transferFetchFailed && !eligibleForTransfer && <span className="text-[7px] text-content-muted">Aucun compte</span>}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Transfer: source account dropdown */}
+            {modePaiement === 'TRANSFER' && (
+              <div className="mt-2 animate-in fade-in slide-in-from-top-2 duration-200">
+                <select
+                  value={compteSourceId}
+                  onChange={(e) => setCompteSourceId(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-surface border border-edge rounded-xl text-sm text-content-primary focus:border-status-info focus:ring-1 focus:ring-status-info"
+                >
+                  <option value="">Sélectionner le compte source...</option>
+                  {clientAccounts.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.numeroCompte} — {formatMoney(parseFloat(c.soldeCourant || '0'))}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
           {/* Error Display */}
           {error && (
             <div className="flex items-center gap-2 p-3 bg-status-danger-bg border border-status-danger/30 rounded-xl text-status-danger text-sm">
@@ -275,14 +392,28 @@ export function AccountActivationModal({
               <span className="text-content-muted">Compte</span>
               <span className="text-content-primary font-mono">{account.numeroCompte}</span>
             </div>
-            {caisseName && (
+            <div className="flex justify-between text-sm">
+              <span className="text-content-muted">Mode de paiement</span>
+              <span className="text-content-primary font-medium">{modeLabels[modePaiement]}</span>
+            </div>
+            {modePaiement !== 'TRANSFER' && caisseName && (
               <div className="flex justify-between text-sm">
                 <span className="text-content-muted">Caisse de réception</span>
                 <span className="text-accent font-medium">{caisseName}</span>
               </div>
             )}
+            {modePaiement === 'TRANSFER' && compteSourceId && (
+              <div className="flex justify-between text-sm">
+                <span className="text-content-muted">Compte source</span>
+                <span className="text-status-info font-mono text-xs">
+                  {clientAccounts.find(c => c.id === compteSourceId)?.numeroCompte || '—'}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between text-sm border-t border-edge pt-2 mt-2">
-              <span className="text-content-muted">Total à encaisser</span>
+              <span className="text-content-muted">
+                {modePaiement === 'TRANSFER' ? 'Montant du virement' : 'Total à encaisser'}
+              </span>
               <span className="text-status-success font-bold text-lg">
                 {isValidAmount ? formatMoney(parsedMontant) : '—'}
               </span>
@@ -301,7 +432,7 @@ export function AccountActivationModal({
             </button>
             <button
               type="button"
-              disabled={loading || !isValidAmount}
+              disabled={loading || !canSubmit}
               onMouseDown={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -321,7 +452,9 @@ export function AccountActivationModal({
               ) : (
                 <>
                   <Wallet className="w-4 h-4 mr-2" />
-                  Encaisser & Activer
+                  {modePaiement === 'TRANSFER' ? 'Virer & Activer' :
+                   modePaiement === 'MTN' || modePaiement === 'AIRTEL' ? 'Confirmer & Activer' :
+                   'Encaisser & Activer'}
                 </>
               )}
             </button>
