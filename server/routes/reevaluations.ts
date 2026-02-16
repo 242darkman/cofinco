@@ -32,6 +32,7 @@ import { reevaluationsCredit, enquetesComplementaires, demandesCredit, enquetesC
 import { clients } from "@shared/schema/clients";
 import { users } from "@shared/schema/auth";
 import { eq, desc, sql } from "drizzle-orm";
+import { StatutReevaluation } from "@shared/enum/status-constants";
 
 // Validation schemas
 const createReevaluationSchema = z.object({
@@ -441,7 +442,7 @@ export function registerReevaluationRoutes(app: Express) {
       res.json({
         success: true,
         eligibilite: {
-          estEligible: result.statut === 'Autorisée',
+          estEligible: result.statut === StatutReevaluation.AUTHORIZED,
           motifRefus: result.motifRefus
         },
         reevaluation: {

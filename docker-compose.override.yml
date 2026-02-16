@@ -95,6 +95,7 @@ services:
   # ==========================================
   mobile:
     container_name: cofinco-mobile
+    profiles: ["mobile"]
     build:
       context: ./mobile
       dockerfile: Dockerfile
