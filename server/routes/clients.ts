@@ -30,7 +30,8 @@ import { calculateClientScore } from "../scoring-service";
 import { z } from "zod";
 import { db } from "../db";
 import { eq, sql, or, isNull, and, gte, lte, desc } from "drizzle-orm";
-import { createClientAccount, getComptesByClient, getCreditsByClient, getDemandesByClient } from "../storage/finance";
+import { getComptesByClient, getCreditsByClient, getDemandesByClient } from "../storage/finance";
+import { autoCreateCourantAccount } from "../services/comptes";
 import { dispatchDomainEvent } from "../services/notifications/domain-events/event-registry";
 
 export function registerClientRoutes(app: Express) {
@@ -681,75 +682,7 @@ export function registerClientRoutes(app: Express) {
     }
   });
 
-  // POST Account (Create)
-  app.post("/api/clients/:id/accounts", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.COMPTE), requireAgenceIdAccess(), async (req, res) => {
-      try {
-        // 1. Verify access to client
-        const client = await storage.getClient(req.params.id);
-        if (!client) return res.status(404).json({ message: "Client not found" });
-
-        const agenceFilter = req.agenceFilter as { agenceId?: string; agence?: string } | null;
-        if (agenceFilter) {
-          if (agenceFilter.agenceId && client.agenceId !== agenceFilter.agenceId) {
-            return res.status(403).json({ message: "Accès refusé : client d'une autre agence" });
-          }
-        }
-
-        // 2. Validate input
-        const schema = z.object({
-            typeCompte: z.enum([TypeCompte.CURRENT, TypeCompte.SAVINGS]),
-            soldeInitial: z.coerce.number().min(0, "Le solde initial ne peut pas être négatif"),
-            tauxInteret: z.coerce.number().min(0).default(0),
-            statut: z.enum([StatutCompte.ACTIVE, StatutCompte.SUSPENDED, StatutCompte.CLOSED]).default(StatutCompte.ACTIVE),
-            methodePaiement: z.enum([MethodePaiement.CASH, MethodePaiement.MOBILE_MONEY, MethodePaiement.TRANSFER, MethodePaiement.CHECK]).optional()
-        });
-
-        const parsed = schema.parse(req.body);
-
-        // 3. Create account atomically
-        const account = await createClientAccount(req.params.id, parsed, req.session.user?.id);
-
-        // 4. Log Audit
-        await logAudit(
-            req,
-            "CREATE_ACCOUNT",
-            "client",
-            client.id,
-            { type: parsed.typeCompte, numero: account.numeroCompte },
-            "success",
-            "medium"
-        );
-
-        // 5. Notify Real-Time Updates
-        const wsServer = await import("../ws-server");
-        const wsInstance = wsServer.getWsInstance();
-        if (wsInstance) {
-            // Notify client update (force refresh of client details everywhere)
-            wsInstance.broadcast({ type: "CLIENT_UPDATE", payload: { clientId: client.id, agenceId: client.agenceId } });
-            
-            // Notify live activity
-            wsInstance.broadcast({
-              type: "LIVE_ACTIVITY",
-              payload: {
-                action: `Nouveau compte ${parsed.typeCompte} : ${account.numeroCompte}`,
-                user: req.session.user?.nom || 'Système',
-                type: 'finance',
-                timestamp: new Date().toISOString(),
-                agenceId: client.agenceId
-              }
-            });
-
-            // Update dashboard stats if there was an invalidation needed
-            wsInstance.broadcast({ type: "DASHBOARD_UPDATE", payload: {} });
-        }
-
-        res.status(201).json(account);
-      } catch (error) {
-         if (error instanceof z.ZodError) return res.status(400).json(error);
-         logger.error({ err: error }, 'Error creating account');
-         res.status(500).json({ message: "Erreur création compte" });
-      }
-  });
+  // POST Account (Create) — REMOVED: Use POST /api/comptes (modern route with product system) instead
 
   // UPDATE Account (PATCH)
   app.patch("/api/clients/:clientId/accounts/:accountId", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.COMPTE), requireAgenceIdAccess(), async (req, res) => {
@@ -974,21 +907,19 @@ export function registerClientRoutes(app: Express) {
           throw new Error("Client créé mais non récupérable");
         }
 
-        // 🏦 Auto-création d'un compte courant pour chaque nouveau client
-        // Règle microfinance : tout client doit avoir un compte courant dans son agence
+        // Auto-création d'un compte courant via le système produit
         let compteCourant = null;
         try {
-          compteCourant = await createClientAccount(client.id, {
-            typeCompte: TypeCompte.CURRENT,
-            soldeInitial: 0,
-            tauxInteret: 0,
-            statut: StatutCompte.ACTIVE,
-            agenceId: client.agenceId
-          }, req.session.user?.id);
-          logger.info({ numeroCompte: compteCourant.numeroCompte, clientNom: client.nom }, 'Compte courant created automatically for client');
+          const autoResult = await autoCreateCourantAccount(client.id, client.agenceId!, req.session.user?.id!);
+          compteCourant = autoResult.compte;
+          logger.info({
+            numeroCompte: compteCourant.numeroCompte,
+            clientId: client.id,
+            statut: compteCourant.statut,
+            isPending: autoResult.isPending,
+          }, 'Compte courant auto-created for client');
         } catch (accountError) {
           logger.error({ err: accountError, clientId: client.id }, 'Failed to create automatic current account for client');
-          // Ne pas bloquer la création du client si le compte échoue
         }
 
         // agence_nom est déjà fourni par getClient via JOIN
@@ -1669,17 +1600,12 @@ export function registerClientRoutes(app: Express) {
 
       const client = await createClientForUser(userId, clientData);
 
-      // Auto-création d'un compte courant (même règle que POST /api/clients)
+      // Auto-création d'un compte courant via le système produit
       let compteCourant = null;
       try {
-        compteCourant = await createClientAccount(client.id, {
-          typeCompte: TypeCompte.CURRENT,
-          soldeInitial: 0,
-          tauxInteret: 0,
-          statut: StatutCompte.ACTIVE,
-          agenceId: clientData.agenceId || client.agenceId,
-        }, req.session.user?.id);
-        logger.info({ numeroCompte: compteCourant.numeroCompte, clientId: client.id }, 'Compte courant created for employee-to-client conversion');
+        const autoResult = await autoCreateCourantAccount(client.id, clientData.agenceId || client.agenceId!, req.session.user?.id!);
+        compteCourant = autoResult.compte;
+        logger.info({ numeroCompte: compteCourant.numeroCompte, clientId: client.id, isPending: autoResult.isPending }, 'Compte courant auto-created for employee-to-client conversion');
       } catch (accountError) {
         logger.error({ err: accountError, clientId: client.id }, 'Failed to create automatic current account for employee-to-client');
       }

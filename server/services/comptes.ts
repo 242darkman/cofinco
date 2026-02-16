@@ -1666,6 +1666,8 @@ export async function createCompteWithInitialDeposit(
     referenceTransaction?: string;
     blocageActif?: boolean;
     blocageMotif?: MotifBlocage;
+    blocageReference?: string;
+    blocageFin?: string; // ISO date string
   },
   userId: string
 ): Promise<{ compte: Compte; transaction?: TransactionCompte; facture?: Facture; openingRequest?: any }> {
@@ -1749,7 +1751,9 @@ export async function createCompteWithInitialDeposit(
       isApproved: false,
       blocageActif: data.blocageActif || false,
       blocageMotif: data.blocageMotif,
+      blocageReference: data.blocageReference,
       blocageDebut: data.blocageActif ? new Date() : null,
+      blocageFin: data.blocageFin ? new Date(data.blocageFin) : null,
       createdBy: userId,
     } as any).returning();
 
@@ -1857,6 +1861,9 @@ export async function createCompteWithInitialDeposit(
             .where(eq(mouvementsFinanciers.id, feeMouvement.id));
         } catch (err) {
           console.error("[OPENING] GL posting failed for transfer opening fee:", err);
+          await tx.update(mouvementsFinanciers)
+            .set({ glPostingStatus: "FAILED" })
+            .where(eq(mouvementsFinanciers.id, feeMouvement.id));
         }
       }
 
@@ -1893,6 +1900,9 @@ export async function createCompteWithInitialDeposit(
             .where(eq(mouvementsFinanciers.id, depositMouvement.id));
         } catch (err) {
           console.error("[OPENING] GL posting failed for transfer initial deposit:", err);
+          await tx.update(mouvementsFinanciers)
+            .set({ glPostingStatus: "FAILED" })
+            .where(eq(mouvementsFinanciers.id, depositMouvement.id));
         }
 
         // E. Transaction on source account (debit deposit portion)
@@ -1963,10 +1973,11 @@ export async function payerDepotInitialCompte(
   compteId: string,
   data: {
     montant: number;
-    sessionCaisseId: string;
+    sessionCaisseId?: string;
     userId: string;
-    methodePaiement?: 'CASH' | 'MOBILE_MONEY';
+    methodePaiement?: 'CASH' | 'MOBILE_MONEY' | 'TRANSFER';
     operateurMobile?: string; // MTN | AIRTEL
+    compteSourceId?: string; // Required for TRANSFER
   }
 ): Promise<{ compte: Compte; transaction: TransactionCompte; facture: Facture; remainingOpeningFee: number; remainingDeposit: number }> {
 
@@ -1995,6 +2006,13 @@ export async function payerDepotInitialCompte(
 
     const paymentMethod = data.methodePaiement || "CASH";
 
+    // Validate payment method requirements
+    if (paymentMethod === 'TRANSFER') {
+      if (!data.compteSourceId) throw new Error("Compte source requis pour un virement");
+    } else if (paymentMethod !== 'TRANSFER' && !data.sessionCaisseId) {
+      throw new Error("Session de caisse requise pour ce mode de paiement");
+    }
+
     // 2. Read opening snapshot from account (immutable — NOT from product)
     const snapshot = (compte as any).openingSnapshot as OpeningSnapshot | null;
     const currentPaidFee = parseFloat((compte as any).paidOpeningFee || "0");
@@ -2009,6 +2027,24 @@ export async function payerDepotInitialCompte(
       const alloc = allocateOpeningPayment(data.montant, snapshot, currentPaidFee, currentPaidDeposit);
       feePayment = alloc.feePayment;
       depositPayment = alloc.depositPayment;
+    }
+
+    // 2b. If TRANSFER, debit the source account atomically
+    if (paymentMethod === 'TRANSFER') {
+      const [compteSource] = await tx.select().from(comptes).where(eq(comptes.id, data.compteSourceId!));
+      if (!compteSource) throw new Error("Compte source introuvable");
+
+      const soldeSource = parseFloat(compteSource.soldeCourant);
+      if (soldeSource < data.montant) {
+        throw new Error(`Solde insuffisant sur le compte source. Disponible: ${soldeSource.toLocaleString()} F, Requis: ${data.montant.toLocaleString()} F`);
+      }
+
+      await tx.update(comptes)
+        .set({
+          soldeCourant: (soldeSource - data.montant).toString(),
+          updatedAt: new Date(),
+        })
+        .where(eq(comptes.id, data.compteSourceId!));
     }
 
     // 3. Create OPENING_FEE mouvement + GL posting (if fee portion > 0)
@@ -2027,7 +2063,7 @@ export async function payerDepotInitialCompte(
         clientId: compte.clientId,
         compteId: compte.id,
         agenceId: compte.agenceId,
-        sessionCaisseId: data.sessionCaisseId,
+        sessionCaisseId: data.sessionCaisseId || null,
         methodePaiement: paymentMethod,
         typePaiement: "OPENING_FEE",
         createdBy: data.userId,
@@ -2066,6 +2102,9 @@ export async function payerDepotInitialCompte(
           .where(eq(mouvementsFinanciers.id, feeMouvement.id));
       } catch (err) {
         console.error("[OPENING] GL posting failed for opening fee:", err);
+        await tx.update(mouvementsFinanciers)
+          .set({ glPostingStatus: "FAILED" })
+          .where(eq(mouvementsFinanciers.id, feeMouvement.id));
       }
     }
 
@@ -2084,7 +2123,7 @@ export async function payerDepotInitialCompte(
         clientId: compte.clientId,
         compteId: compte.id,
         agenceId: compte.agenceId,
-        sessionCaisseId: data.sessionCaisseId,
+        sessionCaisseId: data.sessionCaisseId || null,
         methodePaiement: paymentMethod,
         typePaiement: "INITIAL_DEPOSIT",
         createdBy: data.userId,
@@ -2122,6 +2161,9 @@ export async function payerDepotInitialCompte(
           .where(eq(mouvementsFinanciers.id, depositMouvement.id));
       } catch (err) {
         console.error("[OPENING] GL posting failed for initial deposit:", err);
+        await tx.update(mouvementsFinanciers)
+          .set({ glPostingStatus: "FAILED" })
+          .where(eq(mouvementsFinanciers.id, depositMouvement.id));
       }
     } else {
       // Fee-only payment (no deposit portion) — still need a transaction record
@@ -2160,26 +2202,25 @@ export async function payerDepotInitialCompte(
       .where(eq(comptes.id, compteId))
       .returning();
 
-    // 6. Update Session Balance (full amount received — fee + deposit)
-    await updateSessionSolde(tx, data.sessionCaisseId, data.montant);
+    // 6. Update Session Balance + Create Operation Caisse (only for physical money)
+    if (paymentMethod !== 'TRANSFER' && data.sessionCaisseId) {
+      await updateSessionSolde(tx, data.sessionCaisseId, data.montant);
 
-    // 7. Create Operation Caisse (full amount)
-    // Use the actual mouvements_financiers ID (deposit takes priority, fallback to fee)
-    const caisseOpMouvementId = depositMouvementId || feeMouvementId || null;
-
-    await tx.insert(operationsCaisse).values({
-      sessionId: data.sessionCaisseId,
-      mouvementId: caisseOpMouvementId,
-      typeOperation: "INITIAL_DEPOSIT",
-      montant: data.montant.toString(),
-      methodePaiement: paymentMethod,
-      reference: `DEP-INIT-${compte.numeroCompte}`,
-      description: feePayment > 0
-        ? `Ouverture compte ${compte.numeroCompte} (frais: ${feePayment.toLocaleString()} F + dépôt: ${depositPayment.toLocaleString()} F)`
-        : `Dépôt initial - Compte ${compte.numeroCompte}`,
-      clientId: compte.clientId,
-      createdBy: data.userId
-    });
+      const caisseOpMouvementId = depositMouvementId || feeMouvementId || null;
+      await tx.insert(operationsCaisse).values({
+        sessionId: data.sessionCaisseId,
+        mouvementId: caisseOpMouvementId,
+        typeOperation: "INITIAL_DEPOSIT",
+        montant: data.montant.toString(),
+        methodePaiement: paymentMethod,
+        reference: `DEP-INIT-${compte.numeroCompte}`,
+        description: feePayment > 0
+          ? `Ouverture compte ${compte.numeroCompte} (frais: ${feePayment.toLocaleString()} F + dépôt: ${depositPayment.toLocaleString()} F)`
+          : `Dépôt initial - Compte ${compte.numeroCompte}`,
+        clientId: compte.clientId,
+        createdBy: data.userId
+      });
+    }
 
     // Compute remaining amounts
     const remainingFee = snapshot ? Math.max(0, snapshot.openingFee - newPaidFee) : 0;
@@ -2203,6 +2244,90 @@ export async function payerDepotInitialCompte(
   });
 
   return { ...result, facture };
+}
+
+// ============================================================================
+// AUTO-CREATE COURANT ACCOUNT (replaces legacy createClientAccount)
+// ============================================================================
+
+/**
+ * Auto-create a CURRENT account for a new client using the product system.
+ * Looks up the first active CURRENT product, creates account via createCompteWithInitialDeposit.
+ * If product has fees, account will be PENDING_PAYMENT and a caisse request is created.
+ */
+export async function autoCreateCourantAccount(
+  clientId: string,
+  agenceId: string,
+  userId: string
+): Promise<{ compte: Compte; isPending: boolean }> {
+  // 1. Look up default active CURRENT product
+  const [defaultProduct] = await db
+    .select({ id: produitsCompte.id })
+    .from(produitsCompte)
+    .where(
+      and(
+        eq(produitsCompte.typeCompte, TypeCompteEnum.CURRENT),
+        eq(produitsCompte.actif, true)
+      )
+    )
+    .limit(1);
+
+  if (!defaultProduct) {
+    throw new Error("Aucun produit Compte Courant actif trouvé. Impossible de créer automatiquement le compte.");
+  }
+
+  // 2. Create via the modern product-aware function (montantInitial=0)
+  const result = await createCompteWithInitialDeposit(
+    {
+      clientId,
+      typeCompte: TypeCompteEnum.CURRENT,
+      agenceId,
+      produitId: defaultProduct.id,
+      montantInitial: 0,
+      modePaiement: 'CASH',
+    },
+    userId
+  );
+
+  // 3. Determine if account needs payment
+  const pendingStatuses = [
+    StatutCompteConst.PENDING_PAYMENT,
+    StatutCompteConst.PENDING_PAYMENT_AND_APPROVAL,
+  ];
+  const isPending = pendingStatuses.includes(result.compte.statut as any);
+
+  // 4. If pending, create a caisse payment request for activation
+  if (isPending) {
+    const { createCaisseRequest } = await import("./caisse-queue-service");
+    const snapshot = (result.compte as any).openingSnapshot as OpeningSnapshot | null;
+    const totalDue = snapshot
+      ? (snapshot.openingFee + (snapshot.initialDepositRequired ? snapshot.minInitialDeposit : 0))
+      : 0;
+
+    if (totalDue > 0) {
+      await createCaisseRequest({
+        category: "ACCOUNT_ACTIVATION",
+        direction: "IN",
+        agenceId,
+        sourceType: "compte",
+        sourceId: result.compte.id,
+        clientId,
+        montant: totalDue,
+        label: `Activation compte ${result.compte.numeroCompte}`,
+        description: `Frais d'ouverture — Compte Courant (auto-créé)`,
+        metadata: {
+          compteId: result.compte.id,
+          numeroCompte: result.compte.numeroCompte,
+          typeCompte: TypeCompteEnum.CURRENT,
+          montantTotal: totalDue,
+          autoCreated: true,
+        },
+        createdBy: userId,
+      });
+    }
+  }
+
+  return { compte: result.compte, isPending };
 }
 
 /**

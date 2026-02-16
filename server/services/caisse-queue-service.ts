@@ -544,12 +544,15 @@ async function processAccountActivation(
   const meta = request.metadata as Record<string, unknown> | null;
   const amount = parseFloat(request.montant);
   const compteId = meta?.compteId as string || request.sourceId;
+  const methodePaiement = (meta?.methodePaiement as string) || "CASH";
 
   const result = await payerDepotInitialCompte(compteId, {
     montant: amount,
     sessionCaisseId,
     userId,
-    methodePaiement: "CASH",
+    methodePaiement: methodePaiement as 'CASH' | 'MOBILE_MONEY' | 'TRANSFER',
+    operateurMobile: meta?.operateurMobile as string | undefined,
+    compteSourceId: meta?.compteSourceId as string | undefined,
   });
 
   return undefined; // mouvement created internally

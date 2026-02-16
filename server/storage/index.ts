@@ -151,11 +151,6 @@ export interface IStorage {
     ): Promise<{ data: any[]; total: number; page: number; limit: number; totalPages: number }>;
     createCompte(compte: InsertCompte): Promise<Compte>;
     updateCompte(id: string, compte: Partial<InsertCompte>): Promise<Compte | undefined>;
-    createClientAccount(
-      clientId: string,
-      data: { typeCompte: string; soldeInitial: number; tauxInteret?: number; statut: string; methodePaiement?: string },
-      userId: string | undefined
-    ): Promise<Compte>;
     updateClientAccount(id: string, updateData: { typeCompte?: string; tauxInteret?: string; statut?: string; solde?: string }): Promise<Compte | undefined>;
 
     getTransactionCompte(id: string): Promise<TransactionCompte | undefined>;

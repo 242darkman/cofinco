@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createLogger } from "../lib/logger";
 import { insertAgentTerrainSchema, insertProspectionSchema, insertVisiteTerrainSchema, insertPaiementTerrainSchema, insertZoneSchema, insertObjectifMensuelSchema, prospections, agentsTerrain, employes, arrondissements, marches, clients, users, prospectionPrimes, prospectionPrimeConfig, userAgences } from "@shared/schema";
-import { PROSPECTION_STATUS_TRANSITIONS, StatutProspection, ClientOrigin, TypeCompte, StatutCompte } from "@shared/enum/status-constants";
+import { PROSPECTION_STATUS_TRANSITIONS, StatutProspection, ClientOrigin } from "@shared/enum/status-constants";
 import { logAudit } from "../lib/logger";
 import { and, desc, inArray, isNull, or, sql } from "drizzle-orm";
 import { notDeleted } from "../storage/query-helpers";
@@ -18,7 +18,7 @@ import { StorageService } from "../services/storage-service";
 import { db } from "../db";
 import { eq } from "drizzle-orm";
 import { dispatchDomainEvent } from "../services/notifications/domain-events/event-registry";
-import { createClientAccount } from "../storage/finance";
+import { autoCreateCourantAccount } from "../services/comptes";
 import { recalculateAgentObjectifs } from "../services/objectif-recalculation-service";
 import type { StatutProspectionType } from "@shared/enum/status-constants";
 
@@ -542,16 +542,10 @@ export function registerOperationsRoutes(app: Express) {
         return { client: newClient, user: newUser, prime, agenceId };
       });
 
-      // 6. Auto-create current account (same rule as normal client creation)
+      // 6. Auto-create current account via product system
       try {
-        const compteCourant = await createClientAccount(result.client.id, {
-          typeCompte: TypeCompte.CURRENT,
-          soldeInitial: 0,
-          tauxInteret: 0,
-          statut: StatutCompte.ACTIVE,
-          agenceId: result.agenceId || undefined,
-        }, userId);
-        logger.info({ numeroCompte: compteCourant.numeroCompte, clientId: result.client.id }, "Compte courant auto-created for converted prospect");
+        const autoResult = await autoCreateCourantAccount(result.client.id, result.agenceId!, userId);
+        logger.info({ numeroCompte: autoResult.compte.numeroCompte, clientId: result.client.id, isPending: autoResult.isPending }, "Compte courant auto-created for converted prospect");
       } catch (accountError) {
         logger.error({ err: accountError, clientId: result.client.id }, "Failed to create automatic current account for converted prospect");
       }

@@ -927,56 +927,6 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     return compte || undefined;
   }
 
-  // Atomic Account Creation with Initial Transaction
-  export async function createClientAccount(
-    clientId: string,
-    data: { typeCompte: string; soldeInitial: number; tauxInteret?: number; statut: string; methodePaiement?: string; agenceId?: string | null },
-    userId: string | undefined
-  ): Promise<Compte> {
-    return await db.transaction(async (tx) => {
-      // 1. Generate unique account number
-      // Normaliser le type de compte vers l'Enum
-      const typeCompteEnum = data.typeCompte === TypeCompte.CURRENT ? TypeCompte.CURRENT :
-                              data.typeCompte === TypeCompte.SAVINGS ? TypeCompte.SAVINGS :
-                              data.typeCompte === TypeCompte.BLOCKED ? TypeCompte.BLOCKED :
-                              TypeCompte.SAVINGS; // Défaut: SAVINGS
-
-      const prefix = typeCompteEnum === TypeCompte.CURRENT ? 'CC' : 'CE';
-      const timestamp = Date.now().toString().slice(-6);
-      const random = randomInt(0, 10000).toString().padStart(4, '0');
-      const numeroCompte = `${prefix}-${timestamp}-${random}`;
-
-      // 2. Create Account
-      const [compte] = await tx.insert(comptes).values({
-        clientId,
-        agenceId: data.agenceId, // Add this line
-        numeroCompte,
-        typeCompte: typeCompteEnum,
-        soldeCourant: data.soldeInitial.toString(),
-        // tauxInteret: data.tauxInteret?.toString() || "0", // Removed from schema?
-        statut: data.statut as any,
-        // dateOuverture: new Date(), // CreatedAt is enough
-      }).returning();
-
-      // 3. Create Initial Transaction if needed
-      if (data.soldeInitial > 0) {
-        const typePaiement = typeCompteEnum === TypeCompte.CURRENT ? "DEPOSIT_CURRENT" : "DEPOSIT_SAVINGS";
-        await tx.insert(transactionsCompte).values({
-          compteId: compte.id,
-          // typeTransaction removed as it does not exist in schema
-          montant: data.soldeInitial.toString(),
-          methodePaiement: (data.methodePaiement || MethodePaiement.CASH) as any,
-          observations: 'Solde initial à la création',
-          createdBy: userId,
-          typePaiement,
-          sens: "CREDIT", // Initial deposit is always a credit
-        });
-      }
-
-      return compte;
-    });
-  }
-  
   export async function updateClientAccount(
     id: string,
     updateData: { typeCompte?: string; tauxInteret?: string; statut?: string; solde?: string }

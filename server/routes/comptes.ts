@@ -79,6 +79,7 @@ const createCompteSchema = z.object({
     MotifBlocage.OTHER,
   ]).optional(),
   blocageReference: z.string().optional(),
+  blocageFin: z.string().optional(), // ISO date string for blocked account end date
 });
 
 const depotRetraitSchema = z.object({
@@ -239,10 +240,6 @@ export function registerComptesRoutes(app: Express) {
    * POST /api/comptes - Créer un nouveau compte
    * Validation: Un client ne peut avoir qu'un seul compte par type
    */
-  /**
-   * POST /api/comptes - Créer un nouveau compte
-   * Validation: Un client ne peut avoir qu'un seul compte par type
-   */
   app.post(
     "/api/comptes",
     requireAuth,
@@ -280,6 +277,8 @@ export function registerComptesRoutes(app: Express) {
             referenceTransaction: parsed.referenceTransaction,
             blocageActif: parsed.blocageActif,
             blocageMotif: parsed.blocageMotif,
+            blocageReference: parsed.blocageReference,
+            blocageFin: parsed.blocageFin,
           },
           user?.id!
         );
@@ -289,7 +288,7 @@ export function registerComptesRoutes(app: Express) {
           const { calculateNextTransferDate } = await import("../services/automatic-transfers-service");
           
           const prochainVersement = calculateNextTransferDate(
-            data.versementAutoFrequence || 'Mensuel',
+            data.versementAutoFrequence || 'MONTHLY',
             data.versementAutoJour || 28
           );
           
@@ -368,6 +367,9 @@ export function registerComptesRoutes(app: Express) {
                 numeroCompte: result.compte.numeroCompte,
                 typeCompte: result.compte.typeCompte,
                 montantTotal: parsed.soldeInitial,
+                methodePaiement: parsed.modePaiement,
+                operateurMobile: parsed.operateurMobile,
+                compteSourceId: parsed.compteSourceId,
                 clientNom: client?.nom,
                 clientPrenom: client?.prenom,
               },
@@ -1807,12 +1809,9 @@ export function registerComptesRoutes(app: Express) {
         try {
             const data = normalizeKeysDeep(req.body) as any;
 
-            // Validation stricte du montant et session
+            // Validation stricte du montant
             if (!data.montant || Number(data.montant) <= 0) {
                 return res.status(400).json({ message: "Montant invalide" });
-            }
-            if (!data.sessionCaisseId) {
-                 return res.status(400).json({ message: "Session de caisse requise" });
             }
 
             // KYC pre-check: warn if documents are missing (soft block unless force)
@@ -1835,12 +1834,21 @@ export function registerComptesRoutes(app: Express) {
                 }
             }
 
+            const methodePaiement = data.methodePaiement || data.modePaiement || 'CASH';
+            // Session caisse required for CASH/MOBILE_MONEY, optional for TRANSFER
+            if (methodePaiement !== 'TRANSFER' && !data.sessionCaisseId) {
+                return res.status(400).json({ message: "Session de caisse requise" });
+            }
+
             const result = await comptesService.payerDepotInitialCompte(
                 req.params.id,
                 {
                     montant: Number(data.montant),
                     sessionCaisseId: data.sessionCaisseId,
-                    userId: req.session.user!.id
+                    userId: req.session.user!.id,
+                    methodePaiement: methodePaiement as 'CASH' | 'MOBILE_MONEY' | 'TRANSFER',
+                    operateurMobile: data.operateurMobile,
+                    compteSourceId: data.compteSourceId,
                 }
             );
 
@@ -1940,7 +1948,23 @@ export function registerComptesRoutes(app: Express) {
               continue;
             }
 
-            const montantInitial = Number(compte.soldeCourant || 0);
+            // Compute remaining amount from opening snapshot (not soldeCourant which is 0 for pending accounts)
+            const snapshot = (compte as any).openingSnapshot as { openingFee: number; minInitialDeposit: number; initialDepositRequired: boolean } | null;
+            const paidFee = Number((compte as any).paidOpeningFee || 0);
+            const paidDeposit = Number((compte as any).paidInitialDeposit || 0);
+
+            let montantInitial: number;
+            if (snapshot) {
+              const remainingFee = Math.max(0, snapshot.openingFee - paidFee);
+              const remainingDeposit = snapshot.initialDepositRequired
+                ? Math.max(0, snapshot.minInitialDeposit - paidDeposit)
+                : 0;
+              montantInitial = remainingFee + remainingDeposit;
+            } else {
+              // Legacy account without snapshot
+              montantInitial = Number(compte.soldeCourant || 0);
+            }
+
             if (montantInitial <= 0) {
               results.failed.push({ accountId, numeroCompte: compte.numeroCompte, error: "Montant initial non défini" });
               continue;
