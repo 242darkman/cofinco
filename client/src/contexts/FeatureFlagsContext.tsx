@@ -23,7 +23,7 @@ const defaultFeatures: FeatureFlags = {
   smsEnabled: false,
   smsMessage: "Service SMS non disponible actuellement",
   
-  mobileMoneyEnabled: false,
+  mobileMoneyEnabled: true,
   mobileMoneyMessage: "Mobile Money non disponible actuellement",
   
   internationalTransferEnabled: false,

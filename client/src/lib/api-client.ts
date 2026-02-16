@@ -921,6 +921,45 @@ export const remboursementApi = {
   }),
 };
 
+// Payments API (Mobile Money via pawaPay)
+export const paymentsApi = {
+  /** Get fee estimate for MM transaction */
+  feeEstimate: (params: { amount: number; provider: 'MTN' | 'AIRTEL'; direction: 'COLLECTION' | 'PAYOUT'; feeOption: 'CLIENT_PAYS' | 'FEES_DEDUCTED' }) => {
+    const qs = new URLSearchParams({
+      amount: String(params.amount),
+      provider: params.provider,
+      direction: params.direction,
+      feeOption: params.feeOption,
+    });
+    return request<{ feeAmount: number; feeRate: number; feeFixed: number; montantBrut: number; montantNet: number; feeOption: string }>(`/payments/fee-estimate?${qs}`);
+  },
+
+  /** Initiate a collection (money-in) */
+  collect: (data: {
+    provider: 'MTN' | 'AIRTEL';
+    amount: number;
+    phone: string;
+    clientId: string;
+    compteId?: string;
+    description?: string;
+    idempotencyKey?: string;
+    metadata?: Record<string, unknown>;
+    feeOption?: 'CLIENT_PAYS' | 'FEES_DEDUCTED';
+  }) => request<any>('/payments/collect', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+
+  /** Get payment intent by ID (for polling) */
+  getIntent: (id: string) => request<any>(`/payments/${id}`),
+
+  /** Validate a phone number and resolve operator */
+  validatePhone: (phone: string) => request<{ isValid: boolean; operator: string | null; message: string }>('/payments/validate-phone', {
+    method: 'POST',
+    body: JSON.stringify({ phone }),
+  }),
+};
+
 // Compte Epargne API (uses unified /api/comptes endpoint)
 export const compteEpargneApi = {
   getAll: (params?: { search?: string; page?: number; limit?: number; typeCompte?: string; statut?: string }) => {

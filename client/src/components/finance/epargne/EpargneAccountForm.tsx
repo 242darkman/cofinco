@@ -1,23 +1,22 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  X, User, Smartphone, AlertCircle, CheckCircle, Banknote, Phone, Hash, Wallet,
-  ShieldCheck, Lock, Building2, ChevronRight, ChevronLeft
+  X, User, AlertCircle, CheckCircle, Banknote, Phone, Wallet,
+  ShieldCheck, Lock, Building2, ChevronRight, ChevronLeft, Loader2, XCircle
 } from 'lucide-react';
-import { clientApi, compteEpargneApi, transactionEpargneApi } from '../../../lib/api-client';
+import { clientApi, compteEpargneApi, paymentsApi } from '../../../lib/api-client';
+import mtnLogo from '@/assets/logos/mtn-logo.png';
+import airtelLogo from '@/assets/logos/airtel-logo.png';
 import { useFeatureFlags } from '../../../contexts/FeatureFlagsContext';
 import { toast, handleApiError } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
-import { validateAmount, validateRequired, VALIDATION_LIMITS } from '../../../lib/validation';
 import { sanitizeInput } from '../../../lib/sanitize';
 import { Button } from '../../ui';
 import { StatutClient, StatutCompte, TypeCompte as TypeCompteEnum, FrequenceVirement, FREQUENCE_VIREMENT_LABELS, type FrequenceVirementType } from '@shared/enum/status-constants';
 import { currencySymbol } from '@shared/config/currency';
-
-const MOBILE_OPERATORS = [
-  { id: 'mtn', name: 'MTN Mobile Money', color: 'bg-status-warning-bg0', textColor: 'text-status-warning', prefix: '+242 05/06' },
-  { id: 'airtel', name: 'Airtel Money', color: 'bg-status-danger', textColor: 'text-status-danger', prefix: '+242 04' }
-] as const;
+import { v4 as uuidv4 } from 'uuid';
+import { UniversalPaymentSuccessModal } from '../caisse/shared/UniversalPaymentSuccessModal';
+import type { ReceiptData } from '../../ui/printable/ReceiptTemplate';
 
 const BILLETS_FCFA = [10000, 5000, 2000, 1000, 500] as const;
 
@@ -105,13 +104,23 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
   const [showCaisseModal, setShowCaisseModal] = useState(false);
   const [mobileMoneyData, setMobileMoneyData] = useState({
     numero_telephone: '',
-    numero_transaction: '',
   });
   const [caisseData, setCaisseData] = useState({
     billets: {} as Record<number, number>,
     reference_recu: ''
   });
   const [selectedOperator, setSelectedOperator] = useState<string>('');
+  const [mmFeeEstimate, setMmFeeEstimate] = useState<{ feeAmount: number; feeRate: number; montantBrut: number; montantNet: number } | null>(null);
+  const [mmFeeLoading, setMmFeeLoading] = useState(false);
+
+  // MM live payment state
+  const [mmStep, setMmStep] = useState<'idle' | 'pending' | 'success' | 'failed' | 'expired'>('idle');
+  const [mmError, setMmError] = useState<string | null>(null);
+  const [showReceipt, setShowReceipt] = useState(false);
+  const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const createdAccountRef = useRef<{ id: string; numeroCompte: string } | null>(null);
+  const mmIdempotencyKey = useMemo(() => uuidv4(), []);
 
   // Form Data
   const [formData, setFormData] = useState({
@@ -190,6 +199,33 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
     loadProduits(formData.type_compte);
   }, [formData.type_compte, loadProduits]);
 
+  // Fetch MM fee estimate when MM mode is selected (step 2) or modal opens — debounced 500ms
+  useEffect(() => {
+    const isMM = formData.mode_ouverture === 'MTN' || formData.mode_ouverture === 'AIRTEL';
+    const operator = showMobileMoneyModal ? selectedOperator : (isMM ? formData.mode_ouverture : '');
+    if (!operator) { setMmFeeEstimate(null); return; }
+    const amount = parseFloat(formData.solde_initial);
+    if (isNaN(amount) || amount <= 0) { setMmFeeEstimate(null); return; }
+
+    setMmFeeLoading(true);
+    const timer = setTimeout(() => {
+      paymentsApi.feeEstimate({
+        amount,
+        provider: operator as 'MTN' | 'AIRTEL',
+        direction: 'COLLECTION',
+        feeOption: 'CLIENT_PAYS',
+      }).then(est => setMmFeeEstimate(est)).catch(() => setMmFeeEstimate(null)).finally(() => setMmFeeLoading(false));
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [showMobileMoneyModal, selectedOperator, formData.mode_ouverture, formData.solde_initial]);
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, []);
+
    // Selected Data Helpers
    const selectedClient = useMemo(() => clients.find(c => c.id === formData.client_id), [clients, formData.client_id]);
    const filteredClients = useMemo(() => {
@@ -211,7 +247,20 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
      comptesExistants.map(c => normalizeTypeCompte(c.typeCompte || '')),
    [comptesExistants]);
 
-   const eligibleForTransfer = useMemo(() => 
+   // Auto-select the next available account type when client has existing accounts
+   useEffect(() => {
+     if (existingAccountsTypes.length === 0) return;
+     const typeOrder: TypeCompte[] = ['CURRENT', 'SAVINGS', 'BLOCKED'];
+     // If current selection is already available, keep it
+     if (!existingAccountsTypes.includes(formData.type_compte)) return;
+     // Find the first type not yet owned
+     const nextAvailable = typeOrder.find(t => !existingAccountsTypes.includes(t));
+     if (nextAvailable) {
+       setFormData(prev => ({ ...prev, type_compte: nextAvailable, produit_id: '' }));
+     }
+   }, [existingAccountsTypes]); // eslint-disable-line react-hooks/exhaustive-deps
+
+   const eligibleForTransfer = useMemo(() =>
      comptesExistants.some(c => {
         const type = normalizeTypeCompte(c.typeCompte || '');
         const solde = typeof c.solde === 'number' ? c.solde : parseFloat(String(c.solde || 0));
@@ -297,6 +346,8 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
         setShowCaisseModal(true);
      } else if (isMobileMoneyMode && soldeInitial > 0) {
         setSelectedOperator(formData.mode_ouverture);
+        setMmStep('idle');
+        setMmError(null);
         setShowMobileMoneyModal(true);
      } else {
         performAccountCreation();
@@ -322,7 +373,6 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
         modePaiement,
         operateurMobile: (formData.mode_ouverture === 'MTN' || formData.mode_ouverture === 'AIRTEL') ? formData.mode_ouverture : undefined,
         telephoneMobileMoney: mobileMoneyData.numero_telephone || undefined,
-        referenceTransaction: mobileMoneyData.numero_transaction || undefined,
         compteSourceId: formData.mode_ouverture === 'TRANSFER' ? formData.compte_source_id : undefined,
         blocageActif: formData.type_compte === 'BLOCKED',
         blocageMotif: formData.type_compte === 'BLOCKED' ? sanitizedMotif : undefined,
@@ -353,18 +403,122 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
     }
   };
 
-  // --- Mobile Money Logic ---
-  const handleMobileMoneyValidation = () => {
-    if (!mobileMoneyData.numero_telephone) {
-      toast.error("Veuillez saisir le numéro de téléphone");
+  // --- Mobile Money Live Payment Logic ---
+  const startMmPolling = useCallback((intentId: string) => {
+    setMmStep('pending');
+    pollingRef.current = setInterval(async () => {
+      try {
+        const intent = await paymentsApi.getIntent(intentId);
+        if (intent.status === 'SUCCESS') {
+          if (pollingRef.current) clearInterval(pollingRef.current);
+          pollingRef.current = null;
+          setMmStep('success');
+          const mmFee = intent.clientFeeAmount ? parseFloat(intent.clientFeeAmount) : 0;
+          const amount = parseFloat(formData.solde_initial);
+          const receipt: ReceiptData = {
+            title: 'Ouverture de Compte',
+            reference: intent.providerTxnId || intent.externalRef || `MM-${Date.now()}`,
+            date: new Date(),
+            type: 'Dépôt Initial - Ouverture',
+            client: { nom: selectedClient?.nom || '', prenom: selectedClient?.prenom || '' },
+            items: [
+              { description: `Dépôt initial - Compte ${createdAccountRef.current?.numeroCompte || ''}`, montant: amount, quantite: 1 },
+              ...(mmFee > 0 ? [{ description: `Frais Mobile Money (${formData.mode_ouverture})`, montant: mmFee, quantite: 1 }] : []),
+            ],
+            total: amount + mmFee,
+            modePaiement: formData.mode_ouverture === 'MTN' ? 'MTN Mobile Money' : 'Airtel Money',
+            devise: currencySymbol(),
+            notes: `Compte ${createdAccountRef.current?.numeroCompte || ''} créé et activé`,
+          };
+          setReceiptData(receipt);
+          setShowReceipt(true);
+          toast.success('Paiement réussi ! Compte créé avec succès.');
+        } else if (intent.status === 'FAILED') {
+          if (pollingRef.current) clearInterval(pollingRef.current);
+          pollingRef.current = null;
+          setMmStep('failed');
+          setMmError(intent.errorMessage || 'Le paiement a échoué. Veuillez réessayer.');
+        } else if (intent.status === 'EXPIRED') {
+          if (pollingRef.current) clearInterval(pollingRef.current);
+          pollingRef.current = null;
+          setMmStep('expired');
+          setMmError('Le paiement a expiré. Le client n\'a pas confirmé à temps.');
+        }
+      } catch {
+        // Network error during poll — keep trying
+      }
+    }, 3000);
+  }, [formData.solde_initial, formData.mode_ouverture, selectedClient]);
+
+  const handleMmPayment = async () => {
+    if (!mobileMoneyData.numero_telephone || mobileMoneyData.numero_telephone.length < 8) {
+      toast.error("Numéro de téléphone invalide");
       return;
     }
-    if (!mobileMoneyData.numero_transaction) {
-      toast.error("Veuillez saisir la référence de transaction");
-      return;
+
+    setLoading(true);
+    setMmError(null);
+
+    try {
+      // Step 1: Create the account if not already created
+      if (!createdAccountRef.current) {
+        const soldeInitial = parseFloat(formData.solde_initial) || 0;
+        const sanitizedMotif = sanitizeInput(formData.motif_blocage);
+        const payload = {
+          clientId: formData.client_id,
+          typeCompte: formData.type_compte,
+          produitId: formData.produit_id || undefined,
+          soldeInitial,
+          modePaiement: 'MOBILE_MONEY',
+          operateurMobile: formData.mode_ouverture,
+          telephoneMobileMoney: mobileMoneyData.numero_telephone,
+          compteSourceId: undefined,
+          blocageActif: formData.type_compte === 'BLOCKED',
+          blocageMotif: formData.type_compte === 'BLOCKED' ? sanitizedMotif : undefined,
+          blocageFin: formData.type_compte === 'BLOCKED' ? formData.date_echeance : undefined,
+          versementAutoActif: formData.versement_auto_active,
+          versementAutoMontant: formData.versement_auto_active ? parseFloat(formData.versement_auto_montant) : undefined,
+          versementAutoFrequence: formData.versement_auto_active ? formData.versement_auto_frequence : undefined,
+          versementAutoJour: formData.versement_auto_active ? parseInt(formData.versement_auto_jour) : undefined,
+        };
+        const result = await compteEpargneApi.create(payload);
+        createdAccountRef.current = {
+          id: result?.id || result?.compte?.id || '',
+          numeroCompte: result?.numeroCompte || result?.compte?.numeroCompte || '',
+        };
+      }
+
+      // Step 2: Initiate collection via pawaPay
+      const intent = await paymentsApi.collect({
+        provider: formData.mode_ouverture as 'MTN' | 'AIRTEL',
+        amount: parseFloat(formData.solde_initial),
+        phone: mobileMoneyData.numero_telephone,
+        clientId: formData.client_id,
+        compteId: createdAccountRef.current.id,
+        description: `Dépôt initial compte ${createdAccountRef.current.numeroCompte}`,
+        idempotencyKey: mmIdempotencyKey,
+        feeOption: 'CLIENT_PAYS',
+        metadata: {
+          purpose: 'ACCOUNT_ACTIVATION',
+          accountNumber: createdAccountRef.current.numeroCompte,
+          accountType: formData.type_compte,
+        },
+      });
+
+      // Step 3: Start polling for payment status
+      startMmPolling(intent.id);
+    } catch (error: any) {
+      const msg = handleApiError(error, 'Erreur lors du paiement');
+      setMmError(msg);
+      toast.error(msg);
+    } finally {
+      setLoading(false);
     }
-    setShowMobileMoneyModal(false);
-    performAccountCreation();
+  };
+
+  const handleMmRetry = () => {
+    setMmStep('idle');
+    setMmError(null);
   };
 
   // --- Caisse Logic ---
@@ -427,7 +581,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
     );
   };
 
-  const PaymentCard = ({ id, label, icon: Icon, color = 'emerald' }: any) => {
+  const PaymentCard = ({ id, label, icon: Icon, logoSrc, color = 'emerald' }: any) => {
     const isSelected = formData.mode_ouverture === id;
     const colors: any = {
       emerald: 'border-status-success bg-status-success-bg text-status-success',
@@ -435,7 +589,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
       red: 'border-status-danger bg-status-danger-bg text-status-danger',
       blue: 'border-status-info bg-status-info-bg text-status-info',
     };
-    
+
     // Disable if transfer not eligible or MM not enabled
     const isMM = id === 'MTN' || id === 'AIRTEL';
     const disabled = (id === 'TRANSFER' && !eligibleForTransfer) || (isMM && !mobileMoneyEnabled);
@@ -451,12 +605,27 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
           }
         `}
       >
-         <Icon size={20} />
+         {logoSrc ? (
+           <img src={logoSrc} alt={label} className="w-7 h-7 object-contain rounded" />
+         ) : (
+           <Icon size={20} />
+         )}
          <span className="text-xs font-bold">{label}</span>
          {isMM && !mobileMoneyEnabled && <span className="text-[8px] text-content-muted">Bientôt</span>}
       </button>
     );
   };
+
+  // Show receipt on successful MM payment
+  if (showReceipt && receiptData) {
+    return (
+      <UniversalPaymentSuccessModal
+        isOpen={true}
+        onClose={() => { setShowReceipt(false); onSuccess(); }}
+        data={receiptData}
+      />
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
@@ -675,8 +844,8 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                 )}
                 {(formData.mode_ouverture === 'MTN' || formData.mode_ouverture === 'AIRTEL') && (
                   <div className="p-3 bg-status-info-bg border border-status-info/20 rounded-xl flex items-start gap-3 text-status-info text-xs">
-                     <Smartphone size={16} className="mt-0.5 flex-shrink-0" />
-                     <p>Le paiement sera validé par <strong>{formData.mode_ouverture === 'MTN' ? 'MTN Mobile Money' : 'Airtel Money'}</strong>. Vous devrez fournir le numéro et la référence de transaction.</p>
+                     <img src={formData.mode_ouverture === 'MTN' ? mtnLogo : airtelLogo} alt={formData.mode_ouverture} className="w-5 h-5 mt-0.5 flex-shrink-0 rounded" />
+                     <p>Une demande de paiement <strong>{formData.mode_ouverture === 'MTN' ? 'MTN Mobile Money' : 'Airtel Money'}</strong> sera envoyée directement sur le téléphone du client pour confirmation.</p>
                   </div>
                 )}
 
@@ -685,8 +854,8 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                    <label className="text-xs font-bold text-content-muted uppercase ml-1">Mode de Dépôt</label>
                    <div className="grid grid-cols-4 gap-3">
                       <PaymentCard id="CASH" label="Espèces" icon={Banknote} />
-                      <PaymentCard id="MTN" label="MTN MoMo" icon={Smartphone} color="yellow" />
-                      <PaymentCard id="AIRTEL" label="Airtel" icon={Smartphone} color="red" />
+                      <PaymentCard id="MTN" label="MTN MoMo" logoSrc={mtnLogo} color="yellow" />
+                      <PaymentCard id="AIRTEL" label="Airtel" logoSrc={airtelLogo} color="red" />
                       <PaymentCard id="TRANSFER" label="Interne" icon={Building2} color="blue" />
                    </div>
                    
@@ -712,15 +881,15 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                 <div className="space-y-2">
                    <label className="text-xs font-bold text-content-muted uppercase ml-1">Montant Initial (FCFA)</label>
                    <div className="relative group">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-content-muted font-bold text-xl">{currencySymbol()}</span>
                       <input
                         type="number"
                         value={formData.solde_initial}
                         onChange={(e) => handleInputChange('solde_initial', e.target.value)}
-                        className="w-full h-20 bg-surface-base border-2 border-edge rounded-xl pl-10 pr-4 text-4xl font-bold text-content-primary placeholder-content-primary outline-none focus:border-accent transition-all"
+                        className="w-full h-20 bg-surface-base border-2 border-edge rounded-xl px-6 pr-20 text-4xl font-bold text-content-primary placeholder-content-muted outline-none focus:border-accent transition-all text-right"
                         placeholder="0"
                         min="0"
                       />
+                      <span className="absolute right-6 top-1/2 -translate-y-1/2 text-content-muted font-semibold text-lg pointer-events-none">FCFA</span>
                    </div>
                    {errors.solde_initial && <p className="text-xs text-status-danger ml-1">{errors.solde_initial}</p>}
 
@@ -755,6 +924,45 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                            </div>
                          )}
                        </div>
+                     </div>
+                   )}
+
+                   {/* MM fee breakdown (shown when MTN/AIRTEL selected and amount > 0) */}
+                   {isMobileMoneyMode && parseFloat(formData.solde_initial) > 0 && (
+                     <div className="bg-surface-base/80 border border-status-warning/20 rounded-xl p-3 space-y-2">
+                       <div className="flex items-center gap-2">
+                         <img
+                           src={formData.mode_ouverture === 'MTN' ? mtnLogo : airtelLogo}
+                           alt={formData.mode_ouverture}
+                           className="w-4 h-4 rounded"
+                         />
+                         <p className="text-[10px] font-bold text-content-muted uppercase tracking-wide">
+                           Frais {formData.mode_ouverture === 'MTN' ? 'MTN Mobile Money' : 'Airtel Money'}
+                         </p>
+                       </div>
+                       {mmFeeLoading ? (
+                         <div className="flex items-center gap-2 text-xs text-content-muted">
+                           <Loader2 size={12} className="animate-spin" />
+                           <span>Calcul des frais...</span>
+                         </div>
+                       ) : mmFeeEstimate ? (
+                         <div className="space-y-1.5">
+                           <div className="flex justify-between text-xs">
+                             <span className="text-content-muted">Montant crédité au compte</span>
+                             <span className="text-content-primary font-medium">{formatMoney(mmFeeEstimate.montantNet)} F</span>
+                           </div>
+                           <div className="flex justify-between text-xs">
+                             <span className="text-content-muted">Frais Mobile Money ({mmFeeEstimate.feeRate}%)</span>
+                             <span className="text-status-warning font-medium">+ {formatMoney(mmFeeEstimate.feeAmount)} F</span>
+                           </div>
+                           <div className="border-t border-edge-subtle pt-1.5 flex justify-between text-xs">
+                             <span className="text-content-primary font-semibold">Total débité du téléphone</span>
+                             <span className="text-content-primary font-bold">{formatMoney(mmFeeEstimate.montantBrut)} F</span>
+                           </div>
+                         </div>
+                       ) : (
+                         <p className="text-xs text-content-muted">Impossible d'estimer les frais</p>
+                       )}
                      </div>
                    )}
 
@@ -1011,72 +1219,153 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
         )}
       </AnimatePresence>
 
-      {/* --- Mobile Money Confirmation Modal --- */}
+      {/* --- Mobile Money Live Payment Modal --- */}
       <AnimatePresence>
         {showMobileMoneyModal && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
             <motion.div
                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                className="absolute inset-0 bg-black/90 backdrop-blur-md"
-               onClick={() => setShowMobileMoneyModal(false)}
+               onClick={() => { if (mmStep === 'idle' && !loading) setShowMobileMoneyModal(false); }}
             />
             <motion.div
                initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
                className="bg-surface-base border border-edge rounded-2xl p-6 w-full max-w-lg z-10 relative shadow-2xl"
             >
-               <h3 className="text-xl font-bold text-content-primary mb-2 flex items-center gap-2">
-                  <Smartphone className={selectedOperator === 'MTN' ? 'text-status-warning' : 'text-status-danger'} />
+               {/* Header */}
+               <h3 className="text-xl font-bold text-content-primary mb-2 flex items-center gap-3">
+                  <img
+                    src={selectedOperator === 'MTN' ? mtnLogo : airtelLogo}
+                    alt={selectedOperator}
+                    className="w-8 h-8 object-contain rounded-lg"
+                  />
                   Paiement {selectedOperator === 'MTN' ? 'MTN Mobile Money' : 'Airtel Money'}
                </h3>
-               <p className="text-content-muted mb-6">Confirmez les informations de paiement mobile.</p>
 
-               {/* Summary */}
-               <div className="bg-surface p-4 rounded-xl mb-6 flex justify-between items-center">
-                  <span className="text-content-muted">Montant</span>
-                  <span className="text-2xl font-bold text-content-primary">{formatMoney(parseFloat(formData.solde_initial))}</span>
-               </div>
-
-               {/* MM Fields */}
-               <div className="space-y-4 mb-6">
-                  <div className="space-y-1">
-                     <label className="text-[10px] font-bold text-content-muted uppercase">Numéro de Téléphone</label>
-                     <div className="relative">
-                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" size={16} />
-                        <input
-                           type="tel"
-                           placeholder={selectedOperator === 'MTN' ? '+242 05/06 XX XX XX' : '+242 04 XX XX XX'}
-                           value={mobileMoneyData.numero_telephone}
-                           onChange={(e) => setMobileMoneyData(p => ({ ...p, numero_telephone: e.target.value }))}
-                           className="w-full h-10 bg-surface-base border border-edge rounded-lg pl-10 pr-4 text-content-primary text-sm focus:border-accent outline-none"
-                        />
+               {/* MM Pending State */}
+               {mmStep === 'pending' && (
+                 <div className="py-8 flex flex-col items-center gap-4 text-center">
+                   <div className="relative">
+                     <div className="w-20 h-20 rounded-full bg-status-info-bg flex items-center justify-center">
+                       <img
+                         src={selectedOperator === 'MTN' ? mtnLogo : airtelLogo}
+                         alt={selectedOperator}
+                         className="w-12 h-12 object-contain rounded-lg"
+                       />
                      </div>
-                  </div>
-                  <div className="space-y-1">
-                     <label className="text-[10px] font-bold text-content-muted uppercase">Référence Transaction</label>
-                     <div className="relative">
-                        <Hash className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" size={16} />
-                        <input
-                           type="text"
-                           placeholder="Ex: TXN-123456789"
-                           value={mobileMoneyData.numero_transaction}
-                           onChange={(e) => setMobileMoneyData(p => ({ ...p, numero_transaction: e.target.value }))}
-                           className="w-full h-10 bg-surface-base border border-edge rounded-lg pl-10 pr-4 text-content-primary text-sm focus:border-accent outline-none"
-                        />
+                     <div className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-surface-base border-2 border-status-info flex items-center justify-center">
+                       <Loader2 size={14} className="animate-spin text-status-info" />
                      </div>
-                  </div>
-               </div>
+                   </div>
+                   <div>
+                     <h4 className="text-lg font-bold text-content-primary">Paiement en cours...</h4>
+                     <p className="text-sm text-content-muted mt-1">
+                       Une notification a été envoyée sur le téléphone <strong className="text-content-primary">{mobileMoneyData.numero_telephone}</strong>.
+                     </p>
+                     <p className="text-xs text-content-muted mt-2">
+                       Le client doit confirmer le paiement de <strong className="text-status-info">{formatMoney(mmFeeEstimate?.montantBrut || parseFloat(formData.solde_initial))}</strong> sur son téléphone.
+                     </p>
+                   </div>
+                   <div className="flex items-center gap-2 text-xs text-content-muted animate-pulse">
+                     <Loader2 size={12} className="animate-spin" />
+                     En attente de confirmation...
+                   </div>
+                 </div>
+               )}
 
-               <div className="flex gap-3">
-                  <Button onClick={() => setShowMobileMoneyModal(false)} variant="ghost" fullWidth>Annuler</Button>
-                  <Button
-                     onClick={handleMobileMoneyValidation}
-                     variant="success"
-                     fullWidth
-                     isLoading={loading}
-                  >
-                     Confirmer le Paiement
-                  </Button>
-               </div>
+               {/* MM Failed / Expired State */}
+               {(mmStep === 'failed' || mmStep === 'expired') && (
+                 <div className="py-8 flex flex-col items-center gap-4 text-center">
+                   <div className="w-20 h-20 rounded-full bg-status-danger-bg flex items-center justify-center">
+                     <XCircle size={40} className="text-status-danger" />
+                   </div>
+                   <div>
+                     <h4 className="text-lg font-bold text-content-primary">
+                       {mmStep === 'failed' ? 'Paiement échoué' : 'Paiement expiré'}
+                     </h4>
+                     <p className="text-sm text-content-muted mt-1">{mmError}</p>
+                     {createdAccountRef.current && (
+                       <p className="text-xs text-content-muted mt-2">
+                         Le compte <strong>{createdAccountRef.current.numeroCompte}</strong> a été créé et reste en attente d'activation.
+                       </p>
+                     )}
+                   </div>
+                   <div className="flex gap-3 w-full">
+                     <Button onClick={() => { setShowMobileMoneyModal(false); onSuccess(); }} variant="ghost" fullWidth>Fermer</Button>
+                     <Button onClick={handleMmRetry} variant="primary" fullWidth>Réessayer</Button>
+                   </div>
+                 </div>
+               )}
+
+               {/* Normal form (idle state) */}
+               {mmStep === 'idle' && (
+                 <>
+                   <p className="text-content-muted mb-6">Le paiement sera envoyé directement sur le téléphone du client.</p>
+
+                   {/* Fee breakdown */}
+                   <div className="bg-surface rounded-xl p-4 mb-6 space-y-2">
+                      <div className="flex justify-between items-center">
+                         <span className="text-sm text-content-muted">Montant dépôt</span>
+                         <span className="text-lg font-bold text-content-primary">{formatMoney(parseFloat(formData.solde_initial))}</span>
+                      </div>
+                      {mmFeeLoading ? (
+                        <div className="flex items-center gap-2 text-xs text-content-muted">
+                          <Loader2 size={12} className="animate-spin" />
+                          Calcul des frais...
+                        </div>
+                      ) : mmFeeEstimate ? (
+                        <>
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="text-content-muted">Frais {selectedOperator} ({mmFeeEstimate.feeRate}%)</span>
+                            <span className="text-status-warning font-medium">+{formatMoney(mmFeeEstimate.feeAmount)}</span>
+                          </div>
+                          <div className="flex justify-between items-center border-t border-edge-subtle pt-2">
+                            <span className="text-sm font-semibold text-content-primary">Total débité du téléphone</span>
+                            <span className="text-lg font-bold text-status-danger">{formatMoney(mmFeeEstimate.montantBrut)}</span>
+                          </div>
+                        </>
+                      ) : null}
+                   </div>
+
+                   {/* Phone input */}
+                   <div className="space-y-4 mb-6">
+                      <div className="space-y-1">
+                         <label className="text-[10px] font-bold text-content-muted uppercase">Numéro de Téléphone du Client</label>
+                         <div className="relative">
+                            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" size={16} />
+                            <input
+                               type="tel"
+                               placeholder={selectedOperator === 'MTN' ? '+242 05/06 XX XX XX' : '+242 04 XX XX XX'}
+                               value={mobileMoneyData.numero_telephone}
+                               onChange={(e) => setMobileMoneyData(p => ({ ...p, numero_telephone: e.target.value }))}
+                               className="w-full h-10 bg-surface-base border border-edge rounded-lg pl-10 pr-4 text-content-primary text-sm focus:border-accent outline-none"
+                            />
+                         </div>
+                      </div>
+                   </div>
+
+                   {/* Error */}
+                   {mmError && (
+                     <div className="flex items-center gap-2 p-3 mb-4 bg-status-danger-bg border border-status-danger/30 rounded-xl text-status-danger text-sm">
+                       <AlertCircle size={16} />
+                       {mmError}
+                     </div>
+                   )}
+
+                   <div className="flex gap-3">
+                      <Button onClick={() => { setShowMobileMoneyModal(false); setMmFeeEstimate(null); }} variant="ghost" fullWidth>Annuler</Button>
+                      <Button
+                         onClick={handleMmPayment}
+                         variant="success"
+                         fullWidth
+                         isLoading={loading}
+                         disabled={!mobileMoneyData.numero_telephone || mobileMoneyData.numero_telephone.length < 8}
+                      >
+                         {loading ? 'Envoi...' : 'Lancer le Paiement'}
+                      </Button>
+                   </div>
+                 </>
+               )}
             </motion.div>
           </div>
         )}

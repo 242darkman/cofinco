@@ -13,7 +13,7 @@
  */
 
 import { db } from "../../db";
-import { paymentIntents, operationsCaisse, sessionsCaisse, transactionsCompte, type PaymentIntent } from "@shared/schema";
+import { paymentIntents, operationsCaisse, sessionsCaisse, transactionsCompte, comptes, type PaymentIntent } from "@shared/schema";
 import { eq, and, desc } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import {
@@ -41,6 +41,7 @@ import { operatorToCorrespondent, correspondentToOperator, resolveOperatorFromPh
 import { createLogger } from "../../lib/logger";
 import { currencyCode } from "@shared/config/currency";
 import { calculateFee, type FeeEstimate } from "./fee-calculator";
+import { allocateOpeningPayment, recomputeAccountStatus, type OpeningSnapshot } from "../comptes";
 
 const logger = createLogger('PaymentService');
 
@@ -633,6 +634,14 @@ class PaymentService {
             idempotencyKey: `tx-momo-col-${intent.id}`,
             createdBy: intent.createdBy,
           });
+
+          // 1b. Account activation: update opening snapshot + recompute status
+          if (metadata?.purpose === "ACCOUNT_ACTIVATION") {
+            const activationResult = await this.handleAccountActivationInTx(tx, intent.compteId, creditAmount);
+            if (activationResult) {
+              additionalEventData.accountActivation = activationResult;
+            }
+          }
         }
 
         // 2. Allocation crédit si applicable (remboursement) — utilise montant net
@@ -724,6 +733,67 @@ class PaymentService {
         logger.warn({ err: error }, 'Could not notify agent MM service');
       }
     }
+  }
+
+  /**
+   * Handle account activation within the collection transaction.
+   * Updates paidOpeningFee / paidInitialDeposit and recomputes account status.
+   */
+  private async handleAccountActivationInTx(
+    tx: any,
+    compteId: string,
+    creditAmount: number,
+  ): Promise<{ newStatus: string; feePayment: number; depositPayment: number } | null> {
+    const [account] = await tx
+      .select()
+      .from(comptes)
+      .where(eq(comptes.id, compteId));
+
+    if (!account?.openingSnapshot) return null;
+
+    const snapshot = account.openingSnapshot as OpeningSnapshot;
+    const currentPaidFee = parseFloat(account.paidOpeningFee || "0");
+    const currentPaidDeposit = parseFloat(account.paidInitialDeposit || "0");
+
+    const { feePayment, depositPayment } = allocateOpeningPayment(
+      creditAmount,
+      snapshot,
+      currentPaidFee,
+      currentPaidDeposit,
+    );
+
+    const newPaidFee = currentPaidFee + feePayment;
+    const newPaidDeposit = currentPaidDeposit + depositPayment;
+
+    await tx
+      .update(comptes)
+      .set({
+        paidOpeningFee: newPaidFee.toString(),
+        paidInitialDeposit: newPaidDeposit.toString(),
+      })
+      .where(eq(comptes.id, compteId));
+
+    // Recompute the account status
+    const newStatus = recomputeAccountStatus({
+      openingSnapshot: snapshot,
+      paidOpeningFee: newPaidFee.toString(),
+      paidInitialDeposit: newPaidDeposit.toString(),
+      isApproved: account.isApproved ?? false,
+    });
+
+    if (newStatus !== account.statut) {
+      await tx
+        .update(comptes)
+        .set({ statut: newStatus })
+        .where(eq(comptes.id, compteId));
+    }
+
+    logger.info(
+      { compteId, feePayment, depositPayment, newStatus },
+      "Account activation processed via MM collection",
+    );
+
+    return { newStatus, feePayment, depositPayment };
   }
 
   /**
