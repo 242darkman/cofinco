@@ -351,114 +351,104 @@ async function processFeeRefund(
   userId: string
 ): Promise<string | undefined> {
   const { creditRefundRequests, operationsCaisse } = await import("@shared/schema");
-  const { createMouvementFinancier, generateReference } = await import("./ledger");
-  const { postGlForMouvement } = await import("./accounting-posting-service");
+  const { executeWithLedger, generateReference } = await import("./ledger");
 
-  let mouvementId: string | undefined;
+  // Pre-fetch refund data to build mouvement params
+  const [refundData] = await db
+    .select()
+    .from(creditRefundRequests)
+    .where(eq(creditRefundRequests.id, request.sourceId));
 
-   await db.transaction(async (tx) => {
-    // 1. Get and validate refund
-    const [refundData] = await tx
-      .select()
-      .from(creditRefundRequests)
-      .where(eq(creditRefundRequests.id, request.sourceId));
+  if (!refundData) throw new Error("Remboursement non trouvé");
+  if (refundData.statut !== "PENDING_CAISSE") {
+    throw new Error(`Remboursement pas en attente caisse (statut: ${refundData.statut})`);
+  }
 
-    if (!refundData) throw new Error("Remboursement non trouvé");
-    if (refundData.statut !== "PENDING_CAISSE") {
-      throw new Error(`Remboursement pas en attente caisse (statut: ${refundData.statut})`);
-    }
+  const amount = Number(refundData.montantRemboursable);
+  const paymentMethod = refundData.paymentMethod || "CASH";
+  const momoProvider = refundData.mobileMoneyProvider || undefined;
 
-    const amount = Number(refundData.montantRemboursable);
-    const paymentMethod = refundData.paymentMethod || "CASH";
-    const momoProvider = refundData.mobileMoneyProvider || undefined;
-
-    // 2. Create caisse operation
-    const [op] = await tx.insert(operationsCaisse).values({
-      sessionId: sessionCaisseId,
-      typeOperation: "FEE_REFUND" as any,
+  const { mouvement } = await executeWithLedger(
+    "CAISSE",
+    {
       montant: amount.toString(),
-      methodePaiement: (paymentMethod === "MOBILE_MONEY" ? "MOBILE_MONEY" : "CASH") as any,
-      reference: generateReference("CAISSE"),
-      description: `Remboursement frais dossier ${paymentMethod === "MOBILE_MONEY" ? `Mobile Money ${momoProvider || ""}` : "espèces"} (Ref: ${refundData.id.substring(0, 8)})`,
+      sens: "DEBIT" as const,
       clientId: refundData.clientId,
-      createdBy: userId,
-    } as any).returning();
-
-    // 3. Create ledger mouvement — route GL correctly via methodePaiement + provider
-    const mouvement = await createMouvementFinancier(tx, {
-      montant: amount.toString(),
-      sens: "DEBIT",
-      sourceModule: "CAISSE",
-      sourceId: op.id,
-      typePaiement: "FEE_REFUND",
-      methodePaiement: paymentMethod === "MOBILE_MONEY" ? "MOBILE_MONEY" : "CASH",
-      ...(momoProvider ? { provider: momoProvider } : {}),
+      agenceId: refundData.agenceId || undefined,
       sessionCaisseId,
-      clientId: refundData.clientId,
-      agenceId: refundData.agenceId,
+      methodePaiement: paymentMethod === "MOBILE_MONEY" ? "MOBILE_MONEY" : "CASH",
+      typePaiement: "FEE_REFUND",
+      ...(momoProvider ? { provider: momoProvider } : {}),
+      idempotencyKey: `fee-refund-caisse-${request.id}`,
       metadata: {
         type: "REFUND_PAYMENT",
         refundId: refundData.id,
-        operationId: op.id,
         demandeId: refundData.demandeId,
         method: paymentMethod,
         ...(momoProvider ? { provider: momoProvider } : {}),
       },
-    }, userId);
+    },
+    async (tx, mouvement) => {
+      // 1. Create caisse operation
+      const [op] = await tx.insert(operationsCaisse).values({
+        sessionId: sessionCaisseId,
+        mouvementId: mouvement.id,
+        typeOperation: "FEE_REFUND" as any,
+        montant: amount.toString(),
+        methodePaiement: (paymentMethod === "MOBILE_MONEY" ? "MOBILE_MONEY" : "CASH") as any,
+        reference: generateReference("CAISSE"),
+        description: `Remboursement frais dossier ${paymentMethod === "MOBILE_MONEY" ? `Mobile Money ${momoProvider || ""}` : "espèces"} (Ref: ${refundData.id.substring(0, 8)})`,
+        clientId: refundData.clientId,
+        createdBy: userId,
+      } as any).returning();
 
-    // 4. GL Posting
-    if (refundData.agenceId) {
-      await postGlForMouvement(tx, mouvement, refundData.agenceId, userId, {
-        refundId: refundData.id,
-        type: "REFUND_CAISSE_PAYMENT",
-      });
-    }
+      // 2. For MOBILE_MONEY: trigger automatic payout via MoMo API
+      if (paymentMethod === "MOBILE_MONEY") {
+        const momoPhone = refundData.mobileMoneyPhone;
+        if (!momoPhone || !momoProvider) {
+          throw new Error("Données Mobile Money manquantes (opérateur ou numéro)");
+        }
 
-    // 5. For MOBILE_MONEY: trigger automatic payout via MoMo API
-    if (paymentMethod === "MOBILE_MONEY") {
-      const momoPhone = refundData.mobileMoneyPhone;
-      if (!momoPhone || !momoProvider) {
-        throw new Error("Données Mobile Money manquantes (opérateur ou numéro)");
+        const { paymentService } = await import("./mobile-money/payment-service");
+        await paymentService.initiatePayout({
+          provider: momoProvider as "MTN" | "AIRTEL",
+          amount,
+          phone: momoPhone,
+          clientId: refundData.clientId,
+          agenceId: refundData.agenceId || undefined,
+          description: `Restitution frais dossier — ${refundData.id.substring(0, 8)}`,
+          idempotencyKey: `FEE_REFUND_MOMO_${refundData.id}`,
+          metadata: {
+            useCase: "FEE_REFUND",
+            refundId: refundData.id,
+            demandeId: refundData.demandeId,
+          },
+        }, userId);
       }
 
-      const { paymentService } = await import("./mobile-money/payment-service");
-      await paymentService.initiatePayout({
-        provider: momoProvider as "MTN" | "AIRTEL",
-        amount,
-        phone: momoPhone,
-        clientId: refundData.clientId,
-        agenceId: refundData.agenceId || undefined,
-        description: `Restitution frais dossier — ${refundData.id.substring(0, 8)}`,
-        idempotencyKey: `FEE_REFUND_MOMO_${refundData.id}`,
-        metadata: {
-          useCase: "FEE_REFUND",
-          refundId: refundData.id,
-          demandeId: refundData.demandeId,
-        },
-      }, userId);
-    }
+      // 3. Update refund to PAID
+      const paymentRefString = paymentMethod === "MOBILE_MONEY"
+        ? `MOMO-${op.reference}`
+        : `CASH-${op.reference}`;
 
-    // 6. Update refund to PAID
-    const paymentRefString = paymentMethod === "MOBILE_MONEY"
-      ? `MOMO-${op.reference}`
-      : `CASH-${op.reference}`;
+      await tx.update(creditRefundRequests).set({
+        statut: "PAID",
+        paidAt: new Date(),
+        paidBy: userId,
+        paymentReference: paymentRefString,
+        mouvementId: mouvement.id,
+        updatedAt: new Date(),
+      } as any).where(eq(creditRefundRequests.id, refundData.id));
 
-    await tx.update(creditRefundRequests).set({
-      statut: "PAID",
-      paidAt: new Date(),
-      paidBy: userId,
-      paymentReference: paymentRefString,
-      mouvementId: mouvement.id,
-      updatedAt: new Date(),
-    } as any).where(eq(creditRefundRequests.id, refundData.id));
-
-    mouvementId = mouvement.id;
-  });
+      return { result: mouvement };
+    },
+    userId
+  );
 
   // Broadcast refund paid event
   try {
     const ws = getWsInstance();
-    if (!ws) return mouvementId;
+    if (!ws) return mouvement.id;
     ws.broadcast({
       type: "REFUND_PAID" as any,
       payload: { refundId: request.sourceId },
@@ -467,7 +457,7 @@ async function processFeeRefund(
     logger.warn({ err }, "Failed to broadcast refund paid");
   }
 
-  return mouvementId;
+  return mouvement.id;
 }
 
 async function processSalaryPayment(
