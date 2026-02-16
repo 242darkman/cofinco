@@ -229,7 +229,7 @@ export default function TontineForm({ tontine, onClose, onSave }: TontineFormPro
                                 options={tontinePlans.map(p => ({
                                     value: p.id,
                                     label: p.nom,
-                                    subLabel: `${p.montant_cotisation.toLocaleString()} FCFA • ${p.nombre_membres} membres`,
+                                    subLabel: `${(Number(p.montant_cotisation) || 0).toLocaleString()} FCFA • ${p.nombre_membres ?? 0} membres`,
                                 }))}
                                 value=""
                                 onChange={(val) => applyPlan(val as string)}
