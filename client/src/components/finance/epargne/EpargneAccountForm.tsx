@@ -302,7 +302,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
       // Check against fee + minimum deposit
       const minRequired = openingFee + depotMinimum;
       if (minRequired > 0 && amount < minRequired) {
-        newErrors.solde_initial = `Montant minimum requis: ${formatMoney(minRequired)} FCFA (frais ${formatMoney(openingFee)} + dépôt min ${formatMoney(depotMinimum)})`;
+        newErrors.solde_initial = `Montant minimum requis: ${formatMoney(minRequired)} (frais ${formatMoney(openingFee)} + dépôt min ${formatMoney(depotMinimum)})`;
       }
 
       // Transfer validation
@@ -783,7 +783,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-content-muted">Frais d'ouverture</span>
                         {openingFee > 0 ? (
-                          <span className="text-sm font-bold text-status-danger">{formatMoney(openingFee)} F</span>
+                          <span className="text-sm font-bold text-status-danger">{formatMoney(openingFee)}</span>
                         ) : (
                           <span className="text-sm font-medium text-status-success">Gratuit</span>
                         )}
@@ -792,7 +792,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-content-muted">Dépôt initial minimum</span>
                         {depotMinimum > 0 ? (
-                          <span className="text-sm font-bold text-content-secondary">{formatMoney(depotMinimum)} F</span>
+                          <span className="text-sm font-bold text-content-secondary">{formatMoney(depotMinimum)}</span>
                         ) : (
                           <span className="text-sm font-medium text-content-muted">Aucun</span>
                         )}
@@ -801,14 +801,14 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                       {(selectedProduct.frais?.tenue ?? 0) > 0 && (
                         <div className="flex justify-between items-center">
                           <span className="text-sm text-content-muted">Frais de tenue / mois</span>
-                          <span className="text-sm font-medium text-content-secondary">{formatMoney(selectedProduct.frais!.tenue!)} F</span>
+                          <span className="text-sm font-medium text-content-secondary">{formatMoney(selectedProduct.frais!.tenue!)}</span>
                         </div>
                       )}
 
                       {(selectedProduct.frais?.cloture ?? 0) > 0 && (
                         <div className="flex justify-between items-center">
                           <span className="text-sm text-content-muted">Frais de clôture</span>
-                          <span className="text-sm font-medium text-content-secondary">{formatMoney(selectedProduct.frais!.cloture!)} F</span>
+                          <span className="text-sm font-medium text-content-secondary">{formatMoney(selectedProduct.frais!.cloture!)}</span>
                         </div>
                       )}
 
@@ -822,7 +822,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                       {(openingFee + depotMinimum) > 0 && (
                         <div className="border-t border-edge-subtle pt-2 flex justify-between items-center">
                           <span className="text-sm font-semibold text-content-primary">Minimum à verser</span>
-                          <span className="text-sm font-bold text-accent">{formatMoney(openingFee + depotMinimum)} F</span>
+                          <span className="text-sm font-bold text-accent">{formatMoney(openingFee + depotMinimum)}</span>
                         </div>
                       )}
                     </div>
@@ -879,7 +879,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
 
                 {/* Montant Hero */}
                 <div className="space-y-2">
-                   <label className="text-xs font-bold text-content-muted uppercase ml-1">Montant Initial (FCFA)</label>
+                   <label className="text-xs font-bold text-content-muted uppercase ml-1">Montant ({currencySymbol()})</label>
                    <div className="relative group">
                       <input
                         type="number"
@@ -889,7 +889,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                         placeholder="0"
                         min="0"
                       />
-                      <span className="absolute right-6 top-1/2 -translate-y-1/2 text-content-muted font-semibold text-lg pointer-events-none">FCFA</span>
+                      <span className="absolute right-6 top-1/2 -translate-y-1/2 text-content-muted font-semibold text-lg pointer-events-none">{currencySymbol()}</span>
                    </div>
                    {errors.solde_initial && <p className="text-xs text-status-danger ml-1">{errors.solde_initial}</p>}
 
@@ -901,7 +901,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                          {openingFee > 0 ? (
                            <div className="flex justify-between text-xs">
                              <span className="text-content-muted">Frais d'ouverture</span>
-                             <span className="text-status-danger font-medium">{formatMoney(openingFee)} F</span>
+                             <span className="text-status-danger font-medium">{formatMoney(openingFee)}</span>
                            </div>
                          ) : (
                            <div className="flex justify-between text-xs">
@@ -911,16 +911,16 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                          )}
                          <div className="flex justify-between text-xs">
                            <span className="text-content-muted">Dépôt initial minimum</span>
-                           <span className="text-content-secondary font-medium">{formatMoney(depotMinimum)} F</span>
+                           <span className="text-content-secondary font-medium">{formatMoney(depotMinimum)}</span>
                          </div>
                          <div className="border-t border-edge-subtle pt-1.5 flex justify-between text-xs">
                            <span className="text-content-primary font-semibold">Minimum à verser</span>
-                           <span className="text-content-primary font-bold">{formatMoney(openingFee + depotMinimum)} F</span>
+                           <span className="text-content-primary font-bold">{formatMoney(openingFee + depotMinimum)}</span>
                          </div>
                          {parseFloat(formData.solde_initial) > openingFee + depotMinimum && (
                            <div className="flex justify-between text-xs text-status-success">
                              <span>Solde effectif du compte</span>
-                             <span className="font-medium">{formatMoney(parseFloat(formData.solde_initial) - openingFee)} F</span>
+                             <span className="font-medium">{formatMoney(parseFloat(formData.solde_initial) - openingFee)}</span>
                            </div>
                          )}
                        </div>
@@ -949,15 +949,15 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                          <div className="space-y-1.5">
                            <div className="flex justify-between text-xs">
                              <span className="text-content-muted">Montant crédité au compte</span>
-                             <span className="text-content-primary font-medium">{formatMoney(mmFeeEstimate.montantNet)} F</span>
+                             <span className="text-content-primary font-medium">{formatMoney(mmFeeEstimate.montantNet)}</span>
                            </div>
                            <div className="flex justify-between text-xs">
                              <span className="text-content-muted">Frais Mobile Money ({mmFeeEstimate.feeRate}%)</span>
-                             <span className="text-status-warning font-medium">+ {formatMoney(mmFeeEstimate.feeAmount)} F</span>
+                             <span className="text-status-warning font-medium">+ {formatMoney(mmFeeEstimate.feeAmount)}</span>
                            </div>
                            <div className="border-t border-edge-subtle pt-1.5 flex justify-between text-xs">
                              <span className="text-content-primary font-semibold">Total débité du téléphone</span>
-                             <span className="text-content-primary font-bold">{formatMoney(mmFeeEstimate.montantBrut)} F</span>
+                             <span className="text-content-primary font-bold">{formatMoney(mmFeeEstimate.montantBrut)}</span>
                            </div>
                          </div>
                        ) : (
@@ -1163,11 +1163,11 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                     <div className="border-t border-edge pt-2 space-y-1">
                       <div className="flex justify-between text-xs">
                         <span className="text-content-muted">Dont frais d'ouverture</span>
-                        <span className="text-status-danger">{formatMoney(openingFee)} F</span>
+                        <span className="text-status-danger">{formatMoney(openingFee)}</span>
                       </div>
                       <div className="flex justify-between text-xs">
                         <span className="text-content-muted">Dont dépôt sur compte</span>
-                        <span className="text-status-success">{formatMoney(parseFloat(formData.solde_initial) - openingFee)} F</span>
+                        <span className="text-status-success">{formatMoney(parseFloat(formData.solde_initial) - openingFee)}</span>
                       </div>
                     </div>
                   )}
