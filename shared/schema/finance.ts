@@ -1885,7 +1885,9 @@ export const creditRefundRequests = pgTable(
     // Execution / Payment
     paidAt: timestamp("paid_at"),
     paidBy: uuid("paid_by").references(() => users.id),
-    paymentMethod: text("payment_method"), // CASH | ACCOUNT
+    paymentMethod: text("payment_method"), // CASH | ACCOUNT | MOBILE_MONEY
+    mobileMoneyProvider: text("mobile_money_provider"), // MTN | AIRTEL (for MOBILE_MONEY only)
+    mobileMoneyPhone: text("mobile_money_phone"), // Phone number for MoMo disbursement
     paymentReference: text("payment_reference"), // Bon de sortie / Transfer ref
     
     mouvementId: uuid("mouvement_id").references(() => mouvementsFinanciers.id),

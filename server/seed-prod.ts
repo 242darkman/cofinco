@@ -2098,6 +2098,51 @@ const ACCOUNTING_RULES_DATA = [
     priority: 100,
   },
 
+  // --- Restitution frais de dossier via Mobile Money ---
+  {
+    code: 'FEE_REFUND_MTN',
+    name: 'Restitution frais de dossier — Mobile Money MTN',
+    description: 'Remboursement de frais de dossier crédit via Mobile Money MTN',
+    sourceType: 'MOUVEMENT',
+    eventType: 'FEE_REFUND',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'MTN',
+    journalCode: 'MMTN',
+    debitAccount: '7072',   // Produits — frais de dossier (contre-passation)
+    creditAccount: '5781',  // Mobile Money MTN (argent sort)
+    descriptionTemplate: 'Restitution frais dossier MTN MoMo — {clientName}',
+    priority: 100,
+  },
+  {
+    code: 'FEE_REFUND_AIRTEL',
+    name: 'Restitution frais de dossier — Mobile Money Airtel',
+    description: 'Remboursement de frais de dossier crédit via Mobile Money Airtel',
+    sourceType: 'MOUVEMENT',
+    eventType: 'FEE_REFUND',
+    paymentMethod: 'MOBILE_MONEY',
+    provider: 'AIRTEL',
+    journalCode: 'MAIR',
+    debitAccount: '7072',   // Produits — frais de dossier (contre-passation)
+    creditAccount: '5782',  // Mobile Money Airtel (argent sort)
+    descriptionTemplate: 'Restitution frais dossier Airtel Money — {clientName}',
+    priority: 100,
+  },
+
+  // --- Restitution frais de dossier via compte courant ---
+  {
+    code: 'FEE_REFUND_ACCOUNT',
+    name: 'Restitution frais de dossier — compte courant',
+    description: 'Remboursement de frais de dossier crédit par crédit sur compte courant client',
+    sourceType: 'MOUVEMENT',
+    eventType: 'FEE_REFUND',
+    paymentMethod: 'TRANSFER',
+    journalCode: 'OD',
+    debitAccount: '7072',   // Produits — frais de dossier (contre-passation)
+    creditAccount: '4111',  // Compte courant client
+    descriptionTemplate: 'Restitution frais dossier compte courant — {clientName}',
+    priority: 100,
+  },
+
   // --- Reversals Mobile Money ---
   {
     code: 'REVERSAL_COLLECTION_MTN',

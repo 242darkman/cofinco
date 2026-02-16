@@ -12,6 +12,7 @@ import { formatMoney, formatClientName } from '../../lib/format';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
 
 type PaymentMethod = 'CASH' | 'ACCOUNT' | 'MOBILE_MONEY';
+type MoMoProvider = 'MTN' | 'AIRTEL';
 
 // Safe date format helper to prevent crashes on invalid dates
 const safeDateFormat = (dateValue: string | Date | null | undefined, formatStr: string): string => {
@@ -44,6 +45,8 @@ interface CreditRefundRequest {
   checkerComment?: string;
   paidAt?: string;
   paymentMethod?: string;
+  mobileMoneyProvider?: string;
+  mobileMoneyPhone?: string;
   paymentReference?: string;
   createdAt: string;
   clients: {
@@ -65,7 +68,10 @@ export default function CreditRefundsPage() {
   const [showApproveDialog, setShowApproveDialog] = useState(false);
   const [showPayDialog, setShowPayDialog] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('ACCOUNT');
+  const [momoProvider, setMomoProvider] = useState<MoMoProvider>('MTN');
+  const [momoPhone, setMomoPhone] = useState('');
   const [loadingAction, setLoadingAction] = useState(false);
+  const [accountCheckStatus, setAccountCheckStatus] = useState<'idle' | 'loading' | 'ok' | 'no_account'>('idle');
 
   // Listen for refund updates from other components to refresh data
   useEffect(() => {
@@ -120,22 +126,62 @@ export default function CreditRefundsPage() {
     }
   };
 
+  // Check account when ACCOUNT method is selected
+  useEffect(() => {
+    if (paymentMethod === 'ACCOUNT' && selectedRefund && showPayDialog) {
+      setAccountCheckStatus('loading');
+      fetch(`/api/comptes?clientId=${selectedRefund.clientId}`)
+        .then(r => r.json())
+        .then((accounts: any[]) => {
+          const hasActive = accounts.some((a: any) => a.typeCompte === 'CURRENT' && a.statut === 'ACTIVE');
+          setAccountCheckStatus(hasActive ? 'ok' : 'no_account');
+        })
+        .catch(() => setAccountCheckStatus('no_account'));
+    } else {
+      setAccountCheckStatus('idle');
+    }
+  }, [paymentMethod, selectedRefund, showPayDialog]);
+
+  // Pre-fill phone when MoMo dialog opens
+  useEffect(() => {
+    if (showPayDialog && selectedRefund && paymentMethod === 'MOBILE_MONEY') {
+      setMomoPhone(selectedRefund.clients?.phone || '');
+    }
+  }, [showPayDialog, selectedRefund, paymentMethod]);
+
   // Pay handler
   const handlePay = async () => {
     if (!selectedRefund) return;
+
+    // Validate MoMo fields
+    if (paymentMethod === 'MOBILE_MONEY' && (!momoPhone || momoPhone.trim().length < 8)) {
+      toast.error('Numéro de téléphone invalide');
+      return;
+    }
+
     setLoadingAction(true);
     try {
+      const body: Record<string, unknown> = { method: paymentMethod };
+      if (paymentMethod === 'MOBILE_MONEY') {
+        body.provider = momoProvider;
+        body.phoneNumber = momoPhone.trim();
+      }
+
       const res = await fetch(`/api/finance/credit-refunds/${selectedRefund.id}/pay`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ method: paymentMethod })
+        body: JSON.stringify(body)
       });
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.message || 'Failed to pay');
       }
       if (paymentMethod === 'CASH' || paymentMethod === 'MOBILE_MONEY') {
-        toast.success('Envoyé en caisse', { description: 'En attente de validation.' });
+        toast.success('Envoyé en caisse', {
+          description: paymentMethod === 'MOBILE_MONEY'
+            ? `Paiement ${momoProvider} vers ${momoPhone} en attente de validation.`
+            : 'En attente de validation.'
+        });
       } else {
         toast.success('Paiement effectué', { description: 'Crédité sur compte courant.' });
       }
@@ -423,49 +469,112 @@ export default function CreditRefundsPage() {
                  </div>
 
                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-content-muted">Méthode</label>
-                    <div className="grid grid-cols-3 gap-1.5">
-                        <button
-                          onClick={() => setPaymentMethod('ACCOUNT')}
-                          className={`p-2 rounded-lg border flex flex-col items-center gap-1 transition text-xs ${
-                            paymentMethod === 'ACCOUNT'
-                             ? 'bg-status-info-bg border-status-info text-status-info'
+                     <label className="text-xs font-medium text-content-muted">Méthode</label>
+                     <div className="grid grid-cols-3 gap-1.5">
+                         <button
+                           onClick={() => setPaymentMethod('ACCOUNT')}
+                           className={`p-2 rounded-lg border flex flex-col items-center gap-1 transition text-xs ${
+                             paymentMethod === 'ACCOUNT'
+                              ? 'bg-status-info-bg border-status-info text-status-info'
+                              : 'bg-surface-elevated border-edge-strong text-content-muted hover:bg-surface-subtle'
+                           }`}
+                         >
+                             <ArrowRightLeft size={16} />
+                             <span>Compte</span>
+                         </button>
+                         <button
+                           onClick={() => setPaymentMethod('CASH')}
+                           className={`p-2 rounded-lg border flex flex-col items-center gap-1 transition text-xs ${
+                             paymentMethod === 'CASH'
+                              ? 'bg-status-success-bg border-status-success text-status-success'
+                              : 'bg-surface-elevated border-edge-strong text-content-muted hover:bg-surface-subtle'
+                           }`}
+                         >
+                             <DollarSign size={16} />
+                             <span>Espèces</span>
+                         </button>
+                         <button
+                           onClick={() => { setPaymentMethod('MOBILE_MONEY'); setMomoPhone(selectedRefund?.clients?.phone || ''); }}
+                           className={`p-2 rounded-lg border flex flex-col items-center gap-1 transition text-xs ${
+                             paymentMethod === 'MOBILE_MONEY'
+                              ? 'bg-status-warning-bg border-status-warning text-status-warning'
                              : 'bg-surface-elevated border-edge-strong text-content-muted hover:bg-surface-subtle'
-                          }`}
-                        >
-                            <ArrowRightLeft size={16} />
-                            <span>Compte</span>
-                        </button>
-                        <button
-                          onClick={() => setPaymentMethod('CASH')}
-                          className={`p-2 rounded-lg border flex flex-col items-center gap-1 transition text-xs ${
-                            paymentMethod === 'CASH'
-                             ? 'bg-status-success-bg border-status-success text-status-success'
-                             : 'bg-surface-elevated border-edge-strong text-content-muted hover:bg-surface-subtle'
-                          }`}
-                        >
-                            <DollarSign size={16} />
-                            <span>Espèces</span>
-                        </button>
-                        <button
-                          onClick={() => setPaymentMethod('MOBILE_MONEY')}
-                          className={`p-2 rounded-lg border flex flex-col items-center gap-1 transition text-xs ${
-                            paymentMethod === 'MOBILE_MONEY'
-                             ? 'bg-status-warning-bg border-status-warning text-status-warning'
-                             : 'bg-surface-elevated border-edge-strong text-content-muted hover:bg-surface-subtle'
-                          }`}
-                        >
-                            <Smartphone size={16} />
-                            <span>Mobile</span>
-                        </button>
-                    </div>
-                 </div>
+                           }`}
+                         >
+                             <Smartphone size={16} />
+                             <span>Mobile</span>
+                         </button>
+                     </div>
+                  </div>
 
-                 <p className="text-[10px] text-content-muted text-center p-1.5 bg-surface-base/50 rounded border border-edge">
-                    {paymentMethod === 'ACCOUNT'
-                        ? 'Crédité sur le compte courant du client.'
-                        : 'Envoyé en caisse pour validation.'}
-                 </p>
+                  {/* Mobile Money: Provider + Phone */}
+                  {paymentMethod === 'MOBILE_MONEY' && (
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <button
+                          onClick={() => setMomoProvider('MTN')}
+                          className={`p-2 rounded-lg border text-xs font-semibold transition ${
+                            momoProvider === 'MTN'
+                              ? 'bg-[#FFCC00]/10 border-[#FFCC00] text-[#CC9900]'
+                              : 'bg-surface-elevated border-edge-strong text-content-muted hover:bg-surface-subtle'
+                          }`}
+                        >
+                          MTN MoMo
+                        </button>
+                        <button
+                          onClick={() => setMomoProvider('AIRTEL')}
+                          className={`p-2 rounded-lg border text-xs font-semibold transition ${
+                            momoProvider === 'AIRTEL'
+                              ? 'bg-red-500/10 border-red-400 text-red-500'
+                              : 'bg-surface-elevated border-edge-strong text-content-muted hover:bg-surface-subtle'
+                          }`}
+                        >
+                          Airtel Money
+                        </button>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-medium text-content-muted block mb-1">Numéro {momoProvider}</label>
+                        <input
+                          type="tel"
+                          value={momoPhone}
+                          onChange={(e) => setMomoPhone(e.target.value)}
+                          placeholder="06 XXX XX XX"
+                          className="w-full bg-input-bg border border-input-border rounded-lg px-3 py-1.5 text-sm text-content-primary focus:outline-none focus:ring-1 focus:ring-accent"
+                        />
+                        {momoPhone && momoPhone.trim().length < 8 && (
+                          <p className="text-[10px] text-status-danger mt-0.5">Numéro trop court</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Info / Warnings */}
+                  {paymentMethod === 'ACCOUNT' && accountCheckStatus === 'no_account' && (
+                    <p className="text-[10px] text-status-danger text-center p-1.5 bg-status-danger-bg rounded border border-status-danger/20 flex items-center gap-1 justify-center">
+                      <AlertCircle size={10} />
+                      Aucun compte courant actif trouvé. Choisissez un autre mode.
+                    </p>
+                  )}
+                  {paymentMethod === 'ACCOUNT' && accountCheckStatus === 'ok' && (
+                    <p className="text-[10px] text-status-success text-center p-1.5 bg-status-success-bg rounded border border-edge">
+                      ✓ Sera crédité sur le compte courant du client.
+                    </p>
+                  )}
+                  {paymentMethod === 'ACCOUNT' && accountCheckStatus === 'loading' && (
+                    <p className="text-[10px] text-content-muted text-center p-1.5 bg-surface-base/50 rounded border border-edge">
+                      Vérification du compte courant…
+                    </p>
+                  )}
+                  {paymentMethod === 'CASH' && (
+                    <p className="text-[10px] text-content-muted text-center p-1.5 bg-surface-base/50 rounded border border-edge">
+                      Envoyé en caisse pour validation.
+                    </p>
+                  )}
+                  {paymentMethod === 'MOBILE_MONEY' && (
+                    <p className="text-[10px] text-content-muted text-center p-1.5 bg-surface-base/50 rounded border border-edge">
+                      Le paiement {momoProvider} sera déclenché automatiquement à la validation caisse.
+                    </p>
+                  )}
               </div>
 
               <div className="flex gap-2 justify-end pt-2 border-t border-edge">
@@ -476,13 +585,17 @@ export default function CreditRefundsPage() {
                  >
                    Annuler
                  </button>
-                 <button
-                   onClick={handlePay}
-                   disabled={loadingAction}
-                   className="px-4 py-1.5 bg-status-success hover:bg-status-success text-white text-xs font-medium rounded transition flex items-center gap-1.5"
-                 >
-                   {loadingAction ? <Clock className="animate-spin" size={12} /> : <CheckCircle size={12} />}
-                   {paymentMethod === 'ACCOUNT' ? 'Payer' : 'Envoyer'}
+                  <button
+                    onClick={handlePay}
+                    disabled={loadingAction || (paymentMethod === 'ACCOUNT' && accountCheckStatus === 'no_account') || (paymentMethod === 'MOBILE_MONEY' && (!momoPhone || momoPhone.trim().length < 8))}
+                    className={`px-4 py-1.5 text-white text-xs font-medium rounded transition flex items-center gap-1.5 ${
+                      loadingAction || (paymentMethod === 'ACCOUNT' && accountCheckStatus === 'no_account') || (paymentMethod === 'MOBILE_MONEY' && (!momoPhone || momoPhone.trim().length < 8))
+                        ? 'bg-surface-elevated text-content-muted cursor-not-allowed'
+                        : 'bg-status-success hover:bg-status-success'
+                    }`}
+                  >
+                    {loadingAction ? <Clock className="animate-spin" size={12} /> : <CheckCircle size={12} />}
+                    {paymentMethod === 'ACCOUNT' ? 'Payer' : 'Envoyer'}
                  </button>
               </div>
            </div>

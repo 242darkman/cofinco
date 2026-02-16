@@ -1940,7 +1940,7 @@ export function registerFinanceRoutes(app: Express) {
       const montant = parseFloat(
         (demande as any).montantFraisEngagement
         || (demande as any).fraisDossier
-        || ((demande.montantDemande || 0) * 0.10).toString()
+        || (Number(demande.montantDemande || 0) * 0.10).toString()
       );
 
       if (!montant || montant <= 0) {
@@ -4074,7 +4074,7 @@ export function registerFinanceRoutes(app: Express) {
    * - CASH/MOBILE_MONEY: Requires caisse validation - sets status to PENDING_CAISSE
    */
   app.post("/api/finance/credit-refunds/:id/pay", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.REMBOURSEMENT), async (req, res) => {
-    const { method, sessionCaisseId } = req.body; // method: 'CASH' | 'ACCOUNT' | 'MOBILE_MONEY'
+    const { method, sessionCaisseId, provider, phoneNumber } = req.body; // method: 'CASH' | 'ACCOUNT' | 'MOBILE_MONEY'
     const user = req.session.user!;
 
     try {
@@ -4089,18 +4089,41 @@ export function registerFinanceRoutes(app: Express) {
        if (!refundData) {
           return res.status(404).json({ message: "Remboursement non trouvé" });
        }
-       if (refundData.statut !== 'APPROVED') {
-          return res.status(400).json({ message: `Le remboursement doit être approuvé avant paiement (statut actuel: ${refundData.statut})` });
-       }
+        if (refundData.statut !== 'APPROVED') {
+           return res.status(400).json({ message: `Le remboursement doit être approuvé avant paiement (statut actuel: ${refundData.statut})` });
+        }
 
-       // For CASH or MOBILE_MONEY: Set to PENDING_CAISSE and notify caisse
-       if (method === 'CASH' || method === 'MOBILE_MONEY') {
+        // Validate MOBILE_MONEY requirements
+        if (method === 'MOBILE_MONEY') {
+          if (!provider || !['MTN', 'AIRTEL'].includes(provider)) {
+            return res.status(400).json({ message: "Opérateur mobile requis (MTN ou AIRTEL)" });
+          }
+          if (!phoneNumber || phoneNumber.trim().length < 8) {
+            return res.status(400).json({ message: "Numéro de téléphone valide requis pour le paiement Mobile Money" });
+          }
+        }
+
+        // Validate ACCOUNT requirements: pre-check active current account
+        if (method === 'ACCOUNT') {
+          const clientAccounts = await storage.getComptesByClient(refundData.clientId);
+          const courantAccount = clientAccounts.find(c => c.typeCompte === TypeCompte.CURRENT && c.statut === StatutCompte.ACTIVE);
+          if (!courantAccount) {
+            return res.status(400).json({ message: "Le client n'a aucun compte courant actif. Veuillez choisir un autre mode de paiement." });
+          }
+        }
+
+        // For CASH or MOBILE_MONEY: Set to PENDING_CAISSE and notify caisse
+        if (method === 'CASH' || method === 'MOBILE_MONEY') {
           // Update to PENDING_CAISSE status
-          await db.update(creditRefundRequests).set({
-             statut: 'PENDING_CAISSE',
-             paymentMethod: method,
-             updatedAt: new Date()
-          }).where(eq(creditRefundRequests.id, refundId));
+           await db.update(creditRefundRequests).set({
+              statut: 'PENDING_CAISSE',
+              paymentMethod: method,
+              ...(method === 'MOBILE_MONEY' ? {
+                mobileMoneyProvider: provider,
+                mobileMoneyPhone: phoneNumber.trim(),
+              } : {}),
+              updatedAt: new Date()
+           }).where(eq(creditRefundRequests.id, refundId));
 
           // CASH: Create caisse payment request (queue)
           if (method === 'CASH' && refundData.agenceId) {
@@ -4211,7 +4234,8 @@ export function registerFinanceRoutes(app: Express) {
             montant: refundAmount.toString(),
             sens: 'DEBIT',
             sourceModule: 'COFFRE',
-            typePaiement: 'TRANSFER_OUT',
+            typePaiement: 'FEE_REFUND',
+            methodePaiement: 'TRANSFER',
             sourceId: agencyCoffre.id,
             agenceId: refundDataLocked.agenceId,
             metadata: {
@@ -4227,7 +4251,8 @@ export function registerFinanceRoutes(app: Express) {
             montant: refundAmount.toString(),
             sens: 'CREDIT',
             sourceModule: 'SYSTEME',
-            typePaiement: 'DEPOSIT_CURRENT',
+            typePaiement: 'FEE_REFUND',
+            methodePaiement: 'TRANSFER',
             clientId: refundDataLocked.clientId,
             compteId: courantAccount.id,
             metadata: {
@@ -4333,81 +4358,112 @@ export function registerFinanceRoutes(app: Express) {
        }
 
        await db.transaction(async (tx) => {
-          // 1. Get and validate refund
-          const [refundData] = await tx
-             .select()
-             .from(creditRefundRequests)
-             .where(eq(creditRefundRequests.id, refundId));
+           // 1. Get and validate refund
+           const [refundData] = await tx
+              .select()
+              .from(creditRefundRequests)
+              .where(eq(creditRefundRequests.id, refundId));
 
-          if (!refundData) throw new Error("Remboursement non trouvé");
-          if (refundData.statut !== 'PENDING_CAISSE') {
-             throw new Error(`Le remboursement doit être en attente de caisse (statut actuel: ${refundData.statut})`);
-          }
+           if (!refundData) throw new Error("Remboursement non trouvé");
+           if (refundData.statut !== 'PENDING_CAISSE') {
+              throw new Error(`Le remboursement doit être en attente de caisse (statut actuel: ${refundData.statut})`);
+           }
 
-          const amount = Number(refundData.montantRemboursable);
-          const paymentMethod = refundData.paymentMethod || 'CASH';
+           const amount = Number(refundData.montantRemboursable);
+           const paymentMethod = refundData.paymentMethod || 'CASH';
 
-          // 2. Validate session
-          const [session] = await tx.select().from(sessionsCaisse).where(eq(sessionsCaisse.id, sessionCaisseId));
-          if (!session || session.closedAt) {
-             throw new Error("Session caisse invalide ou fermée");
-          }
+           // 2. Validate session
+           const [session] = await tx.select().from(sessionsCaisse).where(eq(sessionsCaisse.id, sessionCaisseId));
+           if (!session || session.closedAt) {
+              throw new Error("Session caisse invalide ou fermée");
+           }
 
-          // 3. Create caisse operation (outgoing payment)
-          const [op] = await tx.insert(operationsCaisse).values({
-            sessionId: sessionCaisseId,
-            typeOperation: 'WITHDRAWAL_CURRENT',
-            montant: amount.toString(),
-            methodePaiement: paymentMethod === 'MOBILE_MONEY' ? 'MOBILE_MONEY' : 'CASH',
-            reference: `REFUND-${refundData.id.substring(0,8)}`,
-            description: `Remboursement Frais ${paymentMethod === 'MOBILE_MONEY' ? 'Mobile Money' : 'Espèces'} (Ref: ${refundData.id})`,
-            clientId: refundData.clientId,
-            createdBy: user.id
-          }).returning();
+           // 3. Create caisse operation (outgoing payment)
+           const [op] = await tx.insert(operationsCaisse).values({
+             sessionId: sessionCaisseId,
+             typeOperation: 'WITHDRAWAL_CURRENT',
+             montant: amount.toString(),
+             methodePaiement: paymentMethod === 'MOBILE_MONEY' ? 'MOBILE_MONEY' : 'CASH',
+             reference: `REFUND-${refundData.id.substring(0,8)}`,
+             description: `Remboursement Frais ${paymentMethod === 'MOBILE_MONEY' ? 'Mobile Money' : 'Espèces'} (Ref: ${refundData.id})`,
+             clientId: refundData.clientId,
+             createdBy: user.id
+           }).returning();
 
-          // 4. Create ledger mouvement
-          const mouvement = await createMouvementFinancier(tx, {
-            montant: amount.toString(),
-            sens: 'DEBIT',
-            sourceModule: 'CAISSE',
-            sourceId: op.id,
-            typePaiement: paymentMethod === 'MOBILE_MONEY' ? 'TRANSFER_OUT' : 'WITHDRAWAL_CURRENT',
-            sessionCaisseId: sessionCaisseId,
-            clientId: refundData.clientId,
-            agenceId: refundData.agenceId,
-            metadata: {
-               type: 'REFUND_PAYMENT',
-               refundId: refundData.id,
-               operationId: op.id,
-               demandeId: refundData.demandeId,
-               method: paymentMethod
-            }
-          }, user.id);
+           // 4. Create ledger mouvement — pass correct methodePaiement and provider for GL routing
+           const mouvementMethode = paymentMethod === 'MOBILE_MONEY' ? 'MOBILE_MONEY' : 'CASH';
+           const mouvementProvider = paymentMethod === 'MOBILE_MONEY' ? (refundData.mobileMoneyProvider || undefined) : undefined;
 
-          const paymentRefString = paymentMethod === 'MOBILE_MONEY'
-             ? `MOMO-${op.reference}`
-             : `CASH-${op.reference}`;
+           const mouvement = await createMouvementFinancier(tx, {
+             montant: amount.toString(),
+             sens: 'DEBIT',
+             sourceModule: 'CAISSE',
+             sourceId: op.id,
+             typePaiement: 'FEE_REFUND',
+             methodePaiement: mouvementMethode,
+             ...(mouvementProvider ? { provider: mouvementProvider } : {}),
+             sessionCaisseId: sessionCaisseId,
+             clientId: refundData.clientId,
+             agenceId: refundData.agenceId,
+             metadata: {
+                type: 'REFUND_PAYMENT',
+                refundId: refundData.id,
+                operationId: op.id,
+                demandeId: refundData.demandeId,
+                method: paymentMethod,
+                ...(mouvementProvider ? { provider: mouvementProvider } : {}),
+             }
+           }, user.id);
 
-          // GL Posting (STRICT — failure rolls back transaction)
-          if (!refundData.agenceId) {
-            throw new Error(`GL posting impossible: no agenceId on refund ${refundData.id}`);
-          }
-          await postGlForMouvement(tx, mouvement, refundData.agenceId, user.id, {
-            refundId: refundData.id,
-            operationId: op.id,
-            type: 'REFUND_CAISSE_PAYMENT',
-          });
+           const paymentRefString = paymentMethod === 'MOBILE_MONEY'
+              ? `MOMO-${op.reference}`
+              : `CASH-${op.reference}`;
 
-          // 5. Update refund to PAID
-          await tx.update(creditRefundRequests).set({
-             statut: 'PAID',
-             paidAt: new Date(),
-             paidBy: user.id,
-             paymentReference: paymentRefString,
-             mouvementId: mouvement.id,
-             updatedAt: new Date()
-          }).where(eq(creditRefundRequests.id, refundData.id));
-       });
+           // GL Posting (STRICT — failure rolls back transaction)
+           if (!refundData.agenceId) {
+             throw new Error(`GL posting impossible: no agenceId on refund ${refundData.id}`);
+           }
+           await postGlForMouvement(tx, mouvement, refundData.agenceId, user.id, {
+             refundId: refundData.id,
+             operationId: op.id,
+             type: 'REFUND_CAISSE_PAYMENT',
+           });
+
+           // 5. For MOBILE_MONEY: trigger automatic payout via MoMo API
+           if (paymentMethod === 'MOBILE_MONEY') {
+             const momoPhone = refundData.mobileMoneyPhone;
+             const momoProvider = refundData.mobileMoneyProvider as 'MTN' | 'AIRTEL';
+             if (!momoPhone || !momoProvider) {
+               throw new Error("Données Mobile Money manquantes sur la demande de remboursement (opérateur ou numéro)");
+             }
+
+             const { paymentService } = await import("../services/mobile-money/payment-service");
+             await paymentService.initiatePayout({
+               provider: momoProvider,
+               amount,
+               phone: momoPhone,
+               clientId: refundData.clientId,
+               agenceId: refundData.agenceId || undefined,
+               description: `Restitution frais dossier — ${refundData.id.substring(0,8)}`,
+               idempotencyKey: `FEE_REFUND_MOMO_${refundData.id}`,
+               metadata: {
+                 useCase: 'FEE_REFUND',
+                 refundId: refundData.id,
+                 demandeId: refundData.demandeId,
+               },
+             }, user.id);
+           }
+
+           // 6. Update refund to PAID
+           await tx.update(creditRefundRequests).set({
+              statut: 'PAID',
+              paidAt: new Date(),
+              paidBy: user.id,
+              paymentReference: paymentRefString,
+              mouvementId: mouvement.id,
+              updatedAt: new Date()
+           }).where(eq(creditRefundRequests.id, refundData.id));
+        });
 
        // Log audit
        await logAudit(req, "VALIDATE_CAISSE_REFUND", "credit_refund", refundId, { sessionCaisseId }, "success", "medium");

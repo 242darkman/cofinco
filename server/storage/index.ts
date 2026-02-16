@@ -451,6 +451,7 @@ export interface IStorage {
     createCaisse(caisse: InsertCaisse): Promise<Caisse>;
     updateCaisse(id: string, caisse: Partial<InsertCaisse>): Promise<Caisse | undefined>;
     getCaisseAssignments(caisseId: string): Promise<CaisseAssignation[]>;
+    getCaisseAssignmentsEnriched(caisseId: string): Promise<{ id: string; userId: string; assignedAt: Date | null; nom: string | null; prenom: string | null; photoProfile: string | null }[]>;
     getUserCaisseAssignments(userId: string): Promise<CaisseAssignation[]>;
     getUserAssignedCaissesWithBalance(userId: string): Promise<any[]>;
     setCaisseAssignments(caisseId: string, userIds: string[], assignedBy: string): Promise<void>;
@@ -574,7 +575,7 @@ export interface IStorage {
         mouvement: any;
         echeances?: any[];
     }>;
-    getPendingLoanDisbursements(agenceId?: string): Promise<Array<{
+    getPendingLoanDisbursements(agenceId?: string, caisseId?: string): Promise<Array<{
         credit: Credit;
         client: { id: string; nom: string; prenom: string | null; photoUrl?: string | null };
         demande?: any;

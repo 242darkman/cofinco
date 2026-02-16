@@ -82,16 +82,18 @@ export async function createCaisseRequest(
   // Broadcast to agency for real-time badge + list update
   try {
     const ws = getWsInstance();
-    ws.broadcastToAgency(data.agenceId, {
-      type: "CAISSE_REQUEST_CREATED" as any,
-      payload: {
-        requestId: request.id,
-        category: data.category,
-        direction: data.direction,
-        montant: data.montant,
-        label: data.label,
-      },
-    });
+    if (ws) {
+      ws.broadcastToAgency(data.agenceId, {
+        type: "CAISSE_REQUEST_CREATED" as any,
+        payload: {
+          requestId: request.id,
+          category: data.category,
+          direction: data.direction,
+          montant: data.montant,
+          label: data.label,
+        },
+      });
+    }
   } catch (err) {
     logger.warn({ err }, "Failed to broadcast caisse request creation");
   }
@@ -246,14 +248,16 @@ export async function processRequest(
   // 5. Broadcast completion
   try {
     const ws = getWsInstance();
-    ws.broadcastToAgency(request.agenceId, {
-      type: "CAISSE_REQUEST_COMPLETED" as any,
-      payload: {
-        requestId,
-        category: request.category,
-        montant: request.montant,
-      },
-    });
+    if (ws) {
+      ws.broadcastToAgency(request.agenceId, {
+        type: "CAISSE_REQUEST_COMPLETED" as any,
+        payload: {
+          requestId,
+          category: request.category,
+          montant: request.montant,
+        },
+      });
+    }
   } catch (err) {
     logger.warn({ err }, "Failed to broadcast caisse request completion");
   }
@@ -302,10 +306,12 @@ export async function cancelRequest(
 
   try {
     const ws = getWsInstance();
-    ws.broadcastToAgency(request.agenceId, {
-      type: "CAISSE_REQUEST_CANCELLED" as any,
-      payload: { requestId, category: request.category },
-    });
+    if (ws) {
+      ws.broadcastToAgency(request.agenceId, {
+        type: "CAISSE_REQUEST_CANCELLED" as any,
+        payload: { requestId, category: request.category },
+      });
+    }
   } catch (err) {
     logger.warn({ err }, "Failed to broadcast caisse request cancellation");
   }
@@ -350,7 +356,7 @@ async function processFeeRefund(
 
   let mouvementId: string | undefined;
 
-  await db.transaction(async (tx) => {
+   await db.transaction(async (tx) => {
     // 1. Get and validate refund
     const [refundData] = await tx
       .select()
@@ -363,26 +369,30 @@ async function processFeeRefund(
     }
 
     const amount = Number(refundData.montantRemboursable);
+    const paymentMethod = refundData.paymentMethod || "CASH";
+    const momoProvider = refundData.mobileMoneyProvider || undefined;
 
     // 2. Create caisse operation
     const [op] = await tx.insert(operationsCaisse).values({
       sessionId: sessionCaisseId,
       typeOperation: "FEE_REFUND" as any,
       montant: amount.toString(),
-      methodePaiement: "CASH" as any,
-      reference: generateReference("REFUND"),
-      description: `Remboursement frais dossier (Ref: ${refundData.id.substring(0, 8)})`,
+      methodePaiement: (paymentMethod === "MOBILE_MONEY" ? "MOBILE_MONEY" : "CASH") as any,
+      reference: generateReference("CAISSE"),
+      description: `Remboursement frais dossier ${paymentMethod === "MOBILE_MONEY" ? `Mobile Money ${momoProvider || ""}` : "espèces"} (Ref: ${refundData.id.substring(0, 8)})`,
       clientId: refundData.clientId,
       createdBy: userId,
     } as any).returning();
 
-    // 3. Create ledger mouvement
+    // 3. Create ledger mouvement — route GL correctly via methodePaiement + provider
     const mouvement = await createMouvementFinancier(tx, {
       montant: amount.toString(),
       sens: "DEBIT",
       sourceModule: "CAISSE",
       sourceId: op.id,
       typePaiement: "FEE_REFUND",
+      methodePaiement: paymentMethod === "MOBILE_MONEY" ? "MOBILE_MONEY" : "CASH",
+      ...(momoProvider ? { provider: momoProvider } : {}),
       sessionCaisseId,
       clientId: refundData.clientId,
       agenceId: refundData.agenceId,
@@ -391,6 +401,8 @@ async function processFeeRefund(
         refundId: refundData.id,
         operationId: op.id,
         demandeId: refundData.demandeId,
+        method: paymentMethod,
+        ...(momoProvider ? { provider: momoProvider } : {}),
       },
     }, userId);
 
@@ -402,12 +414,40 @@ async function processFeeRefund(
       });
     }
 
-    // 5. Update refund to PAID
+    // 5. For MOBILE_MONEY: trigger automatic payout via MoMo API
+    if (paymentMethod === "MOBILE_MONEY") {
+      const momoPhone = refundData.mobileMoneyPhone;
+      if (!momoPhone || !momoProvider) {
+        throw new Error("Données Mobile Money manquantes (opérateur ou numéro)");
+      }
+
+      const { paymentService } = await import("./mobile-money/payment-service");
+      await paymentService.initiatePayout({
+        provider: momoProvider as "MTN" | "AIRTEL",
+        amount,
+        phone: momoPhone,
+        clientId: refundData.clientId,
+        agenceId: refundData.agenceId || undefined,
+        description: `Restitution frais dossier — ${refundData.id.substring(0, 8)}`,
+        idempotencyKey: `FEE_REFUND_MOMO_${refundData.id}`,
+        metadata: {
+          useCase: "FEE_REFUND",
+          refundId: refundData.id,
+          demandeId: refundData.demandeId,
+        },
+      }, userId);
+    }
+
+    // 6. Update refund to PAID
+    const paymentRefString = paymentMethod === "MOBILE_MONEY"
+      ? `MOMO-${op.reference}`
+      : `CASH-${op.reference}`;
+
     await tx.update(creditRefundRequests).set({
       statut: "PAID",
       paidAt: new Date(),
       paidBy: userId,
-      paymentReference: `CASH-${op.reference}`,
+      paymentReference: paymentRefString,
       mouvementId: mouvement.id,
       updatedAt: new Date(),
     } as any).where(eq(creditRefundRequests.id, refundData.id));
@@ -418,6 +458,7 @@ async function processFeeRefund(
   // Broadcast refund paid event
   try {
     const ws = getWsInstance();
+    if (!ws) return mouvementId;
     ws.broadcast({
       type: "REFUND_PAID" as any,
       payload: { refundId: request.sourceId },
@@ -443,7 +484,7 @@ async function processSalaryPayment(
   const amount = parseFloat(request.montant);
 
   const { mouvement } = await executeWithLedger(
-    "HR",
+    "RH_PAYROLL",
     {
       montant: amount.toString(),
       sens: "DEBIT" as const,
@@ -486,7 +527,7 @@ async function processSalaryPayment(
           .where(eq(bulletinsPaie.id, parseInt(request.sourceId)));
       }
 
-      return { result: mouvement, additionalEventData: { operationCaisseId: op.id } };
+      return { result: mouvement };
     },
     userId
   );
