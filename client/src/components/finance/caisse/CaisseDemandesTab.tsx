@@ -103,6 +103,7 @@ interface CaisseDemandesTabProps {
   caisseId: string;
   agenceId?: string;
   onRequestProcessed?: () => void;
+  onTotalCountChange?: (count: number) => void;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -203,6 +204,7 @@ export default function CaisseDemandesTab({
   caisseId,
   agenceId,
   onRequestProcessed,
+  onTotalCountChange,
 }: CaisseDemandesTabProps) {
   const { socket } = useWebSocket();
 
@@ -363,6 +365,11 @@ export default function CaisseDemandesTab({
     items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     return items;
   }, [paymentRequests, pendingCredits, pendingAgentSessions]);
+
+  // Notify parent of total count changes (for tab badge sync)
+  useEffect(() => {
+    onTotalCountChange?.(allItems.length);
+  }, [allItems.length, onTotalCountChange]);
 
   // ─── Category counts ────────────────────────────────────
 

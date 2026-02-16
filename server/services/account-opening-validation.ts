@@ -35,7 +35,7 @@ export async function approveOpeningRequest(
   requestId: string,
   userId: string
 ): Promise<AccountOpeningRequest> {
-  return await db.transaction(async (tx) => {
+  const txResult = await db.transaction(async (tx) => {
     const [request] = await tx
       .select()
       .from(accountOpeningRequests)
@@ -121,8 +121,52 @@ export async function approveOpeningRequest(
       `Opening request approved — account status: ${newStatus}`
     );
 
-    return updated;
+    return { updated, newStatus, compte, request };
   });
+
+  // After transaction commits: create caisse request if account now needs payment
+  if (txResult.newStatus === StatutCompteConst.PENDING_PAYMENT) {
+    try {
+      const { createCaisseRequest } = await import("./caisse-queue-service");
+      const depositAmount = Number(txResult.request.initialDepositAmount) || 0;
+      const snapshot = (txResult.compte as any).openingSnapshot as OpeningSnapshot | null;
+      // Use user-entered amount, or fall back to minimum from snapshot
+      const totalDue = depositAmount > 0
+        ? depositAmount
+        : snapshot
+          ? (snapshot.openingFee + (snapshot.initialDepositRequired ? snapshot.minInitialDeposit : 0))
+          : 0;
+
+      if (totalDue > 0) {
+        await createCaisseRequest({
+          category: "ACCOUNT_ACTIVATION",
+          direction: "IN",
+          agenceId: txResult.compte.agenceId,
+          sourceType: "compte",
+          sourceId: txResult.request.compteId,
+          clientId: txResult.compte.clientId,
+          montant: totalDue,
+          label: `Activation compte ${txResult.compte.numeroCompte}`,
+          description: snapshot
+            ? `Frais d'ouverture (${snapshot.openingFee}) + dépôt initial — ${snapshot.produitNom || txResult.compte.typeCompte}`
+            : `Frais ouverture + dépôt initial`,
+          metadata: {
+            compteId: txResult.request.compteId,
+            numeroCompte: txResult.compte.numeroCompte,
+            typeCompte: txResult.compte.typeCompte,
+            montantTotal: totalDue,
+            openingFee: snapshot?.openingFee || 0,
+            methodePaiement: "CASH",
+          },
+          createdBy: userId,
+        });
+      }
+    } catch (err) {
+      logger.error({ err }, "Failed to create caisse request after approval");
+    }
+  }
+
+  return txResult.updated;
 }
 
 // ============================================================================

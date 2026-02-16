@@ -4,14 +4,14 @@ import {
   Activity, RefreshCw, ArrowRightLeft, Wallet,
   CreditCard, Lock, Unlock, FileText, TrendingUp, TrendingDown, Clock,
   PiggyBank, ArrowUpRight, ArrowDownRight, Shield, Timer, AlertCircle,
-  LockKeyhole, KeyRound, Package, Check, UserCheck, History, ScrollText, Scale, ClipboardList
+  LockKeyhole, KeyRound, Package, Check, History, ScrollText, Scale, ClipboardList
 } from 'lucide-react';
 import { FeatureHeader, FEATURE_DESCRIPTIONS } from '../../ui/FeatureHeader';
 import { toast } from 'sonner';
 import { useFeatureFlags } from '../../../contexts/FeatureFlagsContext';
 import { Button, Card, StatCard, TabGroup, LoadingSpinner } from '../../ui';
 import { usePermissions } from '../../auth/ProtectedFeature';
-import { sessionCaisseApi, caisseOperationApi, caisseSepareeApi, authApi, compteEpargneApi, api } from '../../../lib/api-client';
+import { sessionCaisseApi, caisseOperationApi, caisseSepareeApi, authApi, compteEpargneApi } from '../../../lib/api-client';
 import { computeSessionStatus } from '../../../lib/format';
 import { isIncomingOperation, isOutgoingOperation } from '@shared/config/caisse-operations';
 import { CaisseQuickActions } from './CaisseQuickActions';
@@ -39,8 +39,8 @@ const CaisseHistoriqueGlobal = lazy(() => import('./CaisseHistoriqueGlobal'));
 const CaisseDemandesTab = lazy(() => import('./CaisseDemandesTab'));
 import { TransactionsList, TransactionDetailDrawer, TransactionHistoryPage } from '../transactions';
 import type { TransactionItem, TransactionDetails } from '../transactions';
-import { PendingActivationDrawer } from './PendingActivationDrawer';
-import { AccountActivationModal } from './AccountActivationModal';
+
+
 import { SessionCaisse, CaisseTransaction as Transaction } from '../../../types/finance';
 
 // P2.1: Suspense fallback for lazy loaded components
@@ -109,20 +109,15 @@ export default function CaisseDashboard({
   const [showOuverture, setShowOuverture] = useState(false);
   const [showRapprochement, setShowRapprochement] = useState(false);
   const [showPaiement, setShowPaiement] = useState(false);
-  const [showActivationDrawer, setShowActivationDrawer] = useState(false);
+
+
   const [initialPaymentType, setInitialPaymentType] = useState<string | undefined>(undefined);
   // État pour pré-remplir le modal de paiement (activation de compte)
   const [preSelectedAccountId, setPreSelectedAccountId] = useState<string | undefined>(undefined);
   const [preFilledAmount, setPreFilledAmount] = useState<number | undefined>(undefined);
   const [preSelectedClientId, setPreSelectedClientId] = useState<string | undefined>(undefined);
-  // État pour le modal d'activation de compte dédié
-  const [activationAccount, setActivationAccount] = useState<{
-    id: string;
-    numeroCompte: string;
-    typeCompte: string;
-    montantInitial: number;
-    client: { id: string; nom: string; prenom: string; photoUrl?: string };
-  } | null>(null);
+
+
   const [caissesSeparees, setCaissesSeparees] = useState<any[]>([]);
   
   // Super-User mode: Admin can supervise a specific active session
@@ -214,28 +209,16 @@ export default function CaisseDashboard({
   const hasPendingOpening = !currentSession && pendingSession &&
     (pendingSession.statut === 'REQUESTING_FUNDS' || pendingSession.statut === 'FUNDS_DISPATCHED');
 
-  // Pending activations - sync with PendingActivationDrawer
-  const { data: pendingActivations = [] } = useQuery({
-    queryKey: ['comptes', 'pending-activation'],
-    queryFn: () => api.get<any[]>('/comptes/pending-activation'),
-    enabled: !!currentSession,
-    refetchInterval: 30000
-  });
 
-  const comptesEnAttenteCount = pendingActivations.length;
 
-  // Pending loan disbursements count - for badge on Prêts tab (real-time via WebSocket)
-  const { data: pendingDisbursementsData, refetch: refetchPendingDisbursements } = useQuery({
-    queryKey: ['pending-disbursements'],
-    queryFn: () => api.get<{ success: boolean; data: any[]; count: number }>('/credits/pending-disbursements'),
-    enabled: !!currentSession,
-    staleTime: 60000 // Keep data fresh for 1 min, updates come via WebSocket
-  });
 
-  const pendingDisbursementsCount = pendingDisbursementsData?.count || pendingDisbursementsData?.data?.length || 0;
+  // Demandes tab total count — two sources:
+  // 1. Count queries (when tab is NOT mounted) — updated via WS event listeners
+  // 2. CaisseDemandesTab callback (when tab IS mounted) — authoritative, always in sync
+  const [demandesCountOverride, setDemandesCountOverride] = useState<number | null>(null);
 
-  // Pending caisse payment requests count - for badge on Demandes tab
   const sessionAgenceId = currentSession?.agenceId;
+
   const { data: caisseRequestsCountData, refetch: refetchCaisseRequestsCount } = useQuery({
     queryKey: ['caisse-payment-requests-count', sessionAgenceId],
     queryFn: async () => {
@@ -245,35 +228,56 @@ export default function CaisseDashboard({
       return res.json();
     },
     enabled: !!currentSession,
-    staleTime: 30000,
+    staleTime: 10000,
   });
-  const pendingCaisseRequestsCount = caisseRequestsCountData?.count || 0;
 
-  // Pending agent provisioning sessions count - for badge on Demandes tab
-  const { data: pendingAgentSessionsCount = 0, refetch: refetchAgentSessions } = useQuery({
+  const { data: pendingDisbursementsData, refetch: refetchPendingDisbursements } = useQuery({
+    queryKey: ['pending-disbursements'],
+    queryFn: async () => {
+      const res = await fetch('/api/credits/pending-disbursements', { credentials: 'include' });
+      if (!res.ok) return { count: 0 };
+      return res.json();
+    },
+    enabled: !!currentSession,
+    staleTime: 10000,
+  });
+
+  const { data: agentSessionsData, refetch: refetchAgentSessions } = useQuery({
     queryKey: ['agent-sessions-requesting', sessionAgenceId],
     queryFn: async () => {
       const params = new URLSearchParams({ statut: 'REQUESTING_FUNDS' });
       if (sessionAgenceId) params.set('agenceId', sessionAgenceId);
       const res = await fetch(`/api/caisse-agent/sessions?${params}`, { credentials: 'include' });
-      if (!res.ok) return 0;
-      const data = await res.json();
-      return data.sessions?.length || 0;
+      if (!res.ok) return { sessions: [] };
+      return res.json();
     },
     enabled: !!currentSession,
-    staleTime: 30000,
+    staleTime: 10000,
   });
+
+  const queryBasedCount =
+    (caisseRequestsCountData?.count || 0) +
+    (pendingDisbursementsData?.count || pendingDisbursementsData?.data?.length || 0) +
+    (agentSessionsData?.sessions?.length || 0);
+
+  // Use override from CaisseDemandesTab when mounted, fall back to query count
+  const demandesCount = demandesCountOverride ?? queryBasedCount;
+
+  // Reset override when navigating away from demandes tab
+  useEffect(() => {
+    if (activeTab !== 'demandes') setDemandesCountOverride(null);
+  }, [activeTab]);
 
   // Listen for caisse request updates (WebSocket → DOM event)
   useEffect(() => {
-    const handler = () => refetchCaisseRequestsCount();
+    const handler = () => { refetchCaisseRequestsCount(); };
     window.addEventListener('caisse-request-update', handler);
     return () => window.removeEventListener('caisse-request-update', handler);
   }, [refetchCaisseRequestsCount]);
 
   // Listen for agent provisioning updates (WebSocket → DOM event)
   useEffect(() => {
-    const handler = () => refetchAgentSessions();
+    const handler = () => { refetchAgentSessions(); };
     window.addEventListener('agent-provisioning-update', handler);
     return () => window.removeEventListener('agent-provisioning-update', handler);
   }, [refetchAgentSessions]);
@@ -282,26 +286,17 @@ export default function CaisseDashboard({
   const { socket } = useWebSocket();
   useEffect(() => {
     if (!socket || !currentSession) return;
-
     const handleMessage = (event: MessageEvent) => {
       try {
         const data = JSON.parse(event.data);
         if (data.type === 'CAISSE_UPDATE') {
           const { subtype } = data.payload || {};
-          if (
-            subtype === 'NEW_LOAN_DISBURSEMENT' ||
-            subtype === 'LOAN_DISBURSEMENT_COMPLETED' ||
-            subtype === 'LOAN_DISBURSEMENT_CANCELLED'
-          ) {
-            // Refresh pending disbursements count instantly
+          if (['NEW_LOAN_DISBURSEMENT', 'LOAN_DISBURSEMENT_COMPLETED', 'LOAN_DISBURSEMENT_CANCELLED'].includes(subtype)) {
             refetchPendingDisbursements();
           }
         }
-      } catch {
-        // Ignore parse errors
-      }
+      } catch { /* ignore */ }
     };
-
     socket.addEventListener('message', handleMessage);
     return () => socket.removeEventListener('message', handleMessage);
   }, [socket, currentSession, refetchPendingDisbursements]);
@@ -617,7 +612,7 @@ export default function CaisseDashboard({
 
   const tabs = [
     { key: 'dashboard', label: 'Dashboard', icon: Activity, disabled: false },
-    { key: 'demandes', label: 'Demandes', icon: ClipboardList, disabled: !isSessionOpen, badge: (pendingCaisseRequestsCount + pendingDisbursementsCount + pendingAgentSessionsCount) > 0 ? (pendingCaisseRequestsCount + pendingDisbursementsCount + pendingAgentSessionsCount) : undefined, badgeClassName: 'bg-accent-secondary text-white animate-pulse' },
+    { key: 'demandes', label: 'Demandes', icon: ClipboardList, disabled: !isSessionOpen, badge: demandesCount > 0 ? demandesCount : undefined, badgeClassName: 'bg-accent-secondary text-white animate-pulse' },
     { key: 'operations', label: 'Opérations', icon: ArrowRightLeft, disabled: !isSessionOpen || isClosingWorkflow },
     { key: 'historique', label: 'Historique', icon: Clock, disabled: !isSessionOpen },
     { key: 'transferts', label: 'Transferts', icon: ArrowRightLeft, disabled: !isSessionOpen || isClosingWorkflow },
@@ -656,10 +651,8 @@ export default function CaisseDashboard({
                 onRequestProcessed={() => {
                   refetchSession();
                   refetchTransactions();
-                  refetchCaisseRequestsCount();
-                  refetchPendingDisbursements();
-                  refetchAgentSessions();
                 }}
+                onTotalCountChange={setDemandesCountOverride}
               />
             </Suspense>
           </div>
@@ -1067,53 +1060,6 @@ export default function CaisseDashboard({
              className="shadow-sm"
           />
       </div>
-
-      {/* Modules Grid Removed - Action Redundancy */}
-      {/* Keeping only pending activation alert if needed */}
-      {comptesEnAttenteCount > 0 && (
-            <div
-              onClick={() => setShowActivationDrawer(true)}
-              className="mt-3 flex items-center gap-3 px-4 py-3 rounded-xl bg-status-warning-bg border border-status-warning/30 cursor-pointer hover:bg-status-warning-bg transition-all group"
-            >
-              <div className="relative p-2 rounded-lg bg-status-warning-bg text-status-warning group-hover:scale-105 transition-transform">
-                <UserCheck size={18} />
-                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 flex items-center justify-center bg-status-warning text-white text-[9px] font-bold rounded-full">
-                  {comptesEnAttenteCount}
-                </span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <span className="text-sm font-semibold text-status-warning">Comptes à activer</span>
-                <p className="text-[10px] text-status-warning/70">Versement initial requis</p>
-              </div>
-              <ArrowRightLeft size={16} className="text-status-warning/50 group-hover:text-status-warning group-hover:translate-x-1 transition-all" />
-            </div>
-          )}
-
-      <PendingActivationDrawer
-        open={showActivationDrawer}
-        onClose={() => setShowActivationDrawer(false)}
-        sessionId={currentSession?.id || ''}
-        onActivate={(account) => {
-           setShowActivationDrawer(false);
-           // Ouvrir le modal d'activation dédié avec le compte complet
-           setActivationAccount(account);
-        }}
-      />
-
-      {/* Modal d'activation de compte dédié */}
-      {activationAccount && currentSession && (
-        <AccountActivationModal
-          account={activationAccount}
-          sessionId={currentSession.id}
-          caisseName={currentSession.caisseNom}
-          onClose={() => setActivationAccount(null)}
-          onSuccess={() => {
-            setActivationAccount(null);
-            refetchSession();
-            refetchTransactions();
-          }}
-        />
-      )}
 
       {/* Recent Transactions - Using new TransactionsList component */}
       <TransactionsList

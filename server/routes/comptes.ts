@@ -335,14 +335,11 @@ export function registerComptesRoutes(app: Express) {
           agenceId: parsed.agenceId,
         });
 
-        // Create caisse payment request for CASH pending-payment accounts
-        const pendingPaymentStatuses = [
-          StatutCompte.PENDING_PAYMENT,
-          StatutCompte.PENDING_PAYMENT_AND_APPROVAL,
-          StatutCompte.PENDING_ACTIVATION, // legacy
-        ];
+        // Create caisse payment request for accounts that go directly to PENDING_PAYMENT
+        // (no approval needed). Accounts needing approval (PENDING_PAYMENT_AND_APPROVAL)
+        // will get their caisse request created at approval time in approveOpeningRequest().
         if (
-          pendingPaymentStatuses.includes(result.compte.statut as any) &&
+          result.compte.statut === StatutCompte.PENDING_PAYMENT &&
           parsed.modePaiement === 'CASH' &&
           parsed.soldeInitial > 0
         ) {
