@@ -1129,6 +1129,64 @@ export const compteEpargneApi = {
       avgExecutionTimeMs: number | null;
     }>('/comptes/transferts-programmes/health'),
 
+  /** Historique des virements instantanés avec pagination et filtres */
+  getTransferHistory: (params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    statut?: string;
+    from?: string;
+    to?: string;
+  }) => {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', String(params.page));
+    if (params?.limit) queryParams.append('limit', String(params.limit));
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.statut) queryParams.append('statut', params.statut);
+    if (params?.from) queryParams.append('from', params.from);
+    if (params?.to) queryParams.append('to', params.to);
+    const query = queryParams.toString();
+    return request<{
+      data: Array<{
+        id: string;
+        reference: string;
+        montant: string;
+        statut: string;
+        dateOperation: string;
+        createdAt: string;
+        metadata: any;
+        reversalOfId: string | null;
+        sourceCompteId: string | null;
+        sourceNumero: string | null;
+        sourceType: string | null;
+        sourceSoldeApres: string | null;
+        destCompteId: string | null;
+        destNumero: string | null;
+        destType: string | null;
+        destSoldeApres: string | null;
+        sourceUserNom: string | null;
+        sourceUserPrenom: string | null;
+        destUserNom: string | null;
+        destUserPrenom: string | null;
+        createdBy: string | null;
+      }>;
+      pagination: { page: number; limit: number; total: number; totalPages: number };
+    }>(`/comptes/transferts/historique${query ? `?${query}` : ''}`);
+  },
+
+  /** Statistiques des virements instantanés */
+  getTransferStats: () =>
+    request<{
+      totalCount: number;
+      totalAmount: number;
+      postedCount: number;
+      reversedCount: number;
+      monthCount: number;
+      monthAmount: number;
+      trend: number;
+      trendUp: boolean;
+    }>('/comptes/transferts/stats'),
+
   // Batch activation of pending accounts
   batchActivate: (accountIds: string[], sessionCaisseId: string) =>
     request<{

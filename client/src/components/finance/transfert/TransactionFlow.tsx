@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   CheckCircle2, AlertCircle, ArrowLeftRight, Lock,
   ArrowDown, Send, FileText, Shield
@@ -56,6 +57,7 @@ function StepHeader({ number, title }: { number: number; title: string }) {
 }
 
 export default function TransactionFlow() {
+  const queryClient = useQueryClient();
   const [accounts, setAccounts] = useState<Compte[]>([]);
   const [loadingAccounts, setLoadingAccounts] = useState(true);
   const [sourceAccountId, setSourceAccountId] = useState('');
@@ -213,6 +215,10 @@ export default function TransactionFlow() {
       } else {
         toast.success('Virement exécuté avec succès.');
       }
+
+      // Invalidate transfer history/stats so the History tab refreshes
+      queryClient.invalidateQueries({ queryKey: ['transfer-history'] });
+      queryClient.invalidateQueries({ queryKey: ['transfer-stats'] });
 
       setAmount('');
       setDestinationAccountId('');
