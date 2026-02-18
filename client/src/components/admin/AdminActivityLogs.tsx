@@ -56,6 +56,19 @@ export default function AdminActivityLogs({
   // Unique modules for filter dropdown
   const modules = Array.from(new Set(logs.map(l => l.module).filter(Boolean)));
 
+  // Sanitize resource field — some legacy logs stored a JSON object instead of a module name
+  const sanitizeModule = (raw: any): string => {
+    if (!raw) return 'SYSTEM';
+    const str = typeof raw === 'object' ? JSON.stringify(raw) : String(raw);
+    if (str.startsWith('{') || str.startsWith('[')) {
+      try {
+        const parsed = typeof raw === 'object' ? raw : JSON.parse(str);
+        return parsed.entityType || parsed.module || parsed.resource || 'SYSTEM';
+      } catch { return 'SYSTEM'; }
+    }
+    return str;
+  };
+
   // Fetch logs
   const fetchLogs = useCallback(async () => {
     setLoading(true);
@@ -80,7 +93,7 @@ export default function AdminActivityLogs({
             user: item.user_nom ? `${item.user_prenom || ''} ${item.user_nom}`.trim() : item.user_email || item.userName || item.userEmail || 'Système',
             userEmail: item.user_email || item.userEmail,
             action: item.action || 'UNKNOWN',
-            module: item.resource || item.module || item.entityType || 'SYSTEM',
+            module: sanitizeModule(item.resource || item.module || item.entityType),
             details: item.details || {},
             status: item.statut === 'FAILURE' || item.success === false ? 'error' : 'success',
             errorMessage: item.errorMessage,
@@ -109,7 +122,7 @@ export default function AdminActivityLogs({
             })(),
             user: item.user_nom ? `${item.user_prenom || ''} ${item.user_nom}`.trim() : item.userName || 'Système',
             action: item.action || 'UNKNOWN',
-            module: item.resource || item.module || item.entityType || 'SYSTEM',
+            module: sanitizeModule(item.resource || item.module || item.entityType),
             details: item.details || {},
             status: item.statut === 'FAILURE' || item.success === false ? 'error' : 'success',
             ip: item.ip_address || item.ipAddress || 'N/A',
@@ -314,11 +327,11 @@ export default function AdminActivityLogs({
       {/* 2. TABLE AREA */}
       <div className="flex-1 overflow-hidden relative flex flex-col">
          <div className="flex items-center px-4 py-3 bg-surface-base border-b border-edge text-xs font-bold text-content-muted uppercase tracking-wider shrink-0">
-            <div className="w-40">Date & Heure</div>
-            <div className="w-48">Utilisateur</div>
-            <div className="w-32 hidden md:block">Module</div>
-            <div className="flex-1">Action</div>
-            <div className="w-20 text-right">Détails</div>
+            <div className="w-36 lg:w-40 shrink-0">Date & Heure</div>
+            <div className="w-40 lg:w-48 shrink-0">Utilisateur</div>
+            <div className="w-28 lg:w-32 shrink-0 hidden md:block">Module</div>
+            <div className="flex-1 min-w-0">Action</div>
+            <div className="w-16 shrink-0 text-right">Détails</div>
          </div>
 
          <div className="flex-1 overflow-y-auto custom-scrollbar">
@@ -328,26 +341,26 @@ export default function AdminActivityLogs({
                  onClick={() => setSelectedLog(log)}
                  className={`flex items-center px-4 py-2.5 border-b border-edge/50 hover:bg-surface/50 cursor-pointer transition-colors group text-sm ${selectedLog?.id === log.id ? 'bg-accent/10' : ''}`}
                >
-                  <div className="w-40 font-mono text-content-muted text-xs">{log.date}</div>
+                  <div className="w-36 lg:w-40 shrink-0 font-mono text-content-muted text-xs truncate pr-2">{log.date}</div>
 
-                  <div className="w-48 flex items-center gap-2">
+                  <div className="w-40 lg:w-48 shrink-0 flex items-center gap-2 overflow-hidden pr-2">
                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${log.user === 'Système' ? 'bg-surface-elevated text-content-secondary' : 'bg-accent text-white'}`}>
                         {log.user.charAt(0)}
                      </div>
                      <span className="truncate text-content-secondary">{log.user}</span>
                   </div>
 
-                  <div className="w-32 hidden md:block px-2">
-                     <span className="inline-flex items-center justify-center w-full h-6 px-2.5 rounded text-[10px] bg-surface border border-edge text-content-muted font-mono whitespace-nowrap">
+                  <div className="w-28 lg:w-32 shrink-0 hidden md:block pr-2 overflow-hidden">
+                     <span className="inline-flex items-center justify-center max-w-full h-6 px-2.5 rounded text-[10px] bg-surface border border-edge text-content-muted font-mono truncate">
                         {(log.module || '').toUpperCase()}
                      </span>
                   </div>
 
-                  <div className="flex-1 px-8">
+                  <div className="flex-1 min-w-0 px-2 overflow-hidden">
                      <ActionBadge action={log.action} />
                   </div>
 
-                  <div className="w-20 text-right">
+                  <div className="w-16 shrink-0 text-right">
                      <button className="p-1.5 text-content-muted hover:text-accent hover:bg-accent/10 rounded transition-colors">
                         <Eye size={16} />
                      </button>
@@ -499,7 +512,7 @@ function ActionBadge({ action }: { action: string }) {
    else if (action.includes('UPDATE') || action.includes('EDIT')) color = colors.UPDATE;
 
    return (
-      <span className={`inline-flex items-center justify-center w-full h-6 px-2.5 rounded-full text-[10px] font-bold border ${color} whitespace-nowrap`}>
+      <span className={`inline-flex items-center justify-center max-w-full h-6 px-2.5 rounded-full text-[10px] font-bold border ${color} truncate`}>
          {action}
       </span>
    )
@@ -509,7 +522,7 @@ function DetailItem({ label, value }: { label: string, value: string }) {
    return (
       <div>
          <div className="text-[10px] text-content-muted uppercase font-bold mb-1">{label}</div>
-         <div className="text-sm text-content-secondary font-mono truncate p-2 bg-surface/30 rounded border border-edge-subtle select-all">
+         <div className="text-xs text-content-secondary font-mono break-all p-2 bg-surface/30 rounded border border-edge-subtle select-all">
             {value}
         </div>
       </div>

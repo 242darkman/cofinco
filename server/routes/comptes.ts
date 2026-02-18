@@ -3476,8 +3476,7 @@ export function registerComptesRoutes(app: Express) {
 
         const result = await approveOpeningRequest(req.params.id, userId);
 
-        logAudit(req, "opening_request.approve", {
-          requestId: req.params.id,
+        logAudit(req, "opening_request.approve", "COMPTE", req.params.id, {
           compteId: result.compteId,
           severity: "important",
         });
@@ -3510,8 +3509,7 @@ export function registerComptesRoutes(app: Express) {
 
         const result = await rejectOpeningRequest(req.params.id, reason.trim(), userId);
 
-        logAudit(req, "opening_request.reject", {
-          requestId: req.params.id,
+        logAudit(req, "opening_request.reject", "COMPTE", req.params.id, {
           compteId: result.compteId,
           reason: reason.trim(),
           severity: "important",
