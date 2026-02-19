@@ -209,7 +209,7 @@ services:
         psql -h db -U ${POSTGRES_USER:?} -tc "SELECT 1 FROM pg_database WHERE datname = 'cofinco_test'" | grep -q 1 \
           || psql -h db -U ${POSTGRES_USER:?} -c "CREATE DATABASE cofinco_test"
         # Push schema + seed
-        npx drizzle-kit push && node --import tsx server/seed-prod.ts
+        npx drizzle-kit push --force && node --import tsx seeds/seed-prod.ts
     depends_on:
       db:
         condition: service_healthy

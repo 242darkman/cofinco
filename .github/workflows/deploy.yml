@@ -74,7 +74,7 @@ jobs:
           DATABASE_URL: postgresql://cofinco:cofinco@localhost:5432/cofinco
         run: |
           npx drizzle-kit push --force
-          node --env-file=.env --import tsx server/seed-prod.ts
+          node --env-file=.env --import tsx seeds/seed-prod.ts
         continue-on-error: false
 
       - name: GL Contract Tests (14 tests)
