@@ -1,9 +1,9 @@
-import { clients, sectors, professions, activityTypes, tags, clientTags, clientActivities, users, agences, historiquePoints, userRoles } from "@shared/schema";
+import { clients, sectors, professions, activityTypes, tags, clientTags, clientActivities, users, agences, historiquePoints, userRoles, pays } from "@shared/schema";
 import { SystemRole } from "@shared/types/roles";
 import { StatutUser, SegmentClient, TypePiece } from "@shared/enum/status-constants";
 import { type Client, type InsertClient, type ClientTag, type InsertClientTag, type Tag, type InsertTag, type ClientActivity, type InsertClientActivity, type User, type InsertHistoriquePoints } from "@shared/schema";
 import { db } from "../db";
-import { eq, desc, and, isNull, sql, inArray } from "drizzle-orm";
+import { eq, desc, and, isNull, sql, inArray, aliasedTable } from "drizzle-orm";
 import { z } from "zod";
 import { StorageService } from "../services/storage-service";
 import { normalizeNom, normalizePrenom } from "./name-utils";
@@ -63,6 +63,15 @@ export interface ClientFull extends Client {
   activity_type_nom?: string | null;
   agence_nom?: string | null;
   photoUrl?: string | null;
+  // Pays (jointures)
+  nationaliteNom?: string | null;
+  nationaliteIso2?: string | null;
+  paysNaissanceNom?: string | null;
+  paysNaissanceIso2?: string | null;
+  paysResidenceNom?: string | null;
+  paysResidenceIso2?: string | null;
+  paysEmissionNom?: string | null;
+  paysEmissionIso2?: string | null;
   // Tags assignés (eager loaded pour la liste)
   tags?: ClientTagCompact[];
 }
@@ -148,6 +157,12 @@ export type UpdateClientApiInput = z.infer<typeof updateClientApiSchema>;
  * Retourne un objet unifié avec les champs d'identité depuis users
  */
 export async function getClient(id: string): Promise<ClientFull | undefined> {
+  // Aliased pays joins (4 references to the same table)
+  const paysNationalite = aliasedTable(pays, "pays_nat");
+  const paysNaissance = aliasedTable(pays, "pays_nais");
+  const paysResidence = aliasedTable(pays, "pays_res");
+  const paysEmission = aliasedTable(pays, "pays_emi");
+
   const result = await db
     .select({
       client: clients,
@@ -164,6 +179,15 @@ export async function getClient(id: string): Promise<ClientFull | undefined> {
       sector_nom: sectors.nom,
       profession_nom: professions.nom,
       activity_type_nom: activityTypes.nom,
+      // Pays jointures
+      nationalite_nom: paysNationalite.nomFr,
+      nationalite_iso2: paysNationalite.iso2,
+      pays_naissance_nom: paysNaissance.nomFr,
+      pays_naissance_iso2: paysNaissance.iso2,
+      pays_residence_nom: paysResidence.nomFr,
+      pays_residence_iso2: paysResidence.iso2,
+      pays_emission_nom: paysEmission.nomFr,
+      pays_emission_iso2: paysEmission.iso2,
     })
     .from(clients)
     .leftJoin(users, eq(clients.userId, users.id))
@@ -171,6 +195,10 @@ export async function getClient(id: string): Promise<ClientFull | undefined> {
     .leftJoin(sectors, eq(clients.sectorId, sectors.id))
     .leftJoin(professions, eq(clients.professionId, professions.id))
     .leftJoin(activityTypes, eq(clients.activityTypeId, activityTypes.id))
+    .leftJoin(paysNationalite, eq(users.nationaliteId, paysNationalite.id))
+    .leftJoin(paysNaissance, eq(users.paysNaissanceId, paysNaissance.id))
+    .leftJoin(paysResidence, eq(clients.paysResidenceId, paysResidence.id))
+    .leftJoin(paysEmission, eq(clients.paysEmissionId, paysEmission.id))
     .where(eq(clients.id, id));
 
   if (result.length === 0) return undefined;
@@ -194,6 +222,15 @@ export async function getClient(id: string): Promise<ClientFull | undefined> {
     activity_type_nom: r.activity_type_nom,
     agence_nom: r.agence_nom,
     photoUrl: r.user_photo_profile,
+    // Pays (nom + ISO2 pour drapeaux)
+    nationaliteNom: r.nationalite_nom,
+    nationaliteIso2: r.nationalite_iso2,
+    paysNaissanceNom: r.pays_naissance_nom,
+    paysNaissanceIso2: r.pays_naissance_iso2,
+    paysResidenceNom: r.pays_residence_nom,
+    paysResidenceIso2: r.pays_residence_iso2,
+    paysEmissionNom: r.pays_emission_nom,
+    paysEmissionIso2: r.pays_emission_iso2,
   };
 }
 

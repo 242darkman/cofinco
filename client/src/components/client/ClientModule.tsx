@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, Download, Upload, Users, MapPin, RefreshCw, List, Eye, Edit2, Trash2, ChevronRight, FileText, CreditCard, Shield, BarChart3, AlertCircle, Zap, Building2, Send, DollarSign, UserPlus } from 'lucide-react';
+import { Plus, Search, Filter, Download, Upload, Users, MapPin, RefreshCw, List, Eye, Edit2, Trash2, ChevronRight, FileText, CreditCard, Shield, BarChart3, AlertCircle, Zap, Building2, Send, DollarSign, UserPlus, LayoutDashboard, User, Phone, Scale, Network } from 'lucide-react';
 import { Button, IconButton, Card, ResponsiveTable, Badge, ConfirmDialog, FeatureHeader, FEATURE_DESCRIPTIONS, TabGroup } from '../ui';
 import { usePermissions, ProtectedFeature } from '../auth/ProtectedFeature';
 import ClientForm from './ClientForm';
@@ -9,7 +9,13 @@ import ClientStatsDashboard from './ClientStatsDashboard';
 import ClientExport from './ClientExport';
 import ClientImport from './ClientImport';
 import ClientsMap from './ClientsMap';
-import ClientDetails from './ClientDetails';
+import ClientProfileLayout from './ClientProfileLayout';
+import ClientEditDrawer from './ClientEditDrawer';
+import ClientOverviewTab from './tabs/ClientOverviewTab';
+import ClientProfileTab from './tabs/ClientProfileTab';
+import ClientContactTab from './tabs/ClientContactTab';
+import ClientKycLegalTab from './tabs/ClientKycLegalTab';
+import ClientReferencesTab from './tabs/ClientReferencesTab';
 import ClientAccounts from './ClientAccounts';
 import ClientKYC from './ClientKYC';
 import ClientNotes from './ClientNotes';
@@ -41,7 +47,7 @@ interface ClientModuleProps {
   activeSubModule?: string;
 }
 
-const CLIENT_TAB_IDS = ['details', 'comptes', 'kyc', 'notes', 'analytics', 'historique', 'transactions', 'alertes', 'actions'] as const;
+const CLIENT_TAB_IDS = ['overview', 'profil', 'coordonnees', 'kyc-legal', 'references', 'comptes', 'kyc', 'notes', 'transactions', 'alertes', 'actions'] as const;
 
 export default function ClientModule({ onModuleChange, activeSubModule }: ClientModuleProps) {
   // RBAC permissions
@@ -54,7 +60,7 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
 
   // URL-driven navigation
   const { currentSubModule, params, navigateToPath } = useAppNavigation();
-  const activeTab = CLIENT_TAB_IDS.includes(currentSubModule as any) ? currentSubModule! : 'details';
+  const activeTab = CLIENT_TAB_IDS.includes(currentSubModule as any) ? currentSubModule! : 'overview';
   const clientIdFromUrl = params?.id;
 
   const [clients, setClients] = useState<any[]>([]);
@@ -75,6 +81,7 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
   const [activeView, setActiveView] = useState<'list' | 'map' | 'stats'>('list');
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<string | null>(null);
+  const [showEditDrawer, setShowEditDrawer] = useState(false);
   const [showAdvancedSearch, setShowAdvancedSearch] = useState(false);
   const [showBulkCommunication, setShowBulkCommunication] = useState(false);
   const [showSelectEmployee, setShowSelectEmployee] = useState(false);
@@ -97,6 +104,12 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
 
   // Deep linking: load client from URL params
   useEffect(() => {
+    // Redirect unknown/missing sub-routes to overview (e.g. old /details URL)
+    if (clientIdFromUrl && !CLIENT_TAB_IDS.includes(currentSubModule as any) && currentSubModule !== 'new') {
+      navigateToPath(`/clients/${clientIdFromUrl}/overview`);
+      return;
+    }
+
     if (clientIdFromUrl && CLIENT_TAB_IDS.includes(currentSubModule as any)) {
       // Load client if not already loaded or different client
       if (!viewingClient || viewingClient.id !== clientIdFromUrl) {
@@ -172,7 +185,7 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
 
   const handleViewClient = (client: any) => {
     setViewingClient(client);
-    navigateToPath(`/clients/${client.id}/details`);
+    navigateToPath(`/clients/${client.id}/overview`);
   };
 
   const handleDeleteClick = (clientId: string, e?: React.MouseEvent) => {
@@ -209,7 +222,7 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
   // Profile view with tabs (when a client is selected)
   if (viewingClient) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-4">
         {/* Back button */}
         <button
           onClick={() => navigateToPath('/clients')}
@@ -219,131 +232,48 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
           Retour à la liste
         </button>
 
-        {/* Client Header */}
-        <Card variant="default" padding="none" className="overflow-hidden">
-          {/* Top accent bar */}
-          <div className="h-1 bg-gradient-to-r from-accent via-status-info to-accent" />
+        {/* Two-column layout: Identity sidebar + Tabbed content */}
+        <ClientProfileLayout
+          client={viewingClient}
+          onEdit={() => setShowEditDrawer(true)}
+          onDelete={() => handleDeleteClick(viewingClient.id)}
+        >
+          {/* Tabs */}
+          <TabGroup
+            activeTab={activeTab}
+            onTabChange={(key) => navigateToPath(`/clients/${viewingClient.id}/${key}`)}
+            variant="underline"
+            size="sm"
+            tabs={[
+              { key: 'overview', label: 'Vue d\'ensemble', icon: LayoutDashboard },
+              { key: 'profil', label: 'Profil', icon: User },
+              { key: 'coordonnees', label: 'Coordonnées', icon: Phone },
+              { key: 'kyc-legal', label: 'Dossier KYC', icon: Scale },
+              { key: 'references', label: 'Références', icon: Network },
+              { key: 'comptes', label: 'Comptes', icon: CreditCard },
+              { key: 'kyc', label: 'Documents KYC', icon: Shield },
+              { key: 'notes', label: 'Notes', icon: Edit2 },
+              { key: 'transactions', label: 'Transactions', icon: DollarSign },
+              { key: 'alertes', label: 'Alertes', icon: AlertCircle },
+              { key: 'actions', label: 'Actions', icon: Zap },
+            ]}
+          />
 
-          <div className="p-4 sm:p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                {/* Avatar with status ring */}
-                <div className="relative shrink-0">
-                  {getPhotoUrl(viewingClient) ? (
-                    <img
-                      src={getPhotoUrl(viewingClient)}
-                      alt={viewingClient.nom || ''}
-                      className={`w-16 h-16 sm:w-[72px] sm:h-[72px] rounded-full object-cover ring-3 shadow-lg ${
-                        viewingClient.statut === StatutClient.ACTIVE
-                          ? 'ring-status-success/40'
-                          : 'ring-edge'
-                      }`}
-                    />
-                  ) : (
-                    <div className={`w-16 h-16 sm:w-[72px] sm:h-[72px] rounded-full bg-gradient-to-br from-accent/20 to-status-info/20 flex items-center justify-center ring-3 shadow-lg ${
-                      viewingClient.statut === StatutClient.ACTIVE
-                        ? 'ring-status-success/40'
-                        : 'ring-edge'
-                    }`}>
-                      <span className="text-xl sm:text-2xl font-bold text-accent">
-                        {viewingClient.prenom?.charAt(0)}{viewingClient.nom?.charAt(0)}
-                      </span>
-                    </div>
-                  )}
-                  {/* Status dot */}
-                  <div className={`absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full border-[3px] border-surface ${
-                    viewingClient.statut === StatutClient.ACTIVE
-                      ? 'bg-status-success'
-                      : viewingClient.statut === StatutClient.SUSPENDED
-                        ? 'bg-status-warning'
-                        : 'bg-content-muted'
-                  }`} />
-                </div>
-
-                <div className="min-w-0">
-                  <h1 className="text-xl sm:text-2xl font-bold text-content-primary tracking-tight truncate">
-                    {formatClientName(viewingClient.nom, viewingClient.prenom)}
-                  </h1>
-                  <div className="flex flex-wrap items-center gap-2 mt-1">
-                    <Badge
-                      value={viewingClient.statut === StatutClient.ACTIVE ? 'Actif' : (STATUT_CLIENT_LABELS[viewingClient.statut as keyof typeof STATUT_CLIENT_LABELS] || viewingClient.statut)}
-                      size="sm"
-                    />
-                    <Badge
-                      value={getStatusLabel(viewingClient.segment, CLIENT_SEGMENT_LABELS)}
-                      className={getStatusColor(viewingClient.segment, CLIENT_SEGMENT_COLORS)}
-                      size="sm"
-                    />
-                    {(viewingClient.agence || viewingClient.agenceNom) && (
-                      <span className="flex items-center gap-1 text-xs text-content-muted">
-                        <Building2 size={12} />
-                        {viewingClient.agenceNom || viewingClient.agence_nom}
-                      </span>
-                    )}
-                  </div>
-                  {viewingClient.codeClient && (
-                    <p className="text-xs text-content-muted mt-1 font-mono">
-                      Réf. {viewingClient.codeClient}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Action buttons */}
-              <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
-                <ProtectedFeature requiredPermission={{ module: 'clients', action: 'edit' }}>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    icon={Edit2}
-                    onClick={() => handleEditClient(viewingClient)}
-                  >
-                    <span className="hidden sm:inline">Modifier</span>
-                  </Button>
-                </ProtectedFeature>
-                <ProtectedFeature requiredPermission={{ module: 'clients', action: 'delete' }}>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    icon={Trash2}
-                    className="text-status-danger hover:bg-status-danger-bg hover:border-status-danger/30"
-                    onClick={() => handleDeleteClick(viewingClient.id)}
-                  >
-                    <span className="hidden sm:inline">Supprimer</span>
-                  </Button>
-                </ProtectedFeature>
-              </div>
-            </div>
+          {/* Tab Content */}
+          <div className="min-h-[400px] mt-4">
+            {activeTab === 'overview' && <ClientOverviewTab client={viewingClient} />}
+            {activeTab === 'profil' && <ClientProfileTab client={viewingClient} />}
+            {activeTab === 'coordonnees' && <ClientContactTab client={viewingClient} />}
+            {activeTab === 'kyc-legal' && <ClientKycLegalTab client={viewingClient} />}
+            {activeTab === 'references' && <ClientReferencesTab client={viewingClient} />}
+            {activeTab === 'comptes' && <ClientAccounts clientId={viewingClient.id} />}
+            {activeTab === 'kyc' && <ClientKYC clientId={viewingClient.id} onUpdate={loadClients} />}
+            {activeTab === 'notes' && <ClientNotes clientId={viewingClient.id} />}
+            {activeTab === 'transactions' && <ClientGlobalHistory clientId={viewingClient.id} />}
+            {activeTab === 'alertes' && <ClientAlerts client={viewingClient} onUpdate={loadClients} />}
+            {activeTab === 'actions' && <ClientActions client={viewingClient} onActionComplete={loadClients} />}
           </div>
-        </Card>
-
-        {/* Tabs */}
-        <TabGroup
-          activeTab={activeTab}
-          onTabChange={(key) => navigateToPath(`/clients/${viewingClient.id}/${key}`)}
-          variant="underline"
-          size="sm"
-          tabs={[
-            { key: 'details', label: 'Détails', icon: FileText },
-            { key: 'comptes', label: 'Comptes', icon: CreditCard },
-            { key: 'kyc', label: 'KYC', icon: Shield },
-            { key: 'notes', label: 'Notes', icon: Edit2 },
-            { key: 'transactions', label: 'Transactions', icon: DollarSign },
-            { key: 'alertes', label: 'Alertes', icon: AlertCircle },
-            { key: 'actions', label: 'Actions', icon: Zap },
-          ]}
-        />
-
-        {/* Tab Content */}
-        <div className="min-h-[400px]">
-          {activeTab === 'details' && <ClientDetails client={viewingClient} />}
-          {activeTab === 'comptes' && <ClientAccounts clientId={viewingClient.id} />}
-          {activeTab === 'kyc' && <ClientKYC clientId={viewingClient.id} onUpdate={loadClients} />}
-          {activeTab === 'notes' && <ClientNotes clientId={viewingClient.id} />}
-          {activeTab === 'transactions' && <ClientGlobalHistory clientId={viewingClient.id} />}
-          {activeTab === 'alertes' && <ClientAlerts client={viewingClient} onUpdate={loadClients} />}
-          {activeTab === 'actions' && <ClientActions client={viewingClient} onActionComplete={loadClients} />}
-        </div>
+        </ClientProfileLayout>
 
         {/* Delete Confirmation */}
         <ConfirmDialog
@@ -357,30 +287,16 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
           variant="danger"
         />
 
-        {/* Edit Form Modal */}
-        {showForm && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3">
-            {selectedClient ? (
-              <ClientForm
-                client={selectedClient}
-                onSave={handleSaveClient}
-                onClose={() => {
-                  setShowForm(false);
-                  setSelectedClient(null);
-                }}
-              />
-            ) : (
-              <CreateClientModal
-                isOpen={true}
-                onClose={() => {
-                  setShowForm(false);
-                  setSelectedClient(null);
-                }}
-                onSave={handleSaveClient}
-              />
-            )}
-          </div>
-        )}
+        {/* Edit Drawer */}
+        <ClientEditDrawer
+          client={viewingClient}
+          isOpen={showEditDrawer}
+          onClose={() => setShowEditDrawer(false)}
+          onSave={async (data) => {
+            await handleSaveClient(data);
+            setShowEditDrawer(false);
+          }}
+        />
       </div>
     );
   }

@@ -243,9 +243,13 @@ export interface ClientWithIdentity extends Client {
   statut: string;
   // Nationalité / pays (jointures)
   nationaliteNom?: string | null;
+  nationaliteIso2?: string | null;
   paysNaissanceNom?: string | null;
+  paysNaissanceIso2?: string | null;
   paysResidenceNom?: string | null;
+  paysResidenceIso2?: string | null;
   paysEmissionNom?: string | null;
+  paysEmissionIso2?: string | null;
   // Champs enrichis (jointures catalogue professionnel)
   sectorNom?: string | null;
   professionNom?: string | null;

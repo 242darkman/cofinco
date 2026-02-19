@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, AlertCircle, AlertTriangle, Info, Edit2, Save, X, MessageSquare, Filter } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Plus, Trash2, AlertCircle, AlertTriangle, Info, Edit2, Save, X, MessageSquare, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card, Badge } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
+
+const NOTES_PER_PAGE = 10;
 
 interface ClientNote {
   id: string;
@@ -28,6 +30,13 @@ export default function ClientNotes({ clientId }: ClientNotesProps) {
   const [newNote, setNewNote] = useState({ note: '', priority: 'Moyenne' as ClientNote['priority'] });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const totalPages = Math.max(1, Math.ceil(notes.length / NOTES_PER_PAGE));
+  const paginatedNotes = useMemo(() => {
+    const start = (currentPage - 1) * NOTES_PER_PAGE;
+    return notes.slice(start, start + NOTES_PER_PAGE);
+  }, [notes, currentPage]);
 
   useEffect(() => {
     fetchNotes();
@@ -80,6 +89,7 @@ export default function ClientNotes({ clientId }: ClientNotesProps) {
       setNotes(updatedNotes);
       setNewNote({ note: '', priority: 'Moyenne' });
       setShowForm(false);
+      setCurrentPage(1);
     } catch (error) {
       console.error('Erreur ajout note:', error);
     }
@@ -158,7 +168,7 @@ export default function ClientNotes({ clientId }: ClientNotesProps) {
         {canAddNotes && (
           <button
             onClick={() => setShowForm(!showForm)}
-            className="px-3 py-1.5 bg-accent-secondary hover:bg-accent-secondary-hover text-content-primary rounded-lg transition flex items-center gap-1.5 text-sm shadow-lg shadow-accent/20"
+            className="px-3 py-1.5 bg-accent-secondary hover:bg-accent-secondary-hover text-content-inverted rounded-lg transition flex items-center gap-1.5 text-sm shadow-lg shadow-accent/20"
           >
             <Plus size={16} />
             <span className="hidden sm:inline">Nouvelle Note</span>
@@ -220,7 +230,7 @@ export default function ClientNotes({ clientId }: ClientNotesProps) {
                 <button
                 onClick={handleAddNote}
                 disabled={!newNote.note.trim()}
-                className="px-4 py-2 bg-accent-secondary hover:bg-accent-secondary-hover disabled:opacity-50 text-content-primary rounded-lg transition flex items-center gap-2 text-sm font-bold"
+                className="px-4 py-2 bg-accent-secondary hover:bg-accent-secondary-hover disabled:opacity-50 text-content-inverted rounded-lg transition flex items-center gap-2 text-sm font-bold"
                 >
                 <Save size={16} />
                 Enregistrer
@@ -243,14 +253,14 @@ export default function ClientNotes({ clientId }: ClientNotesProps) {
           </Card>
         ) : (
           <div className="space-y-3">
-            {notes.map((note) => (
+            {paginatedNotes.map((note) => (
                <Card key={note.id} variant="default" padding="sm" className="hover:border-edge-strong transition-colors group">
                     {/* Header: Priority & Date & Actions */}
                     <div className="flex items-center justify-between mb-3 border-b border-edge/50 pb-2">
                          <div className="flex items-center gap-2">
-                             <Badge 
-                                value={note.priority} 
-                                size="sm" 
+                             <Badge
+                                value={note.priority}
+                                size="sm"
                                 variant={getPriorityVariant(note.priority)}
                                 icon={getPriorityIcon(note.priority)}
                              />
@@ -260,7 +270,7 @@ export default function ClientNotes({ clientId }: ClientNotesProps) {
                                 })}
                              </span>
                          </div>
-                         
+
                          {/* Actions (visible on hover or always on mobile) */}
                          <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                             {editingId === note.id ? (
@@ -320,6 +330,44 @@ export default function ClientNotes({ clientId }: ClientNotesProps) {
                     )}
                </Card>
             ))}
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between pt-2">
+                <p className="text-xs text-content-muted">
+                  {(currentPage - 1) * NOTES_PER_PAGE + 1}-{Math.min(currentPage * NOTES_PER_PAGE, notes.length)} sur {notes.length}
+                </p>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="p-1.5 rounded-lg text-content-muted hover:bg-surface-elevated disabled:opacity-30 disabled:cursor-not-allowed transition"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`w-7 h-7 rounded-lg text-xs font-medium transition ${
+                        page === currentPage
+                          ? 'bg-accent text-white'
+                          : 'text-content-muted hover:bg-surface-elevated'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="p-1.5 rounded-lg text-content-muted hover:bg-surface-elevated disabled:opacity-30 disabled:cursor-not-allowed transition"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
     </div>

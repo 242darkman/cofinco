@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Upload, FileText, CheckCircle, XCircle, Clock, Trash2, Eye, Plus } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Upload, FileText, CheckCircle, XCircle, Clock, Trash2, Eye, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card, Badge, Skeleton } from '../ui';
+
+const DOCS_PER_PAGE = 8;
 import { FileUploadZone } from '../ui/FileUploadZone';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import { usePermissions } from '../auth/ProtectedFeature';
@@ -234,6 +236,13 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
   });
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [docToDelete, setDocToDelete] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const totalPages = Math.max(1, Math.ceil(documents.length / DOCS_PER_PAGE));
+  const paginatedDocuments = useMemo(() => {
+    const start = (currentPage - 1) * DOCS_PER_PAGE;
+    return documents.slice(start, start + DOCS_PER_PAGE);
+  }, [documents, currentPage]);
 
   useEffect(() => {
     fetchDocuments();
@@ -343,6 +352,7 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
       setDocuments(updatedDocs);
       setNewDoc({ type: 'ID Card', name: '', url: '', notes: '' });
       setShowForm(false);
+      setCurrentPage(1);
       onUpdate?.();
     } catch (error) {
       console.error('Erreur ajout document:', error);
@@ -541,7 +551,7 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
                 <button
                 onClick={handleAddDocument}
                 disabled={uploading || !newDoc.name || !newDoc.url}
-                className="px-4 py-2 bg-accent-secondary hover:bg-accent-secondary-hover disabled:opacity-50 text-content-primary rounded-lg transition flex items-center gap-2 text-sm font-bold"
+                className="px-4 py-2 bg-accent-secondary hover:bg-accent-secondary-hover disabled:opacity-50 text-content-inverted rounded-lg transition flex items-center gap-2 text-sm font-bold"
                 >
                 {uploading ? <Clock size={16} className="animate-spin" /> : <Upload size={16} />}
                 {uploading ? 'Ajout...' : 'Enregistrer'}
@@ -564,7 +574,7 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
           </Card>
         ) : (
           <div className="space-y-3">
-            {documents.map((doc) => (
+            {paginatedDocuments.map((doc) => (
               <KycDocumentCard
                 key={doc.id}
                 doc={doc}
@@ -575,6 +585,44 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
                 getStatusIcon={getStatusIcon}
               />
             ))}
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between pt-2">
+                <p className="text-xs text-content-muted">
+                  {(currentPage - 1) * DOCS_PER_PAGE + 1}-{Math.min(currentPage * DOCS_PER_PAGE, documents.length)} sur {documents.length}
+                </p>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="p-1.5 rounded-lg text-content-muted hover:bg-surface-elevated disabled:opacity-30 disabled:cursor-not-allowed transition"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`w-7 h-7 rounded-lg text-xs font-medium transition ${
+                        page === currentPage
+                          ? 'bg-accent text-white'
+                          : 'text-content-muted hover:bg-surface-elevated'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="p-1.5 rounded-lg text-content-muted hover:bg-surface-elevated disabled:opacity-30 disabled:cursor-not-allowed transition"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

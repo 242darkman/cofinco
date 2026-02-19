@@ -124,12 +124,24 @@ export default {
         'glow': '0 0 20px rgba(59, 130, 246, 0.5)',
         'glow-lg': '0 0 40px rgba(59, 130, 246, 0.6)',
       },
+      keyframes: {
+        'accordion-down': {
+          from: { height: '0' },
+          to: { height: 'var(--radix-accordion-content-height)' },
+        },
+        'accordion-up': {
+          from: { height: 'var(--radix-accordion-content-height)' },
+          to: { height: '0' },
+        },
+      },
       animation: {
         'fade-in': 'fadeIn 0.3s ease-in-out',
         'slide-up': 'slideUp 0.4s ease-out',
         'slide-down': 'slideDown 0.4s ease-out',
         'scale-in': 'scaleIn 0.3s ease-out',
         'shimmer': 'shimmer 2s infinite',
+        'accordion-down': 'accordion-down 0.2s ease-out',
+        'accordion-up': 'accordion-up 0.2s ease-out',
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',

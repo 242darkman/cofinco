@@ -86,12 +86,14 @@ export const ROUTES: RouteConfig[] = [
     group: 'Services Clients',
     subRoutes: [
       { path: '/clients/nouveau', subModule: 'new', label: 'Nouveau client' },
-      { path: '/clients/:id/details', subModule: 'details', label: 'Détails' },
+      { path: '/clients/:id/overview', subModule: 'overview', label: 'Vue d\'ensemble' },
+      { path: '/clients/:id/profil', subModule: 'profil', label: 'Profil & Situation' },
+      { path: '/clients/:id/coordonnees', subModule: 'coordonnees', label: 'Coordonnées' },
+      { path: '/clients/:id/kyc-legal', subModule: 'kyc-legal', label: 'Dossier KYC' },
+      { path: '/clients/:id/references', subModule: 'references', label: 'Références' },
       { path: '/clients/:id/comptes', subModule: 'comptes', label: 'Comptes' },
-      { path: '/clients/:id/kyc', subModule: 'kyc', label: 'KYC' },
+      { path: '/clients/:id/kyc', subModule: 'kyc', label: 'Documents KYC' },
       { path: '/clients/:id/notes', subModule: 'notes', label: 'Notes' },
-      { path: '/clients/:id/analytics', subModule: 'analytics', label: 'Analytics' },
-      { path: '/clients/:id/historique', subModule: 'historique', label: 'Activité' },
       { path: '/clients/:id/transactions', subModule: 'transactions', label: 'Transactions' },
       { path: '/clients/:id/alertes', subModule: 'alertes', label: 'Alertes' },
       { path: '/clients/:id/actions', subModule: 'actions', label: 'Actions' },
@@ -574,6 +576,19 @@ export function getModuleFromPath(path: string): { moduleKey: string; subModule?
     const params = matchPathPattern(entry.path, path);
     if (params) {
       return { moduleKey: entry.moduleKey, subModule: entry.subModule, params };
+    }
+  }
+
+  // 3. Fallback: sous-route inconnue → résoudre vers le module parent
+  // Ex: /clients/uuid/details (supprimé) → module "clients" avec params.id
+  const firstSegment = path.split('/').filter(Boolean)[0];
+  if (firstSegment) {
+    const baseRoute = _urlMap.find(entry => !entry.subModule && entry.path === `/${firstSegment}`);
+    if (baseRoute) {
+      const parts = path.split('/').filter(Boolean);
+      const params: Record<string, string> = {};
+      if (parts.length >= 2) params.id = parts[1];
+      return { moduleKey: baseRoute.moduleKey, subModule: undefined, params };
     }
   }
 

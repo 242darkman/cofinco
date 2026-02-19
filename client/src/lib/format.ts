@@ -254,6 +254,21 @@ export function formatFileSize(bytes: number): string {
 }
 
 // ============================================
+// COUNTRY FLAG UTILITIES
+// ============================================
+
+/**
+ * Convertit un code ISO 3166-1 alpha-2 en emoji drapeau.
+ * Ex: "FR" → "🇫🇷", "CI" → "🇨🇮"
+ */
+export function iso2ToFlag(iso2: string | null | undefined): string {
+  if (!iso2 || iso2.length !== 2) return '';
+  return String.fromCodePoint(
+    ...([...iso2.toUpperCase()].map(c => c.charCodeAt(0) + 127397))
+  );
+}
+
+// ============================================
 // STORAGE URL UTILITIES
 // ============================================
 

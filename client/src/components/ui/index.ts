@@ -81,6 +81,9 @@ export type { ThemeToggleProps } from './ThemeToggle';
 export { default as Tooltip } from './Tooltip';
 export type { TooltipProps } from './Tooltip';
 
+// Accordion
+export { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from './accordion';
+
 // Feature Header (with descriptions)
 export { FeatureHeader, FEATURE_DESCRIPTIONS, getFeatureDescription } from './FeatureHeader';
 export type { FeatureKey } from './FeatureHeader';
