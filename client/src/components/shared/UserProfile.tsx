@@ -650,6 +650,20 @@ export default function UserProfile({ onUserUpdate }: UserProfileProps) {
             />
           </div>
 
+          {(user.sexe || user.dateNaissance || user.lieuNaissance) && (
+            <div className="pt-2 border-t border-edge grid grid-cols-2 gap-2">
+              {user.sexe && (
+                <ReadOnlyField label="Sexe" value={user.sexe === 'M' ? 'Masculin' : 'Féminin'} />
+              )}
+              {user.dateNaissance && (
+                <ReadOnlyField label="Date de naissance" value={formatDate(user.dateNaissance)} />
+              )}
+              {user.lieuNaissance && (
+                <ReadOnlyField label="Lieu de naissance" value={user.lieuNaissance} />
+              )}
+            </div>
+          )}
+
           <div className="flex items-center gap-1.5 pt-2 border-t border-edge">
             <UserCircle size={12} className="text-content-muted" />
             <span className="text-[10px] text-content-muted">@{user.username}</span>

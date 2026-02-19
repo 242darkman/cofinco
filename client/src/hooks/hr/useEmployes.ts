@@ -13,6 +13,11 @@ export interface Employe {
   sexe: 'M' | 'F';
   adresse: string | null;
   ville: string | null;
+  lieuNaissance: string | null;
+  nationaliteId: string | null;
+  paysNaissanceId: string | null;
+  nationaliteNom?: string | null;
+  paysNaissanceNom?: string | null;
   statut: string;
   dateEmbauche: string;
   departement: string | null;
@@ -61,6 +66,7 @@ export interface EmployeFormData {
   phone: string;
   dateNaissance: string;
   sexe: 'M' | 'F';
+  lieuNaissance: string;
   adresse: string;
   ville: string;
   dateEmbauche: string;
@@ -129,6 +135,11 @@ export function useEmployes() {
         sexe: item.user?.sexe || 'M',
         adresse: item.user?.adresse || null,
         ville: item.user?.ville || null,
+        lieuNaissance: item.user?.lieuNaissance || null,
+        nationaliteId: item.user?.nationaliteId || null,
+        paysNaissanceId: item.user?.paysNaissanceId || null,
+        nationaliteNom: item.nationaliteNom || null,
+        paysNaissanceNom: item.paysNaissanceNom || null,
         statut: item.user?.statut || StatutUser.ACTIVE,
         photoProfile: item.user?.photoProfile || null,
         typeCompte: item.user?.typeCompte || 'employe',

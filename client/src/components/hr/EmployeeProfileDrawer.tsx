@@ -313,7 +313,7 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
         });
         if (!res.ok) throw new Error('Erreur lors de l\'archivage');
         toast.success('Employé archivé', {
-          description: `${employee.nom} ${employee.prenom} a été archivé(e) avec succès.`,
+          description: `${employee.nom} ${employee.prenom} a été archivé(e)`,
         });
         onRefresh?.();
         onClose();
@@ -660,6 +660,15 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
                 <GridItem label="Téléphone" value={employee.phone || 'Non renseigné'} icon={Phone} />
                 <GridItem label="Date de naissance" value={formatDate(employee.dateNaissance)} icon={Calendar} />
                 <GridItem label="Sexe" value={employee.sexe === 'M' ? 'Masculin' : 'Féminin'} />
+                {employee.lieuNaissance && (
+                  <GridItem label="Lieu de naissance" value={employee.lieuNaissance} />
+                )}
+                {employee.nationaliteNom && (
+                  <GridItem label="Nationalité" value={employee.nationaliteNom} />
+                )}
+                {employee.paysNaissanceNom && (
+                  <GridItem label="Pays de naissance" value={employee.paysNaissanceNom} />
+                )}
                 <GridItem
                   label="Adresse"
                   value={employee.adresse ? `${employee.adresse}${employee.ville ? ', ' + employee.ville : ''}` : 'Non renseignée'}
@@ -970,7 +979,7 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
           isOpen={showConvertToClient}
           onClose={() => setShowConvertToClient(false)}
           onSave={async () => {
-            toast.success('Profil client créé avec succès !', {
+            toast.success('Profil client créé', {
               description: `${employee.nom} ${employee.prenom} est maintenant aussi client.`,
             });
             setShowConvertToClient(false);

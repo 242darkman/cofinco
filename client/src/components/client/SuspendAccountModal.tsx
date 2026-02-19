@@ -60,7 +60,7 @@ export default function SuspendAccountModal({
         throw new Error(err.message || 'Erreur lors de la suspension');
       }
 
-      toast.success('Le compte a été suspendu avec succès.');
+      toast.success('Compte suspendu');
       onSuccess();
       handleClose();
     } catch (error) {

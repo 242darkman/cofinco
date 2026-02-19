@@ -1,11 +1,17 @@
 import React, { useState } from 'react';
 import type { ClientWithIdentity } from '@shared/schema';
-import { DollarSign, Award, MapPin, Phone, Mail, User, Building2, ChevronRight, TrendingUp, Wallet, AlertTriangle, Star, CreditCard, PiggyBank, ExternalLink } from 'lucide-react';
+import { DollarSign, MapPin, Phone, Mail, User, Building2, ChevronRight, TrendingUp, Wallet, AlertTriangle, Star, CreditCard, PiggyBank, ExternalLink, Shield, Briefcase } from 'lucide-react';
 import { Card, Modal, Button, Skeleton } from '../ui';
 import ClientTags from './ClientTags';
 import ClientCreditsPanel from './ClientCreditsPanel';
 import { useQuery } from '@tanstack/react-query';
 import { ALL_STATUS_LABELS } from '../../lib/status-labels';
+import {
+  SITUATION_MATRIMONIALE_LABELS, NIVEAU_EDUCATION_LABELS,
+  TYPE_CLIENT_LABELS, SOURCE_FONDS_LABELS, KYC_STATUS_LABELS,
+  RISK_LEVEL_LABELS, TYPE_PIECE_LABELS, STATUT_VERIFICATION_PIECE_LABELS,
+  STATUT_LOGEMENT_LABELS,
+} from '@shared/enum/status-constants';
 
 interface ClientDetailsProps {
     client: ClientWithIdentity;
@@ -268,6 +274,90 @@ export default function ClientDetails({ client }: ClientDetailsProps) {
         </div>
       </Card>
       
+      {/* 4. Identité & Personnel */}
+      <Card variant="default" padding="none" className="overflow-hidden">
+        <div className="p-4 sm:p-5">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 bg-gradient-to-br from-accent/20 to-status-success/20 rounded-lg">
+              <User size={16} className="text-accent" />
+            </div>
+            <h3 className="text-sm font-bold text-content-primary tracking-tight">Identité & Personnel</h3>
+          </div>
+          <div className="space-y-2">
+            <InfoRow label="Sexe" value={client.sexe === 'M' ? 'Masculin' : client.sexe === 'F' ? 'Féminin' : null} />
+            <InfoRow label="Date de naissance" value={client.dateNaissance ? new Date(client.dateNaissance).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : null} />
+            <InfoRow label="Lieu de naissance" value={client.lieuNaissance} />
+            <InfoRow label="Nationalité" value={client.nationaliteNom} />
+            <InfoRow label="Pays de naissance" value={client.paysNaissanceNom} />
+            <InfoRow label="Situation matrimoniale" value={client.situationMatrimoniale ? (SITUATION_MATRIMONIALE_LABELS as any)[client.situationMatrimoniale] || client.situationMatrimoniale : null} />
+            <InfoRow label="Personnes à charge" value={client.nombrePersonnesCharge != null ? String(client.nombrePersonnesCharge) : null} />
+            <InfoRow label="Niveau d'éducation" value={client.niveauEducation ? (NIVEAU_EDUCATION_LABELS as any)[client.niveauEducation] || client.niveauEducation : null} />
+            <InfoRow label="Logement" value={client.statutLogement ? (STATUT_LOGEMENT_LABELS as any)[client.statutLogement] || client.statutLogement : null} />
+          </div>
+        </div>
+      </Card>
+
+      {/* 5. Situation Professionnelle */}
+      <Card variant="default" padding="none" className="overflow-hidden">
+        <div className="p-4 sm:p-5">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 bg-gradient-to-br from-status-info/20 to-status-success/20 rounded-lg">
+              <Briefcase size={16} className="text-status-info" />
+            </div>
+            <h3 className="text-sm font-bold text-content-primary tracking-tight">Situation Professionnelle</h3>
+          </div>
+          <div className="space-y-2">
+            <InfoRow label="Type client" value={client.typeClient ? (TYPE_CLIENT_LABELS as any)[client.typeClient] || client.typeClient : null} />
+            <InfoRow label="Profession" value={client.professionNom || client.professionAutreTexte} />
+            <InfoRow label="Employeur" value={client.employeur} />
+            <InfoRow label="Type d'activité" value={client.activityTypeNom} />
+            <InfoRow label="Ancienneté" value={client.ancienneteActiviteMois != null ? `${client.ancienneteActiviteMois} mois` : null} />
+            <InfoRow label="Source des fonds" value={client.sourceFonds ? (SOURCE_FONDS_LABELS as any)[client.sourceFonds] || client.sourceFonds : null} />
+            <InfoRow label="Revenu mensuel" value={client.revenuMensuel ? `${parseFloat(client.revenuMensuel).toLocaleString()} FCFA` : null} />
+          </div>
+        </div>
+      </Card>
+
+      {/* 6. Pièce d'identité & Conformité */}
+      <Card variant="default" padding="none" className="overflow-hidden">
+        <div className="p-4 sm:p-5">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 bg-gradient-to-br from-status-warning/20 to-accent/20 rounded-lg">
+              <Shield size={16} className="text-status-warning" />
+            </div>
+            <h3 className="text-sm font-bold text-content-primary tracking-tight">Pièce d'Identité & KYC</h3>
+          </div>
+          <div className="space-y-2">
+            <InfoRow label="Type de pièce" value={client.typePiece ? (TYPE_PIECE_LABELS as any)[client.typePiece] || client.typePiece : null} />
+            <InfoRow label="N° pièce" value={client.numeroPiece} mono />
+            <InfoRow label="Expiration" value={client.dateExpirationPiece ? new Date(client.dateExpirationPiece).toLocaleDateString('fr-FR') : null} />
+            <InfoRow label="Pays d'émission" value={client.paysEmissionNom} />
+            <InfoRow label="Vérification" value={client.statutVerificationPiece ? (STATUT_VERIFICATION_PIECE_LABELS as any)[client.statutVerificationPiece] || client.statutVerificationPiece : null} />
+
+            <div className="pt-2 mt-2 border-t border-edge-subtle space-y-2">
+              <div className="flex items-center justify-between p-2 rounded-lg bg-surface-subtle/30 border border-edge-subtle">
+                <span className="text-[10px] text-content-muted uppercase tracking-wide">KYC</span>
+                <KycBadge status={client.kycStatus} />
+              </div>
+              <div className="flex items-center justify-between p-2 rounded-lg bg-surface-subtle/30 border border-edge-subtle">
+                <span className="text-[10px] text-content-muted uppercase tracking-wide">Risque</span>
+                <RiskBadge level={client.riskLevel} />
+              </div>
+              {client.isPep && (
+                <div className="p-2 rounded-lg bg-status-warning-bg border border-status-warning/20 text-status-warning text-xs font-medium">
+                  Personne Politiquement Exposée (PEP)
+                </div>
+              )}
+              {client.isBlacklisted && (
+                <div className="p-2 rounded-lg bg-status-danger-bg border border-status-danger/20 text-status-danger text-xs font-medium">
+                  Client sur liste noire
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </Card>
+
       {/* Credits Panel Modal */}
       <ClientCreditsPanel
         clientId={client.id}
@@ -310,5 +400,50 @@ export default function ClientDetails({ client }: ClientDetailsProps) {
 
     </div>
     </>
+  );
+}
+
+/* ===== Helper Components ===== */
+
+function InfoRow({ label, value, mono }: { label: string; value?: string | null; mono?: boolean }) {
+  if (!value) return null;
+  return (
+    <div className="flex items-center justify-between p-2 rounded-lg bg-surface-subtle/30 border border-edge-subtle">
+      <span className="text-[10px] text-content-muted uppercase tracking-wide">{label}</span>
+      <span className={`text-xs font-medium text-content-secondary ${mono ? 'font-mono' : ''}`}>{value}</span>
+    </div>
+  );
+}
+
+function KycBadge({ status }: { status?: string | null }) {
+  if (!status) return <span className="text-xs text-content-muted">-</span>;
+  const map: Record<string, string> = {
+    VERIFIED: 'bg-status-success-bg text-status-success border-status-success/20',
+    PARTIAL: 'bg-status-warning-bg text-status-warning border-status-warning/20',
+    PENDING: 'bg-status-info-bg text-status-info border-status-info/20',
+    REJECTED: 'bg-status-danger-bg text-status-danger border-status-danger/20',
+    EXPIRED: 'bg-status-danger-bg text-status-danger border-status-danger/20',
+  };
+  const label = (KYC_STATUS_LABELS as any)[status] || status;
+  return (
+    <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${map[status] || 'bg-surface-subtle text-content-muted border-edge-subtle'}`}>
+      {label}
+    </span>
+  );
+}
+
+function RiskBadge({ level }: { level?: string | null }) {
+  if (!level) return <span className="text-xs text-content-muted">-</span>;
+  const map: Record<string, string> = {
+    LOW: 'bg-status-success-bg text-status-success border-status-success/20',
+    MEDIUM: 'bg-status-warning-bg text-status-warning border-status-warning/20',
+    HIGH: 'bg-status-danger-bg text-status-danger border-status-danger/20',
+    VERY_HIGH: 'bg-status-danger-bg text-status-danger border-status-danger/20',
+  };
+  const label = (RISK_LEVEL_LABELS as any)[level] || level;
+  return (
+    <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${map[level] || 'bg-surface-subtle text-content-muted border-edge-subtle'}`}>
+      {label}
+    </span>
   );
 }

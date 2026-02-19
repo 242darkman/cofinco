@@ -439,7 +439,7 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
         {canAddDocuments && (
           <button
             onClick={() => setShowForm(!showForm)}
-            className="px-3 py-1.5 bg-accent-secondary hover:bg-accent-secondary-hover text-content-primary rounded-lg transition flex items-center gap-1.5 text-sm shadow-lg shadow-accent/20"
+            className="px-3 py-1.5 bg-accent-secondary hover:bg-accent-secondary-hover text-white rounded-lg transition flex items-center gap-1.5 text-sm shadow-lg shadow-accent/20"
           >
             <Plus size={16} />
             <span className="hidden sm:inline">Ajouter Document</span>

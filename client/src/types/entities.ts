@@ -125,27 +125,50 @@ export interface Client {
   photoUrl: string | null;
   photoProfile: string | null;
 
+  // Identité (depuis users, fusionnée par l'API)
+  sexe: string | null;
+  dateNaissance: string | null;
+  lieuNaissance: string | null;
+
   // Adresses
   adresse: string | null;
   adresseDomicile: string | null;
   lieuActivite: string | null;
-  ville: string | null;
-  pays: string | null;
+  villeId: string | null;
+  paysResidenceId: string | null;
+  statutLogement: string | null;
 
-  // Documents
-  dateNaissance: string | null;
+  // Pièce d'identité
   numeroPiece: string | null;
   typePiece: string | null;
+  dateExpirationPiece: string | null;
+  paysEmissionId: string | null;
+  statutVerificationPiece: string | null;
 
-  // Situation professionnelle
-  profession: string | null;
-  employeur: string | null;
-  revenuMensuel: string | null;
+  // Situation personnelle
+  situationMatrimoniale: string | null;
+  nombrePersonnesCharge: number | null;
+  niveauEducation: string | null;
 
   // Classification
-  typeMarcheId: string | null;
+  typeClient: string;
+  sectorId: string | null;
+  sectorNom?: string | null;
   segment: string;
   frequenceCarte: string | null;
+
+  // Situation professionnelle
+  professionId: string | null;
+  professionNom?: string | null;
+  professionAutreTexte: string | null;
+  activityTypeId: string | null;
+  activityTypeNom?: string | null;
+  employeur: string | null;
+  ancienneteActiviteMois: number | null;
+  sourceFonds: string | null;
+  revenuMensuel: string | null;
+  revenuJournalier: string | null;
+  typeRevenu: string | null;
 
   // Géolocalisation
   latitude: string | null;
@@ -165,6 +188,19 @@ export interface Client {
   scoreEngagement: number;
   derniereActivite: string | null;
 
+  // Conformité AML
+  isPep: boolean;
+  isBlacklisted: boolean;
+  riskLevel: string;
+
+  // KYC
+  kycStatus: string;
+  consentementDonnees: boolean;
+
+  // Références
+  referencesPersonnes: any;
+  clientOrigin: string;
+
   // Organisation
   agence: string | null; // Legacy
   agenceId: string | null;
@@ -175,11 +211,11 @@ export interface Client {
 
   // Dates
   dateAdhesion: string | null;
-  dateInscription: string | null;
   createdBy: string | null;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
+  version: number;
 }
 
 // Client avec données utilisateur jointes (si lié)
@@ -310,8 +346,6 @@ export interface CreateClientWithUserData {
 
   // Données client
   adresse?: string;
-  ville?: string;
-  pays?: string;
   profession?: string;
   segment?: string;
   agenceId?: string;

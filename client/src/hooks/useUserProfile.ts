@@ -10,6 +10,11 @@ export interface UserData {
   email?: string;
   telephone?: string;
   adresse?: string;
+  sexe?: string;
+  dateNaissance?: string;
+  lieuNaissance?: string;
+  nationaliteId?: string;
+  paysNaissanceId?: string;
   role: SystemRole;
   agence?: string;
   agenceId?: string;
@@ -132,7 +137,7 @@ export function useUserProfile() {
         const error = await response.json();
         throw new Error(error.error || 'Erreur lors du changement de mot de passe');
       }
-      toast.success('Mot de passe modifié avec succès');
+      toast.success('Mot de passe modifié');
       setShowPasswordModal(false);
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
     } catch (err: any) {

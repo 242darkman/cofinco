@@ -46,7 +46,7 @@ export default function AccountCard({ compte, onEdit, onAction, canSuspend = tru
   const handleCopyNumber = (e: React.MouseEvent) => {
     e.stopPropagation();
     navigator.clipboard.writeText(compte.numeroCompte);
-    toast.success('Numéro de compte copié !');
+    toast.success('Copié', { duration: 1500 });
   };
 
   const menuRef = React.useRef<HTMLDivElement>(null);

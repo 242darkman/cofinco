@@ -61,7 +61,7 @@ export default function ClientImport({ onImportComplete, onClose }: ClientImport
               epargneTotal: (parseFloat(row.epargne_total) || 0).toString(),
               tauxRemboursement: (parseInt(row.taux_remboursement) || 0).toString(),
               pointsFidelite: parseInt(row.points_fidelite) || 0,
-              dateInscription: row.date_inscription || new Date().toISOString()
+              dateAdhesion: row.date_adhesion || new Date().toISOString()
             } as InsertClient);
           }
         });
@@ -287,7 +287,7 @@ Marie Sengele,marie@example.com,+242 06 234 5678,Brazzaville,ACTIVE,Standard,92,
                   {uploadResult.successCount > 0 ? 'Import terminé !' : 'Échec de l\'import'}
                 </h3>
                 <p className="text-content-muted">
-                  {uploadResult.successCount} client(s) ont été importés avec succès.
+                  {uploadResult.successCount} client(s) ont été importés
                 </p>
               </div>
 

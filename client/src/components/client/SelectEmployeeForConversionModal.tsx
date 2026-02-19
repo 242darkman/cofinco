@@ -62,7 +62,6 @@ export default function SelectEmployeeForConversionModal({ isOpen, onClose, onSe
       sexe: (emp.user?.sexe || emp.sexe || null) as 'M' | 'F' | null,
       dateNaissance: emp.user?.dateNaissance || emp.dateNaissance || null,
       adresse: emp.user?.adresse || emp.adresse || null,
-      ville: emp.user?.ville || emp.ville || null,
       agenceId: emp.agenceId || null,
     });
   };

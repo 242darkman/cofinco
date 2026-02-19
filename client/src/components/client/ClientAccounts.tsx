@@ -167,7 +167,9 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
         const err = await res.json();
         throw new Error(err.message || 'Erreur lors de la levée de suspension');
       }
-      toast.success('Suspension levée avec succès. Le compte est de nouveau actif.');
+      toast.success('Suspension levée', {
+        description: 'Le compte est de nouveau actif.'
+      });
       await fetchComptes();
       setShowUnsuspendConfirm(false);
       setSelectedAccount(null);

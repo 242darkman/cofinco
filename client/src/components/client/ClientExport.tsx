@@ -26,7 +26,7 @@ export default function ClientExport({ clients, onClose }: ClientExportProps) {
     { key: 'epargneTotal', label: 'Épargne Total' },
     { key: 'tauxRemboursement', label: 'Taux Remboursement' },
     { key: 'pointsFidelite', label: 'Points Fidélité' },
-    { key: 'dateInscription', label: 'Date Inscription' }
+    { key: 'dateAdhesion', label: 'Date Adhésion' }
   ];
 
   const toggleField = (field: string) => {

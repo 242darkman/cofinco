@@ -19,7 +19,6 @@ interface ClientLocation {
   nom: string;
   prenom?: string;
   telephone: string;
-  ville?: string;
   segment: string;
   latitude: number;
   longitude: number;
@@ -112,7 +111,6 @@ export default function ClientsMap({ clients: propClients, height = '500px', sho
           nom: c.nom,
           prenom: c.prenom,
           telephone: c.telephone,
-          ville: c.ville,
           segment: c.segment || 'Standard',
           latitude: parseFloat(c.latitude),
           longitude: parseFloat(c.longitude),
@@ -235,10 +233,6 @@ export default function ClientsMap({ clients: propClients, height = '500px', sho
                       {formatClientName(client.nom, client.prenom)}
                     </div>
                     <div className="space-y-1 text-sm">
-                      <div className="flex items-center gap-2 text-content-muted">
-                        <MapPin size={14} />
-                        <span>{client.ville || 'Non spécifié'}</span>
-                      </div>
                       <div className="flex items-center gap-2 text-content-muted">
                         <span className="font-medium">Segment:</span>
                         <span className={`px-2 py-0.5 rounded text-xs font-medium ${

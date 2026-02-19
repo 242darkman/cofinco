@@ -10,7 +10,7 @@ import Button from '../ui/Button';
 import SmartDocumentUpload, { type UploadedDocument, type DocumentType } from '../ui/SmartDocumentUpload';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import { isAdminRole, SystemRole } from '@shared/types/roles';
-import { agenceApi, employeApi, villeApi } from '../../lib/api-client';
+import { agenceApi, employeApi, villeApi, catalogApi } from '../../lib/api-client';
 import { useEntityUpload } from '../../hooks/useEntityUpload';
 import { resolveStorageUrl } from '../../lib/format';
 import { StatutClient, StatutAgence, SegmentClient, SEGMENT_CLIENT_LABELS } from '@shared/enum/status-constants';
@@ -35,23 +35,24 @@ interface ClientFormData {
   sexe?: 'M' | 'F' | null;
   photoProfile?: string | null;
 
+  // Champs d'identité supplémentaires (envoyés à la table users)
+  dateNaissance?: string | null;
+
   // Champs métier client (envoyés à la table clients)
   adresse?: string | null; // Alias pour adresseDomicile
   adresseDomicile?: string | null;
   lieuActivite?: string | null;
-  ville?: string | null;
   villeId?: string | null;
-  pays?: string | null;
-  dateNaissance?: string | null;
   numeroPiece?: string | null;
   typePiece?: string | null;
-  profession?: string | null;
+  professionId?: string | null;
+  professionAutreTexte?: string | null;
   employeur?: string | null;
-  typeActivite?: string | null;
+  activityTypeId?: string | null;
   revenuMensuel?: string | null;
   revenuJournalier?: string | null;
   typeRevenu?: string | null;
-  typeMarcheId?: string | null;
+  sectorId?: string | null;
   segment?: string | null;
   frequenceCarte?: string | null;
   latitude?: string | null;
@@ -67,7 +68,6 @@ interface ClientFormData {
   agenceId?: string | null;
   agentReferentId?: string | null;
   statut?: string | null;
-  dateInscription?: Date | null;
 
   // Documents KYC (JSONB)
   documents?: UploadedDocument[];
@@ -117,10 +117,10 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
     sexe: null,
     adresse: '',
     adresseDomicile: '',
-    ville: '',
     lieuActivite: '',
     dateNaissance: '',
-    profession: '',
+    professionId: null,
+    professionAutreTexte: null,
     employeur: '',
     revenuMensuel: '',
     revenuJournalier: '',
@@ -134,18 +134,17 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
     epargneTotal: '0',
     tauxRemboursement: '0',
     pointsFidelite: 0,
-    dateInscription: new Date(),
     typePiece: 'CNI',
     numeroPiece: '',
-    typeMarcheId: null,
+    sectorId: null,
     agenceId: null,
     agentReferentId: null,
     documents: [],
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [typesMarches, setTypesMarches] = useState<{id: string; nom: string}[]>([]);
   const [villesList, setVillesList] = useState<{ id: string; nom: string }[]>([]);
+  const [catalogSectors, setCatalogSectors] = useState<{ id: string; nom: string; parentNom?: string | null }[]>([]);
 
   // Uploaded documents state (structured)
   const [uploadedDocs, setUploadedDocs] = useState<Record<DocumentType, UploadedDocument | null>>({
@@ -250,11 +249,11 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
         sexe: c.sexe || null,
         adresse: c.adresse || '',
         adresseDomicile: c.adresseDomicile || '',
-        ville: c.ville || '',
         villeId: c.villeId || '',
         lieuActivite: c.lieuActivite || '',
         dateNaissance: c.dateNaissance || '',
-        profession: c.profession || '',
+        professionId: c.professionId || null,
+        professionAutreTexte: c.professionAutreTexte || null,
         employeur: c.employeur || '',
         revenuMensuel: c.revenuMensuel || '',
         revenuJournalier: c.revenuJournalier || '',
@@ -268,10 +267,10 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
         epargneTotal: c.epargneTotal || 0,
         tauxRemboursement: c.tauxRemboursement || 0,
         pointsFidelite: c.pointsFidelite || 0,
-        dateInscription: c.dateInscription,
         typePiece: c.typePiece || 'CNI',
         numeroPiece: c.numeroPiece || '',
-        typeMarcheId: c.typeMarcheId || null,
+        sectorId: c.sectorId || null,
+        activityTypeId: c.activityTypeId || null,
         agenceId: c.agenceId || null,
         agentReferentId: c.agentReferentId || null,
         documents: c.documents || [],
@@ -283,21 +282,11 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
     }
   }, [client, parseExistingDocuments]);
 
-  // Load Markets
-  useEffect(() => {
-    const loadTypesMarches = async () => {
-      try {
-        const response = await fetch('/api/types-marches', { credentials: 'include' });
-        if (response.ok) setTypesMarches(await response.json());
-      } catch (error) {
-        console.error('Erreur chargement types marchés:', error);
-      }
-    };
-    loadTypesMarches();
-  }, []);
-
   useEffect(() => {
     villeApi.getAll({ actif: true }).then(setVillesList).catch(console.error);
+    catalogApi.getOptions().then((data: any) => {
+      setCatalogSectors((data.sectors || []).map((s: any) => ({ id: s.id, nom: s.parentNom ? `${s.nom} (${s.parentNom})` : s.nom })));
+    }).catch(console.error);
   }, []);
 
   useEffect(() => {
@@ -581,11 +570,7 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
             label="Ville"
             name="villeId"
             value={formData.villeId || ''}
-            onChange={(e) => {
-              const selected = villesList.find((v: any) => v.id === e.target.value);
-              handleChange('villeId', e.target.value);
-              handleChange('ville', selected?.nom || '');
-            }}
+            onChange={(e) => handleChange('villeId', e.target.value)}
             options={[
               { value: '', label: 'Sélectionner...' },
               ...villesList.map((v: any) => ({ value: v.id, label: v.nom })),
@@ -604,10 +589,10 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
           />
           <SelectField
             label="Secteur d'activité"
-            name="typeMarcheId"
-            value={formData.typeMarcheId || ''}
-            onChange={(e) => handleChange('typeMarcheId', e.target.value === '' ? null : e.target.value)}
-            options={[{ value: '', label: 'Sélectionner...' }, ...(typesMarches || []).map(tm => ({ value: tm.id, label: tm.nom }))]}
+            name="sectorId"
+            value={formData.sectorId || ''}
+            onChange={(e) => handleChange('sectorId', e.target.value === '' ? null : e.target.value)}
+            options={[{ value: '', label: 'Sélectionner...' }, ...catalogSectors.map(s => ({ value: s.id, label: s.nom }))]}
           />
           {isAdmin ? (
             <SelectField
@@ -644,10 +629,10 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <FormField
               label="Profession"
-              name="profession"
+              name="professionAutreTexte"
               icon={Briefcase}
-              value={formData.profession || ''}
-              onChange={(e) => handleChange('profession', e.target.value)}
+              value={formData.professionAutreTexte || ''}
+              onChange={(e) => handleChange('professionAutreTexte', e.target.value)}
               placeholder="Ex: Commerçant"
             />
             <FormField
@@ -669,9 +654,9 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
               </div>
               <div className="relative">
                 <DollarSign className="absolute left-2 top-1/2 -translate-y-1/2 text-content-muted" size={14} />
-                <input type="number" value={formData.typeRevenu === 'Journalier' ? formData.revenuJournalier || '' : formData.revenuMensuel || ''}
-                  onChange={(e) => { if (formData.typeRevenu === 'Journalier') { handleChange('revenuJournalier', e.target.value); const p = parseFloat(e.target.value); handleChange('revenuMensuel', !isNaN(p) && p > 0 ? Math.round(p * 26).toString() : ''); } else { handleChange('revenuMensuel', e.target.value); }}}
-                  placeholder={formData.typeRevenu === 'Journalier' ? '5000' : '150000'} min="0"
+                <input inputMode="numeric" pattern="[0-9]*" value={formData.typeRevenu === 'Journalier' ? formData.revenuJournalier || '' : formData.revenuMensuel || ''}
+                  onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); if (formData.typeRevenu === 'Journalier') { handleChange('revenuJournalier', v); const p = parseFloat(v); handleChange('revenuMensuel', !isNaN(p) && p > 0 ? Math.round(p * 26).toString() : ''); } else { handleChange('revenuMensuel', v); }}}
+                  placeholder={formData.typeRevenu === 'Journalier' ? '5000' : '150000'}
                   className="w-full pl-7 pr-2 py-1.5 bg-surface-elevated border border-edge-strong rounded-lg text-content-primary text-sm placeholder:text-content-muted focus:outline-none focus:border-accent" />
               </div>
               {formData.typeRevenu === 'Journalier' && formData.revenuJournalier && parseFloat(formData.revenuJournalier) > 0 && (

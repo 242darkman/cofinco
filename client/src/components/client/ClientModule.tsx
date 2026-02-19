@@ -141,7 +141,7 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
         const updated = await clientService.update(selectedClient.id, clientData);
         if (updated) {
             setClients(prev => prev.map(c => c.id === updated.id ? updated : c));
-            toast.success('Client mis à jour avec succès !');
+            toast.success('Client mis à jour');
             // Update viewingClient if we're editing the currently viewed client
             if (viewingClient?.id === selectedClient.id) {
               setViewingClient({ ...viewingClient, ...updated });
@@ -151,7 +151,7 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
         const newClient = await clientService.create(clientData);
         if (newClient) {
             setClients(prev => [newClient, ...prev]);
-            toast.success('Client créé avec succès ! Un compte courant a été automatiquement ouvert.');
+            toast.success('Client créé', { description: 'Un compte courant a été ouvert automatiquement.' });
         }
       }
       setShowForm(false);
@@ -185,14 +185,14 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
     if (!clientToDelete) return;
     try {
       await clientService.delete(clientToDelete);
-      toast.success('Client supprimé avec succès');
+      toast.success('Client supprimé');
       if (viewingClient?.id === clientToDelete) {
         navigateToPath('/clients');
       }
       loadClients();
     } catch (error) {
       console.error('Error deleting client:', error);
-      toast.error('Erreur lors de la suppression');
+      toast.error('Erreur lors de la suppression du client');
     } finally {
       setShowConfirmDelete(false);
       setClientToDelete(null);
@@ -780,7 +780,7 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
           isOpen={!!employeeToConvert}
           onClose={() => setEmployeeToConvert(null)}
           onSave={async () => {
-            toast.success('Employé converti en client avec succès !');
+            toast.success('Employé converti en client');
             setEmployeeToConvert(null);
             loadClients();
           }}

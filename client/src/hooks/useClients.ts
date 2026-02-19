@@ -8,8 +8,7 @@ export interface Client {
   email?: string;
   telephone: string;
   adresse?: string;
-  ville?: string;
-  pays?: string;
+  villeId?: string;
   segment?: string;
   latitude?: number;
   longitude?: number;

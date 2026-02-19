@@ -49,6 +49,7 @@ interface Agence {
 interface VilleItem {
   id: string;
   nom: string;
+  regionNom?: string;
   departementNom?: string;
   latitude?: string | number;
   longitude?: string | number;
@@ -129,10 +130,10 @@ export default function AdminGestionAgences() {
     try {
       if (editingAgence) {
         await agenceApi.update(editingAgence.id, formData);
-        toast.success('Agence mise à jour avec succès');
+        toast.success('Agence mise à jour');
       } else {
         await agenceApi.create(formData);
-        toast.success('Agence créée avec succès');
+        toast.success('Agence créée');
       }
 
       setShowForm(false);
@@ -162,10 +163,10 @@ export default function AdminGestionAgences() {
         setLoading(true);
         try {
           await agenceApi.delete(agence.id);
-          toast.success('Agence supprimée avec succès');
+          toast.success('Agence supprimée');
           loadAgences();
         } catch (error) {
-          toast.error(handleApiError(error, 'Erreur lors de la suppression'));
+          toast.error(handleApiError(error, 'Erreur lors de la suppression de l\'agence'));
         } finally {
           setLoading(false);
         }
@@ -202,7 +203,7 @@ export default function AdminGestionAgences() {
       setFormData(prev => ({
         ...prev,
         villeId,
-        region: selected.departementNom || prev.region,
+        region: selected.regionNom || selected.departementNom || prev.region,
         latitude: selected.latitude ? Number(selected.latitude) : prev.latitude,
         longitude: selected.longitude ? Number(selected.longitude) : prev.longitude,
       }));

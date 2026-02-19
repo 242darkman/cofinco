@@ -15,7 +15,7 @@ export interface SearchFilters {
   creditMax?: number;
   dateFrom?: string;
   dateTo?: string;
-  ville?: string;
+  localisation?: string;
 }
 
 export default function ClientSearch({ onSearch, onClose }: ClientSearchProps) {
@@ -27,7 +27,7 @@ export default function ClientSearch({ onSearch, onClose }: ClientSearchProps) {
     creditMax: 1000000,
     dateFrom: '',
     dateTo: '',
-    ville: ''
+    localisation: ''
   });
 
   const handleSearch = () => {
@@ -40,7 +40,7 @@ export default function ClientSearch({ onSearch, onClose }: ClientSearchProps) {
     if (filters.creditMax && filters.creditMax < 1000000) activeFilters.creditMax = filters.creditMax;
     if (filters.dateFrom) activeFilters.dateFrom = filters.dateFrom;
     if (filters.dateTo) activeFilters.dateTo = filters.dateTo;
-    if (filters.ville) activeFilters.ville = filters.ville;
+    if (filters.localisation) activeFilters.localisation = filters.localisation;
 
     onSearch(activeFilters);
   };
@@ -54,7 +54,7 @@ export default function ClientSearch({ onSearch, onClose }: ClientSearchProps) {
       creditMax: 1000000,
       dateFrom: '',
       dateTo: '',
-      ville: ''
+      localisation: ''
     });
     onSearch({});
   };
@@ -134,20 +134,20 @@ export default function ClientSearch({ onSearch, onClose }: ClientSearchProps) {
               <div>
                 <label className="block text-xs text-content-muted mb-1">Minimum (FC)</label>
                 <input
-                  type="number"
-                  min="0"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   value={filters.creditMin}
-                  onChange={(e) => setFilters(prev => ({ ...prev, creditMin: Number(e.target.value) }))}
+                  onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setFilters(prev => ({ ...prev, creditMin: v ? Number(v) : 0 })); }}
                   className="w-full bg-surface-elevated text-content-primary px-4 py-2 rounded-lg border border-edge-strong focus:outline-none focus:ring-2 focus:ring-accent"
                 />
               </div>
               <div>
                 <label className="block text-xs text-content-muted mb-1">Maximum (FC)</label>
                 <input
-                  type="number"
-                  min="0"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   value={filters.creditMax}
-                  onChange={(e) => setFilters(prev => ({ ...prev, creditMax: Number(e.target.value) }))}
+                  onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setFilters(prev => ({ ...prev, creditMax: v ? Number(v) : 0 })); }}
                   className="w-full bg-surface-elevated text-content-primary px-4 py-2 rounded-lg border border-edge-strong focus:outline-none focus:ring-2 focus:ring-accent"
                 />
               </div>
@@ -188,8 +188,8 @@ export default function ClientSearch({ onSearch, onClose }: ClientSearchProps) {
             </label>
             <input
               type="text"
-              value={filters.ville}
-              onChange={(e) => setFilters(prev => ({ ...prev, ville: e.target.value }))}
+              value={filters.localisation}
+              onChange={(e) => setFilters(prev => ({ ...prev, localisation: e.target.value }))}
               className="w-full bg-surface-elevated text-content-primary px-4 py-2 rounded-lg border border-edge-strong focus:outline-none focus:ring-2 focus:ring-accent"
               placeholder="Brazzaville, Poto-Poto, etc..."
             />

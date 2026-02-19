@@ -349,7 +349,7 @@ export default function EmployeeForm({
     setSaving(false);
 
     if (result.success) {
-      toast.success('Employé sauvegardé avec succès');
+      toast.success('Employé sauvegardé');
       onClose();
     } else {
       toast.error(result.error || 'Erreur lors de la sauvegarde');
@@ -852,8 +852,11 @@ export default function EmployeeForm({
                 <FormField label="Téléphone" name="phone" type="tel" value={formData.phone || ''} onChange={(e) => updateField('phone', e.target.value)} readOnly={!!selectedUser && !editingEmploye} error={validationErrors.phone} className="py-1" />
               </div>
 
-               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <FormField label="Date de Naissance" name="dateNaissance" type="date" value={formData.dateNaissance || ''} onChange={(e) => updateField('dateNaissance', e.target.value)} error={validationErrors.dateNaissance} className="py-1" />
+                  <FormField label="Lieu de Naissance" name="lieuNaissance" value={formData.lieuNaissance || ''} onChange={(e) => updateField('lieuNaissance', e.target.value)} className="py-1" />
+               </div>
+               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <FormField label="Adresse" name="adresse" value={formData.adresse || ''} onChange={(e) => updateField('adresse', e.target.value)} className="py-1" />
                   <FormField label="Ville" name="ville" value={formData.ville || ''} onChange={(e) => updateField('ville', e.target.value)} className="py-1" />
                </div>
@@ -939,10 +942,10 @@ export default function EmployeeForm({
                 <FormField
                   label={tauxPaiementLabel}
                   name="salaireBase"
-                  type="number"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   value={formData.salaireBase || ''}
-                  onChange={(e) => updateField('salaireBase', e.target.value)}
-                  min="0"
+                  onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); updateField('salaireBase', v); }}
                   error={validationErrors.salaireBase}
                   className="py-1"
                 />
@@ -994,11 +997,10 @@ export default function EmployeeForm({
                 <FormField
                   label="Enfants à charge"
                   name="nombreEnfantsCharge"
-                  type="number"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   value={String(formData.nombreEnfantsCharge ?? 0)}
-                  onChange={(e) => updateField('nombreEnfantsCharge', e.target.value)}
-                  min="0"
-                  max="20"
+                  onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); updateField('nombreEnfantsCharge', v); }}
                   className="!h-12"
                 />
 
