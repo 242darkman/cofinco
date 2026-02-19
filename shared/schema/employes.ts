@@ -77,10 +77,18 @@ export interface EmployeWithUser extends Employe {
     email: string | null;
     telephone: string | null;
     sexe: string | null;
+    dateNaissance: Date | string | null;
+    lieuNaissance: string | null;
+    nationaliteId: string | null;
+    paysNaissanceId: string | null;
+    adresse: string | null;
+    ville: string | null;
     photoProfile: string | null;
     statut: string;
     role?: string | null; // Rôle principal depuis userRoles
   };
+  nationaliteNom?: string | null;
+  paysNaissanceNom?: string | null;
   jobPosition?: JobPosition | null;
   department?: Department | null;
   agence?: {

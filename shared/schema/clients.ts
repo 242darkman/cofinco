@@ -1,9 +1,11 @@
-import { pgTable, text, varchar, integer, numeric, boolean, timestamp, uuid, serial, jsonb, index } from "drizzle-orm/pg-core";
+import { pgTable, pgEnum, text, varchar, integer, numeric, boolean, timestamp, uuid, serial, jsonb, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { agences } from "./agences";
 import { users } from "./auth";
+import { sectors, professions, activityTypes } from "./catalog";
 import { employes } from "./employes";
+import { pays } from "./pays";
 
 // ===== Document Types for KYC =====
 export const documentTypeEnum = z.enum([
@@ -37,23 +39,47 @@ export type ClientDocument = z.infer<typeof clientDocumentSchema>;
 export const clientDocumentsArraySchema = z.array(clientDocumentSchema).optional();
 export type ClientDocumentsArray = z.infer<typeof clientDocumentsArraySchema>;
 
-// Types de marchés commerciaux
-export const typesMarches = pgTable("types_marches", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  nom: text("nom").notNull().unique(),
-  description: text("description"),
-  actif: boolean("actif").notNull().default(true),
-  createdAt: timestamp("created_at").defaultNow(),
-});
+// ===== Enum strict pour les pièces d'identité =====
+export const typePieceEnum = pgEnum("type_piece_enum", [
+  "CNI",
+  "PASSPORT",
+  "PERMIS_CONDUIRE",
+  "CARTE_RESIDENT",
+]);
 
-export const insertTypeMarcheSchema = createInsertSchema(typesMarches).omit({ id: true, createdAt: true });
-export type InsertTypeMarche = z.infer<typeof insertTypeMarcheSchema>;
-export type TypeMarche = typeof typesMarches.$inferSelect;
+// ===== Zod schema pour les personnes de référence (JSONB) =====
+export const relationReferenceEnum = z.enum([
+  "CONJOINT",
+  "PARENT",
+  "FRERE_SOEUR",
+  "AMI",
+  "COLLEGUE",
+  "VOISIN",
+  "AUTRE",
+]);
+export type RelationReference = z.infer<typeof relationReferenceEnum>;
+
+export const referencePersonneSchema = z.object({
+  nom: z.string().min(1, "Le nom est requis"),
+  prenom: z.string().optional(),
+  telephone: z.string().min(8, "Téléphone requis"),
+  relation: relationReferenceEnum,
+  adresse: z.string().optional(),
+  profession: z.string().optional(),
+});
+export type ReferencePersonne = z.infer<typeof referencePersonneSchema>;
+
+export const referencesPersonnesSchema = z.array(referencePersonneSchema).max(3, "Maximum 3 références").optional();
+export type ReferencesPersonnes = z.infer<typeof referencesPersonnesSchema>;
 
 /**
  * Table Clients - Données métier client
  * Liée à la table users pour l'identité commune
- * Les champs nom, prenom, email, telephone, photoProfile sont dans users
+ *
+ * Champs d'IDENTITÉ (dans users) : nom, prenom, email, telephone, sexe,
+ *   dateNaissance, lieuNaissance, nationaliteId, paysNaissanceId, photoProfile
+ *
+ * Champs MÉTIER (ici) : adresse, professionnel, financier, conformité, KYC
  */
 export const clients = pgTable("clients", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -61,39 +87,51 @@ export const clients = pgTable("clients", {
   // Lien vers la table users (source de vérité pour l'identité)
   userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
 
-  // Adresses
+  // ========== ADRESSE ==========
   adresseDomicile: text("adresse_domicile"),
   lieuActivite: text("lieu_activite"),
-  ville: text("ville"),
-  villeId: uuid("ville_id"), // FK to villes table (nullable for backward compat)
-  pays: text("pays").default("République du Congo"),
+  villeId: uuid("ville_id"), // FK to villes or departements depending on localityType
+  localityType: text("locality_type"), // 'CITY' | 'DISTRICT' — null = legacy CITY
+  paysResidenceId: uuid("pays_residence_id").references(() => pays.id, { onDelete: "set null" }),
+  statutLogement: text("statut_logement"), // PROPRIETAIRE, LOCATAIRE, HEBERGE, AUTRE
 
-  // Documents d'identité
-  dateNaissance: text("date_naissance"),
+  // ========== PIÈCE D'IDENTITÉ ==========
+  typePiece: typePieceEnum("type_piece"),
   numeroPiece: text("numero_piece"),
-  typePiece: text("type_piece"),
+  dateExpirationPiece: timestamp("date_expiration_piece"),
+  paysEmissionId: uuid("pays_emission_id").references(() => pays.id, { onDelete: "set null" }),
+  // Vérification de la pièce
+  statutVerificationPiece: text("statut_verification_piece").notNull().default("PENDING"), // PENDING, VERIFIED, REJECTED
+  verificationPieceBy: uuid("verification_piece_by").references(() => users.id),
+  verificationPieceDate: timestamp("verification_piece_date"),
 
-  // Situation professionnelle
-  profession: text("profession"),
+  // ========== SITUATION PERSONNELLE ==========
+  situationMatrimoniale: text("situation_matrimoniale"), // CELIBATAIRE, MARIE, DIVORCE, VEUF, UNION_LIBRE
+  nombrePersonnesCharge: integer("nombre_personnes_charge").default(0),
+  niveauEducation: text("niveau_education"), // AUCUN, PRIMAIRE, SECONDAIRE, UNIVERSITAIRE, PROFESSIONNEL
+
+  // ========== CLASSIFICATION ==========
+  typeClient: text("type_client").notNull().default("PARTICULIER"), // PARTICULIER, PME, ASSOCIATION, GIE
+  sectorId: uuid("sector_id").references(() => sectors.id, { onDelete: "set null" }),
+  segment: text("segment").notNull().default("Standard"),
+  frequenceCarte: text("frequence_carte").default("DAILY"),
+
+  // ========== PROFESSIONNEL ==========
+  professionId: uuid("profession_id").references(() => professions.id, { onDelete: "set null" }),
+  professionAutreTexte: text("profession_autre_texte"), // texte libre quand "Autre" est sélectionné
+  activityTypeId: uuid("activity_type_id").references(() => activityTypes.id, { onDelete: "set null" }),
   employeur: text("employeur"),
-  typeActivite: text("type_activite"),
+  ancienneteActiviteMois: integer("anciennete_activite_mois"),
+  sourceFonds: text("source_fonds"), // SALAIRE, COMMERCE, AGRICULTURE, PENSION, AIDE_FAMILIALE, AUTRE
   revenuMensuel: numeric("revenu_mensuel"),
   revenuJournalier: numeric("revenu_journalier"),
   typeRevenu: text("type_revenu").default("Mensuel"), // 'Mensuel' | 'Journalier'
 
-  // KYC Documents
-  documents: jsonb("documents"),
-
-  // Classification
-  typeMarcheId: uuid("type_marche_id").references(() => typesMarches.id),
-  segment: text("segment").notNull().default("Standard"),
-  frequenceCarte: text("frequence_carte").default("DAILY"),
-
-  // Géolocalisation
+  // ========== GÉOLOCALISATION ==========
   latitude: numeric("latitude"),
   longitude: numeric("longitude"),
 
-  // Scoring & Limites
+  // ========== SCORING & LIMITES ==========
   score: integer("score").default(50),
   creditTotal: numeric("credit_total").default("0"),
   epargneTotal: numeric("epargne_total").default("0"),
@@ -102,69 +140,85 @@ export const clients = pgTable("clients", {
   limiteRetraitHebdomadaire: numeric("limite_retrait_hebdomadaire").default("10000000"),
   limiteRetraitMensuel: numeric("limite_retrait_mensuel").default("30000000"),
 
-  // Fidélité & Engagement
+  // ========== FIDÉLITÉ & ENGAGEMENT ==========
   pointsFidelite: integer("points_fidelite").default(0),
   scoreEngagement: integer("score_engagement").default(0),
   derniereActivite: timestamp("derniere_activite"),
 
-  // Origine et prospection
-  clientOrigin: text("client_origin").notNull().default("OTHER"), // FIELD_PROSPECTION, WALK_IN_AGENCY, REFERRAL, CAMPAIGN, OTHER
-  prospectId: uuid("prospect_id"), // Soft FK to prospections (cross-schema, enforced in application)
+  // ========== CONFORMITÉ AML ==========
+  isPep: boolean("is_pep").notNull().default(false),
+  pepDetails: text("pep_details"),
+  isBlacklisted: boolean("is_blacklisted").notNull().default(false),
+  blacklistReason: text("blacklist_reason"),
+  blacklistedAt: timestamp("blacklisted_at"),
+  riskLevel: text("risk_level").notNull().default("LOW"), // LOW, MEDIUM, HIGH, VERY_HIGH
 
-  // Organisation
+  // ========== KYC GLOBAL ==========
+  kycStatus: text("kyc_status").notNull().default("PENDING"), // PENDING, PARTIAL, VERIFIED, REJECTED, EXPIRED
+  kycVerifiedAt: timestamp("kyc_verified_at"),
+  kycVerifiedBy: uuid("kyc_verified_by").references(() => users.id),
+  kycExpiryDate: timestamp("kyc_expiry_date"),
+  kycNotes: text("kyc_notes"),
+
+  // KYC Documents (JSONB array)
+  documents: jsonb("documents"),
+
+  // ========== CONSENTEMENT ==========
+  consentementDonnees: boolean("consentement_donnees").notNull().default(false),
+  consentementDate: timestamp("consentement_date"),
+
+  // ========== RÉFÉRENCES (JSONB) ==========
+  referencesPersonnes: jsonb("references_personnes").default([]),
+
+  // ========== ORIGINE & ORGANISATION ==========
+  clientOrigin: text("client_origin").notNull().default("OTHER"),
+  prospectId: uuid("prospect_id"), // Soft FK to prospections
   agenceId: uuid("agence_id").references(() => agences.id),
-  agentReferentId: uuid("agent_referent_id").references(() => employes.id), // Agent commercial référent
+  agentReferentId: uuid("agent_referent_id").references(() => employes.id),
 
-  // Dates
+  // ========== DATES ==========
   dateAdhesion: timestamp("date_adhesion").defaultNow(),
-  dateInscription: timestamp("date_inscription").defaultNow(), // LEGACY: Utiliser dateAdhesion
   createdBy: uuid("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
   deletedAt: timestamp("deleted_at"), // Soft delete
   version: integer("version").notNull().default(1),
 }, (t) => ({
-  // P1.2: Performance indexes for frequently queried columns
+  // Performance indexes
   idxUserId: index("idx_clients_user_id").on(t.userId),
   idxAgenceId: index("idx_clients_agence_id").on(t.agenceId),
   idxAgentReferent: index("idx_clients_agent_referent_id").on(t.agentReferentId),
   idxDeletedAt: index("idx_clients_deleted_at").on(t.deletedAt),
-  // Composite indexes for common query patterns
+  // Composite indexes
   idxAgenceSegment: index("idx_clients_agence_segment").on(t.agenceId, t.segment),
   idxAgenceCreatedAt: index("idx_clients_agence_created_at").on(t.agenceId, t.createdAt),
-  // Prospection origin indexes
+  // Prospection
   idxClientOrigin: index("idx_clients_client_origin").on(t.clientOrigin),
   idxProspectId: index("idx_clients_prospect_id").on(t.prospectId),
+  // Conformité
+  idxRiskLevel: index("idx_clients_risk_level").on(t.riskLevel),
+  idxKycStatus: index("idx_clients_kyc_status").on(t.kycStatus),
+  idxTypeClient: index("idx_clients_type_client").on(t.typeClient),
+  idxIsBlacklisted: index("idx_clients_is_blacklisted").on(t.isBlacklisted),
+  idxIsPep: index("idx_clients_is_pep").on(t.isPep),
+  idxAgenceKyc: index("idx_clients_agence_kyc").on(t.agenceId, t.kycStatus),
+  idxAgenceRisk: index("idx_clients_agence_risk").on(t.agenceId, t.riskLevel),
 }));
 
+const numericPreprocess = (schema: z.ZodTypeAny) =>
+  z.preprocess(
+    (value) => (value === undefined || value === null || value === "" ? undefined : String(value)),
+    schema,
+  );
+
 export const insertClientSchema = createInsertSchema(clients, {
-  creditTotal: (schema) =>
-    z.preprocess(
-      (value) => (value === undefined || value === null || value === "" ? undefined : String(value)),
-      schema,
-    ),
-  epargneTotal: (schema) =>
-    z.preprocess(
-      (value) => (value === undefined || value === null || value === "" ? undefined : String(value)),
-      schema,
-    ),
-  tauxRemboursement: (schema) =>
-    z.preprocess(
-      (value) => (value === undefined || value === null || value === "" ? undefined : String(value)),
-      schema,
-    ),
-  dateInscription: (schema) =>
-    z.preprocess(
-      (value) => {
-        if (value === undefined || value === null || value === "") {
-          return undefined;
-        }
-        return value instanceof Date ? value : new Date(value as string);
-      },
-      schema,
-    ),
+  creditTotal: numericPreprocess,
+  epargneTotal: numericPreprocess,
+  tauxRemboursement: numericPreprocess,
   // Validate documents as an array of ClientDocument objects
   documents: () => clientDocumentsArraySchema,
+  // Validate references as an array of ReferencePersonne objects
+  referencesPersonnes: () => referencesPersonnesSchema,
 }).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
 export type InsertClient = z.infer<typeof insertClientSchema>;
 export type Client = typeof clients.$inferSelect;
@@ -179,12 +233,26 @@ export interface ClientWithIdentity extends Client {
   prenom: string | null;
   email: string | null;
   telephone: string | null;
+  sexe: string | null;
+  dateNaissance: Date | null;
+  lieuNaissance: string | null;
+  lieuNaissanceLocalityId?: string | null;
+  lieuNaissanceLocalityType?: string | null;
   photoProfile: string | null;
   statut: string;
-  // Champs enrichis (jointures)
-  type_marche_nom?: string | null;
+  // Nationalité / pays (jointures)
+  nationaliteNom?: string | null;
+  paysNaissanceNom?: string | null;
+  paysResidenceNom?: string | null;
+  paysEmissionNom?: string | null;
+  // Champs enrichis (jointures catalogue professionnel)
+  sectorNom?: string | null;
+  professionNom?: string | null;
+  activityTypeNom?: string | null;
+  // Champs enrichis (jointures organisation)
   agenceNom?: string | null;
   agence_nom?: string | null;
+  villeNom?: string | null;
   photoUrl?: string | null;
 }
 

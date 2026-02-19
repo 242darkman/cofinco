@@ -1,6 +1,9 @@
 // Export all modules
+export * from "./pays";
+export * from "./geography";
 export * from "./auth";
 export * from "./departments";
+export * from "./catalog";
 // employes is imported by hr.ts, so we export it explicitly to avoid conflicts
 export { employes, insertEmployeSchema, type InsertEmploye, type Employe, type EmployeWithUser } from "./employes";
 export * from "./clients";
@@ -8,7 +11,6 @@ export * from "./settings";
 export * from "./finance";
 export * from "./tontines";
 export * from "./coffre";
-export * from "./messages";
 export * from "./conversations";
 export * from "./operations";
 export * from "./transferts";

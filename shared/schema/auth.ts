@@ -2,6 +2,7 @@ import { pgTable, pgEnum, text, varchar, integer, bigint, boolean, timestamp, uu
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { SystemRole } from "../types/roles";
+import { pays } from "./pays";
 
 export const roleEnum = pgEnum("user_role", [
   SystemRole.ADMIN,
@@ -32,7 +33,12 @@ export const users = pgTable("users", {
   email: text("email"),
   telephone: text("telephone"),
   sexe: varchar("sexe", { length: 1 }), // 'M' ou 'F'
-  dateNaissance: date("date_naissance"),
+  dateNaissance: timestamp("date_naissance"),
+  lieuNaissance: text("lieu_naissance"),
+  lieuNaissanceLocalityId: uuid("lieu_naissance_locality_id"),
+  lieuNaissanceLocalityType: text("lieu_naissance_locality_type"), // 'CITY' | 'DISTRICT'
+  nationaliteId: uuid("nationalite_id").references(() => pays.id, { onDelete: "set null" }),
+  paysNaissanceId: uuid("pays_naissance_id").references(() => pays.id, { onDelete: "set null" }),
   adresse: text("adresse"),
   ville: varchar("ville", { length: 100 }),
   photoProfile: text("photo_profile"),
@@ -76,7 +82,10 @@ export const createUserSchema = z.object({
   email: z.string().email("Email invalide").optional().nullable(),
   telephone: z.string().optional().nullable(),
   sexe: z.enum(['M', 'F']).optional().nullable(),
-  dateNaissance: z.string().optional().nullable(), // Format: YYYY-MM-DD
+  dateNaissance: z.string().optional().nullable(), // ISO datetime string
+  lieuNaissance: z.string().optional().nullable(),
+  nationaliteId: z.string().uuid().optional().nullable(),
+  paysNaissanceId: z.string().uuid().optional().nullable(),
   adresse: z.string().optional().nullable(),
   ville: z.string().optional().nullable(),
   photoProfile: z.string().optional().nullable(),

@@ -2406,3 +2406,258 @@ export const CAISSE_OPENING_STRICTNESS_DESCRIPTIONS: Record<CaisseOpeningStrictn
 export const CAISSE_OPENING_STRICTNESS_OPTIONS = Object.entries(CAISSE_OPENING_STRICTNESS_LABELS).map(
   ([value, label]) => ({ value, label, description: CAISSE_OPENING_STRICTNESS_DESCRIPTIONS[value as CaisseOpeningStrictnessType] })
 );
+
+// ============================================
+// TYPE PIÈCE D'IDENTITÉ
+// ============================================
+
+export const TypePiece = {
+  CNI: "CNI",
+  PASSPORT: "PASSPORT",
+  PERMIS_CONDUIRE: "PERMIS_CONDUIRE",
+  CARTE_RESIDENT: "CARTE_RESIDENT",
+} as const;
+
+export type TypePieceType = (typeof TypePiece)[keyof typeof TypePiece];
+
+export const TYPE_PIECE_LABELS: Record<TypePieceType, string> = {
+  [TypePiece.CNI]: "Carte Nationale d'Identité",
+  [TypePiece.PASSPORT]: "Passeport",
+  [TypePiece.PERMIS_CONDUIRE]: "Permis de conduire",
+  [TypePiece.CARTE_RESIDENT]: "Carte de résident",
+};
+
+export const TYPE_PIECE_OPTIONS = Object.entries(TYPE_PIECE_LABELS).map(
+  ([value, label]) => ({ value, label })
+);
+
+/** Pièces acceptées comme pièce principale (CNI prioritaire) */
+export const TYPE_PIECE_PRINCIPALE = [TypePiece.CNI, TypePiece.PASSPORT, TypePiece.CARTE_RESIDENT] as const;
+/** Pièces acceptées uniquement comme pièce secondaire / complémentaire */
+export const TYPE_PIECE_SECONDAIRE = [TypePiece.PERMIS_CONDUIRE] as const;
+
+// ============================================
+// SITUATION MATRIMONIALE
+// ============================================
+
+export const SituationMatrimoniale = {
+  CELIBATAIRE: "CELIBATAIRE",
+  MARIE: "MARIE",
+  DIVORCE: "DIVORCE",
+  VEUF: "VEUF",
+  UNION_LIBRE: "UNION_LIBRE",
+} as const;
+
+export type SituationMatrimonialeType = (typeof SituationMatrimoniale)[keyof typeof SituationMatrimoniale];
+
+export const SITUATION_MATRIMONIALE_LABELS: Record<SituationMatrimonialeType, string> = {
+  [SituationMatrimoniale.CELIBATAIRE]: "Célibataire",
+  [SituationMatrimoniale.MARIE]: "Marié(e)",
+  [SituationMatrimoniale.DIVORCE]: "Divorcé(e)",
+  [SituationMatrimoniale.VEUF]: "Veuf/Veuve",
+  [SituationMatrimoniale.UNION_LIBRE]: "Union libre",
+};
+
+export const SITUATION_MATRIMONIALE_OPTIONS = Object.entries(SITUATION_MATRIMONIALE_LABELS).map(
+  ([value, label]) => ({ value, label })
+);
+
+// ============================================
+// NIVEAU D'ÉDUCATION
+// ============================================
+
+export const NiveauEducation = {
+  AUCUN: "AUCUN",
+  PRIMAIRE: "PRIMAIRE",
+  SECONDAIRE: "SECONDAIRE",
+  UNIVERSITAIRE: "UNIVERSITAIRE",
+  PROFESSIONNEL: "PROFESSIONNEL",
+} as const;
+
+export type NiveauEducationType = (typeof NiveauEducation)[keyof typeof NiveauEducation];
+
+export const NIVEAU_EDUCATION_LABELS: Record<NiveauEducationType, string> = {
+  [NiveauEducation.AUCUN]: "Aucun",
+  [NiveauEducation.PRIMAIRE]: "Primaire",
+  [NiveauEducation.SECONDAIRE]: "Secondaire",
+  [NiveauEducation.UNIVERSITAIRE]: "Universitaire",
+  [NiveauEducation.PROFESSIONNEL]: "Formation professionnelle",
+};
+
+export const NIVEAU_EDUCATION_OPTIONS = Object.entries(NIVEAU_EDUCATION_LABELS).map(
+  ([value, label]) => ({ value, label })
+);
+
+// ============================================
+// STATUT LOGEMENT
+// ============================================
+
+export const StatutLogement = {
+  PROPRIETAIRE: "PROPRIETAIRE",
+  LOCATAIRE: "LOCATAIRE",
+  HEBERGE: "HEBERGE",
+  AUTRE: "AUTRE",
+} as const;
+
+export type StatutLogementType = (typeof StatutLogement)[keyof typeof StatutLogement];
+
+export const STATUT_LOGEMENT_LABELS: Record<StatutLogementType, string> = {
+  [StatutLogement.PROPRIETAIRE]: "Propriétaire",
+  [StatutLogement.LOCATAIRE]: "Locataire",
+  [StatutLogement.HEBERGE]: "Hébergé(e)",
+  [StatutLogement.AUTRE]: "Autre",
+};
+
+export const STATUT_LOGEMENT_OPTIONS = Object.entries(STATUT_LOGEMENT_LABELS).map(
+  ([value, label]) => ({ value, label })
+);
+
+// ============================================
+// TYPE CLIENT
+// ============================================
+
+export const TypeClient = {
+  PARTICULIER: "PARTICULIER",
+  PME: "PME",
+  ASSOCIATION: "ASSOCIATION",
+  GIE: "GIE",
+} as const;
+
+export type TypeClientType = (typeof TypeClient)[keyof typeof TypeClient];
+
+export const TYPE_CLIENT_LABELS: Record<TypeClientType, string> = {
+  [TypeClient.PARTICULIER]: "Particulier",
+  [TypeClient.PME]: "PME / Entreprise",
+  [TypeClient.ASSOCIATION]: "Association",
+  [TypeClient.GIE]: "GIE (Groupement d'Intérêt Économique)",
+};
+
+export const TYPE_CLIENT_OPTIONS = Object.entries(TYPE_CLIENT_LABELS).map(
+  ([value, label]) => ({ value, label })
+);
+
+// ============================================
+// SOURCE DE FONDS
+// ============================================
+
+export const SourceFonds = {
+  SALAIRE: "SALAIRE",
+  COMMERCE: "COMMERCE",
+  AGRICULTURE: "AGRICULTURE",
+  PENSION: "PENSION",
+  AIDE_FAMILIALE: "AIDE_FAMILIALE",
+  AUTRE: "AUTRE",
+} as const;
+
+export type SourceFondsType = (typeof SourceFonds)[keyof typeof SourceFonds];
+
+export const SOURCE_FONDS_LABELS: Record<SourceFondsType, string> = {
+  [SourceFonds.SALAIRE]: "Salaire",
+  [SourceFonds.COMMERCE]: "Commerce",
+  [SourceFonds.AGRICULTURE]: "Agriculture",
+  [SourceFonds.PENSION]: "Pension",
+  [SourceFonds.AIDE_FAMILIALE]: "Aide familiale",
+  [SourceFonds.AUTRE]: "Autre",
+};
+
+export const SOURCE_FONDS_OPTIONS = Object.entries(SOURCE_FONDS_LABELS).map(
+  ([value, label]) => ({ value, label })
+);
+
+// ============================================
+// STATUT KYC
+// ============================================
+
+export const KycStatus = {
+  PENDING: "PENDING",
+  PARTIAL: "PARTIAL",
+  VERIFIED: "VERIFIED",
+  REJECTED: "REJECTED",
+  EXPIRED: "EXPIRED",
+} as const;
+
+export type KycStatusType = (typeof KycStatus)[keyof typeof KycStatus];
+
+export const KYC_STATUS_LABELS: Record<KycStatusType, string> = {
+  [KycStatus.PENDING]: "En attente",
+  [KycStatus.PARTIAL]: "Partiel",
+  [KycStatus.VERIFIED]: "Vérifié",
+  [KycStatus.REJECTED]: "Rejeté",
+  [KycStatus.EXPIRED]: "Expiré",
+};
+
+export const KYC_STATUS_OPTIONS = Object.entries(KYC_STATUS_LABELS).map(
+  ([value, label]) => ({ value, label })
+);
+
+// ============================================
+// STATUT VÉRIFICATION PIÈCE
+// ============================================
+
+export const StatutVerificationPiece = {
+  PENDING: "PENDING",
+  VERIFIED: "VERIFIED",
+  REJECTED: "REJECTED",
+} as const;
+
+export type StatutVerificationPieceType = (typeof StatutVerificationPiece)[keyof typeof StatutVerificationPiece];
+
+export const STATUT_VERIFICATION_PIECE_LABELS: Record<StatutVerificationPieceType, string> = {
+  [StatutVerificationPiece.PENDING]: "En attente",
+  [StatutVerificationPiece.VERIFIED]: "Vérifiée",
+  [StatutVerificationPiece.REJECTED]: "Rejetée",
+};
+
+// ============================================
+// NIVEAU DE RISQUE CLIENT
+// ============================================
+
+export const RiskLevel = {
+  LOW: "LOW",
+  MEDIUM: "MEDIUM",
+  HIGH: "HIGH",
+  VERY_HIGH: "VERY_HIGH",
+} as const;
+
+export type RiskLevelType = (typeof RiskLevel)[keyof typeof RiskLevel];
+
+export const RISK_LEVEL_LABELS: Record<RiskLevelType, string> = {
+  [RiskLevel.LOW]: "Faible",
+  [RiskLevel.MEDIUM]: "Moyen",
+  [RiskLevel.HIGH]: "Élevé",
+  [RiskLevel.VERY_HIGH]: "Très élevé",
+};
+
+export const RISK_LEVEL_OPTIONS = Object.entries(RISK_LEVEL_LABELS).map(
+  ([value, label]) => ({ value, label })
+);
+
+// ============================================
+// RELATION RÉFÉRENCE
+// ============================================
+
+export const RelationReference = {
+  CONJOINT: "CONJOINT",
+  PARENT: "PARENT",
+  FRERE_SOEUR: "FRERE_SOEUR",
+  AMI: "AMI",
+  COLLEGUE: "COLLEGUE",
+  VOISIN: "VOISIN",
+  AUTRE: "AUTRE",
+} as const;
+
+export type RelationReferenceType = (typeof RelationReference)[keyof typeof RelationReference];
+
+export const RELATION_REFERENCE_LABELS: Record<RelationReferenceType, string> = {
+  [RelationReference.CONJOINT]: "Conjoint(e)",
+  [RelationReference.PARENT]: "Parent",
+  [RelationReference.FRERE_SOEUR]: "Frère / Sœur",
+  [RelationReference.AMI]: "Ami(e)",
+  [RelationReference.COLLEGUE]: "Collègue",
+  [RelationReference.VOISIN]: "Voisin(e)",
+  [RelationReference.AUTRE]: "Autre",
+};
+
+export const RELATION_REFERENCE_OPTIONS = Object.entries(RELATION_REFERENCE_LABELS).map(
+  ([value, label]) => ({ value, label })
+);

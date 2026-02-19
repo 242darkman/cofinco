@@ -7,6 +7,8 @@ import { agences } from "./agences";
 import { sessionsCaisse, operationsCaisse, mouvementsFinanciers, credits, comptes, caisses } from "./finance";
 import { employes } from "./employes";
 import { planComptable } from "./accounting";
+import { pays } from "./pays";
+import { regions } from "./geography";
 import { methodePaiementEnum, statutTransactionEnum, typePaiementTerrainEnum } from "@shared/enum/enums";
 import { sql } from "drizzle-orm";
 
@@ -139,33 +141,86 @@ export type ObjectifMensuel = typeof objectifsMensuels.$inferSelect;
 
 // ===== Géographie (Départements, Villes, Arrondissements, Marchés) =====
 
+/**
+ * Table Departements — ADM2 administrative divisions (mondial)
+ *
+ * Source: GeoNames admin2Codes.txt
+ * Exemples: Kinkala (CG.11.7732002), Paris (FR.11.75)
+ *
+ * MIGRATION: Cette table contenait 12 rows ADM1 Congo.
+ * Ils ont été migrés vers `regions` et remplacés par les ADM2 mondiaux.
+ */
 export const departements = pgTable("departements", {
   id: uuid("id").primaryKey().defaultRandom(),
-  nom: text("nom").notNull().unique(),
-  chefLieu: text("chef_lieu"),
+  nom: text("nom").notNull(),
   actif: boolean("actif").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
-});
+
+  // Hiérarchie (ADM2 mondial)
+  paysId: uuid("pays_id")
+    .references(() => pays.id, { onDelete: "restrict" }),
+  regionId: uuid("region_id")
+    .references(() => regions.id, { onDelete: "restrict" }),
+
+  // GeoNames identifiers
+  code: text("code"),                        // ex: "CG.11.7732002"
+  geonameId: integer("geoname_id"),
+  nomAscii: text("nom_ascii"),
+
+  // Géolocalisation (enrichi via allCountries.txt)
+  latitude: numeric("latitude"),
+  longitude: numeric("longitude"),
+  population: integer("population"),
+}, (t) => ({
+  uqCode: uniqueIndex("uq_departements_code").on(t.code),
+  uqGeonameId: uniqueIndex("uq_departements_geoname_id").on(t.geonameId),
+  idxRegion: index("idx_departements_region").on(t.regionId),
+  idxPays: index("idx_departements_pays").on(t.paysId),
+  idxRegionNom: index("idx_departements_region_nom").on(t.regionId, t.nom),
+  idxActif: index("idx_departements_actif").on(t.actif),
+}));
 
 export const insertDepartementSchema = createInsertSchema(departements).omit({ id: true, createdAt: true });
 export type InsertDepartement = z.infer<typeof insertDepartementSchema>;
 export type Departement = typeof departements.$inferSelect;
 
+/**
+ * Table Villes — Villes / lieux peuplés (mondial)
+ *
+ * Source: GeoNames allCountries.txt (featureClass='P', population >= 5000)
+ * Hiérarchie: pays → region (ADM1) → ville
+ */
 export const villes = pgTable("villes", {
   id: uuid("id").primaryKey().defaultRandom(),
   nom: text("nom").notNull(),
-  departementId: uuid("departement_id").notNull()
-    .references(() => departements.id, { onDelete: "restrict" }),
+
+  // Hiérarchie mondiale
+  regionId: uuid("region_id")
+    .references(() => regions.id, { onDelete: "set null" }),
+  paysId: uuid("pays_id")
+    .references(() => pays.id, { onDelete: "set null" }),
+
+  // GeoNames
+  geonameId: integer("geoname_id"),
+  nomAscii: text("nom_ascii"),
+  population: integer("population"),
+  featureCode: text("feature_code"),         // PPLC, PPLA, PPL...
+  timezone: text("timezone"),
+
+  // Coordonnées
   latitude: numeric("latitude"),
   longitude: numeric("longitude"),
   isChefLieu: boolean("is_chef_lieu").notNull().default(false),
+
   actif: boolean("actif").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
 }, (t) => ({
   idxNom: index("idx_villes_nom").on(t.nom),
-  idxDepartement: index("idx_villes_departement").on(t.departementId),
+  idxRegion: index("idx_villes_region").on(t.regionId),
+  idxPays: index("idx_villes_pays").on(t.paysId),
   idxActif: index("idx_villes_actif").on(t.actif),
-  uqNomDepartement: uniqueIndex("uq_villes_nom_departement").on(t.nom, t.departementId),
+  idxPopulation: index("idx_villes_population").on(t.population),
+  uqGeonameId: uniqueIndex("uq_villes_geoname_id").on(t.geonameId),
 }));
 
 export const insertVilleSchema = createInsertSchema(villes).omit({ id: true, createdAt: true });
