@@ -85,7 +85,8 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
   const [showBulkCommunication, setShowBulkCommunication] = useState(false);
   const [showSelectEmployee, setShowSelectEmployee] = useState(false);
   const [employeeToConvert, setEmployeeToConvert] = useState<EmployeeConversionData | null>(null);
-  
+  const [alertCount, setAlertCount] = useState(0);
+
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
@@ -126,6 +127,20 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
       if (viewingClient) setViewingClient(null);
     }
   }, [clientIdFromUrl, currentSubModule]);
+
+  // Fetch alert count for badge on tab
+  useEffect(() => {
+    if (!viewingClient?.id) {
+      setAlertCount(0);
+      return;
+    }
+    fetch(`/api/clients/${viewingClient.id}/alerts`, { credentials: 'include' })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.active) setAlertCount(data.active.length);
+      })
+      .catch(() => {});
+  }, [viewingClient?.id]);
 
   const loadClients = async () => {
     setLoading(true);
@@ -253,7 +268,7 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
               { key: 'kyc', label: 'Documents KYC', icon: Shield },
               { key: 'notes', label: 'Notes', icon: Edit2 },
               { key: 'transactions', label: 'Transactions', icon: DollarSign },
-              { key: 'alertes', label: 'Alertes', icon: AlertCircle },
+              { key: 'alertes', label: 'Alertes', icon: AlertCircle, badge: alertCount > 0 ? alertCount : undefined, badgeClassName: alertCount > 0 ? 'bg-status-danger text-white' : undefined },
             ]}
           />
 
@@ -268,7 +283,7 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
             {activeTab === 'kyc' && <ClientKYC clientId={viewingClient.id} onUpdate={loadClients} />}
             {activeTab === 'notes' && <ClientNotes clientId={viewingClient.id} />}
             {activeTab === 'transactions' && <ClientGlobalHistory clientId={viewingClient.id} />}
-            {activeTab === 'alertes' && <ClientAlerts client={viewingClient} onUpdate={loadClients} />}
+            {activeTab === 'alertes' && <ClientAlerts client={viewingClient} onUpdate={loadClients} onCountChange={setAlertCount} />}
           </div>
         </ClientProfileLayout>
 

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { ClientWithIdentity } from '@shared/schema';
-import { DollarSign, CreditCard, PiggyBank, TrendingUp, Star, ChevronRight, Wallet } from 'lucide-react';
+import { DollarSign, CreditCard, PiggyBank, Star, ChevronRight, Wallet } from 'lucide-react';
 import { Card, Modal, Button, Skeleton } from '../../ui';
 import { useQuery } from '@tanstack/react-query';
 import ClientTags from '../ClientTags';
@@ -61,11 +61,6 @@ export default function ClientOverviewTab({ client }: ClientOverviewTabProps) {
     repaymentRate: raw.summary?.repaymentRate ?? raw.summary?.repayment_rate ?? 0,
   };
   const distribution = raw.distribution ?? [];
-  const monthlyTrend = {
-    savingsGrowth: raw.monthlyTrend?.savingsGrowth ?? raw.monthly_trend?.savings_growth ?? '0%',
-    creditEvolution: raw.monthlyTrend?.creditEvolution ?? raw.monthly_trend?.credit_evolution ?? '0%',
-  };
-
   return (
     <>
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 animate-in fade-in duration-500">
@@ -125,15 +120,7 @@ export default function ClientOverviewTab({ client }: ClientOverviewTabProps) {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {monthlyTrend.savingsGrowth.startsWith('+') && (
-                    <span className="flex items-center text-[10px] font-bold text-status-success bg-status-success-bg px-1.5 py-0.5 rounded">
-                      <TrendingUp size={10} className="mr-0.5" />
-                      {monthlyTrend.savingsGrowth}
-                    </span>
-                  )}
-                  <ChevronRight size={16} className="text-content-muted group-hover:text-content-primary transition-colors" />
-                </div>
+                <ChevronRight size={16} className="text-content-muted group-hover:text-content-primary transition-colors shrink-0" />
               </button>
 
               {/* Revenu mensuel */}

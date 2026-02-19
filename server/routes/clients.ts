@@ -1640,8 +1640,8 @@ export function registerClientRoutes(app: Express) {
       }
 
       const { evaluateClientAlerts } = await import("../services/client-alerts");
-      const alerts = await evaluateClientAlerts(req.params.id);
-      res.json(alerts);
+      const result = await evaluateClientAlerts(req.params.id);
+      res.json(result);
     } catch (error) {
       logger.error({ err: error }, 'Error evaluating client alerts');
       res.status(500).json({ message: "Erreur lors de l'evaluation des alertes" });
@@ -1666,7 +1666,12 @@ export function registerClientRoutes(app: Express) {
         return res.status(403).json({ message: "Acces refuse : client d'une autre agence" });
       }
 
-      const { resolveClientAlert } = await import("../services/client-alerts");
+      const { resolveClientAlert, KNOWN_ALERT_TYPES } = await import("../services/client-alerts");
+
+      if (!(KNOWN_ALERT_TYPES as readonly string[]).includes(req.params.alertType)) {
+        return res.status(400).json({ message: `Type d'alerte inconnu: ${req.params.alertType}` });
+      }
+
       const success = await resolveClientAlert(
         req.params.id,
         req.params.alertType,

@@ -167,9 +167,10 @@ export const clients = pgTable("clients", {
   consentementDonnees: boolean("consentement_donnees").notNull().default(false),
   consentementDate: timestamp("consentement_date"),
 
-  // ========== NOTES & RÉFÉRENCES (JSONB) ==========
+  // ========== NOTES, RÉFÉRENCES & ALERTES (JSONB) ==========
   notes: jsonb("notes").default([]),
   referencesPersonnes: jsonb("references_personnes").default([]),
+  alerts: jsonb("alerts").default([]),
 
   // ========== ORIGINE & ORGANISATION ==========
   clientOrigin: text("client_origin").notNull().default("OTHER"),
