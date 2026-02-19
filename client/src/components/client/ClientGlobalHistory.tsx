@@ -12,6 +12,7 @@ import {
     Loader2
 } from 'lucide-react';
 import { Card } from '../ui';
+import { ALL_STATUS_LABELS } from '../../lib/status-labels';
 
 interface HistoryItem {
     id: string;
@@ -181,7 +182,7 @@ export default function ClientGlobalHistory({ clientId }: ClientGlobalHistoryPro
                         {/* Details */}
                         <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-content-primary truncate">
-                                {item.type}
+                                {ALL_STATUS_LABELS[item.type] || item.type.replace(/_/g, ' ')}
                             </p>
                             <p className="text-xs text-content-muted">
                                 {new Date(item.date).toLocaleDateString('fr-FR', {
