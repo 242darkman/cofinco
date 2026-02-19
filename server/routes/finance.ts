@@ -20,7 +20,9 @@ import {
   credits,
   coffresForts,
   transactionsCompte,
-  enquetesCredit
+  enquetesCredit,
+  professions,
+  activityTypes
 } from "@shared/schema";
 import { storage } from "../storage";
 import { createMouvementFinancier } from "../services/ledger";
@@ -2520,10 +2522,14 @@ export function registerFinanceRoutes(app: Express) {
         userNom: schema.users.nom,
         userPrenom: schema.users.prenom,
         userTelephone: schema.users.telephone,
+        professionNom: professions.nom,
+        activityTypeNom: activityTypes.nom,
       })
         .from(enquetesCredit)
         .leftJoin(clients, eq(enquetesCredit.clientId, clients.id))
         .leftJoin(schema.users, eq(clients.userId, schema.users.id))
+        .leftJoin(professions, eq(clients.professionId, professions.id))
+        .leftJoin(activityTypes, eq(clients.activityTypeId, activityTypes.id))
         .where(eq(enquetesCredit.assignedAgentId, targetUserId))
         .orderBy(desc(enquetesCredit.createdAt));
 
@@ -2535,11 +2541,11 @@ export function registerFinanceRoutes(app: Express) {
           telephone: r.userTelephone,
           adresseDomicile: r.client?.adresseDomicile,
           // Activity & revenue fields from client profile (for pre-filling investigation form)
-          typeActivite: r.client?.typeActivite,
+          typeActivite: r.activityTypeNom || null,
           revenuMensuel: r.client?.revenuMensuel,
           revenuJournalier: r.client?.revenuJournalier,
           typeRevenu: r.client?.typeRevenu,
-          profession: r.client?.profession,
+          profession: r.professionNom || r.client?.professionAutreTexte || null,
           lieuActivite: r.client?.lieuActivite,
         } : null,
       }));

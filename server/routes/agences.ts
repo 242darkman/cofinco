@@ -7,7 +7,8 @@ import { agences, userAgences, users, coffresForts, comptesLiaison, userRoles } 
 import { employes } from "../../shared/schema/employes";
 import { clients } from "../../shared/schema/clients";
 import { eq, and, ilike, or, desc, asc, sql, ne, isNull } from "drizzle-orm";
-import { villes, departements } from "../../shared/schema/operations";
+import { villes } from "../../shared/schema/operations";
+import { regions } from "../../shared/schema/geography";
 import { requireAuth } from "../auth";
 import { attachAbility, requireAbility } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
@@ -174,14 +175,14 @@ export function registerAgencesRoutes(app: Express) {
           .select({
             latitude: villes.latitude,
             longitude: villes.longitude,
-            departementNom: departements.nom,
+            regionNom: regions.nom,
           })
           .from(villes)
-          .leftJoin(departements, eq(villes.departementId, departements.id))
+          .leftJoin(regions, eq(villes.regionId, regions.id))
           .where(eq(villes.id, villeId));
 
         if (villeData) {
-          regionNom = regionNom || villeData.departementNom;
+          regionNom = regionNom || villeData.regionNom;
           lat = lat ?? (villeData.latitude ? Number(villeData.latitude) : undefined);
           lng = lng ?? (villeData.longitude ? Number(villeData.longitude) : undefined);
         }
@@ -291,14 +292,14 @@ export function registerAgencesRoutes(app: Express) {
           .select({
             latitude: villes.latitude,
             longitude: villes.longitude,
-            departementNom: departements.nom,
+            regionNom: regions.nom,
           })
           .from(villes)
-          .leftJoin(departements, eq(villes.departementId, departements.id))
+          .leftJoin(regions, eq(villes.regionId, regions.id))
           .where(eq(villes.id, villeId));
 
         if (villeData) {
-          regionNom = regionNom || villeData.departementNom;
+          regionNom = regionNom || villeData.regionNom;
           lat = lat ?? (villeData.latitude ? Number(villeData.latitude) : undefined);
           lng = lng ?? (villeData.longitude ? Number(villeData.longitude) : undefined);
         }

@@ -280,7 +280,7 @@ export function registerSettingsRoutes(app: Express) {
         DELETE FROM credits;
         DELETE FROM clients;
         -- DELETE FROM employes;
-        -- DELETE FROM types_marches;
+        -- Tables catalogue (sectors, professions, activity_types) conservées lors du reset
 
         DELETE FROM users WHERE role != 'ADMIN';
 

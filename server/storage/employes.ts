@@ -12,12 +12,12 @@
  * - deleteEmploye: soft delete user + suppression rôles
  */
 
-import { employes, users, userRoles, jobPositions, departments, agences, agentsTerrain, userAgences, sessionsCaisse, hrAuditLog } from "@shared/schema";
+import { employes, users, userRoles, jobPositions, departments, agences, agentsTerrain, userAgences, sessionsCaisse, hrAuditLog, pays } from "@shared/schema";
 import { type Employe, type InsertEmploye, type User, type EmployeWithUser } from "@shared/schema";
 import { SystemRole } from "@shared/types/roles";
 import { StatutUser } from "@shared/enum/status-constants";
 import { db } from "../db";
-import { eq, desc, and, isNull, asc, sql } from "drizzle-orm";
+import { eq, desc, and, isNull, asc, sql, aliasedTable } from "drizzle-orm";
 import { StorageService } from "../services/storage-service";
 import crypto from "crypto";
 import { createLogger } from "../lib/logger";
@@ -116,6 +116,9 @@ export async function getEmployeByUserId(userId: string): Promise<Employe | unde
  * Récupérer un employé avec ses données utilisateur, poste et département
  */
 export async function getEmployeWithUser(id: string): Promise<EmployeWithUser | undefined> {
+  const paysNationalite = aliasedTable(pays, "pays_nationalite");
+  const paysNaissance = aliasedTable(pays, "pays_naissance");
+
   const result = await db.select({
     employe: employes,
     user: {
@@ -131,7 +134,12 @@ export async function getEmployeWithUser(id: string): Promise<EmployeWithUser | 
       ville: users.ville,
       photoProfile: users.photoProfile,
       statut: users.statut,
+      lieuNaissance: users.lieuNaissance,
+      nationaliteId: users.nationaliteId,
+      paysNaissanceId: users.paysNaissanceId,
     },
+    nationaliteNom: paysNationalite.nomFr,
+    paysNaissanceNom: paysNaissance.nomFr,
     jobPosition: {
       id: jobPositions.id,
       departmentId: jobPositions.departmentId,
@@ -160,6 +168,8 @@ export async function getEmployeWithUser(id: string): Promise<EmployeWithUser | 
   })
   .from(employes)
   .innerJoin(users, eq(employes.userId, users.id))
+  .leftJoin(paysNationalite, eq(users.nationaliteId, paysNationalite.id))
+  .leftJoin(paysNaissance, eq(users.paysNaissanceId, paysNaissance.id))
   .leftJoin(jobPositions, eq(employes.jobPositionId, jobPositions.id))
   .leftJoin(departments, eq(jobPositions.departmentId, departments.id))
   .leftJoin(agences, eq(employes.agenceId, agences.id))
@@ -170,6 +180,8 @@ export async function getEmployeWithUser(id: string): Promise<EmployeWithUser | 
   return {
     ...result[0].employe,
     user: result[0].user,
+    nationaliteNom: result[0].nationaliteNom,
+    paysNaissanceNom: result[0].paysNaissanceNom,
     jobPosition: result[0].jobPosition?.id ? result[0].jobPosition : null,
     department: result[0].department?.id ? result[0].department : null,
     agence: result[0].agence?.id ? result[0].agence : null,
@@ -207,6 +219,9 @@ export async function getEmployeWithRoles(id: string): Promise<EmployeWithRoles 
  * @param roleFilter - Filtre optionnel par rôle (ex: 'AGENT_TERRAIN')
  */
 export async function getAllEmployesWithUsers(roleFilter?: string): Promise<EmployeWithUser[]> {
+  const paysNationalite = aliasedTable(pays, "pays_nat_all");
+  const paysNaissance = aliasedTable(pays, "pays_nais_all");
+
   // Build where conditions
   const conditions = [isNull(users.deletedAt)];
   if (roleFilter && Object.values(SystemRole).includes(roleFilter as SystemRole)) {
@@ -226,10 +241,15 @@ export async function getAllEmployesWithUsers(roleFilter?: string): Promise<Empl
       dateNaissance: users.dateNaissance,
       adresse: users.adresse,
       ville: users.ville,
+      lieuNaissance: users.lieuNaissance,
+      nationaliteId: users.nationaliteId,
+      paysNaissanceId: users.paysNaissanceId,
       photoProfile: users.photoProfile,
       statut: users.statut,
       typeCompte: users.typeCompte,
     },
+    nationaliteNom: paysNationalite.nomFr,
+    paysNaissanceNom: paysNaissance.nomFr,
     role: userRoles.role,
     jobPosition: {
       id: jobPositions.id,
@@ -259,6 +279,8 @@ export async function getAllEmployesWithUsers(roleFilter?: string): Promise<Empl
   })
   .from(employes)
   .innerJoin(users, eq(employes.userId, users.id))
+  .leftJoin(paysNationalite, eq(users.nationaliteId, paysNationalite.id))
+  .leftJoin(paysNaissance, eq(users.paysNaissanceId, paysNaissance.id))
   .leftJoin(userRoles, eq(users.id, userRoles.userId))
   .leftJoin(jobPositions, eq(employes.jobPositionId, jobPositions.id))
   .leftJoin(departments, eq(jobPositions.departmentId, departments.id))
@@ -272,6 +294,8 @@ export async function getAllEmployesWithUsers(roleFilter?: string): Promise<Empl
       ...r.user,
       role: r.role || null,
     },
+    nationaliteNom: r.nationaliteNom,
+    paysNaissanceNom: r.paysNaissanceNom,
     jobPosition: r.jobPosition?.id ? r.jobPosition : null,
     department: r.department?.id ? r.department : null,
     agence: r.agence?.id ? r.agence : null,
@@ -284,6 +308,9 @@ export async function getAllEmployesWithUsers(roleFilter?: string): Promise<Empl
  * @param roleFilter - Filtre optionnel par rôle (ex: 'AGENT_TERRAIN')
  */
 export async function getEmployesByAgence(agenceId: string, roleFilter?: string): Promise<EmployeWithUser[]> {
+  const paysNationalite = aliasedTable(pays, "pays_nat_ag");
+  const paysNaissance = aliasedTable(pays, "pays_nais_ag");
+
   // Build where conditions
   const conditions = [
     eq(employes.agenceId, agenceId),
@@ -306,10 +333,15 @@ export async function getEmployesByAgence(agenceId: string, roleFilter?: string)
       dateNaissance: users.dateNaissance,
       adresse: users.adresse,
       ville: users.ville,
+      lieuNaissance: users.lieuNaissance,
+      nationaliteId: users.nationaliteId,
+      paysNaissanceId: users.paysNaissanceId,
       photoProfile: users.photoProfile,
       statut: users.statut,
       typeCompte: users.typeCompte,
     },
+    nationaliteNom: paysNationalite.nomFr,
+    paysNaissanceNom: paysNaissance.nomFr,
     role: userRoles.role,
     jobPosition: {
       id: jobPositions.id,
@@ -339,6 +371,8 @@ export async function getEmployesByAgence(agenceId: string, roleFilter?: string)
   })
   .from(employes)
   .innerJoin(users, eq(employes.userId, users.id))
+  .leftJoin(paysNationalite, eq(users.nationaliteId, paysNationalite.id))
+  .leftJoin(paysNaissance, eq(users.paysNaissanceId, paysNaissance.id))
   .leftJoin(userRoles, eq(users.id, userRoles.userId))
   .leftJoin(jobPositions, eq(employes.jobPositionId, jobPositions.id))
   .leftJoin(departments, eq(jobPositions.departmentId, departments.id))
@@ -352,6 +386,8 @@ export async function getEmployesByAgence(agenceId: string, roleFilter?: string)
       ...r.user,
       role: r.role || null,
     },
+    nationaliteNom: r.nationaliteNom,
+    paysNaissanceNom: r.paysNaissanceNom,
     jobPosition: r.jobPosition?.id ? r.jobPosition : null,
     department: r.department?.id ? r.department : null,
     agence: r.agence?.id ? r.agence : null,

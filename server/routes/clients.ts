@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createLogger } from "../lib/logger";
-import { insertTagSchema, insertClientTagSchema, insertClientActivitySchema, clientTags, clientActivities, users, clients, agences, membresTontine, mouvementsFinanciers, remboursements, contributionsTontine, clientDocumentSchema, clientDocumentsArraySchema, type ClientDocument } from "@shared/schema";
+import { insertTagSchema, insertClientTagSchema, insertClientActivitySchema, clientTags, clientActivities, users, clients, agences, professions, membresTontine, mouvementsFinanciers, remboursements, contributionsTontine, clientDocumentSchema, clientDocumentsArraySchema, type ClientDocument } from "@shared/schema";
 
 const logger = createLogger('Routes:Clients');
 import {
@@ -16,7 +16,7 @@ import {
 
 import { StorageService } from '../services/storage-service';
 import { storage } from "../storage";
-import { getClientTags, addClientTag, removeClientTag, createTag, deleteTag, getAllTags, logClientActivity, getClientActivities, getClientByUserId, getClientWithUser, getAllTypesMarches, getClientStats, createClientApiSchema, updateClientApiSchema, type ClientFull } from "../storage/clients";
+import { getClientTags, addClientTag, removeClientTag, createTag, deleteTag, getAllTags, logClientActivity, getClientActivities, getClientByUserId, getClientWithUser, getClientStats, createClientApiSchema, updateClientApiSchema, type ClientFull } from "../storage/clients";
 
 
 import { requireAuth, hashPassword } from "../auth";
@@ -76,7 +76,7 @@ export function registerClientRoutes(app: Express) {
           c.id,
           c.agence_id,
           c.numero_piece,
-          c.profession,
+          p.nom as profession,
           c.segment,
           c.created_at,
           u.nom,
@@ -96,6 +96,7 @@ export function registerClientRoutes(app: Express) {
         FROM clients c
         INNER JOIN users u ON c.user_id = u.id
         LEFT JOIN agences a ON c.agence_id = a.id
+        LEFT JOIN professions p ON c.profession_id = p.id
         -- Join with active current account (ensures client has one)
         INNER JOIN comptes co ON co.client_id = c.id
           AND co.type_compte = ${TypeCompte.CURRENT}
@@ -211,7 +212,7 @@ export function registerClientRoutes(app: Express) {
               c.id,
               c.agence_id,
               c.numero_piece,
-              c.profession,
+              p.nom as profession,
               c.segment,
               c.created_at,
               c.revenu_mensuel,
@@ -227,6 +228,7 @@ export function registerClientRoutes(app: Express) {
             FROM clients c
             LEFT JOIN users u ON c.user_id = u.id
             LEFT JOIN agences a ON c.agence_id = a.id
+            LEFT JOIN professions p ON c.profession_id = p.id
             WHERE (
               LOWER(UNACCENT(COALESCE(u.nom, ''))) LIKE LOWER(UNACCENT(${searchPattern}))
               OR LOWER(UNACCENT(COALESCE(u.prenom, ''))) LIKE LOWER(UNACCENT(${searchPattern}))
@@ -980,7 +982,6 @@ export function registerClientRoutes(app: Express) {
         res.status(201).json({
             ...client,
             agence_nom: agenceNom,
-            type_marche_nom: 'Standard' // Default for now, or fetch if needed
         });
       } catch (e) {
         // Cleanup temp files if creation failed (not on validation errors)
@@ -1200,12 +1201,6 @@ export function registerClientRoutes(app: Express) {
           logger.error({ err: error }, 'Uniqueness check error');
           res.status(500).json({ message: "Validation error" });
       }
-  });
-
-  // Types de Marchés
-  app.get("/api/types-marches", requireAuth, async (req, res) => {
-      const types = await getAllTypesMarches();
-      res.json(types);
   });
 
   // Client Tags
@@ -1489,9 +1484,6 @@ export function registerClientRoutes(app: Express) {
         password: z.string().optional().nullable(),
         // Données client métier
         adresse: z.string().optional(),
-        ville: z.string().optional(),
-        pays: z.string().optional(),
-        profession: z.string().optional(),
         segment: z.string().optional(),
         agenceId: z.string().uuid().optional().nullable(),
         agence: z.string().optional(), // Legacy
@@ -1530,9 +1522,6 @@ export function registerClientRoutes(app: Express) {
 
       const clientData = {
         adresseDomicile: data.adresse,
-        ville: data.ville,
-        pays: data.pays,
-        profession: data.profession,
         segment: data.segment || SegmentClient.STANDARD,
         agenceId: data.agenceId || (req as any).selectedAgenceId,
         statut: 'ACTIVE' as const,

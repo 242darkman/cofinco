@@ -630,7 +630,7 @@ function calculerScoreAnciennete(
 
   // Bonus pour profil complet
   const profilComplet = client.telephone && client.adresse &&
-    (client.email || client.profession);
+    (client.email || client.professionId);
   if (profilComplet) {
     score += 2;
   }

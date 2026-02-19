@@ -59,8 +59,8 @@ export async function calculateClientScore(clientId: string): Promise<{ score: n
   // 5. Profile Completeness (Max 10 pts)
   // Check for address and profession (user identity fields are in users table)
   let profileScore = 0;
-  if (client.adresseDomicile && client.profession && client.numeroPiece) profileScore = 10;
-  else if (client.adresseDomicile && client.profession) profileScore = 5;
+  if (client.adresseDomicile && client.professionId && client.numeroPiece) profileScore = 10;
+  else if (client.adresseDomicile && client.professionId) profileScore = 5;
 
   score += profileScore;
 

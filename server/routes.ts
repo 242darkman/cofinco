@@ -10,7 +10,6 @@ import { registerSettingsRoutes } from "./routes/settings";
 import { registerDashboardRoutes } from "./routes/dashboard";
 import { hrRouter } from "./routes/hr";
 import { registerMobileMoneyRoutes } from "./mobile-money-service";
-import { registerMessagesRoutes } from "./routes/messages";
 import { registerConversationsRoutes } from "./routes/conversations";
 import { createServer, type Server } from "http";
 import { setupWebSocket, setWsInstance } from "./ws-server";
@@ -50,6 +49,7 @@ import { syncJournalRouter } from "./routes/sync-journal";
 import { registerZoneManagementRoutes } from "./routes/zone-management";
 import { registerProspectionPrimesRoutes } from "./routes/prospection-primes";
 import { registerVilleRoutes } from "./routes/villes";
+import { registerCatalogRoutes } from "./routes/catalog";
 
 const logger = createLogger('Routes');
 
@@ -90,9 +90,9 @@ export function registerRoutes(app: Express): Server {
   registerZoneManagementRoutes(app); // Arrondissements & Marchés CRUD
   registerProspectionPrimesRoutes(app); // Prospection primes management
   registerVilleRoutes(app); // Départements & Villes reference data
+  registerCatalogRoutes(app); // Catalog Module (sectors, professions, activity types)
   registerAgentModulesRoutes(app); // Agent sub-modules (commissions, planning, objectifs, etc.)
   registerDashboardRoutes(app); // Dashboard statistics
-  registerMessagesRoutes(app); // Messaging System (Legacy v1)
   registerConversationsRoutes(app); // Messaging System V2 (Conversations)
   registerNotificationsRoutes(app); // Notifications System (caisse + general)
   registerPushRoutes(app); // Push Notifications (Web Push API)

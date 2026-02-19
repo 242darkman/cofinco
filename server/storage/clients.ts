@@ -1,6 +1,6 @@
-import { clients, typesMarches, tags, clientTags, clientActivities, users, agences, historiquePoints, userRoles } from "@shared/schema";
+import { clients, sectors, professions, activityTypes, tags, clientTags, clientActivities, users, agences, historiquePoints, userRoles } from "@shared/schema";
 import { SystemRole } from "@shared/types/roles";
-import { StatutUser, SegmentClient } from "@shared/enum/status-constants";
+import { StatutUser, SegmentClient, TypePiece } from "@shared/enum/status-constants";
 import { type Client, type InsertClient, type ClientTag, type InsertClientTag, type Tag, type InsertTag, type ClientActivity, type InsertClientActivity, type User, type InsertHistoriquePoints } from "@shared/schema";
 import { db } from "../db";
 import { eq, desc, and, isNull, sql, inArray } from "drizzle-orm";
@@ -52,10 +52,15 @@ export interface ClientFull extends Client {
   prenom: string | null;
   email: string | null;
   telephone: string | null;
+  sexe: string | null;
+  dateNaissance: Date | null;
+  lieuNaissance: string | null;
   photoProfile: string | null;
   statut: string;
   // Champs enrichis
-  type_marche_nom?: string | null;
+  sector_nom?: string | null;
+  profession_nom?: string | null;
+  activity_type_nom?: string | null;
   agence_nom?: string | null;
   photoUrl?: string | null;
   // Tags assignés (eager loaded pour la liste)
@@ -74,23 +79,40 @@ export const createClientApiSchema = z.object({
   telephone: z.string().optional().nullable(),
   sexe: z.enum(['M', 'F']).optional().nullable(),
   photoProfile: z.string().optional().nullable(),
+  dateNaissance: z.string().optional().nullable(),
+  lieuNaissance: z.string().optional().nullable(),
+  lieuNaissanceLocalityId: z.preprocess(v => v === '' ? null : v, z.string().uuid().optional().nullable()),
+  lieuNaissanceLocalityType: z.enum(['CITY', 'DISTRICT']).optional().nullable(),
+  nationaliteId: z.preprocess(v => v === '' ? null : v, z.string().uuid().optional().nullable()),
+  paysNaissanceId: z.preprocess(v => v === '' ? null : v, z.string().uuid().optional().nullable()),
 
   // Données métier client
   adresseDomicile: z.string().optional().nullable(),
   lieuActivite: z.string().optional().nullable(),
-  ville: z.string().optional().nullable(),
-  pays: z.string().optional().nullable(),
-  dateNaissance: z.string().optional().nullable(),
+  villeId: z.preprocess(v => v === '' ? null : v, z.string().uuid().optional().nullable()),
+  localityType: z.enum(['CITY', 'DISTRICT']).optional().nullable(),
+  paysResidenceId: z.preprocess(v => v === '' ? null : v, z.string().uuid().optional().nullable()),
+  statutLogement: z.string().optional().nullable(),
   numeroPiece: z.string().optional().nullable(),
-  typePiece: z.string().optional().nullable(),
-  profession: z.string().optional().nullable(),
+  typePiece: z.enum([TypePiece.CNI, TypePiece.PASSPORT, TypePiece.PERMIS_CONDUIRE, TypePiece.CARTE_RESIDENT]).optional().nullable(),
+  dateExpirationPiece: z.string().optional().nullable(),
+  paysEmissionId: z.preprocess(v => v === '' ? null : v, z.string().uuid().optional().nullable()),
+  professionId: z.preprocess(v => v === '' ? null : v, z.string().uuid().optional().nullable()),
+  professionAutreTexte: z.string().optional().nullable(),
   employeur: z.string().optional().nullable(),
-  typeActivite: z.string().optional().nullable(),
+  activityTypeId: z.preprocess(v => v === '' ? null : v, z.string().uuid().optional().nullable()),
+  ancienneteActiviteMois: z.preprocess(v => v === '' || v === undefined || v === null ? null : Number(v), z.number().int().min(0).optional().nullable()),
+  sourceFonds: z.string().optional().nullable(),
   revenuMensuel: z.string().optional().nullable().transform(v => v === '' ? null : v),
   revenuJournalier: z.string().optional().nullable().transform(v => v === '' ? null : v),
   typeRevenu: z.string().optional().nullable(),
+  situationMatrimoniale: z.string().optional().nullable(),
+  nombrePersonnesCharge: z.preprocess(v => v === '' || v === undefined || v === null ? null : Number(v), z.number().int().min(0).optional().nullable()),
+  niveauEducation: z.string().optional().nullable(),
+  typeClient: z.string().optional().default("PARTICULIER"),
   documents: z.any().optional().nullable(),
-  typeMarcheId: z.preprocess(v => v === '' ? null : v, z.string().uuid().optional().nullable()),
+  referencesPersonnes: z.any().optional().nullable(),
+  sectorId: z.preprocess(v => v === '' ? null : v, z.string().uuid().optional().nullable()),
   segment: z.string().optional().default(SegmentClient.STANDARD),
   frequenceCarte: z.string().optional().nullable(),
   latitude: z.string().optional().nullable().transform(v => v === '' ? null : v),
@@ -98,6 +120,11 @@ export const createClientApiSchema = z.object({
   agenceId: z.preprocess(v => v === '' ? null : v, z.string().uuid().optional().nullable()),
   agentReferentId: z.preprocess(v => v === '' ? null : v, z.string().uuid().optional().nullable()),
   statut: z.string().optional().default(StatutUser.ACTIVE),
+  isPep: z.boolean().optional().default(false),
+  pepDetails: z.string().optional().nullable(),
+  consentementDonnees: z.boolean().optional().default(false),
+  clientOrigin: z.string().optional().default("OTHER"),
+  prospectId: z.preprocess(v => v === '' ? null : v, z.string().uuid().optional().nullable()),
   // UUID temporaire utilisé pour les uploads avant la création de l'entité
   tempEntityId: z.string().uuid().optional().nullable(),
 });
@@ -127,15 +154,22 @@ export async function getClient(id: string): Promise<ClientFull | undefined> {
       user_prenom: users.prenom,
       user_email: users.email,
       user_telephone: users.telephone,
+      user_sexe: users.sexe,
+      user_date_naissance: users.dateNaissance,
+      user_lieu_naissance: users.lieuNaissance,
       user_photo_profile: users.photoProfile,
       user_statut: users.statut,
       agence_nom: agences.nom,
-      type_marche_nom: typesMarches.nom,
+      sector_nom: sectors.nom,
+      profession_nom: professions.nom,
+      activity_type_nom: activityTypes.nom,
     })
     .from(clients)
     .leftJoin(users, eq(clients.userId, users.id))
     .leftJoin(agences, eq(clients.agenceId, agences.id))
-    .leftJoin(typesMarches, eq(clients.typeMarcheId, typesMarches.id))
+    .leftJoin(sectors, eq(clients.sectorId, sectors.id))
+    .leftJoin(professions, eq(clients.professionId, professions.id))
+    .leftJoin(activityTypes, eq(clients.activityTypeId, activityTypes.id))
     .where(eq(clients.id, id));
 
   if (result.length === 0) return undefined;
@@ -148,10 +182,15 @@ export async function getClient(id: string): Promise<ClientFull | undefined> {
     prenom: r.user_prenom,
     email: r.user_email,
     telephone: r.user_telephone,
+    sexe: r.user_sexe,
+    dateNaissance: r.user_date_naissance,
+    lieuNaissance: r.user_lieu_naissance,
     photoProfile: r.user_photo_profile,
     statut: r.user_statut || StatutUser.ACTIVE,
     // Champs enrichis
-    type_marche_nom: r.type_marche_nom,
+    sector_nom: r.sector_nom,
+    profession_nom: r.profession_nom,
+    activity_type_nom: r.activity_type_nom,
     agence_nom: r.agence_nom,
     photoUrl: r.user_photo_profile,
   };
@@ -197,18 +236,25 @@ export async function getAllClients(filter: { agence?: string; agenceId?: string
   let query = db
     .select({
       client: clients,
-      type_marche_nom: typesMarches.nom,
+      sector_nom: sectors.nom,
+      profession_nom: professions.nom,
+      activity_type_nom: activityTypes.nom,
       agence_nom: agences.nom,
       // Source de vérité: users
       user_nom: users.nom,
       user_prenom: users.prenom,
       user_email: users.email,
       user_telephone: users.telephone,
+      user_sexe: users.sexe,
+      user_date_naissance: users.dateNaissance,
+      user_lieu_naissance: users.lieuNaissance,
       user_photo_profile: users.photoProfile,
       user_statut: users.statut,
     })
     .from(clients)
-    .leftJoin(typesMarches, eq(clients.typeMarcheId, typesMarches.id))
+    .leftJoin(sectors, eq(clients.sectorId, sectors.id))
+    .leftJoin(professions, eq(clients.professionId, professions.id))
+    .leftJoin(activityTypes, eq(clients.activityTypeId, activityTypes.id))
     .leftJoin(agences, eq(clients.agenceId, agences.id))
     .leftJoin(users, eq(clients.userId, users.id))
     .$dynamic();
@@ -225,9 +271,14 @@ export async function getAllClients(filter: { agence?: string; agenceId?: string
     prenom: r.user_prenom,
     email: r.user_email,
     telephone: r.user_telephone,
+    sexe: r.user_sexe,
+    dateNaissance: r.user_date_naissance,
+    lieuNaissance: r.user_lieu_naissance,
     photoProfile: r.user_photo_profile,
     statut: r.user_statut || StatutUser.ACTIVE,
-    type_marche_nom: r.type_marche_nom,
+    sector_nom: r.sector_nom,
+    profession_nom: r.profession_nom,
+    activity_type_nom: r.activity_type_nom,
     agence_nom: r.agence_nom,
     photoUrl: (() => {
       const url = r.user_photo_profile;
@@ -279,18 +330,28 @@ export async function getClientsPaginated(
       userId: clients.userId,
       adresseDomicile: clients.adresseDomicile,
       lieuActivite: clients.lieuActivite,
-      ville: clients.ville,
-      pays: clients.pays,
-      dateNaissance: clients.dateNaissance,
+      villeId: clients.villeId,
+      paysResidenceId: clients.paysResidenceId,
+      statutLogement: clients.statutLogement,
       numeroPiece: clients.numeroPiece,
       typePiece: clients.typePiece,
-      profession: clients.profession,
+      dateExpirationPiece: clients.dateExpirationPiece,
+      paysEmissionId: clients.paysEmissionId,
+      statutVerificationPiece: clients.statutVerificationPiece,
+      situationMatrimoniale: clients.situationMatrimoniale,
+      nombrePersonnesCharge: clients.nombrePersonnesCharge,
+      niveauEducation: clients.niveauEducation,
+      typeClient: clients.typeClient,
+      sectorId: clients.sectorId,
+      professionId: clients.professionId,
+      professionAutreTexte: clients.professionAutreTexte,
+      activityTypeId: clients.activityTypeId,
       employeur: clients.employeur,
-      typeActivite: clients.typeActivite,
+      ancienneteActiviteMois: clients.ancienneteActiviteMois,
+      sourceFonds: clients.sourceFonds,
       revenuMensuel: clients.revenuMensuel,
       revenuJournalier: clients.revenuJournalier,
       typeRevenu: clients.typeRevenu,
-      typeMarcheId: clients.typeMarcheId,
       segment: clients.segment,
       frequenceCarte: clients.frequenceCarte,
       latitude: clients.latitude,
@@ -305,26 +366,40 @@ export async function getClientsPaginated(
       pointsFidelite: clients.pointsFidelite,
       scoreEngagement: clients.scoreEngagement,
       derniereActivite: clients.derniereActivite,
+      isPep: clients.isPep,
+      isBlacklisted: clients.isBlacklisted,
+      riskLevel: clients.riskLevel,
+      kycStatus: clients.kycStatus,
+      consentementDonnees: clients.consentementDonnees,
+      referencesPersonnes: clients.referencesPersonnes,
+      clientOrigin: clients.clientOrigin,
       agenceId: clients.agenceId,
       agentReferentId: clients.agentReferentId,
       dateAdhesion: clients.dateAdhesion,
-      dateInscription: clients.dateInscription,
       createdBy: clients.createdBy,
       createdAt: clients.createdAt,
       updatedAt: clients.updatedAt,
       deletedAt: clients.deletedAt,
+      version: clients.version,
       // Related fields
-      type_marche_nom: typesMarches.nom,
+      sector_nom: sectors.nom,
+      profession_nom: professions.nom,
+      activity_type_nom: activityTypes.nom,
       agence_nom: agences.nom,
       user_nom: users.nom,
       user_prenom: users.prenom,
       user_email: users.email,
       user_telephone: users.telephone,
+      user_sexe: users.sexe,
+      user_date_naissance: users.dateNaissance,
+      user_lieu_naissance: users.lieuNaissance,
       user_photo_profile: users.photoProfile,
       user_statut: users.statut,
     })
     .from(clients)
-    .leftJoin(typesMarches, eq(clients.typeMarcheId, typesMarches.id))
+    .leftJoin(sectors, eq(clients.sectorId, sectors.id))
+    .leftJoin(professions, eq(clients.professionId, professions.id))
+    .leftJoin(activityTypes, eq(clients.activityTypeId, activityTypes.id))
     .leftJoin(agences, eq(clients.agenceId, agences.id))
     .leftJoin(users, eq(clients.userId, users.id))
     .$dynamic();
@@ -343,18 +418,28 @@ export async function getClientsPaginated(
     userId: r.userId,
     adresseDomicile: r.adresseDomicile,
     lieuActivite: r.lieuActivite,
-    ville: r.ville,
-    pays: r.pays,
-    dateNaissance: r.dateNaissance,
+    villeId: r.villeId,
+    paysResidenceId: r.paysResidenceId,
+    statutLogement: r.statutLogement,
     numeroPiece: r.numeroPiece,
     typePiece: r.typePiece,
-    profession: r.profession,
+    dateExpirationPiece: r.dateExpirationPiece,
+    paysEmissionId: r.paysEmissionId,
+    statutVerificationPiece: r.statutVerificationPiece,
+    situationMatrimoniale: r.situationMatrimoniale,
+    nombrePersonnesCharge: r.nombrePersonnesCharge,
+    niveauEducation: r.niveauEducation,
+    typeClient: r.typeClient,
+    sectorId: r.sectorId,
+    professionId: r.professionId,
+    professionAutreTexte: r.professionAutreTexte,
+    activityTypeId: r.activityTypeId,
     employeur: r.employeur,
-    typeActivite: r.typeActivite,
+    ancienneteActiviteMois: r.ancienneteActiviteMois,
+    sourceFonds: r.sourceFonds,
     revenuMensuel: r.revenuMensuel,
     revenuJournalier: r.revenuJournalier,
     typeRevenu: r.typeRevenu,
-    typeMarcheId: r.typeMarcheId,
     segment: r.segment,
     frequenceCarte: r.frequenceCarte,
     latitude: r.latitude,
@@ -369,23 +454,35 @@ export async function getClientsPaginated(
     pointsFidelite: r.pointsFidelite,
     scoreEngagement: r.scoreEngagement,
     derniereActivite: r.derniereActivite,
+    isPep: r.isPep,
+    isBlacklisted: r.isBlacklisted,
+    riskLevel: r.riskLevel,
+    kycStatus: r.kycStatus,
+    consentementDonnees: r.consentementDonnees,
+    referencesPersonnes: r.referencesPersonnes,
+    clientOrigin: r.clientOrigin,
     agenceId: r.agenceId,
     agentReferentId: r.agentReferentId,
     dateAdhesion: r.dateAdhesion,
-    dateInscription: r.dateInscription,
     createdBy: r.createdBy,
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
     deletedAt: r.deletedAt,
+    version: r.version,
     // Identity fields from users
     nom: r.user_nom || "Client",
     prenom: r.user_prenom,
     email: r.user_email,
     telephone: r.user_telephone,
+    sexe: r.user_sexe,
+    dateNaissance: r.user_date_naissance,
+    lieuNaissance: r.user_lieu_naissance,
     photoProfile: r.user_photo_profile,
     statut: r.user_statut || StatutUser.ACTIVE,
     // Enriched fields
-    type_marche_nom: r.type_marche_nom,
+    sector_nom: r.sector_nom,
+    profession_nom: r.profession_nom,
+    activity_type_nom: r.activity_type_nom,
     agence_nom: r.agence_nom,
     photoUrl: (() => {
       const url = r.user_photo_profile;
@@ -433,6 +530,12 @@ export async function createClient(input: CreateClientApiInput): Promise<Client>
       telephone: input.telephone,
       photoProfile: input.photoProfile,
       sexe: input.sexe,
+      dateNaissance: input.dateNaissance ? new Date(input.dateNaissance) : null,
+      lieuNaissance: input.lieuNaissance,
+      lieuNaissanceLocalityId: input.lieuNaissanceLocalityId,
+      lieuNaissanceLocalityType: input.lieuNaissanceLocalityType,
+      nationaliteId: input.nationaliteId,
+      paysNaissanceId: input.paysNaissanceId,
       typeCompte: "client",
       canLogin: false, // Par défaut, pas d'accès portail
       statut: input.statut || StatutUser.ACTIVE,
@@ -452,25 +555,41 @@ export async function createClient(input: CreateClientApiInput): Promise<Client>
       userId: user.id,
       adresseDomicile: input.adresseDomicile,
       lieuActivite: input.lieuActivite,
-      ville: input.ville,
-      pays: input.pays,
-      dateNaissance: input.dateNaissance,
+      villeId: input.villeId,
+      localityType: input.localityType,
+      paysResidenceId: input.paysResidenceId,
+      statutLogement: input.statutLogement,
       numeroPiece: input.numeroPiece,
       typePiece: input.typePiece,
-      profession: input.profession,
+      dateExpirationPiece: input.dateExpirationPiece ? new Date(input.dateExpirationPiece) : null,
+      paysEmissionId: input.paysEmissionId,
+      professionId: input.professionId,
+      professionAutreTexte: input.professionAutreTexte,
       employeur: input.employeur,
-      typeActivite: input.typeActivite,
+      activityTypeId: input.activityTypeId,
+      ancienneteActiviteMois: input.ancienneteActiviteMois,
+      sourceFonds: input.sourceFonds,
       revenuMensuel: input.revenuMensuel,
       revenuJournalier: input.revenuJournalier,
       typeRevenu: input.typeRevenu,
+      situationMatrimoniale: input.situationMatrimoniale,
+      nombrePersonnesCharge: input.nombrePersonnesCharge,
+      niveauEducation: input.niveauEducation,
+      typeClient: input.typeClient || "PARTICULIER",
       documents: input.documents,
-      typeMarcheId: input.typeMarcheId,
+      referencesPersonnes: input.referencesPersonnes,
+      sectorId: input.sectorId,
       segment: input.segment || SegmentClient.STANDARD,
       frequenceCarte: input.frequenceCarte,
       latitude: input.latitude,
       longitude: input.longitude,
       agenceId: input.agenceId,
       agentReferentId: input.agentReferentId,
+      isPep: input.isPep || false,
+      pepDetails: input.pepDetails,
+      consentementDonnees: input.consentementDonnees || false,
+      clientOrigin: input.clientOrigin || "OTHER",
+      prospectId: input.prospectId,
     }).returning();
 
     return client;
@@ -513,25 +632,41 @@ export async function createClientWithExistingUser(userId: string, input: Omit<C
       userId,
       adresseDomicile: input.adresseDomicile,
       lieuActivite: input.lieuActivite,
-      ville: input.ville,
-      pays: input.pays,
-      dateNaissance: input.dateNaissance,
+      villeId: input.villeId,
+      localityType: input.localityType,
+      paysResidenceId: input.paysResidenceId,
+      statutLogement: input.statutLogement,
       numeroPiece: input.numeroPiece,
       typePiece: input.typePiece,
-      profession: input.profession,
+      dateExpirationPiece: input.dateExpirationPiece ? new Date(input.dateExpirationPiece) : null,
+      paysEmissionId: input.paysEmissionId,
+      professionId: input.professionId,
+      professionAutreTexte: input.professionAutreTexte,
       employeur: input.employeur,
-      typeActivite: input.typeActivite,
+      activityTypeId: input.activityTypeId,
+      ancienneteActiviteMois: input.ancienneteActiviteMois,
+      sourceFonds: input.sourceFonds,
       revenuMensuel: input.revenuMensuel,
       revenuJournalier: input.revenuJournalier,
       typeRevenu: input.typeRevenu,
+      situationMatrimoniale: input.situationMatrimoniale,
+      nombrePersonnesCharge: input.nombrePersonnesCharge,
+      niveauEducation: input.niveauEducation,
+      typeClient: input.typeClient || "PARTICULIER",
       documents: input.documents,
-      typeMarcheId: input.typeMarcheId,
+      referencesPersonnes: input.referencesPersonnes,
+      sectorId: input.sectorId,
       segment: input.segment || SegmentClient.STANDARD,
       frequenceCarte: input.frequenceCarte,
       latitude: input.latitude,
       longitude: input.longitude,
       agenceId: input.agenceId,
       agentReferentId: input.agentReferentId,
+      isPep: input.isPep || false,
+      pepDetails: input.pepDetails,
+      consentementDonnees: input.consentementDonnees || false,
+      clientOrigin: input.clientOrigin || "OTHER",
+      prospectId: input.prospectId,
     }).returning();
 
     // Mettre à jour typeCompte si nécessaire
@@ -556,7 +691,7 @@ export async function createClientWithExistingUser(userId: string, input: Omit<C
  */
 export async function updateClient(id: string, updateData: Partial<CreateClientApiInput>): Promise<ClientFull | undefined> {
   // Séparer les champs d'identité des champs métier
-  const identityFields = ['nom', 'prenom', 'email', 'telephone', 'photoProfile', 'sexe', 'statut'] as const;
+  const identityFields = ['nom', 'prenom', 'email', 'telephone', 'photoProfile', 'sexe', 'statut', 'dateNaissance', 'lieuNaissance', 'lieuNaissanceLocalityId', 'lieuNaissanceLocalityType', 'nationaliteId', 'paysNaissanceId'] as const;
 
   const identityData: Record<string, any> = {};
   const businessData: Record<string, any> = {};
@@ -575,6 +710,9 @@ export async function updateClient(id: string, updateData: Partial<CreateClientA
   }
   if (identityData.prenom !== undefined) {
     identityData.prenom = normalizePrenom(identityData.prenom);
+  }
+  if (identityData.dateNaissance !== undefined) {
+    identityData.dateNaissance = identityData.dateNaissance ? new Date(identityData.dateNaissance) : null;
   }
 
   return await db.transaction(async (tx) => {
@@ -605,15 +743,22 @@ export async function updateClient(id: string, updateData: Partial<CreateClientA
         user_prenom: users.prenom,
         user_email: users.email,
         user_telephone: users.telephone,
+        user_sexe: users.sexe,
+        user_date_naissance: users.dateNaissance,
+        user_lieu_naissance: users.lieuNaissance,
         user_photo_profile: users.photoProfile,
         user_statut: users.statut,
         agence_nom: agences.nom,
-        type_marche_nom: typesMarches.nom,
+        sector_nom: sectors.nom,
+        profession_nom: professions.nom,
+        activity_type_nom: activityTypes.nom,
       })
       .from(clients)
       .leftJoin(users, eq(clients.userId, users.id))
       .leftJoin(agences, eq(clients.agenceId, agences.id))
-      .leftJoin(typesMarches, eq(clients.typeMarcheId, typesMarches.id))
+      .leftJoin(sectors, eq(clients.sectorId, sectors.id))
+      .leftJoin(professions, eq(clients.professionId, professions.id))
+      .leftJoin(activityTypes, eq(clients.activityTypeId, activityTypes.id))
       .where(eq(clients.id, id));
 
     if (result.length === 0) return undefined;
@@ -625,9 +770,14 @@ export async function updateClient(id: string, updateData: Partial<CreateClientA
       prenom: r.user_prenom,
       email: r.user_email,
       telephone: r.user_telephone,
+      sexe: r.user_sexe,
+      dateNaissance: r.user_date_naissance,
+      lieuNaissance: r.user_lieu_naissance,
       photoProfile: r.user_photo_profile,
       statut: r.user_statut || StatutUser.ACTIVE,
-      type_marche_nom: r.type_marche_nom,
+      sector_nom: r.sector_nom,
+      profession_nom: r.profession_nom,
+      activity_type_nom: r.activity_type_nom,
       agence_nom: r.agence_nom,
       photoUrl: r.user_photo_profile,
     };
@@ -670,11 +820,6 @@ export async function deleteClient(id: string): Promise<boolean> {
   } catch (error: any) {
     throw error;
   }
-}
-
-// Types Marches
-export async function getAllTypesMarches(): Promise<any[]> {
-  return db.select().from(typesMarches);
 }
 
 // Tags
@@ -780,8 +925,8 @@ export async function calculateEngagementScore(clientId: string): Promise<number
   const frequenceScore = Math.min(20, (recentActivities.length / 10) * 20);
 
   // Calculate seniority
-  const inscriptionDate = client.dateInscription || new Date();
-  const monthsSinceInscription = (Date.now() - inscriptionDate.getTime()) / (1000 * 60 * 60 * 24 * 30);
+  const inscriptionDate = client.dateAdhesion || client.createdAt || new Date();
+  const monthsSinceInscription = (Date.now() - new Date(inscriptionDate).getTime()) / (1000 * 60 * 60 * 24 * 30);
   const ancienneteScore = Math.min(10, (monthsSinceInscription / 12) * 10);
 
   const totalScore = Math.round(epargneScore + remboursementScore + frequenceScore + ancienneteScore);
@@ -891,25 +1036,41 @@ export async function createClientWithUser(
       userId: user.id,
       adresseDomicile: clientData.adresseDomicile,
       lieuActivite: clientData.lieuActivite,
-      ville: clientData.ville,
-      pays: clientData.pays,
-      dateNaissance: clientData.dateNaissance,
+      villeId: clientData.villeId,
+      localityType: clientData.localityType,
+      paysResidenceId: clientData.paysResidenceId,
+      statutLogement: clientData.statutLogement,
       numeroPiece: clientData.numeroPiece,
       typePiece: clientData.typePiece,
-      profession: clientData.profession,
+      dateExpirationPiece: clientData.dateExpirationPiece ? new Date(clientData.dateExpirationPiece) : null,
+      paysEmissionId: clientData.paysEmissionId,
+      professionId: clientData.professionId,
+      professionAutreTexte: clientData.professionAutreTexte,
       employeur: clientData.employeur,
-      typeActivite: clientData.typeActivite,
+      activityTypeId: clientData.activityTypeId,
+      ancienneteActiviteMois: clientData.ancienneteActiviteMois,
+      sourceFonds: clientData.sourceFonds,
       revenuMensuel: clientData.revenuMensuel,
       revenuJournalier: clientData.revenuJournalier,
       typeRevenu: clientData.typeRevenu,
+      situationMatrimoniale: clientData.situationMatrimoniale,
+      nombrePersonnesCharge: clientData.nombrePersonnesCharge,
+      niveauEducation: clientData.niveauEducation,
+      typeClient: clientData.typeClient || "PARTICULIER",
       documents: clientData.documents,
-      typeMarcheId: clientData.typeMarcheId,
+      referencesPersonnes: clientData.referencesPersonnes,
+      sectorId: clientData.sectorId,
       segment: clientData.segment || SegmentClient.STANDARD,
       frequenceCarte: clientData.frequenceCarte,
       latitude: clientData.latitude,
       longitude: clientData.longitude,
       agenceId: clientData.agenceId,
       agentReferentId: clientData.agentReferentId,
+      isPep: clientData.isPep || false,
+      pepDetails: clientData.pepDetails,
+      consentementDonnees: clientData.consentementDonnees || false,
+      clientOrigin: clientData.clientOrigin || "OTHER",
+      prospectId: clientData.prospectId,
     }).returning();
 
     return { user, client };
@@ -944,25 +1105,41 @@ export async function createClientForUser(userId: string, clientData: Omit<Creat
       userId,
       adresseDomicile: clientData.adresseDomicile,
       lieuActivite: clientData.lieuActivite,
-      ville: clientData.ville,
-      pays: clientData.pays,
-      dateNaissance: clientData.dateNaissance,
+      villeId: clientData.villeId,
+      localityType: clientData.localityType,
+      paysResidenceId: clientData.paysResidenceId,
+      statutLogement: clientData.statutLogement,
       numeroPiece: clientData.numeroPiece,
       typePiece: clientData.typePiece,
-      profession: clientData.profession,
+      dateExpirationPiece: clientData.dateExpirationPiece ? new Date(clientData.dateExpirationPiece) : null,
+      paysEmissionId: clientData.paysEmissionId,
+      professionId: clientData.professionId,
+      professionAutreTexte: clientData.professionAutreTexte,
       employeur: clientData.employeur,
-      typeActivite: clientData.typeActivite,
+      activityTypeId: clientData.activityTypeId,
+      ancienneteActiviteMois: clientData.ancienneteActiviteMois,
+      sourceFonds: clientData.sourceFonds,
       revenuMensuel: clientData.revenuMensuel,
       revenuJournalier: clientData.revenuJournalier,
       typeRevenu: clientData.typeRevenu,
+      situationMatrimoniale: clientData.situationMatrimoniale,
+      nombrePersonnesCharge: clientData.nombrePersonnesCharge,
+      niveauEducation: clientData.niveauEducation,
+      typeClient: clientData.typeClient || "PARTICULIER",
       documents: clientData.documents,
-      typeMarcheId: clientData.typeMarcheId,
+      referencesPersonnes: clientData.referencesPersonnes,
+      sectorId: clientData.sectorId,
       segment: clientData.segment || SegmentClient.STANDARD,
       frequenceCarte: clientData.frequenceCarte,
       latitude: clientData.latitude,
       longitude: clientData.longitude,
       agenceId: clientData.agenceId,
       agentReferentId: clientData.agentReferentId,
+      isPep: clientData.isPep || false,
+      pepDetails: clientData.pepDetails,
+      consentementDonnees: clientData.consentementDonnees || false,
+      clientOrigin: clientData.clientOrigin || "OTHER",
+      prospectId: clientData.prospectId,
     }).returning();
 
     // 2. Vérifier si le rôle CLIENT existe déjà dans userRoles
@@ -1059,7 +1236,7 @@ export async function getClientStats(filter: { agenceId?: string } = {}): Promis
   startOfMonth.setHours(0, 0, 0, 0);
 
   const newClientsConditions = [...conditions];
-  newClientsConditions.push(sql`${clients.dateInscription} >= ${startOfMonth}`);
+  newClientsConditions.push(sql`${clients.dateAdhesion} >= ${startOfMonth}`);
 
   const [newClientsResult] = await db
     .select({ count: sql<number>`count(*)` })
@@ -1112,6 +1289,12 @@ export async function createClientsBulk(clientsData: CreateClientApiInput[]): Pr
          telephone: data.telephone,
          photoProfile: data.photoProfile,
          sexe: data.sexe,
+         dateNaissance: data.dateNaissance ? new Date(data.dateNaissance) : null,
+         lieuNaissance: data.lieuNaissance,
+         lieuNaissanceLocalityId: data.lieuNaissanceLocalityId,
+         lieuNaissanceLocalityType: data.lieuNaissanceLocalityType,
+         nationaliteId: data.nationaliteId,
+         paysNaissanceId: data.paysNaissanceId,
          typeCompte: "client",
          statut: data.statut || StatutUser.ACTIVE,
          canLogin: false,
@@ -1131,25 +1314,41 @@ export async function createClientsBulk(clientsData: CreateClientApiInput[]): Pr
          userId: user.id,
          adresseDomicile: data.adresseDomicile,
          lieuActivite: data.lieuActivite,
-         ville: data.ville,
-         pays: data.pays,
-         dateNaissance: data.dateNaissance,
+         villeId: data.villeId,
+         localityType: data.localityType,
+         paysResidenceId: data.paysResidenceId,
+         statutLogement: data.statutLogement,
          numeroPiece: data.numeroPiece,
          typePiece: data.typePiece,
-         profession: data.profession,
+         dateExpirationPiece: data.dateExpirationPiece ? new Date(data.dateExpirationPiece) : null,
+         paysEmissionId: data.paysEmissionId,
+         professionId: data.professionId,
+         professionAutreTexte: data.professionAutreTexte,
          employeur: data.employeur,
-         typeActivite: data.typeActivite,
+         activityTypeId: data.activityTypeId,
+         ancienneteActiviteMois: data.ancienneteActiviteMois,
+         sourceFonds: data.sourceFonds,
          revenuMensuel: data.revenuMensuel,
          revenuJournalier: data.revenuJournalier,
          typeRevenu: data.typeRevenu,
+         situationMatrimoniale: data.situationMatrimoniale,
+         nombrePersonnesCharge: data.nombrePersonnesCharge,
+         niveauEducation: data.niveauEducation,
+         typeClient: data.typeClient || "PARTICULIER",
          documents: data.documents,
-         typeMarcheId: data.typeMarcheId,
+         referencesPersonnes: data.referencesPersonnes,
+         sectorId: data.sectorId,
          segment: data.segment || SegmentClient.STANDARD,
          frequenceCarte: data.frequenceCarte,
          latitude: data.latitude,
          longitude: data.longitude,
          agenceId: data.agenceId,
          agentReferentId: data.agentReferentId,
+         isPep: data.isPep || false,
+         pepDetails: data.pepDetails,
+         consentementDonnees: data.consentementDonnees || false,
+         clientOrigin: data.clientOrigin || "OTHER",
+         prospectId: data.prospectId,
        }).returning();
 
        results.push(client);

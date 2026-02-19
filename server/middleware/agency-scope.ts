@@ -61,7 +61,6 @@ export const ROUTES_REQUIRING_AGENCY_SCOPE = [
   // MESSAGES / COMMUNICATIONS
   // ============================================
   { method: 'GET', path: '/api/conversations', entityField: 'agenceId', description: 'Conversations' },
-  { method: 'GET', path: '/api/messages', entityField: 'agenceId', description: 'Messages' },
 
   // ============================================
   // RÉÉVALUATIONS
@@ -160,7 +159,6 @@ export function getAgencyScopeConfig(method: string, path: string) {
  *
  * Routes MANQUANT le scope agence (à corriger):
  * - /api/conversations - server/routes/conversations.ts
- * - /api/messages - server/routes/conversations.ts
  * - /api/reevaluations - server/routes/reevaluations.ts (certaines routes)
  * - /api/employes - server/routes/employes.ts (certaines routes GET)
  *

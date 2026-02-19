@@ -1193,7 +1193,7 @@ export function registerAuthRoutes(app: Express) {
     }
 
     // Récupérer les données utilisateur pour les champs non présents en session
-    let userData: { photoProfile?: string | null; telephone?: string | null; adresse?: string | null } = {};
+    let userData: { photoProfile?: string | null; telephone?: string | null; adresse?: string | null; lieuNaissance?: string | null; nationaliteId?: string | null; paysNaissanceId?: string | null; sexe?: string | null; dateNaissance?: Date | null } = {};
     try {
       const user = await storage.getUser(req.session.user.id);
       if (user) {
@@ -1201,6 +1201,11 @@ export function registerAuthRoutes(app: Express) {
           photoProfile: user.photoProfile,
           telephone: user.telephone,
           adresse: user.adresse,
+          lieuNaissance: user.lieuNaissance,
+          nationaliteId: user.nationaliteId,
+          paysNaissanceId: user.paysNaissanceId,
+          sexe: user.sexe,
+          dateNaissance: user.dateNaissance,
         };
       }
     } catch {

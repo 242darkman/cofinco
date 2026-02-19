@@ -78,7 +78,7 @@ export const checkMaintenanceMode = async (req: Request, res: Response, next: Ne
     return res.status(503).json({ message: "Le module RH est en maintenance.", code: "MAINTENANCE_MODE_MODULE" });
   }
 
-  if (status['MESSAGES'] && path.startsWith('/api/messages')) {
+  if (status['MESSAGES'] && (path.startsWith('/api/messages') || path.startsWith('/api/v2/conversations'))) {
     res.status(503).json({ message: "Le module MESSAGERIE est en maintenance.", code: "MAINTENANCE_MODE_MODULE" });
     return;
   }

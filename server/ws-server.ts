@@ -71,8 +71,8 @@ export type GlobalMessage = {
     // =============================================
     // MESSAGING
     // =============================================
-    // V1 - Messages directs (toujours utilisé dans routes/messages.ts)
-    | "CHAT_MESSAGE" | "TYPING" | "READ_RECEIPT"
+    // V1 - Typing (still used for DM typing indicators)
+    | "TYPING" | "READ_RECEIPT"
     // V2 - Conversations (routes/conversations.ts)
     | "CHAT_MESSAGE_V2" | "TYPING_V2" | "READ_UPDATE"
     | "CONVERSATION_UPDATE" | "MESSAGE_REACTION" | "MESSAGE_DELETED" | "MESSAGE_EDITED"
