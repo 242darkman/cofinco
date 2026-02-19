@@ -112,6 +112,10 @@ export interface StepComponentProps {
   catalogActivityTypes?: { id: string; code: string; nom: string }[];
   catalogLoading?: boolean;
   onCatalogFilter?: (filters: { professionId?: string; sectorId?: string; activityTypeId?: string }) => Promise<void>;
+
+  // Async uniqueness errors
+  onAsyncError?: (field: string, message: string) => void;
+  clearAsyncError?: (field: string) => void;
 }
 
 export interface LocalityItem {

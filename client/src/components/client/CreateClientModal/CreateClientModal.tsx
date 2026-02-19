@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { X } from 'lucide-react';
 import { isAdminRole } from '@shared/types/roles';
 import { useUserProfile } from '../../../hooks/useUserProfile';
@@ -52,6 +52,7 @@ export default function CreateClientModal({ isOpen, onClose, onSave, fromEmploye
   const [direction, setDirection] = useState<'forward' | 'backward'>('forward');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+  const [asyncErrors, setAsyncErrors] = useState<Record<string, string>>({});
 
   const { formData, files, setFiles, updateField, clearDraft, resetForm } = useWizardForm(fromEmployee);
   const { errors, markTouched, isStepValid, isFormValid } = useWizardValidation(formData, files, isAdmin, isConversion);
@@ -59,12 +60,30 @@ export default function CreateClientModal({ isOpen, onClose, onSave, fromEmploye
   const referenceData = useReferenceData(isOpen, isAdmin);
   const { professions: catalogProfessions, sectors: catalogSectors, activityTypes: catalogActivityTypes, loading: catalogLoading, fetchFiltered: fetchCatalogFiltered } = useCatalogOptions(isOpen);
 
+  const handleAsyncError = useCallback((field: string, message: string) => {
+    setAsyncErrors(prev => ({ ...prev, [field]: message }));
+  }, []);
+
+  const handleClearAsyncError = useCallback((field: string) => {
+    setAsyncErrors(prev => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  }, []);
+
+  const mergedErrors = useMemo(() => ({ ...errors, ...asyncErrors }), [errors, asyncErrors]);
+  const hasAsyncErrors = Object.keys(asyncErrors).length > 0;
+
   const stepProps = {
-    formData, updateField, errors, markTouched,
+    formData, updateField, errors: mergedErrors, markTouched,
     isConversion, isAdmin, referenceData,
     files, setFiles,
     catalogProfessions, catalogSectors, catalogActivityTypes, catalogLoading,
     onCatalogFilter: fetchCatalogFiltered,
+    onAsyncError: handleAsyncError,
+    clearAsyncError: handleClearAsyncError,
   };
 
   const handleClose = () => {
@@ -81,6 +100,34 @@ export default function CreateClientModal({ isOpen, onClose, onSave, fromEmploye
     setIsSubmitting(true);
 
     try {
+      // Pre-submit uniqueness check
+      const uniqueRes = await fetch('/api/clients/check-uniqueness', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          telephone: formData.telephone || undefined,
+          email: formData.email || undefined,
+          numeroPiece: formData.numeroPiece || undefined,
+        }),
+      });
+      const uniqueData = await uniqueRes.json();
+      if (!uniqueData.available) {
+        const errorField = uniqueData.field === 'telephone' ? 'telephoneRaw' : uniqueData.field;
+        handleAsyncError(errorField, uniqueData.message);
+        toast.error(uniqueData.message);
+        // Navigate to the step containing the conflicting field
+        if (uniqueData.field === 'telephone' || uniqueData.field === 'email') {
+          setDirection('backward');
+          setStep(2);
+        } else if (uniqueData.field === 'numeroPiece') {
+          setDirection('backward');
+          setStep(6);
+        }
+        setIsSubmitting(false);
+        return;
+      }
+
       // Upload files
       let photoProfileKey: string | null = null;
       const documents: any[] = [];
@@ -297,7 +344,7 @@ export default function CreateClientModal({ isOpen, onClose, onSave, fromEmploye
             setStep={setStep}
             setDirection={setDirection}
             isStepValid={isStepValid}
-            isFormValid={isFormValid}
+            isFormValid={isFormValid && !hasAsyncErrors}
             isSubmitting={isSubmitting}
             isConversion={isConversion}
             onSave={handleSave}

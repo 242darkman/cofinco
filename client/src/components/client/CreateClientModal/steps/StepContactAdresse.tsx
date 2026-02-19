@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect, useRef } from 'react';
+import React, { useMemo, useEffect, useRef, useCallback } from 'react';
 import { FormField, SelectField, SearchableSelect } from '../../../ui';
 import PhoneInput from '../components/PhoneInput';
 import { STATUT_LOGEMENT_OPTIONS } from '@shared/enum/status-constants';
@@ -6,6 +6,7 @@ import type { StepComponentProps } from '../types';
 
 export default function StepContactAdresse({
   formData, updateField, errors, markTouched, isConversion, referenceData,
+  onAsyncError, clearAsyncError,
 }: StepComponentProps) {
   const paysOptions = referenceData.paysList.map(p => ({
     value: p.id,
@@ -56,6 +57,64 @@ export default function StepContactAdresse({
     updateField('localityType', type);
   };
 
+  // Clear async errors when user modifies the field
+  const prevPhoneRef = useRef(formData.telephoneRaw);
+  const prevEmailRef = useRef(formData.email);
+  useEffect(() => {
+    if (formData.telephoneRaw !== prevPhoneRef.current) {
+      prevPhoneRef.current = formData.telephoneRaw;
+      clearAsyncError?.('telephoneRaw');
+    }
+  }, [formData.telephoneRaw, clearAsyncError]);
+  useEffect(() => {
+    if (formData.email !== prevEmailRef.current) {
+      prevEmailRef.current = formData.email;
+      clearAsyncError?.('email');
+    }
+  }, [formData.email, clearAsyncError]);
+
+  // Real-time uniqueness check on blur
+  const checkingRef = useRef(false);
+  const handlePhoneBlur = useCallback(async () => {
+    markTouched('telephoneRaw');
+    if (!formData.telephone || formData.telephoneRaw.length < 6 || !onAsyncError) return;
+    if (checkingRef.current) return;
+    checkingRef.current = true;
+    try {
+      const res = await fetch('/api/clients/check-uniqueness', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ telephone: formData.telephone }),
+      });
+      const data = await res.json();
+      if (!data.available && data.field === 'telephone') {
+        onAsyncError('telephoneRaw', data.message);
+      }
+    } catch { /* ignore network errors */ }
+    finally { checkingRef.current = false; }
+  }, [formData.telephone, formData.telephoneRaw, markTouched, onAsyncError]);
+
+  const handleEmailBlur = useCallback(async () => {
+    markTouched('email');
+    if (!formData.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email) || !onAsyncError) return;
+    if (checkingRef.current) return;
+    checkingRef.current = true;
+    try {
+      const res = await fetch('/api/clients/check-uniqueness', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email: formData.email }),
+      });
+      const data = await res.json();
+      if (!data.available && data.field === 'email') {
+        onAsyncError('email', data.message);
+      }
+    } catch { /* ignore network errors */ }
+    finally { checkingRef.current = false; }
+  }, [formData.email, markTouched, onAsyncError]);
+
   return (
     <div className="space-y-5">
       {/* Téléphone & Email */}
@@ -63,14 +122,14 @@ export default function StepContactAdresse({
         <PhoneInput
           value={formData.telephoneRaw}
           onChange={(raw, full) => { updateField('telephoneRaw', raw); updateField('telephone', full); }}
-          onBlur={() => markTouched('telephoneRaw')}
+          onBlur={handlePhoneBlur}
           error={errors.telephoneRaw}
           disabled={isConversion}
         />
         <FormField
           label="Email" name="email" type="email" value={formData.email}
           onChange={(e) => updateField('email', e.target.value)}
-          onBlur={() => markTouched('email')}
+          onBlur={handleEmailBlur}
           error={errors.email} readOnly={isConversion} className="py-1"
           placeholder="jean.malonga@email.com"
         />
