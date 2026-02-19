@@ -123,7 +123,7 @@ export default function TontineDistributions({ tontineId, montantContribution, t
         setTurns(turnsData || []);
       }
     } catch (error) {
-      toast.error(handleApiError(error, 'Erreur lors du chargement'));
+      toast.error(handleApiError(error, 'Erreur lors du chargement des distributions'));
     } finally {
       setLoading(false);
     }

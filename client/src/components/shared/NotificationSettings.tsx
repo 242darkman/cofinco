@@ -155,9 +155,10 @@ export default function NotificationSettings() {
                {t('notifications.threshold') || 'Seuil d\'alerte'} (FC)
              </label>
              <input
-               type="number"
+               inputMode="numeric"
+               pattern="[0-9]*"
                value={preferences.lowBalanceThreshold}
-               onChange={(e) => handleInputChange('lowBalanceThreshold', e.target.value)}
+               onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); handleInputChange('lowBalanceThreshold', v); }}
                className="px-4 py-2 bg-surface-base border border-edge-strong rounded-xl text-content-primary focus:ring-2 focus:ring-status-success w-full max-w-xs transition-all"
                placeholder="Ex: 10000"
              />
@@ -178,9 +179,10 @@ export default function NotificationSettings() {
                {t('notifications.amount_threshold') || 'Montant déclencheur'} (FC)
              </label>
              <input
-               type="number"
+               inputMode="numeric"
+               pattern="[0-9]*"
                value={preferences.largeTransactionThreshold}
-               onChange={(e) => handleInputChange('largeTransactionThreshold', e.target.value)}
+               onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); handleInputChange('largeTransactionThreshold', v); }}
                className="px-4 py-2 bg-surface-base border border-edge-strong rounded-xl text-content-primary focus:ring-2 focus:ring-status-success w-full max-w-xs transition-all"
                placeholder="Ex: 100000"
              />

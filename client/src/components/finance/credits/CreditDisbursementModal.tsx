@@ -187,7 +187,7 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
         provider: disbursementChannel === DisbursementChannel.MOBILE_MONEY ? mobileProvider : undefined
       });
 
-      toast.success(result.message || 'Crédit décaissé avec succès');
+      toast.success(result.message || 'Crédit décaissé');
 
       // Afficher un message différent selon le canal
       if (result.disbursementChannel === 'CASH') {
@@ -998,9 +998,10 @@ function TransfertInterCoffresFormWithPrefill({
             <label className="text-xs font-medium text-content-muted uppercase">Montant ({currencyCode()}) *</label>
             <div className="relative">
               <input
-                type="number"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={montant}
-                onChange={(e) => setMontant(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => { const v = e.target.value.replace(/[^0-9]/g, ''); setMontant(v); }}
                 placeholder="0"
                 className={`w-full pl-4 pr-16 py-4 bg-surface-base border rounded-xl text-2xl font-bold text-content-primary focus:ring-2 focus:ring-accent/30 outline-none transition-all ${
                   errors.montant ? 'border-status-danger' : 'border-edge focus:border-accent'

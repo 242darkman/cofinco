@@ -156,7 +156,7 @@ export default function ScheduledCaisseTransfersPanel({
     setExecuting(id);
     try {
       await scheduledCaisseTransfersApi.execute(id);
-      toast.success('Transfert exécuté avec succès');
+      toast.success('Transfert exécuté');
       fetchTransfers();
       onTransferExecuted?.();
     } catch (error: any) {
@@ -387,9 +387,10 @@ export default function ScheduledCaisseTransfersPanel({
           <FormField
             label="Montant (FCFA)"
             name="montant"
-            type="number"
+            inputMode="numeric"
+            pattern="[0-9]*"
             value={formData.montant}
-            onChange={(e) => setFormData({ ...formData, montant: e.target.value })}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormData({ ...formData, montant: v }); }}
             placeholder="Ex: 500000"
             required
           />
@@ -430,11 +431,10 @@ export default function ScheduledCaisseTransfersPanel({
             <FormField
               label="Jour du mois (1-31)"
               name="jourMois"
-              type="number"
-              min={1}
-              max={31}
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={formData.jourMois}
-              onChange={(e) => setFormData({ ...formData, jourMois: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormData({ ...formData, jourMois: v }); }}
               placeholder="Ex: 15"
             />
           )}
@@ -443,10 +443,10 @@ export default function ScheduledCaisseTransfersPanel({
             <FormField
               label="Nombre max d'exécutions (optionnel)"
               name="maxExecutions"
-              type="number"
-              min={1}
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={formData.maxExecutions}
-              onChange={(e) => setFormData({ ...formData, maxExecutions: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormData({ ...formData, maxExecutions: v }); }}
               placeholder="Laisser vide pour illimité"
             />
           )}

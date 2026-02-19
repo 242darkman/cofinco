@@ -124,7 +124,7 @@ export default function OperationsApprovalList({ onModuleChange }: OperationsApp
 
     } catch (error: any) {
       console.error('Erreur chargement opérations:', error);
-      toast.error('Erreur lors du chargement');
+      toast.error('Erreur lors du chargement des opérations');
     } finally {
       setLoading(false);
       setRefreshing(false);

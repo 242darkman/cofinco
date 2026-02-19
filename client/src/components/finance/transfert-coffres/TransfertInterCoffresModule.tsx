@@ -268,7 +268,7 @@ export default function TransfertInterCoffresModule({
   // Actions
   const handleCreateSuccess = async (transfert: any) => {
     setShowCreateForm(false);
-    toast.success('Transfert créé avec succès');
+    toast.success('Transfert créé');
     await loadTransferts();
   };
 

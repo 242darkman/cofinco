@@ -659,7 +659,7 @@ function ClosingView({ session, mode, onUpdated }: {
         montantRetourne: montantPhysique,
         ecartJustification: ecartJustification.trim() || undefined,
       });
-      toast.success('Session clôturée avec succès');
+      toast.success('Session clôturée');
       onUpdated();
     } catch (err: any) {
       toast.error(err.message || 'Erreur lors de la finalisation');

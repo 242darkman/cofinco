@@ -206,24 +206,18 @@ export default function PayrollConfigPanel() {
             <div>
               <label className="block text-[10px] text-content-muted mb-1">Part employé (%)</label>
               <input
-                type="number"
-                step="0.01"
-                min="0"
-                max="100"
+                inputMode="decimal"
                 value={cnssEmployee}
-                onChange={(e) => setCnssEmployee(e.target.value)}
+                onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); setCnssEmployee(v); }}
                 className="w-full px-2 py-1.5 bg-surface-base border border-edge rounded text-sm text-content-primary font-mono focus:ring-1 focus:ring-status-info/50 outline-none"
               />
             </div>
             <div>
               <label className="block text-[10px] text-content-muted mb-1">Part employeur (%)</label>
               <input
-                type="number"
-                step="0.01"
-                min="0"
-                max="100"
+                inputMode="decimal"
                 value={cnssEmployer}
-                onChange={(e) => setCnssEmployer(e.target.value)}
+                onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); setCnssEmployer(v); }}
                 className="w-full px-2 py-1.5 bg-surface-base border border-edge rounded text-sm text-content-primary font-mono focus:ring-1 focus:ring-status-info/50 outline-none"
               />
             </div>
@@ -243,22 +237,20 @@ export default function PayrollConfigPanel() {
             <div>
               <label className="block text-[10px] text-content-muted mb-1">Transport (CDF)</label>
               <input
-                type="number"
-                min="0"
-                step="1000"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={transportAllowance}
-                onChange={(e) => setTransportAllowance(e.target.value)}
+                onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setTransportAllowance(v); }}
                 className="w-full px-2 py-1.5 bg-surface-base border border-edge rounded text-sm text-content-primary font-mono focus:ring-1 focus:ring-status-success/50 outline-none"
               />
             </div>
             <div>
               <label className="block text-[10px] text-content-muted mb-1">Logement (CDF)</label>
               <input
-                type="number"
-                min="0"
-                step="1000"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={housingAllowance}
-                onChange={(e) => setHousingAllowance(e.target.value)}
+                onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setHousingAllowance(v); }}
                 className="w-full px-2 py-1.5 bg-surface-base border border-edge rounded text-sm text-content-primary font-mono focus:ring-1 focus:ring-status-success/50 outline-none"
               />
             </div>
@@ -275,33 +267,27 @@ export default function PayrollConfigPanel() {
             <div>
               <label className="block text-[10px] text-content-muted mb-1">Heures sup. (x)</label>
               <input
-                type="number"
-                step="0.05"
-                min="1"
+                inputMode="decimal"
                 value={overtimeRate}
-                onChange={(e) => setOvertimeRate(e.target.value)}
+                onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); setOvertimeRate(v); }}
                 className="w-full px-2 py-1.5 bg-surface-base border border-edge rounded text-sm text-content-primary font-mono focus:ring-1 focus:ring-status-info/50 outline-none"
               />
             </div>
             <div>
               <label className="block text-[10px] text-content-muted mb-1">Nuit (x)</label>
               <input
-                type="number"
-                step="0.05"
-                min="1"
+                inputMode="decimal"
                 value={nightShiftRate}
-                onChange={(e) => setNightShiftRate(e.target.value)}
+                onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); setNightShiftRate(v); }}
                 className="w-full px-2 py-1.5 bg-surface-base border border-edge rounded text-sm text-content-primary font-mono focus:ring-1 focus:ring-status-info/50 outline-none"
               />
             </div>
             <div>
               <label className="block text-[10px] text-content-muted mb-1">Jours fériés (x)</label>
               <input
-                type="number"
-                step="0.05"
-                min="1"
+                inputMode="decimal"
                 value={holidayRate}
-                onChange={(e) => setHolidayRate(e.target.value)}
+                onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); setHolidayRate(v); }}
                 className="w-full px-2 py-1.5 bg-surface-base border border-edge rounded text-sm text-content-primary font-mono focus:ring-1 focus:ring-status-info/50 outline-none"
               />
             </div>
@@ -341,28 +327,25 @@ export default function PayrollConfigPanel() {
             {sortedBrackets.map((bracket, index) => (
               <div key={index} className="grid grid-cols-[1fr_1fr_100px_40px] gap-2 items-center">
                 <input
-                  type="number"
-                  min="0"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   value={bracket.min}
-                  onChange={(e) => updateBracket(index, 'min', e.target.value)}
+                  onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); updateBracket(index, 'min', v); }}
                   className="w-full px-2 py-1.5 bg-surface-base border border-edge rounded text-xs text-content-primary font-mono focus:ring-1 focus:ring-status-warning/50 outline-none"
                 />
                 <input
-                  type="number"
-                  min="0"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   value={bracket.max ?? ''}
                   placeholder={index === sortedBrackets.length - 1 ? '∞' : ''}
-                  onChange={(e) => updateBracket(index, 'max', e.target.value)}
+                  onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); updateBracket(index, 'max', v); }}
                   disabled={index === sortedBrackets.length - 1}
                   className="w-full px-2 py-1.5 bg-surface-base border border-edge rounded text-xs text-content-primary font-mono focus:ring-1 focus:ring-status-warning/50 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                 />
                 <input
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="100"
+                  inputMode="decimal"
                   value={(bracket.rate * 100).toFixed(1)}
-                  onChange={(e) => updateBracket(index, 'rate', e.target.value)}
+                  onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); updateBracket(index, 'rate', v); }}
                   className="w-full px-2 py-1.5 bg-surface-base border border-edge rounded text-xs text-content-primary font-mono focus:ring-1 focus:ring-status-warning/50 outline-none"
                 />
                 <button
@@ -413,11 +396,10 @@ function IprSimulator({ brackets }: { brackets: IprBracket[] }) {
       <div>
         <label className="block text-[10px] text-content-muted mb-1">Simuler sur un salaire</label>
         <input
-          type="number"
-          min="0"
-          step="100000"
+          inputMode="numeric"
+          pattern="[0-9]*"
           value={testSalary}
-          onChange={(e) => setTestSalary(e.target.value)}
+          onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setTestSalary(v); }}
           className="w-44 px-2 py-1.5 bg-surface-base border border-edge rounded text-xs text-content-primary font-mono focus:ring-1 focus:ring-status-warning/50 outline-none"
         />
       </div>

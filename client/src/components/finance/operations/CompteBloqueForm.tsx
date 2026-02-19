@@ -114,7 +114,7 @@ export default function CompteBloqueForm({ onClose, onSuccess, clientId }: Compt
         statut: StatutCompte.ACTIVE
       });
 
-      toast.success('Compte bloqué créé avec succès');
+      toast.success('Compte bloqué créé');
       onSuccess();
     } catch (error) {
       toast.error(handleApiError(error, 'Erreur lors de la création du compte'));
@@ -179,9 +179,10 @@ export default function CompteBloqueForm({ onClose, onSuccess, clientId }: Compt
                 Montant à Bloquer (FC) *
               </label>
               <input
-                type="number"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={formData.montant_initial}
-                onChange={(e) => setFormData({ ...formData, montant_initial: e.target.value })}
+                onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormData({ ...formData, montant_initial: v }); }}
                 className={`w-full bg-surface-elevated border ${errors.montant_initial ? 'border-status-info' : 'border-edge-strong'} rounded-lg px-4 py-3 text-content-primary text-lg`}
                 placeholder="Montant minimum requis"
               />
@@ -213,10 +214,9 @@ export default function CompteBloqueForm({ onClose, onSuccess, clientId }: Compt
                 Taux d'Intérêt Annuel (%) *
               </label>
               <input
-                type="number"
-                step="0.1"
+                inputMode="decimal"
                 value={formData.taux_interet}
-                onChange={(e) => setFormData({ ...formData, taux_interet: e.target.value })}
+                onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); setFormData({ ...formData, taux_interet: v }); }}
                 className={`w-full bg-surface-elevated border ${errors.taux_interet ? 'border-status-info' : 'border-edge-strong'} rounded-lg px-4 py-3 text-content-primary`}
                 placeholder="8.0"
               />
@@ -228,10 +228,9 @@ export default function CompteBloqueForm({ onClose, onSuccess, clientId }: Compt
                 Pénalité Retrait Anticipé (%)
               </label>
               <input
-                type="number"
-                step="0.1"
+                inputMode="decimal"
                 value={formData.penalite_retrait_anticipe}
-                onChange={(e) => setFormData({ ...formData, penalite_retrait_anticipe: e.target.value })}
+                onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); setFormData({ ...formData, penalite_retrait_anticipe: v }); }}
                 className="w-full bg-surface-elevated border border-edge-strong rounded-lg px-4 py-3 text-content-primary"
                 placeholder="10"
               />

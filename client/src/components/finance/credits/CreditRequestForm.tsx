@@ -667,10 +667,11 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
                 <div className="flex-1 flex flex-col justify-center pb-4">
                    <label className="text-center text-xs font-bold text-content-muted uppercase tracking-wider mb-4">{label('Montant Demandé')}</label>
                    <div className="relative max-w-sm mx-auto w-full">
-                      <input 
-                        type="number" 
+                      <input
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         value={formData.montant_demande}
-                        onChange={e => setFormData({...formData, montant_demande: e.target.value})}
+                        onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormData({...formData, montant_demande: v}); }}
                         className={`w-full h-24 bg-surface-base/50 border-2 ${errors.montant_demande ? 'border-status-danger/50' : 'border-edge'} focus:border-accent/50 rounded-2xl pl-8 pr-8 text-5xl font-black text-content-primary text-center outline-none transition-all placeholder:text-content-primary`}
                         placeholder="0"
                         autoFocus
@@ -715,11 +716,12 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
                    {formData.frequence_remboursement ? (
                        <>
                         <div className="flex gap-2 h-14">
-                            <input 
-                                type="number" 
-                                className="flex-1 h-full bg-surface-base border border-edge rounded-xl px-4 text-xl font-bold text-content-primary focus:border-accent outline-none" 
+                            <input
+                                inputMode="numeric"
+                                pattern="[0-9]*"
+                                className="flex-1 h-full bg-surface-base border border-edge rounded-xl px-4 text-xl font-bold text-content-primary focus:border-accent outline-none"
                                 value={formData.duree_valeur}
-                                onChange={e => setFormData({...formData, duree_valeur: e.target.value})}
+                                onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormData({...formData, duree_valeur: v}); }}
                                 placeholder="0"
                             />
                             <div className="w-40 h-full">
@@ -778,18 +780,19 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
                    <div className="space-y-1.5">
                       <label className="text-[10px] font-bold text-content-muted uppercase tracking-wider ml-1">Revenus {formData.type_revenu === 'DAILY' ? '(Journalier)' : '(Mensuel)'}</label>
                       <div className="relative h-12">
-                          <input 
-                            type="number" 
-                            className="w-full h-full bg-surface-base border border-edge rounded-lg pl-4 pr-36 text-content-primary focus:border-accent outline-none" 
-                            placeholder="0" 
+                          <input
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            className="w-full h-full bg-surface-base border border-edge rounded-lg pl-4 pr-36 text-content-primary focus:border-accent outline-none"
+                            placeholder="0"
                             value={formData.type_revenu === 'DAILY' ? formData.revenu_journalier : formData.revenus_mensuels}
                             onChange={(e) => {
+                                const v = e.target.value.replace(/[^0-9]/g, '');
                                 if (formData.type_revenu === 'DAILY') {
-                                   const j = e.target.value;
-                                   const m = j ? (parseFloat(j) * 26).toString() : '';
-                                   setFormData({ ...formData, revenu_journalier: j, revenus_mensuels: m });
+                                   const m = v ? (parseFloat(v) * 26).toString() : '';
+                                   setFormData({ ...formData, revenu_journalier: v, revenus_mensuels: m });
                                 } else {
-                                   setFormData({ ...formData, revenus_mensuels: e.target.value });
+                                   setFormData({ ...formData, revenus_mensuels: v });
                                 }
                             }}
                           />
@@ -829,21 +832,22 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
                    </div>
                    <div className="space-y-1.5">
                       <label className="text-[10px] font-bold text-content-muted uppercase tracking-wider ml-1">Charges Mensuelles</label>
-                      <input 
-                        type="number" 
-                        className="w-full h-12 bg-surface-base border border-edge rounded-lg px-4 text-content-primary focus:border-accent outline-none" 
-                        placeholder="0" 
+                      <input
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        className="w-full h-12 bg-surface-base border border-edge rounded-lg px-4 text-content-primary focus:border-accent outline-none"
+                        placeholder="0"
                         value={formData.charges_mensuelles}
-                        onChange={e => setFormData({...formData, charges_mensuelles: e.target.value})}
+                        onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormData({...formData, charges_mensuelles: v}); }}
                       />
                    </div>
                    <div className="space-y-1.5">
                       <label className="text-[10px] font-bold text-content-muted uppercase tracking-wider ml-1">Taux d'intérêt (%)</label>
-                      <input 
-                        type="number" 
+                      <input
+                        inputMode="decimal"
                         className={`w-full h-12 bg-surface-base border border-edge rounded-lg px-4 text-content-primary ${selectedPlan ? 'text-status-success font-bold' : ''}`}
                         value={formData.taux_interet}
-                        onChange={e => { setRateOverrideEnabled(true); setFormData({...formData, taux_interet: e.target.value}); }}
+                        onChange={e => { const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); setRateOverrideEnabled(true); setFormData({...formData, taux_interet: v}); }}
                         readOnly={!!selectedPlan && !rateOverrideEnabled}
                       />
                    </div>

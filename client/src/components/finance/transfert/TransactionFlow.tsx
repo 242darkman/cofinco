@@ -210,10 +210,10 @@ export default function TransactionFlow() {
         toast.success(
           nextExecution
             ? `Virement programmé. Prochaine exécution: ${new Date(nextExecution).toLocaleString('fr-FR')}`
-            : 'Virement programmé avec succès.'
+            : 'Virement programmé'
         );
       } else {
-        toast.success('Virement exécuté avec succès.');
+        toast.success('Virement exécuté');
       }
 
       // Invalidate transfer history/stats so the History tab refreshes
@@ -388,10 +388,10 @@ export default function TransactionFlow() {
                         : 'border-edge bg-surface focus-within:border-accent'
                     }`}>
                       <input
-                        type="number"
-                        min="0"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
+                        onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setAmount(v); }}
                         placeholder="0"
                         className="w-full bg-transparent px-3 sm:px-4 py-3 sm:py-4 text-xl sm:text-2xl font-bold text-content-primary text-center outline-none placeholder:text-content-muted/30 font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />

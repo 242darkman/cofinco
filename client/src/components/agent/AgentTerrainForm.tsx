@@ -233,14 +233,13 @@ export default function AgentTerrainForm({ onClose, onSuccess, agent }: AgentTer
                <FormField
                   label="Objectif Mensuel (FCFA)"
                   name="objectif_mensuel"
-                  type="number"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   icon={Target}
                   value={formData.objectif_mensuel}
-                  onChange={(e) => setFormData({ ...formData, objectif_mensuel: e.target.value })}
+                  onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormData({ ...formData, objectif_mensuel: v }); }}
                   error={errors.objectif_mensuel}
                   placeholder="500000"
-                  min={0}
-                  step={1000}
                />
             </div>
         </Card>

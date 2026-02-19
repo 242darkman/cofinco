@@ -403,24 +403,24 @@ export default function SaisieEcriture({ onSuccess }: SaisieEcritureProps) {
                   {/* Débit */}
                   <td className="px-3 py-2">
                     <input
-                      type="number"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       value={ligne.debit || ''}
-                      onChange={(e) => updateLigne(index, 'debit', e.target.value)}
+                      onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); updateLigne(index, 'debit', v); }}
                       className="w-full bg-surface-subtle text-content-primary text-xs px-2 py-1.5 rounded-lg text-right font-mono"
-                      placeholder="0.00"
-                      step="0.01"
+                      placeholder="0"
                     />
                   </td>
 
                   {/* Crédit */}
                   <td className="px-3 py-2">
                     <input
-                      type="number"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       value={ligne.credit || ''}
-                      onChange={(e) => updateLigne(index, 'credit', e.target.value)}
+                      onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); updateLigne(index, 'credit', v); }}
                       className="w-full bg-surface-subtle text-content-primary text-xs px-2 py-1.5 rounded-lg text-right font-mono"
-                      placeholder="0.00"
-                      step="0.01"
+                      placeholder="0"
                     />
                   </td>
 

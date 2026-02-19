@@ -168,7 +168,7 @@ export default function CaisseOperationModal({
     const ref = result?.transaction?.reference || result?.transaction?.id;
     if (ref) {
       await navigator.clipboard.writeText(ref);
-      toast.success('Référence copiée');
+      toast.success('Copié', { duration: 1500 });
     }
   };
 
@@ -377,7 +377,8 @@ export default function CaisseOperationModal({
               </label>
               <input
                 ref={amountRef}
-                type="number"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 className={`
                   w-full px-4 py-3 bg-surface-base border rounded-xl text-content-primary text-2xl font-mono font-bold
                   focus:ring-1 outline-none transition-all
@@ -389,9 +390,8 @@ export default function CaisseOperationModal({
                   }
                 `}
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setAmount(v); }}
                 placeholder="0"
-                min="1"
               />
               {(validationErrors.amount || validationErrors.limit) && (
                 <p className="text-xs text-status-danger mt-1 flex items-center gap-1">

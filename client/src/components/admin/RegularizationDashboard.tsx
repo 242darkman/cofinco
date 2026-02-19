@@ -260,7 +260,7 @@ export default function RegularizationDashboard() {
       setTotal(listRes?.pagination?.total || 0);
       setStats(statsRes);
     } catch (err) {
-      if (!isPolling) toast.error(handleApiError(err, 'Erreur lors du chargement'));
+      if (!isPolling) toast.error(handleApiError(err, 'Erreur lors du chargement des régularisations'));
     } finally {
       if (!isPolling) setLoading(false);
     }
@@ -304,7 +304,7 @@ export default function RegularizationDashboard() {
         resolution,
         newStatut: 'RESOLVED',
       });
-      toast.success('Tâche résolue avec succès');
+      toast.success('Tâche résolue');
       setResolveModalOpen(false);
       loadData(true);
     } catch (err: any) {

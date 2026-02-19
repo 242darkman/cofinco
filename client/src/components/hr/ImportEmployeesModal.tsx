@@ -69,7 +69,7 @@ export default function ImportEmployeesModal({ isOpen, onClose, onSuccess }: Imp
       setResult(data);
 
       if (data.created > 0) {
-        toast.success(`${data.created} employé(s) importé(s) avec succès`);
+        toast.success(`${data.created} employé(s) importé(s)`);
         onSuccess();
       }
 

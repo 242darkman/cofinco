@@ -239,7 +239,7 @@ export function useCaisseOperation({
     onSuccess: (data) => {
       setResult(data);
       setPhase('RESULT');
-      toast.success(data.message || `${operationType === 'DEPOT' ? 'Dépôt' : 'Retrait'} effectué avec succès`);
+      toast.success(data.message || `${operationType === 'DEPOT' ? 'Dépôt' : 'Retrait'} effectué`);
 
       // Invalidate relevant queries
       if (client?.id) {
@@ -312,7 +312,7 @@ export function useCaisseOperation({
       setDuplicateWarning(null);
       setResult(data);
       setPhase('RESULT');
-      toast.success(data.message || `${operationType === 'DEPOT' ? 'Dépôt' : 'Retrait'} effectué avec succès`);
+      toast.success(data.message || `${operationType === 'DEPOT' ? 'Dépôt' : 'Retrait'} effectué`);
 
       if (client?.id) {
         queryClient.invalidateQueries({ queryKey: ['clients', client.id] });

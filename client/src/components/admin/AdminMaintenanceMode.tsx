@@ -65,7 +65,7 @@ const AdminMaintenanceMode: React.FC = () => {
         setModules(otherModules);
       }
     } catch (error) {
-      toast.error(handleApiError(error, 'Erreur lors du chargement'));
+      toast.error(handleApiError(error, 'Erreur lors du chargement du statut de maintenance'));
     } finally {
       setLoading(false);
     }

@@ -277,7 +277,7 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
 
       setTakenSession(newSession);
       setStep('payment');
-      toast.success(`Caisse "${selectedCaisse.nom}" ouverte avec succès`);
+      toast.success(`Caisse "${selectedCaisse.nom}" ouverte`);
 
     } catch (err: any) {
       setPinError(err.message || "Erreur lors de l'ouverture de la caisse");

@@ -270,7 +270,7 @@ export default function TransactionDetailsSheet({
     const handleCopyId = () => {
         if (!transaction?.reference) return;
         navigator.clipboard.writeText(transaction.reference);
-        toast.success("Référence copiée !", { duration: 2000 });
+        toast.success("Copié", { duration: 1500 });
     };
 
     // --- Content Renderer (Shared between Drawer & Slideover) ---

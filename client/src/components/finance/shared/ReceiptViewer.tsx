@@ -64,7 +64,7 @@ export const ReceiptViewer: React.FC<ReceiptViewerProps> = ({
       }
     } else {
       await navigator.clipboard.writeText(`${shareData.title}\n${shareData.text}`);
-      toast.success('Détails copiés !');
+      toast.success('Copié', { duration: 1500 });
     }
   };
 

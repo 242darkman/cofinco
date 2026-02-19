@@ -134,7 +134,7 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
           description: 'Contactez un administrateur pour activer votre caisse agent.'
         });
       } else {
-        toast.error('Erreur de chargement');
+        toast.error('Erreur lors du chargement du tableau de bord');
       }
     } finally {
       setLoading(false);
@@ -166,7 +166,7 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
     setShowCollectModal(false);
     setShowSettlementModal(false);
     loadData(false);
-    toast.success('Opération soumise avec succès', {
+    toast.success('Opération soumise', {
       description: 'En attente de validation par un superviseur.'
     });
   };

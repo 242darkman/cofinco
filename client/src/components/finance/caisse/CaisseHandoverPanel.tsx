@@ -416,9 +416,10 @@ export default function CaisseHandoverPanel({
                     Montant compté (XOF)
                   </label>
                   <input
-                    type="number"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={declaredAmount}
-                    onChange={(e) => setDeclaredAmount(Number(e.target.value))}
+                    onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setDeclaredAmount(v ? Number(v) : 0); }}
                     className="w-full px-3 py-2 bg-surface-elevated/50 border border-edge-strong rounded-lg text-content-primary"
                   />
                   <p className="text-xs text-content-muted mt-1">
@@ -517,9 +518,10 @@ export default function CaisseHandoverPanel({
                     Montant vérifié (XOF)
                   </label>
                   <input
-                    type="number"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={verifiedAmount}
-                    onChange={(e) => setVerifiedAmount(Number(e.target.value))}
+                    onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setVerifiedAmount(v ? Number(v) : 0); }}
                     className="w-full px-3 py-2 bg-surface-elevated/50 border border-edge-strong rounded-lg text-content-primary"
                   />
                   {verifiedAmount !== showConfirmModal.montantTheorique && (

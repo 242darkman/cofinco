@@ -117,7 +117,7 @@ export default function NotificationsCaisse({ onClose, compact = false }: Notifi
       });
 
       await traiterNotification(notif.id, `Paiement validé - ${notif.modePaiement}`);
-      alert('Paiement validé avec succès ! Compte actif.');
+      alert('Paiement validé Compte actif.');
     } catch (error: any) {
       alert(`Erreur: ${error.error}`);
     }

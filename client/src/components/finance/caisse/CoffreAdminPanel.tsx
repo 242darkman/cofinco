@@ -75,9 +75,10 @@ const MiniInput = ({ label, value, onChange, placeholder }: {
   <div className="flex-1">
     <label className="text-[10px] text-content-muted uppercase block mb-1 truncate">{label}</label>
     <input
-      type="number"
+      inputMode="numeric"
+      pattern="[0-9]*"
       value={value}
-      onChange={onChange}
+      onChange={(e) => { e.target.value = e.target.value.replace(/[^0-9]/g, ''); onChange(e); }}
       placeholder={placeholder}
       className="w-full px-2 py-1.5 text-[11px] rounded border border-edge bg-surface-base/50 text-content-primary placeholder:text-content-muted focus:border-primary/50 focus:outline-none"
     />

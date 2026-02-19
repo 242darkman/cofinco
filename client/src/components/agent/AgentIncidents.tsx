@@ -198,7 +198,7 @@ export default function AgentIncidents({ agentId }: { agentId?: string }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: agentKeys.incidents(agentId) });
-      toast.success('Incident signalé avec succès');
+      toast.success('Incident signalé');
       setShowForm(false);
       setPendingFiles([]);
       setFormData({

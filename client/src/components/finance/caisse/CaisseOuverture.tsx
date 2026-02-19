@@ -393,7 +393,7 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
         observations,
       });
 
-      setSuccessMessage('Session ouverte avec succès !');
+      setSuccessMessage('Session ouverte');
       queryClient.invalidateQueries({ queryKey: ['session-caisse'] });
 
       setTimeout(() => {
@@ -539,7 +539,7 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
       });
 
       setSession(result.session);
-      setSuccessMessage('Session ouverte avec succès !');
+      setSuccessMessage('Session ouverte');
       queryClient.invalidateQueries({ queryKey: ['session-caisse'] });
 
       setTimeout(() => {
@@ -798,10 +798,11 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                      {/* Input Géant */}
                      <div className="relative group">
                         <span className="absolute left-4 top-1/2 -translate-y-1/2 text-content-muted font-bold text-xl group-focus-within:text-status-success">F</span>
-                        <input 
-                          type="number" 
+                        <input
+                          inputMode="numeric"
+                          pattern="[0-9]*"
                           value={montantDemande}
-                          onChange={(e) => setMontantDemande(Number(e.target.value))}
+                          onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setMontantDemande(v ? Number(v) : 0); }}
                           placeholder="0"
                           className="w-full bg-surface-base border border-edge rounded-xl pl-10 pr-4 py-5 text-3xl font-bold text-content-primary placeholder-content-muted focus:border-status-success focus:ring-1 focus:ring-status-success outline-none transition-all"
                         />
@@ -1039,10 +1040,11 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                         return (
                           <div key={value} className="bg-surface-base border border-edge rounded-xl p-2 focus-within:border-status-success/50 transition-all">
                             <label className="block text-[10px] font-bold text-content-muted uppercase mb-1 ml-1">{value} F</label>
-                            <input 
-                              type="number" 
+                            <input
+                              inputMode="numeric"
+                              pattern="[0-9]*"
                               value={billetage[stateKey as keyof typeof billetage] || ''}
-                              onChange={(e) => setBilletage({ ...billetage, [stateKey]: Number(e.target.value) || 0 })}
+                              onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setBilletage({ ...billetage, [stateKey]: v ? Number(v) : 0 }); }}
                               className="w-full bg-transparent text-content-primary font-bold text-sm outline-none px-1"
                               placeholder="0"
                             />

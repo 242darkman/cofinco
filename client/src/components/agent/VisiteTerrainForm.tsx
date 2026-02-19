@@ -229,14 +229,13 @@ export default function VisiteTerrainForm({ onClose, onSuccess, agentId, clientI
           <FormField
             label={label('Montant Collecté')}
             name="montant_collecte"
-            type="number"
+            inputMode="numeric"
+            pattern="[0-9]*"
             value={formData.montant_collecte}
-            onChange={(e) => setFormData({ ...formData, montant_collecte: e.target.value })}
+            onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormData({ ...formData, montant_collecte: v }); }}
             error={errors.montant_collecte}
             icon={DollarSign}
             placeholder="0"
-            min="0"
-            step="100"
           />
         </div>
 

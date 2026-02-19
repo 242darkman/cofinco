@@ -414,11 +414,10 @@ export default function SecurityCodeManager({ agenceId }: SecurityCodeManagerPro
                         Fréquence de rotation (jours)
                       </label>
                       <input
-                        type="number"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         value={policyDays}
-                        onChange={(e) => setPolicyDays(parseInt(e.target.value) || 30)}
-                        min={1}
-                        max={365}
+                        onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setPolicyDays(v ? parseInt(v) : 30); }}
                         className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-content-primary"
                       />
                     </div>
@@ -427,11 +426,10 @@ export default function SecurityCodeManager({ agenceId }: SecurityCodeManagerPro
                         Notification avant expiration (jours)
                       </label>
                       <input
-                        type="number"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         value={policyNotifyDays}
-                        onChange={(e) => setPolicyNotifyDays(parseInt(e.target.value) || 7)}
-                        min={1}
-                        max={30}
+                        onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setPolicyNotifyDays(v ? parseInt(v) : 7); }}
                         className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-content-primary"
                       />
                     </div>
@@ -440,11 +438,11 @@ export default function SecurityCodeManager({ agenceId }: SecurityCodeManagerPro
                         Max utilisations avant rotation
                       </label>
                       <input
-                        type="number"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         value={policyMaxUsage || ''}
-                        onChange={(e) => setPolicyMaxUsage(parseInt(e.target.value) || undefined)}
+                        onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setPolicyMaxUsage(v ? parseInt(v) : undefined); }}
                         placeholder="Illimité"
-                        min={1}
                         className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-content-primary placeholder-content-muted"
                       />
                     </div>
@@ -630,11 +628,11 @@ export default function SecurityCodeManager({ agenceId }: SecurityCodeManagerPro
                           Max utilisations
                         </label>
                         <input
-                          type="number"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
                           value={newCodeMaxUsages || ''}
-                          onChange={(e) => setNewCodeMaxUsages(parseInt(e.target.value) || undefined)}
+                          onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setNewCodeMaxUsages(v ? parseInt(v) : undefined); }}
                           placeholder="Illimité"
-                          min={1}
                           className="w-full px-3 py-2 bg-surface-elevated/50 border border-edge-strong rounded-lg text-content-primary placeholder-content-muted"
                         />
                       </div>
@@ -643,11 +641,11 @@ export default function SecurityCodeManager({ agenceId }: SecurityCodeManagerPro
                           Expire dans (heures)
                         </label>
                         <input
-                          type="number"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
                           value={newCodeExpiresInHours || ''}
-                          onChange={(e) => setNewCodeExpiresInHours(parseInt(e.target.value) || undefined)}
+                          onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setNewCodeExpiresInHours(v ? parseInt(v) : undefined); }}
                           placeholder="Par défaut"
-                          min={1}
                           className="w-full px-3 py-2 bg-surface-elevated/50 border border-edge-strong rounded-lg text-content-primary placeholder-content-muted"
                         />
                       </div>

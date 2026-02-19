@@ -351,9 +351,10 @@ export default function EvacuationDetail({
                   <div>
                     <label className="block text-[10px] font-bold text-content-muted mb-1">Montant compté (FCFA)</label>
                     <input
-                      type="number"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       value={montantCompte}
-                      onChange={(e) => setMontantCompte(e.target.value)}
+                      onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setMontantCompte(v); }}
                       placeholder={evacuation.montant}
                       className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-status-info/50"
                     />
@@ -437,9 +438,10 @@ export default function EvacuationDetail({
                   <div>
                     <label className="block text-[10px] font-bold text-content-muted mb-1">Montant déposé (FCFA)</label>
                     <input
-                      type="number"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       value={montantDepose}
-                      onChange={(e) => setMontantDepose(e.target.value)}
+                      onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setMontantDepose(v); }}
                       placeholder={evacuation.montant}
                       className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-status-info/50"
                     />
@@ -478,11 +480,13 @@ export default function EvacuationDetail({
                   <div>
                     <label className="block text-[10px] font-bold text-content-muted mb-1">Montant confirmé par destination (FCFA)</label>
                     <input
-                      type="number"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       value={montantConfirme}
                       onChange={(e) => {
-                        setMontantConfirme(e.target.value);
-                        const confirmed = Number(e.target.value);
+                        const v = e.target.value.replace(/[^0-9]/g, '');
+                        setMontantConfirme(v);
+                        const confirmed = Number(v);
                         const original = Number(evacuation.montant);
                         setConforme(confirmed === original);
                       }}

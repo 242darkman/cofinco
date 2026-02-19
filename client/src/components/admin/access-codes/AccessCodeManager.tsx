@@ -120,7 +120,7 @@ export default function AccessCodeManager({ codes, users, onRefresh, onRevoke, o
         <div className="px-3 sm:px-4 py-3 bg-status-success-bg border-b border-status-success/20">
           <div className="flex items-center gap-2 mb-2">
             <Shield size={16} className="text-status-success" />
-            <span className="text-sm font-medium text-status-success">Code généré avec succès</span>
+            <span className="text-sm font-medium text-status-success">Code généré</span>
           </div>
           <div className="flex items-center gap-3">
             <code className="font-mono font-bold text-xl text-status-success bg-status-success-bg px-4 py-2 rounded-lg tracking-wider">

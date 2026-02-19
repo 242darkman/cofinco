@@ -111,10 +111,12 @@ export function ProvisionCoffreModal({
 
             <FormField
               label="Montant (FCFA)"
-              type="number"
+              inputMode="numeric"
+              pattern="[0-9]*"
               placeholder="0"
               required
               {...register('montant')}
+              onInput={(e: React.FormEvent<HTMLInputElement>) => { e.currentTarget.value = e.currentTarget.value.replace(/[^0-9]/g, ''); }}
               error={errors.montant?.message}
             />
 

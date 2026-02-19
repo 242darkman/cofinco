@@ -166,7 +166,7 @@ export default function OnboardingWizard({
         dateEmbauche: employeeData.dateEmbauche,
       });
 
-      toast.success('Employé créé avec succès');
+      toast.success('Employé créé');
       setShowConvertModal(false);
       onComplete?.(result.employe?.id);
       onClose();
@@ -400,9 +400,10 @@ export default function OnboardingWizard({
           <FormField
             label="Salaire de base (FCFA)"
             name="salaireBase"
-            type="number"
+            inputMode="numeric"
+            pattern="[0-9]*"
             value={employeeData.salaireBase}
-            onChange={(e) => setEmployeeData({ ...employeeData, salaireBase: e.target.value })}
+            onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setEmployeeData({ ...employeeData, salaireBase: v }); }}
             placeholder="Ex: 150000"
             required
           />

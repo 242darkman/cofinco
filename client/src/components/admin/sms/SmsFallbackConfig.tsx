@@ -228,11 +228,10 @@ export default function SmsFallbackConfig({
                 Nombre max de tentatives
               </label>
               <input
-                type="number"
-                min={1}
-                max={5}
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={maxRetries}
-                onChange={(e) => setMaxRetries(parseInt(e.target.value) || 1)}
+                onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setMaxRetries(v ? parseInt(v) : 1); }}
                 className="w-full px-4 py-2.5 bg-surface-elevated border border-edge-strong rounded-lg text-content-primary focus:outline-none focus:ring-2 focus:ring-status-info"
               />
               <p className="mt-1 text-xs text-content-muted">Par provider avant basculement</p>
@@ -243,11 +242,10 @@ export default function SmsFallbackConfig({
                 Délai entre tentatives (sec)
               </label>
               <input
-                type="number"
-                min={1}
-                max={60}
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={retryDelaySeconds}
-                onChange={(e) => setRetryDelaySeconds(parseInt(e.target.value) || 5)}
+                onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setRetryDelaySeconds(v ? parseInt(v) : 5); }}
                 className="w-full px-4 py-2.5 bg-surface-elevated border border-edge-strong rounded-lg text-content-primary focus:outline-none focus:ring-2 focus:ring-status-info"
               />
               <p className="mt-1 text-xs text-content-muted">Attente avant nouvelle tentative</p>

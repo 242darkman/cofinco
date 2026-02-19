@@ -65,7 +65,7 @@ export function TransfertCoffreModal({
         agenceId,
       }),
     onSuccess: () => {
-      toast.success("Demande créée avec succès", {
+      toast.success("Demande créée", {
         description: "Votre demande de transfert a été envoyée pour validation."
       });
       queryClient.invalidateQueries({ queryKey: ["transferts-coffre"] });

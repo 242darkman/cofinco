@@ -95,7 +95,7 @@ export default function AdminAgencyReset() {
       await adminApi.resetAgence(selectedAgenceId, { confirmation: confirmCode, deleteEmployees });
       setResetSuccess(true);
       setConfirmCode('');
-      toast.success(`Agence "${preview.agenceName}" réinitialisée avec succès`);
+      toast.success(`Agence "${preview.agenceName}" réinitialisée`);
       // Reload preview to show zeroed counts
       setTimeout(() => loadPreview(selectedAgenceId), 1000);
     } catch (err) {

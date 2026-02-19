@@ -141,7 +141,7 @@ export default function AdminValidationTerrain() {
       });
       
       if (response.ok) {
-        toast.success("Paiement validé avec succès");
+        toast.success("Paiement validé");
         // Optimistic update or wait for invalidation
         queryClient.invalidateQueries({ queryKey: ['/api/paiements-terrain'] });
       } else {
@@ -227,7 +227,7 @@ export default function AdminValidationTerrain() {
         queryClient.invalidateQueries({ queryKey: ['/api/paiements-terrain'] });
 
         if (failCount === 0) {
-          toast.success(`${successCount} paiement(s) validé(s) avec succès`);
+          toast.success(`${successCount} paiement(s) validé(s)`);
         } else {
           toast.warning(`${successCount} validé(s), ${failCount} échoué(s)`);
         }

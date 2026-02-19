@@ -426,9 +426,10 @@ export default function AvantagesManager({
               <FormField
                 label={label('Montant par défaut')}
                 name="montantParDefaut"
-                type="number"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={formData.montantParDefaut.toString()}
-                onChange={(e) => set({ montantParDefaut: parseInt(e.target.value) || 0 })}
+                onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); set({ montantParDefaut: v ? parseInt(v) : 0 }); }}
                 placeholder="50000"
               />
             ) : (
@@ -436,9 +437,9 @@ export default function AvantagesManager({
                 <FormField
                   label="Pourcentage (%)"
                   name="pourcentage"
-                  type="number"
+                  inputMode="decimal"
                   value={formData.pourcentage.toString()}
-                  onChange={(e) => set({ pourcentage: parseFloat(e.target.value) || 0 })}
+                  onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); set({ pourcentage: v === '' ? 0 : parseFloat(v) }); }}
                   placeholder="5.00"
                 />
               </>
@@ -449,9 +450,10 @@ export default function AvantagesManager({
             <FormField
               label={`Plafond max (${currency.symbol}, optionnel)`}
               name="plafond"
-              type="number"
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={formData.plafond ? formData.plafond.toString() : ''}
-              onChange={(e) => set({ plafond: parseInt(e.target.value) || 0 })}
+              onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); set({ plafond: v ? parseInt(v) : 0 }); }}
               placeholder="200000"
             />
           )}

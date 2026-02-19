@@ -165,15 +165,15 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
       const result = await response.json();
       
       if (!response.ok || !result.success) {
-        toast.error(result.error?.message || 'Erreur lors de la création');
+        toast.error(result.error?.message || 'Erreur lors de la création de la réévaluation');
         return;
       }
       
-      toast.success('Réévaluation créée avec succès');
+      toast.success('Réévaluation créée');
       onSuccess(result.reevaluation);
       onClose();
     } catch (err) {
-      toast.error('Erreur lors de la création');
+      toast.error('Erreur lors de la création de la réévaluation');
     } finally {
       setSubmitting(false);
     }
@@ -384,10 +384,11 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
                 <label className="text-xs text-content-muted mb-1 block">Nouveau montant</label>
                 <div className="relative">
                   <input
-                    type="number"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={formData.nouveauMontantDemande}
-                    onChange={(e) => handleNumberChange('nouveauMontantDemande', e.target.value)}
-                    className="w-full bg-surface/50 rounded-lg p-2.5 text-content-primary text-lg font-bold border border-edge focus:border-status-warning focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); handleNumberChange('nouveauMontantDemande', v); }}
+                    className="w-full bg-surface/50 rounded-lg p-2.5 text-content-primary text-lg font-bold border border-edge focus:border-status-warning focus:outline-none"
                     placeholder="0"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-content-muted text-sm">FCFA</span>
@@ -405,16 +406,17 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
                 <div>
                   <label className="text-xs text-content-muted mb-1 block">Durée</label>
                   <input
-                    type="number"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={formData.nouvelleDureeValeur === undefined ? demande.dureeValeur : formData.nouvelleDureeValeur}
                     onChange={(e) => {
-                       const val = e.target.value;
+                       const val = e.target.value.replace(/[^0-9]/g, '');
                        setFormData(prev => ({
                          ...prev,
                          nouvelleDureeValeur: val === '' ? '' : parseInt(val)
                        }));
                     }}
-                    className="w-full bg-surface/50 rounded-lg p-2.5 text-content-primary border border-edge focus:border-status-warning focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    className="w-full bg-surface/50 rounded-lg p-2.5 text-content-primary border border-edge focus:border-status-warning focus:outline-none"
                   />
                 </div>
                 <div>
@@ -479,12 +481,14 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
                       className="w-full bg-surface-base/50 rounded p-2 text-content-primary text-xs border border-edge focus:border-status-warning focus:outline-none"
                     />
                     <input
-                      type="number"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       placeholder="Valeur (FCFA)"
                       value={garantie.valeurEstimee || ''}
                       onChange={(e) => {
+                        const v = e.target.value.replace(/[^0-9]/g, '');
                         const newGaranties = [...formData.garantiesAdditionnelles];
-                        newGaranties[idx] = { ...garantie, valeurEstimee: parseFloat(e.target.value) || 0 };
+                        newGaranties[idx] = { ...garantie, valeurEstimee: v ? parseFloat(v) : 0 };
                         setFormData(prev => ({ ...prev, garantiesAdditionnelles: newGaranties }));
                       }}
                       className="w-full bg-surface-base/50 rounded p-2 text-content-primary text-xs border border-edge focus:border-status-warning focus:outline-none"
@@ -553,19 +557,20 @@ export function ReevaluationModal({ demande, isOpen, onClose, onSuccess }: Props
                   </div>
 
                   <input
-                    type="number"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     placeholder="Revenus mensuels (FCFA)"
                     value={formData.coEmprunteur?.revenusMensuels || ''}
-                    onChange={(e) => setFormData(prev => ({
+                    onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormData(prev => ({
                       ...prev,
                       coEmprunteur: {
                         ...prev.coEmprunteur,
                         nom: prev.coEmprunteur?.nom,
                         relation: prev.coEmprunteur?.relation || '',
-                        revenusMensuels: parseFloat(e.target.value) || 0,
+                        revenusMensuels: v ? parseFloat(v) : 0,
                         consentement: prev.coEmprunteur?.consentement || false
                       }
-                    }))}
+                    })); }}
                     className="w-full bg-surface-base/50 rounded p-2 text-content-primary text-xs border border-edge focus:border-status-info focus:outline-none"
                   />
 

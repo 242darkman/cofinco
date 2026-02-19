@@ -406,28 +406,22 @@ export default function PermissionAnalyticsDashboard() {
             <FormField
               label="Echantillonnage autorises (%)"
               name="samplingRateAllowed"
-              type="number"
-              min={0}
-              max={100}
-              step={0.1}
+              inputMode="decimal"
               value={(configForm.samplingRateAllowed ?? 0.01) * 100}
-              onChange={(e) => setConfigForm({
+              onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); setConfigForm({
                 ...configForm,
-                samplingRateAllowed: parseFloat(e.target.value) / 100
-              })}
+                samplingRateAllowed: v === '' ? 0 : parseFloat(v) / 100
+              }); }}
             />
             <FormField
               label="Echantillonnage refuses (%)"
               name="samplingRateDenied"
-              type="number"
-              min={0}
-              max={100}
-              step={1}
+              inputMode="decimal"
               value={(configForm.samplingRateDenied ?? 1) * 100}
-              onChange={(e) => setConfigForm({
+              onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); setConfigForm({
                 ...configForm,
-                samplingRateDenied: parseFloat(e.target.value) / 100
-              })}
+                samplingRateDenied: v === '' ? 0 : parseFloat(v) / 100
+              }); }}
             />
           </div>
 
@@ -435,41 +429,37 @@ export default function PermissionAnalyticsDashboard() {
             <FormField
               label="Taille batch"
               name="batchSize"
-              type="number"
-              min={1}
-              max={1000}
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={configForm.batchSize ?? 100}
-              onChange={(e) => setConfigForm({
+              onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setConfigForm({
                 ...configForm,
-                batchSize: parseInt(e.target.value)
-              })}
+                batchSize: v ? parseInt(v) : 0
+              }); }}
             />
             <FormField
               label="Intervalle flush (ms)"
               name="flushIntervalMs"
-              type="number"
-              min={1000}
-              max={60000}
-              step={1000}
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={configForm.flushIntervalMs ?? 5000}
-              onChange={(e) => setConfigForm({
+              onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setConfigForm({
                 ...configForm,
-                flushIntervalMs: parseInt(e.target.value)
-              })}
+                flushIntervalMs: v ? parseInt(v) : 0
+              }); }}
             />
           </div>
 
           <FormField
             label="Retention (jours)"
             name="retentionDays"
-            type="number"
-            min={1}
-            max={365}
+            inputMode="numeric"
+            pattern="[0-9]*"
             value={configForm.retentionDays ?? 30}
-            onChange={(e) => setConfigForm({
+            onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setConfigForm({
               ...configForm,
-              retentionDays: parseInt(e.target.value)
-            })}
+              retentionDays: v ? parseInt(v) : 0
+            }); }}
           />
 
           <div className="flex justify-end gap-3 pt-4 border-t border-edge">
@@ -501,11 +491,10 @@ export default function PermissionAnalyticsDashboard() {
           <FormField
             label="Conserver les logs des X derniers jours"
             name="purgeDays"
-            type="number"
-            min={1}
-            max={365}
+            inputMode="numeric"
+            pattern="[0-9]*"
             value={purgeDays}
-            onChange={(e) => setPurgeDays(parseInt(e.target.value))}
+            onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setPurgeDays(v ? parseInt(v) : 0); }}
           />
 
           <div className="flex justify-end gap-3 pt-4 border-t border-edge">

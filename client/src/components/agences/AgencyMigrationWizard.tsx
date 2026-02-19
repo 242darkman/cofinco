@@ -170,7 +170,7 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
   // Handle migration completion
   useEffect(() => {
     if (migrationStatus?.status === 'COMPLETED') {
-      toast.success('Migration terminée avec succès !');
+      toast.success('Migration terminée');
       onSuccess();
     } else if (migrationStatus?.status === 'FAILED') {
       toast.error(`Erreur: ${migrationStatus.error}`);
@@ -258,7 +258,7 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
       return api.post<{ success: boolean; report: any }>(`/agences/migrations/${id}/rollback`);
     },
     onSuccess: () => {
-      toast.success('Rollback effectué avec succès');
+      toast.success('Rollback effectué');
       queryClient.invalidateQueries({ queryKey: ['migration-status', migrationId] });
       onSuccess();
     },
@@ -635,7 +635,7 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
               </div>
               <h3 className="text-xl font-bold text-content-primary">Migration Terminée !</h3>
               <p className="text-content-muted text-center">
-                L'agence {sourceAgence.nom} a été fermée avec succès.<br />
+                L'agence {sourceAgence.nom} a été fermée<br />
                 Toutes les données ont été transférées.
               </p>
 

@@ -1097,10 +1097,10 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                   </label>
                   <div className="relative">
                     <input
-                      type="number"
                       inputMode="numeric"
+                      pattern="[0-9]*"
                       value={formData.montant}
-                      onChange={(e) => setFormData({ ...formData, montant: e.target.value })}
+                      onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormData({ ...formData, montant: v }); }}
                       placeholder="0"
                       className={`
                         w-full h-14 px-4 rounded-xl text-2xl font-bold text-center

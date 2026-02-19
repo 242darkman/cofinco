@@ -98,7 +98,7 @@ function InfoRow({ icon: Icon, label, value, copyable }: {
   const handleCopy = () => {
     if (typeof value === 'string') {
       navigator.clipboard.writeText(value);
-      toast.success('Copié');
+      toast.success('Copié', { duration: 1500 });
     }
   };
 

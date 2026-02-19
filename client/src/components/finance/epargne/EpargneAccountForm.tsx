@@ -382,10 +382,10 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
         toast.success('Compte créé — en attente de validation du chef d\'agence.');
         toast.info('Le compte apparaîtra dans le Centre de Validations.');
       } else if (formData.mode_ouverture === 'CASH' && soldeInitial > 0) {
-        toast.success('Compte créé avec succès !');
+        toast.success('Compte créé');
         toast.info(`Statut: En attente de paiement. Veuillez encaisser ${formatMoney(soldeInitial)} en caisse.`);
       } else {
-        toast.success('Compte créé et activé avec succès !');
+        toast.success('Compte créé et activé');
       }
       onSuccess();
     } catch (error: any) {
@@ -424,7 +424,7 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
           };
           setReceiptData(receipt);
           setShowReceipt(true);
-          toast.success('Paiement réussi ! Compte créé avec succès.');
+          toast.success('Paiement réussi, compte créé');
         } else if (intent.status === 'FAILED') {
           if (pollingRef.current) clearInterval(pollingRef.current);
           pollingRef.current = null;
@@ -863,12 +863,12 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                    <label className="text-xs font-bold text-content-muted uppercase ml-1">Montant ({currencySymbol()})</label>
                    <div className="relative group">
                       <input
-                        type="number"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         value={formData.solde_initial}
-                        onChange={(e) => handleInputChange('solde_initial', e.target.value)}
+                        onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); handleInputChange('solde_initial', v); }}
                         className="w-full h-20 bg-surface-base border-2 border-edge rounded-xl px-6 pr-20 text-4xl font-bold text-content-primary placeholder-content-muted outline-none focus:border-accent transition-all text-right"
                         placeholder="0"
-                        min="0"
                       />
                       <span className="absolute right-6 top-1/2 -translate-y-1/2 text-content-muted font-semibold text-lg pointer-events-none">{currencySymbol()}</span>
                    </div>
@@ -1008,10 +1008,11 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                            {formData.versement_auto_active && (
                              <div className="grid grid-cols-2 gap-3 mt-3 animate-in slide-in-from-top-2">
                                 <input
-                                  type="number"
+                                  inputMode="numeric"
+                                  pattern="[0-9]*"
                                   placeholder="Montant (ex: 50000)"
                                   value={formData.versement_auto_montant}
-                                  onChange={(e) => handleInputChange('versement_auto_montant', e.target.value)}
+                                  onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); handleInputChange('versement_auto_montant', v); }}
                                   className="h-9 bg-surface-base border border-edge rounded-md px-2 text-content-primary text-xs"
                                 />
                                 <select
@@ -1028,10 +1029,10 @@ export default function EpargneAccountForm({ onClose, onSuccess, clientId }: Epa
                                   <div className="flex items-center gap-2 bg-surface-base border border-edge rounded-md px-2 col-span-2">
                                      <span className="text-[10px] text-content-muted uppercase whitespace-nowrap">Jour du mois:</span>
                                      <input
-                                        type="number"
-                                        min="1" max="28"
+                                        inputMode="numeric"
+                                        pattern="[0-9]*"
                                         value={formData.versement_auto_jour}
-                                        onChange={(e) => handleInputChange('versement_auto_jour', e.target.value)}
+                                        onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); handleInputChange('versement_auto_jour', v); }}
                                         className="h-9 bg-transparent border-none text-content-primary text-xs w-full focus:ring-0"
                                      />
                                   </div>

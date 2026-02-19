@@ -102,7 +102,7 @@ export default function TontineRegles({ tontineId }: TontineReglesProps) {
         description: ''
       });
       fetchRegles();
-      toast.success('Règle créée avec succès');
+      toast.success('Règle créée');
     } catch (error) {
       toast.error(handleApiError(error, 'Erreur lors de la création de la règle'));
     } finally {
@@ -116,7 +116,7 @@ export default function TontineRegles({ tontineId }: TontineReglesProps) {
       fetchRegles();
       toast.success(regle.actif ? 'Règle désactivée' : 'Règle activée');
     } catch (error) {
-      toast.error(handleApiError(error, 'Erreur lors de la mise à jour'));
+      toast.error(handleApiError(error, 'Erreur lors de la mise à jour de la règle'));
     }
   }, [fetchRegles]);
 
@@ -131,9 +131,9 @@ export default function TontineRegles({ tontineId }: TontineReglesProps) {
         try {
           await tontineRegleApi.delete(regle.id);
           fetchRegles();
-          toast.success('Règle supprimée avec succès');
+          toast.success('Règle supprimée');
         } catch (error) {
-          toast.error(handleApiError(error, 'Erreur lors de la suppression'));
+          toast.error(handleApiError(error, 'Erreur lors de la suppression de la règle'));
         }
       },
     });
@@ -423,10 +423,10 @@ export default function TontineRegles({ tontineId }: TontineReglesProps) {
                 <FormField
                     label="Montant (FCFA)"
                     name="montant"
-                    type="number"
-                    min="0"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={formData.montant}
-                    onChange={(e) => setFormData(prev => ({ ...prev, montant: Number(e.target.value) }))}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormData(prev => ({ ...prev, montant: v ? Number(v) : 0 })); }}
                 />
 
                 <TextareaField

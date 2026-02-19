@@ -227,7 +227,7 @@ export default function TransfertInterCoffresForm({
         if (!submitResult.success) {
           toast.warning('Transfert créé mais non soumis: ' + (submitResult.error || 'Erreur'));
         } else {
-          toast.success('Transfert créé et soumis avec succès');
+          toast.success('Transfert créé et soumis');
         }
       } else {
         toast.success('Brouillon de transfert créé');
@@ -338,9 +338,10 @@ export default function TransfertInterCoffresForm({
             <label className="text-xs font-medium text-content-muted uppercase">Montant ({currencyCode()}) *</label>
             <div className="relative">
               <input
-                type="number"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={montant}
-                onChange={(e) => setMontant(e.target.value)}
+                onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setMontant(v); }}
                 placeholder="0"
                 className={`w-full pl-4 pr-16 py-4 bg-surface-base border rounded-xl text-2xl font-bold text-content-primary focus:ring-2 focus:ring-accent/30 outline-none transition-all ${
                   errors.montant ? 'border-status-danger' : 'border-edge focus:border-accent'

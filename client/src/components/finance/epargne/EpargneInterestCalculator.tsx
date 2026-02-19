@@ -74,7 +74,7 @@ export default function EpargneInterestCalculator({ compte, onClose, onSuccess }
         observations: `Intérêts créditeurs - ${PERIODE_CONFIG[periode].label} (${tauxInteret}%)`,
       });
 
-      toast.success(`Intérêts de ${formatMoney(interets)} crédités avec succès`);
+      toast.success(`Intérêts de ${formatMoney(interets)} crédités`);
       onSuccess();
     } catch (error) {
       const errorMessage = handleApiError(error, 'Erreur lors du paiement des intérêts');

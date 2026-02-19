@@ -244,7 +244,7 @@ export function AccountActivationModal({
           );
           setReceiptData(receipt);
           setShowReceipt(true);
-          toast.success(`Compte ${account.numeroCompte} activé avec succès !`);
+          toast.success(`Compte ${account.numeroCompte} activé`);
         } else if (intent.status === 'FAILED') {
           if (pollingRef.current) clearInterval(pollingRef.current);
           pollingRef.current = null;
@@ -289,7 +289,7 @@ export function AccountActivationModal({
       );
       setReceiptData(receipt);
       setShowReceipt(true);
-      toast.success(`Compte ${account.numeroCompte} activé avec succès !`);
+      toast.success(`Compte ${account.numeroCompte} activé`);
     } catch (err) {
       const errorMessage = handleApiError(err, 'Erreur lors de l\'activation');
       setError(errorMessage);
@@ -567,9 +567,10 @@ export function AccountActivationModal({
               </label>
               <div className="relative">
                 <input
-                  type="number"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   value={montant}
-                  onChange={(e) => setMontant(e.target.value)}
+                  onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setMontant(v); }}
                   placeholder="0"
                   disabled={loading}
                   className="w-full px-4 py-3 bg-surface border border-edge rounded-xl text-content-primary text-lg font-bold placeholder:text-content-muted focus:border-status-success focus:ring-1 focus:ring-status-success transition-colors disabled:opacity-50"

@@ -34,7 +34,7 @@ const formatMoney = (amount: number, devise = currencySymbol()) => {
 const copyToClipboard = async (text: string, label: string) => {
   try {
     await navigator.clipboard.writeText(text);
-    toast.success(`${label} copié !`);
+    toast.success('Copié', { duration: 1500 });
     return true;
   } catch {
     toast.error('Erreur lors de la copie');

@@ -129,7 +129,7 @@ export default function ClosureApprovals({ agenceId }: ClosureApprovalsProps) {
         const err = await res.json();
         throw new Error(err.message || 'Erreur lors de l\'approbation');
       }
-      toast.success('Clôture approuvée et exécutée avec succès.');
+      toast.success('Clôture approuvée et exécutée');
       setApproveTarget(null);
       fetchPending();
       window.dispatchEvent(new CustomEvent('closure-update'));

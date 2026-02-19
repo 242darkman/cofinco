@@ -173,8 +173,8 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
       });
 
       toast.dismiss(loadingId);
-      toast.success('Transfert initié avec succès');
-      setSuccessMsg('Transfert initié avec succès');
+      toast.success('Transfert initié');
+      setSuccessMsg('Transfert initié');
       setTimeout(() => setSuccessMsg(''), 3000);
 
       setShowForm(false);
@@ -219,7 +219,7 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
       if (pendingAction.type === 'receive') {
         await caisseTransfertApi.receive(pendingAction.transfert.id);
         toast.dismiss(loadingId);
-        toast.success('Transfert reçu avec succès');
+        toast.success('Transfert reçu');
       } else {
         await caisseTransfertApi.cancel(pendingAction.transfert.id);
         toast.dismiss(loadingId);
@@ -704,16 +704,17 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
                   <div className="relative">
                     <input
                       id="montant-transfert"
-                      type="number"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       value={formData.montant}
                       onChange={(e) => {
-                        setFormData({ ...formData, montant: e.target.value });
-                        if (e.target.value) validateMontant(e.target.value);
+                        const v = e.target.value.replace(/[^0-9]/g, '');
+                        setFormData({ ...formData, montant: v });
+                        if (v) validateMontant(v);
                       }}
                       className={`w-full pl-4 pr-12 py-3 bg-surface-base border rounded-xl text-lg font-bold text-content-primary focus:ring-1 focus:ring-accent focus:border-accent outline-none transition-all ${
                         montantError ? 'border-status-danger' : 'border-edge'
                       }`}
-                      min="0"
                       placeholder="0"
                       required
                       aria-required="true"

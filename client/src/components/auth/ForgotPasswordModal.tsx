@@ -480,7 +480,7 @@ export default function ForgotPasswordModal({ isOpen, onClose }: ForgotPasswordM
                     Mot de passe réinitialisé !
                   </h3>
                   <p className="text-content-muted mb-6">
-                    Votre mot de passe a été modifié avec succès.
+                    Votre mot de passe a été modifié
                     <br />
                     Vous pouvez maintenant vous connecter.
                   </p>

@@ -145,11 +145,11 @@ export default function WeightVerificationPanel({ initialBilletage, compact = fa
               {DENOMINATION_LABELS[key] || key}
             </label>
             <input
-              type="number"
-              min="0"
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={billetage[key] || ''}
               placeholder="0"
-              onChange={(e) => updateDenom(key, e.target.value)}
+              onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); updateDenom(key, v); }}
               className="w-full px-2 py-1 bg-surface-base border border-edge rounded text-xs text-content-primary font-mono focus:ring-1 focus:ring-accent/50 outline-none"
             />
           </div>
@@ -167,12 +167,10 @@ export default function WeightVerificationPanel({ initialBilletage, compact = fa
         <div className="flex-1 min-w-[140px]">
           <label className="block text-[10px] text-content-muted mb-0.5">Poids réel mesuré (g)</label>
           <input
-            type="number"
-            step="0.01"
-            min="0"
+            inputMode="decimal"
             value={actualWeight}
             placeholder="Ex: 1250.50"
-            onChange={(e) => { setActualWeight(e.target.value); setResult(null); }}
+            onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); setActualWeight(v); setResult(null); }}
             className="w-full px-2 py-1.5 bg-surface-base border border-edge rounded text-sm text-content-primary font-mono focus:ring-1 focus:ring-accent/50 outline-none"
           />
         </div>

@@ -122,7 +122,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
     try {
       await coffreApi.validateTransfert(id, approved);
       toast.success(approved ? "Transfert validé" : "Transfert rejeté", {
-        description: `Le transfert a été ${approved ? "validé" : "rejeté"} avec succès.`
+        description: `Le transfert a été ${approved ? "validé" : "rejeté"}`
       });
       refetch();
     } catch (e: any) {
@@ -159,7 +159,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
 
       await coffreApi.executeTransfert(id, sessionId);
       toast.success("Transfert exécuté", {
-        description: "Les fonds ont été déplacés avec succès."
+        description: "Les fonds ont été déplacés"
       });
       refetch();
       refetchStats(); // Mise à jour du solde en temps réel
@@ -235,7 +235,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
       if (canBeCancelled) {
         // Simple cancellation for REQUESTED or VALIDATED
         await coffreApi.cancelTransfert(transfertToCancel.id, cancelReason);
-        toast.success('Transfert annulé avec succès');
+        toast.success('Transfert annulé');
       } else if (canReverseWithin24h) {
         // Cancellation with compensation for EXECUTED
         await coffreApi.reverseTransfert(transfertToCancel.id, { reason: cancelReason });
@@ -1431,7 +1431,7 @@ function TransfertDetailPanel({ transfert, onClose }: { transfert: any; onClose:
             if (canBeCancelled) {
                 // Annulation simple pour REQUESTED ou VALIDATED
                 await coffreApi.cancelTransfert(transfert.id, cancelReason);
-                toast.success('Transfert annulé avec succès');
+                toast.success('Transfert annulé');
             } else if (canReverseWithin24h) {
                 // Annulation avec compensation pour EXECUTED
                 await coffreApi.reverseTransfert(transfert.id, { reason: cancelReason });

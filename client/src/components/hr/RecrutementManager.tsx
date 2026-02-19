@@ -184,7 +184,7 @@ export default function RecrutementManager({
     try {
       const result = await onUploadCv(selectedCandidat.id, file);
       if (result) {
-        toast.success('CV uploadé avec succès');
+        toast.success('CV uploadé');
         setSelectedCandidat({ ...selectedCandidat, cvUrl: result.cvUrl });
         if (result.cvDownloadUrl) setCvDownloadUrl(result.cvDownloadUrl);
       } else {
@@ -783,7 +783,7 @@ export default function RecrutementManager({
               setShowOnboarding(false);
               setOnboardingCandidat(null);
               onRefresh?.();
-              toast.success('Employé créé avec succès');
+              toast.success('Employé créé');
             }}
             onClose={() => { setShowOnboarding(false); setOnboardingCandidat(null); }}
           />

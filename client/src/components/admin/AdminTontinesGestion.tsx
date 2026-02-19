@@ -191,10 +191,10 @@ export default function AdminTontinesGestion() {
 
       if (editMode && selectedTontine) {
         await tontineApi.update(selectedTontine.id, tontineData);
-        toast.success('Tontine modifiée avec succès');
+        toast.success('Tontine modifiée');
       } else {
         await tontineApi.create(tontineData);
-        toast.success('Tontine créée avec succès');
+        toast.success('Tontine créée');
       }
 
       await chargerTontines();
@@ -217,11 +217,11 @@ export default function AdminTontinesGestion() {
       onConfirm: async () => {
         try {
           await tontineApi.delete(tontineId);
-          toast.success('Tontine supprimée avec succès');
+          toast.success('Tontine supprimée');
           await chargerTontines();
           setSelectedTontine(null);
         } catch (error) {
-          toast.error(handleApiError(error, 'Erreur lors de la suppression'));
+          toast.error(handleApiError(error, 'Erreur lors de la suppression de la tontine'));
         }
       },
     });
@@ -248,7 +248,7 @@ export default function AdminTontinesGestion() {
         membres_actuels: selectedTontine.membresActuels + 1
       });
 
-      toast.success('Membre ajouté avec succès');
+      toast.success('Membre ajouté');
       await chargerMembres(selectedTontine.id);
       await chargerTontines();
       setShowMembreForm(false);
@@ -276,7 +276,7 @@ export default function AdminTontinesGestion() {
             membres_actuels: Math.max(0, selectedTontine.membresActuels - 1)
           });
 
-          toast.success('Membre retiré avec succès');
+          toast.success('Membre retiré');
           await chargerMembres(selectedTontine.id);
           await chargerTontines();
         } catch (error) {
@@ -521,9 +521,10 @@ export default function AdminTontinesGestion() {
                 <FormField
                   label="Position dans l'ordre"
                   name="position"
-                  type="number"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   value={membreForm.position}
-                  onChange={(e) => setMembreForm({ ...membreForm, position: e.target.value })}
+                  onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setMembreForm({ ...membreForm, position: v }); }}
                   placeholder="1"
                 />
                 <div className="flex items-center gap-4 pt-6">
@@ -679,25 +680,27 @@ export default function AdminTontinesGestion() {
             <FormField
               label="Montant cotisation (FCFA)"
               name="montant_cotisation"
-              type="number"
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={formData.montant_cotisation}
-              onChange={(e) => setFormData({ ...formData, montant_cotisation: e.target.value })}
+              onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormData({ ...formData, montant_cotisation: v }); }}
               placeholder="10000"
             />
             <FormField
               label="Nombre max de membres"
               name="nombre_membres"
-              type="number"
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={formData.nombre_membres}
-              onChange={(e) => setFormData({ ...formData, nombre_membres: e.target.value })}
+              onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormData({ ...formData, nombre_membres: v }); }}
               placeholder="10"
             />
             <FormField
               label="Frais de sortie (%)"
               name="frais_pourcentage"
-              type="number"
+              inputMode="decimal"
               value={formData.frais_pourcentage}
-              onChange={(e) => setFormData({ ...formData, frais_pourcentage: e.target.value })}
+              onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); setFormData({ ...formData, frais_pourcentage: v }); }}
               placeholder="2"
               helperText={<span className="text-[10px]">Pourcentage retenu par la plateforme sur chaque bénéficiaire.</span>}
             />

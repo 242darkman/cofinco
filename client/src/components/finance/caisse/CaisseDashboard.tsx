@@ -933,7 +933,7 @@ export default function CaisseDashboard({
                   <div className="space-y-3">
                     <h2 className="text-3xl font-black text-content-primary tracking-tight">Vault Compté</h2>
                     <p className="text-content-muted max-w-sm mx-auto font-medium leading-relaxed">
-                      Le rapprochement physique a été enregistré avec succès. La session est prête pour l'archivage final.
+                      Le rapprochement physique a été enregistré La session est prête pour l'archivage final.
                     </p>
                     <div className="inline-flex items-center gap-2 px-3 py-1 bg-status-success-bg rounded-full border border-status-success/20 text-[10px] font-black text-status-success uppercase tracking-widest">
                        <Shield size={12} />

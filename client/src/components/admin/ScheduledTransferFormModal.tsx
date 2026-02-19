@@ -356,7 +356,7 @@ export default function ScheduledTransferFormModal({ isOpen, onClose, onSuccess,
       onSuccess();
       onClose();
     } catch (err) {
-      toast.error(handleApiError(err, 'Erreur lors de la création'));
+      toast.error(handleApiError(err, 'Erreur lors de l\'enregistrement du virement'));
     } finally {
       setLoading(false);
     }

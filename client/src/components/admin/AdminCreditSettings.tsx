@@ -73,9 +73,10 @@ export default function AdminCreditSettings() {
             <FormField
               label="Limite d'approbation automatique (FCFA)"
               name="auto_approve_limit"
-              type="number"
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={settings.auto_approve_limit}
-              onChange={(e) => setSettings({...settings, auto_approve_limit: Number(e.target.value)})}
+              onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setSettings({...settings, auto_approve_limit: v ? Number(v) : 0}); }}
               placeholder="0 pour désactiver"
             />
         </div>

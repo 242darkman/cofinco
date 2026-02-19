@@ -157,7 +157,7 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
         throw new Error(errorData.error || errorData.message || 'Erreur lors de la transaction');
       }
 
-      setNotification({ type: 'success', message: `${getTabLabel(activeTab)} de ${amount.toLocaleString()} FCFA effectué avec succès` });
+      setNotification({ type: 'success', message: `${getTabLabel(activeTab)} de ${amount.toLocaleString()} FCFA effectué` });
       setMontant('');
       setReference('');
       setSelectedClient(null);
@@ -360,10 +360,11 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
                     Montant (FC)
                   </label>
                   <input
-                    type="number"
-                    placeholder="0.00"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    placeholder="0"
                     value={montant}
-                    onChange={(e) => setMontant(e.target.value)}
+                    onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setMontant(v); }}
                     className="w-full bg-surface-elevated text-content-primary px-4 py-3 rounded-lg border border-edge-strong input-focus text-2xl font-bold"
                     disabled={!canPerformAction()}
                   />

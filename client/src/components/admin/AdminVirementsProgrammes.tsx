@@ -173,7 +173,7 @@ export default function AdminVirementsProgrammes() {
       }
 
     } catch (err) {
-      if (!isPolling) setError(handleApiError(err, 'Erreur lors du chargement'));
+      if (!isPolling) setError(handleApiError(err, 'Erreur lors du chargement des virements programmés'));
     } finally {
       if (!isPolling) setLoading(false);
     }

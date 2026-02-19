@@ -341,9 +341,9 @@ export default function EmployeeRatesManager({ employeId }: EmployeeRatesManager
               <FormField
                 label={label('Taux Horaire')}
                 name="tauxHoraire"
-                type="number"
+                inputMode="decimal"
                 value={tauxHoraire}
-                onChange={(e) => { setTauxHoraire(e.target.value); setErrors(prev => ({ ...prev, tauxHoraire: '' })); }}
+                onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); setTauxHoraire(v); setErrors(prev => ({ ...prev, tauxHoraire: '' })); }}
                 placeholder="Ex: 2500"
               />
               {errors.tauxHoraire && <p className="text-xs text-status-danger mt-1">{errors.tauxHoraire}</p>}
@@ -355,9 +355,9 @@ export default function EmployeeRatesManager({ employeId }: EmployeeRatesManager
               <FormField
                 label={label('Taux Journalier')}
                 name="tauxJournalier"
-                type="number"
+                inputMode="decimal"
                 value={tauxJournalier}
-                onChange={(e) => { setTauxJournalier(e.target.value); setErrors(prev => ({ ...prev, tauxJournalier: '' })); }}
+                onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); setTauxJournalier(v); setErrors(prev => ({ ...prev, tauxJournalier: '' })); }}
                 placeholder="Ex: 15000"
               />
               {errors.tauxJournalier && <p className="text-xs text-status-danger mt-1">{errors.tauxJournalier}</p>}
@@ -369,9 +369,10 @@ export default function EmployeeRatesManager({ employeId }: EmployeeRatesManager
               <FormField
                 label={label('Salaire de Base')}
                 name="salaireBase"
-                type="number"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={salaireBase}
-                onChange={(e) => { setSalaireBase(e.target.value); setErrors(prev => ({ ...prev, salaireBase: '' })); }}
+                onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setSalaireBase(v); setErrors(prev => ({ ...prev, salaireBase: '' })); }}
                 placeholder="Ex: 350000"
               />
               {errors.salaireBase && <p className="text-xs text-status-danger mt-1">{errors.salaireBase}</p>}

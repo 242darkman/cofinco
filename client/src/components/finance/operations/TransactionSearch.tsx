@@ -385,10 +385,11 @@ export default function TransactionSearch({
               <div>
                 <label className="block text-sm text-content-muted mb-1">{t('montantMin')} (FCFA)</label>
                 <input
-                  type="number"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   placeholder="0"
                   value={filters.minAmount}
-                  onChange={(e) => updateFilter('minAmount', e.target.value)}
+                  onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); updateFilter('minAmount', v); }}
                   className="w-full px-3 py-2 bg-surface-elevated border border-edge-strong rounded-lg text-content-primary focus:outline-none focus:ring-2 focus:ring-accent"
                   data-testid="input-min-amount"
                 />
@@ -397,10 +398,11 @@ export default function TransactionSearch({
               <div>
                 <label className="block text-sm text-content-muted mb-1">{t('montantMax')} (FCFA)</label>
                 <input
-                  type="number"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   placeholder="∞"
                   value={filters.maxAmount}
-                  onChange={(e) => updateFilter('maxAmount', e.target.value)}
+                  onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); updateFilter('maxAmount', v); }}
                   className="w-full px-3 py-2 bg-surface-elevated border border-edge-strong rounded-lg text-content-primary focus:outline-none focus:ring-2 focus:ring-accent"
                   data-testid="input-max-amount"
                 />

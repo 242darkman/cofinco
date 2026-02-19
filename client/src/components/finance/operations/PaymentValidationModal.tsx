@@ -274,13 +274,13 @@ export default function PaymentValidationModal({
                   </div>
                   <span className="text-content-muted">×</span>
                   <input
-                    type="number"
-                    min="0"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={caisseData.billets[billet] || ''}
-                    onChange={(e) => setCaisseData({
+                    onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setCaisseData({
                       ...caisseData,
-                      billets: { ...caisseData.billets, [billet]: parseInt(e.target.value) || 0 }
-                    })}
+                      billets: { ...caisseData.billets, [billet]: v ? parseInt(v) : 0 }
+                    }); }}
                     className="w-20 bg-surface-subtle border border-edge-strong rounded px-3 py-2 text-content-primary text-center"
                     placeholder="0"
                   />

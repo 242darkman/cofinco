@@ -553,7 +553,7 @@ export default function CaisseOperations({ sessionId, onTransactionComplete }: C
       }
 
       if (loadingId) toast.dismiss(loadingId);
-      toast.success(`${typeOperation} de ${formatMoney(parseFloat(montant))} effectué avec succès !`);
+      toast.success(`${typeOperation} de ${formatMoney(parseFloat(montant))} effectué`);
 
       setLastOperationData({
         reference: operationData.reference,

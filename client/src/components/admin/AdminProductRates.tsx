@@ -374,10 +374,9 @@ export default function AdminProductRates() {
                     {isEditing ? (
                       <div className="flex items-center gap-1">
                         <input
-                          type="number"
-                          step="0.01"
+                          inputMode="decimal"
                           value={editValues.tauxInteret}
-                          onChange={(e) => setEditValues({ ...editValues, tauxInteret: e.target.value })}
+                          onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); setEditValues({ ...editValues, tauxInteret: v }); }}
                           className="w-16 px-2 py-0.5 text-right text-sm bg-surface-elevated border border-edge-strong rounded focus:border-accent outline-none text-content-primary"
                         />
                         <span className="text-content-muted text-xs">%</span>
@@ -438,9 +437,9 @@ export default function AdminProductRates() {
                       <span className="text-content-muted inline-flex items-center">Min:<InfoTooltip field="soldeMinimum" /> </span>
                       {isEditing ? (
                         <input
-                          type="number"
+                          inputMode="decimal"
                           value={editValues.soldeMinimum}
-                          onChange={(e) => setEditValues({ ...editValues, soldeMinimum: e.target.value })}
+                          onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); setEditValues({ ...editValues, soldeMinimum: v }); }}
                           className="w-16 px-1 py-0.5 bg-surface-elevated border border-edge-strong rounded text-content-primary text-[10px]"
                         />
                       ) : (
@@ -453,9 +452,9 @@ export default function AdminProductRates() {
                       <span className="text-content-muted inline-flex items-center">Plafond:<InfoTooltip field="plafondDepot" /> </span>
                       {isEditing ? (
                         <input
-                          type="number"
+                          inputMode="decimal"
                           value={editValues.plafondDepot}
-                          onChange={(e) => setEditValues({ ...editValues, plafondDepot: e.target.value })}
+                          onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); setEditValues({ ...editValues, plafondDepot: v }); }}
                           className="w-16 px-1 py-0.5 bg-surface-elevated border border-edge-strong rounded text-content-primary text-[10px]"
                         />
                       ) : (
@@ -481,9 +480,9 @@ export default function AdminProductRates() {
                         <span className="text-content-muted inline-flex items-center">Dépôt min: <InfoTooltip field="depotInitialMinimum" /></span>
                         {isEditing ? (
                           <input
-                            type="number"
+                            inputMode="decimal"
                             value={editValues.depotInitialMinimum}
-                            onChange={(e) => setEditValues({ ...editValues, depotInitialMinimum: e.target.value })}
+                            onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); setEditValues({ ...editValues, depotInitialMinimum: v }); }}
                             className="w-16 px-1 py-0.5 bg-surface-elevated border border-edge-strong rounded text-content-primary text-[10px]"
                             placeholder="0"
                           />
@@ -656,9 +655,9 @@ function FeeField({
       <p className="text-[9px] text-content-muted uppercase tracking-wide mb-0.5 flex items-center">{label}{tooltipField && <InfoTooltip field={tooltipField} />}</p>
       {isEditing ? (
         <input
-          type="number"
+          inputMode="decimal"
           value={editValue}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); onChange(v); }}
           className="w-full px-1.5 py-0.5 text-xs bg-surface-elevated border border-edge-strong rounded focus:border-accent outline-none text-content-primary"
           placeholder="0"
         />

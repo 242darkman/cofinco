@@ -115,10 +115,10 @@ export default function AdminTontinePlansGestion({ showForm: externalShowForm, o
 
       if (editMode && selectedPlanId) {
         await tontinePlanApi.update(selectedPlanId, payload);
-        toast.success(`Le modèle "${formData.nom}" a été mis à jour avec succès`);
+        toast.success(`Modèle "${formData.nom}" mis à jour`);
       } else {
         await tontinePlanApi.create(payload);
-        toast.success(`Le modèle "${formData.nom}" a été créé avec succès`);
+        toast.success(`Modèle "${formData.nom}" créé`);
       }
 
       setInternalShowForm(false);
@@ -143,7 +143,7 @@ export default function AdminTontinePlansGestion({ showForm: externalShowForm, o
           toast.success('Modèle supprimé');
           await loadPlans();
         } catch (error) {
-          toast.error(handleApiError(error, 'Erreur lors de la suppression'));
+          toast.error(handleApiError(error, 'Erreur lors de la suppression du modèle'));
         }
       }
     });
@@ -270,16 +270,18 @@ export default function AdminTontinePlansGestion({ showForm: externalShowForm, o
             <FormField
               label={label('Montant cotisation')}
               name="montant_cotisation"
-              type="number"
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={formData.montant_cotisation}
-              onChange={(e) => setFormData({ ...formData, montant_cotisation: e.target.value })}
+              onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormData({ ...formData, montant_cotisation: v }); }}
             />
             <FormField
               label="Nombre de membres"
               name="nombre_membres"
-              type="number"
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={formData.nombre_membres}
-              onChange={(e) => setFormData({ ...formData, nombre_membres: e.target.value })}
+              onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormData({ ...formData, nombre_membres: v }); }}
             />
             <SelectField
               label="Fréquence"
@@ -306,9 +308,9 @@ export default function AdminTontinePlansGestion({ showForm: externalShowForm, o
             <FormField
               label="Frais plateforme (%)"
               name="taux_plateforme"
-              type="number"
+              inputMode="decimal"
               value={formData.taux_plateforme}
-              onChange={(e) => setFormData({ ...formData, taux_plateforme: e.target.value })}
+              onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); setFormData({ ...formData, taux_plateforme: v }); }}
             />
             <div className="flex items-center pt-8">
               <label className="flex items-center gap-2 text-content-secondary cursor-pointer">

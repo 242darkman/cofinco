@@ -630,7 +630,7 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.5 }}
                   >
-                    {initialData ? 'Profil modifié !' : 'Compte créé avec succès !'}
+                    {initialData ? 'Profil modifié !' : 'Compte créé'}
                   </motion.p>
                   <motion.p
                     className="mt-1.5 text-sm text-content-muted text-center px-4"

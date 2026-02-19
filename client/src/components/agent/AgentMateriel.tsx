@@ -286,7 +286,7 @@ export default function AgentMateriel({ agentId }: { agentId?: string }) {
                 <input type="text" value={formData.numero_serie} onChange={(e) => setFormData({ ...formData, numero_serie: e.target.value })} className="w-full px-2 py-1.5 bg-surface border border-edge rounded-lg text-content-primary text-xs" />
               </FormField>
               <FormField label="Valeur (FCFA)">
-                <input type="number" value={formData.valeur} onChange={(e) => setFormData({ ...formData, valeur: Number(e.target.value) })} className="w-full px-2 py-1.5 bg-surface border border-edge rounded-lg text-content-primary text-xs" />
+                <input inputMode="numeric" pattern="[0-9]*" value={formData.valeur} onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormData({ ...formData, valeur: v ? Number(v) : 0 }); }} className="w-full px-2 py-1.5 bg-surface border border-edge rounded-lg text-content-primary text-xs" />
               </FormField>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
@@ -302,7 +302,7 @@ export default function AgentMateriel({ agentId }: { agentId?: string }) {
                 <input type="date" value={formData.date_garantie_fin} onChange={(e) => setFormData({ ...formData, date_garantie_fin: e.target.value })} className="w-full px-2 py-1.5 bg-surface border border-edge rounded-lg text-content-primary text-xs" />
               </FormField>
               <FormField label="Amortis. (mois)">
-                <input type="number" value={formData.duree_amortissement_mois} onChange={(e) => setFormData({ ...formData, duree_amortissement_mois: Number(e.target.value) })} className="w-full px-2 py-1.5 bg-surface border border-edge rounded-lg text-content-primary text-xs" min={1} max={120} />
+                <input inputMode="numeric" pattern="[0-9]*" value={formData.duree_amortissement_mois} onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormData({ ...formData, duree_amortissement_mois: v ? Number(v) : 0 }); }} className="w-full px-2 py-1.5 bg-surface border border-edge rounded-lg text-content-primary text-xs" />
               </FormField>
               <FormField label="Maintenance">
                 <input type="date" value={formData.prochaine_maintenance} onChange={(e) => setFormData({ ...formData, prochaine_maintenance: e.target.value })} className="w-full px-2 py-1.5 bg-surface border border-edge rounded-lg text-content-primary text-xs" />
@@ -545,7 +545,7 @@ export default function AgentMateriel({ agentId }: { agentId?: string }) {
                 <h4 className="text-xs font-bold text-content-muted">Enregistrer une maintenance</h4>
                 <input type="text" value={newMaintenance.description} onChange={(e) => setNewMaintenance({ ...newMaintenance, description: e.target.value })} placeholder="Description..." className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-content-primary text-xs" />
                 <div className="flex gap-2">
-                  <input type="number" value={newMaintenance.cout} onChange={(e) => setNewMaintenance({ ...newMaintenance, cout: Number(e.target.value) })} placeholder="Coût (FCFA)" className="flex-1 px-3 py-2 bg-surface border border-edge rounded-lg text-content-primary text-xs" min={0} />
+                  <input inputMode="numeric" pattern="[0-9]*" value={newMaintenance.cout} onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setNewMaintenance({ ...newMaintenance, cout: v ? Number(v) : 0 }); }} placeholder="Coût (FCFA)" className="flex-1 px-3 py-2 bg-surface border border-edge rounded-lg text-content-primary text-xs" />
                   <button onClick={ajouterMaintenance} disabled={!newMaintenance.description} className="px-4 py-2 bg-accent hover:bg-accent-primary-hover disabled:opacity-50 text-white rounded-lg text-xs font-bold">Ajouter</button>
                 </div>
               </div>

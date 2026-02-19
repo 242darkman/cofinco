@@ -68,7 +68,7 @@ export default function AdminUserForm({ user, onClose, onSuccess }: AdminUserFor
           statut: formData.statut
         });
 
-        toast.success('Utilisateur modifié avec succès');
+        toast.success('Utilisateur modifié');
       } else {
         if (!formData.password || formData.password.length < 8) {
           setError('Le mot de passe doit contenir au moins 8 caractères');
@@ -92,13 +92,13 @@ export default function AdminUserForm({ user, onClose, onSuccess }: AdminUserFor
           statut: formData.statut
         });
 
-        toast.success('Utilisateur créé avec succès');
+        toast.success('Utilisateur créé');
       }
 
       onSuccess();
       onClose();
     } catch (error: any) {
-      const message = handleApiError(error, 'Une erreur est survenue');
+      const message = handleApiError(error, 'Erreur lors de l\'enregistrement de l\'utilisateur');
       setError(message);
     } finally {
       setLoading(false);

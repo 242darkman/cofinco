@@ -159,7 +159,7 @@ export default function AdminGestionZones() {
           });
 
           if (response.ok) {
-            toast.success('Zone supprimée avec succès');
+            toast.success('Zone supprimée');
             await loadAgents();
             if (selectedAgent?.id === agent.id) setSelectedAgent(null);
             if (editingAgent?.id === agent.id) cancelEditing();
@@ -223,7 +223,7 @@ export default function AdminGestionZones() {
       });
 
       if (response.ok) {
-        setMessage({ type: 'success', text: 'Zone mise à jour avec succès' });
+        setMessage({ type: 'success', text: 'Zone mise à jour' });
         await loadAgents();
         cancelEditing();
       } else {
@@ -524,9 +524,10 @@ export default function AdminGestionZones() {
                 <FormField
                   label="Rayon de la zone (km)"
                   name="rayon"
-                  type="number"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   value={formData.rayon}
-                  onChange={(e) => setFormData(prev => ({ ...prev, rayon: e.target.value }))}
+                  onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormData(prev => ({ ...prev, rayon: v })); }}
                   data-testid="input-rayon"
                 />
 

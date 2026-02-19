@@ -104,7 +104,7 @@ export function PendingActivationDrawer({ open, onClose, sessionId, onActivate }
       const result = await compteEpargneApi.batchActivate(Array.from(selectedIds), sessionId);
 
       if (result.activated > 0) {
-        toast.success(`${result.activated} compte(s) activé(s) avec succès`);
+        toast.success(`${result.activated} compte(s) activé(s)`);
       }
       if (result.failed > 0) {
         toast.warning(`${result.failed} activation(s) échouée(s)`);

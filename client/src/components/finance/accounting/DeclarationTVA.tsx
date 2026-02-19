@@ -68,7 +68,7 @@ export default function DeclarationTVA() {
         statut: 'DRAFT'
       });
 
-      toast.success('Déclaration créée avec succès');
+      toast.success('Déclaration créée');
       setShowForm(false);
       fetchDeclarations();
     } catch (error) {
@@ -252,11 +252,11 @@ export default function DeclarationTVA() {
                       <label className="text-[10px] uppercase font-bold text-status-info">TVA Collectée (FCFA)</label>
                       <div className="relative">
                          <TrendingUp size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-status-info" />
-                         <input 
-                            type="number" 
-                            step="0.01"
+                         <input
+                            inputMode="numeric"
+                            pattern="[0-9]*"
                             value={form.tva_collectee}
-                            onChange={(e) => setForm({ ...form, tva_collectee: parseFloat(e.target.value) || 0 })}
+                            onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setForm({ ...form, tva_collectee: v ? parseInt(v) : 0 }); }}
                             className="w-full bg-surface-base border border-edge rounded-lg py-2 pl-9 pr-3 text-sm text-content-primary font-mono focus:ring-1 focus:ring-status-info outline-none"
                          />
                       </div>
@@ -266,11 +266,11 @@ export default function DeclarationTVA() {
                       <label className="text-[10px] uppercase font-bold text-status-success">TVA Déductible (FCFA)</label>
                       <div className="relative">
                          <TrendingDown size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-status-success" />
-                         <input 
-                            type="number" 
-                            step="0.01"
+                         <input
+                            inputMode="numeric"
+                            pattern="[0-9]*"
                             value={form.tva_deductible}
-                            onChange={(e) => setForm({ ...form, tva_deductible: parseFloat(e.target.value) || 0 })}
+                            onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setForm({ ...form, tva_deductible: v ? parseInt(v) : 0 }); }}
                             className="w-full bg-surface-base border border-edge rounded-lg py-2 pl-9 pr-3 text-sm text-content-primary font-mono focus:ring-1 focus:ring-status-success outline-none"
                          />
                       </div>

@@ -455,14 +455,14 @@ export default function AgentCollecteValidations() {
         await caisseAgentApi.approveOperation(pendingApprovalIds[0], password);
         toast({
           title: t('succes'),
-          description: 'Opération validée avec succès.',
+          description: 'Opération validée',
         });
       } else {
         const result = await caisseAgentApi.bulkApproveOperations(pendingApprovalIds, password);
         if (result.success) {
           toast({
             title: t('succes'),
-            description: `${pendingApprovalIds.length} opérations validées avec succès.`,
+            description: `${pendingApprovalIds.length} opérations validées`,
           });
         } else {
           const failures = result.results?.filter((r: any) => !r.success).length || 0;

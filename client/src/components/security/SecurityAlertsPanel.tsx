@@ -69,7 +69,7 @@ export default function SecurityAlertsPanel() {
   const resolveAlert = useCallback(async (alertId: string, notes: string) => {
     try {
       await notificationApi.markAsRead(alertId);
-      toast.success('Alerte résolue avec succès !');
+      toast.success('Alerte résolue');
       fetchAlerts();
       setSelectedAlert(null);
       setShowResolutionModal(false);

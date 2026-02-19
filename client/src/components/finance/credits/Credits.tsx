@@ -1192,7 +1192,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
           onSuccess={() => {
             setShowRequestForm(false);
             demandes.fetchDemandes(); 
-            toast.success('Demande créée avec succès');
+            toast.success('Demande créée');
           }}
           userRole={userRole}
         />

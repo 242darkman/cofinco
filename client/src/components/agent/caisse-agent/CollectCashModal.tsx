@@ -299,9 +299,10 @@ export default function CollectCashModal({
         <FormField
           label={isWithdrawal ? "Montant à retirer" : "Montant collecté"}
           name="montant"
-          type="number"
+          inputMode="numeric"
+          pattern="[0-9]*"
           value={montant}
-          onChange={(e) => setMontant(e.target.value)}
+          onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setMontant(v); }}
           placeholder="0"
           required
         />

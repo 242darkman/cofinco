@@ -64,7 +64,7 @@ export default function WorkScheduleGrid({ employeId, agenceId }: WorkScheduleGr
         method: 'POST',
       });
       if (res.ok) {
-        toast.success('Modèle appliqué avec succès');
+        toast.success('Modèle appliqué');
         fetchHoraires();
       } else {
         toast.error("Erreur lors de l'application du modèle");
@@ -107,7 +107,7 @@ export default function WorkScheduleGrid({ employeId, agenceId }: WorkScheduleGr
       });
 
       if (res.ok) {
-        toast.success('Modèle sauvegardé avec succès');
+        toast.success('Modèle sauvegardé');
         setShowSaveTemplate(false);
         setTemplateName('');
         setTemplateDescription('');
@@ -340,9 +340,10 @@ export default function WorkScheduleGrid({ employeId, agenceId }: WorkScheduleGr
                               <div className="flex items-center gap-1">
                                 <span className="text-xs text-content-muted">Pause:</span>
                                 <input
-                                  type="number"
+                                  inputMode="numeric"
+                                  pattern="[0-9]*"
                                   value={horaire.pauseMinutes}
-                                  onChange={(e) => handleUpdateHoraire(globalIndex, 'pauseMinutes', parseInt(e.target.value))}
+                                  onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); handleUpdateHoraire(globalIndex, 'pauseMinutes', v ? parseInt(v) : 0); }}
                                   className="bg-surface-subtle text-content-primary text-xs px-2 py-1 rounded w-16"
                                 />
                                 <span className="text-xs text-content-muted">min</span>

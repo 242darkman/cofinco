@@ -94,7 +94,7 @@ export default function DeadLetterQueue({
       setNotifications(result.data);
       setTotal(result.total);
     } catch (error) {
-      toast.error(handleApiError(error, 'Erreur lors du chargement'));
+      toast.error(handleApiError(error, 'Erreur lors du chargement des notifications'));
     } finally {
       setLoading(false);
     }
@@ -154,7 +154,7 @@ export default function DeadLetterQueue({
         loadNotifications();
       }
     } catch (error) {
-      toast.error(handleApiError(error, 'Erreur lors de la suppression'));
+      toast.error(handleApiError(error, 'Erreur lors de la suppression des notifications'));
     } finally {
       setDeleting(false);
     }

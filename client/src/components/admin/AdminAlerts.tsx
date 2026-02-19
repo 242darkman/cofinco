@@ -53,7 +53,7 @@ export default function AdminAlerts() {
       toast.success('Alerte supprimée');
       fetchAlerts();
     } catch (error) {
-      toast.error(handleApiError(error, 'Erreur lors de la suppression'));
+      toast.error(handleApiError(error, 'Erreur lors de la suppression de l\'alerte'));
     }
   }, [fetchAlerts]);
 

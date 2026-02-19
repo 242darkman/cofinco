@@ -157,7 +157,7 @@ export default function AdminBlockingRules() {
       toast.success(rule.isActive ? 'Règle désactivée' : 'Règle activée');
       loadRules();
     } catch (error) {
-      toast.error(handleApiError(error, 'Erreur lors de la mise à jour'));
+      toast.error(handleApiError(error, 'Erreur lors de la mise à jour de la règle'));
     }
   };
 
@@ -173,7 +173,7 @@ export default function AdminBlockingRules() {
           toast.success('Règle supprimée');
           loadRules();
         } catch (error) {
-          toast.error(handleApiError(error, 'Erreur lors de la suppression'));
+          toast.error(handleApiError(error, 'Erreur lors de la suppression de la règle'));
         }
       },
     });

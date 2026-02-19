@@ -131,7 +131,7 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
         const error = await response.json();
         throw new Error(error.error || 'Erreur lors de la création');
       }
-      toast.success('Objectif assigné avec succès.', {
+      toast.success('Objectif assigné', {
         description: `${formData.type_objectif} — ${formData.valeur_objectif.toLocaleString()} ${formData.unite}`,
       });
       setShowForm(false);
@@ -478,9 +478,10 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
                   {selectedObjectif.statut === StatutObjectif.IN_PROGRESS && (
                     <div className="flex gap-2">
                        <input
-                         type="number"
+                         inputMode="numeric"
+                         pattern="[0-9]*"
                          value={updateValue}
-                         onChange={(e) => setUpdateValue(e.target.value)}
+                         onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setUpdateValue(v); }}
                          placeholder="Nouvelle valeur..."
                          className="flex-1 px-3 py-2 bg-surface-base border border-edge rounded-lg text-content-primary text-sm"
                        />

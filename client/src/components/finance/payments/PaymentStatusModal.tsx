@@ -56,7 +56,7 @@ const statusConfig: Record<PaymentStatus, {
   SUCCESS: {
     icon: CheckCircle2,
     title: 'Paiement confirmé',
-    description: 'La transaction a été validée avec succès',
+    description: 'La transaction a été validée',
     color: 'text-status-success',
     bgColor: 'bg-status-success-bg',
   },

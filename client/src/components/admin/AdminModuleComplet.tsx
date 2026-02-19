@@ -246,7 +246,7 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
       variant: 'warning',
       onConfirm: async () => {
         const success = await resetPermissions(selectedUserId);
-        if (success) setConfirmMessage('Permissions réinitialisées avec succès');
+        if (success) setConfirmMessage('Permissions réinitialisées');
       }
     });
   };

@@ -231,7 +231,7 @@ export default function ProspectionFormModal({ isOpen, agentId, onClose, onSucce
 
     try {
       await prospectionApi.create(payload);
-      toast({ title: 'Prospect enregistré !', description: `${formData.nomProspect} ajouté avec succès.` });
+      toast({ title: 'Prospect enregistré !', description: `${formData.nomProspect} ajouté` });
       onSuccess(); onClose();
     } catch (error: any) {
       if (error.message?.includes('fetch') || error.message?.includes('network')) {
@@ -468,8 +468,8 @@ export default function ProspectionFormModal({ isOpen, agentId, onClose, onSucce
                   {formData.typeRevenu === 'Journalier' ? (
                     <div className="space-y-1">
                       <label className="text-[10px] text-content-muted font-medium">Revenu/jour (FCFA)</label>
-                      <input type="number" value={formData.revenuJournalier} onChange={e => {
-                        const j = e.target.value;
+                      <input inputMode="numeric" pattern="[0-9]*" value={formData.revenuJournalier} onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                        const j = e.target.value.replace(/[^0-9]/g, '');
                         const m = j ? (parseFloat(j) * 26).toString() : '';
                         setFormData(prev => ({ ...prev, revenuJournalier: j, revenuEstime: m }));
                       }} placeholder="Ex: 5 000" className={inputCls()} />
@@ -477,13 +477,13 @@ export default function ProspectionFormModal({ isOpen, agentId, onClose, onSucce
                   ) : (
                     <div className="space-y-1">
                       <label className="text-[10px] text-content-muted font-medium">Revenu/mois (FCFA)</label>
-                      <input type="number" value={formData.revenuEstime} onChange={e => set('revenuEstime', e.target.value)}
+                      <input inputMode="numeric" pattern="[0-9]*" value={formData.revenuEstime} onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ''); set('revenuEstime', v); }}
                         placeholder="Ex: 150 000" className={inputCls()} />
                     </div>
                   )}
                   <div className="space-y-1">
                     <label className="text-[10px] text-content-muted font-medium">CA mensuel (FCFA)</label>
-                    <input type="number" value={formData.chiffreAffairesMensuel} onChange={e => set('chiffreAffairesMensuel', e.target.value)}
+                    <input inputMode="numeric" pattern="[0-9]*" value={formData.chiffreAffairesMensuel} onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ''); set('chiffreAffairesMensuel', v); }}
                       placeholder="Ex: 500 000" className={inputCls()} />
                   </div>
                 </div>

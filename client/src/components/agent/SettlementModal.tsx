@@ -299,15 +299,15 @@ export default function SettlementModal({ isOpen, onClose, onSuccess, agentId, a
             <div className="relative">
               <DollarSign size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" />
               <input
-                type="number"
                 inputMode="numeric"
+                pattern="[0-9]*"
                 value={formData.montant}
                 onChange={(e) => {
-                  setFormData({ ...formData, montant: e.target.value });
+                  const v = e.target.value.replace(/[^0-9]/g, '');
+                  setFormData({ ...formData, montant: v });
                   if (errors.montant) setErrors(prev => ({ ...prev, montant: '' }));
                 }}
                 placeholder="0"
-                max={disponible}
                 className={`
                   w-full h-12 pl-10 pr-20 rounded-xl text-lg font-bold
                   bg-surface/80 border

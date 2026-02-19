@@ -451,7 +451,7 @@ export default function TransactionDetailDrawer({
     if (!transaction?.reference) return;
     navigator.clipboard.writeText(transaction.reference);
     setCopied(true);
-    toast.success("Référence copiée !", { duration: 2000 });
+    toast.success("Copié", { duration: 1500 });
     setTimeout(() => setCopied(false), 2000);
   }, [transaction?.reference]);
 

@@ -86,7 +86,7 @@ export default function NotificationPreview({
       await navigator.clipboard.writeText(renderContent(template.content));
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-      toast.success('Contenu copié');
+      toast.success('Copié', { duration: 1500 });
     } catch {
       toast.error('Impossible de copier');
     }

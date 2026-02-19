@@ -208,9 +208,9 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
 
             fetchMembres();
             onUpdate();
-            toast.success('Membre retiré avec succès');
+            toast.success('Membre retiré');
           } catch (error) {
-            toast.error(handleApiError(error, 'Erreur lors de la suppression'));
+            toast.error(handleApiError(error, 'Erreur lors du retrait du membre'));
           }
         },
       });

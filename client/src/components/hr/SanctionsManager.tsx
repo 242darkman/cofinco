@@ -869,21 +869,19 @@ export default function SanctionsManager({
             <FormField
               label="Nombre de sanctions"
               name="sanctionCountThreshold"
-              type="number"
-              min={1}
-              max={10}
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={ruleFormData.sanctionCountThreshold}
-              onChange={(e) => setRuleFormData({ ...ruleFormData, sanctionCountThreshold: parseInt(e.target.value) || 1 })}
+              onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setRuleFormData({ ...ruleFormData, sanctionCountThreshold: v ? parseInt(v) : 1 }); }}
               required
             />
             <FormField
               label="Période (mois)"
               name="periodMonths"
-              type="number"
-              min={1}
-              max={36}
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={ruleFormData.periodMonths}
-              onChange={(e) => setRuleFormData({ ...ruleFormData, periodMonths: parseInt(e.target.value) || 12 })}
+              onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setRuleFormData({ ...ruleFormData, periodMonths: v ? parseInt(v) : 12 }); }}
               required
             />
           </div>

@@ -397,7 +397,7 @@ export default function EvacuationCoffreModule({
   const handleCreateSuccess = () => {
     setShowCreateForm(false);
     loadData(true);
-    toast.success('Évacuation créée avec succès');
+    toast.success('Évacuation créée');
   };
 
   // Detail action callback — reload list after any workflow action from detail view

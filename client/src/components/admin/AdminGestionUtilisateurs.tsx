@@ -81,10 +81,10 @@ export default function AdminGestionUtilisateurs() {
     try {
       if (editingUser) {
         await userApi.update(editingUser.id, formData);
-        toast.success('Utilisateur modifié avec succès');
+        toast.success('Utilisateur modifié');
       } else {
         await userApi.create(formData);
-        toast.success('Utilisateur créé avec succès');
+        toast.success('Utilisateur créé');
       }
       loadUsers();
     } catch (error) {
@@ -102,10 +102,10 @@ export default function AdminGestionUtilisateurs() {
       onConfirm: async () => {
         try {
           await userApi.delete(id);
-          toast.success('Utilisateur supprimé avec succès');
+          toast.success('Utilisateur supprimé');
           loadUsers();
         } catch (error) {
-          toast.error(handleApiError(error, 'Erreur lors de la suppression'));
+          toast.error(handleApiError(error, 'Erreur lors de la suppression de l\'utilisateur'));
         }
       },
     });

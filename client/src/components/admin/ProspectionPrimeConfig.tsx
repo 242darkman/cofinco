@@ -172,9 +172,10 @@ export default function ProspectionPrimeConfig() {
               <div>
                 <label className="block text-[9px] font-medium text-content-muted uppercase mb-0.5">Montant (FCFA)</label>
                 <input
-                  type="number"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   value={formData.montantFixe}
-                  onChange={(e) => setFormData(prev => ({ ...prev, montantFixe: e.target.value }))}
+                  onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormData(prev => ({ ...prev, montantFixe: v })); }}
                   className="w-full px-2 py-1.5 bg-surface-base border border-edge rounded text-xs text-content-primary focus:border-accent focus:outline-none"
                   placeholder="5000"
                 />
@@ -183,12 +184,11 @@ export default function ProspectionPrimeConfig() {
               <div>
                 <label className="block text-[9px] font-medium text-content-muted uppercase mb-0.5">Taux (% salaire brut annuel)</label>
                 <input
-                  type="number"
+                  inputMode="decimal"
                   value={formData.tauxVariable}
-                  onChange={(e) => setFormData(prev => ({ ...prev, tauxVariable: e.target.value }))}
+                  onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); setFormData(prev => ({ ...prev, tauxVariable: v })); }}
                   className="w-full px-2 py-1.5 bg-surface-base border border-edge rounded text-xs text-content-primary focus:border-accent focus:outline-none"
                   placeholder="1.5"
-                  step="0.1"
                 />
               </div>
             )}
@@ -196,9 +196,10 @@ export default function ProspectionPrimeConfig() {
             <div>
               <label className="block text-[9px] font-medium text-content-muted uppercase mb-0.5">Revenu min.</label>
               <input
-                type="number"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={formData.requireMinRevenu}
-                onChange={(e) => setFormData(prev => ({ ...prev, requireMinRevenu: e.target.value }))}
+                onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormData(prev => ({ ...prev, requireMinRevenu: v })); }}
                 className="w-full px-2 py-1.5 bg-surface-base border border-edge rounded text-xs text-content-primary focus:border-accent focus:outline-none"
                 placeholder="Optionnel"
               />

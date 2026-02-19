@@ -73,7 +73,7 @@ export default function TransferTemplates({ onUseTemplate }: TransferTemplatesPr
       // setTemplates(data);
       setTemplates([]);
     } catch (error) {
-      toast.error(handleApiError(error, 'Erreur lors du chargement'));
+      toast.error(handleApiError(error, 'Erreur lors du chargement des modèles de virement'));
     } finally {
       setLoading(false);
     }
@@ -118,7 +118,7 @@ export default function TransferTemplates({ onUseTemplate }: TransferTemplatesPr
       toast.success('Template supprimé');
       loadTemplates();
     } catch (error) {
-      toast.error(handleApiError(error, 'Erreur lors de la suppression'));
+      toast.error(handleApiError(error, 'Erreur lors de la suppression du modèle'));
     }
   };
 
@@ -247,9 +247,10 @@ export default function TransferTemplates({ onUseTemplate }: TransferTemplatesPr
             <div>
               <label className="block text-sm text-content-muted mb-1">Montant par défaut (FCFA)</label>
               <input
-                type="number"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={formData.defaultAmount}
-                onChange={(e) => setFormData({ ...formData, defaultAmount: e.target.value })}
+                onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormData({ ...formData, defaultAmount: v }); }}
                 className="w-full px-4 py-2.5 bg-surface-elevated border border-edge-strong rounded-lg text-content-primary focus:outline-none focus:ring-2 focus:ring-accent"
                 placeholder="Optionnel"
               />

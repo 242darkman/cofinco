@@ -126,7 +126,7 @@ export default function AdminClientCredentials() {
           setShowResults(true);
 
           if (data.generated > 0) {
-            toast.success(`${data.generated} identifiant(s) générés avec succès`);
+            toast.success(`${data.generated} identifiant(s) générés`);
             // Recharger la liste
             loadClientsWithoutCredentials();
             setSelectedClients(new Set());
@@ -144,7 +144,7 @@ export default function AdminClientCredentials() {
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    toast.success('Copié dans le presse-papier');
+    toast.success('Copié', { duration: 1500 });
   };
 
   const togglePasswordVisibility = (clientId: string) => {

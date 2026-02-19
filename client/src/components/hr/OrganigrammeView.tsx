@@ -258,7 +258,7 @@ export default function OrganigrammeView({ employes }: OrganigrammeViewProps) {
       }
     } catch (e) {
       console.error('Erreur chargement organigramme:', e);
-      toast.error('Erreur lors du chargement');
+      toast.error('Erreur lors du chargement de l\'organigramme');
     } finally {
       setLoading(false);
     }

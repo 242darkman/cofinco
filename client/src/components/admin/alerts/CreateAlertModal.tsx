@@ -80,7 +80,7 @@ export default function CreateAlertModal({
       onSuccess?.();
       handleClose();
     } catch (error) {
-      toast.error(handleApiError(error, 'Erreur lors de la création'));
+      toast.error(handleApiError(error, 'Erreur lors de la création de l\'alerte'));
     } finally {
       setSaving(false);
     }

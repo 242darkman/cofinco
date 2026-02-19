@@ -261,13 +261,13 @@ export default function TontineForm({ tontine, onClose, onSave }: TontineFormPro
                         {errors.montantCotisation && <span className="text-[10px] sm:text-xs text-status-danger">{errors.montantCotisation}</span>}
                    </div>
                    <div className="relative group">
-                      <input 
-                        type="number" 
-                        min="0"
+                      <input
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         className={`w-full h-16 sm:h-20 bg-surface-base border-2 ${errors.montantCotisation ? 'border-status-danger/50' : 'border-edge'} rounded-xl px-4 sm:px-6 text-3xl sm:text-4xl font-bold text-content-primary placeholder-content-primary outline-none focus:border-accent transition-all text-center`}
                         placeholder="0"
                         value={formData.montantCotisation || ''}
-                        onChange={e => setFormData({...formData, montantCotisation: Number(e.target.value)})}
+                        onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormData({...formData, montantCotisation: v ? Number(v) : 0}); }}
                       />
                    </div>
                 </div>
@@ -289,13 +289,11 @@ export default function TontineForm({ tontine, onClose, onSave }: TontineFormPro
                    <div className="space-y-1.5 sm:space-y-2">
                       <label className="text-[10px] sm:text-xs font-bold text-content-muted uppercase ml-1">Taux Plateforme (%)</label>
                       <div className="relative">
-                         <input 
-                           type="number" 
-                           min="0"
-                           step="0.1"
-                           className="w-full h-10 sm:h-12 bg-surface-base border border-edge rounded-xl px-3 sm:px-4 text-sm sm:text-base text-content-primary outline-none" 
-                           value={formData.tauxPlateforme} 
-                           onChange={e => setFormData({...formData, tauxPlateforme: Number(e.target.value)})}
+                         <input
+                           inputMode="decimal"
+                           className="w-full h-10 sm:h-12 bg-surface-base border border-edge rounded-xl px-3 sm:px-4 text-sm sm:text-base text-content-primary outline-none"
+                           value={formData.tauxPlateforme}
+                           onChange={e => { const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); setFormData({...formData, tauxPlateforme: v === '' ? 0 : Number(v)}); }}
                          />
                          <Shield size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-content-muted" />
                       </div>
@@ -321,12 +319,12 @@ export default function TontineForm({ tontine, onClose, onSave }: TontineFormPro
                    </div>
                    <div className="space-y-1.5 sm:space-y-2">
                       <label className="text-[10px] sm:text-xs font-bold text-content-muted uppercase ml-1">Nb Membres (Slots)</label>
-                      <input 
-                        type="number" 
-                        min="2"
+                      <input
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         className="w-full h-10 sm:h-12 bg-surface-base border border-edge rounded-xl px-3 sm:px-4 text-sm sm:text-base text-content-primary outline-none"
                         value={formData.nombreMembres}
-                        onChange={e => setFormData({...formData, nombreMembres: Number(e.target.value)})}
+                        onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormData({...formData, nombreMembres: v ? Number(v) : 0}); }}
                       />
                    </div>
                 </div>
@@ -334,22 +332,22 @@ export default function TontineForm({ tontine, onClose, onSave }: TontineFormPro
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                    <div className="space-y-1.5 sm:space-y-2">
                       <label className="text-[10px] sm:text-xs font-bold text-content-muted uppercase ml-1">Intervalle (Jours)</label>
-                      <input 
-                        type="number" 
-                        min="1"
-                        className="w-full h-10 sm:h-12 bg-surface-base border border-edge rounded-xl px-3 sm:px-4 text-sm sm:text-base text-content-primary outline-none" 
-                        value={formData.intervalleCotisation} 
-                        onChange={e => setFormData({...formData, intervalleCotisation: Number(e.target.value)})}
+                      <input
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        className="w-full h-10 sm:h-12 bg-surface-base border border-edge rounded-xl px-3 sm:px-4 text-sm sm:text-base text-content-primary outline-none"
+                        value={formData.intervalleCotisation}
+                        onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormData({...formData, intervalleCotisation: v ? Number(v) : 0}); }}
                       />
                    </div>
                    <div className="space-y-1.5 sm:space-y-2">
                       <label className="text-[10px] sm:text-xs font-bold text-content-muted uppercase ml-1">Délai Pénalité (Jours)</label>
-                      <input 
-                        type="number"
-                        min="0" 
-                        className="w-full h-10 sm:h-12 bg-surface-base border border-edge rounded-xl px-3 sm:px-4 text-sm sm:text-base text-content-primary outline-none" 
-                        value={formData.delaiPenalite} 
-                        onChange={e => setFormData({...formData, delaiPenalite: Number(e.target.value)})}
+                      <input
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        className="w-full h-10 sm:h-12 bg-surface-base border border-edge rounded-xl px-3 sm:px-4 text-sm sm:text-base text-content-primary outline-none"
+                        value={formData.delaiPenalite}
+                        onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormData({...formData, delaiPenalite: v ? Number(v) : 0}); }}
                       />
                    </div>
                 </div>

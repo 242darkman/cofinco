@@ -148,7 +148,7 @@ export default function AgentRapports({ agentId }: { agentId?: string }) {
 
       if (!response.ok) throw new Error('Erreur lors de la création du rapport');
       loadRapports();
-      toast.success(`Rapport ${typeRapport.toLowerCase()} généré avec succès`);
+      toast.success(`Rapport ${typeRapport.toLowerCase()} généré`);
     } catch (error: any) {
       toast.error(error.message || 'Erreur lors de la génération du rapport');
     } finally {

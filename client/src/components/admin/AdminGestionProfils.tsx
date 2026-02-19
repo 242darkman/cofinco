@@ -290,7 +290,7 @@ export default function AdminGestionProfils() {
       // Show success animation then auto-close
       setShowCreateSuccess(true);
       toast.success(
-        `Compte utilisateur ${formData.nom} ${formData.prenom} créé avec succès.`,
+        `Compte utilisateur ${formData.nom} ${formData.prenom} créé`,
         { duration: 4000 }
       );
 
@@ -312,7 +312,7 @@ export default function AdminGestionProfils() {
         loadUsers();
       }, 2000);
     } catch (error) {
-      toast.error(handleApiError(error, 'Erreur lors de la création'));
+      toast.error(handleApiError(error, 'Erreur lors de la création du profil'));
     } finally {
       setIsSubmitting(false);
     }
@@ -350,7 +350,7 @@ export default function AdminGestionProfils() {
 
       // Update State
       setFormData(prev => ({ ...prev, photoProfile: objectPath }));
-      toast.success('Photo modifiée avec succès');
+      toast.success('Photo modifiée');
     } catch (error) {
       console.error(error);
       toast.error('Impossible de modifier la photo');
@@ -405,7 +405,7 @@ export default function AdminGestionProfils() {
       onConfirm: async () => {
         try {
           await userApi.update(user.id, { statut: newStatus });
-          toast.success(`Profil ${newStatus === StatutUser.ACTIVE ? 'activé' : 'désactivé'} avec succès`);
+          toast.success(`Profil ${newStatus === StatutUser.ACTIVE ? 'activé' : 'désactivé'}`);
           loadUsers();
         } catch (error) {
           toast.error(handleApiError(error, 'Erreur lors du changement de statut'));
@@ -429,10 +429,10 @@ export default function AdminGestionProfils() {
           } else {
             await userApi.delete(user.id);
           }
-          toast.success('Profil supprimé avec succès');
+          toast.success('Profil supprimé');
           loadUsers();
         } catch (error) {
-          toast.error(handleApiError(error, 'Erreur lors de la suppression'));
+          toast.error(handleApiError(error, 'Erreur lors de la suppression du profil'));
         }
       },
     });
@@ -932,7 +932,7 @@ export default function AdminGestionProfils() {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.5 }}
                     >
-                      Profil créé avec succès !
+                      Profil créé
                     </motion.p>
                     <motion.p
                       className="mt-1.5 text-sm text-content-muted text-center px-4"
@@ -1433,7 +1433,7 @@ export default function AdminGestionProfils() {
           isOpen={!!convertToClientUser}
           onClose={() => setConvertToClientUser(null)}
           onSave={async () => {
-            toast.success('Profil client créé avec succès');
+            toast.success('Profil client créé');
             setConvertToClientUser(null);
             loadUsers();
           }}

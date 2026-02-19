@@ -47,7 +47,7 @@ export default function AdminPasswordReset({ user, onClose, onSuccess }: AdminPa
         setResult({
           method: 'temporary_password',
           password: tempPassword,
-          message: 'Mot de passe temporaire généré avec succès'
+          message: 'Mot de passe temporaire généré'
         });
 
         setTimeout(() => {
@@ -74,7 +74,7 @@ export default function AdminPasswordReset({ user, onClose, onSuccess }: AdminPa
         setResult({
           method: 'email_link',
           link: data.reset_link || '',
-          message: 'Lien de réinitialisation généré avec succès'
+          message: 'Lien de réinitialisation généré'
         });
       }
 

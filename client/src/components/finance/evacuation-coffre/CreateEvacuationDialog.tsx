@@ -193,11 +193,11 @@ export default function CreateEvacuationDialog({
               Montant (FCFA)
             </label>
             <input
-              type="number"
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={montant}
-              onChange={(e) => setMontant(e.target.value)}
+              onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setMontant(v); }}
               placeholder="0"
-              min={1}
               className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-status-info/50"
             />
             {coffreSource && montant && (

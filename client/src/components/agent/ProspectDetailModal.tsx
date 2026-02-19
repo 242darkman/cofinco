@@ -65,7 +65,7 @@ export default function ProspectDetailSheet({ prospectId, onClose, onUpdate, can
     setActionLoading(true);
     try {
       const result = await prospectionApi.convert(prospectId);
-      toast.success('Prospect converti en client avec succès !');
+      toast.success('Prospect converti en client');
       onUpdate();
       onClose();
     } catch (error: any) {

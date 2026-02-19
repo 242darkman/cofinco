@@ -440,7 +440,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
 
       const successMessage = reimbursementAmount 
         ? `Demande rejetée. Remboursement de ${formatMoney(Number(reimbursementAmount))} initié.`
-        : 'Demande de crédit rejetée avec succès.';
+        : 'Demande de crédit rejetée';
       
       toast.success(successMessage, { duration: 5000 });
       onSuccess();
@@ -1003,12 +1003,12 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                                             100%
                                         </button>
                                         <input
-                                            type="number"
+                                            inputMode="numeric"
+                                            pattern="[0-9]*"
                                             value={reimbursementAmount}
-                                            onChange={(e) => setReimbursementAmount(e.target.value)}
+                                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => { const v = e.target.value.replace(/[^0-9]/g, ''); setReimbursementAmount(v); }}
                                             className="w-full bg-surface-base border border-edge-strong rounded-lg px-2 py-2 text-content-primary text-xs text-center focus:ring-1 focus:ring-status-warning focus:border-status-warning outline-none"
                                             placeholder="Autre"
-                                            max={demande.montantFraisEngagement}
                                         />
                                     </div>
 
@@ -1237,12 +1237,12 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                     100%
                   </button>
                   <input
-                    type="number"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={refundAmount}
-                    onChange={(e) => setRefundAmount(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => { const v = e.target.value.replace(/[^0-9]/g, ''); setRefundAmount(v); }}
                     className="w-full bg-surface-base border border-edge-strong rounded-lg px-3 py-2.5 text-content-primary text-sm text-center focus:ring-1 focus:ring-status-warning focus:border-status-warning outline-none"
                     placeholder="Autre"
-                    max={demande.montantFraisEngagement || 0}
                   />
                 </div>
               </div>

@@ -289,9 +289,10 @@ export default function TransferAgenceModal({ employee, onClose, onSuccess }: Tr
                     <Briefcase size={12} /> Salaire de base ({currency.symbol})
                   </label>
                   <input
-                    type="number"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={salaireBase}
-                    onChange={e => setSalaireBase(e.target.value)}
+                    onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ''); setSalaireBase(v); }}
                     placeholder={employee.salaireBase || '0'}
                     className="w-full h-10 px-3 bg-input border border-input-border rounded-lg text-xs text-content-primary font-mono focus:border-input-focus focus:outline-none transition-colors"
                   />

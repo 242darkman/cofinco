@@ -216,7 +216,7 @@ export default function AdminGestionAcces() {
       onConfirm: async () => {
         try {
           await userApi.update(userId, { statut: StatutUser.SUSPENDED });
-          toast.success('Utilisateur bloqué avec succès');
+          toast.success('Utilisateur bloqué');
           fetchUsers();
         } catch (error) {
           toast.error(handleApiError(error, 'Erreur lors du blocage'));
@@ -228,7 +228,7 @@ export default function AdminGestionAcces() {
   const unblockUser = useCallback(async (userId: string) => {
     try {
       await userApi.update(userId, { statut: StatutUser.ACTIVE });
-      toast.success('Utilisateur débloqué avec succès');
+      toast.success('Utilisateur débloqué');
       fetchUsers();
     } catch (error) {
       toast.error(handleApiError(error, 'Erreur lors du déblocage'));
@@ -244,10 +244,10 @@ export default function AdminGestionAcces() {
       onConfirm: async () => {
         try {
           await userApi.delete(userId);
-          toast.success('Utilisateur supprimé avec succès');
+          toast.success('Utilisateur supprimé');
           fetchUsers();
         } catch (error) {
-          toast.error(handleApiError(error, 'Erreur lors de la suppression'));
+          toast.error(handleApiError(error, 'Erreur lors de la suppression de l\'accès'));
         }
       },
     });

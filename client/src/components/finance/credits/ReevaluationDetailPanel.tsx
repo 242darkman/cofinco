@@ -1021,9 +1021,10 @@ function ReevaluationDecisionModalInline({
             <div>
               <label className="text-sm text-content-muted mb-2 block">Montant approuvé</label>
               <input
-                type="number"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={montantApprouve || ''}
-                onChange={(e) => setMontantApprouve(parseFloat(e.target.value) || undefined)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => { const v = e.target.value.replace(/[^0-9]/g, ''); setMontantApprouve(v ? parseFloat(v) : undefined); }}
                 placeholder="Montant en FCFA"
                 className="w-full bg-surface border border-edge rounded-lg px-4 py-3 text-content-primary focus:outline-none focus:border-status-warning"
               />

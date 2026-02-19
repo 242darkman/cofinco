@@ -205,10 +205,10 @@ export default function SettlementCashModal({
                     {formatMoney(denom)}
                   </span>
                   <input
-                    type="number"
-                    min={0}
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={billetage[denom.toString()] || ''}
-                    onChange={(e) => handleBilletageChange(denom, e.target.value)}
+                    onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); handleBilletageChange(denom, v); }}
                     placeholder="0"
                     className="flex-1 px-3 py-2 bg-surface border border-edge rounded-lg text-content-primary placeholder-content-muted focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent text-center"
                   />
@@ -230,9 +230,10 @@ export default function SettlementCashModal({
           <FormField
             label="Montant à remettre"
             name="montant"
-            type="number"
+            inputMode="numeric"
+            pattern="[0-9]*"
             value={montant}
-            onChange={(e) => setMontant(e.target.value)}
+            onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setMontant(v); }}
             placeholder="0"
             required
           />

@@ -104,7 +104,7 @@ export default function AdminSessionsManager() {
       onConfirm: async () => {
         try {
           await sessionApi.terminate(session.userId);
-          toast.success('Session terminée avec succès');
+          toast.success('Session terminée');
           loadSessions();
         } catch (error) {
           toast.error(handleApiError(error, 'Erreur lors de la terminaison de la session'));

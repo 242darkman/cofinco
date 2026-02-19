@@ -200,21 +200,21 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
           montant: montantNum,
           sessionCaisseId: undefined, // Backend will auto-resolve from user session
         });
-        toast.success(`Compte activé ! Dépôt de ${formatMoney(montantNum)} encaissé avec succès`);
+        toast.success(`Compte activé — dépôt de ${formatMoney(montantNum)} encaissé`);
       } else if (type === 'Dépôt') {
         await compteEpargneApi.depot(compte.id, {
           montant: montantNum,
           methodePaiement: formData.mode_paiement,
           observations,
         });
-        toast.success(`${type} de ${formatMoney(montantNum)} effectué avec succès`);
+        toast.success(`${type} de ${formatMoney(montantNum)} effectué`);
       } else {
         await compteEpargneApi.retrait(compte.id, {
           montant: montantNum,
           methodePaiement: formData.mode_paiement,
           observations,
         });
-        toast.success(`${type} de ${formatMoney(montantNum)} effectué avec succès`);
+        toast.success(`${type} de ${formatMoney(montantNum)} effectué`);
       }
 
       onSuccess();
@@ -424,16 +424,14 @@ export default function EpargneTransactionForm({ compte, type, onClose, onSucces
               </label>
               <input
                 id="montant"
-                type="number"
                 inputMode="numeric"
+                pattern="[0-9]*"
                 value={formData.montant}
-                onChange={(e) => handleInputChange('montant', e.target.value)}
+                onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); handleInputChange('montant', v); }}
                 className={`w-full bg-surface-elevated border ${errors.montant ? 'border-status-danger' : 'border-edge-strong'} rounded-lg px-4 py-3 text-content-primary text-lg focus:outline-none focus:ring-2 focus:ring-status-info`}
                 placeholder="0"
                 autoFocus
                 disabled={loading}
-                min="100"
-                max={type === 'Retrait' ? actualBalance : (isPendingActivation ? pendingDepositAmount : VALIDATION_LIMITS.MAX_EPARGNE)}
                 aria-invalid={!!errors.montant}
                 aria-describedby={errors.montant ? 'montant-error' : type === 'Retrait' ? 'montant-help' : undefined}
               />

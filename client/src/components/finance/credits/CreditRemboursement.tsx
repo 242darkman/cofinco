@@ -543,7 +543,7 @@ export default function CreditRemboursement() {
             </div>
             <h3 className="text-xl font-bold text-content-primary mb-2">Remboursement Enregistré !</h3>
             <p className="text-content-muted mb-6">
-              Le remboursement de <strong className="text-content-primary">{formatMoney(lastPaymentAmount)}</strong> a été validé avec succès.
+              Le remboursement de <strong className="text-content-primary">{formatMoney(lastPaymentAmount)}</strong> a été validé
             </p>
             
             <div className="space-y-3">
@@ -699,12 +699,10 @@ export default function CreditRemboursement() {
                   </label>
                   <input
                     id="montant"
-                    type="number"
                     inputMode="numeric"
-                    min="100"
-                    max={selectedCredit.soldeRestant}
+                    pattern="[0-9]*"
                     value={paymentData.montant}
-                    onChange={(e) => handleInputChange('montant', e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => { const v = e.target.value.replace(/[^0-9]/g, ''); handleInputChange('montant', v); }}
                     className={`w-full bg-surface-elevated border ${errors.montant ? 'border-status-danger' : 'border-edge-strong'} rounded-lg px-4 py-2 text-content-primary focus:outline-none focus:ring-2 focus:ring-status-success`}
                     placeholder={`Montant prévu: ${formatMoney(montantPrevu)}`}
                     disabled={loading}

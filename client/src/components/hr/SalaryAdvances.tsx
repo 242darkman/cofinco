@@ -235,12 +235,12 @@ export default function SalaryAdvances() {
               <div>
                 <label className="block text-xs font-medium text-content-muted mb-1">Montant (FCFA) *</label>
                 <input
-                  type="number"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   className="w-full px-3 py-2 bg-surface border border-edge rounded-lg text-sm text-content-primary focus:ring-1 focus:ring-status-success/50 outline-none font-mono"
                   value={formMontant}
-                  onChange={(e) => setFormMontant(e.target.value)}
+                  onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormMontant(v); }}
                   placeholder="Ex: 150000"
-                  min="0"
                 />
               </div>
               <div>

@@ -743,11 +743,10 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
               Montant du crédit demandé (FCFA) *
             </label>
             <input
-              type="number"
-              min="0"
-              step="1000"
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={formData.montant_demande}
-              onChange={(e) => handleChange('montant_demande', e.target.value)}
+              onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); handleChange('montant_demande', v); }}
               className={`w-full bg-surface text-content-primary px-3 py-2 rounded-lg border text-sm ${
                 errors.montant_demande ? 'border-accent' : 'border-edge-strong'
               } focus:outline-none focus:ring-2 focus:ring-accent`}
@@ -806,10 +805,10 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
             </label>
             <div className="flex gap-2">
               <input
-                type="number"
-                min="0"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={seniorityValue}
-                onChange={(e) => setSeniorityValue(e.target.value)}
+                onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setSeniorityValue(v); }}
                 className={`flex-1 bg-surface text-content-primary px-3 py-2 rounded-lg border text-sm ${
                   errors.anciennete_activite ? 'border-accent' : 'border-edge-strong'
                 } focus:outline-none focus:ring-2 focus:ring-accent`}
@@ -875,11 +874,11 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
                 <div>
                   <label className="block text-[10px] text-content-muted mb-0.5">Revenu journalier (FCFA)</label>
                   <input
-                    type="number"
-                    min="0"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={formData.revenu_journalier}
                     onChange={(e) => {
-                      const journalier = e.target.value;
+                      const journalier = e.target.value.replace(/[^0-9]/g, '');
                       const mensuel = journalier ? (parseFloat(journalier) * 26).toString() : '';
                       setFormData(prev => ({
                         ...prev,
@@ -896,7 +895,7 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
                   <label className="block text-[10px] text-content-muted mb-0.5">Revenu mensuel calculé *</label>
                   <div className="relative">
                     <input
-                      type="number"
+                      inputMode="numeric"
                       readOnly
                       value={formData.revenu_mensuel_declare}
                       className="w-full bg-surface text-content-primary px-3 py-2 rounded-lg border border-edge text-sm font-semibold cursor-not-allowed"
@@ -911,10 +910,10 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
               <div>
                 <label className="block text-[10px] text-content-muted mb-0.5">Revenu mensuel fixe (FCFA) *</label>
                 <input
-                  type="number"
-                  min="0"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   value={formData.revenu_mensuel_declare}
-                  onChange={(e) => handleChange('revenu_mensuel_declare', e.target.value)}
+                  onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); handleChange('revenu_mensuel_declare', v); }}
                   className={`w-full bg-surface-elevated text-content-primary px-3 py-2 rounded-lg border text-sm font-semibold ${
                     errors.revenu_mensuel_declare ? 'border-accent' : 'border-accent/50'
                   } focus:outline-none focus:ring-2 focus:ring-accent`}
@@ -997,10 +996,10 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
                 )}
               </div>
               <input
-                type="number"
-                min="0"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={formData.charges_mensuelles}
-                onChange={(e) => handleChange('charges_mensuelles', e.target.value)}
+                onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); handleChange('charges_mensuelles', v); }}
                 className={`w-full bg-surface text-content-primary px-3 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-accent ${
                   initialData?.charges_mensuelles ? 'border-accent/50' : 'border-edge-strong'
                 }`}
@@ -1100,9 +1099,10 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
                 />
                 <div className="flex gap-1.5">
                   <input
-                    type="number"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={autreCredit.montant}
-                    onChange={(e) => setAutreCredit({ ...autreCredit, montant: e.target.value })}
+                    onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setAutreCredit({ ...autreCredit, montant: v }); }}
                     placeholder="Montant FCFA"
                     className="flex-1 min-w-0 bg-surface-elevated text-content-primary px-2 py-1.5 rounded text-xs border border-edge-strong focus:outline-none focus:ring-1 focus:ring-accent"
                   />

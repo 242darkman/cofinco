@@ -895,12 +895,12 @@ export default function TontineContributions({ tontineId }: TontineContributions
                   </label>
                   <input
                     id="montant-input"
-                    type="number"
-                    min="100"
-                    max={VALIDATION_LIMITS.MAX_COTISATION}
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={formData.montant || ''}
                     onChange={(e) => {
-                      setFormData((prev) => ({ ...prev, montant: Number(e.target.value) }));
+                      const v = e.target.value.replace(/[^0-9]/g, '');
+                      setFormData((prev) => ({ ...prev, montant: v ? Number(v) : 0 }));
                       if (errors.montant) setErrors((prev) => ({ ...prev, montant: undefined }));
                     }}
                     className={`w-full bg-surface-base text-content-primary px-3 py-2.5 rounded-lg border focus:outline-none focus:border-accent text-sm ${
@@ -930,10 +930,10 @@ export default function TontineContributions({ tontineId }: TontineContributions
                   </label>
                   <input
                     id="tour-input"
-                    type="number"
-                    min="1"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={formData.tour_numero}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, tour_numero: Number(e.target.value) }))}
+                    onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormData((prev) => ({ ...prev, tour_numero: v ? Number(v) : 0 })); }}
                     className="w-full bg-surface-base text-content-primary px-3 py-2.5 rounded-lg border border-edge focus:outline-none focus:border-accent text-sm"
                   />
                 </div>

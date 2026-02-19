@@ -96,9 +96,9 @@ export default function Tontines() {
           await tontineApi.delete(tontine.id);
           fetchTontines();
           if (selectedTontine?.id === tontine.id) setSelectedTontine(null);
-          toast.success('Tontine supprimée avec succès');
+          toast.success('Tontine supprimée');
         } catch (error) {
-          toast.error(handleApiError(error, 'Erreur lors de la suppression'));
+          toast.error(handleApiError(error, 'Erreur lors de la suppression de la tontine'));
         }
       },
     });

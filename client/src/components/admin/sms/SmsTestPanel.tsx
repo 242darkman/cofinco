@@ -97,7 +97,7 @@ export default function SmsTestPanel({
       onTestComplete?.(result);
 
       if (response.success) {
-        toast.success('SMS de test envoyé avec succès');
+        toast.success('SMS de test envoyé');
       } else {
         toast.error(response.error || 'Échec de l\'envoi du SMS');
       }

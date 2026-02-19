@@ -225,10 +225,10 @@ export default function AdminCreditPlansGestion({
 
       if (editMode && selectedPlan) {
         await creditPlanApi.update(selectedPlan.id, payload);
-        toast.success('Plan modifié avec succès');
+        toast.success('Plan modifié');
       } else {
         await creditPlanApi.create(payload);
-        toast.success('Plan créé avec succès');
+        toast.success('Plan créé');
       }
 
       await loadPlans();
@@ -505,17 +505,18 @@ export default function AdminCreditPlansGestion({
                 <FormField
                   label="Taux d'intérêt (%)"
                   name="taux_interet"
-                  type="number"
+                  inputMode="decimal"
                   value={formData.taux_interet}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, taux_interet: e.target.value})}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => { const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); setFormData({...formData, taux_interet: v}); }}
                 />
                 
                 <FormField
                   label="Durée"
                   name="duree_valeur"
-                  type="number"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   value={formData.duree_valeur}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, duree_valeur: e.target.value})}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormData({...formData, duree_valeur: v}); }}
                 />
                 
                 <SelectField
@@ -554,23 +555,26 @@ export default function AdminCreditPlansGestion({
                 <FormField
                   label={label('Montant Min')}
                   name="montant_min"
-                  type="number"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   value={formData.montant_min}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, montant_min: e.target.value})}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormData({...formData, montant_min: v}); }}
                 />
                 <FormField
                   label={label('Montant Max')}
                   name="montant_max"
-                  type="number"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   value={formData.montant_max}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, montant_max: e.target.value})}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormData({...formData, montant_max: v}); }}
                 />
                 <FormField
                   label={label('Frais Dossier')}
                   name="frais_dossier"
-                  type="number"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   value={formData.frais_dossier}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData({...formData, frais_dossier: e.target.value})}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormData({...formData, frais_dossier: v}); }}
                 />
               </div>
             </div>

@@ -258,7 +258,7 @@ export default function GenerateCodeModal({ isOpen, onClose, onGenerate, generat
             <Check className="w-10 h-10 text-white" />
           </div>
 
-          <h2 className="text-xl font-bold text-content-primary mb-2">Code généré avec succès !</h2>
+          <h2 className="text-xl font-bold text-content-primary mb-2">Code généré</h2>
 
           {selectedUser && (
             <p className="text-content-muted text-sm mb-4">

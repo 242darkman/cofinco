@@ -118,7 +118,7 @@ export default function EpargneSavingsGoals({ compteId, compteSolde, onClose }: 
         setErrors({});
         invalidateObjectifs();
 
-        toast.success('Objectif créé avec succès');
+        toast.success('Objectif créé');
       } catch (error) {
         toast.error(handleApiError(error, "Erreur lors de la création de l'objectif"));
       } finally {
@@ -141,7 +141,7 @@ export default function EpargneSavingsGoals({ compteId, compteSolde, onClose }: 
             invalidateObjectifs();
             toast.success('Objectif supprimé');
           } catch (error) {
-            toast.error(handleApiError(error, 'Erreur lors de la suppression'));
+            toast.error(handleApiError(error, 'Erreur lors de la suppression de l\'objectif'));
           }
         },
       });
@@ -162,7 +162,7 @@ export default function EpargneSavingsGoals({ compteId, compteSolde, onClose }: 
         invalidateObjectifs();
         toast.success('Progression mise à jour');
       } catch (error) {
-        toast.error(handleApiError(error, 'Erreur lors de la mise à jour'));
+        toast.error(handleApiError(error, 'Erreur lors de la mise à jour de l\'objectif'));
       }
     },
     [compteSolde, invalidateObjectifs]
@@ -299,12 +299,12 @@ export default function EpargneSavingsGoals({ compteId, compteSolde, onClose }: 
                   </label>
                   <input
                     id="goal-amount"
-                    type="number"
-                    min="1000"
-                    max={VALIDATION_LIMITS.MAX_EPARGNE}
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     value={formData.montantCible}
                     onChange={(e) => {
-                      setFormData({ ...formData, montantCible: e.target.value });
+                      const v = e.target.value.replace(/[^0-9]/g, '');
+                      setFormData({ ...formData, montantCible: v });
                       if (errors.montantCible) setErrors({ ...errors, montantCible: undefined });
                     }}
                     className={`w-full bg-surface-elevated border rounded-lg px-4 py-2 text-content-primary ${

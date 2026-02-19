@@ -369,7 +369,7 @@ export default function AdminImportCSV({ onClose, onSuccess }: AdminImportCSVPro
   const copyBatchId = () => {
     if (batchId) {
       navigator.clipboard.writeText(batchId);
-      toast.success('ID du lot copié');
+      toast.success('Copié', { duration: 1500 });
     }
   };
 

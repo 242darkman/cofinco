@@ -46,10 +46,10 @@ export default function BilletageInput({ billetage, onChange, total }: Billetage
           <div key={value} className="grid grid-cols-3 gap-2 items-center">
             <span className="text-sm text-content-secondary font-medium">{label} {currencySymbol()}</span>
             <input
-              type="number"
-              min={0}
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={count || ''}
-              onChange={(e) => onChange(String(value), parseInt(e.target.value) || 0)}
+              onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); onChange(String(value), v ? parseInt(v) : 0); }}
               className="bg-surface-elevated border border-edge-strong rounded px-2 py-1.5 text-content-primary text-sm text-center w-full"
               placeholder="0"
             />

@@ -273,7 +273,7 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
         toast.success(
           montantReporte > 0
             ? `Caisse fermée - ${formatMoney(montantReporte)} conservé pour demain`
-            : 'Caisse fermée avec succès'
+            : 'Caisse fermée'
         );
       }
 
@@ -827,10 +827,11 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
                             className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-surface text-content-muted hover:text-content-primary transition-colors"
                           >-</button>
                           <input
-                            type="number"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
                             value={count || ''}
-                            onChange={(e) => updateBilletage(denom.name, parseInt(e.target.value) || 0)}
-                            className="w-12 bg-transparent text-center text-sm font-bold text-content-primary focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); updateBilletage(denom.name, v ? parseInt(v) : 0); }}
+                            className="w-12 bg-transparent text-center text-sm font-bold text-content-primary focus:outline-none"
                             placeholder="0"
                           />
                           <button
@@ -954,10 +955,10 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
                             <div key={name} className="text-center">
                               <label className="text-[10px] text-content-muted block mb-1">{label}</label>
                               <input
-                                type="number"
-                                min={0}
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 value={verificationBilletage[name] || ''}
-                                onChange={(e) => updateVerificationBilletage(name, parseInt(e.target.value) || 0)}
+                                onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); updateVerificationBilletage(name, v ? parseInt(v) : 0); }}
                                 className="w-full px-1.5 py-1.5 bg-surface-base/50 border border-edge rounded text-xs text-content-primary text-center focus:border-status-info/50 outline-none [appearance:textfield]"
                               />
                             </div>
@@ -1036,14 +1037,16 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
                       <label className="text-xs font-medium text-content-secondary">Vers le Coffre-Fort</label>
                     </div>
                     <input
-                      type="number"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       value={montantVersCoffre || ''}
                       onChange={(e) => {
-                        const value = Number(e.target.value) || 0;
+                        const v = e.target.value.replace(/[^0-9]/g, '');
+                        const value = v ? Number(v) : 0;
                         setMontantVersCoffre(Math.max(0, value));
                         setMontantReporte(Math.max(0, montantPhysique - value));
                       }}
-                      className="w-full px-3 py-2 bg-surface-base/50 border border-edge rounded-lg text-base font-bold text-content-primary text-right focus:border-accent/50 focus:ring-1 focus:ring-accent/50 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      className="w-full px-3 py-2 bg-surface-base/50 border border-edge rounded-lg text-base font-bold text-content-primary text-right focus:border-accent/50 focus:ring-1 focus:ring-accent/50 outline-none"
                       placeholder="0"
                     />
                     <p className="text-[10px] text-content-muted mt-1.5">Sera en attente de validation</p>
@@ -1055,14 +1058,16 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
                       <label className="text-xs font-medium text-content-secondary">Fonds Reporté (J+1)</label>
                     </div>
                     <input
-                      type="number"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       value={montantReporte || ''}
                       onChange={(e) => {
-                        const value = Number(e.target.value) || 0;
+                        const v = e.target.value.replace(/[^0-9]/g, '');
+                        const value = v ? Number(v) : 0;
                         setMontantReporte(Math.max(0, value));
                         setMontantVersCoffre(Math.max(0, montantPhysique - value));
                       }}
-                      className="w-full px-3 py-2 bg-surface-base/50 border border-edge rounded-lg text-base font-bold text-content-primary text-right focus:border-status-warning/50 focus:ring-1 focus:ring-status-warning/50 outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      className="w-full px-3 py-2 bg-surface-base/50 border border-edge rounded-lg text-base font-bold text-content-primary text-right focus:border-status-warning/50 focus:ring-1 focus:ring-status-warning/50 outline-none"
                       placeholder="0"
                     />
                     <p className="text-[10px] text-content-muted mt-1.5">Disponible à l'ouverture demain</p>

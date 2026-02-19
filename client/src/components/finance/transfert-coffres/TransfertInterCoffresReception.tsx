@@ -134,7 +134,7 @@ export default function TransfertInterCoffresReception({
       if (result.success) {
         toast.success(
           conforme
-            ? 'Transfert réceptionné avec succès'
+            ? 'Transfert réceptionné'
             : 'Transfert réceptionné avec écart signalé'
         );
         onComplete();
@@ -282,9 +282,10 @@ export default function TransfertInterCoffresReception({
               </label>
               <div className="relative">
                 <input
-                  type="number"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   value={montantRecu}
-                  onChange={(e) => setMontantRecu(e.target.value)}
+                  onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setMontantRecu(v); }}
                   className={`w-full px-4 py-3 bg-surface-base border rounded-xl text-lg font-bold text-content-primary placeholder-content-muted focus:outline-none transition-colors ${
                     hasEcart
                       ? 'border-status-warning/50 focus:border-status-warning focus:ring-2 focus:ring-status-warning/20'

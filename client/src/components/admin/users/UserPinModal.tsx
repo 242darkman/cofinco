@@ -202,7 +202,7 @@ export default function UserPinModal({ isOpen, onClose, userId, userName }: User
 
       // Close after animation
       setTimeout(() => {
-        toast.success('PIN configuré avec succès');
+        toast.success('PIN configuré');
         onClose();
       }, 1800);
     } catch (err: any) {
