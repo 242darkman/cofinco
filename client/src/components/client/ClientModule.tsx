@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, Download, Upload, Users, MapPin, RefreshCw, List, Eye, Edit2, Trash2, ChevronRight, FileText, CreditCard, Shield, BarChart3, AlertCircle, Zap, Building2, Send, DollarSign, UserPlus, LayoutDashboard, User, Phone, Scale, Network } from 'lucide-react';
+import { Plus, Search, Filter, Download, Upload, Users, MapPin, RefreshCw, List, Eye, Edit2, Trash2, ChevronRight, FileText, CreditCard, Shield, BarChart3, AlertCircle, Building2, Send, DollarSign, UserPlus, LayoutDashboard, User, Phone, Scale, Network } from 'lucide-react';
 import { Button, IconButton, Card, ResponsiveTable, Badge, ConfirmDialog, FeatureHeader, FEATURE_DESCRIPTIONS, TabGroup } from '../ui';
 import { usePermissions, ProtectedFeature } from '../auth/ProtectedFeature';
 import ClientForm from './ClientForm';
@@ -21,7 +21,6 @@ import ClientKYC from './ClientKYC';
 import ClientNotes from './ClientNotes';
 import ClientGlobalHistory from './ClientGlobalHistory';
 import ClientAlerts from './ClientAlerts';
-import ClientActions from './ClientActions';
 import ClientBulkCommunication from './ClientBulkCommunication';
 import ClientSearch from './ClientSearch';
 import SelectEmployeeForConversionModal from './SelectEmployeeForConversionModal';
@@ -47,7 +46,7 @@ interface ClientModuleProps {
   activeSubModule?: string;
 }
 
-const CLIENT_TAB_IDS = ['overview', 'profil', 'coordonnees', 'kyc-legal', 'references', 'comptes', 'kyc', 'notes', 'transactions', 'alertes', 'actions'] as const;
+const CLIENT_TAB_IDS = ['overview', 'profil', 'coordonnees', 'kyc-legal', 'references', 'comptes', 'kyc', 'notes', 'transactions', 'alertes'] as const;
 
 export default function ClientModule({ onModuleChange, activeSubModule }: ClientModuleProps) {
   // RBAC permissions
@@ -255,7 +254,6 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
               { key: 'notes', label: 'Notes', icon: Edit2 },
               { key: 'transactions', label: 'Transactions', icon: DollarSign },
               { key: 'alertes', label: 'Alertes', icon: AlertCircle },
-              { key: 'actions', label: 'Actions', icon: Zap },
             ]}
           />
 
@@ -271,7 +269,6 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
             {activeTab === 'notes' && <ClientNotes clientId={viewingClient.id} />}
             {activeTab === 'transactions' && <ClientGlobalHistory clientId={viewingClient.id} />}
             {activeTab === 'alertes' && <ClientAlerts client={viewingClient} onUpdate={loadClients} />}
-            {activeTab === 'actions' && <ClientActions client={viewingClient} onActionComplete={loadClients} />}
           </div>
         </ClientProfileLayout>
 
