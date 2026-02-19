@@ -111,6 +111,7 @@ export const createClientApiSchema = z.object({
   niveauEducation: z.string().optional().nullable(),
   typeClient: z.string().optional().default("PARTICULIER"),
   documents: z.any().optional().nullable(),
+  notes: z.any().optional().nullable(),
   referencesPersonnes: z.any().optional().nullable(),
   sectorId: z.preprocess(v => v === '' ? null : v, z.string().uuid().optional().nullable()),
   segment: z.string().optional().default(SegmentClient.STANDARD),
