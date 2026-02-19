@@ -14,6 +14,12 @@ import {
 import { Card } from '../ui';
 import { ALL_STATUS_LABELS } from '../../lib/status-labels';
 
+const TYPE_COMPTE_LABELS: Record<string, string> = {
+    SAVINGS: 'Épargne',
+    CURRENT: 'Courant',
+    BLOCKED: 'Bloqué',
+};
+
 interface HistoryItem {
     id: string;
     date: string;
@@ -25,6 +31,8 @@ interface HistoryItem {
     referenceExterne?: string;
     statut: string;
     icon: string;
+    numeroCompte?: string | null;
+    typeCompte?: string | null;
 }
 
 interface HistoryResponse {
@@ -183,6 +191,11 @@ export default function ClientGlobalHistory({ clientId }: ClientGlobalHistoryPro
                         <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-content-primary truncate">
                                 {ALL_STATUS_LABELS[item.type] || item.type.replace(/_/g, ' ')}
+                                {item.numeroCompte && (
+                                    <span className="font-normal text-content-muted">
+                                        {' · '}Compte {item.typeCompte ? TYPE_COMPTE_LABELS[item.typeCompte] || item.typeCompte : ''} {item.numeroCompte}
+                                    </span>
+                                )}
                             </p>
                             <p className="text-xs text-content-muted">
                                 {new Date(item.date).toLocaleDateString('fr-FR', {

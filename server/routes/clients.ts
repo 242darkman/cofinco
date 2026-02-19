@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createLogger } from "../lib/logger";
-import { insertTagSchema, insertClientTagSchema, insertClientActivitySchema, clientTags, clientActivities, users, clients, agences, professions, membresTontine, mouvementsFinanciers, remboursements, contributionsTontine, clientDocumentSchema, clientDocumentsArraySchema, type ClientDocument } from "@shared/schema";
+import { insertTagSchema, insertClientTagSchema, insertClientActivitySchema, clientTags, clientActivities, users, clients, agences, professions, membresTontine, mouvementsFinanciers, comptes, remboursements, contributionsTontine, clientDocumentSchema, clientDocumentsArraySchema, type ClientDocument } from "@shared/schema";
 
 const logger = createLogger('Routes:Clients');
 import {
@@ -1828,9 +1828,14 @@ export function registerClientRoutes(app: Express) {
         
 
         
-        // Get all movements for this client
-        const movements = await db.select()
+        // Get all movements for this client, with account info
+        const movements = await db.select({
+            mouvement: mouvementsFinanciers,
+            numeroCompte: comptes.numeroCompte,
+            typeCompte: comptes.typeCompte,
+        })
             .from(mouvementsFinanciers)
+            .leftJoin(comptes, eq(mouvementsFinanciers.compteId, comptes.id))
             .where(and(
                 eq(mouvementsFinanciers.clientId, clientId),
                 gte(mouvementsFinanciers.dateOperation, oneYearAgo)
@@ -1840,19 +1845,23 @@ export function registerClientRoutes(app: Express) {
             .offset((page - 1) * limit);
 
         // Transform to unified history format
-        const history = movements.map((m: any) => ({
-            id: m.id,
-            date: m.dateOperation,
-            type: m.typePaiement || m.sourceModule,
-            sens: m.sens, // 'Débit' or 'Crédit'
-            montant: Number(m.montant),
-            source_module: m.sourceModule,
-            reference: m.reference,
-            reference_externe: m.referenceExterne,
-            statut: m.statut,
-            // Icon mapping for frontend
-            icon: getTransactionIcon(m.sourceModule, m.typePaiement)
-        }));
+        const history = movements.map((row: any) => {
+            const m = row.mouvement;
+            return {
+                id: m.id,
+                date: m.dateOperation,
+                type: m.typePaiement || m.sourceModule,
+                sens: m.sens,
+                montant: Number(m.montant),
+                source_module: m.sourceModule,
+                reference: m.reference,
+                reference_externe: m.referenceExterne,
+                statut: m.statut,
+                numeroCompte: row.numeroCompte || null,
+                typeCompte: row.typeCompte || null,
+                icon: getTransactionIcon(m.sourceModule, m.typePaiement),
+            };
+        });
 
         // Count total for pagination
         const [countResult] = await db.select({ count: sql`count(*)` })
