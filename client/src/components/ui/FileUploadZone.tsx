@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { Upload, X, File, FileText, Image as ImageIcon, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { validateFileSize } from '../../lib/file-validation';
 
 interface UploadedFile {
   file: File;
@@ -90,21 +91,23 @@ export function FileUploadZone({
   };
 
   const handleFiles = useCallback(async (newFiles: FileList | File[]) => {
-    const fileArray = Array.from(newFiles);
-    
+    // Reject oversized files immediately (no preload)
+    const fileArray = Array.from(newFiles).filter(f => validateFileSize(f, maxSize));
+    if (fileArray.length === 0) return;
+
     // Check max files limit
     if (files.length + fileArray.length > maxFiles) {
       alert(`Vous ne pouvez télécharger que ${maxFiles} fichiers maximum`);
       return;
     }
 
-    // Validate and prepare files
+    // Validate and prepare files (type check only, size already checked)
     const validatedFiles: UploadedFile[] = [];
-    
+
     for (const file of fileArray) {
       const error = validateFile(file);
       const preview = await createPreview(file);
-      
+
       validatedFiles.push({
         file,
         preview,

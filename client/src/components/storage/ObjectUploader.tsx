@@ -7,6 +7,7 @@ import "@uppy/core/css/style.min.css";
 import "@uppy/dashboard/css/style.min.css";
 import AwsS3 from "@uppy/aws-s3";
 import Button from "../ui/Button";
+import { MAX_UPLOAD_SIZE_MB } from '@shared/config/storage-paths';
 
 interface ObjectUploaderProps {
   maxNumberOfFiles?: number;
@@ -61,7 +62,7 @@ interface ObjectUploaderProps {
  */
 export function ObjectUploader({
   maxNumberOfFiles = 1,
-  maxFileSize = 10485760, // 10MB default
+  maxFileSize = MAX_UPLOAD_SIZE_MB * 1024 * 1024,
   onGetUploadParameters,
   onComplete,
   buttonClassName,

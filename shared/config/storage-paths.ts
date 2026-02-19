@@ -7,6 +7,9 @@
  * Utilisé côté client ET serveur pour garantir la cohérence.
  */
 
+/** Taille max d'upload par fichier (en Mo) — utilisé par multer (serveur) et la validation client */
+export const MAX_UPLOAD_SIZE_MB = 5;
+
 /**
  * Types de fichiers supportés
  */

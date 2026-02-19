@@ -4,6 +4,7 @@ import { useEntityUpload } from '../../hooks/useEntityUpload';
 import type { StorageFileType, StorageEntityType } from '@shared/config/storage-paths';
 import { useImageCompression } from '../../hooks/useImageCompression';
 import { useSecureDocument } from '../../hooks/useSecureDocument';
+import { validateFileSize } from '../../lib/file-validation';
 
 export type DocumentType = 'ID_CARD_FRONT' | 'ID_CARD_BACK' | 'PROOF_OF_ADDRESS' | 'AVATAR' | 'OTHER';
 
@@ -360,11 +361,15 @@ export function SmartDocumentUpload({
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (!validateFileSize(file, maxSizeMB)) {
+        e.target.value = '';
+        return;
+      }
       handleFileSelect(file);
     }
     // Reset input value to allow re-selecting same file
     e.target.value = '';
-  }, [handleFileSelect]);
+  }, [handleFileSelect, maxSizeMB]);
 
   // Handle click on card
   const handleCardClick = useCallback(() => {

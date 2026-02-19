@@ -3,6 +3,7 @@ import { Upload } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import ProgressBar from '@/components/ui/ProgressBar';
+import { validateFileSize } from '@/lib/file-validation';
 
 interface UploadModalProps {
   isOpen: boolean;
@@ -19,6 +20,10 @@ export default function UploadModal({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (!validateFileSize(file)) {
+        e.target.value = '';
+        return;
+      }
       onUpload(file);
     }
   };
