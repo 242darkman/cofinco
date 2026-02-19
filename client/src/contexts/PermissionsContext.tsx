@@ -172,36 +172,28 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
       if (!currentUser) return;
 
       let shouldRefresh = false;
-      let showPermissionToast = false;
 
       // Check if update is relevant for current user based on scope
       switch (payload.scope) {
         case 'user':
-          // Only refresh if this update targets the current user
           if (payload.userId === currentUser.id) {
             shouldRefresh = true;
-            showPermissionToast = true;
           }
           break;
 
-        case 'role':
-          // Refresh if user has the affected role
-          // Note: currentUser.role is the primary role
+        case 'role': {
           const userRoles = (currentUser as any).roles || [currentUser.role];
           if (payload.role && userRoles.includes(payload.role)) {
             shouldRefresh = true;
-            showPermissionToast = true;
           }
           break;
+        }
 
         case 'global':
-          // Global updates affect everyone
           shouldRefresh = true;
-          showPermissionToast = true;
           break;
 
         default:
-          // Unknown scope - refresh to be safe
           shouldRefresh = true;
       }
 
@@ -220,19 +212,7 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
           setRbacServerVersion(payload.version);
         }
 
-        // 🔔 UX Feedback: Notify user that their permissions changed
-        if (showPermissionToast && payload.changed) {
-          const action = payload.changed.granted ? 'accordée' : 'révoquée';
-          toast.info('Droits mis à jour', {
-            description: `Permission ${payload.changed.permissionCode} ${action}. L'interface s'est adaptée.`,
-            duration: 5000,
-          });
-        } else if (showPermissionToast) {
-          toast.info('Droits mis à jour', {
-            description: "Vos permissions ont été modifiées par l'administrateur. L'interface s'est adaptée.",
-            duration: 5000,
-          });
-        }
+        // Permissions are refreshed silently - UI adapts automatically via permissionsVersion.
       }
     };
 
@@ -245,9 +225,8 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
       if (!currentUser) return;
 
       let shouldRefresh = false;
-      let showPermissionToast = false;
 
-      // 🛡️ Kill Switch: Handle user status changes (suspension/deactivation)
+      // Kill Switch: Handle user status changes (suspension/deactivation)
       if (payload.entity === 'user_status') {
         handleUserStatusChange(payload);
         return;
@@ -259,16 +238,13 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
         const userRoles = (currentUser as any).roles || [currentUser.role];
         if (userRoles.includes(payload.role)) {
           shouldRefresh = true;
-          showPermissionToast = true;
         }
       } else if (payload.entity === 'user_permission') {
         if (payload.userId === currentUser.id) {
           shouldRefresh = true;
-          showPermissionToast = true;
         }
       } else if (payload.type === 'reseed') {
         shouldRefresh = true;
-        showPermissionToast = true;
       } else {
         shouldRefresh = true;
       }
@@ -277,12 +253,7 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
         console.log('🔄 Legacy RBAC Update received, refreshing permissions...');
         await refreshPermissions();
 
-        if (showPermissionToast) {
-          toast.info('Droits mis à jour', {
-            description: "Vos permissions ont été modifiées par l'administrateur. L'interface s'est adaptée.",
-            duration: 5000,
-          });
-        }
+        // Permissions are refreshed silently - UI adapts automatically.
       }
     };
 

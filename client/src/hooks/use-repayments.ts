@@ -190,7 +190,7 @@ export function useReverseRepayment() {
       queryClient.invalidateQueries({ queryKey: ['creditSchedule'] });
       queryClient.invalidateQueries({ queryKey: ['credit'] });
 
-      toast.success(data.message || 'Remboursement extourné avec succès');
+      toast.success(data.message || 'Remboursement extourné');
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Erreur lors de l\'extourne');

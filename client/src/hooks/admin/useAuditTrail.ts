@@ -117,7 +117,7 @@ export function useAuditTrail() {
       const response = await auditApi.rollback(auditLogId);
 
       if (response?.success) {
-        toast.success('Action annulée avec succès');
+        toast.success('Action annulée');
         return true;
       } else {
         toast.error(response?.error || 'Impossible d\'annuler cette action');

@@ -122,7 +122,7 @@ export function useTemporaryPermissions(userId?: string) {
 
       toast({
         title: 'Permission révoquée',
-        description: 'La permission temporaire a été révoquée avec succès',
+        description: 'La permission temporaire a été révoquée',
       });
 
       // Refresh list

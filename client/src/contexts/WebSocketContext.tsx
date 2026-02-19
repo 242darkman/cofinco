@@ -3,7 +3,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { authService } from '../lib/auth';
 import { hardRedirectToLogin } from '../lib/navigation';
-import { formatMoney } from '../lib/format';
 import { useServerHealth } from './ServerHealthContext';
 import {
   balanceKeys,
@@ -27,8 +26,8 @@ type MessageType =
   // =============================================
   // MESSAGING
   // =============================================
-  // V1 - Messages directs
-  | "CHAT_MESSAGE" | "TYPING" | "READ_RECEIPT"
+  // V1 - Typing (still used for DM typing indicators)
+  | "TYPING" | "READ_RECEIPT"
   // V2 - Conversations
   | "CHAT_MESSAGE_V2" | "TYPING_V2" | "READ_UPDATE"
   | "CONVERSATION_UPDATE" | "MESSAGE_REACTION" | "MESSAGE_DELETED" | "MESSAGE_EDITED"
@@ -141,7 +140,6 @@ const processedEventIds = new Set<string>();
 
 // Messages that should be buffered when offline
 const BUFFERABLE_TYPES: MessageType[] = [
-  'CHAT_MESSAGE',
   'TYPING',
   'TYPING_V2',
   'LOCATION_UPDATE',
@@ -413,20 +411,14 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
         break;
       }
 
-      // Legacy V1 handler (backward compat for any remaining V1 code)
-      case "CHAT_MESSAGE": {
-        const newMessage = message.payload;
-        queryClient.invalidateQueries({ queryKey: ["v2", "conversations"] });
-        if (newMessage.senderId !== user?.id) {
-          toast.info(`Nouveau message reçu`);
-        }
-        break;
-      }
 
       case "NOTIFICATION":
         // Handle forced logout from admin
         if (message.payload.type === 'FORCE_LOGOUT' || message.payload.forceLogout) {
-          toast.error('Votre session a été terminée par un administrateur. Vous allez être déconnecté.');
+          toast.error('Votre session a été terminée par un administrateur.', {
+            id: 'session-expired',
+            duration: 5000,
+          });
           setTimeout(() => {
             authService.logout();
             hardRedirectToLogin('Session terminée par un administrateur');
@@ -809,14 +801,10 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
       case "SESSION_TIMEOUT":
          // Check if this timeout applies to current user
          if (message.payload.caissierId === user?.id || message.payload.userId === user?.id || message.payload.sessionId === (user as any)?.sessionId) {
-            toast.error("Votre session a expiré suite à une période d'inactivité.", {
-              duration: Infinity, // Require manual dismissal or it stays until redirect
-              action: {
-                label: "Se reconnecter",
-                onClick: () => window.location.reload()
-              }
+            toast.error("Session expirée suite à une période d'inactivité.", {
+              id: 'session-expired',
+              duration: 5000,
             });
-            // Delay slightly to let user see toast, then logout
             setTimeout(() => {
                 authService.logout();
                 window.location.reload();
@@ -836,9 +824,10 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
 
       case "FORCE_LOGOUT":
          if (message.payload.userId === user?.id) {
-             toast.error("DÉCONNEXION FORCÉE", {
-                 description: message.payload.reason || "Un administrateur a terminé votre session.",
-                 duration: 5000
+             toast.error("Session terminée par un administrateur", {
+                 id: 'session-expired',
+                 description: message.payload.reason || undefined,
+                 duration: 5000,
              });
              setTimeout(() => {
                  authService.logout();
@@ -849,9 +838,10 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
 
       case "SESSION_INVALID":
          // Session invalidated server-side via WebSocket heartbeat - immediate logout
-         toast.error("SESSION EXPIRÉE", {
-             description: message.payload.message || "Votre session a expiré. Veuillez vous reconnecter.",
-             duration: 5000
+         toast.error("Session expirée", {
+             id: 'session-expired',
+             description: message.payload.message || "Veuillez vous reconnecter.",
+             duration: 5000,
          });
          setTimeout(() => {
              authService.logout();
@@ -862,9 +852,10 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
       case "SESSION_HEARTBEAT_RESPONSE":
          // WebSocket heartbeat response - logout if invalid
          if (!message.payload.valid) {
-           toast.error("SESSION EXPIRÉE", {
-               description: "Votre session n'est plus valide.",
-               duration: 5000
+           toast.error("Session expirée", {
+               id: 'session-expired',
+               description: "Veuillez vous reconnecter.",
+               duration: 5000,
            });
            setTimeout(() => {
                authService.logout();
@@ -896,13 +887,8 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          // Dispatch custom event for components that need direct updates
          window.dispatchEvent(new CustomEvent('balance-updated', { detail: message.payload }));
 
-         // Real-time feedback toast for significant operations
-         const { delta, sourceModule, typePaiement: balanceTypePaiement } = message.payload;
-         if (delta && (entityType === 'coffre' || entityType === 'caisse')) {
-           const label = entityType === 'coffre' ? 'Coffre-fort' : 'Caisse';
-           const direction = delta > 0 ? '+' : '';
-           toast.info(`${label} mis à jour : ${direction}${formatMoney(delta)}`, { duration: 3000 });
-         }
+         // Balance updates are reflected in the UI via query invalidation below.
+         // No toast needed - avoids spam during high-activity periods.
 
          // Invalidate relevant queries using centralized query keys
          // SOURCE UNIQUE: Toutes les invalidations financières passent par ici
@@ -1012,13 +998,6 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          }
          debounceInvalidate(compteKeys.epargne());
          window.dispatchEvent(new CustomEvent('scheduled-transfer-executed', { detail: message.payload }));
-
-         // Toast notification si succès ou échec
-         if (message.payload?.success) {
-           toast.success('Virement programmé exécuté avec succès');
-         } else if (message.payload?.error) {
-           toast.error(`Échec virement programmé: ${message.payload.error}`);
-         }
          break;
 
       case "SCHEDULED_TRANSFERS_BATCH_COMPLETED":
@@ -1029,16 +1008,6 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          debounceInvalidate(compteKeys.epargne());
          debounceInvalidate(dashboardKeys.stats());
          window.dispatchEvent(new CustomEvent('scheduled-transfers-batch-completed', { detail: message.payload }));
-
-         // Toast récapitulatif pour les admins
-         const { success, skipped, failed } = message.payload || {};
-         if (typeof success === 'number' || typeof failed === 'number') {
-           if (failed > 0) {
-             toast.warning(`Virements programmés: ${success || 0} succès, ${failed} échecs, ${skipped || 0} ignorés`);
-           } else {
-             toast.success(`Virements programmés: ${success || 0} exécutés avec succès`);
-           }
-         }
          break;
 
       // ============================================

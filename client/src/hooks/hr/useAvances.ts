@@ -36,7 +36,7 @@ export function useAvances() {
       toast.success('Demande d\'avance créée');
       queryClient.invalidateQueries({ queryKey: hrKeys.avances() });
     },
-    onError: () => toast.error('Erreur lors de la création'),
+    onError: () => toast.error('Erreur lors de la création de l\'avance'),
   });
 
   const approveMutation = useMutation({
@@ -45,7 +45,7 @@ export function useAvances() {
       toast.success('Avance approuvée');
       queryClient.invalidateQueries({ queryKey: hrKeys.avances() });
     },
-    onError: () => toast.error('Erreur lors de l\'approbation'),
+    onError: () => toast.error('Erreur lors de l\'approbation de l\'avance'),
   });
 
   const rejectMutation = useMutation({
@@ -54,7 +54,7 @@ export function useAvances() {
       toast.success('Avance rejetée');
       queryClient.invalidateQueries({ queryKey: hrKeys.avances() });
     },
-    onError: () => toast.error('Erreur lors du rejet'),
+    onError: () => toast.error('Erreur lors du rejet de l\'avance'),
   });
 
   const payMutation = useMutation({
@@ -63,7 +63,7 @@ export function useAvances() {
       toast.success('Avance payée');
       queryClient.invalidateQueries({ queryKey: hrKeys.avances() });
     },
-    onError: () => toast.error('Erreur lors du paiement'),
+    onError: () => toast.error('Erreur lors du paiement de l\'avance'),
   });
 
   const deductMutation = useMutation({
@@ -73,7 +73,7 @@ export function useAvances() {
       toast.success('Avance déduite du salaire');
       queryClient.invalidateQueries({ queryKey: hrKeys.avances() });
     },
-    onError: () => toast.error('Erreur lors de la déduction'),
+    onError: () => toast.error('Erreur lors de la déduction de l\'avance'),
   });
 
   return {

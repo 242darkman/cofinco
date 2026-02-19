@@ -60,7 +60,7 @@ export const useReceiptActions = () => {
         await navigator.clipboard.writeText(
           `${shareData.title}\n${shareData.text}\n${shareData.url}`
         );
-        toast.success('Détails copiés dans le presse-papier');
+        toast.success('Copié', { duration: 1500 });
       }
     } catch (error) {
       if ((error as Error).name !== 'AbortError') {

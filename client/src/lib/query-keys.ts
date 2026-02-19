@@ -320,10 +320,6 @@ export const loyaltyKeys = {
 // ============================================
 
 export const messageKeys = {
-  conversations: () => ['/api/messages/conversations'] as const,
-  messages: (userId: string) => ['/api/messages', userId] as const,
-
-  // V2
   conversationsV2: () => ['/api/conversations'] as const,
   conversationMessages: (conversationId: string) => ['/api/conversations', conversationId, 'messages'] as const,
 };

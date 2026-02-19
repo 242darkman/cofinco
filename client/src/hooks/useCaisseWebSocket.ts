@@ -149,7 +149,7 @@ export function useCaisseWebSocket({
             // Show toast notification based on update type
             const updateType = data.payload?.type;
             if (updateType === 'SESSION_OPENED') {
-                toast.success('✓ Session ouverte avec succès', {
+                toast.success('Session ouverte', {
                     duration: 3000,
                     description: `Solde: ${Number(data.payload.newBalance || 0).toLocaleString()} FCFA`,
                 });

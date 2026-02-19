@@ -134,7 +134,7 @@ export function useDemandes() {
     },
     onSuccess: () => {
       invalidateAll();
-      toast.success('Demande supprimée', { description: 'La demande a été supprimée avec succès' });
+      toast.success('Demande supprimée');
     },
     onError: (err: Error) => {
       toast.error('Échec de la suppression', { description: err.message });
@@ -155,7 +155,7 @@ export function useDemandes() {
     },
     onSuccess: () => {
       invalidateAll();
-      toast.success('Demande annulée', { description: 'La demande a été annulée avec succès' });
+      toast.success('Demande annulée');
     },
     onError: (err: Error) => {
       toast.error("Échec de l'annulation", { description: err.message });

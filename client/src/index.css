@@ -899,3 +899,123 @@ body.modal-open {
 .animate-pulse-subtle {
   animation: pulse-subtle 2s ease-in-out infinite;
 }
+
+/* ─── CreateClientModal wizard: Uniform form controls ─── */
+
+/* Base: 44px height, 16px padding, 12px radius */
+.wizard-form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.wizard-form select {
+  height: 2.75rem !important;
+  padding-left: 1rem !important;
+  padding-right: 1rem !important;
+  border-radius: 0.75rem !important;
+  font-size: 0.875rem !important;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* Select: extra right padding for chevron (icon at 12px from right edge) */
+.wizard-form select {
+  padding-right: 2.5rem !important;
+}
+
+/* SearchableSelect trigger: match 44px height */
+.wizard-form div[data-state] {
+  min-height: 2.75rem !important;
+  height: 2.75rem !important;
+  border-radius: 0.75rem !important;
+  font-size: 0.875rem !important;
+}
+
+/* SearchableSelect inner search input: reset overrides */
+.wizard-form div[data-state] input {
+  height: auto !important;
+  min-height: auto !important;
+  padding: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  white-space: normal !important;
+  overflow: visible !important;
+}
+
+/* PhoneInput: unified group container */
+.wizard-form .phone-input-group {
+  height: 2.75rem !important;
+  border-radius: 0.75rem !important;
+}
+.wizard-form .phone-input-group .phone-prefix {
+  font-size: 0.875rem !important;
+}
+.wizard-form .phone-input-group input {
+  height: 100% !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding-left: 0.75rem !important;
+  padding-right: 1rem !important;
+}
+.wizard-form .phone-input-group:focus-within {
+  border-color: var(--input-focus) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--input-focus) 20%, transparent) !important;
+}
+
+/* Active / touch feedback */
+.wizard-form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):active:not(:focus),
+.wizard-form select:active:not(:focus),
+.wizard-form div[data-state]:active:not([data-state="open"]) {
+  transform: scale(0.995);
+  transition: transform 0.1s ease;
+}
+
+/* Focus ring consistency */
+.wizard-form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
+.wizard-form select:focus {
+  border-color: var(--input-focus) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--input-focus) 20%, transparent) !important;
+  outline: none !important;
+}
+
+/* ─── POS / Touch devices: 48px targets, 16px min font ─── */
+@media (pointer: coarse), (max-width: 600px) {
+  .wizard-form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+  .wizard-form select {
+    height: 3rem !important;
+    font-size: 1rem !important;
+  }
+
+  .wizard-form div[data-state] {
+    min-height: 3rem !important;
+    height: 3rem !important;
+    font-size: 1rem !important;
+  }
+
+  .wizard-form .phone-input-group {
+    height: 3rem !important;
+  }
+
+  .wizard-form .phone-input-group .phone-prefix {
+    font-size: 1rem !important;
+  }
+
+  .wizard-form .phone-input-group input {
+    font-size: 1rem !important;
+  }
+
+  /* Toggle buttons: 48px on touch */
+  .wizard-form .h-11 {
+    height: 3rem !important;
+  }
+
+  /* Stronger active feedback for touch */
+  .wizard-form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):active,
+  .wizard-form select:active,
+  .wizard-form div[data-state]:active:not([data-state="open"]) {
+    transform: scale(0.98);
+    background-color: color-mix(in srgb, var(--input-bg) 90%, var(--accent-primary)) !important;
+    transition: transform 0.1s ease, background-color 0.1s ease;
+  }
+}

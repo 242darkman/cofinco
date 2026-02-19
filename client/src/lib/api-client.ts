@@ -1706,18 +1706,53 @@ export const marcheApi = {
   delete: (id: string) => request<any>(`/marches/${id}`, { method: 'DELETE' }),
 };
 
-// Départements & Villes API
+// Régions (ADM1) API
+export const regionApi = {
+  getAll: (params?: { paysId?: string; actif?: boolean }) => {
+    const q = buildQuery(params as Record<string, unknown>);
+    return request<any[]>(`/regions${q ? `?${q}` : ''}`);
+  },
+  getById: (id: string) => request<any>(`/regions/${id}`),
+};
+
+// Départements (ADM2) API
 export const departementApi = {
-  getAll: (params?: { actif?: boolean }) =>
-    request<any[]>(`/departements${params?.actif !== undefined ? `?actif=${params.actif}` : ''}`),
+  getAll: (params?: { regionId?: string; paysId?: string; actif?: boolean }) => {
+    const q = buildQuery(params as Record<string, unknown>);
+    return request<any[]>(`/departements${q ? `?${q}` : ''}`);
+  },
+};
+
+// Villes API (mondial, avec support autocomplete)
+export const paysApi = {
+  getAll: (params?: { actif?: boolean; search?: string }) => {
+    const q = buildQuery(params as Record<string, unknown>);
+    return request<any[]>(`/pays${q ? `?${q}` : ''}`);
+  },
 };
 
 export const villeApi = {
-  getAll: (params?: { departementId?: string; actif?: boolean }) => {
+  getAll: (params?: { regionId?: string; paysId?: string; actif?: boolean; search?: string; limit?: number }) => {
     const q = buildQuery(params as Record<string, unknown>);
     return request<any[]>(`/villes${q ? `?${q}` : ''}`);
   },
   getById: (id: string) => request<any>(`/villes/${id}`),
+};
+
+export interface LocalityOption {
+  id: string;
+  type: 'CITY' | 'DISTRICT';
+  name: string;
+  regionName: string | null;
+  population: number | null;
+  isChefLieu: boolean;
+}
+
+export const localityApi = {
+  getAll: (params: { paysId: string; search?: string; limit?: number }) => {
+    const q = buildQuery(params as Record<string, unknown>);
+    return request<LocalityOption[]>(`/localities${q ? `?${q}` : ''}`);
+  },
 };
 
 // Prospection Primes API
@@ -2661,18 +2696,18 @@ export const smsApi = {
     }),
 };
 
-// Types Marchés API
-export const typeMarcheApi = {
-  getAll: () => request<any[]>('/types-marches'),
-  create: (data: any) => request<any>('/types-marches', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }),
-  update: (id: string, data: any) => request<any>(`/types-marches/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify(data),
-  }),
-  delete: (id: string) => request<any>(`/types-marches/${id}`, { method: 'DELETE' }),
+// Catalog API (sectors, professions, activity types)
+export const catalogApi = {
+  getOptions: (filters?: { professionId?: string; sectorId?: string; activityTypeId?: string }) => {
+    const params = new URLSearchParams();
+    if (filters?.professionId) params.set('profession_id', filters.professionId);
+    if (filters?.sectorId) params.set('sector_id', filters.sectorId);
+    if (filters?.activityTypeId) params.set('activity_type_id', filters.activityTypeId);
+    const qs = params.toString();
+    return request<any>(`/catalog/options${qs ? `?${qs}` : ''}`);
+  },
+  search: (q: string, type: 'profession' | 'sector' = 'profession', limit = 20) =>
+    request<any[]>(`/catalog/search?q=${encodeURIComponent(q)}&type=${type}&limit=${limit}`),
 };
 
 
