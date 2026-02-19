@@ -1,10 +1,10 @@
 
-import { db } from './db';
+import { db } from '../server/db';
 import { modules, permissions, rolePermissions } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { MODULES_DATA, PERMISSIONS_DATA, SEED_ROLE_PERMISSIONS } from '@shared/config/rbac';
 import type { SystemRole } from '@shared/types/roles';
-import { createLogger } from './lib/logger';
+import { createLogger } from '../server/lib/logger';
 
 const logger = createLogger('SeedRBAC');
 

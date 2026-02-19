@@ -100,7 +100,7 @@ async function main() {
   console.log(`\n${YELLOW}[3/3] Seeding database...${RESET}`);
 
   try {
-    execSync("node --env-file=.env --import tsx server/seed-prod.ts", {
+    execSync("node --env-file=.env --import tsx seeds/seed-prod.ts", {
       cwd,
       stdio: "inherit",
     });

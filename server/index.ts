@@ -237,7 +237,7 @@ app.get("/api/health", async (_req, res) => {
   // Ensures permission codes like comptes.suspend, comptes.close_initiate exist
   // and role_permissions are in sync with shared/config/rbac.ts
   try {
-    const { seedRBAC } = await import('./seed-rbac-logic');
+    const { seedRBAC } = await import('../seeds/seed-rbac-logic');
     await seedRBAC();
     logger.info('RBAC permissions synced from config');
   } catch (error) {

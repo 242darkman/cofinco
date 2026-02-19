@@ -14,12 +14,14 @@
  *   pnpm seed:prod --force      # Force reset config (dangereux)
  */
 
-import { db, pool } from './db';
-import { eq, count, and, isNull } from 'drizzle-orm';
+import { db, pool } from '../server/db';
+import { eq, count, and, isNull, sql } from 'drizzle-orm';
 import { seedRBAC } from './seed-rbac-logic';
-import { generateMatricule } from './storage/employes';
-import { ensureCustomFunctions } from './db';
-import { createLogger } from './lib/logger';
+import { generateMatricule } from '../server/storage/employes';
+import { ensureCustomFunctions } from '../server/db';
+import { createLogger } from '../server/lib/logger';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 
 const logger = createLogger('SeedProd');
 import {
@@ -30,11 +32,9 @@ import {
   rolePermissions,
   agences,
   zones,
-  departements,
   villes,
   arrondissements,
   marches,
-  typesMarches,
   tags,
   systemSettings,
   featureFlags,
@@ -68,6 +68,8 @@ import {
   criticalPermissionPatterns,
   rbacVersions,
 } from '@shared/schema';
+import { pays } from '@shared/schema/pays';
+import { seedRegions, migrateCongoDeptsToRegions, seedDepartementsADM2, cleanupLegacyDepts, loadGeonamesStaging, enrichFromStaging } from './seed-geography-world';
 import { departments, jobPositions, employes, payrollConfig, conventionsCollectives, qualificationCoefficients, chargeDefinitions, rubriqueDefinitions, payrollGlMapping, irppBaremes } from '@shared/schema';
 import { accountingRules } from '@shared/schema/accounting';
 import { caissesAgent } from '@shared/schema/caisse-agent';
@@ -76,7 +78,9 @@ import { tontineRulesets } from '@shared/schema/tontines';
 import { configEcartCaisse } from '@shared/schema/caisse-closing';
 import { currencyPresets } from '@shared/schema/settings';
 import { mmFeeSchedules } from '@shared/schema/mm-fee-schedules';
-import { hashPassword } from './auth';
+import { sectors, professions, activityTypes, professionSectors, professionActivityTypes, sectorActivityTypes } from '@shared/schema/catalog';
+import { ACTIVITY_TYPES_DATA, SECTORS_DATA, PROFESSIONS_DATA } from './seed-catalog';
+import { hashPassword } from '../server/auth';
 import { SystemRole } from '@shared/types/roles';
 import { StatutUser, StatutCoffre, TypeAgence, StatutCaisse } from '@shared/enum/status-constants';
 import { MODULES_DATA } from '@shared/config/rbac';
@@ -150,43 +154,6 @@ const ZONES_DATA = [
   { nom: 'Port Autonome', ville: 'Pointe-Noire', description: 'Zone portuaire et logistique', statut: StatutUser.ACTIVE }
 ];
 
-// ===== Données géographiques Congo-Brazzaville =====
-
-const DEPARTEMENTS_GEO_DATA = [
-  { nom: 'Bouenza', chefLieu: 'Madingou' },
-  { nom: 'Cuvette', chefLieu: 'Owando' },
-  { nom: 'Cuvette-Ouest', chefLieu: 'Ewo' },
-  { nom: 'Kouilou', chefLieu: 'Hinda' },
-  { nom: 'Lékoumou', chefLieu: 'Sibiti' },
-  { nom: 'Likouala', chefLieu: 'Impfondo' },
-  { nom: 'Niari', chefLieu: 'Dolisie' },
-  { nom: 'Plateaux', chefLieu: 'Djambala' },
-  { nom: 'Pool', chefLieu: 'Kinkala' },
-  { nom: 'Sangha', chefLieu: 'Ouesso' },
-  { nom: 'Brazzaville', chefLieu: 'Brazzaville' },
-  { nom: 'Pointe-Noire', chefLieu: 'Pointe-Noire' },
-];
-
-const VILLES_GEO_DATA: { nom: string; departement: string; lat: string; lng: string; isChefLieu: boolean }[] = [
-  { nom: 'Brazzaville', departement: 'Brazzaville', lat: '-4.2634', lng: '15.2429', isChefLieu: true },
-  { nom: 'Pointe-Noire', departement: 'Pointe-Noire', lat: '-4.7692', lng: '11.8664', isChefLieu: true },
-  { nom: 'Dolisie', departement: 'Niari', lat: '-4.1986', lng: '12.6716', isChefLieu: true },
-  { nom: 'Nkayi', departement: 'Bouenza', lat: '-4.1744', lng: '13.2847', isChefLieu: false },
-  { nom: 'Sibiti', departement: 'Lékoumou', lat: '-3.6833', lng: '13.35', isChefLieu: true },
-  { nom: 'Impfondo', departement: 'Likouala', lat: '1.6217', lng: '18.0647', isChefLieu: true },
-  { nom: 'Ouesso', departement: 'Sangha', lat: '1.6136', lng: '16.0517', isChefLieu: true },
-  { nom: 'Owando', departement: 'Cuvette', lat: '-0.4833', lng: '15.9', isChefLieu: true },
-  { nom: 'Madingou', departement: 'Bouenza', lat: '-4.1533', lng: '13.55', isChefLieu: true },
-  { nom: 'Kinkala', departement: 'Pool', lat: '-4.3564', lng: '14.7647', isChefLieu: true },
-  { nom: 'Djambala', departement: 'Plateaux', lat: '-2.5447', lng: '14.7553', isChefLieu: true },
-  { nom: 'Ewo', departement: 'Cuvette-Ouest', lat: '-0.8667', lng: '14.82', isChefLieu: true },
-  { nom: 'Mossendjo', departement: 'Niari', lat: '-2.95', lng: '12.7', isChefLieu: false },
-  { nom: 'Gamboma', departement: 'Plateaux', lat: '-1.8833', lng: '15.8667', isChefLieu: false },
-  { nom: 'Loutété', departement: 'Bouenza', lat: '-4.2833', lng: '13.5667', isChefLieu: false },
-  { nom: 'Mouyondzi', departement: 'Bouenza', lat: '-4.0', lng: '13.9667', isChefLieu: false },
-  { nom: 'Kindamba', departement: 'Pool', lat: '-3.7833', lng: '14.5167', isChefLieu: false },
-  { nom: 'Hinda', departement: 'Kouilou', lat: '-4.485', lng: '11.866', isChefLieu: true },
-];
 
 // Arrondissements by ville
 const ARRONDISSEMENTS_SEED: Record<string, string[]> = {
@@ -211,39 +178,6 @@ const MARCHES_SEED: Record<string, string[]> = {
   'Mongo-MPoukou': ['Tystère 2', 'Siafoumou', 'Tchiali', 'Makayabou', 'La patience', 'Faubourg', 'Terre jaune'],
   'Ngoyo': ['Ngoyo Péage', 'Dubaï (fond tié-tié)', 'Patra', 'Tchimbambouka', 'Mpaka'],
 };
-
-const TYPES_MARCHES_DATA = [
-  { nom: 'Commerce Général', description: 'Vente de produits divers (alimentaire et non alimentaire)', actif: true },
-  { nom: 'Alimentation', description: 'Vente de denrées alimentaires, épiceries, boutiques', actif: true },
-  { nom: 'Marchands de Marché', description: 'Vendeurs installés dans les marchés', actif: true },
-  { nom: 'Commerces de Rue', description: 'Vendeurs ambulants et kiosques', actif: true },
-  { nom: 'Restauration', description: 'Restaurants, gargotes, fast-foods', actif: true },
-  { nom: 'Boulangerie & Pâtisserie', description: 'Fabrication et vente de pain et pâtisseries', actif: true },
-  { nom: 'Boucherie & Poissonnerie', description: 'Vente de viande, poisson frais ou fumé', actif: true },
-  { nom: 'Agriculture', description: 'Cultures vivrières et commerciales', actif: true },
-  { nom: 'Élevage', description: 'Élevage de volailles, porcs, bovins, etc.', actif: true },
-  { nom: 'Pêche', description: 'Pêche artisanale et vente de poissons', actif: true },
-  { nom: 'Transformation Agroalimentaire', description: 'Transformation de produits agricoles', actif: true },
-  { nom: 'Artisanat', description: 'Métiers artisanaux et production locale', actif: true },
-  { nom: 'Couture & Stylisme', description: 'Tailleurs, stylistes, retoucheurs', actif: true },
-  { nom: 'Coiffure & Esthétique', description: 'Salons de coiffure, esthétique et beauté', actif: true },
-  { nom: 'Menuiserie', description: 'Fabrication de meubles et ouvrages en bois', actif: true },
-  { nom: 'Maçonnerie & BTP', description: 'Travaux de construction et rénovation', actif: true },
-  { nom: 'Soudure & Métallerie', description: 'Travaux de soudure et fabrication métallique', actif: true },
-  { nom: 'Transport', description: 'Taxi, moto-taxi, transport de marchandises', actif: true },
-  { nom: 'Logistique & Livraison', description: 'Services de livraison et transport local', actif: true },
-  { nom: 'Téléphonie & Mobile Money', description: 'Crédit téléphonique, mobile money, kiosques', actif: true },
-  { nom: 'Informatique & Télécoms', description: 'Services informatiques et maintenance', actif: true },
-  { nom: 'Pharmacie & Produits de Santé', description: 'Vente de médicaments et produits médicaux', actif: true },
-  { nom: 'Soins & Bien-être', description: 'Centres de soins, massage, bien-être', actif: true },
-  { nom: 'Éducation & Formation', description: 'Écoles privées, formations professionnelles', actif: true },
-  { nom: 'Services Administratifs', description: 'Cybercafés, impression, secrétariat', actif: true },
-  { nom: 'Immobilier', description: 'Location, gestion de biens immobiliers', actif: true },
-  { nom: 'Hôtellerie & Hébergement', description: 'Hôtels, auberges, maisons d\'hôtes', actif: true },
-  { nom: 'Industrie & Production', description: 'Petites unités de production locale', actif: true },
-  { nom: 'Import – Export', description: 'Commerce international et distribution', actif: true },
-  { nom: 'Services Divers', description: 'Autres activités génératrices de revenus', actif: true }
-];
 
 const TAGS_DATA = [
   { name: 'VIP', color: '#f59e0b', type: 'category' },
@@ -2410,6 +2344,132 @@ async function upsertByName<T extends { nom: string }>(
 // SEED MODULES
 // ============================================================================
 
+// ============================================================================
+// PAYS (ISO-3166) — from seeds/all.json
+// ============================================================================
+
+// Indicatifs téléphoniques pour les pays les plus pertinents (Afrique + majeurs)
+const INDICATIFS_TEL: Record<string, string> = {
+  CG: '+242', CD: '+243', CM: '+237', GA: '+241', TD: '+235', CF: '+236', GQ: '+240',
+  FR: '+33', BE: '+32', CH: '+41', CA: '+1', US: '+1', GB: '+44', DE: '+49',
+  SN: '+221', CI: '+225', BF: '+226', ML: '+223', GN: '+224', BJ: '+229',
+  TG: '+228', NE: '+227', MR: '+222', NG: '+234', GH: '+233', KE: '+254',
+  TZ: '+255', UG: '+256', RW: '+250', BI: '+257', ZA: '+27', AO: '+244',
+  MZ: '+258', MG: '+261', MA: '+212', DZ: '+213', TN: '+216', EG: '+20',
+  ET: '+251', SD: '+249', LY: '+218', ZM: '+260', ZW: '+263', MW: '+265',
+  NA: '+264', BW: '+267', LS: '+266', SZ: '+268', SC: '+248', MU: '+230',
+  DJ: '+253', SO: '+252', ER: '+291', SS: '+211', CN: '+86', IN: '+91',
+  JP: '+81', BR: '+55', RU: '+7', AU: '+61', MX: '+52', TR: '+90',
+  SA: '+966', AE: '+971', PT: '+351', ES: '+34', IT: '+39', NL: '+31',
+};
+
+// Devises pour les pays pertinents
+const DEVISES: Record<string, string> = {
+  CG: 'XAF', CD: 'CDF', CM: 'XAF', GA: 'XAF', TD: 'XAF', CF: 'XAF', GQ: 'XAF',
+  FR: 'EUR', BE: 'EUR', DE: 'EUR', ES: 'EUR', IT: 'EUR', PT: 'EUR', NL: 'EUR',
+  US: 'USD', GB: 'GBP', CH: 'CHF', CA: 'CAD', JP: 'JPY', CN: 'CNY',
+  SN: 'XOF', CI: 'XOF', BF: 'XOF', ML: 'XOF', GN: 'GNF', BJ: 'XOF',
+  TG: 'XOF', NE: 'XOF', NG: 'NGN', GH: 'GHS', KE: 'KES', TZ: 'TZS',
+  ZA: 'ZAR', AO: 'AOA', MG: 'MGA', MA: 'MAD', DZ: 'DZD', TN: 'TND',
+  EG: 'EGP', BR: 'BRL', RU: 'RUB', IN: 'INR', AU: 'AUD', MX: 'MXN',
+  SA: 'SAR', AE: 'AED', TR: 'TRY',
+};
+
+// Noms français pour les pays (les plus courants)
+const NOMS_FR: Record<string, string> = {
+  AF: 'Afghanistan', AL: 'Albanie', DZ: 'Algérie', AD: 'Andorre', AO: 'Angola',
+  AR: 'Argentine', AM: 'Arménie', AU: 'Australie', AT: 'Autriche', AZ: 'Azerbaïdjan',
+  BS: 'Bahamas', BH: 'Bahreïn', BD: 'Bangladesh', BB: 'Barbade', BY: 'Biélorussie',
+  BE: 'Belgique', BZ: 'Belize', BJ: 'Bénin', BT: 'Bhoutan', BO: 'Bolivie',
+  BA: 'Bosnie-Herzégovine', BW: 'Botswana', BR: 'Brésil', BN: 'Brunei', BG: 'Bulgarie',
+  BF: 'Burkina Faso', BI: 'Burundi', CV: 'Cap-Vert', KH: 'Cambodge', CM: 'Cameroun',
+  CA: 'Canada', CF: 'République centrafricaine', TD: 'Tchad', CL: 'Chili', CN: 'Chine',
+  CO: 'Colombie', KM: 'Comores', CG: 'Congo (Brazzaville)', CD: 'Congo (Kinshasa)',
+  CR: 'Costa Rica', CI: "Côte d'Ivoire", HR: 'Croatie', CU: 'Cuba', CY: 'Chypre',
+  CZ: 'Tchéquie', DK: 'Danemark', DJ: 'Djibouti', DO: 'République dominicaine',
+  EC: 'Équateur', EG: 'Égypte', SV: 'Salvador', GQ: 'Guinée équatoriale',
+  ER: 'Érythrée', EE: 'Estonie', SZ: 'Eswatini', ET: 'Éthiopie',
+  FI: 'Finlande', FR: 'France', GA: 'Gabon', GM: 'Gambie', GE: 'Géorgie',
+  DE: 'Allemagne', GH: 'Ghana', GR: 'Grèce', GT: 'Guatemala', GN: 'Guinée',
+  GW: 'Guinée-Bissau', GY: 'Guyana', HT: 'Haïti', HN: 'Honduras', HU: 'Hongrie',
+  IS: 'Islande', IN: 'Inde', ID: 'Indonésie', IR: 'Iran', IQ: 'Irak',
+  IE: 'Irlande', IL: 'Israël', IT: 'Italie', JM: 'Jamaïque', JP: 'Japon',
+  JO: 'Jordanie', KZ: 'Kazakhstan', KE: 'Kenya', KP: 'Corée du Nord', KR: 'Corée du Sud',
+  KW: 'Koweït', KG: 'Kirghizistan', LA: 'Laos', LV: 'Lettonie', LB: 'Liban',
+  LS: 'Lesotho', LR: 'Libéria', LY: 'Libye', LI: 'Liechtenstein', LT: 'Lituanie',
+  LU: 'Luxembourg', MG: 'Madagascar', MW: 'Malawi', MY: 'Malaisie', MV: 'Maldives',
+  ML: 'Mali', MT: 'Malte', MR: 'Mauritanie', MU: 'Maurice', MX: 'Mexique',
+  MD: 'Moldavie', MC: 'Monaco', MN: 'Mongolie', ME: 'Monténégro', MA: 'Maroc',
+  MZ: 'Mozambique', MM: 'Myanmar', NA: 'Namibie', NP: 'Népal', NL: 'Pays-Bas',
+  NZ: 'Nouvelle-Zélande', NI: 'Nicaragua', NE: 'Niger', NG: 'Nigéria',
+  MK: 'Macédoine du Nord', NO: 'Norvège', OM: 'Oman', PK: 'Pakistan',
+  PA: 'Panama', PG: 'Papouasie-Nouvelle-Guinée', PY: 'Paraguay', PE: 'Pérou',
+  PH: 'Philippines', PL: 'Pologne', PT: 'Portugal', QA: 'Qatar', RO: 'Roumanie',
+  RU: 'Russie', RW: 'Rwanda', SA: 'Arabie saoudite', SN: 'Sénégal', RS: 'Serbie',
+  SC: 'Seychelles', SL: 'Sierra Leone', SG: 'Singapour', SK: 'Slovaquie',
+  SI: 'Slovénie', SO: 'Somalie', ZA: 'Afrique du Sud', SS: 'Soudan du Sud',
+  ES: 'Espagne', LK: 'Sri Lanka', SD: 'Soudan', SR: 'Suriname', SE: 'Suède',
+  CH: 'Suisse', SY: 'Syrie', TW: 'Taïwan', TJ: 'Tadjikistan', TZ: 'Tanzanie',
+  TH: 'Thaïlande', TL: 'Timor oriental', TG: 'Togo', TT: 'Trinité-et-Tobago',
+  TN: 'Tunisie', TR: 'Turquie', TM: 'Turkménistan', UG: 'Ouganda', UA: 'Ukraine',
+  AE: 'Émirats arabes unis', GB: 'Royaume-Uni', US: 'États-Unis', UY: 'Uruguay',
+  UZ: 'Ouzbékistan', VE: 'Venezuela', VN: 'Viêt Nam', YE: 'Yémen',
+  ZM: 'Zambie', ZW: 'Zimbabwe',
+};
+
+async function seedPays(dryRun: boolean): Promise<SeedStepResult[]> {
+  logger.info('Seeding Pays (ISO-3166)...');
+  const results: SeedStepResult[] = [];
+
+  // Check if already seeded
+  const [{ value: existingCount }] = await db.select({ value: count() }).from(pays);
+  if (existingCount > 0) {
+    results.push({ table: 'pays', action: 'skipped', count: 0, details: `${existingCount} pays already exist` });
+    return results;
+  }
+
+  if (dryRun) {
+    results.push({ table: 'pays', action: 'skipped', count: 0, details: 'dry-run' });
+    return results;
+  }
+
+  // Read ISO-3166 JSON
+  const jsonPath = resolve(process.cwd(), 'seeds', 'all.json');
+  const raw = readFileSync(jsonPath, 'utf-8');
+  const countries: Array<{
+    name: string;
+    'alpha-2': string;
+    'alpha-3': string;
+    'country-code': string;
+    region: string | null;
+    'sub-region': string | null;
+  }> = JSON.parse(raw);
+
+  let inserted = 0;
+  for (const c of countries) {
+    const iso2 = c['alpha-2'];
+    await db.insert(pays).values({
+      iso2,
+      iso3: c['alpha-3'],
+      numericCode: c['country-code'],
+      nomEn: c.name,
+      nomFr: NOMS_FR[iso2] || null,
+      indicatifTel: INDICATIFS_TEL[iso2] || null,
+      deviseCode: DEVISES[iso2] || null,
+      region: c.region || null,
+      subRegion: c['sub-region'] || null,
+      isActive: true,
+      isHighRiskAml: false,
+      isSanctioned: false,
+    });
+    inserted++;
+  }
+
+  results.push({ table: 'pays', action: 'created', count: inserted, details: `${countries.length} pays ISO-3166 from seeds/all.json` });
+
+  return results;
+}
+
 async function seedGeography(context: SeedContext, dryRun: boolean): Promise<SeedStepResult[]> {
   logger.info('Seeding Geography...');
   const results: SeedStepResult[] = [];
@@ -2431,52 +2491,25 @@ async function seedGeography(context: SeedContext, dryRun: boolean): Promise<See
     results.push({ table: 'zones', action: 'skipped', count: 0, details: 'production mode' });
   }
 
-  // ===== Départements =====
-  let deptCount = 0;
-  if (!dryRun) {
-    for (const dept of DEPARTEMENTS_GEO_DATA) {
-      const [existing] = await db.select().from(departements).where(eq(departements.nom, dept.nom));
-      if (!existing) {
-        await db.insert(departements).values(dept);
-        deptCount++;
-      }
-    }
-  }
-  results.push({ table: 'departements', action: 'created', count: deptCount, details: `${DEPARTEMENTS_GEO_DATA.length} départements (upsert by nom)` });
-
-  // ===== Villes =====
-  let villeCount = 0;
+  // ===== Build villeIdMap from existing Congo cities in DB =====
+  // Villes are now seeded by seed-geography-world.ts (from GeoNames data)
+  // We just lookup existing Congo cities to link arrondissements, marchés, zones
   const villeIdMap: Record<string, string> = {};
   if (!dryRun) {
-    for (const v of VILLES_GEO_DATA) {
-      // Find departement
-      const [dept] = await db.select().from(departements).where(eq(departements.nom, v.departement));
-      if (!dept) {
-        logger.warn(`Département '${v.departement}' not found for ville '${v.nom}', skipping`);
-        continue;
+    const [congo] = await db.select().from(pays).where(eq(pays.iso2, 'CG'));
+    if (congo) {
+      const congoCities = await db.select({ id: villes.id, nom: villes.nom })
+        .from(villes)
+        .where(eq(villes.paysId, congo.id));
+      for (const city of congoCities) {
+        villeIdMap[city.nom] = city.id;
       }
-      const [existing] = await db.select().from(villes).where(
-        and(eq(villes.nom, v.nom), eq(villes.departementId, dept.id))
-      );
-      if (!existing) {
-        const [inserted] = await db.insert(villes).values({
-          nom: v.nom,
-          departementId: dept.id,
-          latitude: v.lat,
-          longitude: v.lng,
-          isChefLieu: v.isChefLieu,
-        }).returning();
-        villeIdMap[v.nom] = inserted.id;
-        villeCount++;
-      } else {
-        villeIdMap[v.nom] = existing.id;
-      }
+      logger.info(`Built villeIdMap from ${congoCities.length} Congo cities in DB`);
+    } else {
+      logger.warn('Congo (CG) not found in pays table — arrondissements/marchés will not be linked');
     }
-  }
-  results.push({ table: 'villes', action: 'created', count: villeCount, details: `${VILLES_GEO_DATA.length} villes (upsert by nom+dept)` });
 
-  // ===== Backfill zones with villeId =====
-  if (!dryRun) {
+    // Backfill zones with villeId
     for (const [villeNom, villeId] of Object.entries(villeIdMap)) {
       await db.update(zones)
         .set({ villeId })
@@ -2817,6 +2850,185 @@ async function seedCoreSettings(context: SeedContext, dryRun: boolean): Promise<
   return results;
 }
 
+// ============================================================================
+// PROFESSIONAL CATALOG (sectors, professions, activity types + junction tables)
+// ============================================================================
+
+async function seedProfessionalCatalog(dryRun: boolean): Promise<SeedStepResult[]> {
+  logger.info('Seeding Professional Catalog...');
+  const results: SeedStepResult[] = [];
+
+  if (dryRun) {
+    return [
+      { table: 'activityTypes', action: 'skipped', count: ACTIVITY_TYPES_DATA.length, details: 'dry-run' },
+      { table: 'sectors', action: 'skipped', count: SECTORS_DATA.length, details: 'dry-run' },
+      { table: 'professions', action: 'skipped', count: PROFESSIONS_DATA.length, details: 'dry-run' },
+      { table: 'professionSectors', action: 'skipped', count: 0, details: 'dry-run' },
+      { table: 'professionActivityTypes', action: 'skipped', count: 0, details: 'dry-run' },
+      { table: 'sectorActivityTypes', action: 'skipped', count: 0, details: 'dry-run' },
+    ];
+  }
+
+  // 1. Upsert activity types
+  const atMap = new Map<string, string>(); // code → id
+  let atCreated = 0;
+  for (const at of ACTIVITY_TYPES_DATA) {
+    const [existing] = await db.select().from(activityTypes).where(eq(activityTypes.code, at.code));
+    if (existing) {
+      atMap.set(at.code, existing.id);
+    } else {
+      const [inserted] = await db.insert(activityTypes).values({
+        code: at.code,
+        nom: at.nom,
+        sortOrder: at.sortOrder,
+      }).returning({ id: activityTypes.id });
+      atMap.set(at.code, inserted.id);
+      atCreated++;
+    }
+  }
+  results.push({ table: 'activityTypes', action: atCreated > 0 ? 'created' : 'skipped', count: atCreated, details: `${ACTIVITY_TYPES_DATA.length} total` });
+
+  // 2. Upsert sectors (top-level first, then sub-sectors)
+  const sectorMap = new Map<string, string>(); // code → id
+  let secCreated = 0;
+
+  // Top-level sectors first (no parentCode)
+  const topLevel = SECTORS_DATA.filter(s => !s.parentCode);
+  for (const s of topLevel) {
+    const [existing] = await db.select().from(sectors).where(eq(sectors.code, s.code));
+    if (existing) {
+      sectorMap.set(s.code, existing.id);
+    } else {
+      const [inserted] = await db.insert(sectors).values({
+        code: s.code,
+        nom: s.nom,
+        description: s.description,
+        keywords: s.keywords || null,
+        sortOrder: s.sortOrder,
+      }).returning({ id: sectors.id });
+      sectorMap.set(s.code, inserted.id);
+      secCreated++;
+    }
+  }
+
+  // Sub-sectors (have parentCode)
+  const subLevel = SECTORS_DATA.filter(s => !!s.parentCode);
+  for (const s of subLevel) {
+    const parentId = sectorMap.get(s.parentCode!);
+    if (!parentId) {
+      logger.warn({ code: s.code, parentCode: s.parentCode }, 'Parent sector not found, skipping');
+      continue;
+    }
+    const [existing] = await db.select().from(sectors).where(eq(sectors.code, s.code));
+    if (existing) {
+      sectorMap.set(s.code, existing.id);
+    } else {
+      const [inserted] = await db.insert(sectors).values({
+        code: s.code,
+        nom: s.nom,
+        description: s.description,
+        parentId,
+        keywords: s.keywords || null,
+        sortOrder: s.sortOrder,
+      }).returning({ id: sectors.id });
+      sectorMap.set(s.code, inserted.id);
+      secCreated++;
+    }
+  }
+  results.push({ table: 'sectors', action: secCreated > 0 ? 'created' : 'skipped', count: secCreated, details: `${SECTORS_DATA.length} total` });
+
+  // 3. Upsert professions
+  const profMap = new Map<string, string>(); // code → id
+  let profCreated = 0;
+  for (const p of PROFESSIONS_DATA) {
+    const [existing] = await db.select().from(professions).where(eq(professions.code, p.code));
+    if (existing) {
+      profMap.set(p.code, existing.id);
+    } else {
+      const [inserted] = await db.insert(professions).values({
+        code: p.code,
+        nom: p.nom,
+        keywords: p.keywords || null,
+        sortOrder: p.sortOrder,
+      }).returning({ id: professions.id });
+      profMap.set(p.code, inserted.id);
+      profCreated++;
+    }
+  }
+  results.push({ table: 'professions', action: profCreated > 0 ? 'created' : 'skipped', count: profCreated, details: `${PROFESSIONS_DATA.length} total` });
+
+  // 4. Upsert junction tables
+  let psCreated = 0, patCreated = 0;
+  const sectorActivitySet = new Set<string>(); // "sectorId|activityTypeId" to deduplicate
+
+  for (const p of PROFESSIONS_DATA) {
+    const profId = profMap.get(p.code);
+    if (!profId) continue;
+
+    // profession_sectors
+    for (const sc of p.sectorCodes) {
+      const secId = sectorMap.get(sc);
+      if (!secId) continue;
+
+      const [existingPS] = await db.select().from(professionSectors)
+        .where(and(eq(professionSectors.professionId, profId), eq(professionSectors.sectorId, secId)));
+      if (!existingPS) {
+        await db.insert(professionSectors).values({
+          professionId: profId,
+          sectorId: secId,
+          weight: sc === p.defaultSector ? 100 : 50,
+          isDefault: sc === p.defaultSector,
+        });
+        psCreated++;
+      }
+      // Collect sector↔activityType pairs for step 5
+      for (const atc of p.activityTypeCodes) {
+        const atId = atMap.get(atc);
+        if (atId) sectorActivitySet.add(`${secId}|${atId}`);
+      }
+    }
+
+    // profession_activity_types
+    for (const atc of p.activityTypeCodes) {
+      const atId = atMap.get(atc);
+      if (!atId) continue;
+
+      const [existingPAT] = await db.select().from(professionActivityTypes)
+        .where(and(eq(professionActivityTypes.professionId, profId), eq(professionActivityTypes.activityTypeId, atId)));
+      if (!existingPAT) {
+        await db.insert(professionActivityTypes).values({
+          professionId: profId,
+          activityTypeId: atId,
+          weight: atc === p.defaultActivity ? 100 : 50,
+          isDefault: atc === p.defaultActivity,
+        });
+        patCreated++;
+      }
+    }
+  }
+  results.push({ table: 'professionSectors', action: psCreated > 0 ? 'created' : 'skipped', count: psCreated });
+  results.push({ table: 'professionActivityTypes', action: patCreated > 0 ? 'created' : 'skipped', count: patCreated });
+
+  // 5. sector_activity_types (derived from professions data)
+  let satCreated = 0;
+  for (const key of sectorActivitySet) {
+    const [secId, atId] = key.split('|');
+    const [existing] = await db.select().from(sectorActivityTypes)
+      .where(and(eq(sectorActivityTypes.sectorId, secId), eq(sectorActivityTypes.activityTypeId, atId)));
+    if (!existing) {
+      await db.insert(sectorActivityTypes).values({
+        sectorId: secId,
+        activityTypeId: atId,
+        weight: 50,
+      });
+      satCreated++;
+    }
+  }
+  results.push({ table: 'sectorActivityTypes', action: satCreated > 0 ? 'created' : 'skipped', count: satCreated });
+
+  return results;
+}
+
 async function seedProductsCatalog(context: SeedContext, dryRun: boolean): Promise<SeedStepResult[]> {
   logger.info('Seeding Products Catalog...');
   const results: SeedStepResult[] = [];
@@ -2905,15 +3117,6 @@ async function seedProductsCatalog(context: SeedContext, dryRun: boolean): Promi
   } else {
     results.push({ table: 'tontineRulesets', action: 'skipped', count: 0, details: 'exists' });
   }
-
-  // Types Marchés - upsert by nom
-  for (const tm of TYPES_MARCHES_DATA) {
-    const [existing] = await db.select().from(typesMarches).where(eq(typesMarches.nom, tm.nom));
-    if (!existing) {
-      await db.insert(typesMarches).values(tm);
-    }
-  }
-  results.push({ table: 'typesMarches', action: 'created', count: TYPES_MARCHES_DATA.length });
 
   // Tags - upsert by name
   for (const t of TAGS_DATA) {
@@ -4913,7 +5116,37 @@ async function seedProd() {
     // 3. Execute seed modules
     logger.info('───────────────────────────────────────────────────────────────');
 
-    // Geography
+    // Pays (ISO-3166) — must run before Geography (villes backfill needs pays)
+    const paysResults = await seedPays(DRY_RUN);
+    report.steps.push(...paysResults);
+
+    // Worldwide Geography (regions ADM1, departements ADM2, migration Congo, villes)
+    // All geographic data comes from GeoNames via seed-geography-world.ts
+    if (!DRY_RUN) {
+      const r1 = await seedRegions();
+      report.steps.push({ table: r1.step, action: r1.action as SeedAction, count: r1.count, details: r1.details });
+      const r2 = await migrateCongoDeptsToRegions();
+      report.steps.push({ table: r2.step, action: r2.action as SeedAction, count: r2.count, details: r2.details });
+      const r3 = await seedDepartementsADM2();
+      report.steps.push({ table: r3.step, action: r3.action as SeedAction, count: r3.count, details: r3.details });
+      const r4 = await cleanupLegacyDepts();
+      report.steps.push({ table: r4.step, action: r4.action as SeedAction, count: r4.count, details: r4.details });
+
+      // Load GeoNames staging + insert worldwide cities (requires seeds/allCountries.txt)
+      const r5 = await loadGeonamesStaging();
+      report.steps.push({ table: r5.step, action: r5.action as SeedAction, count: r5.count, details: r5.details });
+      if (r5.action !== 'error') {
+        const enrichResults = await enrichFromStaging();
+        for (const r of enrichResults) {
+          report.steps.push({ table: r.step, action: r.action as SeedAction, count: r.count, details: r.details });
+        }
+      } else {
+        logger.warn('GeoNames staging unavailable (seeds/allCountries.txt missing) — cities not seeded from GeoNames');
+      }
+    }
+
+    // Congo-specific business data (zones, arrondissements, marchés, agence Siège)
+    // Links to cities already seeded by GeoNames above
     const geoResults = await seedGeography(report.context, DRY_RUN);
     report.steps.push(...geoResults);
 
@@ -4930,6 +5163,10 @@ async function seedProd() {
     // Products Catalog
     const productsResults = await seedProductsCatalog(report.context, DRY_RUN);
     report.steps.push(...productsResults);
+
+    // Professional Catalog (sectors, professions, activity types)
+    const catalogResults = await seedProfessionalCatalog(DRY_RUN);
+    report.steps.push(...catalogResults);
 
     // Accounting
     const accountingResults = await seedAccountingBootstrap(report.context, DRY_RUN);
@@ -4986,23 +5223,51 @@ async function seedProd() {
     report.completedAt = new Date();
 
     // 4. Summary
+    const elapsed = ((Date.now() - report.startedAt.getTime()) / 1000).toFixed(1);
+
     logger.info('═══════════════════════════════════════════════════════════════');
-    if (report.success) {
-      logger.info('PRODUCTION SEED COMPLETE');
-    } else {
-      logger.error('SEED COMPLETED WITH ERRORS');
+    logger.info(report.success ? 'PRODUCTION SEED COMPLETE' : 'SEED COMPLETED WITH ERRORS');
+    logger.info(`Context: ${report.context} | Dry-run: ${DRY_RUN} | Duration: ${elapsed}s`);
+    logger.info('═══════════════════════════════════════════════════════════════');
+
+    // Detailed step-by-step report
+    logger.info(`Total steps: ${report.steps.length}`);
+    logger.info('───────────────────────────────────────────────────────────────');
+
+    const actionCounts: Record<string, number> = {};
+    for (const step of report.steps) {
+      actionCounts[step.action] = (actionCounts[step.action] || 0) + 1;
+      const icon = step.action === 'created' ? '+'
+        : step.action === 'updated' ? '~'
+        : step.action === 'skipped' ? '-'
+        : step.action === 'deleted' ? 'x'
+        : step.action === 'replaced' ? 'R'
+        : '?';
+      const detail = step.details ? ` (${step.details})` : '';
+      logger.info(`  [${icon}] ${step.table.padEnd(35)} ${String(step.action).padEnd(10)} ${String(step.count).padStart(6)} rows${detail}`);
     }
+
+    logger.info('───────────────────────────────────────────────────────────────');
+    const summaryParts = Object.entries(actionCounts)
+      .map(([action, count]) => `${count} ${action}`)
+      .join(', ');
+    logger.info(`Steps summary: ${summaryParts}`);
+
+    if (report.errors.length > 0) {
+      logger.error(`Errors (${report.errors.length}):`);
+      report.errors.forEach((e, i) => logger.error(`  ${i + 1}. ${e}`));
+    }
+    if (report.warnings.length > 0) {
+      logger.warn(`Warnings (${report.warnings.length}):`);
+      report.warnings.forEach((w, i) => logger.warn(`  ${i + 1}. ${w}`));
+    }
+
     logger.info('═══════════════════════════════════════════════════════════════');
 
     if (!DRY_RUN) {
       logger.info('Login: s.administrateur / [SEED_ADMIN_PASSWORD or password123]');
       logger.warn('IMPORTANT: Change password on first login (mustChangePassword=true)');
     }
-
-    const created = report.steps.filter(s => s.action === 'created').length;
-    const skipped = report.steps.filter(s => s.action === 'skipped').length;
-    logger.info({ created, skipped, errors: report.errors.length }, 'Summary');
-    logger.info('═══════════════════════════════════════════════════════════════');
 
     if (!report.success) {
       await pool.end();

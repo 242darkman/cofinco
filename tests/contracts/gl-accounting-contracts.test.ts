@@ -465,7 +465,7 @@ describe("Contract 6: No Direct Balance Updates (Static Scan)", () => {
   const ALLOWLIST = [
     "server/services/ledger.ts",
     "server/db.ts",
-    "server/seed-prod.ts",
+    "seeds/seed-prod.ts",
     // Legacy violations — each must be refactored to use executeWithLedger
     // Adding a file here is TEMPORARY and must be tracked for cleanup
     "server/services/compte-transfers.ts",
@@ -531,7 +531,7 @@ describe("Contract 6: No Direct Balance Updates (Static Scan)", () => {
     // Current known legacy violations: 8 files.
     // If you add a file, update this count AND create a cleanup ticket.
     const LEGACY_FILES = ALLOWLIST.filter(
-      (f) => !["server/services/ledger.ts", "server/db.ts", "server/seed-prod.ts"].includes(f)
+      (f) => !["server/services/ledger.ts", "server/db.ts", "seeds/seed-prod.ts"].includes(f)
     );
     expect(LEGACY_FILES.length).toBeLessThanOrEqual(9);
   });

@@ -413,7 +413,7 @@ describe("Password policy — Minimum length >= 12", () => {
   });
 
   it("seed securitySettings should have passwordMinLength >= 12", () => {
-    const content = readFileSync(resolve(ROOT, "seed-prod.ts"), "utf-8");
+    const content = readFileSync(resolve(ROOT, "../seeds/seed-prod.ts"), "utf-8");
     const matches = content.match(/passwordMinLength:\s*(\d+)/g);
     expect(matches).toBeTruthy();
     for (const m of matches!) {

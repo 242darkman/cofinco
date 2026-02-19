@@ -177,7 +177,7 @@ export async function ensureAccountingRuleExists(
     throw new Error(
       `[GL GUARD] Aucune règle comptable active pour l'événement "${eventType}". ` +
       `Opération: ${operationDescription}. ` +
-      `Ajoutez une règle dans server/seed-prod.ts (ACCOUNTING_RULES_DATA) ` +
+      `Ajoutez une règle dans seeds/seed-prod.ts (ACCOUNTING_RULES_DATA) ` +
       `avant d'exécuter cette opération.`
     );
   }
