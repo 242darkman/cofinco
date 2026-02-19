@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Trash2, AlertCircle, AlertTriangle, Info, Edit2, Save, X, MessageSquare, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Trash2, AlertCircle, AlertTriangle, Info, Edit2, Save, X, MessageSquare, ChevronLeft, ChevronRight, CheckSquare, Square, ListTodo } from 'lucide-react';
 import { Card, Badge } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
 
@@ -11,6 +11,8 @@ interface ClientNote {
   note: string;
   priority: 'Basse' | 'Moyenne' | 'Haute';
   createdAt: string;
+  isTodo?: boolean;
+  completedAt?: string | null;
 }
 
 interface ClientNotesProps {
@@ -27,7 +29,7 @@ export default function ClientNotes({ clientId }: ClientNotesProps) {
   const [notes, setNotes] = useState<ClientNote[]>([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
-  const [newNote, setNewNote] = useState({ note: '', priority: 'Moyenne' as ClientNote['priority'] });
+  const [newNote, setNewNote] = useState({ note: '', priority: 'Moyenne' as ClientNote['priority'], isTodo: false });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -68,7 +70,8 @@ export default function ClientNotes({ clientId }: ClientNotesProps) {
         client_id: clientId,
         note: newNote.note,
         priority: newNote.priority,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        ...(newNote.isTodo ? { isTodo: true, completedAt: null } : {}),
       };
 
       const res = await fetch(`/api/clients/${clientId}`, { credentials: 'include' });
@@ -87,7 +90,7 @@ export default function ClientNotes({ clientId }: ClientNotesProps) {
       if (!updateRes.ok) throw new Error('Erreur ajout note');
 
       setNotes(updatedNotes);
-      setNewNote({ note: '', priority: 'Moyenne' });
+      setNewNote({ note: '', priority: 'Moyenne', isTodo: false });
       setShowForm(false);
       setCurrentPage(1);
     } catch (error) {
@@ -138,6 +141,29 @@ export default function ClientNotes({ clientId }: ClientNotesProps) {
       setNotes(updatedNotes);
     } catch (error) {
       console.error('Erreur suppression note:', error);
+    }
+  };
+
+  const handleToggleTodo = async (noteId: string) => {
+    try {
+      const updatedNotes = notes.map(n =>
+        n.id === noteId
+          ? { ...n, completedAt: n.completedAt ? null : new Date().toISOString() }
+          : n
+      );
+
+      const res = await fetch(`/api/clients/${clientId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ notes: updatedNotes })
+      });
+
+      if (!res.ok) throw new Error('Erreur mise à jour note');
+
+      setNotes(updatedNotes);
+    } catch (error) {
+      console.error('Erreur toggle todo:', error);
     }
   };
 
@@ -218,6 +244,24 @@ export default function ClientNotes({ clientId }: ClientNotesProps) {
                     placeholder="Saisissez votre note ici..."
                     />
                 </div>
+
+                <label className="flex items-center gap-2.5 cursor-pointer select-none group">
+                    <button
+                      type="button"
+                      onClick={() => setNewNote(prev => ({ ...prev, isTodo: !prev.isTodo }))}
+                      className={`shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                        newNote.isTodo
+                          ? 'bg-accent border-accent text-white'
+                          : 'border-edge bg-surface group-hover:border-content-muted'
+                      }`}
+                    >
+                      {newNote.isTodo && <CheckSquare size={12} />}
+                    </button>
+                    <div>
+                      <span className="text-sm font-medium text-content-primary">Tache a faire</span>
+                      <p className="text-[10px] text-content-muted">Affiche une case a cocher pour marquer comme fait</p>
+                    </div>
+                </label>
             </div>
 
             <div className="flex justify-end gap-2">
@@ -253,8 +297,10 @@ export default function ClientNotes({ clientId }: ClientNotesProps) {
           </Card>
         ) : (
           <div className="space-y-3">
-            {paginatedNotes.map((note) => (
-               <Card key={note.id} variant="default" padding="sm" className="hover:border-edge-strong transition-colors group">
+            {paginatedNotes.map((note) => {
+              const isCompleted = note.isTodo && !!note.completedAt;
+              return (
+               <Card key={note.id} variant="default" padding="sm" className={`hover:border-edge-strong transition-colors group ${isCompleted ? 'opacity-60' : ''}`}>
                     {/* Header: Priority & Date & Actions */}
                     <div className="flex items-center justify-between mb-3 border-b border-edge/50 pb-2">
                          <div className="flex items-center gap-2">
@@ -264,6 +310,9 @@ export default function ClientNotes({ clientId }: ClientNotesProps) {
                                 variant={getPriorityVariant(note.priority)}
                                 icon={getPriorityIcon(note.priority)}
                              />
+                             {note.isTodo && (
+                               <Badge value="Tache" size="sm" variant="neutral" icon={<ListTodo size={10} />} />
+                             )}
                              <span className="text-[10px] text-content-muted">
                                 {new Date(note.createdAt).toLocaleDateString('fr-FR', {
                                     day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
@@ -324,12 +373,37 @@ export default function ClientNotes({ clientId }: ClientNotesProps) {
                         autoFocus
                         />
                     ) : (
-                        <p className="text-sm text-content-secondary whitespace-pre-wrap leading-relaxed">
-                            {note.note}
-                        </p>
+                        <div className="flex items-start gap-2.5">
+                          {note.isTodo && (
+                            <button
+                              onClick={() => handleToggleTodo(note.id)}
+                              className={`shrink-0 mt-0.5 transition-colors ${
+                                isCompleted ? 'text-status-success' : 'text-content-muted hover:text-accent'
+                              }`}
+                              title={isCompleted ? 'Marquer comme non fait' : 'Marquer comme fait'}
+                            >
+                              {isCompleted ? <CheckSquare size={18} /> : <Square size={18} />}
+                            </button>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <p className={`text-sm whitespace-pre-wrap leading-relaxed ${
+                              isCompleted
+                                ? 'line-through text-content-muted'
+                                : 'text-content-secondary'
+                            }`}>
+                              {note.note}
+                            </p>
+                            {isCompleted && note.completedAt && (
+                              <p className="text-[10px] text-status-success mt-1">
+                                Fait le {new Date(note.completedAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                            )}
+                          </div>
+                        </div>
                     )}
                </Card>
-            ))}
+              );
+            })}
 
             {/* Pagination */}
             {totalPages > 1 && (
