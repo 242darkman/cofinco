@@ -101,7 +101,7 @@ export function registerFinanceRoutes(app: Express) {
   app.get("/api/credit-plans/:id", requireAuth, async (req, res) => {
     try {
       const plan = await storage.getCreditPlan(req.params.id);
-      if (!plan) return res.status(404).json({ message: "Plan non trouve" });
+      if (!plan) return res.status(404).json({ message: "Plan non trouvé" });
       res.json(plan);
     } catch (err: any) {
       logger.error(err, "Erreur GET /api/credit-plans/:id");
@@ -115,17 +115,18 @@ export function registerFinanceRoutes(app: Express) {
       const { fees, ...planData } = data;
 
       if (!planData.nom) return res.status(400).json({ message: "Le nom est obligatoire" });
-      if (!planData.taux_interet && !planData.tauxInteret) return res.status(400).json({ message: "Le taux d'interet est obligatoire" });
+      if (!planData.taux_interet && !planData.tauxInteret) return res.status(400).json({ message: "Le taux d'intérêt est obligatoire" });
 
       planData.createdBy = (req as any).user?.id;
       planData.updatedBy = (req as any).user?.id;
 
       const parsed = insertCreditPlanSchema.parse(planData);
       const plan = await storage.createCreditPlan(parsed, fees || []);
+      await logAudit(req, "CREATE_CREDIT_PLAN", "credit_plan", plan.id, { nom: plan.nom, feesCount: (fees || []).length }, "success", "medium");
       res.status(201).json(plan);
     } catch (err: any) {
       logger.error(err, "Erreur POST /api/credit-plans");
-      if (err.name === "ZodError") return res.status(400).json({ message: "Donnees invalides", errors: err.errors });
+      if (err.name === "ZodError") return res.status(400).json({ message: "Données invalides", details: err.errors });
       res.status(500).json({ message: "Erreur serveur" });
     }
   });
@@ -143,11 +144,12 @@ export function registerFinanceRoutes(app: Express) {
         fees,
         expectedVersion,
       );
-      if (!plan) return res.status(404).json({ message: "Plan non trouve" });
+      if (!plan) return res.status(404).json({ message: "Plan non trouvé" });
+      await logAudit(req, "UPDATE_CREDIT_PLAN", "credit_plan", req.params.id, { nom: plan.nom, version: plan.version }, "success", "medium");
       res.json(plan);
     } catch (err: any) {
       if (err.message?.startsWith("CONFLICT")) {
-        return res.status(409).json({ message: err.message });
+        return res.status(409).json({ message: "Ce plan a été modifié par un autre utilisateur. Rechargez et réessayez." });
       }
       logger.error(err, "Erreur PATCH /api/credit-plans/:id");
       res.status(500).json({ message: "Erreur serveur" });
@@ -157,7 +159,8 @@ export function registerFinanceRoutes(app: Express) {
   app.delete("/api/credit-plans/:id", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.PLAN_CREDIT), async (req, res) => {
     try {
       const success = await storage.deleteCreditPlan(req.params.id);
-      if (!success) return res.status(404).json({ message: "Plan non trouve" });
+      if (!success) return res.status(404).json({ message: "Plan non trouvé" });
+      await logAudit(req, "DEACTIVATE_CREDIT_PLAN", "credit_plan", req.params.id, {}, "success", "medium");
       res.json({ success: true });
     } catch (err: any) {
       logger.error(err, "Erreur DELETE /api/credit-plans/:id");
@@ -166,8 +169,20 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   // Preview schedule (accepts full plan config, no save needed)
+  const previewLimiter = new Map<string, number[]>();
   app.post("/api/credit-plans/preview-schedule", requireAuth, async (req, res) => {
     try {
+      // Simple rate-limit: max 10 requests per 30s per user
+      const userId = (req as any).user?.id || "anon";
+      const now = Date.now();
+      const window = 30_000;
+      const maxRequests = 10;
+      const timestamps = (previewLimiter.get(userId) || []).filter(t => now - t < window);
+      if (timestamps.length >= maxRequests) {
+        return res.status(429).json({ message: "Trop de requêtes. Réessayez dans quelques secondes." });
+      }
+      timestamps.push(now);
+      previewLimiter.set(userId, timestamps);
       const { D: toDecimal } = await import("../lib/money");
       const { generateSchedule } = await import("../services/credit-plan");
       const { planConfig, principal, disbursementDate } = req.body;
@@ -233,8 +248,13 @@ export function registerFinanceRoutes(app: Express) {
 
       res.json(serialized);
     } catch (err: any) {
+      // Engine throws user-facing messages for known validation errors
+      const isValidationError = err.message && !err.message.includes("Cannot read") && !err.message.includes("undefined");
+      if (isValidationError) {
+        return res.status(400).json({ message: err.message });
+      }
       logger.error(err, "Erreur POST /api/credit-plans/preview-schedule");
-      res.status(500).json({ message: "Erreur de calcul", details: err.message });
+      res.status(500).json({ message: "Erreur de calcul de l'échéancier" });
     }
   });
 

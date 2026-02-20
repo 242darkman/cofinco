@@ -4,6 +4,7 @@ import {
   computeFirstDueDate,
   advanceDate,
   computeNumberOfInstallments,
+  validateHolidays,
 } from "./calendar-utils";
 import {
   computeFlatSchedule,
@@ -29,6 +30,11 @@ import {
  */
 export function generateSchedule(input: ScheduleInput): ScheduleResult {
   const { principal, disbursementDate, plan, fees, customFirstDueDate, holidays } = input;
+
+  // 0. Validate holidays format if provided
+  if (holidays && holidays.size > 0) {
+    validateHolidays(holidays);
+  }
 
   // 1. Compute fees
   const feeBreakdowns = computeFees(fees, principal);

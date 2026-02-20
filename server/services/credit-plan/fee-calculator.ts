@@ -14,9 +14,16 @@ export function computeFees(
 
     if (fee.calcType === "FIXED") {
       amount = D(fee.value);
+      if (amount.lt(0)) {
+        throw new Error(`Le montant du frais "${fee.label || fee.feeType}" ne peut pas être négatif`);
+      }
     } else {
       // PERCENTAGE of principal
-      amount = principal.times(D(fee.value)).div(100);
+      const pct = D(fee.value);
+      if (pct.lt(0) || pct.gt(100)) {
+        throw new Error(`Le pourcentage du frais "${fee.label || fee.feeType}" doit être entre 0 et 100`);
+      }
+      amount = principal.times(pct).div(100);
     }
 
     // Apply min/max caps

@@ -1,5 +1,19 @@
 import type { PlanConfig } from "./types";
 
+const DATE_KEY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Validate that all entries in a holidays set match "YYYY-MM-DD" format.
+ * Throws if any entry is malformed.
+ */
+export function validateHolidays(holidays: Set<string>): void {
+  for (const entry of holidays) {
+    if (!DATE_KEY_REGEX.test(entry)) {
+      throw new Error(`Format de jour férié invalide : "${entry}". Attendu : YYYY-MM-DD`);
+    }
+  }
+}
+
 /**
  * Format a Date as "YYYY-MM-DD" for holiday lookup.
  */
@@ -68,11 +82,11 @@ function shiftForward(
   holidays?: Set<string>,
 ): Date {
   const d = new Date(date);
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 60; i++) {
     d.setDate(d.getDate() + 1);
     if (isWorkingDay(d, plan, holidays)) return new Date(d);
   }
-  return new Date(date); // fallback
+  throw new Error(`Aucun jour ouvré trouvé dans les 60 jours suivant ${formatDateKey(date)}`);
 }
 
 function shiftBackward(
@@ -81,11 +95,11 @@ function shiftBackward(
   holidays?: Set<string>,
 ): Date {
   const d = new Date(date);
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 60; i++) {
     d.setDate(d.getDate() - 1);
     if (isWorkingDay(d, plan, holidays)) return new Date(d);
   }
-  return new Date(date); // fallback
+  throw new Error(`Aucun jour ouvré trouvé dans les 60 jours précédant ${formatDateKey(date)}`);
 }
 
 // ============================================================
