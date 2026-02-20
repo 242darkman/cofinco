@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useClientAlerts } from '../../hooks/useClientAlerts';
-import { Plus, Search, Filter, Download, Upload, Users, MapPin, RefreshCw, List, Eye, Edit2, Trash2, ChevronRight, FileText, CreditCard, Shield, BarChart3, AlertCircle, Building2, Send, DollarSign, UserPlus, LayoutDashboard, User, Phone, Scale, Network, TrendingUp } from 'lucide-react';
+import { Plus, Search, Filter, Download, Upload, Users, MapPin, RefreshCw, List, Eye, Edit2, Trash2, ChevronRight, FileText, CreditCard, Shield, BarChart3, AlertCircle, Building2, Send, DollarSign, UserPlus, LayoutDashboard, User, Phone, Scale, Network, TrendingUp, FileSearch } from 'lucide-react';
 import { Button, IconButton, Card, ResponsiveTable, Badge, ConfirmDialog, FeatureHeader, FEATURE_DESCRIPTIONS, TabGroup } from '../ui';
 import { usePermissions, ProtectedFeature } from '../auth/ProtectedFeature';
 import ClientForm from './ClientForm';
@@ -23,6 +23,7 @@ import ClientNotes from './ClientNotes';
 import ClientGlobalHistory from './ClientGlobalHistory';
 import ClientAlerts from './ClientAlerts';
 import ClientScoreTab from './tabs/ClientScoreTab';
+import ClientEnquetesTab from './tabs/ClientEnquetesTab';
 import ClientBulkCommunication from './ClientBulkCommunication';
 import ClientSearch from './ClientSearch';
 import SelectEmployeeForConversionModal from './SelectEmployeeForConversionModal';
@@ -48,7 +49,7 @@ interface ClientModuleProps {
   activeSubModule?: string;
 }
 
-const CLIENT_TAB_IDS = ['overview', 'profil', 'coordonnees', 'kyc-legal', 'references', 'comptes', 'kyc', 'notes', 'transactions', 'alertes', 'score'] as const;
+const CLIENT_TAB_IDS = ['overview', 'profil', 'coordonnees', 'kyc-legal', 'references', 'comptes', 'kyc', 'notes', 'transactions', 'enquetes', 'alertes', 'score'] as const;
 
 export default function ClientModule({ onModuleChange, activeSubModule }: ClientModuleProps) {
   // RBAC permissions
@@ -258,6 +259,7 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
               { key: 'kyc', label: 'Documents KYC', icon: Shield },
               { key: 'notes', label: 'Notes', icon: Edit2 },
               { key: 'transactions', label: 'Transactions', icon: DollarSign },
+              { key: 'enquetes', label: 'Enquêtes', icon: FileSearch },
               { key: 'alertes', label: 'Alertes', icon: AlertCircle, badge: alertCount > 0 ? alertCount : undefined, badgeClassName: alertCount > 0 ? 'bg-status-danger text-white' : undefined },
               { key: 'score', label: 'Score', icon: TrendingUp },
             ]}
@@ -274,6 +276,7 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
             {activeTab === 'kyc' && <ClientKYC clientId={viewingClient.id} onUpdate={loadClients} />}
             {activeTab === 'notes' && <ClientNotes clientId={viewingClient.id} />}
             {activeTab === 'transactions' && <ClientGlobalHistory clientId={viewingClient.id} />}
+            {activeTab === 'enquetes' && <ClientEnquetesTab client={viewingClient} />}
             {activeTab === 'alertes' && <ClientAlerts client={viewingClient} onUpdate={loadClients} onNavigateToTab={(tab) => navigateToPath(`/clients/${viewingClient.id}/${tab}`)} />}
             {activeTab === 'score' && <ClientScoreTab client={viewingClient} />}
           </div>

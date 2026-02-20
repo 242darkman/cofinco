@@ -1,6 +1,6 @@
 import type { Express, Request } from "express";
 import { createLogger } from "../lib/logger";
-import { insertTagSchema, insertClientTagSchema, insertClientActivitySchema, clientTags, clientActivities, users, clients, agences, professions, membresTontine, mouvementsFinanciers, comptes, credits, tontines, remboursements, contributionsTontine, clientDocumentSchema, clientDocumentsArraySchema, type ClientDocument } from "@shared/schema";
+import { insertTagSchema, insertClientTagSchema, insertClientActivitySchema, clientTags, clientActivities, users, clients, agences, professions, membresTontine, mouvementsFinanciers, comptes, credits, tontines, remboursements, contributionsTontine, clientDocumentSchema, clientDocumentsArraySchema, enquetesCredit, demandesCredit, creditPlans, type ClientDocument } from "@shared/schema";
 import { getTransactionLabel } from "@shared/config/transaction-labels";
 
 const logger = createLogger('Routes:Clients');
@@ -658,6 +658,57 @@ export function registerClientRoutes(app: Express) {
     } catch (error) {
       logger.error({ err: error }, 'Error fetching client comptes');
       res.status(500).json({ message: "Erreur lors de la récupération des comptes" });
+    }
+  });
+
+  // GET Client Enquêtes — Historique des enquêtes de crédit
+  app.get("/api/clients/:id/enquetes", requireAuth, requireAgenceIdAccess(), async (req, res) => {
+    try {
+      if (!z.string().uuid().safeParse(req.params.id).success) {
+        return res.status(404).json({ message: "Client not found (Invalid ID)" });
+      }
+
+      const client = await storage.getClient(req.params.id);
+      if (!client) return res.status(404).json({ message: "Client not found" });
+
+      const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
+      if (agenceFilter?.agenceId && client.agenceId !== agenceFilter.agenceId) {
+        return res.status(403).json({ message: "Accès refusé : client d'une autre agence" });
+      }
+
+      const enquetes = await db.select({
+        id: enquetesCredit.id,
+        statut: enquetesCredit.statut,
+        montantDemande: enquetesCredit.montantDemande,
+        objetCredit: enquetesCredit.objetCredit,
+        agentRecommendation: enquetesCredit.agentRecommendation,
+        recommendedAmount: enquetesCredit.recommendedAmount,
+        riskLevel: enquetesCredit.riskLevel,
+        scoreGlobal: enquetesCredit.scoreGlobal,
+        assignedAt: enquetesCredit.assignedAt,
+        submittedAt: enquetesCredit.submittedAt,
+        reviewedAt: enquetesCredit.reviewedAt,
+        createdAt: enquetesCredit.createdAt,
+        supervisorNotes: enquetesCredit.supervisorNotes,
+        numeroDemande: demandesCredit.numeroDemande,
+        creditPlanName: creditPlans.nom,
+        agentNom: users.nom,
+        agentPrenom: users.prenom,
+      })
+        .from(enquetesCredit)
+        .leftJoin(demandesCredit, eq(enquetesCredit.demandeId, demandesCredit.id))
+        .leftJoin(creditPlans, eq(enquetesCredit.creditPlanId, creditPlans.id))
+        .leftJoin(users, eq(enquetesCredit.assignedAgentId, users.id))
+        .where(and(
+          eq(enquetesCredit.clientId, req.params.id),
+          isNull(enquetesCredit.deletedAt)
+        ))
+        .orderBy(desc(enquetesCredit.createdAt));
+
+      res.json(enquetes);
+    } catch (error) {
+      logger.error({ err: error }, 'Error fetching client enquêtes');
+      res.status(500).json({ message: "Erreur lors de la récupération des enquêtes" });
     }
   });
 
