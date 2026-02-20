@@ -24,7 +24,7 @@ export default function ClientReferencesTab({ client }: ClientReferencesTabProps
     return (
       <div className="animate-in fade-in duration-500">
         <EmptyState
-          icon={<Users size={40} className="text-content-muted" />}
+          icon={Users}
           title="Aucune personne de reference"
           description="Ce client n'a pas encore de personnes de reference enregistrees."
         />
