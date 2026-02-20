@@ -3074,6 +3074,7 @@ async function seedProductsCatalog(context: SeedContext, dryRun: boolean): Promi
 
   // Credit Plans - delete all existing then insert canonical plans (new schema)
   const creditPlansData = [
+    { nom: 'Standard', description: 'Crédit standard — paramètres par défaut', typeCredit: 'PERSONAL' as const, montantMin: '10000', montantMax: '5000000', tauxInteret: '20', dureeValeur: 30, dureeUnite: 'DAY' as const, frequenceRemboursement: 'DAILY' as const, interestMethod: 'FLAT' as const, amortizationType: 'EQUAL_INSTALLMENTS' as const, interestRatePeriod: 'MONTHLY' as const, dayCountConvention: '30_360' as const, conditions: [] as string[], isActive: true },
     { nom: 'Pamba', description: 'Credit Pamba', typeCredit: 'PERSONAL' as const, montantMin: '50000', montantMax: '100000', tauxInteret: '10', dureeValeur: 10, dureeUnite: 'DAY' as const, frequenceRemboursement: 'DAILY' as const, conditions: [] as string[], isActive: true },
     { nom: 'Solidaire-Fidel 1', description: 'Credit Solidaire-Fidel 1', typeCredit: 'PERSONAL' as const, montantMin: '200000', montantMax: '300000', tauxInteret: '12', dureeValeur: 84, dureeUnite: 'DAY' as const, frequenceRemboursement: 'WEEKLY' as const, conditions: [] as string[], isActive: true },
     { nom: 'Scolaire', description: 'Credit Scolaire', typeCredit: 'PERSONAL' as const, montantMin: '50000', montantMax: '100000', tauxInteret: '21', dureeValeur: 42, dureeUnite: 'DAY' as const, frequenceRemboursement: 'WEEKLY' as const, conditions: [] as string[], isActive: true },
@@ -4832,11 +4833,8 @@ async function seedMigrationBackfills(context: SeedContext, dryRun: boolean): Pr
   // qui sont seedés par seedAccountingBootstrap()
   // ========================================================================
 
-  // ========================================================================
-  // Migration 0034: RBAC Versions
-  // Note: Table rbac_versions n'existe pas encore dans le schema TypeScript
-  // TODO: Créer le schema et ajouter le seed quand la table sera créée
-  // ========================================================================
+  // RBAC Versions: Le versioning RBAC est géré dynamiquement par rbac-service.ts
+  // via les timestamps createdAt/updatedAt des rôles et permissions — pas de table dédiée nécessaire.
 
   return results;
 }
