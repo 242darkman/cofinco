@@ -34,6 +34,7 @@ import { eq, sql, or, isNull, and, gte, lte, desc } from "drizzle-orm";
 import { getComptesByClient, getCreditsByClient, getDemandesByClient } from "../storage/finance";
 import { autoCreateCourantAccount } from "../services/comptes";
 import { dispatchDomainEvent } from "../services/notifications/domain-events/event-registry";
+import { evaluateClientAlerts, resolveClientAlert, resolveAllClientAlerts, snoozeClientAlert, getAlertsSummary, KNOWN_ALERT_TYPES } from "../services/client-alerts";
 
 export function registerClientRoutes(app: Express) {
   // ============================================
@@ -1847,6 +1848,22 @@ export function registerClientRoutes(app: Express) {
   // ============================================
 
   /**
+   * GET /api/alerts/summary
+   * Cross-client alert summary for dashboard (lightweight SQL-based)
+   */
+  app.get("/api/alerts/summary", requireAuth, requireAgenceIdAccess(), async (req, res) => {
+    try {
+      const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
+      const result = await getAlertsSummary(agenceFilter?.agenceId);
+      res.set("Cache-Control", "private, max-age=60");
+      res.json(result);
+    } catch (error) {
+      logger.error({ err: error }, 'Error fetching alerts summary');
+      res.status(500).json({ message: "Erreur lors du chargement du resume des alertes" });
+    }
+  });
+
+  /**
    * GET /api/clients/:id/alerts
    * Evaluate and return active alerts for a client (server-side)
    */
@@ -1864,7 +1881,6 @@ export function registerClientRoutes(app: Express) {
         return res.status(403).json({ message: "Acces refuse : client d'une autre agence" });
       }
 
-      const { evaluateClientAlerts } = await import("../services/client-alerts");
       const result = await evaluateClientAlerts(req.params.id);
       res.set("Cache-Control", "private, max-age=30");
       res.json(result);
@@ -1891,8 +1907,6 @@ export function registerClientRoutes(app: Express) {
       if (agenceFilter?.agenceId && client.agenceId !== agenceFilter.agenceId) {
         return res.status(403).json({ message: "Acces refuse : client d'une autre agence" });
       }
-
-      const { resolveClientAlert, KNOWN_ALERT_TYPES } = await import("../services/client-alerts");
 
       if (!(KNOWN_ALERT_TYPES as readonly string[]).includes(req.params.alertType)) {
         return res.status(400).json({ message: `Type d'alerte inconnu: ${req.params.alertType}` });
@@ -1962,8 +1976,6 @@ export function registerClientRoutes(app: Express) {
         return res.status(400).json({ message: "Aucun type d'alerte fourni" });
       }
 
-      const { resolveAllClientAlerts } = await import("../services/client-alerts");
-
       const user = req.session.user;
       const resolvedByName = user ? `${user.prenom || ""} ${user.nom || ""}`.trim() : undefined;
 
@@ -2001,6 +2013,68 @@ export function registerClientRoutes(app: Express) {
     } catch (error) {
       logger.error({ err: error }, 'Error resolving all client alerts');
       res.status(500).json({ message: "Erreur lors de la resolution des alertes" });
+    }
+  });
+
+  /**
+   * POST /api/clients/:id/alerts/:alertType/snooze
+   * Snooze a specific alert type for 7 days (configurable)
+   */
+  app.post("/api/clients/:id/alerts/:alertType/snooze", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.CLIENT), requireAgenceIdAccess(), async (req, res) => {
+    try {
+      if (!z.string().uuid().safeParse(req.params.id).success) {
+        return res.status(404).json({ message: "Client not found (Invalid ID)" });
+      }
+
+      const client = await storage.getClient(req.params.id);
+      if (!client) return res.status(404).json({ message: "Client not found" });
+
+      const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
+      if (agenceFilter?.agenceId && client.agenceId !== agenceFilter.agenceId) {
+        return res.status(403).json({ message: "Acces refuse : client d'une autre agence" });
+      }
+
+      if (!(KNOWN_ALERT_TYPES as readonly string[]).includes(req.params.alertType)) {
+        return res.status(400).json({ message: `Type d'alerte inconnu: ${req.params.alertType}` });
+      }
+
+      const user = req.session.user;
+      const snoozedByName = user ? `${user.prenom || ""} ${user.nom || ""}`.trim() : undefined;
+
+      const success = await snoozeClientAlert(
+        req.params.id,
+        req.params.alertType,
+        user?.id,
+        snoozedByName
+      );
+
+      if (!success) {
+        return res.status(500).json({ message: "Erreur mise en veille alerte" });
+      }
+
+      await logAudit(
+        req,
+        "SNOOZE_CLIENT_ALERT",
+        "client",
+        req.params.id,
+        { alertType: req.params.alertType },
+        "success",
+        "low"
+      );
+
+      const wsServer = await import("../ws-server");
+      const wsInstance = wsServer.getWsInstance();
+      if (wsInstance) {
+        wsInstance.broadcast({
+          type: "CLIENT_UPDATE",
+          payload: { clientId: req.params.id, alertsChanged: true },
+        });
+      }
+
+      res.json({ success: true, snoozedType: req.params.alertType });
+    } catch (error) {
+      logger.error({ err: error }, 'Error snoozing client alert');
+      res.status(500).json({ message: "Erreur lors de la mise en veille de l'alerte" });
     }
   });
 

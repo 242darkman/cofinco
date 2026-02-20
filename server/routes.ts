@@ -49,6 +49,7 @@ import { registerZoneManagementRoutes } from "./routes/zone-management";
 import { registerProspectionPrimesRoutes } from "./routes/prospection-primes";
 import { registerVilleRoutes } from "./routes/villes";
 import { registerCatalogRoutes } from "./routes/catalog";
+import { scoringAdminRouter } from "./routes/scoring-admin";
 
 const logger = createLogger('Routes');
 
@@ -110,6 +111,9 @@ export function registerRoutes(app: Express): Server {
 
   // Permission Analytics (Admin only)
   app.use("/api/admin/permission-analytics", permissionAnalyticsRouter);
+
+  // Scoring Admin (audit log, states, CSV exports)
+  app.use("/api/admin/scoring", scoringAdminRouter);
 
   // Agences Module (Multi-agency management)
   registerAgencesRoutes(app);

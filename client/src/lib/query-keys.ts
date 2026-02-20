@@ -179,6 +179,9 @@ export const clientKeys = {
 
 export const scoreKeys = {
   agencyStats: (agenceId?: string) => ['scoring', 'agency-stats', agenceId] as const,
+  adminEvents: (filters?: Record<string, any>) => ['scoring', 'admin', 'events', filters] as const,
+  adminStates: (filters?: Record<string, any>) => ['scoring', 'admin', 'states', filters] as const,
+  adminEventTypes: () => ['scoring', 'admin', 'event-types'] as const,
 };
 
 // ============================================

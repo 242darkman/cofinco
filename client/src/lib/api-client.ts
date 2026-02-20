@@ -823,6 +823,102 @@ export interface AgencyScoreStats {
 }
 
 // ============================================================================
+// ADMIN SCORING API
+// ============================================================================
+
+export interface AdminScoreEventsFilter {
+  agenceId?: string;
+  eventType?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  clientId?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface AdminScoreEvent extends ClientScoreEvent {
+  clientNom?: string;
+  clientPrenom?: string;
+}
+
+export interface AdminScoreEventsResponse {
+  rows: AdminScoreEvent[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface AdminScoreStatesFilter {
+  agenceId?: string;
+  segment?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface AdminScoreStateRow extends ClientScoreState {
+  clientNom?: string;
+  clientPrenom?: string;
+  totalIncidents?: number;
+}
+
+export interface AdminScoreStatesResponse {
+  rows: AdminScoreStateRow[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export const scoringAdminApi = {
+  getEvents: (filters: AdminScoreEventsFilter = {}) => {
+    const qs = new URLSearchParams();
+    if (filters.agenceId) qs.set('agenceId', filters.agenceId);
+    if (filters.eventType) qs.set('eventType', filters.eventType);
+    if (filters.dateFrom) qs.set('dateFrom', filters.dateFrom);
+    if (filters.dateTo) qs.set('dateTo', filters.dateTo);
+    if (filters.clientId) qs.set('clientId', filters.clientId);
+    if (filters.limit) qs.set('limit', String(filters.limit));
+    if (filters.offset) qs.set('offset', String(filters.offset));
+    const q = qs.toString();
+    return request<AdminScoreEventsResponse>(`/admin/scoring/events${q ? `?${q}` : ''}`);
+  },
+
+  getStates: (filters: AdminScoreStatesFilter = {}) => {
+    const qs = new URLSearchParams();
+    if (filters.agenceId) qs.set('agenceId', filters.agenceId);
+    if (filters.segment) qs.set('segment', filters.segment);
+    if (filters.limit) qs.set('limit', String(filters.limit));
+    if (filters.offset) qs.set('offset', String(filters.offset));
+    const q = qs.toString();
+    return request<AdminScoreStatesResponse>(`/admin/scoring/states${q ? `?${q}` : ''}`);
+  },
+
+  getEventTypes: () => request<Record<string, string>>('/admin/scoring/event-types'),
+
+  exportEventsUrl: (filters: AdminScoreEventsFilter = {}) => {
+    const qs = new URLSearchParams();
+    if (filters.agenceId) qs.set('agenceId', filters.agenceId);
+    if (filters.eventType) qs.set('eventType', filters.eventType);
+    if (filters.dateFrom) qs.set('dateFrom', filters.dateFrom);
+    if (filters.dateTo) qs.set('dateTo', filters.dateTo);
+    if (filters.clientId) qs.set('clientId', filters.clientId);
+    const q = qs.toString();
+    return `/api/admin/scoring/events/export${q ? `?${q}` : ''}`;
+  },
+
+  exportStatesUrl: (filters: AdminScoreStatesFilter = {}) => {
+    const qs = new URLSearchParams();
+    if (filters.agenceId) qs.set('agenceId', filters.agenceId);
+    if (filters.segment) qs.set('segment', filters.segment);
+    const q = qs.toString();
+    return `/api/admin/scoring/states/export${q ? `?${q}` : ''}`;
+  },
+
+  exportAgencyStatsUrl: (agenceId?: string) => {
+    return `/api/admin/scoring/agency-stats/export${agenceId ? `?agenceId=${agenceId}` : ''}`;
+  },
+};
+
+// ============================================================================
 // TYPES D'ERREURS STRUCTURÉES
 // ============================================================================
 

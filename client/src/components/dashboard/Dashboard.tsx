@@ -17,7 +17,9 @@ import {
   Activity,
   ArrowUpRight,
   Database,
-  BarChart3
+  BarChart3,
+  ShieldAlert,
+  ChevronRight
 } from 'lucide-react';
 
 import { useQuery } from '@tanstack/react-query';
@@ -79,6 +81,21 @@ export default function Dashboard({
     queryKey: scoreKeys.agencyStats(selectedAgence?.id),
     queryFn: () => clientApi.getAgencyScoreStats(selectedAgence?.id),
     staleTime: 120_000,
+  });
+
+  // Cross-client alerts summary
+  const { data: alertsSummary } = useQuery<{
+    totalAtRisk: number;
+    breakdown: Record<string, number>;
+    topClients: { id: string; nom: string; prenom: string; codeClient: string; flags: string[]; score: number }[];
+  }>({
+    queryKey: ['alerts-summary', selectedAgence?.id],
+    queryFn: async () => {
+      const res = await fetch('/api/alerts/summary', { credentials: 'include' });
+      if (!res.ok) return { totalAtRisk: 0, breakdown: {}, topClients: [] };
+      return res.json();
+    },
+    staleTime: 60_000,
   });
 
   // Scroll container refs and state for fade indicators
@@ -541,6 +558,85 @@ export default function Dashboard({
               </section>
             );
           })()}
+
+          {/* Clients a risque */}
+          {alertsSummary && alertsSummary.totalAtRisk > 0 && (
+            <section className="space-y-2" aria-labelledby="risque-section-title">
+              <h3 id="risque-section-title" className="text-xs font-semibold text-content-muted uppercase tracking-widest flex items-center gap-1.5">
+                <ShieldAlert size={12} aria-hidden="true" />
+                Clients a risque
+                <Badge value={alertsSummary.totalAtRisk} size="sm" variant="danger" />
+              </h3>
+              <Card variant="default" padding="sm" className="bg-surface/40 p-2.5">
+                {/* Breakdown badges */}
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  {alertsSummary.breakdown.blacklisted > 0 && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-status-danger-bg text-status-danger font-medium">
+                      {alertsSummary.breakdown.blacklisted} liste noire
+                    </span>
+                  )}
+                  {alertsSummary.breakdown.pep > 0 && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-status-warning-bg text-status-warning font-medium">
+                      {alertsSummary.breakdown.pep} PEP
+                    </span>
+                  )}
+                  {alertsSummary.breakdown.highRisk > 0 && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-status-danger-bg text-status-danger font-medium">
+                      {alertsSummary.breakdown.highRisk} risque eleve
+                    </span>
+                  )}
+                  {alertsSummary.breakdown.kycExpired > 0 && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-status-warning-bg text-status-warning font-medium">
+                      {alertsSummary.breakdown.kycExpired} KYC expire
+                    </span>
+                  )}
+                  {alertsSummary.breakdown.idExpired > 0 && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-status-warning-bg text-status-warning font-medium">
+                      {alertsSummary.breakdown.idExpired} ID expiree
+                    </span>
+                  )}
+                  {alertsSummary.breakdown.lowScore > 0 && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-status-info-bg text-status-info font-medium">
+                      {alertsSummary.breakdown.lowScore} score faible
+                    </span>
+                  )}
+                </div>
+
+                {/* Top clients list */}
+                <div className="space-y-1">
+                  {alertsSummary.topClients.slice(0, 5).map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => {
+                        window.dispatchEvent(new CustomEvent('navigate-module', { detail: { module: 'clients', subModule: `${c.id}/alertes` } }));
+                      }}
+                      className="w-full flex items-center justify-between py-1.5 px-2 rounded hover:bg-surface-elevated/50 transition-colors text-left group"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-6 h-6 rounded-full bg-status-danger-bg flex items-center justify-center shrink-0">
+                          <span className="text-[10px] font-bold text-status-danger">{c.flags.length}</span>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-content-primary truncate">
+                            {c.prenom} {c.nom}
+                          </p>
+                          <p className="text-[10px] text-content-muted font-mono">{c.codeClient}</p>
+                        </div>
+                      </div>
+                      <ChevronRight size={12} className="text-content-muted group-hover:text-content-primary transition-colors shrink-0" />
+                    </button>
+                  ))}
+                </div>
+
+                {alertsSummary.totalAtRisk > 5 && (
+                  <p className="text-[9px] text-content-muted text-right mt-1.5">
+                    + {alertsSummary.totalAtRisk - 5} autre(s)
+                  </p>
+                )}
+              </Card>
+            </section>
+          )}
         </aside>
 
       </div>

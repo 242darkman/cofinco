@@ -50,6 +50,7 @@ import ZoneManagement from './ZoneManagement';
 import AdminCurrencySettings from './AdminCurrencySettings';
 import AdminBrandingSettings from './AdminBrandingSettings';
 import AdminAgencyReset from './AdminAgencyReset';
+import AdminScoring from './AdminScoring';
 
 
 interface AdminModuleCompletProps {
@@ -391,6 +392,7 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
                   {activeTab === 'currency' && <AdminCurrencySettings />}
                   {activeTab === 'branding' && <AdminBrandingSettings />}
                   {activeTab === 'reset-agence' && <AdminAgencyReset />}
+                  {activeTab === 'scoring' && <AdminScoring />}
 
                   {activeTab === 'roles' && (
                     <div className="flex flex-col h-full overflow-hidden space-y-2">

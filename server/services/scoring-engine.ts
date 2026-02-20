@@ -24,7 +24,7 @@ import {
   clientScoreState,
 } from "@shared/schema";
 import { membresTontine, contributionsTontine } from "@shared/schema/tontines";
-import { eq, and, gte, sql, desc, count, sum } from "drizzle-orm";
+import { eq, and, gte, lte, sql, desc, count, sum } from "drizzle-orm";
 import { SegmentClient } from "@shared/enum/status-constants";
 import { StatutCredit, StatutCompte } from "@shared/enum/status-constants";
 import { createLogger } from "../lib/logger";
@@ -838,4 +838,114 @@ export async function getScorePercentile(clientId: string) {
     percentile: Math.round((rank / total) * 100),
     agenceId,
   };
+}
+
+// ============================================================================
+// ADMIN QUERY HELPERS (cross-client)
+// ============================================================================
+
+export interface AdminEventsFilter {
+  agenceId?: string;
+  eventType?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  clientId?: string;
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * Cross-client scoring events with filters. For admin audit log.
+ */
+export async function getAdminScoreEvents(filters: AdminEventsFilter) {
+  const conditions = [];
+  if (filters.agenceId) conditions.push(eq(clientScoreEvents.agenceId, filters.agenceId));
+  if (filters.eventType) conditions.push(eq(clientScoreEvents.eventType, filters.eventType as any));
+  if (filters.clientId) conditions.push(eq(clientScoreEvents.clientId, filters.clientId));
+  if (filters.dateFrom) conditions.push(gte(clientScoreEvents.createdAt, new Date(filters.dateFrom)));
+  if (filters.dateTo) conditions.push(lte(clientScoreEvents.createdAt, new Date(filters.dateTo + "T23:59:59")));
+
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
+  const limit = Math.min(filters.limit || 50, 200);
+  const offset = filters.offset || 0;
+
+  const rows = await db.select({
+    id: clientScoreEvents.id,
+    clientId: clientScoreEvents.clientId,
+    agenceId: clientScoreEvents.agenceId,
+    eventType: clientScoreEvents.eventType,
+    refId: clientScoreEvents.refId,
+    refType: clientScoreEvents.refType,
+    pointsDelta: clientScoreEvents.pointsDelta,
+    montant: clientScoreEvents.montant,
+    reason: clientScoreEvents.reason,
+    createdBy: clientScoreEvents.createdBy,
+    createdAt: clientScoreEvents.createdAt,
+    clientNom: clients.nom,
+    clientPrenom: clients.prenom,
+  })
+    .from(clientScoreEvents)
+    .leftJoin(clients, eq(clientScoreEvents.clientId, clients.id))
+    .where(where)
+    .orderBy(desc(clientScoreEvents.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+  const [{ total }] = await db
+    .select({ total: count() })
+    .from(clientScoreEvents)
+    .where(where);
+
+  return { rows, total: Number(total), limit, offset };
+}
+
+export interface AdminStatesFilter {
+  agenceId?: string;
+  segment?: string;
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * All score states with filters. For admin overview.
+ */
+export async function getAdminScoreStates(filters: AdminStatesFilter) {
+  const conditions = [];
+  if (filters.agenceId) conditions.push(eq(clientScoreState.agenceId, filters.agenceId));
+  if (filters.segment) conditions.push(eq(clientScoreState.segment, filters.segment));
+
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
+  const limit = Math.min(filters.limit || 50, 200);
+  const offset = filters.offset || 0;
+
+  const rows = await db.select({
+    id: clientScoreState.id,
+    clientId: clientScoreState.clientId,
+    agenceId: clientScoreState.agenceId,
+    scoreGlobal: clientScoreState.scoreGlobal,
+    scorePayment: clientScoreState.scorePayment,
+    scoreLoyalty: clientScoreState.scoreLoyalty,
+    scoreEngagement: clientScoreState.scoreEngagement,
+    scoreCompliance: clientScoreState.scoreCompliance,
+    segment: clientScoreState.segment,
+    tauxRemboursement: clientScoreState.tauxRemboursement,
+    totalPointsFidelite: clientScoreState.totalPointsFidelite,
+    totalIncidents: clientScoreState.totalIncidents,
+    updatedAt: clientScoreState.updatedAt,
+    clientNom: clients.nom,
+    clientPrenom: clients.prenom,
+  })
+    .from(clientScoreState)
+    .leftJoin(clients, eq(clientScoreState.clientId, clients.id))
+    .where(where)
+    .orderBy(desc(clientScoreState.scoreGlobal))
+    .limit(limit)
+    .offset(offset);
+
+  const [{ total }] = await db
+    .select({ total: count() })
+    .from(clientScoreState)
+    .where(where);
+
+  return { rows, total: Number(total), limit, offset };
 }

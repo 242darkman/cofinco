@@ -293,6 +293,11 @@ export const FEATURE_DESCRIPTIONS = {
     subtitle: 'Historique des actions système',
     helpText: 'Visualisez toutes les opérations effectuées sur la plateforme. Chaque entrée contient l\'utilisateur, l\'action, le module concerné et les détails techniques.'
   },
+  'admin.scoring': {
+    title: 'Scoring Clients',
+    subtitle: 'Audit log cross-clients, scores et exports',
+    helpText: 'Consultez l\'historique de tous les événements scoring (dépôts, remboursements, incidents, bonus...) à travers tous les clients. Filtrez par type, date, agence. Visualisez les scores par segment et exportez en CSV.'
+  },
   'admin.alerts': {
     title: 'Alertes Système',
     subtitle: 'Notifications importantes à traiter',
