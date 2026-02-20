@@ -55,6 +55,13 @@ export interface DashboardStats {
     monthlyCredits: number;
     monthlyGoal: number;
   };
+  enquetes?: {
+    enCours: number;
+    soumises: number;
+    traitees: number;
+    tauxFavorable: number;
+    tempsMoyenHeures: number;
+  };
   // Flag for lightweight data
   isLightweight?: boolean;
 }
