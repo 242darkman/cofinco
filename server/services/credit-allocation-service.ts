@@ -11,13 +11,14 @@
 import { db } from "../db";
 import {
   credits,
+  echeancesCredits,
   remboursements,
   mouvementsFinanciers,
   loanPaymentAllocations,
   type Credit,
   type InsertLoanPaymentAllocation,
 } from "@shared/schema";
-import { eq, and, sql, desc } from "drizzle-orm";
+import { eq, and, gt, sql, desc, asc } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import { MethodePaiement } from "@shared/enum/status-constants";
 import { createLogger } from "../lib/logger";
@@ -141,7 +142,7 @@ async function updateCreditSoldeRestant(
  * Alloue un remboursement crédit selon l'ordre de priorité
  *
  * Algorithme:
- * 1. Récupérer les pénalités impayées (TODO: implémenter table pénalités crédit si nécessaire)
+ * 1. Récupérer les pénalités impayées depuis echeances_credits (penaliteMontant - penalitePayee)
  * 2. Calculer les intérêts courus (retard)
  * 3. Allouer dans l'ordre: pénalités → intérêts → principal
  * 4. Mettre à jour le solde restant du crédit
@@ -186,9 +187,40 @@ export async function allocateCreditRepayment(
     tauxApplique: parseFloat(credit.taux),
   };
 
-  // 3. Payer les pénalités impayées (TODO: implémenter quand table pénalités crédit existe)
-  // Pour l'instant, on passe directement aux intérêts
-  // Note: La table loan_payment_allocations tracke déjà montantPenalites
+  // 3. Payer les pénalités impayées (écheances avec penaliteMontant > penalitePayee)
+  const unpaidPenalties = await tx
+    .select({
+      id: echeancesCredits.id,
+      penaliteMontant: echeancesCredits.penaliteMontant,
+      penalitePayee: echeancesCredits.penalitePayee,
+    })
+    .from(echeancesCredits)
+    .where(and(
+      eq(echeancesCredits.creditId, creditId),
+      gt(sql`${echeancesCredits.penaliteMontant}::numeric - ${echeancesCredits.penalitePayee}::numeric`, 0)
+    ))
+    .orderBy(asc(echeancesCredits.dateEcheance));
+
+  for (const echeance of unpaidPenalties) {
+    if (remaining <= 0) break;
+    const due = D(echeance.penaliteMontant || '0').minus(D(echeance.penalitePayee || '0')).toNumber();
+    if (due <= 0) continue;
+    const paid = Math.min(remaining, due);
+    penalitesPaid += paid;
+    remaining -= paid;
+
+    // Mettre à jour la pénalité payée sur l'échéance
+    const newPayee = D(echeance.penalitePayee || '0').plus(paid).toString();
+    await tx
+      .update(echeancesCredits)
+      .set({ penalitePayee: newPayee })
+      .where(eq(echeancesCredits.id, echeance.id));
+
+    details.penalitesPayees!.push({
+      id: echeance.id,
+      montant: paid,
+    });
+  }
 
   // 4. Calculer et payer les intérêts courus
   const { interets, joursRetard } = calculateAccruedInterest(credit);

@@ -23,8 +23,9 @@ import {
   operationsCaisse,
   transfertsCoffreCaisse,
   transfertsInterCoffres,
+  operationsTerrain,
 } from "@shared/schema";
-import { eq, sql, and, isNull, desc, sum } from "drizzle-orm";
+import { eq, sql, and, or, isNull, desc, sum } from "drizzle-orm";
 import type {
   Balance,
   BalanceEntityType,
@@ -72,12 +73,23 @@ class BalanceService {
     // Compte bloqué si blocageActif ET (pas de date de fin OU date de fin dans le futur)
     const isBlocked = compte.blocageActif && (!compte.blocageFin || new Date(compte.blocageFin) > new Date());
 
+    // Calculer les opérations en attente (PENDING non encore postées)
+    const [pendingOps] = await db.select({
+      total: sql<number>`COALESCE(SUM(CASE WHEN ${mouvementsFinanciers.sens} = 'CREDIT' THEN ${mouvementsFinanciers.montant}::numeric ELSE -${mouvementsFinanciers.montant}::numeric END), 0)`.mapWith(Number)
+    })
+    .from(mouvementsFinanciers)
+    .where(and(
+      eq(mouvementsFinanciers.compteId, compteId),
+      eq(mouvementsFinanciers.statut, 'PENDING')
+    ));
+    const pendingAmount = pendingOps?.total ?? 0;
+
     return {
       entityId: compteId,
       entityType: 'compte',
       current,
       available: isBlocked ? 0 : current,
-      pending: 0, // TODO: calculer transactions en attente si applicable
+      pending: Math.abs(pendingAmount),
       currency: currencySymbol(),
       asOf: new Date()
     };
@@ -244,12 +256,26 @@ class BalanceService {
 
     const current = Number(tontine.solde || 0);
 
+    // Exclure les distributions en cours (SUBMITTED ou PENDING_PROVIDER)
+    const [pendingDist] = await db.select({
+      total: sql<number>`COALESCE(SUM(${tontineDistributionRequests.netAmount}::numeric), 0)`.mapWith(Number)
+    })
+    .from(tontineDistributionRequests)
+    .where(and(
+      eq(tontineDistributionRequests.tontineId, tontineId),
+      or(
+        eq(tontineDistributionRequests.status, 'SUBMITTED'),
+        eq(tontineDistributionRequests.status, 'PENDING_PROVIDER')
+      )
+    ));
+    const pendingDistAmount = pendingDist?.total ?? 0;
+
     return {
       entityId: tontineId,
       entityType: 'tontine',
       current,
-      available: current, // TODO: Peut-être exclure les distributions en cours
-      pending: 0,
+      available: Math.max(0, current - pendingDistAmount),
+      pending: pendingDistAmount,
       currency: currencySymbol(),
       asOf: new Date()
     };
@@ -272,12 +298,23 @@ class BalanceService {
 
     const current = Number(caisseAgent.soldeValide || 0);
 
+    // Calculer les opérations terrain SUBMITTED non approuvées
+    const [pendingAgentOps] = await db.select({
+      total: sql<number>`COALESCE(SUM(${operationsTerrain.montant}::numeric), 0)`.mapWith(Number)
+    })
+    .from(operationsTerrain)
+    .where(and(
+      eq(operationsTerrain.caisseAgentId, caisseAgentId),
+      eq(operationsTerrain.statut, 'SUBMITTED')
+    ));
+    const pendingAgentAmount = pendingAgentOps?.total ?? 0;
+
     return {
       entityId: caisseAgentId,
       entityType: 'caisse_agent',
       current,
       available: current,
-      pending: 0, // TODO: Calculer les opérations SUBMITTED non approuvées
+      pending: pendingAgentAmount,
       currency: currencySymbol(),
       asOf: new Date()
     };

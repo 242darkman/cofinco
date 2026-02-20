@@ -3,12 +3,16 @@ import {
   sessionsCaisse,
   operationsCaisse,
   tontines,
+  tontineTurns,
+  tontineDistributions,
   comptes,
   credits,
   remboursements,
+  echeancesCredits,
   type MouvementFinancier
 } from "@shared/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, or, asc, sql } from "drizzle-orm";
+import { allocateRepaymentToSchedule } from "./repayment-allocation-service";
 import {
   executeWithLedger,
   validateUserId,
@@ -189,29 +193,52 @@ export class GlobalTransactionService {
              if (!payload.tontineId) throw new Error("ID Tontine requis");
              if (!payload.membreId) throw new Error("ID Membre requis");
 
-             // Retrait tontine = Distribution de bénéfice
-             // Le numéro de tour doit être déterminé. 
-             // Simplification: on prend le tour actuel de la tontine ou on suppose que c'est un retrait "fin de cycle"
-             // Pour l'instant, disons qu'on distribue le tour courant si le membre est bénéficiaire
-             
-             // TODO: Logique plus fine pour déterminer QUEL tour on retire.
-             // Pour cette V1, on va supposer qu'on retire le montant total disponible ou un tour spécifique si passé en param
-             
+             // Retrait tontine = Distribution de bénéfice au membre bénéficiaire du tour
              const tontine = await db.query.tontines.findFirst({
                  where: eq(tontines.id, payload.tontineId)
              });
-             
+
              if (!tontine) throw new Error("Tontine introuvable");
-             
-             // Utiliser le tour qui vient de passer ou le tour actuel
-             // Warning: This logic assumes we withdraw the current round's gain
-             const tourNumero = tontine.nombreMembres; // Defaulting logic needs check
+
+             // Déterminer le numéro de tour correct
+             let tourNumero: number;
+
+             if (tontine.currentCycleId) {
+               // Système production : chercher le tour SCHEDULED/READY du membre dans le cycle actif
+               const [turn] = await db
+                 .select({ turnNumber: tontineTurns.turnNumber })
+                 .from(tontineTurns)
+                 .where(and(
+                   eq(tontineTurns.cycleId, tontine.currentCycleId),
+                   eq(tontineTurns.beneficiaryMemberId, payload.membreId!),
+                   or(
+                     eq(tontineTurns.status, 'SCHEDULED'),
+                     eq(tontineTurns.status, 'READY')
+                   )
+                 ))
+                 .orderBy(asc(tontineTurns.turnNumber))
+                 .limit(1);
+
+               if (!turn) throw new Error("Aucun tour programmé pour ce membre dans le cycle actif");
+               tourNumero = turn.turnNumber;
+             } else {
+               // Système legacy : tour actuel = MAX(tour distribué) + 1
+               const [result] = await db
+                 .select({
+                   tourActuel: sql<number>`COALESCE((
+                     SELECT MAX(tour_numero) FROM tontine_distributions WHERE tontine_id = ${payload.tontineId}
+                   ), 0) + 1`.mapWith(Number)
+                 })
+                 .from(tontines)
+                 .where(eq(tontines.id, payload.tontineId));
+               tourNumero = result.tourActuel;
+             }
 
              const distResult = await processTontineDistribution(tx, mouvement, {
                 tontineId: payload.tontineId,
                 membreId: payload.membreId,
                 clientId: payload.clientId, // Pour l'affichage dans le journal caisse
-                tourNumero: tourNumero, // FIXME: Needs logic to identify correct round
+                tourNumero,
                 montantTotal: payload.amount,
                 modeDistribution: "CASH_WITHDRAWAL",
                 modePaiement: payload.paymentMethod,
@@ -300,29 +327,18 @@ export class GlobalTransactionService {
             }
 
             // Vérifier que le montant ne dépasse pas le solde restant
-            const soldeRestant = Number(credit.soldeRestant || credit.montant);
+            const soldeRestant = Number(credit.soldeRestant);
             if (payload.amount > soldeRestant) {
               throw new Error(`Le montant (${payload.amount}) dépasse le solde restant (${soldeRestant})`);
             }
 
-            // 1. Mettre à jour le solde du crédit (diminution)
-            const nouveauSoldeCredit = soldeRestant - payload.amount;
-            await tx.update(credits)
-              .set({
-                soldeRestant: nouveauSoldeCredit.toString(),
-                statut: nouveauSoldeCredit <= 0 ? StatutCredit.PAID : credit.statut,
-                dateSolde: nouveauSoldeCredit <= 0 ? new Date() : undefined,
-                updatedAt: new Date()
-              })
-              .where(eq(credits.id, creditId));
-
-            // 2. Mettre à jour la session caisse (entrée d'argent)
+            // 1. Mettre à jour la session caisse (entrée d'argent)
             if (sessionCaisseId) {
               const nouveauSolde = await updateSessionSolde(tx, sessionCaisseId, payload.amount);
               additionalData.nouveauSoldeSession = nouveauSolde;
             }
 
-            // 3. Créer le remboursement
+            // 2. Créer le remboursement
             const validatedUserIdRemb = await validateUserId(tx, userId);
             const [remboursement] = await tx.insert(remboursements).values({
               creditId: creditId,
@@ -334,7 +350,35 @@ export class GlobalTransactionService {
               createdBy: validatedUserIdRemb,
             }).returning();
 
-            // 4. Créer opération caisse
+            // 3. Allouer aux échéances (FIFO) et recalculer soldeRestant
+            const allocationResult = await allocateRepaymentToSchedule(
+              tx,
+              remboursement.id,
+              creditId,
+              payload.amount,
+              validatedUserIdRemb
+            );
+
+            // soldeRestant = somme des échéances non entièrement payées
+            const echeancesNonPayees = allocationResult.updatedEcheances.filter(e =>
+              Number(e.montantPaye || 0) < Number(e.montantTotal)
+            );
+            const nouveauSoldeCredit = echeancesNonPayees.reduce((sum, e) => {
+              return sum + (Number(e.montantTotal) - Number(e.montantPaye || 0));
+            }, 0);
+
+            // 4. Mettre à jour le crédit
+            const creditSolde = nouveauSoldeCredit <= 0 && echeancesNonPayees.length === 0;
+            await tx.update(credits)
+              .set({
+                soldeRestant: nouveauSoldeCredit.toString(),
+                statut: creditSolde ? StatutCredit.PAID : credit.statut,
+                dateSolde: creditSolde ? new Date() : undefined,
+                updatedAt: new Date()
+              })
+              .where(eq(credits.id, creditId));
+
+            // 5. Créer opération caisse
             if (sessionCaisseId) {
               await tx.insert(operationsCaisse).values({
                 sessionId: sessionCaisseId,
@@ -351,18 +395,18 @@ export class GlobalTransactionService {
 
             result = remboursement;
             additionalData.nouveauSoldeCredit = nouveauSoldeCredit;
-            additionalData.creditSolde = nouveauSoldeCredit <= 0;
+            additionalData.creditSolde = creditSolde;
 
             // Domain event: credit fully paid off
-            if (nouveauSoldeCredit <= 0 && credit.clientId) {
+            if (creditSolde && credit.clientId) {
               dispatchDomainEvent({
                 type: "CREDIT_PAID_OFF",
                 data: {
                   creditId: credit.id,
                   numeroCredit: credit.numeroCredit || credit.id,
                   clientId: credit.clientId,
-                  totalPaid: Number(credit.montant || 0),
-                  agenceId: (credit as any).agenceId,
+                  totalPaid: Number(credit.totalDu),
+                  agenceId: credit.agenceId,
                 },
                 timestamp: new Date(),
               });
