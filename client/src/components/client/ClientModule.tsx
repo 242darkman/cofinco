@@ -297,7 +297,7 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
 
           {/* Tab Content */}
           <div className="min-h-[400px] mt-4">
-            {activeTab === 'overview' && <ClientOverviewTab client={viewingClient} />}
+            {activeTab === 'overview' && <ClientOverviewTab client={viewingClient} onNavigateToTab={(tab) => navigateToPath(`/clients/${viewingClient.id}/${tab}`)} />}
             {activeTab === 'profil' && <ClientProfileTab client={viewingClient} />}
             {activeTab === 'coordonnees' && <ClientContactTab client={viewingClient} />}
             {activeTab === 'kyc-legal' && <ClientKycLegalTab client={viewingClient} />}

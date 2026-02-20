@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { ClientWithIdentity } from '@shared/schema';
-import { DollarSign, CreditCard, PiggyBank, Star, ChevronRight, Wallet, BarChart3 } from 'lucide-react';
+import { DollarSign, CreditCard, PiggyBank, Star, ChevronRight, Wallet, BarChart3, AlertTriangle } from 'lucide-react';
 import { Card, Modal, Button, Skeleton, ProgressBar } from '../../ui';
 import { useQuery } from '@tanstack/react-query';
 import ClientTags from '../ClientTags';
@@ -10,6 +10,7 @@ import { useCurrency } from '../../../contexts/CurrencyContext';
 
 interface ClientOverviewTabProps {
   client: ClientWithIdentity;
+  onNavigateToTab?: (tabKey: string) => void;
 }
 
 interface AnalyticsData {
@@ -27,10 +28,37 @@ interface AnalyticsData {
   };
 }
 
-export default function ClientOverviewTab({ client }: ClientOverviewTabProps) {
+interface AlertSummary {
+  critical: number;
+  warning: number;
+  total: number;
+  topMessage?: string;
+}
+
+export default function ClientOverviewTab({ client, onNavigateToTab }: ClientOverviewTabProps) {
   const { currency } = useCurrency();
   const [showSavingsModal, setShowSavingsModal] = useState(false);
   const [showCreditsPanel, setShowCreditsPanel] = useState(false);
+
+  const { data: alertSummary } = useQuery<AlertSummary>({
+    queryKey: ['client-alerts-summary', client.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/clients/${client.id}/alerts`);
+      if (!res.ok) return { critical: 0, warning: 0, total: 0 };
+      const data = await res.json();
+      const active = data.active || [];
+      const critical = active.filter((a: any) => a.alertLevel === 'critical').length;
+      const warning = active.filter((a: any) => a.alertLevel === 'warning').length;
+      const topCritical = active.find((a: any) => a.alertLevel === 'critical');
+      return {
+        critical,
+        warning,
+        total: active.length,
+        topMessage: topCritical?.message,
+      };
+    },
+    staleTime: 30000,
+  });
 
   const { data: analytics, isLoading } = useQuery<AnalyticsData>({
     queryKey: ['client-analytics', client.id],
@@ -63,6 +91,45 @@ export default function ClientOverviewTab({ client }: ClientOverviewTabProps) {
   const distribution = raw.distribution ?? [];
   return (
     <>
+      {/* Alert banner — visible only when critical/warning alerts exist */}
+      {alertSummary && alertSummary.total > 0 && (
+        <button
+          type="button"
+          onClick={() => onNavigateToTab?.('alertes')}
+          className={`w-full mb-4 flex items-center gap-3 p-3 rounded-xl border transition-all duration-200 text-left group cursor-pointer ${
+            alertSummary.critical > 0
+              ? 'bg-status-danger-bg border-status-danger/30 hover:border-status-danger/50'
+              : 'bg-status-warning-bg border-status-warning/30 hover:border-status-warning/50'
+          }`}
+        >
+          <div className={`p-2 rounded-lg shrink-0 ${
+            alertSummary.critical > 0 ? 'bg-status-danger/10' : 'bg-status-warning/10'
+          }`}>
+            <AlertTriangle size={16} className={alertSummary.critical > 0 ? 'text-status-danger' : 'text-status-warning'} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className={`text-xs font-bold uppercase tracking-wide ${
+                alertSummary.critical > 0 ? 'text-status-danger' : 'text-status-warning'
+              }`}>
+                {alertSummary.critical > 0
+                  ? `${alertSummary.critical} alerte(s) critique(s)`
+                  : `${alertSummary.warning} avertissement(s)`}
+              </span>
+              {alertSummary.total > alertSummary.critical && alertSummary.critical > 0 && (
+                <span className="text-[10px] text-content-muted">
+                  + {alertSummary.total - alertSummary.critical} autre(s)
+                </span>
+              )}
+            </div>
+            {alertSummary.topMessage && (
+              <p className="text-xs text-content-secondary truncate">{alertSummary.topMessage}</p>
+            )}
+          </div>
+          <ChevronRight size={16} className="text-content-muted group-hover:text-content-primary transition-colors shrink-0" />
+        </button>
+      )}
+
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 animate-in fade-in duration-500">
 
         {/* 1. Finances */}

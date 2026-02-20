@@ -36,6 +36,9 @@ const ID_EXPIRY_WARNING_DAYS = 90;
 /** Score thresholds */
 const SCORE_DROP_THRESHOLD = 40;
 
+/** Temporal escalation: warning alerts older than this become critical */
+const ESCALATION_DAYS = 30;
+
 export const KNOWN_ALERT_TYPES = [
   "payment_overdue",
   "document_missing",
@@ -209,11 +212,21 @@ export async function evaluateClientAlerts(
     if (!resolvedTypes.has(type)) {
       // Use persisted firstSeenAt or fallback to now
       const createdAt = trackingMap.get(type) || nowIso;
+
+      // Temporal escalation: warning alerts older than ESCALATION_DAYS become critical
+      let effectiveLevel = level;
+      if (level === "warning") {
+        const ageInDays = daysBetween(new Date(createdAt), now);
+        if (ageInDays >= ESCALATION_DAYS) {
+          effectiveLevel = "critical";
+        }
+      }
+
       alerts.push({
         id: `alert-${clientId}-${type}`,
         clientId,
         alertType: type,
-        alertLevel: level,
+        alertLevel: effectiveLevel,
         message,
         isResolved: false,
         createdAt,
