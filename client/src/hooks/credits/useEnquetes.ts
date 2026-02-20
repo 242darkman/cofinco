@@ -140,12 +140,14 @@ export function useEnquetes() {
       montantApprouve,
       commentaire,
       raison,
+      supervisorNotes,
     }: {
       enqueteId: string;
       decision: 'APPROVED' | 'REJECTED' | 'REDUCED';
       montantApprouve?: number;
       commentaire?: string;
       raison?: string;
+      supervisorNotes?: string;
     }) => {
       const response = await fetch(`/api/enquetes-credit/${enqueteId}/valider`, {
         method: 'POST',
@@ -155,6 +157,7 @@ export function useEnquetes() {
           montant_approuve: montantApprouve,
           commentaire,
           raison,
+          supervisorNotes,
         }),
       });
       if (!response.ok) {
@@ -194,10 +197,11 @@ export function useEnquetes() {
     decision: 'APPROVED' | 'REJECTED' | 'REDUCED',
     montantApprouve?: number,
     commentaire?: string,
-    raison?: string
+    raison?: string,
+    supervisorNotes?: string
   ): Promise<boolean> => {
     try {
-      await validateMutation.mutateAsync({ enqueteId, decision, montantApprouve, commentaire, raison });
+      await validateMutation.mutateAsync({ enqueteId, decision, montantApprouve, commentaire, raison, supervisorNotes });
       return true;
     } catch {
       return false;

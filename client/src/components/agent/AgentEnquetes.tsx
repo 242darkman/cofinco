@@ -22,7 +22,7 @@ import {
   FileSearch,
 } from 'lucide-react';
 import clsx from 'clsx';
-import EnqueteCreditForm from '../finance/credits/EnqueteCreditForm';
+import { EnqueteWizard } from '../finance/credits/EnqueteWizard';
 
 interface Investigation {
   id: string;
@@ -465,27 +465,44 @@ export default function AgentEnquetes({ agentId }: AgentEnquetesProps) {
         </button>
       </div>
 
-      {/* Enquête Credit Form — agent fills investigation data */}
+      {/* Enquête Wizard — agent fills investigation data in 5 steps */}
       {enqueteFormData && (
-        <EnqueteCreditForm
+        <EnqueteWizard
           clientId={enqueteFormData.clientId}
           clientNom={enqueteFormData.client ? `${enqueteFormData.client.prenom || ''} ${enqueteFormData.client.nom || ''}`.trim() : undefined}
           initialData={{
             demandeId: enqueteFormData.demandeId,
             id: enqueteFormData.id,
-            client_id: enqueteFormData.clientId,
-            montant_demande: enqueteFormData.montantDemande,
-            objet_credit: enqueteFormData.objetCredit,
-            // Enquête fields with client profile fallback
-            categorie_activite: enqueteFormData.categorieActivite,
-            type_activite: enqueteFormData.typeActivite || enqueteFormData.client?.typeActivite,
-            anciennete_activite: enqueteFormData.ancienneteActivite,
-            revenu_mensuel: enqueteFormData.revenuMensuel || enqueteFormData.client?.revenuMensuel,
-            revenus_mensuels: enqueteFormData.revenuMensuel || enqueteFormData.client?.revenuMensuel,
-            revenu_journalier: enqueteFormData.revenuJournalier || enqueteFormData.client?.revenuJournalier,
-            type_revenu: enqueteFormData.typeRevenu || enqueteFormData.client?.typeRevenu,
-            charges_mensuelles: enqueteFormData.chargesMensuelles,
-            description_activite: enqueteFormData.descriptionActivite || enqueteFormData.client?.profession,
+            clientId: enqueteFormData.clientId,
+            montantDemande: enqueteFormData.montantDemande,
+            objetCredit: enqueteFormData.objetCredit,
+            categorieActivite: enqueteFormData.categorieActivite,
+            typeActivite: enqueteFormData.typeActivite || enqueteFormData.client?.typeActivite,
+            ancienneteActivite: enqueteFormData.ancienneteActivite,
+            revenuMensuel: enqueteFormData.revenuMensuel || enqueteFormData.client?.revenuMensuel,
+            revenuJournalier: enqueteFormData.revenuJournalier || enqueteFormData.client?.revenuJournalier,
+            typeRevenu: enqueteFormData.typeRevenu || enqueteFormData.client?.typeRevenu,
+            chargesMensuelles: enqueteFormData.chargesMensuelles,
+            descriptionActivite: enqueteFormData.descriptionActivite || enqueteFormData.client?.profession,
+            creditPlan: enqueteFormData.creditPlan || null,
+            clientSituation: enqueteFormData.clientSituation || null,
+            situationMatrimoniale: enqueteFormData.situationMatrimoniale,
+            personnesCharge: enqueteFormData.personnesCharge,
+            typeHabitation: enqueteFormData.typeHabitation,
+            garantiesProposees: enqueteFormData.garantiesProposees,
+            autresCredits: enqueteFormData.autresCredits,
+            photosActivite: enqueteFormData.photosActivite,
+            documentsJustificatifs: enqueteFormData.documentsJustificatifs,
+            agentRecommendation: enqueteFormData.agentRecommendation,
+            recommendedAmount: enqueteFormData.recommendedAmount,
+            riskLevel: enqueteFormData.riskLevel,
+            riskFactors: enqueteFormData.riskFactors,
+            observations: enqueteFormData.observations,
+            geoLatitude: enqueteFormData.geoLatitude,
+            geoLongitude: enqueteFormData.geoLongitude,
+            geoAccuracy: enqueteFormData.geoAccuracy,
+            geoTimestamp: enqueteFormData.geoTimestamp,
+            client: enqueteFormData.client,
           }}
           onClose={() => setEnqueteFormData(null)}
           onSave={handleSubmitEnquete}

@@ -10,7 +10,7 @@ import { StatutCredit, StatutDemande, type StatutCreditType } from '@shared/enum
 import { CREDIT_STATUS_LABELS } from '../../../lib/status-labels';
 import CreditDetailModal from './CreditDetailModal';
 import CreditRequestForm from './CreditRequestForm';
-import EnqueteCreditForm from './EnqueteCreditForm';
+import { EnqueteWizard } from './EnqueteWizard';
 import EnqueteAssignModal from './EnqueteAssignModal';
 import CreditApprovalModal from './CreditApprovalModal';
 import CreditDisbursementModal from './CreditDisbursementModal';
@@ -1198,50 +1198,58 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
       )}
 
       {showEnqueteForm && (
-        <EnqueteCreditForm
+        <EnqueteWizard
           onClose={() => {
             setShowEnqueteForm(false);
             setSelectedDemande(null);
-            setEnqueteData(null); // Reset enquête data on close
+            setEnqueteData(null);
           }}
           clientId={selectedDemande?.clients?.id || selectedDemande?.clientId}
           clientNom={selectedDemande ? formatClientName(selectedDemande.clients?.nom, selectedDemande.clients?.prenom) : undefined}
           readOnly={true}
           initialData={enqueteData ? {
-            // Use fetched enquête data if available
             id: enqueteData.id,
             demandeId: enqueteData.demandeId,
-            client_id: enqueteData.clientId,
-            montant_demande: enqueteData.montantDemande,
-            categorie_activite: enqueteData.categorieActivite,
-            type_activite: enqueteData.typeActivite,
-            anciennete_activite: enqueteData.ancienneteActivite,
-            description_activite: enqueteData.objetCredit,
-            objet_credit: enqueteData.objetCredit,
-            revenu_mensuel: enqueteData.revenuMensuel,
-            revenus_mensuels: enqueteData.revenuMensuel,
-            revenu_journalier: enqueteData.revenuJournalier,
-            type_revenu: enqueteData.typeRevenu,
-            charges_mensuelles: enqueteData.chargesMensuelles,
-            photos_activite: enqueteData.photosActivite || [],
-            photos_geotagged: enqueteData.photosGeotagged || [],
-            garanties_proposees: enqueteData.garantiesProposees || [],
-            autres_credits: enqueteData.autresCredits || [],
+            clientId: enqueteData.clientId,
+            montantDemande: enqueteData.montantDemande,
+            objetCredit: enqueteData.objetCredit,
+            categorieActivite: enqueteData.categorieActivite,
+            typeActivite: enqueteData.typeActivite,
+            ancienneteActivite: enqueteData.ancienneteActivite,
+            revenuMensuel: enqueteData.revenuMensuel,
+            revenuJournalier: enqueteData.revenuJournalier,
+            typeRevenu: enqueteData.typeRevenu,
+            chargesMensuelles: enqueteData.chargesMensuelles,
+            photosActivite: enqueteData.photosActivite || [],
+            photosGeotagged: enqueteData.photosGeotagged || [],
+            garantiesProposees: enqueteData.garantiesProposees || [],
+            autresCredits: enqueteData.autresCredits || [],
+            situationMatrimoniale: enqueteData.situationMatrimoniale,
+            personnesCharge: enqueteData.personnesCharge,
+            typeHabitation: enqueteData.typeHabitation,
+            agentRecommendation: enqueteData.agentRecommendation,
+            recommendedAmount: enqueteData.recommendedAmount,
+            riskLevel: enqueteData.riskLevel,
+            riskFactors: enqueteData.riskFactors,
+            observations: enqueteData.observations,
+            geoLatitude: enqueteData.geoLatitude,
+            geoLongitude: enqueteData.geoLongitude,
+            geoAccuracy: enqueteData.geoAccuracy,
+            geoTimestamp: enqueteData.geoTimestamp,
+            creditPlan: enqueteData.creditPlan || null,
+            clientSituation: enqueteData.clientSituation || null,
           } : selectedDemande ? {
-            // Fallback to demande data for new enquêtes
-            id: selectedDemande.id,
             demandeId: selectedDemande.id,
-            client_id: selectedDemande.clientId || selectedDemande.clients?.id,
-            montant_demande: selectedDemande.montantDemande?.toString(),
-            type_activite: selectedDemande.typeActivite,
-            categorie_activite: selectedDemande.categorieActivite,
-            anciennete_activite: selectedDemande.ancienneteActivite,
-            objet_credit: selectedDemande.objetCredit,
-            revenus_mensuels: selectedDemande.revenusMensuels || selectedDemande.revenuMensuel || selectedDemande.clients?.revenuMensuel,
-            revenu_mensuel: selectedDemande.revenuMensuel || selectedDemande.revenusMensuels || selectedDemande.clients?.revenuMensuel,
-            revenu_journalier: selectedDemande.revenuJournalier || selectedDemande.clients?.revenuJournalier,
-            type_revenu: selectedDemande.typeRevenu || selectedDemande.clients?.typeRevenu,
-            charges_mensuelles: selectedDemande.chargesMensuelles
+            clientId: selectedDemande.clientId || selectedDemande.clients?.id,
+            montantDemande: selectedDemande.montantDemande?.toString(),
+            objetCredit: selectedDemande.objetCredit,
+            categorieActivite: selectedDemande.categorieActivite,
+            typeActivite: selectedDemande.typeActivite,
+            ancienneteActivite: selectedDemande.ancienneteActivite,
+            revenuMensuel: selectedDemande.revenuMensuel || selectedDemande.revenusMensuels || selectedDemande.clients?.revenuMensuel,
+            revenuJournalier: selectedDemande.revenuJournalier || selectedDemande.clients?.revenuJournalier,
+            typeRevenu: selectedDemande.typeRevenu || selectedDemande.clients?.typeRevenu,
+            chargesMensuelles: selectedDemande.chargesMensuelles,
           } : undefined}
           onSave={async (data) => {
             const success = await enquetes.createEnquete(data);

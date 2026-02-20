@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, UserCheck, Calendar, AlertTriangle, Loader2, Search, MapPin } from 'lucide-react';
+import { X, UserCheck, Calendar, AlertTriangle, Loader2, Search, MapPin, FileText, Shield, Info } from 'lucide-react';
 import { api } from '../../../lib/api';
+import { creditPlanApi } from '../../../lib/api-client';
 import { resolveStorageUrl } from '../../../lib/format';
 
 interface Agent {
@@ -15,6 +16,18 @@ interface Agent {
   statut: string;
 }
 
+interface CreditPlanSummary {
+  id: string;
+  nom: string;
+  montantMin?: string | null;
+  montantMax?: string | null;
+  tauxInteret?: string;
+  collateralRequired?: boolean;
+  collateralTypes?: string[] | null;
+  documentsRequis?: string[] | null;
+  guaranteeDepositPercent?: string | null;
+}
+
 interface EnqueteAssignModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -23,6 +36,7 @@ interface EnqueteAssignModalProps {
     clientNom?: string;
     montantDemande?: string | number;
     objetCredit?: string;
+    creditPlanId?: string | null;
   };
   onAssign: (data: { agentId: string; priority: string; dueDate?: string }) => Promise<boolean>;
 }
@@ -35,6 +49,7 @@ export default function EnqueteAssignModal({ isOpen, onClose, demande, onAssign 
   const [priority, setPriority] = useState('MEDIUM');
   const [dueDate, setDueDate] = useState('');
   const [search, setSearch] = useState('');
+  const [creditPlan, setCreditPlan] = useState<CreditPlanSummary | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -42,6 +57,7 @@ export default function EnqueteAssignModal({ isOpen, onClose, demande, onAssign 
     setPriority('MEDIUM');
     setDueDate('');
     setSearch('');
+    setCreditPlan(null);
 
     const fetchAgents = async () => {
       setLoading(true);
@@ -56,7 +72,11 @@ export default function EnqueteAssignModal({ isOpen, onClose, demande, onAssign 
       }
     };
     fetchAgents();
-  }, [isOpen]);
+
+    if (demande.creditPlanId) {
+      creditPlanApi.getById(demande.creditPlanId).then(setCreditPlan).catch(() => {});
+    }
+  }, [isOpen, demande.creditPlanId]);
 
   const filteredAgents = agents.filter(a => {
     if (!search) return true;
@@ -103,12 +123,47 @@ export default function EnqueteAssignModal({ isOpen, onClose, demande, onAssign 
         </div>
 
         {/* Demande info */}
-        <div className="px-4 pt-3">
+        <div className="px-4 pt-3 space-y-2">
           <div className="bg-surface/50 rounded-lg p-2.5 text-xs text-content-muted space-y-0.5">
             {demande.clientNom && <p>Client : <span className="text-content-primary font-medium">{demande.clientNom}</span></p>}
             {demande.objetCredit && <p>Objet : <span className="text-content-secondary">{demande.objetCredit}</span></p>}
             {demande.montantDemande && <p>Montant : <span className="text-status-success font-medium">{Number(demande.montantDemande).toLocaleString()} FCFA</span></p>}
           </div>
+
+          {/* Credit plan info */}
+          {creditPlan && (
+            <div className="bg-status-info-bg border border-status-info/20 rounded-lg p-2.5 text-xs space-y-1.5">
+              <div className="flex items-center gap-1.5 text-status-info font-semibold">
+                <FileText size={13} />
+                Plan : {creditPlan.nom}
+              </div>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-content-muted">
+                {(creditPlan.montantMin || creditPlan.montantMax) && (
+                  <p>Plage : <span className="text-content-secondary">{creditPlan.montantMin ? Number(creditPlan.montantMin).toLocaleString() : '—'} – {creditPlan.montantMax ? Number(creditPlan.montantMax).toLocaleString() : '—'}</span></p>
+                )}
+                {creditPlan.tauxInteret && (
+                  <p>Taux : <span className="text-content-secondary">{creditPlan.tauxInteret}%</span></p>
+                )}
+                {creditPlan.guaranteeDepositPercent && (
+                  <p>Dépôt garantie : <span className="text-content-secondary">{creditPlan.guaranteeDepositPercent}%</span></p>
+                )}
+              </div>
+              {(creditPlan.collateralRequired || (creditPlan.documentsRequis && creditPlan.documentsRequis.length > 0)) && (
+                <div className="flex flex-wrap gap-1 pt-0.5">
+                  {creditPlan.collateralRequired && (
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-status-warning-bg text-status-warning text-[10px] font-medium">
+                      <Shield size={10} /> Garanties requises
+                    </span>
+                  )}
+                  {creditPlan.documentsRequis && creditPlan.documentsRequis.length > 0 && (
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-surface text-content-muted text-[10px] font-medium">
+                      <FileText size={10} /> {creditPlan.documentsRequis.length} doc(s) requis
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Agent selection */}
