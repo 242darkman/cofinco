@@ -1,12 +1,14 @@
 import type { ClientWithIdentity } from '@shared/schema';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   AlertCircle, Info, X, ShieldAlert, BadgeCheck, Clock,
   ChevronDown, ChevronUp, IdCard, Shield, UserX,
-  CreditCard, Wallet, FileWarning, Lightbulb, RotateCcw, Users
+  CreditCard, Wallet, FileWarning, Lightbulb, RotateCcw, Users,
+  ExternalLink, CheckCheck, Filter, TrendingDown
 } from 'lucide-react';
-import { Card, Badge } from '../ui';
+import { Card, Badge, Button } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
+import { toast } from '../../lib/toast';
 
 interface ClientAlert {
   id: string;
@@ -18,12 +20,14 @@ interface ClientAlert {
   resolvedAt?: string;
   createdAt: string;
   action?: string;
+  targetTab?: string;
 }
 
 interface ResolvedEntry {
   alertType: string;
   resolvedAt: string;
   resolvedBy?: string;
+  resolvedByName?: string;
 }
 
 interface AlertsResponse {
@@ -35,7 +39,10 @@ interface ClientAlertsProps {
   client: ClientWithIdentity;
   onUpdate?: () => void;
   onCountChange?: (count: number) => void;
+  onNavigateToTab?: (tabKey: string) => void;
 }
+
+type LevelFilter = 'all' | 'critical' | 'warning' | 'info';
 
 const ALERT_TYPE_LABELS: Record<string, string> = {
   payment_overdue: 'Retard paiement',
@@ -47,6 +54,7 @@ const ALERT_TYPE_LABELS: Record<string, string> = {
   kyc_expired: 'KYC expire',
   client_inactive: 'Inactivite',
   tontine_late: 'Retard tontine',
+  score_drop: 'Score critique',
 };
 
 const ALERT_TYPE_ICONS: Record<string, React.ReactElement> = {
@@ -59,9 +67,20 @@ const ALERT_TYPE_ICONS: Record<string, React.ReactElement> = {
   kyc_expired: <Shield size={16} />,
   client_inactive: <UserX size={16} />,
   tontine_late: <Users size={16} />,
+  score_drop: <TrendingDown size={16} />,
 };
 
-export default function ClientAlerts({ client, onUpdate, onCountChange }: ClientAlertsProps) {
+/** Human-readable "depuis X jours" */
+function formatSince(dateStr: string): string {
+  const days = Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24));
+  if (days <= 0) return "Aujourd'hui";
+  if (days === 1) return 'Depuis 1 jour';
+  if (days < 30) return `Depuis ${days} jours`;
+  const months = Math.floor(days / 30);
+  return months === 1 ? 'Depuis 1 mois' : `Depuis ${months} mois`;
+}
+
+export default function ClientAlerts({ client, onUpdate, onCountChange, onNavigateToTab }: ClientAlertsProps) {
   const { hasPermission } = usePermissions();
   const canResolve = hasPermission('clients', 'edit') || hasPermission('clients', 'manage');
 
@@ -69,16 +88,10 @@ export default function ClientAlerts({ client, onUpdate, onCountChange }: Client
   const [resolved, setResolved] = useState<ResolvedEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [showResolved, setShowResolved] = useState(false);
+  const [levelFilter, setLevelFilter] = useState<LevelFilter>('all');
+  const [resolvingAll, setResolvingAll] = useState(false);
 
-  useEffect(() => {
-    fetchAlerts();
-  }, [client.id]);
-
-  useEffect(() => {
-    onCountChange?.(alerts.length);
-  }, [alerts.length]);
-
-  const fetchAlerts = async () => {
+  const fetchAlerts = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch(`/api/clients/${client.id}/alerts`, { credentials: 'include' });
@@ -97,7 +110,33 @@ export default function ClientAlerts({ client, onUpdate, onCountChange }: Client
     } finally {
       setLoading(false);
     }
-  };
+  }, [client.id]);
+
+  // Initial fetch
+  useEffect(() => {
+    fetchAlerts();
+  }, [fetchAlerts]);
+
+  // Sync count to parent
+  useEffect(() => {
+    onCountChange?.(alerts.length);
+  }, [alerts.length]);
+
+  // Auto-refresh on WebSocket events (client update, score change, account change)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail?.clientId || detail.clientId === client.id) {
+        fetchAlerts();
+      }
+    };
+    window.addEventListener('client-update', handler);
+    window.addEventListener('score-updated', handler);
+    return () => {
+      window.removeEventListener('client-update', handler);
+      window.removeEventListener('score-updated', handler);
+    };
+  }, [client.id, fetchAlerts]);
 
   const handleResolveAlert = async (alertType: string) => {
     if (!canResolve) return;
@@ -120,6 +159,35 @@ export default function ClientAlerts({ client, onUpdate, onCountChange }: Client
       onUpdate?.();
     } catch (error) {
       console.error('Erreur resolution alerte:', error);
+    }
+  };
+
+  const handleResolveAll = async () => {
+    if (!canResolve || alerts.length === 0) return;
+    setResolvingAll(true);
+    try {
+      const alertTypes = alerts.map(a => a.alertType);
+      const res = await fetch(`/api/clients/${client.id}/alerts/resolve-all`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ alertTypes }),
+      });
+      if (!res.ok) throw new Error('Erreur resolution');
+
+      const nowIso = new Date().toISOString();
+      setResolved(prev => [
+        ...alertTypes.map(t => ({ alertType: t, resolvedAt: nowIso })),
+        ...prev.filter(r => !alertTypes.includes(r.alertType)),
+      ]);
+      setAlerts([]);
+      onUpdate?.();
+      toast.success(`${alertTypes.length} alerte(s) resolue(s)`);
+    } catch (error) {
+      console.error('Erreur resolution globale:', error);
+      toast.error('Erreur lors de la resolution');
+    } finally {
+      setResolvingAll(false);
     }
   };
 
@@ -155,75 +223,137 @@ export default function ClientAlerts({ client, onUpdate, onCountChange }: Client
   const warningAlerts = alerts.filter(a => a.alertLevel === 'warning');
   const infoAlerts = alerts.filter(a => a.alertLevel === 'info');
 
-  // Group alerts by level for the action panel
-  const alertsWithActions = alerts.filter(a => a.action);
+  const filteredAlerts = useMemo(() => {
+    if (levelFilter === 'all') return alerts;
+    return alerts.filter(a => a.alertLevel === levelFilter);
+  }, [alerts, levelFilter]);
 
   return (
     <div className="space-y-4 animate-in fade-in duration-500">
-      {/* 1. Stats Grid */}
+      {/* 1. Stats Grid (clickable = filter) */}
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
-        <Card
-          variant="default"
-          padding="sm"
-          className={`${criticalAlerts.length > 0 ? 'bg-status-danger-bg border-status-danger/20 ring-1 ring-status-danger/50' : 'bg-status-danger-bg/50 border-status-danger/10'}`}
+        <button
+          type="button"
+          onClick={() => setLevelFilter(levelFilter === 'critical' ? 'all' : 'critical')}
+          className="text-left"
         >
-          <div className="flex items-center gap-2 mb-1 text-status-danger font-semibold text-xs uppercase">
-            <ShieldAlert size={14} /> Critiques
-          </div>
-          <p className={`text-2xl font-bold ${criticalAlerts.length > 0 ? 'text-status-danger' : 'text-status-danger/40'}`}>
-            {criticalAlerts.length}
-          </p>
-        </Card>
+          <Card
+            variant="default"
+            padding="sm"
+            className={`transition-all ${
+              levelFilter === 'critical' ? 'ring-2 ring-status-danger/60' :
+              criticalAlerts.length > 0 ? 'bg-status-danger-bg border-status-danger/20 ring-1 ring-status-danger/50' :
+              'bg-status-danger-bg/50 border-status-danger/10'
+            }`}
+          >
+            <div className="flex items-center gap-2 mb-1 text-status-danger font-semibold text-xs uppercase">
+              <ShieldAlert size={14} /> Critiques
+            </div>
+            <p className={`text-2xl font-bold ${criticalAlerts.length > 0 ? 'text-status-danger' : 'text-status-danger/40'}`}>
+              {criticalAlerts.length}
+            </p>
+          </Card>
+        </button>
 
-        <Card
-          variant="default"
-          padding="sm"
-          className={`${warningAlerts.length > 0 ? 'bg-status-warning-bg border-status-warning/20' : 'bg-status-warning-bg/50 border-status-warning/10'}`}
+        <button
+          type="button"
+          onClick={() => setLevelFilter(levelFilter === 'warning' ? 'all' : 'warning')}
+          className="text-left"
         >
-          <div className="flex items-center gap-2 mb-1 text-status-warning font-semibold text-xs uppercase">
-            <AlertCircle size={14} /> Attention
-          </div>
-          <p className={`text-2xl font-bold ${warningAlerts.length > 0 ? 'text-status-warning' : 'text-status-warning/40'}`}>
-            {warningAlerts.length}
-          </p>
-        </Card>
+          <Card
+            variant="default"
+            padding="sm"
+            className={`transition-all ${
+              levelFilter === 'warning' ? 'ring-2 ring-status-warning/60' :
+              warningAlerts.length > 0 ? 'bg-status-warning-bg border-status-warning/20' :
+              'bg-status-warning-bg/50 border-status-warning/10'
+            }`}
+          >
+            <div className="flex items-center gap-2 mb-1 text-status-warning font-semibold text-xs uppercase">
+              <AlertCircle size={14} /> Attention
+            </div>
+            <p className={`text-2xl font-bold ${warningAlerts.length > 0 ? 'text-status-warning' : 'text-status-warning/40'}`}>
+              {warningAlerts.length}
+            </p>
+          </Card>
+        </button>
 
-        <Card
-          variant="default"
-          padding="sm"
-          className={`${infoAlerts.length > 0 ? 'bg-status-info-bg border-status-info/20' : 'bg-status-info-bg/50 border-status-info/10'}`}
+        <button
+          type="button"
+          onClick={() => setLevelFilter(levelFilter === 'info' ? 'all' : 'info')}
+          className="text-left"
         >
-          <div className="flex items-center gap-2 mb-1 text-status-info font-semibold text-xs uppercase">
-            <Info size={14} /> Infos
-          </div>
-          <p className={`text-2xl font-bold ${infoAlerts.length > 0 ? 'text-status-info' : 'text-status-info/40'}`}>
-            {infoAlerts.length}
-          </p>
-        </Card>
+          <Card
+            variant="default"
+            padding="sm"
+            className={`transition-all ${
+              levelFilter === 'info' ? 'ring-2 ring-status-info/60' :
+              infoAlerts.length > 0 ? 'bg-status-info-bg border-status-info/20' :
+              'bg-status-info-bg/50 border-status-info/10'
+            }`}
+          >
+            <div className="flex items-center gap-2 mb-1 text-status-info font-semibold text-xs uppercase">
+              <Info size={14} /> Infos
+            </div>
+            <p className={`text-2xl font-bold ${infoAlerts.length > 0 ? 'text-status-info' : 'text-status-info/40'}`}>
+              {infoAlerts.length}
+            </p>
+          </Card>
+        </button>
       </div>
 
       {/* 2. Active Alerts Feed */}
       <Card variant="default" padding="md">
-        <h3 className="text-base font-bold text-content-primary mb-4 flex items-center gap-2">
-          Alertes actives
-          <Badge value={alerts.length} size="sm" variant={criticalAlerts.length > 0 ? 'danger' : alerts.length > 0 ? 'warning' : 'neutral'} />
-        </h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-base font-bold text-content-primary flex items-center gap-2">
+            Alertes actives
+            <Badge value={alerts.length} size="sm" variant={criticalAlerts.length > 0 ? 'danger' : alerts.length > 0 ? 'warning' : 'neutral'} />
+            {levelFilter !== 'all' && (
+              <button
+                onClick={() => setLevelFilter('all')}
+                className="ml-1 flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium text-accent bg-accent/10 rounded-full hover:bg-accent/20 transition-colors"
+              >
+                <Filter size={10} />
+                {levelFilter === 'critical' ? 'Critiques' : levelFilter === 'warning' ? 'Attention' : 'Infos'}
+                <X size={10} />
+              </button>
+            )}
+          </h3>
+          {canResolve && alerts.length > 1 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleResolveAll}
+              disabled={resolvingAll}
+              className="text-xs"
+            >
+              <CheckCheck size={14} />
+              {resolvingAll ? 'Resolution...' : 'Tout resoudre'}
+            </Button>
+          )}
+        </div>
 
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" />
           </div>
-        ) : alerts.length === 0 ? (
+        ) : filteredAlerts.length === 0 ? (
           <div className="text-center py-12 border border-dashed border-edge rounded-lg bg-surface/20">
             <div className="w-16 h-16 bg-status-success-bg rounded-full flex items-center justify-center mx-auto mb-4">
               <BadgeCheck size={32} className="text-status-success" />
             </div>
-            <p className="text-status-success font-bold text-lg">Aucune alerte active</p>
-            <p className="text-content-muted text-sm">Le client est en parfaite regle.</p>
+            <p className="text-status-success font-bold text-lg">
+              {alerts.length === 0 ? 'Aucune alerte active' : 'Aucune alerte de ce niveau'}
+            </p>
+            <p className="text-content-muted text-sm">
+              {alerts.length === 0
+                ? 'Le client est en parfaite regle.'
+                : `${alerts.length} alerte(s) active(s) dans d'autres niveaux.`}
+            </p>
           </div>
         ) : (
           <div className="space-y-3">
-            {alerts.map((alert) => {
+            {filteredAlerts.map((alert) => {
               const colors = getLevelColor(alert.alertLevel);
               return (
                 <div
@@ -247,6 +377,9 @@ export default function ClientAlerts({ client, onUpdate, onCountChange }: Client
                           <span className="text-[10px] text-content-muted font-medium uppercase">
                             {ALERT_TYPE_LABELS[alert.alertType] || alert.alertType}
                           </span>
+                          <span className="text-[10px] text-content-muted italic">
+                            {formatSince(alert.createdAt)}
+                          </span>
                         </div>
                         {canResolve && (
                           <button
@@ -264,11 +397,24 @@ export default function ClientAlerts({ client, onUpdate, onCountChange }: Client
                     </div>
                   </div>
 
-                  {/* Contextual action */}
-                  {alert.action && (
-                    <div className={`flex items-start gap-2 px-3 pb-3 pt-0 ml-[42px]`}>
-                      <Lightbulb size={12} className="text-accent shrink-0 mt-0.5" />
-                      <p className="text-xs text-accent/80">{alert.action}</p>
+                  {/* Contextual action + navigation link */}
+                  {(alert.action || alert.targetTab) && (
+                    <div className="flex items-center justify-between px-3 pb-3 pt-0 ml-[42px] gap-2">
+                      {alert.action && (
+                        <div className="flex items-start gap-2 flex-1 min-w-0">
+                          <Lightbulb size={12} className="text-accent shrink-0 mt-0.5" />
+                          <p className="text-xs text-accent/80 truncate">{alert.action}</p>
+                        </div>
+                      )}
+                      {alert.targetTab && onNavigateToTab && (
+                        <button
+                          onClick={() => onNavigateToTab(alert.targetTab!)}
+                          className="shrink-0 flex items-center gap-1 text-[10px] font-semibold text-accent hover:text-accent/80 bg-accent/5 hover:bg-accent/10 px-2 py-1 rounded transition-colors"
+                        >
+                          Aller a l'onglet
+                          <ExternalLink size={10} />
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -312,6 +458,9 @@ export default function ClientAlerts({ client, onUpdate, onCountChange }: Client
                           Resolu le {new Date(entry.resolvedAt).toLocaleDateString('fr-FR', {
                             day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
                           })}
+                          {entry.resolvedByName && (
+                            <span className="ml-1">par <span className="font-medium text-content-secondary">{entry.resolvedByName}</span></span>
+                          )}
                         </p>
                       </div>
                     </div>

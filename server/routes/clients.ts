@@ -1393,10 +1393,17 @@ export function registerClientRoutes(app: Express) {
       }
   });
 
-  // Agency score stats (segment distribution, averages)
+  // Agency score stats (segment distribution, averages) — scoped by agency for non-admins
   app.get("/api/scoring/agency-stats", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.LOYALTY), async (req, res) => {
       try {
-        const agenceId = req.query.agenceId as string | undefined;
+        let agenceId = req.query.agenceId as string | undefined;
+
+        // Non-admin users are restricted to their own agency
+        const userRole = req.session.user?.role;
+        if (userRole !== SystemRole.ADMIN) {
+          agenceId = req.session.user?.agenceId || agenceId;
+        }
+
         const stats = await getAgencyScoreStats(agenceId);
         res.json(stats);
       } catch (error) {
@@ -1878,10 +1885,14 @@ export function registerClientRoutes(app: Express) {
         return res.status(400).json({ message: `Type d'alerte inconnu: ${req.params.alertType}` });
       }
 
+      const user = req.session.user;
+      const resolvedByName = user ? `${user.prenom || ""} ${user.nom || ""}`.trim() : undefined;
+
       const success = await resolveClientAlert(
         req.params.id,
         req.params.alertType,
-        req.session.user?.id
+        user?.id,
+        resolvedByName
       );
 
       if (!success) {
@@ -1898,10 +1909,85 @@ export function registerClientRoutes(app: Express) {
         "low"
       );
 
+      // Broadcast alert change for real-time UI update
+      const wsServer = await import("../ws-server");
+      const wsInstance = wsServer.getWsInstance();
+      if (wsInstance) {
+        wsInstance.broadcast({
+          type: "CLIENT_UPDATE",
+          payload: { clientId: req.params.id, alertsChanged: true },
+        });
+      }
+
       res.json({ success: true, resolvedType: req.params.alertType });
     } catch (error) {
       logger.error({ err: error }, 'Error resolving client alert');
       res.status(500).json({ message: "Erreur lors de la resolution de l'alerte" });
+    }
+  });
+
+  /**
+   * POST /api/clients/:id/alerts/resolve-all
+   * Resolve all active alerts for a client at once
+   */
+  app.post("/api/clients/:id/alerts/resolve-all", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.CLIENT), requireAgenceIdAccess(), async (req, res) => {
+    try {
+      if (!z.string().uuid().safeParse(req.params.id).success) {
+        return res.status(404).json({ message: "Client not found (Invalid ID)" });
+      }
+
+      const client = await storage.getClient(req.params.id);
+      if (!client) return res.status(404).json({ message: "Client not found" });
+
+      const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
+      if (agenceFilter?.agenceId && client.agenceId !== agenceFilter.agenceId) {
+        return res.status(403).json({ message: "Acces refuse : client d'une autre agence" });
+      }
+
+      const alertTypes: string[] = Array.isArray(req.body?.alertTypes) ? req.body.alertTypes : [];
+      if (alertTypes.length === 0) {
+        return res.status(400).json({ message: "Aucun type d'alerte fourni" });
+      }
+
+      const { resolveAllClientAlerts } = await import("../services/client-alerts");
+
+      const user = req.session.user;
+      const resolvedByName = user ? `${user.prenom || ""} ${user.nom || ""}`.trim() : undefined;
+
+      const success = await resolveAllClientAlerts(
+        req.params.id,
+        alertTypes,
+        user?.id,
+        resolvedByName
+      );
+
+      if (!success) {
+        return res.status(500).json({ message: "Erreur resolution des alertes" });
+      }
+
+      await logAudit(
+        req,
+        "RESOLVE_ALL_CLIENT_ALERTS",
+        "client",
+        req.params.id,
+        { alertTypes },
+        "success",
+        "low"
+      );
+
+      const wsServer = await import("../ws-server");
+      const wsInstance = wsServer.getWsInstance();
+      if (wsInstance) {
+        wsInstance.broadcast({
+          type: "CLIENT_UPDATE",
+          payload: { clientId: req.params.id, alertsChanged: true },
+        });
+      }
+
+      res.json({ success: true, resolvedCount: alertTypes.length });
+    } catch (error) {
+      logger.error({ err: error }, 'Error resolving all client alerts');
+      res.status(500).json({ message: "Erreur lors de la resolution des alertes" });
     }
   });
 

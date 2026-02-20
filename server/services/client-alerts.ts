@@ -5,6 +5,9 @@
  * Les resolutions sont persistees dans le champ JSONB `alerts` du client.
  * Les resolutions expirent apres RESOLUTION_EXPIRY_DAYS jours — les alertes
  * reapparaissent si la condition persiste.
+ *
+ * firstSeenAt tracking: persiste la date de premiere detection de chaque
+ * condition active pour que le frontend affiche "depuis X jours".
  */
 
 import { storage } from "../storage";
@@ -30,6 +33,9 @@ const INACTIVITY_DAYS = 90;
 const ID_EXPIRY_CRITICAL_DAYS = 30;
 const ID_EXPIRY_WARNING_DAYS = 90;
 
+/** Score thresholds */
+const SCORE_DROP_THRESHOLD = 40;
+
 export const KNOWN_ALERT_TYPES = [
   "payment_overdue",
   "document_missing",
@@ -40,6 +46,7 @@ export const KNOWN_ALERT_TYPES = [
   "kyc_expired",
   "client_inactive",
   "tontine_late",
+  "score_drop",
 ] as const;
 
 export type AlertType = (typeof KNOWN_ALERT_TYPES)[number];
@@ -54,18 +61,47 @@ export interface ClientAlert {
   resolvedAt?: string;
   createdAt: string;
   action?: string;
+  /** Tab key to navigate to when clicking the action link */
+  targetTab?: string;
 }
 
 export interface ResolvedAlertEntry {
   alertType: string;
   resolvedAt: string;
   resolvedBy?: string;
+  resolvedByName?: string;
+}
+
+/** Tracking entry for firstSeenAt persistence */
+interface AlertTrackingEntry {
+  alertType: string;
+  firstSeenAt: string;
+}
+
+/** Shape of the `alerts` JSONB stored on client */
+interface AlertsJSONB {
+  resolved: ResolvedAlertEntry[];
+  tracking: AlertTrackingEntry[];
 }
 
 export interface AlertsResponse {
   active: ClientAlert[];
   resolved: ResolvedAlertEntry[];
 }
+
+/** Maps alert type to the target tab for quick navigation */
+const ALERT_TARGET_TABS: Record<string, string> = {
+  payment_overdue: "score",
+  document_missing: "kyc",
+  kyc_pending: "kyc",
+  credit_late: "comptes",
+  low_balance: "comptes",
+  id_expiring: "kyc-legal",
+  kyc_expired: "kyc-legal",
+  client_inactive: "transactions",
+  tontine_late: "comptes",
+  score_drop: "score",
+};
 
 /** Contextual recommended actions per alert type */
 const ALERT_ACTIONS: Record<string, string> = {
@@ -87,6 +123,8 @@ const ALERT_ACTIONS: Record<string, string> = {
     "Relancer le client par telephone ou SMS pour maintenir la relation.",
   tontine_late:
     "Contacter le client pour regulariser les cotisations tontine en retard.",
+  score_drop:
+    "Analyser les causes de la baisse du score et prendre des mesures correctives.",
 };
 
 // ============================================================================
@@ -103,6 +141,27 @@ function isResolutionExpired(resolvedAt: string): boolean {
   return daysBetween(resolved, now) > RESOLUTION_EXPIRY_DAYS;
 }
 
+/** Parse the alerts JSONB from client, handling old (array) and new (object) format */
+function parseAlertsJSONB(raw: any): AlertsJSONB {
+  // New format: { resolved: [...], tracking: [...] }
+  if (raw && typeof raw === "object" && !Array.isArray(raw) && Array.isArray(raw.resolved)) {
+    return {
+      resolved: raw.resolved || [],
+      tracking: raw.tracking || [],
+    };
+  }
+
+  // Old format: ResolvedAlertEntry[] (backwards compat)
+  if (Array.isArray(raw)) {
+    return {
+      resolved: raw.filter((e: any) => e.resolvedAt),
+      tracking: [],
+    };
+  }
+
+  return { resolved: [], tracking: [] };
+}
+
 // ============================================================================
 // EVALUATION
 // ============================================================================
@@ -110,6 +169,7 @@ function isResolutionExpired(resolvedAt: string): boolean {
 /**
  * Evaluate client alerts server-side.
  * Returns active (unresolved) alerts and the full resolution history.
+ * Also persists firstSeenAt tracking for active alert conditions.
  */
 export async function evaluateClientAlerts(
   clientId: string
@@ -117,30 +177,38 @@ export async function evaluateClientAlerts(
   const client = await storage.getClient(clientId);
   if (!client) return { active: [], resolved: [] };
 
-  // Load resolved entries from client JSONB
+  // Load resolved + tracking entries from client JSONB
   const clientAny = client as any;
-  const resolvedEntries: ResolvedAlertEntry[] = Array.isArray(clientAny.alerts)
-    ? (clientAny.alerts as ResolvedAlertEntry[]).filter(
-        (a: any) => a.resolvedAt
-      )
-    : [];
+  const alertsData = parseAlertsJSONB(clientAny.alerts);
 
   // Only non-expired resolutions suppress alerts
-  const activeResolutions = resolvedEntries.filter(
+  const activeResolutions = alertsData.resolved.filter(
     (e) => !isResolutionExpired(e.resolvedAt)
   );
   const resolvedTypes = new Set(activeResolutions.map((e) => e.alertType));
 
+  // Build a lookup for existing tracking
+  const trackingMap = new Map<string, string>();
+  for (const t of alertsData.tracking) {
+    trackingMap.set(t.alertType, t.firstSeenAt);
+  }
+
   const alerts: ClientAlert[] = [];
   const now = new Date();
   const nowIso = now.toISOString();
+
+  // Track which alert types are detected in this evaluation
+  const detectedTypes = new Set<string>();
 
   const pushAlert = (
     type: AlertType,
     level: ClientAlert["alertLevel"],
     message: string
   ) => {
+    detectedTypes.add(type);
     if (!resolvedTypes.has(type)) {
+      // Use persisted firstSeenAt or fallback to now
+      const createdAt = trackingMap.get(type) || nowIso;
       alerts.push({
         id: `alert-${clientId}-${type}`,
         clientId,
@@ -148,8 +216,9 @@ export async function evaluateClientAlerts(
         alertLevel: level,
         message,
         isResolved: false,
-        createdAt: nowIso,
+        createdAt,
         action: ALERT_ACTIONS[type],
+        targetTab: ALERT_TARGET_TABS[type],
       });
     }
   };
@@ -301,7 +370,43 @@ export async function evaluateClientAlerts(
     // Non-blocking: client may not be in any tontine
   }
 
-  return { active: alerts, resolved: resolvedEntries };
+  // 9. Score en chute — segment Risque ou score < seuil
+  const clientScore = Number(client.score ?? 50);
+  if (clientScore < SCORE_DROP_THRESHOLD) {
+    pushAlert(
+      "score_drop",
+      "critical",
+      `Score client critique (${clientScore}/100). Le client est dans le segment Risque.`
+    );
+  }
+
+  // ── Persist firstSeenAt tracking ──
+  // Update tracking: add new detections, keep existing ones that are still active
+  const updatedTracking: AlertTrackingEntry[] = [];
+  for (const type of detectedTypes) {
+    updatedTracking.push({
+      alertType: type,
+      firstSeenAt: trackingMap.get(type) || nowIso,
+    });
+  }
+
+  // Only write if tracking changed
+  const trackingChanged =
+    updatedTracking.length !== alertsData.tracking.length ||
+    updatedTracking.some(
+      (t) => !alertsData.tracking.find((old) => old.alertType === t.alertType)
+    );
+
+  if (trackingChanged) {
+    const updatedJSONB: AlertsJSONB = {
+      resolved: alertsData.resolved,
+      tracking: updatedTracking,
+    };
+    // Fire-and-forget: don't block the response
+    storage.updateClient(clientId, { alerts: updatedJSONB } as any).catch(() => {});
+  }
+
+  return { active: alerts, resolved: alertsData.resolved };
 }
 
 // ============================================================================
@@ -315,7 +420,8 @@ export async function evaluateClientAlerts(
 export async function resolveClientAlert(
   clientId: string,
   alertType: string,
-  resolvedBy?: string
+  resolvedBy?: string,
+  resolvedByName?: string
 ): Promise<boolean> {
   if (!(KNOWN_ALERT_TYPES as readonly string[]).includes(alertType)) {
     return false;
@@ -325,33 +431,73 @@ export async function resolveClientAlert(
   if (!client) return false;
 
   const clientAny = client as any;
-  const existingResolved: ResolvedAlertEntry[] = Array.isArray(clientAny.alerts)
-    ? (clientAny.alerts as ResolvedAlertEntry[])
-    : [];
+  const alertsData = parseAlertsJSONB(clientAny.alerts);
 
-  const existingIdx = existingResolved.findIndex(
+  const existingIdx = alertsData.resolved.findIndex(
     (e) => e.alertType === alertType
   );
-  let updatedResolved: ResolvedAlertEntry[];
 
   if (existingIdx >= 0) {
     // Refresh the resolution timestamp (resets expiry countdown)
-    updatedResolved = existingResolved.map((e, i) =>
-      i === existingIdx
-        ? { ...e, resolvedAt: new Date().toISOString(), resolvedBy }
-        : e
-    );
+    alertsData.resolved[existingIdx] = {
+      ...alertsData.resolved[existingIdx],
+      resolvedAt: new Date().toISOString(),
+      resolvedBy,
+      resolvedByName,
+    };
   } else {
-    updatedResolved = [
-      ...existingResolved,
-      {
-        alertType,
-        resolvedAt: new Date().toISOString(),
-        resolvedBy,
-      },
-    ];
+    alertsData.resolved.push({
+      alertType,
+      resolvedAt: new Date().toISOString(),
+      resolvedBy,
+      resolvedByName,
+    });
   }
 
-  await storage.updateClient(clientId, { alerts: updatedResolved } as any);
+  await storage.updateClient(clientId, { alerts: alertsData } as any);
+  return true;
+}
+
+/**
+ * Resolve all active alert types for a client in one shot.
+ */
+export async function resolveAllClientAlerts(
+  clientId: string,
+  alertTypes: string[],
+  resolvedBy?: string,
+  resolvedByName?: string
+): Promise<boolean> {
+  const client = await storage.getClient(clientId);
+  if (!client) return false;
+
+  const clientAny = client as any;
+  const alertsData = parseAlertsJSONB(clientAny.alerts);
+  const nowIso = new Date().toISOString();
+
+  for (const alertType of alertTypes) {
+    if (!(KNOWN_ALERT_TYPES as readonly string[]).includes(alertType)) continue;
+
+    const existingIdx = alertsData.resolved.findIndex(
+      (e) => e.alertType === alertType
+    );
+
+    if (existingIdx >= 0) {
+      alertsData.resolved[existingIdx] = {
+        ...alertsData.resolved[existingIdx],
+        resolvedAt: nowIso,
+        resolvedBy,
+        resolvedByName,
+      };
+    } else {
+      alertsData.resolved.push({
+        alertType,
+        resolvedAt: nowIso,
+        resolvedBy,
+        resolvedByName,
+      });
+    }
+  }
+
+  await storage.updateClient(clientId, { alerts: alertsData } as any);
   return true;
 }
