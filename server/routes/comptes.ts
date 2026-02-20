@@ -1763,6 +1763,10 @@ export function registerComptesRoutes(app: Express) {
             type: "CAISSE_UPDATE",
             payload: { action: "DEPOT", montant: parsed.montant },
           });
+          wsInstance.broadcastToAgency(user.agence, {
+            type: "COMPTE_UPDATE",
+            payload: { compteId: req.params.id, action: "DEPOT" },
+          });
         }
 
         res.json(
@@ -1882,6 +1886,10 @@ export function registerComptesRoutes(app: Express) {
                wsInstance.broadcastToAgency(req.session.user.agence, {
                 type: "DASHBOARD_UPDATE",
                 payload: {},
+              });
+              wsInstance.broadcastToAgency(req.session.user.agence, {
+                type: "COMPTE_UPDATE",
+                payload: { compteId: req.params.id, action: "DEPOT_INITIAL" },
               });
             }
 
@@ -2030,6 +2038,10 @@ export function registerComptesRoutes(app: Express) {
             type: "DASHBOARD_UPDATE",
             payload: { batchActivation: true, count: results.success.length }
           });
+          wsInstance.broadcastToAgency(req.session.user.agence, {
+            type: "COMPTE_UPDATE",
+            payload: { action: "BATCH_ACTIVATION", count: results.success.length },
+          });
         }
 
         res.json({
@@ -2140,6 +2152,10 @@ export function registerComptesRoutes(app: Express) {
           wsInstance.broadcastToAgency(user.agence, {
             type: "CAISSE_UPDATE",
             payload: { action: "RETRAIT", montant: parsed.montant },
+          });
+          wsInstance.broadcastToAgency(user.agence, {
+            type: "COMPTE_UPDATE",
+            payload: { compteId: req.params.id, action: "RETRAIT" },
           });
         }
 
@@ -2303,6 +2319,10 @@ export function registerComptesRoutes(app: Express) {
               message: `Compte ${compte.numeroCompte} débloqué`,
               type: "success",
             },
+          });
+          wsInstance.broadcastToAgency(user.agence, {
+            type: "COMPTE_UPDATE",
+            payload: { compteId: req.params.id, action: "DEBLOQUAGE" },
           });
         }
 
@@ -2583,6 +2603,10 @@ export function registerComptesRoutes(app: Express) {
           wsInstance.broadcastToAgency(user.agence, {
             type: "DASHBOARD_UPDATE",
             payload: {},
+          });
+          wsInstance.broadcastToAgency(user.agence, {
+            type: "COMPTE_UPDATE",
+            payload: { compteId: req.params.id, action: "INTERETS" },
           });
         }
 
