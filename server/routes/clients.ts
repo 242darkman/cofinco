@@ -1913,7 +1913,7 @@ export function registerClientRoutes(app: Express) {
       }
 
       const user = req.session.user;
-      const resolvedByName = user ? `${user.prenom || ""} ${user.nom || ""}`.trim() : undefined;
+      const resolvedByName = user ? `${user.prenom || ""} ${user.nom || ""}`.trim() || undefined : undefined;
 
       const success = await resolveClientAlert(
         req.params.id,
@@ -1977,7 +1977,7 @@ export function registerClientRoutes(app: Express) {
       }
 
       const user = req.session.user;
-      const resolvedByName = user ? `${user.prenom || ""} ${user.nom || ""}`.trim() : undefined;
+      const resolvedByName = user ? `${user.prenom || ""} ${user.nom || ""}`.trim() || undefined : undefined;
 
       const success = await resolveAllClientAlerts(
         req.params.id,
@@ -2039,7 +2039,7 @@ export function registerClientRoutes(app: Express) {
       }
 
       const user = req.session.user;
-      const snoozedByName = user ? `${user.prenom || ""} ${user.nom || ""}`.trim() : undefined;
+      const snoozedByName = user ? `${user.prenom || ""} ${user.nom || ""}`.trim() || undefined : undefined;
 
       const success = await snoozeClientAlert(
         req.params.id,

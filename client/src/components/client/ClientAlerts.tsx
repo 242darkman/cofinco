@@ -1,39 +1,16 @@
 import type { ClientWithIdentity } from '@shared/schema';
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   AlertCircle, Info, X, ShieldAlert, BadgeCheck, Clock,
   ChevronDown, ChevronUp, IdCard, Shield, UserX,
   CreditCard, Wallet, FileWarning, Lightbulb, RotateCcw, Users,
-  ExternalLink, CheckCheck, Filter, TrendingDown
+  ExternalLink, CheckCheck, Filter, TrendingDown,
+  Ban, Landmark, AlertOctagon, CircleSlash
 } from 'lucide-react';
-import { Card, Badge, Button } from '../ui';
+import { Card, Badge, Button, Skeleton } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { toast } from '../../lib/toast';
-
-interface ClientAlert {
-  id: string;
-  clientId: string;
-  alertType: string;
-  alertLevel: 'info' | 'warning' | 'critical';
-  message: string;
-  isResolved: boolean;
-  resolvedAt?: string;
-  createdAt: string;
-  action?: string;
-  targetTab?: string;
-}
-
-interface ResolvedEntry {
-  alertType: string;
-  resolvedAt: string;
-  resolvedBy?: string;
-  resolvedByName?: string;
-}
-
-interface AlertsResponse {
-  active: ClientAlert[];
-  resolved: ResolvedEntry[];
-}
+import { useClientAlerts } from '../../hooks/useClientAlerts';
 
 interface ClientAlertsProps {
   client: ClientWithIdentity;
@@ -56,6 +33,10 @@ const ALERT_TYPE_LABELS: Record<string, string> = {
   client_inactive: 'Inactivite',
   tontine_late: 'Retard tontine',
   score_drop: 'Score critique',
+  blacklisted: 'Liste noire',
+  pep_flagged: 'PEP',
+  high_risk: 'Risque eleve',
+  id_missing: 'Piece manquante',
 };
 
 const ALERT_TYPE_ICONS: Record<string, React.ReactElement> = {
@@ -70,6 +51,10 @@ const ALERT_TYPE_ICONS: Record<string, React.ReactElement> = {
   client_inactive: <UserX size={16} />,
   tontine_late: <Users size={16} />,
   score_drop: <TrendingDown size={16} />,
+  blacklisted: <Ban size={16} />,
+  pep_flagged: <Landmark size={16} />,
+  high_risk: <AlertOctagon size={16} />,
+  id_missing: <CircleSlash size={16} />,
 };
 
 /** Human-readable "depuis X jours" */
@@ -86,79 +71,45 @@ export default function ClientAlerts({ client, onUpdate, onCountChange, onNaviga
   const { hasPermission } = usePermissions();
   const canResolve = hasPermission('clients', 'edit') || hasPermission('clients', 'manage');
 
-  const [alerts, setAlerts] = useState<ClientAlert[]>([]);
-  const [resolved, setResolved] = useState<ResolvedEntry[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [fetchError, setFetchError] = useState(false);
+  const { data: alertsData, isLoading: loading, isError: fetchError, refetch: fetchAlerts, setData } = useClientAlerts(client.id);
+
+  const alerts = alertsData?.active ?? [];
+  const resolved = alertsData?.resolved ?? [];
+  const snoozed = alertsData?.snoozed ?? [];
+
   const [showResolved, setShowResolved] = useState(false);
   const [levelFilter, setLevelFilter] = useState<LevelFilter>('all');
   const [resolvingAll, setResolvingAll] = useState(false);
-
-  const fetchAlerts = useCallback(async () => {
-    setLoading(true);
-    setFetchError(false);
-    try {
-      const res = await fetch(`/api/clients/${client.id}/alerts`, { credentials: 'include' });
-      if (!res.ok) throw new Error('Erreur chargement alertes');
-      const data: AlertsResponse = await res.json();
-
-      const sorted = (data.active || []).sort((a, b) => {
-        const levelOrder: Record<string, number> = { critical: 0, warning: 1, info: 2 };
-        return (levelOrder[a.alertLevel] ?? 3) - (levelOrder[b.alertLevel] ?? 3);
-      });
-
-      setAlerts(sorted);
-      setResolved(data.resolved || []);
-    } catch (error) {
-      console.error('Erreur chargement alertes:', error);
-      setFetchError(true);
-    } finally {
-      setLoading(false);
-    }
-  }, [client.id]);
-
-  // Initial fetch
-  useEffect(() => {
-    fetchAlerts();
-  }, [fetchAlerts]);
+  const [dismissingType, setDismissingType] = useState<string | null>(null);
 
   // Sync count to parent
   useEffect(() => {
     onCountChange?.(alerts.length);
   }, [alerts.length, onCountChange]);
 
-  // Auto-refresh on WebSocket events (client update, score change, account change)
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      if (!detail?.clientId || detail.clientId === client.id) {
-        fetchAlerts();
-      }
-    };
-    window.addEventListener('client-update', handler);
-    window.addEventListener('score-updated', handler);
-    return () => {
-      window.removeEventListener('client-update', handler);
-      window.removeEventListener('score-updated', handler);
-    };
-  }, [client.id, fetchAlerts]);
-
   const handleResolveAlert = async (alertType: string) => {
     if (!canResolve) return;
 
-    // Save state for rollback
-    const prevAlerts = alerts;
-    const prevResolved = resolved;
+    // Trigger fade-out animation
+    setDismissingType(alertType);
+    await new Promise(resolve => setTimeout(resolve, 300));
 
-    // Optimistic update
-    const dismissed = alerts.find(a => a.alertType === alertType);
-    setAlerts(prev => prev.filter(a => a.alertType !== alertType));
-    if (dismissed) {
-      setResolved(prev => [
-        { alertType, resolvedAt: new Date().toISOString() },
-        ...prev.filter(r => r.alertType !== alertType),
-      ]);
-    }
+    // Snapshot for rollback
+    const snapshot = alertsData;
+
+    // Optimistic update via shared cache
+    setData(prev => {
+      if (!prev) return prev;
+      return {
+        active: prev.active.filter(a => a.alertType !== alertType),
+        resolved: [
+          { alertType, resolvedAt: new Date().toISOString() },
+          ...prev.resolved.filter(r => r.alertType !== alertType),
+        ],
+        snoozed: prev.snoozed,
+      };
+    });
+    setDismissingType(null);
 
     try {
       const res = await fetch(`/api/clients/${client.id}/alerts/${alertType}/resolve`, {
@@ -169,18 +120,59 @@ export default function ClientAlerts({ client, onUpdate, onCountChange, onNaviga
       onUpdate?.();
     } catch (error) {
       console.error('Erreur resolution alerte:', error);
-      // Rollback on failure
-      setAlerts(prevAlerts);
-      setResolved(prevResolved);
+      setData(() => snapshot);
       toast.error('Erreur lors de la resolution');
     }
   };
 
+  const handleSnoozeAlert = async (alertType: string) => {
+    if (!canResolve) return;
+
+    // Trigger fade-out animation
+    setDismissingType(alertType);
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    // Snapshot for rollback
+    const snapshot = alertsData;
+
+    const snoozedUntil = new Date();
+    snoozedUntil.setDate(snoozedUntil.getDate() + 7);
+
+    // Optimistic update via shared cache
+    setData(prev => {
+      if (!prev) return prev;
+      return {
+        active: prev.active.filter(a => a.alertType !== alertType),
+        resolved: prev.resolved,
+        snoozed: [
+          { alertType, snoozedAt: new Date().toISOString(), snoozedUntil: snoozedUntil.toISOString() },
+          ...prev.snoozed.filter(s => s.alertType !== alertType),
+        ],
+      };
+    });
+    setDismissingType(null);
+
+    try {
+      const res = await fetch(`/api/clients/${client.id}/alerts/${alertType}/snooze`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Erreur mise en veille');
+      onUpdate?.();
+      toast.success('Alerte mise en veille pour 7 jours');
+    } catch (error) {
+      console.error('Erreur snooze alerte:', error);
+      setData(() => snapshot);
+      toast.error('Erreur lors de la mise en veille');
+    }
+  };
+
   const handleResolveAll = async () => {
-    if (!canResolve || alerts.length === 0) return;
+    const targetAlerts = filteredAlerts;
+    if (!canResolve || targetAlerts.length === 0) return;
     setResolvingAll(true);
     try {
-      const alertTypes = alerts.map(a => a.alertType);
+      const alertTypes = targetAlerts.map(a => a.alertType);
       const res = await fetch(`/api/clients/${client.id}/alerts/resolve-all`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -190,11 +182,17 @@ export default function ClientAlerts({ client, onUpdate, onCountChange, onNaviga
       if (!res.ok) throw new Error('Erreur resolution');
 
       const nowIso = new Date().toISOString();
-      setResolved(prev => [
-        ...alertTypes.map(t => ({ alertType: t, resolvedAt: nowIso })),
-        ...prev.filter(r => !alertTypes.includes(r.alertType)),
-      ]);
-      setAlerts([]);
+      setData(prev => {
+        if (!prev) return prev;
+        return {
+          active: prev.active.filter(a => !alertTypes.includes(a.alertType)),
+          resolved: [
+            ...alertTypes.map(t => ({ alertType: t, resolvedAt: nowIso })),
+            ...prev.resolved.filter(r => !alertTypes.includes(r.alertType)),
+          ],
+          snoozed: prev.snoozed,
+        };
+      });
       onUpdate?.();
       toast.success(`${alertTypes.length} alerte(s) resolue(s)`);
     } catch (error) {
@@ -246,80 +244,90 @@ export default function ClientAlerts({ client, onUpdate, onCountChange, onNaviga
     <div className="space-y-4 animate-in fade-in duration-500">
       {/* 1. Stats Grid (clickable = filter) */}
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
-        <button
-          type="button"
-          onClick={() => setLevelFilter(levelFilter === 'critical' ? 'all' : 'critical')}
-          className="text-left"
-          aria-pressed={levelFilter === 'critical'}
-          aria-label={`Filtrer alertes critiques (${criticalAlerts.length})`}
-        >
-          <Card
-            variant="default"
-            padding="sm"
-            className={`transition-all ${
-              levelFilter === 'critical' ? 'ring-2 ring-status-danger/60' :
-              criticalAlerts.length > 0 ? 'bg-status-danger-bg border-status-danger/20 ring-1 ring-status-danger/50' :
-              'bg-status-danger-bg/50 border-status-danger/10'
-            }`}
-          >
-            <div className="flex items-center gap-2 mb-1 text-status-danger font-semibold text-xs uppercase">
-              <ShieldAlert size={14} /> Critiques
-            </div>
-            <p className={`text-2xl font-bold ${criticalAlerts.length > 0 ? 'text-status-danger' : 'text-status-danger/40'}`}>
-              {criticalAlerts.length}
-            </p>
-          </Card>
-        </button>
+        {loading ? (
+          <>
+            <Skeleton className="h-[72px] w-full rounded-xl" />
+            <Skeleton className="h-[72px] w-full rounded-xl" />
+            <Skeleton className="h-[72px] w-full rounded-xl" />
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={() => setLevelFilter(levelFilter === 'critical' ? 'all' : 'critical')}
+              className="text-left"
+              aria-pressed={levelFilter === 'critical'}
+              aria-label={`Filtrer alertes critiques (${criticalAlerts.length})`}
+            >
+              <Card
+                variant="default"
+                padding="sm"
+                className={`transition-all ${
+                  levelFilter === 'critical' ? 'ring-2 ring-status-danger/60' :
+                  criticalAlerts.length > 0 ? 'bg-status-danger-bg border-status-danger/20 ring-1 ring-status-danger/50' :
+                  'bg-status-danger-bg/50 border-status-danger/10'
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-1 text-status-danger font-semibold text-xs uppercase">
+                  <ShieldAlert size={14} /> Critiques
+                </div>
+                <p className={`text-2xl font-bold ${criticalAlerts.length > 0 ? 'text-status-danger' : 'text-status-danger/40'}`}>
+                  {criticalAlerts.length}
+                </p>
+              </Card>
+            </button>
 
-        <button
-          type="button"
-          onClick={() => setLevelFilter(levelFilter === 'warning' ? 'all' : 'warning')}
-          className="text-left"
-          aria-pressed={levelFilter === 'warning'}
-          aria-label={`Filtrer avertissements (${warningAlerts.length})`}
-        >
-          <Card
-            variant="default"
-            padding="sm"
-            className={`transition-all ${
-              levelFilter === 'warning' ? 'ring-2 ring-status-warning/60' :
-              warningAlerts.length > 0 ? 'bg-status-warning-bg border-status-warning/20' :
-              'bg-status-warning-bg/50 border-status-warning/10'
-            }`}
-          >
-            <div className="flex items-center gap-2 mb-1 text-status-warning font-semibold text-xs uppercase">
-              <AlertCircle size={14} /> Attention
-            </div>
-            <p className={`text-2xl font-bold ${warningAlerts.length > 0 ? 'text-status-warning' : 'text-status-warning/40'}`}>
-              {warningAlerts.length}
-            </p>
-          </Card>
-        </button>
+            <button
+              type="button"
+              onClick={() => setLevelFilter(levelFilter === 'warning' ? 'all' : 'warning')}
+              className="text-left"
+              aria-pressed={levelFilter === 'warning'}
+              aria-label={`Filtrer avertissements (${warningAlerts.length})`}
+            >
+              <Card
+                variant="default"
+                padding="sm"
+                className={`transition-all ${
+                  levelFilter === 'warning' ? 'ring-2 ring-status-warning/60' :
+                  warningAlerts.length > 0 ? 'bg-status-warning-bg border-status-warning/20' :
+                  'bg-status-warning-bg/50 border-status-warning/10'
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-1 text-status-warning font-semibold text-xs uppercase">
+                  <AlertCircle size={14} /> Attention
+                </div>
+                <p className={`text-2xl font-bold ${warningAlerts.length > 0 ? 'text-status-warning' : 'text-status-warning/40'}`}>
+                  {warningAlerts.length}
+                </p>
+              </Card>
+            </button>
 
-        <button
-          type="button"
-          onClick={() => setLevelFilter(levelFilter === 'info' ? 'all' : 'info')}
-          className="text-left"
-          aria-pressed={levelFilter === 'info'}
-          aria-label={`Filtrer informations (${infoAlerts.length})`}
-        >
-          <Card
-            variant="default"
-            padding="sm"
-            className={`transition-all ${
-              levelFilter === 'info' ? 'ring-2 ring-status-info/60' :
-              infoAlerts.length > 0 ? 'bg-status-info-bg border-status-info/20' :
-              'bg-status-info-bg/50 border-status-info/10'
-            }`}
-          >
-            <div className="flex items-center gap-2 mb-1 text-status-info font-semibold text-xs uppercase">
-              <Info size={14} /> Infos
-            </div>
-            <p className={`text-2xl font-bold ${infoAlerts.length > 0 ? 'text-status-info' : 'text-status-info/40'}`}>
-              {infoAlerts.length}
-            </p>
-          </Card>
-        </button>
+            <button
+              type="button"
+              onClick={() => setLevelFilter(levelFilter === 'info' ? 'all' : 'info')}
+              className="text-left"
+              aria-pressed={levelFilter === 'info'}
+              aria-label={`Filtrer informations (${infoAlerts.length})`}
+            >
+              <Card
+                variant="default"
+                padding="sm"
+                className={`transition-all ${
+                  levelFilter === 'info' ? 'ring-2 ring-status-info/60' :
+                  infoAlerts.length > 0 ? 'bg-status-info-bg border-status-info/20' :
+                  'bg-status-info-bg/50 border-status-info/10'
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-1 text-status-info font-semibold text-xs uppercase">
+                  <Info size={14} /> Infos
+                </div>
+                <p className={`text-2xl font-bold ${infoAlerts.length > 0 ? 'text-status-info' : 'text-status-info/40'}`}>
+                  {infoAlerts.length}
+                </p>
+              </Card>
+            </button>
+          </>
+        )}
       </div>
 
       {/* 2. Active Alerts Feed */}
@@ -327,7 +335,7 @@ export default function ClientAlerts({ client, onUpdate, onCountChange, onNaviga
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-bold text-content-primary flex items-center gap-2">
             Alertes actives
-            <Badge value={alerts.length} size="sm" variant={criticalAlerts.length > 0 ? 'danger' : alerts.length > 0 ? 'warning' : 'neutral'} />
+            <span aria-live="polite"><Badge value={alerts.length} size="sm" variant={criticalAlerts.length > 0 ? 'danger' : alerts.length > 0 ? 'warning' : 'neutral'} /></span>
             {levelFilter !== 'all' && (
               <button
                 onClick={() => setLevelFilter('all')}
@@ -339,7 +347,7 @@ export default function ClientAlerts({ client, onUpdate, onCountChange, onNaviga
               </button>
             )}
           </h3>
-          {canResolve && alerts.length > 1 && (
+          {canResolve && filteredAlerts.length > 1 && (
             <Button
               variant="ghost"
               size="sm"
@@ -348,7 +356,11 @@ export default function ClientAlerts({ client, onUpdate, onCountChange, onNaviga
               className="text-xs"
             >
               <CheckCheck size={14} />
-              {resolvingAll ? 'Resolution...' : 'Tout resoudre'}
+              {resolvingAll
+                ? 'Resolution...'
+                : levelFilter !== 'all'
+                ? `Resoudre ${filteredAlerts.length} ${levelFilter === 'critical' ? 'critiques' : levelFilter === 'warning' ? 'avertissements' : 'infos'}`
+                : 'Tout resoudre'}
             </Button>
           )}
         </div>
@@ -390,7 +402,9 @@ export default function ClientAlerts({ client, onUpdate, onCountChange, onNaviga
               return (
                 <div
                   key={alert.id}
-                  className={`rounded-lg border ${colors.border} bg-surface/30 hover:bg-surface/50 transition-colors`}
+                  className={`rounded-lg border ${colors.border} bg-surface/30 hover:bg-surface/50 transition-all duration-300 ${
+                    dismissingType === alert.alertType ? 'opacity-0 scale-95' : 'opacity-100'
+                  }`}
                 >
                   {/* Alert main row */}
                   <div className="flex items-start gap-3 p-3">
@@ -414,14 +428,26 @@ export default function ClientAlerts({ client, onUpdate, onCountChange, onNaviga
                           </span>
                         </div>
                         {canResolve && (
-                          <button
-                            onClick={() => handleResolveAlert(alert.alertType)}
-                            className="text-content-muted hover:text-content-primary p-1 hover:bg-surface-elevated/50 rounded transition shrink-0"
-                            title="Marquer comme resolu (expire apres 30 jours)"
-                            aria-label={`Resoudre l'alerte ${ALERT_TYPE_LABELS[alert.alertType] || alert.alertType}`}
-                          >
-                            <X size={16} />
-                          </button>
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            <button
+                              onClick={() => handleSnoozeAlert(alert.alertType)}
+                              disabled={resolvingAll || dismissingType === alert.alertType}
+                              className="text-content-muted hover:text-status-warning p-1 hover:bg-status-warning-bg rounded transition disabled:opacity-40 disabled:pointer-events-none"
+                              title="Reporter 7 jours"
+                              aria-label={`Reporter l'alerte ${ALERT_TYPE_LABELS[alert.alertType] || alert.alertType} de 7 jours`}
+                            >
+                              <Clock size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleResolveAlert(alert.alertType)}
+                              disabled={resolvingAll || dismissingType === alert.alertType}
+                              className="text-content-muted hover:text-content-primary p-1 hover:bg-surface-elevated/50 rounded transition disabled:opacity-40 disabled:pointer-events-none"
+                              title="Marquer comme resolu (expire apres 30 jours)"
+                              aria-label={`Resoudre l'alerte ${ALERT_TYPE_LABELS[alert.alertType] || alert.alertType}`}
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
                         )}
                       </div>
                       <p className="text-sm text-content-secondary leading-relaxed font-medium">
@@ -436,7 +462,7 @@ export default function ClientAlerts({ client, onUpdate, onCountChange, onNaviga
                       {alert.action && (
                         <div className="flex items-start gap-2 flex-1 min-w-0">
                           <Lightbulb size={12} className="text-accent shrink-0 mt-0.5" />
-                          <p className="text-xs text-accent/80 truncate" title={alert.action}>{alert.action}</p>
+                          <p className="text-xs text-accent/80 line-clamp-2" title={alert.action}>{alert.action}</p>
                         </div>
                       )}
                       {alert.targetTab && onNavigateToTab && (
@@ -457,7 +483,39 @@ export default function ClientAlerts({ client, onUpdate, onCountChange, onNaviga
         )}
       </Card>
 
-      {/* 3. Resolved History (Collapsible) */}
+      {/* 3. Snoozed Alerts */}
+      {snoozed.length > 0 && (
+        <Card variant="default" padding="sm" className="border-status-warning/10 bg-status-warning-bg/20">
+          <div className="flex items-center gap-2 mb-2">
+            <Clock size={14} className="text-status-warning" />
+            <h3 className="text-xs font-semibold text-status-warning uppercase">
+              En veille ({snoozed.length})
+            </h3>
+          </div>
+          <div className="space-y-1.5">
+            {snoozed.map((entry) => {
+              const daysLeft = Math.max(0, Math.ceil((new Date(entry.snoozedUntil).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+              return (
+                <div key={entry.alertType} className="flex items-center justify-between py-1.5 px-2 rounded bg-surface/30">
+                  <div className="flex items-center gap-2">
+                    <div className="text-content-muted">
+                      {ALERT_TYPE_ICONS[entry.alertType] || <AlertCircle size={12} />}
+                    </div>
+                    <span className="text-xs text-content-secondary font-medium">
+                      {ALERT_TYPE_LABELS[entry.alertType] || entry.alertType}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-status-warning px-2 py-0.5 rounded-full bg-status-warning-bg">
+                    Revient dans {daysLeft}j
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      )}
+
+      {/* 4. Resolved History (Collapsible) */}
       {resolved.length > 0 && (
         <Card variant="default" padding="none" className="overflow-hidden">
           <button
@@ -479,8 +537,8 @@ export default function ClientAlerts({ client, onUpdate, onCountChange, onNaviga
           {showResolved && (
             <div className="border-t border-edge-subtle">
               <div className="divide-y divide-edge-subtle">
-                {resolved.map((entry, idx) => (
-                  <div key={idx} className="flex items-center justify-between px-4 py-3">
+                {resolved.map((entry) => (
+                  <div key={entry.alertType} className="flex items-center justify-between px-4 py-3">
                     <div className="flex items-center gap-3">
                       <div className="p-1.5 rounded-lg bg-surface-subtle text-content-muted">
                         {ALERT_TYPE_ICONS[entry.alertType] || <AlertCircle size={14} />}
