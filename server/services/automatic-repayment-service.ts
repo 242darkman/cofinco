@@ -5,6 +5,7 @@ import { executeWithLedger } from "./ledger";
 import { updateCompteSolde, updateCreditSolde, generateReference } from "./ledger";
 import { StatutCredit, TypeCompte, TypeOperationCaisse, MethodePaiement, FrequenceRemboursement } from "@shared/enum/status-constants";
 import { createLogger } from "../lib/logger";
+import { dispatchDomainEvent } from "./notifications/domain-events/event-registry";
 
 const logger = createLogger('AutoRepay');
 
@@ -79,7 +80,18 @@ async function executeAutomaticRepayment(credit: any) {
   if (currentBalance < amountToPay) {
     // Insufficient funds
     // Log failure or partial payment? For now, fail.
-    // TODO: Send notification to user
+    dispatchDomainEvent({
+      type: 'CREDIT_INSTALLMENT_LATE',
+      data: {
+        creditId: credit.id,
+        clientId: credit.clientId,
+        echeanceDate: credit.prochaineEcheance?.toISOString() || new Date().toISOString(),
+        montantDu: amountToPay.toString(),
+        joursRetard: 0,
+        description: `Fonds insuffisants pour remboursement automatique (solde: ${currentBalance.toLocaleString()}, échéance: ${amountToPay.toLocaleString()})`,
+      },
+      timestamp: new Date(),
+    });
     throw new Error("Insufficient funds");
   }
 

@@ -12,6 +12,7 @@
 
 import { db } from "../db";
 import { createLogger } from "../lib/logger";
+import { paymentService } from "./mobile-money/payment-service";
 
 const logger = createLogger('TontineProduction');
 import {
@@ -1051,19 +1052,25 @@ export async function approveDistribution(params: {
       mouvementId = ledgerResult.mouvement.id;
       finalStatus = TontineDistributionRequestStatus.SUCCESS;
     } else if (request.payoutMethod === TontinePayoutMethod.MOBILE_MONEY) {
-      // Mobile Money payout - would integrate with payment service
-      // For now, mark as pending provider
+      // Mobile Money payout via PawaPay
       finalStatus = TontineDistributionRequestStatus.PENDING_PROVIDER;
 
-      // TODO: Integrate with PaymentService.initiatePayout()
-      // const paymentResult = await paymentService.initiatePayout({
-      //   provider: request.provider,
-      //   amount: netAmount,
-      //   phone: request.targetMsisdn,
-      //   tontineId: request.tontineId,
-      //   ...
-      // });
-      // paymentIntentId = paymentResult.id;
+      try {
+        const paymentResult = await paymentService.initiatePayout({
+          provider: request.provider as 'MTN' | 'AIRTEL',
+          amount: netAmount,
+          phone: request.targetMsisdn!,
+          tontineId: request.tontineId,
+          clientId: request.beneficiaryMemberId,
+          description: `Distribution Tontine - Tour #${request.turnId}`,
+          idempotencyKey: `tontine-dist-${request.id}`,
+          agenceId,
+        });
+        paymentIntentId = paymentResult.id;
+      } catch (error) {
+        logger.error({ err: error, requestId: request.id }, 'Erreur initiation payout Mobile Money tontine');
+        finalStatus = TontineDistributionRequestStatus.FAILED;
+      }
     }
 
     // ========================================================================

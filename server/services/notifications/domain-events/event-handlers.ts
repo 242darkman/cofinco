@@ -53,7 +53,13 @@ import type {
   HrSanctionCreatedData,
   HrSanctionNotifiedData,
   HrSanctionFinalizedData,
+  CreditInstallmentLateData,
+  SystemJobFailedData,
   ClientSegmentChangedData,
+  AccountSuspendedData,
+  AccountUnsuspendedData,
+  ClosureInitiatedData,
+  ClosureApprovedData,
 } from "./event-types";
 
 // ============================================================================
@@ -142,7 +148,7 @@ export async function handleCreditRequestCreated(data: CreditRequestCreatedData)
     appName: "COFIN&CO-M",
   };
 
-  await emitNotificationEvent("CREDIT_REQUEST_CREATED", data as any, {
+  await emitNotificationEvent("CREDIT_REQUEST_CREATED", data, {
     smsRecipients: client.phone
       ? [
           {
@@ -182,7 +188,7 @@ export async function handleCreditApproved(data: CreditApprovedData) {
     numeroDemande: data.numeroDemande,
   };
 
-  await emitNotificationEvent("CREDIT_APPROVED", data as any, {
+  await emitNotificationEvent("CREDIT_APPROVED", data, {
     smsRecipients: client.phone
       ? [
           {
@@ -224,7 +230,7 @@ export async function handleCreditRejected(data: CreditRejectedData) {
     motif: data.motifRejet || "Non spécifié",
   };
 
-  await emitNotificationEvent("CREDIT_REJECTED", data as any, {
+  await emitNotificationEvent("CREDIT_REJECTED", data, {
     smsRecipients: client.phone
       ? [
           {
@@ -264,7 +270,7 @@ export async function handleCreditDisbursed(data: CreditDisbursedData) {
     channel: data.channel,
   };
 
-  await emitNotificationEvent("CREDIT_DISBURSED", data as any, {
+  await emitNotificationEvent("CREDIT_DISBURSED", data, {
     smsRecipients: client.phone
       ? [
           {
@@ -333,7 +339,7 @@ export async function handleCreditOverdue(data: CreditOverdueData) {
         creditNumber: credit.numeroCredit || "",
       };
 
-      await emitNotificationEvent("CREDIT_OVERDUE", {} as any, {
+      await emitNotificationEvent("CREDIT_OVERDUE", {}, {
         smsRecipients: client.phone
           ? [
               {
@@ -354,7 +360,7 @@ export async function handleCreditOverdue(data: CreditOverdueData) {
           : [],
       });
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, 'Error sending overdue notifications');
   }
 
@@ -376,7 +382,7 @@ export async function handleCreditInvestigationAssigned(
     agentName: data.agentName || "un agent",
   };
 
-  await emitNotificationEvent("CREDIT_INVESTIGATION_ASSIGNED", data as any, {
+  await emitNotificationEvent("CREDIT_INVESTIGATION_ASSIGNED", data, {
     smsRecipients: client.phone
       ? [
           {
@@ -415,7 +421,7 @@ export async function handleCreditPaidOff(data: CreditPaidOffData) {
     totalPaid: data.totalPaid.toLocaleString("fr-FR"),
   };
 
-  await emitNotificationEvent("CREDIT_PAID_OFF", data as any, {
+  await emitNotificationEvent("CREDIT_PAID_OFF", data, {
     smsRecipients: client.phone
       ? [
           {
@@ -454,7 +460,7 @@ export async function handleCreditRefundApproved(data: CreditRefundApprovedData)
     reference: data.reference,
   };
 
-  await emitNotificationEvent("CREDIT_REFUND_APPROVED", data as any, {
+  await emitNotificationEvent("CREDIT_REFUND_APPROVED", data, {
     smsRecipients: client.phone
       ? [
           {
@@ -493,7 +499,7 @@ export async function handleCreditRefundPaid(data: CreditRefundPaidData) {
     reference: data.reference,
   };
 
-  await emitNotificationEvent("CREDIT_REFUND_PAID", data as any, {
+  await emitNotificationEvent("CREDIT_REFUND_PAID", data, {
     smsRecipients: client.phone
       ? [
           {
@@ -538,7 +544,7 @@ export async function handleTontineMemberJoined(data: TontineMemberJoinedData) {
     position: data.position ? String(data.position) : undefined,
   };
 
-  await emitNotificationEvent("TONTINE_MEMBER_JOINED", data as any, {
+  await emitNotificationEvent("TONTINE_MEMBER_JOINED", data, {
     smsRecipients: client.phone
       ? [{ phone: client.phone, templateCode: "TONTINE_MEMBER_JOINED", payload, agenceId: data.agenceId }]
       : [],
@@ -565,7 +571,7 @@ export async function handleTontineContributionReceived(data: TontineContributio
     reference: data.reference,
   };
 
-  await emitNotificationEvent("TONTINE_CONTRIBUTION_RECEIVED", data as any, {
+  await emitNotificationEvent("TONTINE_CONTRIBUTION_RECEIVED", data, {
     smsRecipients: client.phone
       ? [{ phone: client.phone, templateCode: "TONTINE_CONTRIBUTION_RECEIVED", payload, agenceId: data.agenceId }]
       : [],
@@ -592,7 +598,7 @@ export async function handleTontineContributionOverdue(data: TontineContribution
     daysOverdue: String(data.daysOverdue),
   };
 
-  await emitNotificationEvent("TONTINE_CONTRIBUTION_OVERDUE", data as any, {
+  await emitNotificationEvent("TONTINE_CONTRIBUTION_OVERDUE", data, {
     smsRecipients: client.phone
       ? [{ phone: client.phone, templateCode: "TONTINE_CONTRIBUTION_OVERDUE", payload, agenceId: data.agenceId }]
       : [],
@@ -618,7 +624,7 @@ export async function handleTontinePenaltyApplied(data: TontinePenaltyAppliedDat
     motif: data.motif,
   };
 
-  await emitNotificationEvent("TONTINE_PENALTY_APPLIED", data as any, {
+  await emitNotificationEvent("TONTINE_PENALTY_APPLIED", data, {
     smsRecipients: client.phone
       ? [{ phone: client.phone, templateCode: "TONTINE_PENALTY_APPLIED", payload, agenceId: data.agenceId }]
       : [],
@@ -644,7 +650,7 @@ export async function handleTontineDistributionApproved(data: TontineDistributio
     payoutMethod: data.payoutMethod,
   };
 
-  await emitNotificationEvent("TONTINE_DISTRIBUTION_APPROVED", data as any, {
+  await emitNotificationEvent("TONTINE_DISTRIBUTION_APPROVED", data, {
     smsRecipients: client.phone
       ? [{ phone: client.phone, templateCode: "TONTINE_DISTRIBUTION_APPROVED", payload, agenceId: data.agenceId }]
       : [],
@@ -671,7 +677,7 @@ export async function handleTontineDistributionPaid(data: TontineDistributionPai
     payoutMethod: data.payoutMethod,
   };
 
-  await emitNotificationEvent("TONTINE_DISTRIBUTION_PAID", data as any, {
+  await emitNotificationEvent("TONTINE_DISTRIBUTION_PAID", data, {
     smsRecipients: client.phone
       ? [{ phone: client.phone, templateCode: "TONTINE_DISTRIBUTION_PAID", payload, agenceId: data.agenceId }]
       : [],
@@ -713,7 +719,7 @@ export async function handleTontineCycleStarted(data: TontineCycleStartedData) {
         startDate: data.startDate,
       };
 
-      await emitNotificationEvent("TONTINE_CYCLE_STARTED", data as any, {
+      await emitNotificationEvent("TONTINE_CYCLE_STARTED", data, {
         smsRecipients: client.phone
           ? [{ phone: client.phone, templateCode: "TONTINE_CYCLE_STARTED", payload, agenceId: data.agenceId }]
           : [],
@@ -722,7 +728,7 @@ export async function handleTontineCycleStarted(data: TontineCycleStartedData) {
           : [],
       });
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, 'Error notifying members for cycle start');
   }
 
@@ -753,7 +759,7 @@ export async function handleAccountCreated(data: AccountCreatedData) {
     amount: data.montantInitial > 0 ? data.montantInitial.toLocaleString("fr-FR") : undefined,
   };
 
-  await emitNotificationEvent("ACCOUNT_CREATED", data as any, {
+  await emitNotificationEvent("ACCOUNT_CREATED", data, {
     smsRecipients: client.phone
       ? [{ phone: client.phone, templateCode: "ACCOUNT_CREATED", payload, agenceId: data.agenceId }]
       : [],
@@ -779,7 +785,7 @@ export async function handleAccountActivated(data: AccountActivatedData) {
     amount: data.montantDepose.toLocaleString("fr-FR"),
   };
 
-  await emitNotificationEvent("ACCOUNT_ACTIVATED", data as any, {
+  await emitNotificationEvent("ACCOUNT_ACTIVATED", data, {
     smsRecipients: client.phone
       ? [{ phone: client.phone, templateCode: "ACCOUNT_ACTIVATED", payload, agenceId: data.agenceId }]
       : [],
@@ -805,7 +811,7 @@ export async function handleAccountDeposit(data: AccountDepositData) {
     balance: Number(data.nouveauSolde).toLocaleString("fr-FR"),
   };
 
-  await emitNotificationEvent("ACCOUNT_DEPOSIT", data as any, {
+  await emitNotificationEvent("ACCOUNT_DEPOSIT", data, {
     smsRecipients: client.phone
       ? [{ phone: client.phone, templateCode: "ACCOUNT_DEPOSIT", payload, agenceId: data.agenceId }]
       : [],
@@ -831,7 +837,7 @@ export async function handleAccountWithdrawal(data: AccountWithdrawalData) {
     balance: Number(data.nouveauSolde).toLocaleString("fr-FR"),
   };
 
-  await emitNotificationEvent("ACCOUNT_WITHDRAWAL", data as any, {
+  await emitNotificationEvent("ACCOUNT_WITHDRAWAL", data, {
     smsRecipients: client.phone
       ? [{ phone: client.phone, templateCode: "ACCOUNT_WITHDRAWAL", payload, agenceId: data.agenceId }]
       : [],
@@ -866,7 +872,7 @@ export async function handleAccountBlocked(data: AccountBlockedData) {
     dateFin: data.dateFin || undefined,
   };
 
-  await emitNotificationEvent("ACCOUNT_BLOCKED", data as any, {
+  await emitNotificationEvent("ACCOUNT_BLOCKED", data, {
     smsRecipients: client.phone
       ? [{ phone: client.phone, templateCode: "ACCOUNT_BLOCKED", payload, agenceId: data.agenceId }]
       : [],
@@ -890,7 +896,7 @@ export async function handleAccountUnblocked(data: AccountUnblockedData) {
     accountNumber: data.numeroCompte,
   };
 
-  await emitNotificationEvent("ACCOUNT_UNBLOCKED", data as any, {
+  await emitNotificationEvent("ACCOUNT_UNBLOCKED", data, {
     smsRecipients: client.phone
       ? [{ phone: client.phone, templateCode: "ACCOUNT_UNBLOCKED", payload, agenceId: data.agenceId }]
       : [],
@@ -915,7 +921,7 @@ export async function handleAccountClosed(data: AccountClosedData) {
     accountType: ACCOUNT_TYPE_LABELS[data.typeCompte] || data.typeCompte,
   };
 
-  await emitNotificationEvent("ACCOUNT_CLOSED", data as any, {
+  await emitNotificationEvent("ACCOUNT_CLOSED", data, {
     smsRecipients: client.phone
       ? [{ phone: client.phone, templateCode: "ACCOUNT_CLOSED", payload, agenceId: data.agenceId }]
       : [],
@@ -941,7 +947,7 @@ export async function handleInterestCapitalized(data: InterestCapitalizedData) {
     newBalance: Number(data.nouveauSolde).toLocaleString("fr-FR"),
   };
 
-  await emitNotificationEvent("INTEREST_CAPITALIZED", data as any, {
+  await emitNotificationEvent("INTEREST_CAPITALIZED", data, {
     smsRecipients: client.phone
       ? [{ phone: client.phone, templateCode: "INTEREST_CAPITALIZED", payload, agenceId: data.agenceId }]
       : [],
@@ -975,7 +981,7 @@ export async function handleTransferRequested(data: TransferRequestedData) {
     typeTransfert: TRANSFER_TYPE_LABELS[data.typeTransfert] || data.typeTransfert,
   };
 
-  await emitNotificationEvent("TRANSFER_REQUESTED", data as any, {
+  await emitNotificationEvent("TRANSFER_REQUESTED", data, {
     smsRecipients: [],
     emailRecipients: requester?.email
       ? [{ email: requester.email, templateCode: "TRANSFER_REQUESTED", payload, agenceId: data.agenceId }]
@@ -997,7 +1003,7 @@ export async function handleTransferValidated(data: TransferValidatedData) {
     reference: data.reference,
   };
 
-  await emitNotificationEvent("TRANSFER_VALIDATED", data as any, {
+  await emitNotificationEvent("TRANSFER_VALIDATED", data, {
     smsRecipients: [],
     emailRecipients: validator?.email
       ? [{ email: validator.email, templateCode: "TRANSFER_EXECUTED", payload, agenceId: data.agenceId }]
@@ -1021,7 +1027,7 @@ export async function handleTransferRejected(data: TransferRejectedData) {
     reason: data.reason || "Non spécifié",
   };
 
-  await emitNotificationEvent("TRANSFER_REJECTED", data as any, {
+  await emitNotificationEvent("TRANSFER_REJECTED", data, {
     smsRecipients: [],
     emailRecipients: rejector?.email
       ? [{ email: rejector.email, templateCode: "TRANSFER_REJECTED", payload, agenceId: data.agenceId }]
@@ -1044,7 +1050,7 @@ export async function handleTransferExecuted(data: TransferExecutedData) {
     typeTransfert: TRANSFER_TYPE_LABELS[data.typeTransfert] || data.typeTransfert,
   };
 
-  await emitNotificationEvent("TRANSFER_EXECUTED", data as any, {
+  await emitNotificationEvent("TRANSFER_EXECUTED", data, {
     smsRecipients: [],
     emailRecipients: executor?.email
       ? [{ email: executor.email, templateCode: "TRANSFER_EXECUTED", payload, agenceId: data.agenceId }]
@@ -1068,7 +1074,7 @@ export async function handleTransferCancelled(data: TransferCancelledData) {
     reason: data.reason,
   };
 
-  await emitNotificationEvent("TRANSFER_CANCELLED", data as any, {
+  await emitNotificationEvent("TRANSFER_CANCELLED", data, {
     smsRecipients: [],
     emailRecipients: canceller?.email
       ? [{ email: canceller.email, templateCode: "TRANSFER_CANCELLED", payload, agenceId: data.agenceId }]
@@ -1093,7 +1099,7 @@ export async function handleTransferReversed(data: TransferReversedData) {
     reason: data.reason,
   };
 
-  await emitNotificationEvent("TRANSFER_REVERSED", data as any, {
+  await emitNotificationEvent("TRANSFER_REVERSED", data, {
     smsRecipients: [],
     emailRecipients: reverser?.email
       ? [{ email: reverser.email, templateCode: "TRANSFER_REVERSED", payload, agenceId: data.agenceId }]
@@ -1129,7 +1135,7 @@ export async function handleScheduledTransferExecuted(
     toAccount: destCompte?.numeroCompte || "—",
   };
 
-  await emitNotificationEvent("SCHEDULED_TRANSFER_EXECUTED", data as any, {
+  await emitNotificationEvent("SCHEDULED_TRANSFER_EXECUTED", data, {
     smsRecipients: client.phone
       ? [{ phone: client.phone, templateCode: "SCHEDULED_TRANSFER_EXECUTED", payload, agenceId: sourceCompte.agenceId || undefined }]
       : [],
@@ -1169,7 +1175,7 @@ export async function handleScheduledTransferFailed(
     retryInfo,
   };
 
-  await emitNotificationEvent("SCHEDULED_TRANSFER_FAILED", data as any, {
+  await emitNotificationEvent("SCHEDULED_TRANSFER_FAILED", data, {
     smsRecipients: client.phone
       ? [{ phone: client.phone, templateCode: "SCHEDULED_TRANSFER_FAILED", payload, agenceId: sourceCompte.agenceId || undefined }]
       : [],
@@ -1202,7 +1208,7 @@ export async function handleHrLeaveRequested(data: HrLeaveRequestedData) {
     daysRequested: String(data.daysRequested),
   };
 
-  await emitNotificationEvent("HR_LEAVE_REQUESTED", data as any, {
+  await emitNotificationEvent("HR_LEAVE_REQUESTED", data, {
     smsRecipients: employee.phone
       ? [{ phone: employee.phone, templateCode: "HR_LEAVE_REQUESTED", payload, userId: employee.userId || undefined, agenceId: data.agenceId }]
       : [],
@@ -1226,7 +1232,7 @@ export async function handleHrLeaveApproved(data: HrLeaveApprovedData) {
     approvedBy: data.approvedByName || "Direction",
   };
 
-  await emitNotificationEvent("HR_LEAVE_APPROVED", data as any, {
+  await emitNotificationEvent("HR_LEAVE_APPROVED", data, {
     smsRecipients: employee.phone
       ? [
           {
@@ -1256,7 +1262,7 @@ export async function handleHrLeaveRejected(data: HrLeaveRejectedData) {
     reason: data.reason || "Non spécifié",
   };
 
-  await emitNotificationEvent("HR_LEAVE_REJECTED", data as any, {
+  await emitNotificationEvent("HR_LEAVE_REJECTED", data, {
     smsRecipients: employee.phone
       ? [
           {
@@ -1291,7 +1297,7 @@ export async function handleHrSanctionCreated(data: HrSanctionCreatedData) {
     motif: data.motif,
   };
 
-  await emitNotificationEvent("HR_SANCTION_CREATED", data as any, {
+  await emitNotificationEvent("HR_SANCTION_CREATED", data, {
     smsRecipients: [],
     emailRecipients: employee.email
       ? [{ email: employee.email, templateCode: "HR_SANCTION_CREATED", payload, agenceId: data.agenceId }]
@@ -1314,7 +1320,7 @@ export async function handleHrSanctionNotified(data: HrSanctionNotifiedData) {
     gravite: data.gravite,
   };
 
-  await emitNotificationEvent("HR_SANCTION_NOTIFIED", data as any, {
+  await emitNotificationEvent("HR_SANCTION_NOTIFIED", data, {
     smsRecipients: employee.phone
       ? [{ phone: employee.phone, templateCode: "HR_SANCTION_NOTIFIED", payload, userId: employee.userId || undefined, agenceId: data.agenceId }]
       : [],
@@ -1339,7 +1345,7 @@ export async function handleHrSanctionFinalized(data: HrSanctionFinalizedData) {
     gravite: data.gravite,
   };
 
-  await emitNotificationEvent("HR_SANCTION_FINALIZED", data as any, {
+  await emitNotificationEvent("HR_SANCTION_FINALIZED", data, {
     smsRecipients: employee.phone
       ? [{ phone: employee.phone, templateCode: "HR_SANCTION_FINALIZED", payload, userId: employee.userId || undefined, agenceId: data.agenceId }]
       : [],
@@ -1366,7 +1372,7 @@ export async function handleUserPasswordReset(data: UserPasswordResetData) {
     userName: user.name,
   };
 
-  await emitNotificationEvent("USER_PASSWORD_RESET", data as any, {
+  await emitNotificationEvent("USER_PASSWORD_RESET", data, {
     smsRecipients: user.phone
       ? [
           {
@@ -1406,7 +1412,7 @@ export async function handleSessionForceClosed(data: SessionForceClosedData) {
       hoursInactive: String(session.hoursInactive),
     };
 
-    await emitNotificationEvent("SESSION_FORCE_CLOSED", session as any, {
+    await emitNotificationEvent("SESSION_FORCE_CLOSED", session, {
       smsRecipients: user.phone
         ? [{ phone: user.phone, templateCode: "SESSION_FORCE_CLOSED", payload }]
         : [],
@@ -1439,7 +1445,7 @@ export async function handleClientCreated(data: ClientCreatedData) {
     accountNumber: data.numeroCompte || undefined,
   };
 
-  await emitNotificationEvent("CLIENT_CREATED", data as any, {
+  await emitNotificationEvent("CLIENT_CREATED", data, {
     smsRecipients: phone
       ? [{ phone, templateCode: "CLIENT_CREATED", payload, agenceId: data.agenceId }]
       : [],
@@ -1463,7 +1469,7 @@ export async function handleUserRegistered(data: UserRegisteredData) {
     username: data.username,
   };
 
-  await emitNotificationEvent("USER_REGISTERED", data as any, {
+  await emitNotificationEvent("USER_REGISTERED", data, {
     smsRecipients: [],
     emailRecipients: [{ email: data.email, templateCode: "USER_REGISTERED", payload, agenceId: data.agenceId }],
   });
@@ -1482,7 +1488,7 @@ export async function handleUserPasswordChanged(data: UserPasswordChangedData) {
     userName: data.userName,
   };
 
-  await emitNotificationEvent("USER_PASSWORD_CHANGED", data as any, {
+  await emitNotificationEvent("USER_PASSWORD_CHANGED", data, {
     smsRecipients: [],
     emailRecipients: [{ email: data.email, templateCode: "USER_PASSWORD_CHANGED", payload }],
   });
@@ -1504,7 +1510,7 @@ export async function handleEmployeeCreated(data: EmployeeCreatedData) {
     appName: data.agenceNom || undefined,
   };
 
-  await emitNotificationEvent("EMPLOYEE_CREATED", data as any, {
+  await emitNotificationEvent("EMPLOYEE_CREATED", data, {
     smsRecipients: data.telephone
       ? [{ phone: data.telephone, templateCode: "EMPLOYEE_CREATED", payload, agenceId: data.agenceId }]
       : [],
@@ -1534,7 +1540,7 @@ export async function handleProspectionCreated(data: ProspectionCreatedData) {
     location: data.localisation || "Non spécifiée",
   };
 
-  await emitNotificationEvent("PROSPECTION_CREATED", data as any, {
+  await emitNotificationEvent("PROSPECTION_CREATED", data, {
     smsRecipients: [],
     emailRecipients: agent?.email
       ? [{ email: agent.email, templateCode: "PROSPECTION_CREATED", payload, agenceId: data.agenceId }]
@@ -1547,7 +1553,7 @@ export async function handleProspectionCreated(data: ProspectionCreatedData) {
   });
 }
 
-export async function handleProspectConverted(data: any) {
+export async function handleProspectConverted(data: { userId?: string; prospectionId?: string }) {
   if (!data.userId) return;
 
   logNotificationEvent("info", "Domain event: PROSPECT_CONVERTED", {
@@ -1577,7 +1583,7 @@ export async function handlePaiementTerrainValidated(data: PaiementTerrainValida
     reference: data.reference || undefined,
   };
 
-  await emitNotificationEvent("PAIEMENT_TERRAIN_VALIDATED", data as any, {
+  await emitNotificationEvent("PAIEMENT_TERRAIN_VALIDATED", data, {
     smsRecipients: client.phone
       ? [{ phone: client.phone, templateCode: "PAIEMENT_TERRAIN_VALIDATED", payload, agenceId: data.agenceId }]
       : [],
@@ -1593,20 +1599,156 @@ export async function handlePaiementTerrainValidated(data: PaiementTerrainValida
 }
 
 // ============================================================================
-// CREDIT INSTALLMENT & SYSTEM EVENT HANDLERS
+// ACCOUNT LIFECYCLE (SUSPENSION / CLOSURE) HANDLERS
 // ============================================================================
 
-export async function handleCreditInstallmentLate(data: any) {
-  // TODO: Implement credit installment late notification
-  logNotificationEvent("info", "Domain event: CREDIT_INSTALLMENT_LATE", {
-    correlationId: `credit-late-${data.creditId || 'unknown'}`,
-    status: "SKIPPED",
+export async function handleAccountSuspended(data: AccountSuspendedData) {
+  const client = await getClientContact(data.clientId);
+  if (!client) return;
+
+  const payload = {
+    clientName: client.name,
+    accountNumber: data.numeroCompte,
+    motif: data.reasonCode,
+  };
+
+  await emitNotificationEvent("ACCOUNT_SUSPENDED", data, {
+    smsRecipients: client.phone
+      ? [{ phone: client.phone, templateCode: "ACCOUNT_SUSPENDED", payload, agenceId: data.agenceId }]
+      : [],
+    inAppRecipients: [],
+  });
+
+  logNotificationEvent("info", "Domain event: ACCOUNT_SUSPENDED", {
+    correlationId: `account-suspended-${data.compteId}`,
+    status: "DISPATCHED",
   });
 }
 
-export async function handleSystemJobFailed(data: any) {
-  // TODO: Implement system job failure notification
-  logNotificationEvent("error", "Domain event: SYSTEM_JOB_FAILED", {
+export async function handleAccountUnsuspended(data: AccountUnsuspendedData) {
+  const client = await getClientContact(data.clientId);
+  if (!client) return;
+
+  const payload = {
+    clientName: client.name,
+    accountNumber: data.numeroCompte,
+  };
+
+  await emitNotificationEvent("ACCOUNT_UNSUSPENDED", data, {
+    smsRecipients: client.phone
+      ? [{ phone: client.phone, templateCode: "ACCOUNT_UNSUSPENDED", payload, agenceId: data.agenceId }]
+      : [],
+    inAppRecipients: [],
+  });
+
+  logNotificationEvent("info", "Domain event: ACCOUNT_UNSUSPENDED", {
+    correlationId: `account-unsuspended-${data.compteId}`,
+    status: "DISPATCHED",
+  });
+}
+
+export async function handleClosureInitiated(data: ClosureInitiatedData) {
+  // Look up account to get clientId
+  const [compte] = await db.select({ clientId: comptes.clientId }).from(comptes).where(eq(comptes.id, data.compteId));
+  if (!compte) return;
+
+  const client = await getClientContact(compte.clientId);
+  if (!client) return;
+
+  const payload = {
+    clientName: client.name,
+    payoutMethod: data.payoutMethod,
+    payoutAmount: Number(data.payoutAmount).toLocaleString("fr-FR"),
+  };
+
+  await emitNotificationEvent("CLOSURE_INITIATED", data, {
+    smsRecipients: client.phone
+      ? [{ phone: client.phone, templateCode: "CLOSURE_INITIATED", payload }]
+      : [],
+    inAppRecipients: [],
+  });
+
+  logNotificationEvent("info", "Domain event: CLOSURE_INITIATED", {
+    correlationId: `closure-initiated-${data.requestId}`,
+    status: "DISPATCHED",
+  });
+}
+
+export async function handleClosureApproved(data: ClosureApprovedData) {
+  // Look up account to get clientId
+  const [compte] = await db.select({ clientId: comptes.clientId }).from(comptes).where(eq(comptes.id, data.compteId));
+  if (!compte) return;
+
+  const client = await getClientContact(compte.clientId);
+  if (!client) return;
+
+  const payload = {
+    clientName: client.name,
+    approvedBy: data.approvedBy,
+  };
+
+  await emitNotificationEvent("CLOSURE_APPROVED", data, {
+    smsRecipients: client.phone
+      ? [{ phone: client.phone, templateCode: "CLOSURE_APPROVED", payload }]
+      : [],
+    inAppRecipients: [],
+  });
+
+  logNotificationEvent("info", "Domain event: CLOSURE_APPROVED", {
+    correlationId: `closure-approved-${data.requestId}`,
+    status: "DISPATCHED",
+  });
+}
+
+// ============================================================================
+// CREDIT INSTALLMENT & SYSTEM EVENT HANDLERS
+// ============================================================================
+
+export async function handleCreditInstallmentLate(data: CreditInstallmentLateData) {
+  const clientId = data.clientId;
+  if (!clientId) {
+    logNotificationEvent("warn", "CREDIT_INSTALLMENT_LATE: missing clientId", {
+      correlationId: `credit-late-${data.creditId || 'unknown'}`,
+      status: "SKIPPED",
+    });
+    return;
+  }
+
+  const client = await getClientContact(clientId);
+  if (!client) return;
+
+  const payload = {
+    clientName: client.name,
+    creditNumber: data.numeroCredit || '',
+    amount: data.montantEcheance ? Number(data.montantEcheance).toLocaleString("fr-FR") : '',
+    dueDate: data.dateEcheance || '',
+  };
+
+  await emitNotificationEvent("CREDIT_INSTALLMENT_LATE", data, {
+    smsRecipients: client.phone
+      ? [{ phone: client.phone, templateCode: "CREDIT_INSTALLMENT_LATE", payload, agenceId: data.agenceId }]
+      : [],
+  });
+
+  logNotificationEvent("info", "Domain event: CREDIT_INSTALLMENT_LATE", {
+    correlationId: `credit-late-${data.creditId || 'unknown'}`,
+    status: "DISPATCHED",
+  });
+}
+
+export async function handleSystemJobFailed(data: SystemJobFailedData) {
+  // System job failures are logged and notified to admins via in-app only
+  const payload = {
+    jobName: data.jobName || data.jobId || 'Unknown',
+    error: data.error || 'Unknown error',
+    timestamp: new Date().toISOString(),
+  };
+
+  await emitNotificationEvent("SYSTEM_JOB_FAILED", data, {
+    inAppRecipients: [],  // Admin-only, handled via WS broadcast
+  });
+
+  logNotificationEvent("error", `System job failed: ${payload.jobName}`, {
     correlationId: `job-fail-${data.jobId || 'unknown'}`,
     status: "LOGGED",
   });
@@ -1617,14 +1759,13 @@ export async function handleClientSegmentChanged(data: ClientSegmentChangedData)
 
   // In-app notification via the notification service
   await emitNotificationEvent("CLIENT_SEGMENT_CHANGED", data, {
-    inAppRecipients: data.agenceId
-      ? [{ agenceId: data.agenceId, title: `Changement de segment client`, body: `${data.clientName || 'Client'} : ${data.previousSegment} → ${data.newSegment}`, metadata: { clientId: data.clientId, direction } }]
-      : [],
+    // TODO: inAppRecipients requires userId + titre + message (InAppNotificationParams);
+    // segment change is agency-level — skipping in-app until a per-user recipient is available
+    inAppRecipients: [],
   });
 
   logNotificationEvent("info", `Segment changed: ${data.previousSegment} → ${data.newSegment}`, {
     correlationId: `segment-${data.clientId}`,
     status: "SENT",
-    metadata: { clientId: data.clientId, scoreGlobal: data.scoreGlobal },
   });
 }

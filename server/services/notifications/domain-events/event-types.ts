@@ -64,7 +64,12 @@ export type DomainEventType =
   | "CREDIT_INSTALLMENT_LATE"
   | "SYSTEM_JOB_FAILED"
   // Scoring
-  | "CLIENT_SEGMENT_CHANGED";
+  | "CLIENT_SEGMENT_CHANGED"
+  // Account lifecycle (suspension / closure)
+  | "ACCOUNT_SUSPENDED"
+  | "ACCOUNT_UNSUSPENDED"
+  | "CLOSURE_INITIATED"
+  | "CLOSURE_APPROVED";
 
 // ============================================================================
 // EVENT DATA INTERFACES
@@ -523,6 +528,8 @@ export interface CreditInstallmentLateData {
   numeroCredit: string;
   clientId: string;
   clientName: string;
+  montantEcheance?: string;
+  dateEcheance?: string;
   agenceId?: string;
   metadata?: {
     markedAt: string;
@@ -531,6 +538,7 @@ export interface CreditInstallmentLateData {
 
 export interface SystemJobFailedData {
   jobName: string;
+  jobId?: string;
   error: string;
   timestamp: string;
 }
@@ -544,6 +552,38 @@ export interface ClientSegmentChangedData {
   newSegment: string;
   scoreGlobal: number;
   agenceId?: string;
+}
+
+// Account lifecycle (suspension / closure)
+
+export interface AccountSuspendedData {
+  compteId: string;
+  numeroCompte: string;
+  typeCompte: string;
+  clientId: string;
+  reasonCode: string;
+  agenceId?: string;
+}
+
+export interface AccountUnsuspendedData {
+  compteId: string;
+  numeroCompte: string;
+  typeCompte: string;
+  clientId: string;
+  agenceId?: string;
+}
+
+export interface ClosureInitiatedData {
+  compteId: string;
+  requestId: string;
+  payoutMethod: string;
+  payoutAmount: string;
+}
+
+export interface ClosureApprovedData {
+  compteId: string;
+  requestId: string;
+  approvedBy: string;
 }
 
 export interface DomainEvent<T = unknown> {

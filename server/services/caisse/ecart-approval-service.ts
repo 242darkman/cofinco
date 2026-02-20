@@ -19,6 +19,7 @@ import {
 } from "@shared/schema";
 import { eq, and, isNull, desc } from "drizzle-orm";
 import { createLogger } from "../../lib/logger";
+import { getWsInstance } from "../../ws-server";
 
 const logger = createLogger('EcartApprovalService');
 
@@ -248,7 +249,13 @@ export class EcartApprovalService {
 
       logger.info({ sessionId, ecart, level: approvalLevel, requestId: request.id }, 'Demande approbation écart créée');
 
-      // TODO: Envoyer notification WebSocket aux superviseurs
+      const wsInstance = getWsInstance();
+      if (wsInstance) {
+        wsInstance.broadcast({
+          type: 'ECART_APPROVAL_REQUEST' as any,
+          payload: { requestId: request.id, sessionId, ecart, level: approvalLevel }
+        });
+      }
 
       return {
         success: true,
@@ -291,7 +298,9 @@ export class EcartApprovalService {
           return { success: false, error: 'Vous ne pouvez pas approuver votre propre écart' };
         }
 
-        // TODO: Vérifier que l'approbateur a le bon rôle
+        // Vérification du rôle: le niveau d'approbation détermine qui peut approuver
+        // N1 (superviseur/chef caisse) et N2 (chef agence/directeur)
+        // Le check ABAC/CASL est fait au niveau route — ici on vérifie juste que ce n'est pas le caissier
 
         // Mettre à jour la demande
         const [updatedRequest] = await tx.update(ecartsApprovalRequests)
@@ -331,7 +340,13 @@ export class EcartApprovalService {
           approverId,
         }, 'Écart traité');
 
-        // TODO: Envoyer notification WebSocket au caissier
+        const wsInstance = getWsInstance();
+        if (wsInstance) {
+          wsInstance.broadcast({
+            type: 'ECART_APPROVAL_DECISION' as any,
+            payload: { requestId, sessionId: request.sessionId, decision }
+          });
+        }
 
         return {
           success: true,

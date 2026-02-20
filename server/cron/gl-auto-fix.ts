@@ -12,6 +12,7 @@ import { pool } from "../db";
 import { logger } from "../lib/logger";
 import { v4 as uuidv4 } from "uuid";
 import { currencySymbol } from "@shared/config/currency";
+import { dispatchDomainEvent } from "../services/notifications/domain-events/event-registry";
 
 const AUTO_FIX_THRESHOLD = 10_000; // 10k FCFA
 const ALERT_THRESHOLD = 100_000; // 100k FCFA
@@ -68,7 +69,15 @@ export async function attemptAutoFixGlDiscrepancy(): Promise<AutoFixResult> {
         '[GL Auto-Fix] ÉCART CRITIQUE - Correction manuelle requise'
       );
 
-      // TODO: Envoyer email/Slack à l'équipe
+      dispatchDomainEvent({
+        type: 'SYSTEM_JOB_FAILED',
+        data: {
+          jobName: 'GL_AUTO_FIX',
+          errorMessage: `Écart critique GL de ${discrepancy.toLocaleString()} ${currencySymbol()} détecté — correction manuelle requise`,
+          details: { discrepancy, threshold: ALERT_THRESHOLD },
+        },
+        timestamp: new Date(),
+      });
       return {
         action: 'ALERTED',
         discrepancy,

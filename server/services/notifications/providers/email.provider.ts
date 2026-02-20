@@ -65,7 +65,7 @@ export class SmtpEmailProvider implements EmailProvider {
         secure: process.env.SMTP_SECURE === "true",
         username,
         password,
-        fromEmail: process.env.SMTP_FROM_EMAIL || username,
+        fromEmail: process.env.SMTP_FROM_EMAIL || username || '',
         fromName: process.env.SMTP_FROM_NAME || "COFIN&CO-M",
       };
     }

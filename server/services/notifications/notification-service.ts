@@ -138,13 +138,13 @@ export async function sendInAppNotification(
  * Resolves routing policy (enabled channels from settings) and enqueues accordingly.
  *
  * @param eventType - Domain event name (for logging/audit)
- * @param data - Raw event data (for logging/audit)
+ * @param data - Raw event data object (for logging/audit — accepts any domain event data shape)
  * @param options - Recipients per channel
  * @param tx - Optional Drizzle transaction for atomicity
  */
 export async function emitNotificationEvent(
   eventType: string,
-  data: Record<string, unknown>,
+  data: object,
   options: NotificationEventOptions,
   tx?: typeof db
 ): Promise<string[]> {

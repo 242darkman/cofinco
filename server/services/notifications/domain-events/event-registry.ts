@@ -52,6 +52,10 @@ import {
   handleCreditInstallmentLate,
   handleSystemJobFailed,
   handleClientSegmentChanged,
+  handleAccountSuspended,
+  handleAccountUnsuspended,
+  handleClosureInitiated,
+  handleClosureApproved,
 } from "./event-handlers";
 
 // ============================================================================
@@ -111,6 +115,10 @@ const handlerRegistry: Record<DomainEventType, EventHandler> = {
   CREDIT_INSTALLMENT_LATE: handleCreditInstallmentLate,
   SYSTEM_JOB_FAILED: handleSystemJobFailed,
   CLIENT_SEGMENT_CHANGED: handleClientSegmentChanged,
+  ACCOUNT_SUSPENDED: handleAccountSuspended,
+  ACCOUNT_UNSUSPENDED: handleAccountUnsuspended,
+  CLOSURE_INITIATED: handleClosureInitiated,
+  CLOSURE_APPROVED: handleClosureApproved,
 };
 
 const logger = createLogger('DomainEvents');

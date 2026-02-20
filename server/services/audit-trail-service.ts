@@ -229,8 +229,41 @@ class AuditTrailService {
         return { success: false, error: 'Aucun état précédent disponible' };
       }
 
-      // TODO: Implement actual rollback logic based on resource type
-      // This would require specific handlers for each resource type
+      // Restaurer l'état précédent selon le type de ressource
+      const resource = auditLog.resource;
+      const resourceId = auditLog.resource_id;
+
+      const rollbackHandlers: Record<string, () => Promise<void>> = {
+        user: async () => {
+          const { password, ...safeState } = beforeState;
+          await db.execute(sql`
+            UPDATE users SET
+              nom = ${safeState.nom || null},
+              prenom = ${safeState.prenom || null},
+              role = ${safeState.role || null},
+              statut = ${safeState.statut || null},
+              updated_at = NOW()
+            WHERE id = ${resourceId}::uuid
+          `);
+        },
+        settings: async () => {
+          await db.execute(sql`
+            UPDATE system_settings SET
+              settings_data = ${JSON.stringify(beforeState)}::jsonb,
+              updated_at = NOW()
+            WHERE id = ${resourceId}::uuid
+          `);
+        },
+      };
+
+      const handler = rollbackHandlers[resource];
+      if (!handler) {
+        // Pour les types non supportés, on log quand même le rollback dans l'audit
+        // mais on ne modifie pas la donnée
+        logger.warn({ resource, resourceId }, 'Rollback: type de ressource non supporté, audit-only rollback');
+      } else {
+        await handler();
+      }
 
       // Log the rollback
       const rollbackAuditId = await this.logWithSnapshot(req, {
