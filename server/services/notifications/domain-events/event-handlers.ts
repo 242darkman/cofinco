@@ -13,6 +13,7 @@ import type {
   CreditDisbursedData,
   CreditOverdueData,
   CreditInvestigationAssignedData,
+  CreditInvestigationSubmittedData,
   CreditPaidOffData,
   CreditRefundApprovedData,
   CreditRefundPaidData,
@@ -408,6 +409,37 @@ export async function handleCreditInvestigationAssigned(
   logNotificationEvent("info", "Domain event: CREDIT_INVESTIGATION_ASSIGNED", {
     correlationId: `credit-investigation-${data.demandeId}`,
     status: "DISPATCHED",
+  });
+}
+
+export async function handleCreditInvestigationSubmitted(
+  data: CreditInvestigationSubmittedData
+) {
+  const client = await getClientContact(data.clientId);
+  if (!client) return;
+
+  const recommendationLabel =
+    data.agentRecommendation === "APPROVE" ? "Favorable" :
+    data.agentRecommendation === "APPROVE_WITH_CONDITIONS" ? "Sous conditions" :
+    data.agentRecommendation === "REJECT" ? "Défavorable" : "Non renseignée";
+
+  const payload = {
+    clientName: client.name,
+    creditNumber: data.numeroDemande,
+    agentName: data.agentName || "un agent terrain",
+    recommendation: recommendationLabel,
+    riskLevel: data.riskLevel || "N/A",
+  };
+
+  await emitNotificationEvent("CREDIT_INVESTIGATION_SUBMITTED", data, {
+    smsRecipients: [],
+    emailRecipients: [],
+  });
+
+  logNotificationEvent("info", "Domain event: CREDIT_INVESTIGATION_SUBMITTED", {
+    correlationId: `credit-investigation-submitted-${data.enqueteId}`,
+    status: "DISPATCHED",
+    payload,
   });
 }
 

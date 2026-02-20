@@ -10,6 +10,7 @@ export type DomainEventType =
   | "CREDIT_DISBURSED"
   | "CREDIT_OVERDUE"
   | "CREDIT_INVESTIGATION_ASSIGNED"
+  | "CREDIT_INVESTIGATION_SUBMITTED"
   | "CREDIT_PAID_OFF"
   | "CREDIT_REFUND_APPROVED"
   | "CREDIT_REFUND_PAID"
@@ -124,6 +125,17 @@ export interface CreditInvestigationAssignedData {
   numeroDemande: string;
   clientId: string;
   agentName: string;
+  agenceId?: string;
+}
+
+export interface CreditInvestigationSubmittedData {
+  demandeId: string;
+  numeroDemande: string;
+  enqueteId: string;
+  clientId: string;
+  agentName: string;
+  agentRecommendation?: string;
+  riskLevel?: string;
   agenceId?: string;
 }
 
