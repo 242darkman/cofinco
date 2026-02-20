@@ -7,8 +7,8 @@ import { useBranding } from '../../contexts/BrandingContext';
 interface AgentSidebarContentProps {
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
-  activeTab: 'versement' | 'retrait' | 'remboursement' | 'epargne';
-  onTabChange: (tab: 'versement' | 'retrait' | 'remboursement' | 'epargne') => void;
+  activeTab: 'versement' | 'retrait' | 'remboursement' | 'epargne' | 'offline';
+  onTabChange: (tab: 'versement' | 'retrait' | 'remboursement' | 'epargne' | 'offline') => void;
   onLogout: () => void;
   agent: {
     nomComplet: string;

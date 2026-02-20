@@ -198,7 +198,7 @@ function EventsTab() {
         <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>
       ) : !data || data.rows.length === 0 ? (
         <EmptyState
-          icon={<Filter size={40} />}
+          icon={Filter}
           title="Aucun événement scoring"
           description="Aucun événement ne correspond aux filtres sélectionnés."
         />
@@ -355,7 +355,7 @@ function StatesTab() {
         <div className="flex justify-center py-12"><LoadingSpinner size="lg" /></div>
       ) : !data || data.rows.length === 0 ? (
         <EmptyState
-          icon={<TrendingUp size={40} />}
+          icon={TrendingUp}
           title="Aucun score calculé"
           description="Aucun client n'a encore de score dans les filtres sélectionnés."
         />
@@ -455,7 +455,7 @@ function StatsTab() {
   if (!stats || stats.length === 0) {
     return (
       <EmptyState
-        icon={<Users size={40} />}
+        icon={Users}
         title="Aucune statistique"
         description="Aucun score n'a encore été calculé pour les agences."
       />

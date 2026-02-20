@@ -646,7 +646,7 @@ export default function CaisseDashboard({
             <Suspense fallback={<TabLoadingFallback />}>
               <CaisseDemandesTab
                 sessionCaisseId={currentSession.id}
-                caisseId={currentSession.caisseId}
+                caisseId={currentSession.caisseId || ''}
                 agenceId={currentSession.agenceId || undefined}
                 onRequestProcessed={() => {
                   refetchSession();
@@ -735,7 +735,7 @@ export default function CaisseDashboard({
                     description: tx.description,
                     client: tx.clientNom ? {
                       name: `${tx.clientNom} ${tx.clientPrenom || ''}`.trim(),
-                      phone: tx.clientTelephone
+                      telephone: tx.clientTelephone
                     } : undefined,
                     agent: currentSession?.caissierNom,
                     mode_paiement: tx.modePaiement,
@@ -1074,7 +1074,7 @@ export default function CaisseDashboard({
           description: tx.description,
           client: tx.clientNom ? {
             name: `${tx.clientNom} ${tx.clientPrenom || ''}`.trim(),
-            phone: tx.clientTelephone
+            telephone: tx.clientTelephone
           } : undefined,
           agent: currentSession?.caissierNom,
           modePaiement: tx.modePaiement,

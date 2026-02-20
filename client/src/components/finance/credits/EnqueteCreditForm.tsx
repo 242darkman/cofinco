@@ -13,7 +13,8 @@ import { StatutClient } from '@shared/enum/status-constants';
 interface Client {
   id: string;
   nom: string;
-  photoUrl?: string;
+  prenom?: string;
+  photoProfile?: string;
   // Added GPS fields
   latitude?: string;
   longitude?: string;
@@ -116,8 +117,8 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
     revenu_mensuel_declare: getInitialRevenuMensuel(),
     type_revenu: getInitialTypeRevenu(),
     charges_mensuelles: initialData?.charges_mensuelles?.toString() || '',
-    autres_credits: [] as any[],
-    garanties_proposees: [] as any[],
+    autres_credits: [] as { organisme: string; montant: string; echeance: string }[],
+    garanties_proposees: [] as { type: string; description: string; valeur: string }[],
     photos_activite: [] as string[],
     photos_geotagged: [] as { url: string; latitude?: number; longitude?: number; accuracy?: number; timestamp?: string }[],
     documents_justificatifs: [] as string[],
@@ -565,8 +566,10 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
       };
 
       // Debug: log demandeId before sending
-      console.log('[EnqueteCreditForm] formData.demandeId:', formData.demandeId);
-      console.log('[EnqueteCreditForm] initialData:', initialData);
+      if (import.meta.env.DEV) {
+        console.log('[EnqueteCreditForm] formData.demandeId:', formData.demandeId);
+        console.log('[EnqueteCreditForm] initialData:', initialData);
+      }
 
       const payload = {
         clientId: formData.client_id,
@@ -643,7 +646,7 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
               {readOnly ? 'Détails de l\'Enquête' : 'Enquête de Crédit'}
             </h2>
             <p className="text-content-muted text-xs">
-              Client : {clientNom || (selectedClient ? formatClientName(selectedClient.nom, (selectedClient as any).prenom) : 'Non sélectionné')}
+              Client : {clientNom || (selectedClient ? formatClientName(selectedClient.nom, selectedClient.prenom) : 'Non sélectionné')}
               {readOnly && <span className="ml-2 text-status-success">(Lecture seule)</span>}
             </p>
           </div>
@@ -672,21 +675,21 @@ export default function EnqueteCreditForm({ clientId, clientNom, initialData, on
               >
                 <option value="">-- Choisir un client --</option>
                 {clients.map(client => (
-                  <option key={client.id} value={client.id}>{formatClientName(client.nom, (client as any).prenom)}</option>
+                  <option key={client.id} value={client.id}>{formatClientName(client.nom, client.prenom)}</option>
                 ))}
               </select>
 
               {selectedClient && (
                 <div className="mt-2 flex items-center gap-3 p-2 bg-surface-elevated/50 rounded-lg">
                   <div className="w-10 h-10 bg-surface-subtle rounded-full flex items-center justify-center overflow-hidden border border-edge-strong">
-                    {selectedClient.photoUrl ? (
-                      <img src={selectedClient.photoUrl} alt={selectedClient.nom} className="w-full h-full object-cover" />
+                    {selectedClient.photoProfile ? (
+                      <img src={selectedClient.photoProfile} alt={selectedClient.nom} className="w-full h-full object-cover" />
                     ) : (
                       <span className="text-sm font-bold text-content-primary">{selectedClient.nom.charAt(0)}</span>
                     )}
                   </div>
                   <div>
-                    <h3 className="font-semibold text-content-primary text-sm">{formatClientName(selectedClient.nom, (selectedClient as any).prenom)}</h3>
+                    <h3 className="font-semibold text-content-primary text-sm">{formatClientName(selectedClient.nom, selectedClient.prenom)}</h3>
                     <p className="text-xs text-accent">Client sélectionné</p>
                   </div>
                 </div>

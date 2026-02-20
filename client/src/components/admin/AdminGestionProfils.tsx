@@ -533,7 +533,7 @@ export default function AdminGestionProfils() {
       const user = emp.user || emp;
       const fullName = `${user.nom} ${user.prenom}`.toLowerCase();
       const email = (user.email || '').toLowerCase();
-      const phone = (user.telephone || user.phone || '').toLowerCase();
+      const phone = (user.telephone || '').toLowerCase();
       // Architecture V3: utiliser user.role depuis userRoles
       const userRole = normalizeRole(user.role);
 
@@ -1442,7 +1442,7 @@ export default function AdminGestionProfils() {
             nom: convertToClientUser.user?.nom || convertToClientUser.nom || '',
             prenom: convertToClientUser.user?.prenom || convertToClientUser.prenom || '',
             email: convertToClientUser.user?.email || convertToClientUser.email || null,
-            telephone: convertToClientUser.user?.telephone || convertToClientUser.phone || null,
+            telephone: convertToClientUser.user?.telephone || convertToClientUser.telephone || null,
             sexe: (convertToClientUser.user?.sexe || convertToClientUser.sexe || null) as 'M' | 'F' | null,
             dateNaissance: convertToClientUser.user?.dateNaissance || convertToClientUser.dateNaissance || null,
             adresse: convertToClientUser.user?.adresse || convertToClientUser.adresse || null,

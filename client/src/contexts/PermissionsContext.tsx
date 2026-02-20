@@ -91,7 +91,7 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
   // Refresh permissions when WebSocket reconnects to ensure we didn't miss updates
   useEffect(() => {
     if (isConnected) {
-      console.log('🔄 WebSocket Connected/Reconnected, syncing permissions...');
+      if (import.meta.env.DEV) console.log('[RBAC] WebSocket Connected/Reconnected, syncing permissions...');
       refreshPermissions();
     }
   }, [isConnected]);
@@ -106,17 +106,17 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
       const now = Date.now();
       // Only refresh if we haven't refreshed recently (debounce)
       if (now - lastFocusRefreshRef.current > FOCUS_DEBOUNCE_MS) {
-        console.log('🔄 Window focused, checking for permission updates...');
+        if (import.meta.env.DEV) console.log('[RBAC] Window focused, checking for permission updates...');
         lastFocusRefreshRef.current = now;
         refreshPermissions();
       } else {
-        console.log('🔄 Window focused, but skipping refresh (debounced)');
+        if (import.meta.env.DEV) console.log('[RBAC] Window focused, but skipping refresh (debounced)');
       }
     };
 
     // Revalidate on network reconnect
     const handleOnline = () => {
-      console.log('🔄 Network reconnected, syncing permissions...');
+      if (import.meta.env.DEV) console.log('[RBAC] Network reconnected, syncing permissions...');
       refreshPermissions();
     };
 
@@ -125,7 +125,7 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
       if (document.visibilityState === 'visible') {
         const timeSinceSync = Date.now() - lastSyncTime;
         if (timeSinceSync > STALE_THRESHOLD_MS) {
-          console.log(`🔄 Permissions stale (${Math.round(timeSinceSync / 1000)}s since last sync), refreshing...`);
+          if (import.meta.env.DEV) console.log(`[RBAC] Permissions stale (${Math.round(timeSinceSync / 1000)}s since last sync), refreshing...`);
           setSyncStatus('stale');
           refreshPermissions();
         }
@@ -150,7 +150,7 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Set up periodic sync as a safety net
     periodicSyncRef.current = setInterval(() => {
-      console.log('🔄 Periodic permissions sync (safety net)...');
+      if (import.meta.env.DEV) console.log('[RBAC] Periodic permissions sync (safety net)...');
       refreshPermissions();
     }, PERIODIC_SYNC_INTERVAL);
 
@@ -199,12 +199,12 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
 
       // Check if server version is ahead (we missed updates)
       if (payload.version && payload.version > rbacServerVersion) {
-        console.log(`[RBAC] Server version ${payload.version} > local ${rbacServerVersion}, syncing...`);
+        if (import.meta.env.DEV) console.log(`[RBAC] Server version ${payload.version} > local ${rbacServerVersion}, syncing...`);
         shouldRefresh = true;
       }
 
       if (shouldRefresh) {
-        console.log('🔄 RBAC Update received:', payload);
+        if (import.meta.env.DEV) console.log('[RBAC] Update received:', payload);
         await refreshPermissions();
 
         // Update server version from payload
@@ -250,7 +250,7 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
       }
 
       if (shouldRefresh) {
-        console.log('🔄 Legacy RBAC Update received, refreshing permissions...');
+        if (import.meta.env.DEV) console.log('[RBAC] Legacy RBAC Update received, refreshing permissions...');
         await refreshPermissions();
 
         // Permissions are refreshed silently - UI adapts automatically.

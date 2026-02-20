@@ -117,7 +117,7 @@ export function usePendingSessionSync(
 
           // FUNDS_DISPATCHED = coffre a validé
           if (payload?.type === 'FUNDS_DISPATCHED') {
-            console.log('[WS] FUNDS_DISPATCHED received, refetching session...');
+            if (import.meta.env.DEV) console.log('[WS] FUNDS_DISPATCHED received, refetching session...');
             lastWebSocketUpdateRef.current = Date.now();
 
             // Refetch immédiat pour avoir le statut à jour
@@ -132,7 +132,7 @@ export function usePendingSessionSync(
 
           // FUNDS_REJECTED = demande rejetée
           else if (payload?.type === 'FUNDS_REJECTED') {
-            console.log('[WS] FUNDS_REJECTED received');
+            if (import.meta.env.DEV) console.log('[WS] FUNDS_REJECTED received');
             lastWebSocketUpdateRef.current = Date.now();
 
             // Refetch pour mettre à jour
@@ -148,13 +148,13 @@ export function usePendingSessionSync(
 
         // Événements génériques d'opening request
         else if (data.type === 'OPENING_REQUEST_VALIDATED') {
-          console.log('[WS] OPENING_REQUEST_VALIDATED received');
+          if (import.meta.env.DEV) console.log('[WS] OPENING_REQUEST_VALIDATED received');
           lastWebSocketUpdateRef.current = Date.now();
           refetch();
         }
 
         else if (data.type === 'OPENING_REQUEST_REJECTED') {
-          console.log('[WS] OPENING_REQUEST_REJECTED received');
+          if (import.meta.env.DEV) console.log('[WS] OPENING_REQUEST_REJECTED received');
           lastWebSocketUpdateRef.current = Date.now();
           refetch();
         }
@@ -182,10 +182,12 @@ export function usePendingSessionSync(
       const timeSinceWsUpdate = Date.now() - lastWebSocketUpdateRef.current;
       const wasRecentlyNotifiedByWs = timeSinceWsUpdate < 2000;
 
-      console.log(
-        `[Session Status] ${prevStatus} → ${currentStatus}`,
-        wasRecentlyNotifiedByWs ? '(via WebSocket)' : '(via polling)'
-      );
+      if (import.meta.env.DEV) {
+        console.log(
+          `[Session Status] ${prevStatus} → ${currentStatus}`,
+          wasRecentlyNotifiedByWs ? '(via WebSocket)' : '(via polling)'
+        );
+      }
 
       onStatusChange?.(prevStatus, currentStatus);
     }

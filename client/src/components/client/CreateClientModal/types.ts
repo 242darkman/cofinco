@@ -9,6 +9,7 @@ export interface EmployeeConversionData {
   sexe: 'M' | 'F' | null;
   dateNaissance: string | null;
   adresse: string | null;
+  ville?: string | null;
   agenceId: string | null;
 }
 

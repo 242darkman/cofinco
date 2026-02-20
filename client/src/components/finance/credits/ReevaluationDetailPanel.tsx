@@ -159,9 +159,9 @@ const WorkflowStepper = ({ currentStatus, onStepClick }: { currentStatus: string
   ];
 
   const getCurrentStepIndex = () => {
-    if ([StatutReevaluation.REFUSED, StatutReevaluation.DEFINITIVELY_REJECTED, StatutReevaluation.APPROVED, StatutReevaluation.CANCELLED].includes(currentStatus as any)) return 3;
-    if ([StatutReevaluation.IN_COMMITTEE].includes(currentStatus as any)) return 2;
-    if ([StatutReevaluation.AUTHORIZED, StatutReevaluation.ADDITIONAL_INVESTIGATION].includes(currentStatus as any)) return 1;
+    if (([StatutReevaluation.REFUSED, StatutReevaluation.DEFINITIVELY_REJECTED, StatutReevaluation.APPROVED, StatutReevaluation.CANCELLED] as readonly string[]).includes(currentStatus)) return 3;
+    if (([StatutReevaluation.IN_COMMITTEE] as readonly string[]).includes(currentStatus)) return 2;
+    if (([StatutReevaluation.AUTHORIZED, StatutReevaluation.ADDITIONAL_INVESTIGATION] as readonly string[]).includes(currentStatus)) return 1;
     return 0;
   };
   
@@ -630,7 +630,7 @@ export function ReevaluationDetailPanel({ reevaluationId, onBack, onStatusChange
     }
     
     // Cancel button for non-terminal states
-    if (![StatutReevaluation.APPROVED, StatutReevaluation.DEFINITIVELY_REJECTED, StatutReevaluation.CANCELLED, StatutReevaluation.REFUSED].includes(reevaluation.statut as any)) {
+    if (!([StatutReevaluation.APPROVED, StatutReevaluation.DEFINITIVELY_REJECTED, StatutReevaluation.CANCELLED, StatutReevaluation.REFUSED] as readonly string[]).includes(reevaluation.statut)) {
       actions.push(
         <button
           key="cancel"
@@ -996,14 +996,14 @@ function ReevaluationDecisionModalInline({
           <div>
             <label className="text-sm text-content-muted mb-2 block">Décision</label>
             <div className="grid grid-cols-3 gap-2">
-              {[
+              {([
                 { value: DecisionComite.APPROVED, label: 'Approuver', color: 'emerald' },
                 { value: DecisionComite.REDUCED_AMOUNT, label: 'Réduire', color: 'amber' },
                 { value: DecisionComite.REJECTED, label: 'Rejeter', color: 'red' },
-              ].map(opt => (
+              ] as const).map(opt => (
                 <button
                   key={opt.value}
-                  onClick={() => setDecision(opt.value as any)}
+                  onClick={() => setDecision(opt.value)}
                   className={`px-4 py-3 rounded-lg border transition ${
                     decision === opt.value
                       ? `bg-${opt.color}-500/20 border-${opt.color}-500/50 text-${opt.color}-400`

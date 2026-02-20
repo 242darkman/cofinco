@@ -1288,7 +1288,7 @@ export async function initOfflineDb(): Promise<void> {
       clearOldTrackPoints()
     ]);
 
-    if (purgedCache > 0 || purgedOps > 0 || purgedTiles > 0 || purgedTracks > 0) {
+    if (import.meta.env.DEV && (purgedCache > 0 || purgedOps > 0 || purgedTiles > 0 || purgedTracks > 0)) {
       console.log('[OfflineDB] Purged:', {
         cache: purgedCache,
         operations: purgedOps,
@@ -1297,7 +1297,7 @@ export async function initOfflineDb(): Promise<void> {
       });
     }
 
-    console.log('[OfflineDB] Initialized successfully');
+    if (import.meta.env.DEV) console.log('[OfflineDB] Initialized successfully');
   } catch (error) {
     console.error('[OfflineDB] Initialization failed:', error);
   }

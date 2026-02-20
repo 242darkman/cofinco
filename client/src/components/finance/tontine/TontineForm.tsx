@@ -392,7 +392,7 @@ export default function TontineForm({ tontine, onClose, onSave }: TontineFormPro
                                 value: c.id,
                                 label: formatClientName(c.nom, c.prenom),
                                 subLabel: `${c.telephone} • ${c.quartier || 'N/A'}`,
-                                image: c.photoProfile || c.photoUrl // Avatar fix
+                                image: c.photoProfile
                             }))
                         }
                         value=""
@@ -412,7 +412,7 @@ export default function TontineForm({ tontine, onClose, onSave }: TontineFormPro
                       {/* Active Members */}
 
                       {selectedClientObjects.map(client => {
-                         const photoUrl = resolveStorageUrl(client.photoProfile || client.photoUrl);
+                         const photoUrl = resolveStorageUrl(client.photoProfile);
                          return (
                             <div key={client.id} className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-accent/10 border border-accent/30 rounded-xl animate-in zoom-in-95">
                                  <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center text-xs font-bold text-white shrink-0 overflow-hidden relative">

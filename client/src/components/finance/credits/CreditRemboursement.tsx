@@ -314,7 +314,7 @@ export default function CreditRemboursement() {
         const result = await executeOfflineOperation({
           type: 'LOAN_REPAYMENT',
           amount: montant,
-          agentId: parseInt(user.id, 10),
+          agentId: user.id.toString(),
           agenceId: user.agenceId || '',
           payload: {
             creditId: selectedCredit.id,
@@ -426,7 +426,7 @@ export default function CreditRemboursement() {
       client: {
         nom: formatClientName(selectedCredit.clients.nom, selectedCredit.clients.prenom),
         email: selectedCredit.clients.email,
-        telephone: selectedCredit.clients.phone || selectedCredit.clients.telephone,
+        telephone: selectedCredit.clients.telephone,
         numeroCompte: selectedCredit.clients.numeroCompte
       },
       agent: {

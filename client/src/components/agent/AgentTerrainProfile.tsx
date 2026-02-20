@@ -256,7 +256,7 @@ export default function AgentTerrainProfile({ agentId, onClose, onEdit }: AgentT
                     </div>
                     <div className="min-w-0">
                        <p className="text-xs text-content-muted">Téléphone</p>
-                       <p className="font-medium text-content-primary truncate">{agent.phone || agent.telephone || '--'}</p>
+                       <p className="font-medium text-content-primary truncate">{agent.telephone || '--'}</p>
                     </div>
                   </div>
 

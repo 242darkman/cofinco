@@ -23,7 +23,7 @@ export default function TransferHistory() {
   const limit = 15;
 
   // Debounce search
-  const searchTimerRef = React.useRef<ReturnType<typeof setTimeout>>();
+  const searchTimerRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearch(e.target.value);
     clearTimeout(searchTimerRef.current);

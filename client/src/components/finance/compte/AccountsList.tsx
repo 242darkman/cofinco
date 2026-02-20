@@ -40,9 +40,8 @@ interface Compte {
     id: string;
     nom: string;
     prenom?: string;
-    phone?: string;
     telephone?: string;
-    photoUrl?: string;
+    photoProfile?: string;
   } | null;
 }
 
@@ -107,7 +106,7 @@ export default function AccountsList({ data, type, onManage, onTransaction, load
             const clientName = formatClientName(account.clients?.nom, account.clients?.prenom);
             const initials = getInitials(account.clients?.nom || '?', account.clients?.prenom);
             const avatarColor = getAvatarColor(clientName || 'Inconnu');
-            const photoUrl = resolveStorageUrl(account.clients?.photoUrl);
+            const photoUrl = resolveStorageUrl(account.clients?.photoProfile);
 
             return (
               <div className="flex items-center gap-3 min-w-0">

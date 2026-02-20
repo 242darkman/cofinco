@@ -337,8 +337,8 @@ export default function AgentTerrainPortail({ agentId, activeView, onModuleChang
           </div>
         ) : ActiveComponent ? (
           <ActiveComponent
-            agentId={isAdminOrSupervisor ? selectedAgentId || undefined : agentId}
-            selectedAgentId={selectedAgentId}
+            agentId={isAdminOrSupervisor ? (selectedAgentId ?? undefined) : agentId}
+            selectedAgentId={selectedAgentId ?? undefined}
             onAgentChange={setSelectedAgentId}
           />
         ) : (

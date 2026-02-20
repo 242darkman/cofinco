@@ -205,14 +205,14 @@ export default function CaissePaiementModal({
     formData.type_operation === TypeOperationCaisse.TONTINE_CONTRIBUTION ||
     formData.type_operation === TypeOperationCaisse.TONTINE_WITHDRAWAL;
 
-  const isAccountOperation = [
+  const isAccountOperation = ([
     TypeOperationCaisse.DEPOSIT_SAVINGS,
     TypeOperationCaisse.WITHDRAWAL_SAVINGS,
     TypeOperationCaisse.DEPOSIT_CURRENT,
     TypeOperationCaisse.WITHDRAWAL_CURRENT,
     TypeOperationCaisse.DEPOSIT_BLOCKED,
     TypeOperationCaisse.WITHDRAWAL_BLOCKED
-  ].includes(formData.type_operation as any);
+  ] as readonly string[]).includes(formData.type_operation);
 
   const loadClients = useCallback(async () => {
     try {
@@ -306,11 +306,11 @@ export default function CaissePaiementModal({
      if (!clientAccounts) return [];
      const op = formData.type_operation;
      
-     if ([TypeOperationCaisse.DEPOSIT_SAVINGS, TypeOperationCaisse.WITHDRAWAL_SAVINGS].includes(op as any)) {
+     if (([TypeOperationCaisse.DEPOSIT_SAVINGS, TypeOperationCaisse.WITHDRAWAL_SAVINGS] as readonly string[]).includes(op)) {
          return clientAccounts.filter(a => (a.typeCompte) === 'SAVINGS');
-     } else if ([TypeOperationCaisse.DEPOSIT_CURRENT, TypeOperationCaisse.WITHDRAWAL_CURRENT].includes(op as any)) {
+     } else if (([TypeOperationCaisse.DEPOSIT_CURRENT, TypeOperationCaisse.WITHDRAWAL_CURRENT] as readonly string[]).includes(op)) {
          return clientAccounts.filter(a => (a.typeCompte) === 'CURRENT');
-     } else if ([TypeOperationCaisse.DEPOSIT_BLOCKED, TypeOperationCaisse.WITHDRAWAL_BLOCKED].includes(op as any)) {
+     } else if (([TypeOperationCaisse.DEPOSIT_BLOCKED, TypeOperationCaisse.WITHDRAWAL_BLOCKED] as readonly string[]).includes(op)) {
          return clientAccounts.filter(a => (a.typeCompte) === 'BLOCKED');
      }
      return [];
@@ -717,7 +717,7 @@ export default function CaissePaiementModal({
                         key={m.provider || m.id}
                         type="button"
                         onClick={() => {
-                          setFormData(prev => ({...prev, mode_paiement: m.id as any}));
+                          setFormData(prev => ({...prev, mode_paiement: m.id as MethodePaiementType}));
                           setMobileProvider(m.provider);
                         }}
                         className={`h-14 sm:h-16 rounded-xl sm:rounded-2xl border-2 flex flex-col items-center justify-center gap-1 sm:gap-1.5 transition-all relative ${

@@ -256,7 +256,7 @@ self.addEventListener('install', (event) => {
         OFFLINE_FALLBACK_IMAGE,
         '/cofin-logo.png'
       ]).catch(err => {
-        console.log('[SW] Some offline resources not available:', err);
+        if (import.meta.env.DEV) console.log('[SW] Some offline resources not available:', err);
       });
     })
   );
@@ -346,7 +346,7 @@ self.addEventListener('notificationclick', (event) => {
 // ========== BACKGROUND SYNC ==========
 
 self.addEventListener('sync', (event) => {
-  console.log('[SW] Background sync triggered:', event.tag);
+  if (import.meta.env.DEV) console.log('[SW] Background sync triggered:', event.tag);
 
   if (event.tag === 'financial-operations') {
     event.waitUntil(financialSyncQueue.replayRequests());
@@ -358,7 +358,7 @@ self.addEventListener('sync', (event) => {
 // ========== PERIODIC SYNC ==========
 
 self.addEventListener('periodicsync', (event: any) => {
-  console.log('[SW] Periodic sync:', event.tag);
+  if (import.meta.env.DEV) console.log('[SW] Periodic sync:', event.tag);
 
   if (event.tag === 'sync-pending-operations') {
     event.waitUntil(syncPendingOperations());
@@ -390,7 +390,7 @@ async function refreshCriticalCache(): Promise<void> {
         await cache.put(url, response);
       }
     } catch (error) {
-      console.log('[SW] Failed to refresh:', url);
+      if (import.meta.env.DEV) console.log('[SW] Failed to refresh:', url);
     }
   }
 }
@@ -452,7 +452,7 @@ self.addEventListener('message', async (event) => {
 // ========== ACTIVATION ==========
 
 self.addEventListener('activate', (event) => {
-  console.log('[SW] Activating new service worker...');
+  if (import.meta.env.DEV) console.log('[SW] Activating new service worker...');
 
   event.waitUntil(
     (async () => {
@@ -467,7 +467,7 @@ self.addEventListener('activate', (event) => {
       // Take control of all clients
       await self.clients.claim();
 
-      console.log('[SW] Service worker activated and controlling');
+      if (import.meta.env.DEV) console.log('[SW] Service worker activated and controlling');
     })()
   );
 });

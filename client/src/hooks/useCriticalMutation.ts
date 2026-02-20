@@ -177,9 +177,9 @@ export function useCriticalMutation<
       }
 
       // Call user's onSuccess
-      (userOnSuccess as any)?.(data, variables, context?.previousContext as TContext, _mutationCtx);
+      userOnSuccess?.(data, variables, context?.previousContext as TContext, {} as any);
     },
-    onError: (error, variables, context, _mutationCtx) => {
+    onError: (error, variables, context) => {
       // Keep key for retry on error
       // Don't reset currentKeyRef
 
@@ -195,10 +195,10 @@ export function useCriticalMutation<
       }
 
       // Call user's onError
-      (userOnError as any)?.(error, variables, context?.previousContext as TContext, _mutationCtx);
+      userOnError?.(error, variables, context?.previousContext as TContext, {} as any);
     },
-    onSettled: (data, error, variables, context, _mutationCtx) => {
-      (userOnSettled as any)?.(data, error, variables, context?.previousContext as TContext, _mutationCtx);
+    onSettled: (data, error, variables, context) => {
+      userOnSettled?.(data, error, variables, context?.previousContext as TContext, {} as any);
     },
   });
 

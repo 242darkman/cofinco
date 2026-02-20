@@ -599,7 +599,7 @@ export function useConversationRealtime(conversationId: string | null) {
     if (!conversationId || !isConnected || !socket) return;
 
     // Subscribe
-    sendMessage("SUBSCRIBE_CONVERSATION" as any, { conversationId });
+    sendMessage("SUBSCRIBE_CONVERSATION", { conversationId });
 
     // Handler pour les messages WS
     const handleWsMessage = (event: MessageEvent) => {
@@ -699,7 +699,7 @@ export function useConversationRealtime(conversationId: string | null) {
     return () => {
       // Unsubscribe
       if (socket.readyState === WebSocket.OPEN) {
-        sendMessage("UNSUBSCRIBE_CONVERSATION" as any, { conversationId });
+        sendMessage("UNSUBSCRIBE_CONVERSATION", { conversationId });
       }
       socket.removeEventListener("message", handleWsMessage);
 
@@ -713,7 +713,7 @@ export function useConversationRealtime(conversationId: string | null) {
   const sendTypingV2 = useCallback(
     (isTyping: boolean) => {
       if (!conversationId || !isConnected) return;
-      sendMessage("TYPING_V2" as any, { conversationId, isTyping });
+      sendMessage("TYPING_V2", { conversationId, isTyping });
     },
     [conversationId, isConnected, sendMessage]
   );

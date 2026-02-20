@@ -11,7 +11,7 @@ interface Agent {
   telephone?: string;
   zoneAffectation?: string;
   zone_affectation?: string;
-  photoUrl?: string;
+  photoProfile?: string;
   statut: string;
 }
 
@@ -141,7 +141,7 @@ export default function EnqueteAssignModal({ isOpen, onClose, demande, onAssign 
               filteredAgents.map(agent => {
                 const zone = agent.zoneAffectation || agent.zone_affectation;
                 const isSelected = selectedAgentId === agent.id;
-                const photoUrl = resolveStorageUrl(agent.photoUrl);
+                const photoUrl = resolveStorageUrl(agent.photoProfile);
                 const initials = `${(agent.nom?.[0] || '')}${(agent.prenom?.[0] || '')}`.toUpperCase();
 
                 return (

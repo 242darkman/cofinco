@@ -44,7 +44,7 @@ export interface TransactionDetails {
     date: string | Date;
     client?: {
         name: string;
-        phone?: string;
+        telephone?: string;
         accountNumber?: string;
     };
     description?: string;
@@ -115,7 +115,7 @@ export default function TransactionDetailsSheet({
             client: {
                 nom: clientNom,
                 prenom: clientPrenom,
-                telephone: transaction.client?.phone,
+                telephone: transaction.client?.telephone,
                 numeroCompte: transaction.client?.accountNumber,
             },
             agent: {
@@ -232,7 +232,7 @@ export default function TransactionDetailsSheet({
     const handleSendReceipt = useCallback(async (channel: "SMS" | "EMAIL") => {
         if (!transaction?.id) return;
         const recipient = channel === "SMS"
-            ? transaction.client?.phone
+            ? transaction.client?.telephone
             : transaction.metadata?.email;
         if (!recipient) {
             toast.error(channel === "SMS"
@@ -254,7 +254,7 @@ export default function TransactionDetailsSheet({
         } finally {
             setIsSendingReceipt(false);
         }
-    }, [transaction?.id, transaction?.client?.phone, transaction?.metadata]);
+    }, [transaction?.id, transaction?.client?.telephone, transaction?.metadata]);
 
     // Prevent rendering if closed and animation finished (handled by Dialog/Drawer roots usually)
     // But for null safety:
@@ -367,7 +367,7 @@ export default function TransactionDetailsSheet({
                                 </h3>
                                 <div className="bg-surface-muted/50 rounded-xl p-4 space-y-3">
                                     <DetailRow label="Nom" value={transaction.client.name} />
-                                    <DetailRow label="Téléphone" value={transaction.client.phone} />
+                                    <DetailRow label="Téléphone" value={transaction.client.telephone} />
                                     <DetailRow label="Compte" value={transaction.client.accountNumber || 'Espèces'} />
                                 </div>
                             </section>

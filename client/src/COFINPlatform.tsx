@@ -540,7 +540,6 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
                   setShowCreditRequestForm(false);
                   showNotification('success', t('demandeCreditEnvoyee'));
                 }}
-                userRole={normalizedRole}
               />
             </Suspense>
           </div>

@@ -24,38 +24,38 @@ interface ClientCreditsPanelProps {
   onClose: () => void;
 }
 
-// Normalize credit fields (backend may return snake_case or camelCase)
 function normalizeCredit(raw: any) {
   return {
     id: raw.id,
-    numeroCredit: raw.numeroCredit || raw.numero_credit || '',
+    numeroCredit: raw.numeroCredit || '',
     montant: Number(raw.montant || 0),
-    taux: Number(raw.taux || raw.taux_interet || 0),
-    duree: Number(raw.duree || raw.duree_mois || 0),
-    soldeRestant: Number(raw.soldeRestant || raw.solde_restant || 0),
-    statut: raw.statut || raw.status || 'ACTIVE',
-    typeCredit: raw.typeCredit || raw.type_credit || '',
-    objetCredit: raw.objetCredit || raw.objet || '',
+    taux: Number(raw.taux || 0),
+    duree: Number(raw.duree || 0),
+    soldeRestant: Number(raw.soldeRestant || 0),
+    statut: raw.statut || 'ACTIVE',
+    typeCredit: raw.typeCredit || '',
+    objetCredit: raw.objetCredit || '',
     echeance: raw.echeance || '',
-    montantEcheance: Number(raw.montantEcheance || raw.montant_echeance || 0),
-    dateDebut: raw.dateDebut || raw.date_debut || null,
-    dateFin: raw.dateFin || raw.date_fin || null,
-    prochaineEcheance: raw.prochaineEcheance || raw.prochaine_echeance || null,
+    totalDu: Number(raw.totalDu || 0),
+    montantEcheance: Number(raw.montantEcheance || 0),
+    dateDebut: raw.dateDebut || null,
+    dateFin: raw.dateFin || null,
+    prochaineEcheance: raw.prochaineEcheance || null,
   };
 }
 
 function normalizeEcheance(raw: any) {
   return {
     id: raw.id,
-    numeroEcheance: Number(raw.numeroEcheance || raw.numero_echeance || 0),
-    dateEcheance: raw.dateEcheance || raw.date_echeance || '',
-    montantCapital: Number(raw.montantCapital || raw.montant_capital || raw.montant_principal || 0),
-    montantInteret: Number(raw.montantInteret || raw.montant_interet || 0),
-    montantTotal: Number(raw.montantTotal || raw.montant_total || 0),
-    montantPaye: Number(raw.montantPaye || raw.montant_paye || 0),
-    statut: raw.statut || raw.status || 'UPCOMING',
-    datePaiement: raw.datePaiement || raw.date_paiement || null,
-    penaliteMontant: Number(raw.penaliteMontant || raw.penalite_montant || 0),
+    numeroEcheance: Number(raw.numeroEcheance || 0),
+    dateEcheance: raw.dateEcheance || '',
+    montantCapital: Number(raw.montantCapital || 0),
+    montantInteret: Number(raw.montantInteret || 0),
+    montantTotal: Number(raw.montantTotal || 0),
+    montantPaye: Number(raw.montantPaye || 0),
+    statut: raw.statut || 'UPCOMING',
+    datePaiement: raw.datePaiement || null,
+    penaliteMontant: Number(raw.penaliteMontant || 0),
   };
 }
 
@@ -200,8 +200,7 @@ function CreditCard_({ credit, defaultExpanded }: { credit: any; defaultExpanded
 
   const montantNum = c.montant;
   const soldeNum = c.soldeRestant;
-  // Le solde restant inclut les intérêts, donc la base = montant * (1 + taux/100)
-  const totalDue = montantNum * (1 + c.taux / 100);
+  const totalDue = c.totalDu;
   const paid = totalDue - soldeNum;
   const progressPct = totalDue > 0 ? Math.max(0, Math.min(100, (paid / totalDue) * 100)) : 0;
 
@@ -310,7 +309,7 @@ export default function ClientCreditsPanel({ clientId, isOpen, onClose }: Client
   const activeCredits = credits.filter(c => c.statut === 'ACTIVE' || c.statut === 'LATE' || c.statut === 'WAITING_DISBURSEMENT');
   const closedCredits = credits.filter(c => c.statut === 'PAID' || c.statut === 'CLOSED');
   const totalSoldeRestant = activeCredits.reduce((sum, c) => sum + c.soldeRestant, 0);
-  const totalDueAll = activeCredits.reduce((sum, c) => sum + c.montant * (1 + c.taux / 100), 0);
+  const totalDueAll = activeCredits.reduce((sum, c) => sum + c.totalDu, 0);
   const lateCount = credits.filter(c => c.statut === 'LATE').length;
 
   return (

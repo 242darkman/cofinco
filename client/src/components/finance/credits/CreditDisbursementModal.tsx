@@ -40,8 +40,8 @@ interface Demande {
     nom: string;
     prenom?: string;
     email?: string;
-    phone: string;
-    photoUrl?: string;
+    telephone: string;
+    photoProfile?: string;
   };
 }
 
@@ -100,7 +100,7 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
     return `/api/storage/files/${encodeURIComponent(photoUrl)}`;
   };
 
-  const clientAvatarUrl = useMemo(() => getAvatarUrl(demande.clients.photoUrl), [demande.clients.photoUrl]);
+  const clientAvatarUrl = useMemo(() => getAvatarUrl(demande.clients.photoProfile), [demande.clients.photoProfile]);
 
   // Helper: convert V2 duration to days
   const convertDureeEnJours = (valeur: number, unite: string): number => {
@@ -184,7 +184,7 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
         soldeRestant: montantTotal.toString(),
         decaissementImmediat: decaissementType === 'immediat',
         disbursementChannel,
-        provider: disbursementChannel === DisbursementChannel.MOBILE_MONEY ? mobileProvider : undefined
+        provider: disbursementChannel === DisbursementChannel.MOBILE_MONEY ? mobileProvider as 'MTN' | 'AIRTEL' : undefined
       });
 
       toast.success(result.message || 'Crédit décaissé');
@@ -465,7 +465,7 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
                         <div className="text-xs text-content-muted uppercase tracking-wider font-semibold">Bénéficiaire</div>
                         <div className="text-content-primary font-bold text-sm sm:text-base">{formatClientName(demande.clients.nom, demande.clients.prenom)}</div>
                         <div className="text-content-muted text-xs flex items-center gap-1">
-                             <Phone size={10} /> {demande.clients.phone}
+                             <Phone size={10} /> {demande.clients.telephone}
                         </div>
                     </div>
                 </div>
@@ -540,7 +540,7 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
                     )}
                     {disbursementChannel === DisbursementChannel.MOBILE_MONEY && (
                          <p className="text-content-secondary">
-                             Transfert vers le numéro <span className="text-status-info font-semibold">{demande.clients.phone}</span>. Des frais opérateur peuvent s'appliquer.
+                             Transfert vers le numéro <span className="text-status-info font-semibold">{demande.clients.telephone}</span>. Des frais opérateur peuvent s'appliquer.
                          </p>
                     )}
                 </div>
@@ -682,7 +682,7 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
           disbursementChannel === DisbursementChannel.CASH
             ? `Confirmez-vous l'envoi de cet ordre de paiement à la caisse ? Le client ${formatClientName(demande.clients.nom, demande.clients.prenom)} devra se présenter au guichet pour récupérer ${formatMoney(montantDecaissement)}.`
             : disbursementChannel === DisbursementChannel.MOBILE_MONEY
-              ? `Confirmez-vous l'envoi de ${formatMoney(montantDecaissement)} via Mobile Money au numéro ${demande.clients.phone} ?`
+              ? `Confirmez-vous l'envoi de ${formatMoney(montantDecaissement)} via Mobile Money au numéro ${demande.clients.telephone} ?`
               : decaissementType === 'immediat'
                 ? `Confirmez-vous le décaissement immédiat de ${formatMoney(montantDecaissement)} vers le compte courant du client ? Un crédit actif sera créé et le compte sera crédité.`
                 : `Confirmez-vous la programmation du décaissement de ${formatMoney(montantDecaissement)} pour le ${dateEffectiveDecaissement.toLocaleDateString('fr-FR')} ?`

@@ -452,7 +452,7 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRe
                                   </div>
                                   <div className="flex justify-between items-center py-1.5 sm:py-2">
                                      <span className="text-content-muted">Téléphone</span>
-                                     <span className="text-content-primary font-mono text-[11px] sm:text-sm">{compte.clients?.phone || compte.clients?.telephone || '—'}</span>
+                                     <span className="text-content-primary font-mono text-[11px] sm:text-sm">{compte.clients?.telephone || '—'}</span>
                                   </div>
                                   <div className="flex justify-between items-center py-1.5 sm:py-2">
                                      <span className="text-content-muted">Email</span>

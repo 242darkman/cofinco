@@ -250,9 +250,9 @@ export default function OrganigrammeView({ employes }: OrganigrammeViewProps) {
       const res = await fetch('/api/hr/organigramme', { credentials: 'include' });
       if (res.ok) {
         const apiData = await res.json();
-        console.log('API organigramme data:', apiData);
+        if (import.meta.env.DEV) console.log('API organigramme data:', apiData);
         const transformed = transformApiDataToOrgChart(apiData, branding.appName);
-        console.log('Transformed data:', transformed);
+        if (import.meta.env.DEV) console.log('Transformed data:', transformed);
         setData(transformed);
         setLastUpdated(new Date());
       }

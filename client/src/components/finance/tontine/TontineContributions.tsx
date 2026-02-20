@@ -409,6 +409,19 @@ export default function TontineContributions({ tontineId }: TontineContributions
     return Object.keys(newErrors).length === 0;
   }, [formData, selectedOperator]);
 
+  const resetForm = useCallback(() => {
+    setFormData({
+      membre_id: '',
+      montant: 0,
+      tour_numero: 1,
+      mode_paiement: MethodePaiement.CASH,
+      reference_paiement: '',
+      notes: '',
+    });
+    setSelectedOperator('');
+    setErrors({});
+  }, []);
+
   const handleAddContribution = useCallback(async () => {
     if (!validateForm()) return;
 
@@ -442,7 +455,7 @@ export default function TontineContributions({ tontineId }: TontineContributions
           const result = await executeOfflineOperation({
             type: 'TONTINE_CONTRIBUTION',
             amount: formData.montant,
-            agentId: parseInt(user.id, 10),
+            agentId: user.id.toString(),
             agenceId: user.agenceId || '',
             payload: {
               tontineId,
@@ -496,19 +509,6 @@ export default function TontineContributions({ tontineId }: TontineContributions
     },
     [formData, membres, tontineId, selectedOperator, fetchContributions, fetchMembres, isOffline, user, resetForm]
   );
-
-  const resetForm = useCallback(() => {
-    setFormData({
-      membre_id: '',
-      montant: 0,
-      tour_numero: 1,
-      mode_paiement: MethodePaiement.CASH,
-      reference_paiement: '',
-      notes: '',
-    });
-    setSelectedOperator('');
-    setErrors({});
-  }, []);
 
   const handlePaymentValidation = useCallback(
     (paymentRef: string, operator?: string) => {

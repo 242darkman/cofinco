@@ -508,8 +508,8 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
       if (data) {
         setSelectedClient(data);
         // Toujours pré-remplir le numéro de téléphone avec celui du client
-        if (data.phone || data.telephone) {
-          setFormData(prev => ({ ...prev, numero_telephone: data.phone || data.telephone || '' }));
+        if (data.telephone) {
+          setFormData(prev => ({ ...prev, numero_telephone: data.telephone || '' }));
         }
       }
     } catch (error) {
@@ -711,7 +711,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
           nom: selectedClient.nom,
           prenom: selectedClient.prenom,
           email: selectedClient.email,
-          telephone: selectedClient.phone || selectedClient.telephone,
+          telephone: selectedClient.telephone,
           numeroCompte: numeroCompte || selectedClient.numeroCompte
         },
         agent: { nom: agentName, prenom: '' },
@@ -864,7 +864,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
         nom: selectedClient?.nom || '',
         prenom: selectedClient?.prenom || '',
         email: selectedClient?.email,
-        telephone: formData.numero_telephone || selectedClient?.phone,
+        telephone: formData.numero_telephone || selectedClient?.telephone,
         numeroCompte: numeroCompte || selectedClient?.numeroCompte,
       },
       agent: { nom: agentName, prenom: '' },
@@ -980,7 +980,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                       options={clients.map(c => {
                         // Build full name from nom + prenom
                         const fullName = [c.nom, c.prenom].filter(Boolean).join(' ') || 'Sans nom';
-                        const phone = c.phone || c.telephone;
+                        const phone = c.telephone;
                         return {
                           value: c.id,
                           label: fullName,
@@ -1153,7 +1153,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                         onClick={() => setFormData({
                           ...formData,
                           methode_paiement: m.id,
-                          numero_telephone: selectedClient?.phone || selectedClient?.telephone || formData.numero_telephone || '',
+                          numero_telephone: selectedClient?.telephone || formData.numero_telephone || '',
                           numero_transaction: ''
                         })}
                         className={`
@@ -1305,7 +1305,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
           }}
           onConfirm={handlePresenceConfirm}
           clientName={`${selectedClient.nom} ${selectedClient.prenom || ''}`}
-          clientPhone={selectedClient.phone || selectedClient.telephone}
+          clientPhone={selectedClient.telephone}
           operationType={formData.type_paiement}
           amount={pendingPaymentData.montant}
           isLoading={loading}

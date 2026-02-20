@@ -53,7 +53,7 @@ export default function FaceLivenessCapture({
       try {
         faceDetectorRef.current = new (window as any).FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
       } catch (err) {
-        console.log('FaceDetector not available, using position-based detection');
+        if (import.meta.env.DEV) console.log('FaceDetector not available, using position-based detection');
       }
     }
   };

@@ -156,7 +156,7 @@ class NetworkManager {
       prevCircuitState !== this.state.circuitState;
 
     if (hasStateChanged) {
-      console.log(`[NetworkManager] Status: ${prevStatus} → ${this.state.status}`);
+      if (import.meta.env.DEV) console.log(`[NetworkManager] Status: ${prevStatus} → ${this.state.status}`);
       this.notifyListeners();
     }
   }
@@ -181,7 +181,7 @@ class NetworkManager {
       this.state.isNavigatorOnline = false;
       // Only notify if we weren't already offline
       if (!wasOffline) {
-        console.log(`[NetworkManager] Status: ${prevStatus} → offline`);
+        if (import.meta.env.DEV) console.log(`[NetworkManager] Status: ${prevStatus} → offline`);
         this.notifyListeners();
       }
       return;
@@ -218,7 +218,7 @@ class NetworkManager {
       prevCircuitState !== this.state.circuitState;
 
     if (hasStateChanged) {
-      console.log(`[NetworkManager] Status: ${prevStatus} → ${this.state.status}`);
+      if (import.meta.env.DEV) console.log(`[NetworkManager] Status: ${prevStatus} → ${this.state.status}`);
       this.notifyListeners();
     }
   }
@@ -300,7 +300,7 @@ class NetworkManager {
       this.state.status = 'unstable';
     }
 
-    console.log(`[NetworkManager] Navigator online: ${isOnline}`);
+    if (import.meta.env.DEV) console.log(`[NetworkManager] Navigator online: ${isOnline}`);
     this.notifyListeners();
   }
 
@@ -318,7 +318,7 @@ class NetworkManager {
       this.closeCircuit();
     }
 
-    console.log(`[NetworkManager] Force status: ${prevStatus} → ${status}`);
+    if (import.meta.env.DEV) console.log(`[NetworkManager] Force status: ${prevStatus} → ${status}`);
     this.notifyListeners();
   }
 
@@ -372,9 +372,11 @@ class NetworkManager {
 
     this.state.nextRetryAt = Date.now() + this.currentCooldown;
 
-    console.log(
-      `[NetworkManager] Circuit OPEN, cooldown: ${this.currentCooldown / 1000}s`
-    );
+    if (import.meta.env.DEV) {
+      console.log(
+        `[NetworkManager] Circuit OPEN, cooldown: ${this.currentCooldown / 1000}s`
+      );
+    }
   }
 
   private closeCircuit(): void {
@@ -383,7 +385,7 @@ class NetworkManager {
     this.currentCooldown = CONFIG.COOLDOWN_MS;
     this.circuitOpenedAt = null;
 
-    console.log('[NetworkManager] Circuit CLOSED');
+    if (import.meta.env.DEV) console.log('[NetworkManager] Circuit CLOSED');
   }
 
   private updateLatency(latencyMs: number): void {

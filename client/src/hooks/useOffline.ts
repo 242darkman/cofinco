@@ -263,7 +263,7 @@ export function useOffline(): UseOfflineResult {
             throw new Error('Offline');
           }
         } catch (error) {
-          console.log('[useOffline] Requête échouée, passage en mode offline');
+          if (import.meta.env.DEV) console.log('[useOffline] Requête échouée, passage en mode offline');
 
           // Handle write operations when offline
           if (fetchOptions.method && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(fetchOptions.method)) {

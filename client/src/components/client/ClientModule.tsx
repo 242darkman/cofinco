@@ -61,7 +61,7 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
 
   // URL-driven navigation
   const { currentSubModule, params, navigateToPath } = useAppNavigation();
-  const activeTab = CLIENT_TAB_IDS.includes(currentSubModule as any) ? currentSubModule! : 'overview';
+  const activeTab = (CLIENT_TAB_IDS as readonly string[]).includes(currentSubModule ?? '') ? currentSubModule! : 'overview';
   const clientIdFromUrl = params?.id;
 
   const [clients, setClients] = useState<any[]>([]);
@@ -105,12 +105,12 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
   // Deep linking: load client from URL params
   useEffect(() => {
     // Redirect unknown/missing sub-routes to overview (e.g. old /details URL)
-    if (clientIdFromUrl && !CLIENT_TAB_IDS.includes(currentSubModule as any) && currentSubModule !== 'new') {
+    if (clientIdFromUrl && !(CLIENT_TAB_IDS as readonly string[]).includes(currentSubModule ?? '') && currentSubModule !== 'new') {
       navigateToPath(`/clients/${clientIdFromUrl}/overview`);
       return;
     }
 
-    if (clientIdFromUrl && CLIENT_TAB_IDS.includes(currentSubModule as any)) {
+    if (clientIdFromUrl && (CLIENT_TAB_IDS as readonly string[]).includes(currentSubModule ?? '')) {
       // Load client if not already loaded or different client
       if (!viewingClient || viewingClient.id !== clientIdFromUrl) {
         clientService.getById(clientIdFromUrl).then(client => {
@@ -148,7 +148,7 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
   };
 
   const getPhotoUrl = (client: any) => {
-    const raw = client.photoProfile || client.photoUrl || '';
+    const raw = client.photoProfile || '';
     return resolveStorageUrl(raw);
   };
 

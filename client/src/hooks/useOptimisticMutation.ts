@@ -76,7 +76,7 @@ export function useOptimisticMutation<TData, TError = Error, TVariables = void, 
     },
 
     // On error, rollback to previous values
-    onError: (error, variables, context, _mutationCtx) => {
+    onError: (error, variables, context) => {
       // Rollback
       context?.previousData.forEach((data, keyStr) => {
         const key = JSON.parse(keyStr);
@@ -92,11 +92,11 @@ export function useOptimisticMutation<TData, TError = Error, TVariables = void, 
       toast.error(message);
 
       // Call custom onError
-      (onError as any)?.(error, variables, context as TContext, _mutationCtx);
+      onError?.(error, variables, context as unknown as TContext, {} as any);
     },
 
     // On success, optionally show toast
-    onSuccess: (data, variables, context, _mutationCtx) => {
+    onSuccess: (data, variables, context) => {
       if (successMessage) {
         const message = typeof successMessage === 'function'
           ? successMessage(data, variables)
@@ -104,17 +104,17 @@ export function useOptimisticMutation<TData, TError = Error, TVariables = void, 
         toast.success(message);
       }
 
-      (onSuccess as any)?.(data, variables, context as TContext, _mutationCtx);
+      onSuccess?.(data, variables, context as unknown as TContext, {} as any);
     },
 
     // Always refetch after mutation settles
-    onSettled: (data, error, variables, context, _mutationCtx) => {
+    onSettled: (data, error, variables, context) => {
       // Invalidate queries to ensure data consistency
       queryKeys.forEach(key => {
         queryClient.invalidateQueries({ queryKey: key });
       });
 
-      (onSettled as any)?.(data, error, variables, context as TContext, _mutationCtx);
+      onSettled?.(data, error, variables, context as unknown as TContext, {} as any);
     },
   });
 }

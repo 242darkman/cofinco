@@ -100,11 +100,13 @@ export function AbilityProvider({ children }: { children: ReactNode }) {
             agenceNom: data.agenceNom,
           });
 
-          console.log('[CASL] Ability built from API rules:', {
-            rulesCount: data.caslRules.length,
-            isAdmin: data.isAdmin,
-            roles: data.roles,
-          });
+          if (import.meta.env.DEV) {
+            console.log('[CASL] Ability built from API rules:', {
+              rulesCount: data.caslRules.length,
+              isAdmin: data.isAdmin,
+              roles: data.roles,
+            });
+          }
         } else {
           // Fallback: Admin gets full access, others get empty ability
           // This handles the transition period before all permissions include CASL rules

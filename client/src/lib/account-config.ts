@@ -83,17 +83,17 @@ export function getAccountUiConfig(account: AccountLike, role: AccountViewRole =
   const isPendingActivation = status === StatutCompte.PENDING_ACTIVATION;
 
   // New granular pending states (backward compat: PENDING_ACTIVATION is also payment-pending)
-  const isPendingPayment = [
+  const isPendingPayment = ([
     StatutCompte.PENDING_PAYMENT,
     StatutCompte.PENDING_PAYMENT_AND_APPROVAL,
     StatutCompte.PENDING_ACTIVATION,
-  ].includes(status as StatutCompteType);
+  ] as string[]).includes(status);
 
-  const isPendingApproval = [
+  const isPendingApproval = ([
     StatutCompte.PENDING_APPROVAL,
     StatutCompte.PENDING_PAYMENT_AND_APPROVAL,
     StatutCompte.PENDING_VALIDATION,
-  ].includes(status as StatutCompteType);
+  ] as string[]).includes(status);
 
   // Any "pending" state (activation, payment, approval, validation)
   const isAnyPending = isPendingActivation || isPendingPayment || isPendingApproval ||

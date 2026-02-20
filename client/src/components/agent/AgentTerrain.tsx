@@ -32,7 +32,7 @@ interface Agent {
   telephone: string;
   zone_affectation: string;
   statut: string;
-  photo_url?: string;
+  photoProfile?: string;
   currentAgenceId?: string;
 }
 
@@ -105,7 +105,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
   const targetAgenceId = targetAgent?.currentAgenceId || currentUser?.agenceId;
 
   // GL session
-  const { session: glSession, hasActiveSession: hasGlSession } = useAgentGlSession(targetAgentId);
+  const { session: glSession, hasActiveSession: hasGlSession } = useAgentGlSession(targetAgentId || undefined);
 
   // Modals
   const [showPaiementForm, setShowPaiementForm] = useState(false);
@@ -624,8 +624,8 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                                    }}
                                    className="w-full px-4 py-3 flex items-center gap-3 hover:bg-surface transition-colors text-left border-b border-edge last:border-b-0"
                                 >
-                                   {agent.photo_url ? (
-                                      <img src={resolveStorageUrl(agent.photo_url)} alt="" className="w-9 h-9 rounded-full object-cover border border-edge-strong" />
+                                   {agent.photoProfile ? (
+                                      <img src={resolveStorageUrl(agent.photoProfile)} alt="" className="w-9 h-9 rounded-full object-cover border border-edge-strong" />
                                    ) : (
                                       <div className="w-9 h-9 rounded-full bg-accent/10 flex items-center justify-center text-accent font-bold text-xs">
                                          {agent.nom.charAt(0)}{agent.prenom.charAt(0)}
@@ -677,8 +677,8 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
            ) : (
               <div className="bg-surface-base border border-edge rounded-2xl p-3 flex items-center justify-between relative overflow-hidden">
                  <div className="flex items-center gap-3 z-10">
-                    {currentAgent?.photo_url ? (
-                      <img src={resolveStorageUrl(currentAgent.photo_url)} alt="" className="w-10 h-10 rounded-full object-cover shrink-0 border-2 border-accent/30" />
+                    {currentAgent?.photoProfile ? (
+                      <img src={resolveStorageUrl(currentAgent.photoProfile)} alt="" className="w-10 h-10 rounded-full object-cover shrink-0 border-2 border-accent/30" />
                     ) : (
                       <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center font-bold text-sm text-white shrink-0">
                         {currentAgent ? `${currentAgent.nom.charAt(0)}${currentAgent.prenom.charAt(0)}` : <Users size={16} />}

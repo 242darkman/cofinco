@@ -117,10 +117,10 @@ export async function openDaySession(params: {
  */
 export async function getCurrentSession(agentId: string): Promise<AgentDaySession | null> {
   const today = new Date().toISOString().slice(0, 10);
-  return db.agentDaySessions
+  return await db.agentDaySessions
     .where('[agentId+date]')
     .equals([agentId, today])
-    .first() || null;
+    .first() ?? null;
 }
 
 /**
@@ -456,7 +456,7 @@ export async function updateOfflineLimits(
  * Get current offline limits.
  */
 export async function getOfflineLimits(): Promise<OfflineLimits | null> {
-  return db.offlineLimits.get('current') || null;
+  return await db.offlineLimits.get('current') ?? null;
 }
 
 // ========== SESSION HISTORY ==========

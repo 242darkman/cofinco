@@ -52,7 +52,7 @@ interface CreditRefundRequest {
   clients: {
     nom: string;
     prenom?: string;
-    phone?: string;
+    telephone?: string;
   };
   demande: {
     numeroDemande: string;
@@ -145,7 +145,7 @@ export default function CreditRefundsPage() {
   // Pre-fill phone when MoMo dialog opens
   useEffect(() => {
     if (showPayDialog && selectedRefund && paymentMethod === 'MOBILE_MONEY') {
-      setMomoPhone(selectedRefund.clients?.phone || '');
+      setMomoPhone(selectedRefund.clients?.telephone || '');
     }
   }, [showPayDialog, selectedRefund, paymentMethod]);
 
@@ -494,7 +494,7 @@ export default function CreditRefundsPage() {
                              <span>Espèces</span>
                          </button>
                          <button
-                           onClick={() => { setPaymentMethod('MOBILE_MONEY'); setMomoPhone(selectedRefund?.clients?.phone || ''); }}
+                           onClick={() => { setPaymentMethod('MOBILE_MONEY'); setMomoPhone(selectedRefund?.clients?.telephone || ''); }}
                            className={`p-2 rounded-lg border flex flex-col items-center gap-1 transition text-xs ${
                              paymentMethod === 'MOBILE_MONEY'
                               ? 'bg-status-warning-bg border-status-warning text-status-warning'

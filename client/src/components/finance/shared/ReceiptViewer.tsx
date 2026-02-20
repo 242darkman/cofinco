@@ -3,7 +3,7 @@ import { Download, Share2, Loader2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { Button, Modal } from '@/components/ui';
 import { factureApi } from '@/lib/api/factureApi';
-import { ReceiptTemplate } from '@/components/ui/printable/ReceiptTemplate';
+import { ReceiptTemplate, type ReceiptData } from '@/components/ui/printable/ReceiptTemplate';
 import { InvoiceTemplate } from '@/components/ui/printable/InvoiceTemplate';
 import { useReceiptPDF } from '@/hooks/finance/useReceiptPDF';
 import { toast } from 'sonner';
@@ -111,8 +111,8 @@ export const ReceiptViewer: React.FC<ReceiptViewerProps> = ({
             zIndex: -1,
           }}
         >
-          <ReceiptTemplate ref={ticketRef} data={facture as any} />
-          <InvoiceTemplate ref={invoiceRef} data={facture as any} />
+          <ReceiptTemplate ref={ticketRef} data={facture as unknown as ReceiptData} />
+          <InvoiceTemplate ref={invoiceRef} data={facture as unknown as ReceiptData} />
         </div>
       )}
 
@@ -132,9 +132,9 @@ export const ReceiptViewer: React.FC<ReceiptViewerProps> = ({
       {facture && !isLoading && (
         <div className="bg-white rounded-lg p-6">
           {format === 'ticket' ? (
-            <ReceiptTemplate data={facture as any} />
+            <ReceiptTemplate data={facture as unknown as ReceiptData} />
           ) : (
-            <InvoiceTemplate data={facture as any} />
+            <InvoiceTemplate data={facture as unknown as ReceiptData} />
           )}
         </div>
       )}

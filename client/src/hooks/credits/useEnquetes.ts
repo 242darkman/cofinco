@@ -104,8 +104,10 @@ export function useEnquetes() {
 
   const createMutation = useMutation({
     mutationFn: async (enqueteData: Partial<EnqueteCredit>) => {
-      console.log('[useEnquetes] Creating enquete with data:', enqueteData);
-      console.log('[useEnquetes] demandeId in payload:', (enqueteData as any).demandeId);
+      if (import.meta.env.DEV) {
+        console.log('[useEnquetes] Creating enquete with data:', enqueteData);
+        console.log('[useEnquetes] demandeId in payload:', (enqueteData as any).demandeId);
+      }
 
       const response = await fetch('/api/enquetes-credit', {
         method: 'POST',
@@ -117,7 +119,7 @@ export function useEnquetes() {
         throw new Error(errorData.message || "Erreur lors de la création de l'enquête");
       }
       const result = await response.json();
-      console.log('[useEnquetes] Server response:', result);
+      if (import.meta.env.DEV) console.log('[useEnquetes] Server response:', result);
       return result;
     },
     onSuccess: () => {

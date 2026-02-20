@@ -31,6 +31,7 @@ export interface ConfirmDialogProps {
   variant?: ConfirmDialogVariant;
   size?: 'sm' | 'md' | 'lg';
   confirmText?: string;
+  confirmLabel?: string;
   cancelText?: string;
   isLoading?: boolean;
   disabled?: boolean;

@@ -56,7 +56,7 @@ const AccountRow: React.FC<AccountRowProps> = ({ account, onManage, onTransactio
   const clientName = formatClientName(account.clients?.nom, account.clients?.prenom);
   const initials = getInitials(account.clients?.nom || '?', account.clients?.prenom);
   const avatarColor = getAvatarColor(clientName || 'Inconnu');
-  const clientPhotoUrl = account.clients?.photoUrl;
+  const clientPhotoUrl = account.clients?.photoProfile;
 
   return (
     <div

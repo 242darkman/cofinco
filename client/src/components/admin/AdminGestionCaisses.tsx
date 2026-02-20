@@ -29,8 +29,12 @@ interface Caisse {
   solde: string;
   isOccupied?: boolean;
   occupiedBy?: string;
+  occupiedById?: string;
   agenceId: string;
+  assignments?: string[];
   assignmentsDetails?: AssignmentDetail[];
+  sessionId?: string;
+  currentSessionId?: string;
   // Operating hours
   operatingHoursEnabled?: boolean;
   operatingHoursStart?: string;
@@ -53,7 +57,7 @@ export default function AdminGestionCaisses() {
     queryKey: ['agences'],
     queryFn: async () => {
        const res = await api.get('/agences');
-       return (res as any[]) || [];
+       return (res as Record<string, unknown>[]) || [];
     },
     enabled: isAdmin
   });
@@ -118,7 +122,7 @@ export default function AdminGestionCaisses() {
   });
 
   const unassignAgent = (caisse: Caisse, userIdToRemove: string) => {
-      const currentIds = (caisse as any).assignments || [];
+      const currentIds = caisse.assignments || [];
       const newIds = currentIds.filter((id: string) => id !== userIdToRemove);
       assignMutation.mutate({ caisseId: caisse.id, userIds: newIds });
   };
@@ -126,7 +130,7 @@ export default function AdminGestionCaisses() {
   const handleOpenAssign = (caisse: Caisse) => {
       setSelectedCaisseForAssign(caisse);
       // Récupérer les assignés actuels depuis la BDD
-      const existing = (caisse as any).assignments || [];
+      const existing = caisse.assignments || [];
       setCurrentAssigneeIds(existing);
       setIsAssignModalOpen(true);
   };
@@ -153,7 +157,7 @@ export default function AdminGestionCaisses() {
     const selectedCaisseId = selectedCaisseForAssign?.id;
     return caisses
       .filter(c => c.isOccupied && c.id !== selectedCaisseId)
-      .map(c => (c as any).occupiedById)
+      .map(c => c.occupiedById)
       .filter(Boolean);
   }, [caisses, selectedCaisseForAssign]);
 
@@ -397,8 +401,8 @@ export default function AdminGestionCaisses() {
                                 onClick={() => {
                                   setSelectedCaisseForClose(caisse);
                                   // Get sessionId from caisse object - it might be in different formats
-                                  const sid = (caisse as any).sessionId || (caisse as any).currentSessionId || '';
-                                  console.log('Session ID for force close:', sid, 'Caisse:', caisse);
+                                  const sid = caisse.sessionId || caisse.currentSessionId || '';
+                                  if (import.meta.env.DEV) console.log('Session ID for force close:', sid, 'Caisse:', caisse);
                                   setActiveSessionId(sid);
                                   setIsForceCloseModalOpen(true);
                                   setOpenMenuId(null);

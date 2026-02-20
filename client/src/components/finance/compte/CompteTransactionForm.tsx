@@ -176,7 +176,7 @@ export default function CompteTransactionForm({ compte, type, onClose, onSuccess
         const result = await executeOfflineOperation({
           type: journalType as any,
           amount: montantNum,
-          agentId: parseInt(user.id, 10),
+          agentId: user.id.toString(),
           agenceId: user.agenceId || '',
           payload: {
             compteId: compte.id,

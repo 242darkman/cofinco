@@ -36,7 +36,7 @@ export const CreditSchedulePDF = React.forwardRef<HTMLDivElement, CreditSchedule
     const { branding } = useBranding();
     const companyInfo = { ...companyInfoProp, nom: companyInfoProp === DEFAULT_COMPANY_INFO ? branding.appName : companyInfoProp.nom };
     const totalPrincipal = parseFloat(credit.montant) || 0;
-    const totalWithInterest = totalPrincipal * (1 + (parseFloat(credit.taux) || 0) / 100);
+    const totalWithInterest = parseFloat(credit.totalDu) || 0;
 
     return (
       <div className="hidden print:block font-sans text-content-primary bg-white" ref={ref}>

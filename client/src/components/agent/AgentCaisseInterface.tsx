@@ -260,9 +260,9 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
             >
               <div className="flex items-center justify-between mb-2">
                 {getTabIcon(tab)}
-                {tab === 'offline' && pendingOffline > 0 && (
+                {tab === 'offline' && pendingOffline.count > 0 && (
                   <span className="absolute -top-1 -right-1 bg-status-warning text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
-                    {pendingOffline > 99 ? '99+' : pendingOffline}
+                    {pendingOffline.count > 99 ? '99+' : pendingOffline.count}
                   </span>
                 )}
               </div>
@@ -330,7 +330,7 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
                           <p className="text-content-primary font-semibold text-sm">
                             {client.nomComplet || `${client.nom || ''} ${client.prenom || ''}`.trim()}
                           </p>
-                          <p className="text-content-muted text-xs">{client.telephone || client.phone || ''}</p>
+                          <p className="text-content-muted text-xs">{client.telephone || ''}</p>
                         </button>
                       ))}
                     </div>
@@ -341,7 +341,7 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
                         <p className="text-status-success font-semibold">
                           {selectedClient.nomComplet || `${selectedClient.nom || ''} ${selectedClient.prenom || ''}`.trim()}
                         </p>
-                        <p className="text-sm text-content-muted">{selectedClient.telephone || selectedClient.phone || ''}</p>
+                        <p className="text-sm text-content-muted">{selectedClient.telephone || ''}</p>
                       </div>
                       <button
                         type="button"

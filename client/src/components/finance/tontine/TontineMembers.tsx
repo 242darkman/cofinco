@@ -26,8 +26,7 @@ interface Client {
   prenom?: string;
   email?: string;
   telephone?: string;
-  phone?: string;
-  photoUrl?: string;
+  photoProfile?: string;
   status?: string;
 }
 
@@ -229,7 +228,7 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
 
       const name = (client.nom || '').toLowerCase();
       const email = (client.email || '').toLowerCase();
-      const phone = (client.telephone || client.phone || '').toLowerCase();
+      const phone = (client.telephone || '').toLowerCase();
 
       return name.includes(query) || email.includes(query) || phone.includes(query);
     });
@@ -406,9 +405,9 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
                   {/* Avatar / Position */}
                   <div className="shrink-0 relative">
                     <div className="w-10 h-10 rounded-lg bg-surface-elevated flex items-center justify-center text-content-secondary font-bold border border-edge-strong">
-                      {membre.client?.photoUrl ? (
+                      {membre.client?.photoProfile ? (
                         <img
-                          src={membre.client.photoUrl}
+                          src={membre.client.photoProfile}
                           alt=""
                           className="w-full h-full object-cover rounded-lg"
                           loading="lazy"
@@ -623,7 +622,7 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
                           {formatClientName(client.nom, client.prenom)}
                         </div>
                         <div className="text-xs text-content-muted mt-0.5">
-                          {escapeHtml(client.telephone || client.phone || client.email || '')}
+                          {escapeHtml(client.telephone || client.email || '')}
                         </div>
                       </div>
                       {selectedClientId === client.id && (

@@ -183,7 +183,7 @@ export function useCaisseWebSocket({
   useEffect(() => {
     if (!enabled) return;
 
-    console.log('[useCaisseWebSocket] Effect triggered. Dependencies:', { enabled, caisseId, sessionId });
+    if (import.meta.env.DEV) console.log('[useCaisseWebSocket] Effect triggered. Dependencies:', { enabled, caisseId, sessionId });
 
     // Connect to WebSocket
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -193,7 +193,7 @@ export function useCaisseWebSocket({
     let pingInterval: NodeJS.Timeout;
 
     ws.addEventListener('open', () => {
-      console.log('WebSocket connected for caisse updates');
+      if (import.meta.env.DEV) console.log('WebSocket connected for caisse updates');
       
       // Start Heartbeat
       pingInterval = setInterval(() => {
@@ -212,7 +212,7 @@ export function useCaisseWebSocket({
             type: 'SUBSCRIBE',
             aggregate,
           }));
-          console.log(`[WS] Subscribing to ${aggregate}`);
+          if (import.meta.env.DEV) console.log(`[WS] Subscribing to ${aggregate}`);
       });
     });
 
@@ -223,7 +223,7 @@ export function useCaisseWebSocket({
     });
 
     ws.addEventListener('close', () => {
-      console.log('WebSocket disconnected');
+      if (import.meta.env.DEV) console.log('WebSocket disconnected');
       if (pingInterval) clearInterval(pingInterval);
     });
 

@@ -21,8 +21,8 @@ export interface Credit {
   typeCredit: string | null;
   clients?: {
     nom: string;
-    phone: string;
-    photoUrl?: string;
+    telephone: string;
+    photoProfile?: string;
   };
 }
 
@@ -49,7 +49,7 @@ export function useCredits() {
         try {
             const data = JSON.parse(event.data);
             if (data.type === 'CREDIT_UPDATE') {
-                console.log('[useCredits] Received real-time update');
+                if (import.meta.env.DEV) console.log('[useCredits] Received real-time update');
             }
         } catch (e) {}
     };
@@ -82,7 +82,7 @@ export function useCredits() {
     return credits.filter(c =>
       c.numeroCredit.toLowerCase().includes(lower) ||
       c.clients?.nom.toLowerCase().includes(lower) ||
-      c.clients?.phone?.includes(term)
+      c.clients?.telephone?.includes(term)
     );
   };
 

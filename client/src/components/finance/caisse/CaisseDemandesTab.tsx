@@ -64,7 +64,7 @@ interface PendingCredit {
     id: string;
     nom: string;
     prenom: string;
-    photoUrl?: string;
+    photoProfile?: string;
   };
 }
 
@@ -340,7 +340,7 @@ export default function CaisseDemandesTab({
         label: `Prêt #${credit.numeroCredit}`,
         description: `Décaissement prêt — ${credit.duree} mois`,
         displayName: formatClientName(credit.client.nom, credit.client.prenom),
-        photoUrl: credit.client.photoUrl,
+        photoUrl: credit.client.photoProfile,
         createdAt: credit.createdAt,
         creditData: credit,
       });

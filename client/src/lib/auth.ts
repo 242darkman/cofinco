@@ -73,7 +73,7 @@ class AuthService {
       this.broadcastChannel = new BroadcastChannel('auth-channel');
       this.broadcastChannel.onmessage = (event) => {
         if (event.data === 'logout') {
-          console.log('🔄 Logout triggered from another tab');
+          if (import.meta.env.DEV) console.log('[Auth] Logout triggered from another tab');
           this.clearSession();
           // Force reload to clear React state and redirect to login
           // Import dynamique pour éviter la dépendance circulaire
@@ -134,7 +134,7 @@ class AuthService {
     if (this.currentUser && data.role) {
       const normalizedRole = normalizeRole(data.role);
       if (normalizedRole && this.currentUser.role !== normalizedRole) {
-        console.log(`👤 Role updated: ${this.currentUser.role} -> ${normalizedRole}`);
+        if (import.meta.env.DEV) console.log(`[Auth] Role updated: ${this.currentUser.role} -> ${normalizedRole}`);
         this.currentUser.role = normalizedRole;
       }
     }
@@ -151,12 +151,14 @@ class AuthService {
       }
     }
 
-    console.group('🔐 Permissions Loaded (from login)');
-    console.log('👤 Role:', this.currentUser?.role);
-    console.log('🔑 IsAdmin:', this.isAdminUser);
-    console.log('📦 Total Modules:', Object.keys(this.permissionsMap).length);
-    console.log('✅ Total Permissions:', this.permissions.length);
-    console.groupEnd();
+    if (import.meta.env.DEV) {
+      console.group('[Auth] Permissions Loaded (from login)');
+      console.log('Role:', this.currentUser?.role);
+      console.log('IsAdmin:', this.isAdminUser);
+      console.log('Total Modules:', Object.keys(this.permissionsMap).length);
+      console.log('Total Permissions:', this.permissions.length);
+      console.groupEnd();
+    }
   }
 
   /**
@@ -206,7 +208,7 @@ class AuthService {
       if (this.currentUser && data.role) {
           const normalizedRole = normalizeRole(data.role);
           if (normalizedRole && this.currentUser.role !== normalizedRole) {
-            console.log(`👤 Role updated: ${this.currentUser.role} -> ${normalizedRole}`);
+            if (import.meta.env.DEV) console.log(`[Auth] Role updated: ${this.currentUser.role} -> ${normalizedRole}`);
             this.currentUser.role = normalizedRole;
           }
       }
@@ -223,13 +225,15 @@ class AuthService {
         }
       }
 
-      console.group('🔐 Permissions Loaded');
-      console.log('👤 Role:', this.currentUser?.role);
-      console.log('🔑 IsAdmin:', this.isAdminUser);
-      console.log('📦 Total Modules:', Object.keys(this.permissionsMap).length);
-      console.log('✅ Total Permissions:', this.permissions.length);
-      console.log('📜 Permissions Map:', this.permissionsMap);
-      console.groupEnd();
+      if (import.meta.env.DEV) {
+        console.group('[Auth] Permissions Loaded');
+        console.log('Role:', this.currentUser?.role);
+        console.log('IsAdmin:', this.isAdminUser);
+        console.log('Total Modules:', Object.keys(this.permissionsMap).length);
+        console.log('Total Permissions:', this.permissions.length);
+        console.log('Permissions Map:', this.permissionsMap);
+        console.groupEnd();
+      }
     } catch (error) {
       // Fail-Closed: Ne pas fallback sur config statique - retourner permissions vides
       console.error('🚨 SECURITY: Failed to load permissions from API - applying Fail-Closed strategy');
@@ -335,7 +339,7 @@ class AuthService {
    */
   async tryRefreshSession(): Promise<boolean> {
     try {
-      console.log('🔄 Attempting session refresh via remember-me token...');
+      if (import.meta.env.DEV) console.log('[Auth] Attempting session refresh via remember-me token...');
 
       const result = await authApi.refreshSession();
 
@@ -350,11 +354,11 @@ class AuthService {
           await this.loadPermissionsFromApi();
         }
 
-        console.log('✅ Session refreshed successfully via remember-me');
+        if (import.meta.env.DEV) console.log('[Auth] Session refreshed successfully via remember-me');
         return true;
       }
 
-      console.log('❌ Session refresh failed - no valid refresh token');
+      if (import.meta.env.DEV) console.log('[Auth] Session refresh failed - no valid refresh token');
       return false;
     } catch (error) {
       console.error('Error refreshing session:', error);

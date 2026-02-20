@@ -85,7 +85,7 @@ export function useRealTimeSubscription(
     }));
     
     subscriptionRef.current = channel;
-    console.log(`[RealTime] Subscribed to ${channel}`);
+    if (import.meta.env.DEV) console.log(`[RealTime] Subscribed to ${channel}`);
   }, [socket, isConnected, aggregateType, aggregateId]);
 
   // Unsubscribe from channel
@@ -98,7 +98,7 @@ export function useRealTimeSubscription(
       aggregate: channel 
     }));
     
-    console.log(`[RealTime] Unsubscribed from ${channel}`);
+    if (import.meta.env.DEV) console.log(`[RealTime] Unsubscribed from ${channel}`);
     subscriptionRef.current = null;
   }, [socket]);
 

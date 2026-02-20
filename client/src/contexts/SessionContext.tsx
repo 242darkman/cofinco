@@ -307,7 +307,7 @@ export function SessionProvider({
           error: null,
         }));
 
-        console.log('[Session] Extended successfully');
+        if (import.meta.env.DEV) console.log('[Session] Extended successfully');
         return true;
       } else {
         throw new Error('Failed to extend session');
@@ -334,7 +334,7 @@ export function SessionProvider({
 
       // Ne rafraîchir que si l'utilisateur est actif (activité < 5 min)
       if (timeSinceActivity < 5 * 60 * 1000) {
-        console.log('[Session] Auto-refreshing (expires in', Math.round(timeUntilExpiry / 1000), 's)');
+        if (import.meta.env.DEV) console.log('[Session] Auto-refreshing (expires in', Math.round(timeUntilExpiry / 1000), 's)');
         await extendSession();
       }
     }

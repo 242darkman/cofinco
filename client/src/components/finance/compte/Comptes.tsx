@@ -197,7 +197,7 @@ export default function Comptes({ activeView }: ComptesProps) {
       StatutCompte.PENDING_ACTIVATION,
       StatutCompte.PENDING_PAYMENT,
       StatutCompte.PENDING_PAYMENT_AND_APPROVAL,
-    ].includes(compte.statut as StatutCompteType);
+    ].includes(compte.statut as any);
     if (isPendingPayment && type === 'Dépôt') {
       if (!sessionActive) {
         toast.warning('Pour activer un compte, veuillez d\'abord ouvrir une session de caisse');

@@ -74,7 +74,7 @@ async function revalidateSessionBeforeLogout(reason: string): Promise<boolean> {
 
       if (response.ok) {
         // Session is VALID — the 401 was transient or endpoint-specific
-        console.log('[API] Session revalidation: OK — ignoring transient 401');
+        if (import.meta.env.DEV) console.log('[API] Session revalidation: OK — ignoring transient 401');
         return false;
       }
 
@@ -123,19 +123,19 @@ if (typeof BroadcastChannel !== 'undefined') {
     logoutChannel = new BroadcastChannel(LOGOUT_CHANNEL_NAME);
     logoutChannel.onmessage = (event) => {
       if (event.data?.type === 'LOGOUT') {
-        console.log('[API] Cross-tab logout received, invalidating session');
+        if (import.meta.env.DEV) console.log('[API] Cross-tab logout received, invalidating session');
         // Trigger local logout without broadcasting (to avoid loop)
         if (onUnauthorizedCallback) {
           onUnauthorizedCallback();
         }
       } else if (event.data?.type === 'SESSION_INVALID') {
-        console.log('[API] Cross-tab session invalidation received:', event.data.reason);
+        if (import.meta.env.DEV) console.log('[API] Cross-tab session invalidation received:', event.data.reason);
         if (onUnauthorizedCallback) {
           onUnauthorizedCallback();
         }
       }
     };
-    console.log('[API] BroadcastChannel initialized for cross-tab logout sync');
+    if (import.meta.env.DEV) console.log('[API] BroadcastChannel initialized for cross-tab logout sync');
   } catch (e) {
     console.warn('[API] BroadcastChannel not available:', e);
   }
@@ -1049,6 +1049,7 @@ export const creditApi = {
     soldeRestant?: string;
     decaissementImmediat?: boolean;
     disbursementChannel?: 'ACCOUNT' | 'CASH' | 'MOBILE_MONEY';
+    provider?: 'MTN' | 'AIRTEL';
   }) =>
     request<any>('/credits/decaissement', {
       method: 'POST',
@@ -2834,7 +2835,7 @@ export const adminApi = {
     }>;
     systemHealth: {
       database: 'healthy' | 'warning' | 'error';
-      security: 'secure' | 'attention';
+      security: 'secure' | 'warning' | 'critical';
       dbResponseTime: number;
       serverUptime: string;
       memoryPercent: number;

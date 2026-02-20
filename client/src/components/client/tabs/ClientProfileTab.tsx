@@ -13,6 +13,12 @@ interface ClientProfileTabProps {
   client: ClientWithIdentity;
 }
 
+/** Safely look up a label from a Record<EnumType, string> using a string key */
+function getLabel(labels: Record<string, string>, key: string | null | undefined): string | undefined {
+  if (!key) return undefined;
+  return labels[key] || key;
+}
+
 function formatAnciennete(mois: number): string {
   if (mois < 1) return `< 1 mois`;
   if (mois < 12) return `${mois} mois`;
@@ -57,7 +63,7 @@ export default function ClientProfileTab({ client }: ClientProfileTabProps) {
           <div className="space-y-2">
             <InfoRow
               label="Situation matrimoniale"
-              value={client.situationMatrimoniale ? (SITUATION_MATRIMONIALE_LABELS as any)[client.situationMatrimoniale] || client.situationMatrimoniale : null}
+              value={getLabel(SITUATION_MATRIMONIALE_LABELS, client.situationMatrimoniale)}
             />
             <InfoRow
               label="Personnes a charge"
@@ -65,11 +71,11 @@ export default function ClientProfileTab({ client }: ClientProfileTabProps) {
             />
             <InfoRow
               label="Niveau d'education"
-              value={client.niveauEducation ? (NIVEAU_EDUCATION_LABELS as any)[client.niveauEducation] || client.niveauEducation : null}
+              value={getLabel(NIVEAU_EDUCATION_LABELS, client.niveauEducation)}
             />
             <InfoRow
               label="Logement"
-              value={client.statutLogement ? (STATUT_LOGEMENT_LABELS as any)[client.statutLogement] || client.statutLogement : null}
+              value={getLabel(STATUT_LOGEMENT_LABELS, client.statutLogement)}
             />
           </div>
         </div>
@@ -87,7 +93,7 @@ export default function ClientProfileTab({ client }: ClientProfileTabProps) {
           <div className="space-y-2">
             <InfoRow
               label="Type client"
-              value={client.typeClient ? (TYPE_CLIENT_LABELS as any)[client.typeClient] || client.typeClient : null}
+              value={getLabel(TYPE_CLIENT_LABELS, client.typeClient)}
             />
             <InfoRow label="Profession" value={client.professionNom || client.professionAutreTexte} />
             <InfoRow label="Employeur" value={client.employeur} />
@@ -98,7 +104,7 @@ export default function ClientProfileTab({ client }: ClientProfileTabProps) {
             />
             <InfoRow
               label="Source des fonds"
-              value={client.sourceFonds ? (SOURCE_FONDS_LABELS as any)[client.sourceFonds] || client.sourceFonds : null}
+              value={getLabel(SOURCE_FONDS_LABELS, client.sourceFonds)}
             />
             <InfoRow
               label="Revenu mensuel"
@@ -125,14 +131,14 @@ export default function ClientProfileTab({ client }: ClientProfileTabProps) {
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {/* Agence de rattachement */}
-            {(client.agenceNom || (client as any).agence_nom) && (
+            {!!(client.agenceNom || (client as unknown as Record<string, unknown>).agence_nom) && (
               <div className="flex items-center gap-3 p-3 rounded-lg border border-edge-subtle bg-surface-subtle/30">
                 <div className="p-2 rounded-lg bg-status-info/10">
                   <Building2 size={14} className="text-status-info" />
                 </div>
                 <div>
                   <p className="text-[10px] text-content-muted uppercase">Agence de rattachement</p>
-                  <p className="text-sm font-medium text-content-primary">{client.agenceNom || (client as any).agence_nom}</p>
+                  <p className="text-sm font-medium text-content-primary">{client.agenceNom || String((client as unknown as Record<string, unknown>).agence_nom)}</p>
                 </div>
               </div>
             )}

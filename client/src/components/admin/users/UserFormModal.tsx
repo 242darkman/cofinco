@@ -158,7 +158,7 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
         nom: resolvedNames.nom,
         prenom: resolvedNames.prenom,
         email: initialData.email || '',
-        telephone: initialData.telephone || initialData.phone || '',
+        telephone: initialData.telephone || '',
         role: normalizeRoleValue(initialData.role),
         statut: initialData.statut || StatutUser.ACTIVE,
         photoProfile: initialData.photoProfile || ''

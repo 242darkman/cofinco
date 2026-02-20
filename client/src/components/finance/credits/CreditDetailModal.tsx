@@ -37,6 +37,7 @@ interface Credit {
   prochaineEcheance?: string;
   montantEcheance?: number;
   demandeId?: string;
+  totalDu?: string | number;
 }
 
 interface Client {
@@ -146,7 +147,7 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
       : montant;
     
     const soldeRestant = soldeRestantRaw;
-    const totalAvecInterets = montant * (1 + taux / 100);
+    const totalAvecInterets = parseMoney(credit.totalDu);
     const totalPaye = Math.max(0, totalAvecInterets - soldeRestant);
     const progression = totalAvecInterets > 0 ? ((totalPaye / totalAvecInterets) * 100) : 0;
 

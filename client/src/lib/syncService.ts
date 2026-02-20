@@ -35,6 +35,23 @@ import { getActiveKeyId } from './offline-crypto';
 import { getOrCreateFingerprint } from './device-fingerprint';
 import { updateOfflineLimits, markSessionSynced } from './offline-treasury';
 
+// ========== Service Worker Sync API extensions (not in standard TS lib) ==========
+
+interface SyncManager {
+  register(tag: string): Promise<void>;
+}
+
+interface PeriodicSyncManager {
+  register(tag: string, options?: { minInterval: number }): Promise<void>;
+  unregister(tag: string): Promise<void>;
+  getTags(): Promise<string[]>;
+}
+
+interface ServiceWorkerRegistrationWithSync {
+  readonly sync: SyncManager;
+  readonly periodicSync: PeriodicSyncManager;
+}
+
 // ========== TYPES ==========
 
 type SyncCallback = (stats: SyncStats) => void;
@@ -125,7 +142,7 @@ class SyncService {
     this.setupConnectivityListener();
     this.setupServiceWorkerListener();
     this.initializeStats();
-    console.log('[Sync Service] Service de synchronisation initialisé');
+    if (import.meta.env.DEV) console.log('[Sync Service] Service de synchronisation initialisé');
   }
 
   // ========== INITIALIZATION ==========
@@ -135,7 +152,7 @@ class SyncService {
       this.syncStats.backgroundSyncSupported = true;
     }
 
-    if ('serviceWorker' in navigator && 'periodicSync' in (await navigator.serviceWorker.ready as any)) {
+    if ('serviceWorker' in navigator && 'periodicSync' in (await navigator.serviceWorker.ready as unknown as ServiceWorkerRegistrationWithSync)) {
       this.syncStats.periodicSyncSupported = true;
     }
   }
@@ -144,13 +161,13 @@ class SyncService {
     networkManager.subscribe((state) => {
       const usable = state.status === 'online' || state.status === 'unstable';
       if (usable) {
-        console.log('[Sync Service] Connexion rétablie, démarrage de la synchronisation');
+        if (import.meta.env.DEV) console.log('[Sync Service] Connexion rétablie, démarrage de la synchronisation');
         this.currentRetryDelay = RETRY_DELAY_MS; // Reset retry delay
         this.scheduleSync(1000);
         // Also trigger journal sync when connectivity returns
         setTimeout(() => this.syncJournal().catch(() => {}), 2000);
       } else {
-        console.log('[Sync Service] Connexion perdue, synchronisation en pause');
+        if (import.meta.env.DEV) console.log('[Sync Service] Connexion perdue, synchronisation en pause');
         this.cancelScheduledSync();
       }
     });
@@ -163,12 +180,12 @@ class SyncService {
 
         switch (type) {
           case 'SYNC_COMPLETED':
-            console.log('[Sync Service] Opération synchronisée via SW:', payload);
+            if (import.meta.env.DEV) console.log('[Sync Service] Opération synchronisée via SW:', payload);
             this.refreshPendingCount();
             break;
 
           case 'PERIODIC_SYNC_TRIGGER':
-            console.log('[Sync Service] Sync périodique déclenché');
+            if (import.meta.env.DEV) console.log('[Sync Service] Sync périodique déclenché');
             this.sync({ useBackgroundSync: false });
             break;
 
@@ -210,14 +227,14 @@ class SyncService {
    */
   public async requestBackgroundSync(tag: string = BACKGROUND_SYNC_TAG): Promise<boolean> {
     if (!this.syncStats.backgroundSyncSupported) {
-      console.log('[Sync Service] Background sync non supporté');
+      if (import.meta.env.DEV) console.log('[Sync Service] Background sync non supporté');
       return false;
     }
 
     try {
       const registration = await navigator.serviceWorker.ready;
-      await (registration as any).sync.register(tag);
-      console.log('[Sync Service] Background sync demandé:', tag);
+      await (registration as unknown as ServiceWorkerRegistrationWithSync).sync.register(tag);
+      if (import.meta.env.DEV) console.log('[Sync Service] Background sync demandé:', tag);
       return true;
     } catch (error) {
       console.error('[Sync Service] Erreur background sync:', error);
@@ -230,13 +247,13 @@ class SyncService {
    */
   public async registerPeriodicSync(minInterval: number = 60 * 60 * 1000): Promise<boolean> {
     if (!this.syncStats.periodicSyncSupported) {
-      console.log('[Sync Service] Periodic sync non supporté');
+      if (import.meta.env.DEV) console.log('[Sync Service] Periodic sync non supporté');
       return false;
     }
 
     try {
       const registration = await navigator.serviceWorker.ready;
-      const periodicSync = (registration as any).periodicSync;
+      const periodicSync = (registration as unknown as ServiceWorkerRegistrationWithSync).periodicSync;
 
       // Check permission
       const status = await navigator.permissions.query({
@@ -245,7 +262,7 @@ class SyncService {
 
       if (status.state === 'granted') {
         await periodicSync.register(PERIODIC_SYNC_TAG, { minInterval });
-        console.log('[Sync Service] Periodic sync enregistré');
+        if (import.meta.env.DEV) console.log('[Sync Service] Periodic sync enregistré');
         return true;
       }
     } catch (error) {
@@ -258,12 +275,12 @@ class SyncService {
 
   public async sync(options: SyncOptions = {}): Promise<SyncStats> {
     if (this.isSyncing) {
-      console.log('[Sync Service] Synchronisation déjà en cours');
+      if (import.meta.env.DEV) console.log('[Sync Service] Synchronisation déjà en cours');
       return this.syncStats;
     }
 
     if (!isNetworkUsable()) {
-      console.log('[Sync Service] Hors ligne, synchronisation reportée');
+      if (import.meta.env.DEV) console.log('[Sync Service] Hors ligne, synchronisation reportée');
 
       // Try background sync if supported
       if (options.useBackgroundSync !== false && this.syncStats.backgroundSyncSupported) {
@@ -280,7 +297,7 @@ class SyncService {
     this.syncStats.conflicts = 0;
     this.notifyCallbacks();
 
-    console.log('[Sync Service] Démarrage de la synchronisation...', options);
+    if (import.meta.env.DEV) console.log('[Sync Service] Démarrage de la synchronisation...', options);
 
     try {
       const operations = await getPendingOperations({
@@ -302,16 +319,16 @@ class SyncService {
       this.syncStats.totalPending = filteredOps.length;
 
       if (filteredOps.length === 0) {
-        console.log('[Sync Service] Aucune opération en attente');
+        if (import.meta.env.DEV) console.log('[Sync Service] Aucune opération en attente');
         return this.finishSync();
       }
 
-      console.log(`[Sync Service] ${filteredOps.length} opération(s) à synchroniser`);
+      if (import.meta.env.DEV) console.log(`[Sync Service] ${filteredOps.length} opération(s) à synchroniser`);
 
       // Process in batches
       for (let i = 0; i < filteredOps.length; i += BATCH_SIZE) {
         if (!isNetworkUsable()) {
-          console.log('[Sync Service] Connexion perdue pendant la synchronisation');
+          if (import.meta.env.DEV) console.log('[Sync Service] Connexion perdue pendant la synchronisation');
           break;
         }
 
@@ -355,7 +372,7 @@ class SyncService {
     });
 
     if (operation.retryCount >= operation.maxRetries) {
-      console.log(`[Sync Service] Opération ${operation.uuid} a atteint le max de tentatives`);
+      if (import.meta.env.DEV) console.log(`[Sync Service] Opération ${operation.uuid} a atteint le max de tentatives`);
       await updateOperationStatus(operation.uuid, 'failed', 'Nombre maximum de tentatives atteint');
       this.syncStats.failed++;
       return;
@@ -380,12 +397,12 @@ class SyncService {
       const responseData = await response.json().catch(() => null);
 
       if (response.ok) {
-        console.log(`[Sync Service] Opération ${operation.uuid} synchronisée avec succès`);
+        if (import.meta.env.DEV) console.log(`[Sync Service] Opération ${operation.uuid} synchronisée avec succès`);
         await updateOperationStatus(operation.uuid, 'completed', undefined, JSON.stringify(responseData));
         this.syncStats.synced++;
       } else if (response.status === 409) {
         // Conflict
-        console.log(`[Sync Service] Conflit détecté pour ${operation.uuid}`);
+        if (import.meta.env.DEV) console.log(`[Sync Service] Conflit détecté pour ${operation.uuid}`);
         await updateOperationStatus(operation.uuid, 'conflict', 'Conflit de données');
         await addConflict(
           operation.uuid,
@@ -405,18 +422,18 @@ class SyncService {
           serverData: responseData
         });
       } else if (response.status === 401 || response.status === 403) {
-        console.log(`[Sync Service] Session expirée pour ${operation.uuid}`);
+        if (import.meta.env.DEV) console.log(`[Sync Service] Session expirée pour ${operation.uuid}`);
         await updateOperationStatus(operation.uuid, 'failed', 'Session expirée - reconnexion requise');
         this.syncStats.failed++;
       } else if (response.status === 422 || response.status === 400) {
         // Validation error - don't retry
         const errorMsg = responseData?.message || `Erreur de validation`;
-        console.log(`[Sync Service] Erreur de validation ${operation.uuid}: ${errorMsg}`);
+        if (import.meta.env.DEV) console.log(`[Sync Service] Erreur de validation ${operation.uuid}: ${errorMsg}`);
         await updateOperationStatus(operation.uuid, 'failed', errorMsg, JSON.stringify(responseData));
         this.syncStats.failed++;
       } else {
         const errorMsg = responseData?.message || `Erreur HTTP ${response.status}`;
-        console.log(`[Sync Service] Échec opération ${operation.uuid}: ${errorMsg}`);
+        if (import.meta.env.DEV) console.log(`[Sync Service] Échec opération ${operation.uuid}: ${errorMsg}`);
         await updateOperationStatus(operation.uuid, 'pending', errorMsg);
         this.syncStats.failed++;
       }
@@ -436,15 +453,17 @@ class SyncService {
     // Clear progress
     this.notifyProgress({ current: 0, total: 0 });
 
-    console.log('[Sync Service] Synchronisation terminée:', {
-      synced: this.syncStats.synced,
-      failed: this.syncStats.failed,
-      conflicts: this.syncStats.conflicts
-    });
+    if (import.meta.env.DEV) {
+      console.log('[Sync Service] Synchronisation terminée:', {
+        synced: this.syncStats.synced,
+        failed: this.syncStats.failed,
+        conflicts: this.syncStats.conflicts
+      });
+    }
 
     // Schedule retry with exponential backoff
     if (this.syncStats.failed > 0 && isNetworkUsable()) {
-      console.log('[Sync Service] Programmation nouvelle tentative dans', this.currentRetryDelay, 'ms');
+      if (import.meta.env.DEV) console.log('[Sync Service] Programmation nouvelle tentative dans', this.currentRetryDelay, 'ms');
       this.scheduleSync(this.currentRetryDelay);
       this.currentRetryDelay = Math.min(this.currentRetryDelay * 2, MAX_RETRY_DELAY_MS);
     } else {
@@ -636,12 +655,12 @@ class SyncService {
     options?: { limit?: number }
   ): Promise<{ totalChanges: number; byEntity: Record<string, number> }> {
     if (this.isPulling) {
-      console.log('[Sync Service] Pull already in progress');
+      if (import.meta.env.DEV) console.log('[Sync Service] Pull already in progress');
       return { totalChanges: 0, byEntity: {} };
     }
 
     if (!isNetworkUsable()) {
-      console.log('[Sync Service] Offline, pull skipped');
+      if (import.meta.env.DEV) console.log('[Sync Service] Offline, pull skipped');
       return { totalChanges: 0, byEntity: {} };
     }
 
@@ -691,7 +710,7 @@ class SyncService {
       // Persist cursors
       await this.savePullCursors();
 
-      console.log(`[Sync Service] Pull complete: ${totalChanges} changes across ${entities.length} entities`);
+      if (import.meta.env.DEV) console.log(`[Sync Service] Pull complete: ${totalChanges} changes across ${entities.length} entities`);
 
       // If any entity has more data, schedule another pull
       const hasMore = Object.values(data.hasMore || {}).some(Boolean);
@@ -757,12 +776,12 @@ class SyncService {
    */
   public async syncJournal(): Promise<JournalSyncStats> {
     if (this.isJournalSyncing) {
-      console.log('[Sync Service] Journal sync already in progress');
+      if (import.meta.env.DEV) console.log('[Sync Service] Journal sync already in progress');
       return { phase: 'idle', uploaded: 0, confirmed: 0, rejected: 0, conflicts: 0, error: null };
     }
 
     if (!isNetworkUsable()) {
-      console.log('[Sync Service] Offline, journal sync skipped');
+      if (import.meta.env.DEV) console.log('[Sync Service] Offline, journal sync skipped');
       return { phase: 'idle', uploaded: 0, confirmed: 0, rejected: 0, conflicts: 0, error: null };
     }
 
@@ -802,7 +821,7 @@ class SyncService {
 
       const unsyncedEntries = await getUnsyncedEntries();
       if (unsyncedEntries.length > 0) {
-        console.log(`[Sync Service] Journal: ${unsyncedEntries.length} entries to upload`);
+        if (import.meta.env.DEV) console.log(`[Sync Service] Journal: ${unsyncedEntries.length} entries to upload`);
 
         // Process in batches of 10
         for (let i = 0; i < unsyncedEntries.length; i += JOURNAL_BATCH_SIZE) {
@@ -863,12 +882,14 @@ class SyncService {
       stats.phase = 'done';
       this.notifyJournalCallbacks(stats);
 
-      console.log('[Sync Service] Journal sync complete:', {
-        uploaded: stats.uploaded,
-        confirmed: stats.confirmed,
-        rejected: stats.rejected,
-        conflicts: stats.conflicts,
-      });
+      if (import.meta.env.DEV) {
+        console.log('[Sync Service] Journal sync complete:', {
+          uploaded: stats.uploaded,
+          confirmed: stats.confirmed,
+          rejected: stats.rejected,
+          conflicts: stats.conflicts,
+        });
+      }
 
       return stats;
     } catch (error: any) {
@@ -1100,7 +1121,13 @@ class SyncService {
     confirmed: number;
     rejected: number;
   }> {
-    return getJournalStats();
+    const stats = await getJournalStats();
+    return {
+      pending: stats.local,
+      syncing: stats.syncing,
+      confirmed: stats.confirmed,
+      rejected: stats.rejected,
+    };
   }
 
   /**

@@ -102,12 +102,12 @@ export default function PlatformSidebarContent({
     // Real-time Updates Listener
     const handleMaintenanceUpdate = (event: CustomEvent) => {
         const { moduleName, isLocked, isPlatform } = event.detail;
-        console.log('[Sidebar] Maintenance update received:', { moduleName, isLocked, isPlatform });
-        
+        if (import.meta.env.DEV) console.log('[Sidebar] Maintenance update received:', { moduleName, isLocked, isPlatform });
+
         setLockedModules(prev => {
             const next = new Set(prev);
-            console.log('[Sidebar] Previous locked:', Array.from(prev));
-            
+            if (import.meta.env.DEV) console.log('[Sidebar] Previous locked:', Array.from(prev));
+
             if (isPlatform) {
                  if (isLocked) next.add('PLATFORM');
                  else next.delete('PLATFORM');
@@ -115,13 +115,13 @@ export default function PlatformSidebarContent({
                  const name = String(moduleName);
                  if (isLocked) {
                      next.add(name);
-                     console.log(`[Sidebar] Locking ${name}`);
+                     if (import.meta.env.DEV) console.log(`[Sidebar] Locking ${name}`);
                  } else {
                      const deleted = next.delete(name);
-                     console.log(`[Sidebar] Unlocking ${name}, found=${deleted}`);
+                     if (import.meta.env.DEV) console.log(`[Sidebar] Unlocking ${name}, found=${deleted}`);
                  }
             }
-            console.log('[Sidebar] Next locked:', Array.from(next));
+            if (import.meta.env.DEV) console.log('[Sidebar] Next locked:', Array.from(next));
             return next;
         });
     };

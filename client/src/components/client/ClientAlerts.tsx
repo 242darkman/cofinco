@@ -370,7 +370,7 @@ export default function ClientAlerts({ client, onUpdate, onNavigateToTab }: Clie
             </div>
             <p className="text-status-danger font-bold text-lg">Erreur de chargement</p>
             <p className="text-content-muted text-sm mb-3">Impossible de recuperer les alertes du client.</p>
-            <Button variant="outline" size="sm" onClick={fetchAlerts}>
+            <Button variant="outline" size="sm" onClick={() => fetchAlerts()}>
               <RotateCcw size={14} />
               Reessayer
             </Button>

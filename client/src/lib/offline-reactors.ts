@@ -352,7 +352,7 @@ export function initOfflineReactors(deps?: {
   unsubscribers.push(registerAuditReactor());
 
   initialized = true;
-  console.log('[OfflineReactors] Initialized with', unsubscribers.length, 'reactors');
+  if (import.meta.env.DEV) console.log('[OfflineReactors] Initialized with', unsubscribers.length, 'reactors');
 }
 
 /**
@@ -376,7 +376,7 @@ export function teardownOfflineReactors(): void {
   context.queryClient = null;
   context.showToast = null;
   context.syncService = null;
-  console.log('[OfflineReactors] Torn down');
+  if (import.meta.env.DEV) console.log('[OfflineReactors] Torn down');
 }
 
 /**

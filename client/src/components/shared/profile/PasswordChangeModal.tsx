@@ -35,7 +35,7 @@ export default function PasswordChangeModal({
             <input
               type="password"
               value={passwordData.currentPassword}
-              onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value as any })}
+              onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
               className="w-full px-4 py-3 bg-surface-elevated/50 border border-edge-strong rounded-xl text-content-primary focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all duration-200"
               placeholder="Votre mot de passe actuel"
               data-testid="input-current-password"
@@ -49,7 +49,7 @@ export default function PasswordChangeModal({
             <input
               type="password"
               value={passwordData.newPassword}
-              onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value as any })}
+              onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
               className="w-full px-4 py-3 bg-surface-elevated/50 border border-edge-strong rounded-xl text-content-primary focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all duration-200"
               placeholder="Minimum 8 caractères"
               data-testid="input-new-password"
@@ -63,7 +63,7 @@ export default function PasswordChangeModal({
             <input
               type="password"
               value={passwordData.confirmPassword}
-              onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value as any })}
+              onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
               className="w-full px-4 py-3 bg-surface-elevated/50 border border-edge-strong rounded-xl text-content-primary focus:border-accent focus:ring-1 focus:ring-accent outline-none transition-all duration-200"
               placeholder="Retapez le nouveau mot de passe"
               data-testid="input-confirm-password"

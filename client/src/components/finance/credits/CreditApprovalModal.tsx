@@ -48,10 +48,10 @@ interface Demande {
     nom: string;
     prenom?: string;
     email?: string;
-    phone: string;
+    telephone: string;
     tauxRemboursement?: number;
     creditTotal?: number;
-    photoUrl?: string;
+    photoProfile?: string;
   };
   deletedAt?: string | null;
 }
@@ -326,7 +326,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
     return `/api/storage/files/${encodeURIComponent(photoUrl)}`;
   };
 
-  const clientAvatarUrl = useMemo(() => getAvatarUrl(demande.clients.photoUrl), [demande.clients.photoUrl]);
+  const clientAvatarUrl = useMemo(() => getAvatarUrl(demande.clients.photoProfile), [demande.clients.photoProfile]);
 
   const addGuarantee = useCallback(() => {
     setGuarantees(prev => [...prev, { typeGarantie: 'Hypothèque', description: '', valeurEstimee: '' }]);
@@ -654,7 +654,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                                 <Mail size={12} /> {demande.clients.email || 'Pas d\'email'}
                             </div>
                             <div className="flex items-center gap-2 text-xs text-content-muted mt-1">
-                                <Phone size={12} /> {demande.clients.phone || 'Pas de téléphone'}
+                                <Phone size={12} /> {demande.clients.telephone || 'Pas de téléphone'}
                             </div>
                             
                             <div className="mt-4 pt-4 border-t border-edge grid grid-cols-2 gap-2 text-center">

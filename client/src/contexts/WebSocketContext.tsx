@@ -101,7 +101,17 @@ type MessageType =
   // =============================================
   // MIGRATION D'AGENCE
   // =============================================
-  | "MIGRATION_PROGRESS" | "MIGRATION_STATUS";
+  | "MIGRATION_PROGRESS" | "MIGRATION_STATUS"
+
+  // =============================================
+  // CONFIGURATION & BRANDING
+  // =============================================
+  | "BRANDING_CHANGED" | "PRESETS_CHANGED" | "CURRENCY_CHANGED"
+
+  // =============================================
+  // CAISSE REQUESTS
+  // =============================================
+  | "CAISSE_REQUEST_CREATED" | "CAISSE_REQUEST_COMPLETED" | "CAISSE_REQUEST_CANCELLED";
 
 interface WebSocketMessage {
   type: MessageType;
@@ -216,7 +226,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
     ws.onopen = () => {
       // Don't update state if socket was already closed (StrictMode cleanup race)
       if (wsRef.current !== ws || intentionallyClosed) return;
-      console.log("WebSocket Connected");
+      if (import.meta.env.DEV) console.log("[WS] Connected");
       setIsConnected(true);
       setSocket(ws);
 
@@ -226,7 +236,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
       // Flush buffered messages
       const buffer = loadBuffer();
       if (buffer.length > 0) {
-        console.log(`[WS] Flushing ${buffer.length} buffered messages`);
+        if (import.meta.env.DEV) console.log(`[WS] Flushing ${buffer.length} buffered messages`);
         buffer.forEach((msg) => {
           if (msg.retries < MAX_RETRIES) {
             try {
@@ -255,8 +265,8 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
       // Don't log or reconnect if this was an intentional close (StrictMode cleanup)
       if (intentionallyClosed) return;
 
-      if (isConnected) {
-         console.log("WebSocket Disconnected");
+      if (isConnected && import.meta.env.DEV) {
+         console.log("[WS] Disconnected");
       }
       setIsConnected(false);
       setSocket(null);
@@ -270,7 +280,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
             BASE_RECONNECT_DELAY * Math.pow(2, reconnectAttemptsRef.current - 1),
             MAX_RECONNECT_DELAY
           );
-          console.log(`[WS] Reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current}/${MAX_RECONNECT_ATTEMPTS})`);
+          if (import.meta.env.DEV) console.log(`[WS] Reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current}/${MAX_RECONNECT_ATTEMPTS})`);
           reconnectTimeoutRef.current = setTimeout(() => connect(), delay);
       } else if (reconnectAttemptsRef.current >= MAX_RECONNECT_ATTEMPTS) {
           console.warn('[WS] Max reconnect attempts reached. Please refresh the page.');
@@ -451,7 +461,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
         const { users: initialOnlineUsers } = message.payload;
         if (Array.isArray(initialOnlineUsers)) {
           setOnlineUsers(new Set(initialOnlineUsers));
-          console.log(`[WS] Received initial online users list: ${initialOnlineUsers.length} users online`);
+          if (import.meta.env.DEV) console.log(`[WS] Received initial online users list: ${initialOnlineUsers.length} users online`);
         }
         break;
 
@@ -795,7 +805,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
       case "SUBSCRIBED":
       case "UNSUBSCRIBED":
          // Acknowledgment messages - can be logged for debugging
-         console.log(`[WS] ${message.type}:`, message.payload?.aggregate || message);
+         if (import.meta.env.DEV) console.log(`[WS] ${message.type}:`, message.payload?.aggregate || message);
          break;
 
       case "MAINTENANCE_UPDATE":
@@ -874,7 +884,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
 
          // Idempotence check: ignore duplicate events
          if (eventId && processedEventIds.has(eventId)) {
-           console.log(`[WS] Ignoring duplicate BALANCE_UPDATED event: ${eventId}`);
+           if (import.meta.env.DEV) console.log(`[WS] Ignoring duplicate BALANCE_UPDATED event: ${eventId}`);
            break;
          }
 
@@ -1054,7 +1064,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
         saveBuffer(newBuffer);
         return newBuffer;
       });
-      console.log(`[WS] Message buffered (offline): ${type}`);
+      if (import.meta.env.DEV) console.log(`[WS] Message buffered (offline): ${type}`);
     }
   }, []);
 

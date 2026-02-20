@@ -21,7 +21,7 @@ export interface PendingAccount {
     id: string;
     nom: string;
     prenom: string;
-    photoUrl?: string;
+    photoProfile?: string;
   };
 }
 
@@ -225,9 +225,9 @@ export function PendingActivationDrawer({ open, onClose, sessionId, onActivate }
                            </button>
 
                            <div className="w-10 h-10 rounded-full bg-surface flex items-center justify-center overflow-hidden border border-edge">
-                              {resolveClientPhotoUrl(account.client.photoUrl) && !imageErrors[account.id] ? (
+                              {resolveClientPhotoUrl(account.client.photoProfile) && !imageErrors[account.id] ? (
                                  <img
-                                   src={resolveClientPhotoUrl(account.client.photoUrl)}
+                                   src={resolveClientPhotoUrl(account.client.photoProfile)}
                                    alt="Client"
                                    className="w-full h-full object-cover"
                                    onError={() => handleImageError(account.id)}

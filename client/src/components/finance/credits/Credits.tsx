@@ -423,7 +423,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
   const renderClientName = (item: any) => {
     const client = item.clients || item.client;
     const name = formatClientName(client?.nom, client?.prenom) || 'Client Inconnu';
-    const photoUrl = resolveClientPhotoUrl(client?.photoUrl || client?.photoProfile);
+    const photoUrl = resolveClientPhotoUrl(client?.photoProfile);
     const initials = ((client?.prenom?.[0] || '') + (client?.nom?.[0] || 'C')).toUpperCase();
 
     return (
@@ -448,9 +448,9 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
           <span className="font-medium truncate text-content-secondary group-hover:text-content-primary transition-colors">
             {name}
           </span>
-          {client?.phone && (
+          {client?.telephone && (
             <span className="text-[10px] text-content-muted font-mono truncate">
-              {client.phone}
+              {client.telephone}
             </span>
           )}
         </div>
@@ -1187,14 +1187,13 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
       )}
 
       {showRequestForm && (
-        <CreditRequestForm 
+        <CreditRequestForm
           onClose={() => setShowRequestForm(false)}
           onSuccess={() => {
             setShowRequestForm(false);
-            demandes.fetchDemandes(); 
+            demandes.fetchDemandes();
             toast.success('Demande créée');
           }}
-          userRole={userRole}
         />
       )}
 

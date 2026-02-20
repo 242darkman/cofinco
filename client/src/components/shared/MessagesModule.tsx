@@ -42,6 +42,19 @@ const MESSAGE_EMOJIS = [
   '📱', '💻', '🖥️', '📷', '🔔', '📣', '💬', '💭', '🗨️', '📝', '📋', '📌', '📎', '🔗', '💼', '📁', '📂', '🗂️', '📊', '📈', '📉',
 ];
 
+/** Shape of message metadata for file/image messages */
+interface MessageMetadata {
+  url?: string;
+  filename?: string;
+  mimeType?: string;
+  size?: number;
+}
+
+/** Safely extract typed metadata from a MessageV2 */
+function getMetadata(msg: MessageV2): MessageMetadata {
+  return (msg.metadata || {}) as MessageMetadata;
+}
+
 interface MessagesModuleProps {
   initialConversationId?: string;
   initialChatUserId?: string;
@@ -593,15 +606,15 @@ export default function MessagesModule({ initialConversationId, initialChatUserI
                                 )}
                                 <div
                                   className="relative cursor-pointer overflow-hidden rounded-2xl border border-edge/40 shadow-sm hover:shadow-md transition-shadow"
-                                  onClick={() => setPreviewFile({
-                                    url: resolveStorageUrl((msg.metadata as any)?.url || msg.content || ''),
-                                    name: (msg.metadata as any)?.filename || 'Image',
-                                    mimeType: (msg.metadata as any)?.mimeType || 'image/jpeg',
-                                  })}
+                                  onClick={() => { const meta = getMetadata(msg); setPreviewFile({
+                                    url: resolveStorageUrl(meta.url || msg.content || ''),
+                                    name: meta.filename || 'Image',
+                                    mimeType: meta.mimeType || 'image/jpeg',
+                                  }); }}
                                 >
                                   <img
-                                    src={resolveStorageUrl((msg.metadata as any)?.url || msg.content || '')}
-                                    alt={(msg.metadata as any)?.filename || 'Image'}
+                                    src={resolveStorageUrl(getMetadata(msg).url || msg.content || '')}
+                                    alt={getMetadata(msg).filename || 'Image'}
                                     className="max-w-[280px] sm:max-w-[320px] rounded-2xl object-cover"
                                   />
                                   {/* Time overlay on image */}
@@ -637,11 +650,11 @@ export default function MessagesModule({ initialConversationId, initialChatUserI
                                   </p>
                                 )}
                                 <button
-                                  onClick={() => setPreviewFile({
-                                    url: resolveStorageUrl((msg.metadata as any)?.url || msg.content || ''),
-                                    name: (msg.metadata as any)?.filename || 'Fichier',
-                                    mimeType: (msg.metadata as any)?.mimeType,
-                                  })}
+                                  onClick={() => { const meta = getMetadata(msg); setPreviewFile({
+                                    url: resolveStorageUrl(meta.url || msg.content || ''),
+                                    name: meta.filename || 'Fichier',
+                                    mimeType: meta.mimeType,
+                                  }); }}
                                   className={`flex items-center gap-3 p-3 rounded-2xl border transition-colors w-full text-left ${
                                     isMe
                                       ? 'bg-status-info/90 border-status-info/30 hover:bg-status-info'
@@ -653,10 +666,10 @@ export default function MessagesModule({ initialConversationId, initialChatUserI
                                   </div>
                                   <div className="flex-1 min-w-0">
                                     <p className={`text-sm font-medium truncate ${isMe ? 'text-white' : 'text-content-primary'}`}>
-                                      {(msg.metadata as any)?.filename || 'Fichier'}
+                                      {getMetadata(msg).filename || 'Fichier'}
                                     </p>
                                     <p className={`text-[11px] ${isMe ? 'text-white/60' : 'text-content-muted'}`}>
-                                      {(msg.metadata as any)?.size ? `${((msg.metadata as any).size / 1024).toFixed(0)} Ko` : 'Fichier'}
+                                      {getMetadata(msg).size ? `${(getMetadata(msg).size! / 1024).toFixed(0)} Ko` : 'Fichier'}
                                       {' · '}{new Date(msg.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                                       {isMe && (isMessageRead(msg) ? ' ✓✓' : ' ✓')}
                                     </p>
@@ -911,12 +924,12 @@ export default function MessagesModule({ initialConversationId, initialChatUserI
             {groupParticipants.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-3">
                 {groupParticipants.map((pid) => {
-                  const user = (groupSearchResults || []).find((u: any) => u.id === pid) || conversations
+                  const user: { nom?: string } | undefined = (groupSearchResults || []).find((u) => u.id === pid) || conversations
                     .flatMap((c) => c.participants)
                     .find((p) => p.id === pid);
                   return (
                     <span key={pid} className="px-2 py-1 bg-accent/30 text-accent rounded-lg text-xs flex items-center gap-1">
-                      {(user as any)?.nom || pid.slice(0, 8)}
+                      {user?.nom || pid.slice(0, 8)}
                       <button onClick={() => setGroupParticipants((prev) => prev.filter((id) => id !== pid))} className="hover:text-content-primary">
                         <X size={12} />
                       </button>

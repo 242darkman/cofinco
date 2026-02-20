@@ -45,7 +45,7 @@ function formatBirthPlace(client: ClientWithIdentity): string | null {
 }
 
 export default function ClientIdentityCard({ client, onEdit, onDelete }: ClientIdentityCardProps) {
-  const photoUrl = resolveStorageUrl(client.photoProfile || (client as any).photoUrl || '');
+  const photoUrl = resolveStorageUrl(client.photoProfile || '');
   const age = getAge(client.dateNaissance);
 
   return (

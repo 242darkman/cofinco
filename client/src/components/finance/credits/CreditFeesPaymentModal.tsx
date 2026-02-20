@@ -106,7 +106,7 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
   // Auto-fill phone number when selecting Mobile Money
   useEffect(() => {
     if (isMobileMoney && !phoneNumber) {
-      const clientPhone = demande.clients?.phone || demande.clients?.telephone || '';
+      const clientPhone = demande.clients?.telephone || '';
       if (clientPhone) {
         setPhoneNumber(clientPhone.replace(/\D/g, ''));
       }
@@ -934,7 +934,7 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
             client: demande.clients ? {
               nom: demande.clients.nom || '',
               prenom: demande.clients.prenom || '',
-              telephone: demande.clients.phone || demande.clients.telephone,
+              telephone: demande.clients.telephone,
             } : undefined,
             items: [{
               description: `Frais d'engagement - Demande de crédit N° ${demande.numeroDemande}`,

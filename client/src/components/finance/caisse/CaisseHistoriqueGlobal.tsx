@@ -137,7 +137,7 @@ export default function CaisseHistoriqueGlobal({
         description: op.description,
         client: op.clientNom ? {
           name: `${op.clientNom} ${op.clientPrenom || ''}`.trim(),
-          phone: op.clientTelephone || undefined
+          telephone: op.clientTelephone || undefined
         } : undefined,
         agent: op.caissierNom || undefined,
         mode_paiement: op.modePaiement,

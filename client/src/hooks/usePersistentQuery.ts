@@ -69,7 +69,7 @@ export function usePersistentQuery<TData, TError = Error>(
         if (!skipPersist && isNetworkError(error)) {
           const cached = await getCachedQuery<TData>(cacheKey);
           if (cached) {
-            console.log('[PersistentQuery] Returning cached data due to network error');
+            if (import.meta.env.DEV) console.log('[PersistentQuery] Returning cached data due to network error');
             return cached;
           }
         }

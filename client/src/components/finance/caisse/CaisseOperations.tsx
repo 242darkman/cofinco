@@ -211,7 +211,7 @@ export default function CaisseOperations({ sessionId, onTransactionComplete }: C
   // ── Auto-fill phone from client ──
   useEffect(() => {
     if (selectedClient) {
-      setPhoneNumber(selectedClient.telephone || selectedClient.phone || '');
+      setPhoneNumber(selectedClient.telephone || '');
     }
   }, [selectedClient]);
 
@@ -505,7 +505,7 @@ export default function CaisseOperations({ sessionId, onTransactionComplete }: C
           client_info: {
             nom: selectedClient!.nom,
             prenom: selectedClient!.prenom,
-            telephone: selectedClient!.telephone || selectedClient!.phone
+            telephone: selectedClient!.telephone
           }
         }
       };
@@ -726,7 +726,7 @@ export default function CaisseOperations({ sessionId, onTransactionComplete }: C
       client: {
         nom: lastOperationData.client?.nom || '',
         prenom: lastOperationData.client?.prenom || '',
-        telephone: lastOperationData.client?.telephone || lastOperationData.client?.phone || '',
+        telephone: lastOperationData.client?.telephone || '',
         numeroCompte: lastOperationData.client?.numeroCompte
       },
       agent: { nom: user?.nom || 'Agent', prenom: user?.prenom || '', id: user?.id },
@@ -1029,7 +1029,7 @@ export default function CaisseOperations({ sessionId, onTransactionComplete }: C
                           key={p.id}
                           onClick={() => {
                             setMoyenPaiement(p.id);
-                            if (selectedClient) setPhoneNumber(selectedClient.telephone || selectedClient.phone || '');
+                            if (selectedClient) setPhoneNumber(selectedClient.telephone || '');
                           }}
                           className={`flex-1 flex items-center justify-center gap-2 px-3 py-3 rounded-xl border-2 transition-all ${
                             moyenPaiement === p.id
@@ -1187,11 +1187,11 @@ export default function CaisseOperations({ sessionId, onTransactionComplete }: C
                       <div className="bg-accent/5 border border-accent/20 rounded-xl p-3 space-y-1.5 animate-in fade-in">
                         <div className="flex justify-between text-xs">
                           <span className="text-content-muted">Montant opération</span>
-                          <span className="text-content-primary font-medium">{Number(montant).toLocaleString()} {currencySymbol}</span>
+                          <span className="text-content-primary font-medium">{Number(montant).toLocaleString()} {currencySymbol()}</span>
                         </div>
                         <div className="flex justify-between text-xs">
                           <span className="text-content-muted">Frais {moyenPaiement} ({feeEstimate.feeRate}%)</span>
-                          <span className="text-status-warning font-medium">{feeEstimate.feeAmount.toLocaleString()} {currencySymbol}</span>
+                          <span className="text-status-warning font-medium">{feeEstimate.feeAmount.toLocaleString()} {currencySymbol()}</span>
                         </div>
                         <div className="flex justify-between text-xs pt-1.5 border-t border-accent/20">
                           <span className="text-content-muted font-semibold">
@@ -1200,7 +1200,7 @@ export default function CaisseOperations({ sessionId, onTransactionComplete }: C
                               : (feeOption === 'CLIENT_PAYS' ? 'Débité du compte' : 'Reçu au téléphone')}
                           </span>
                           <span className="text-content-primary font-bold">
-                            {(feeOption === 'CLIENT_PAYS' ? feeEstimate.montantBrut : feeEstimate.montantNet).toLocaleString()} {currencySymbol}
+                            {(feeOption === 'CLIENT_PAYS' ? feeEstimate.montantBrut : feeEstimate.montantNet).toLocaleString()} {currencySymbol()}
                           </span>
                         </div>
                       </div>
@@ -1340,7 +1340,7 @@ export default function CaisseOperations({ sessionId, onTransactionComplete }: C
           onClose={() => setShowPhysicalConfirmation(false)}
           onConfirm={validerOperationAvecConfirmation}
           clientName={`${selectedClient.nom} ${selectedClient.prenom || ''}`}
-          clientPhone={selectedClient.telephone || selectedClient.phone}
+          clientPhone={selectedClient.telephone}
           operationType={typeRetrait || typeDepot || typeOperation || 'Opération'}
           amount={parseFloat(montant)}
           isLoading={loading}
@@ -1354,7 +1354,7 @@ export default function CaisseOperations({ sessionId, onTransactionComplete }: C
           onClose={() => setShowPresenceModal(false)}
           onConfirm={handlePresenceConfirm}
           clientName={`${selectedClient.nom} ${selectedClient.prenom}`}
-          clientPhone={selectedClient.telephone || selectedClient.phone}
+          clientPhone={selectedClient.telephone}
           operationType={typeOperation || 'Retrait'}
           amount={parseFloat(montant)}
           isLoading={loading}

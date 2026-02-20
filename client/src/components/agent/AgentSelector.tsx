@@ -11,7 +11,7 @@ interface Agent {
   zone_affectation?: string;
   zoneAffectation?: string; // Alias camelCase
   statut: string;
-  photoUrl?: string; // Alias camelCase
+  photoProfile?: string;
 }
 
 interface AgentSelectorProps {
@@ -46,7 +46,7 @@ export default function AgentSelector({
 
   // Resolve photo URL for storage
   const getPhotoUrl = (agent: Agent) => {
-    return resolveStorageUrl(agent.photoUrl);
+    return resolveStorageUrl(agent.photoProfile);
   };
 
   // Find selected agent

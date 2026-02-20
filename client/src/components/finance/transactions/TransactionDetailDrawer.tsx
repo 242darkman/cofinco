@@ -36,7 +36,7 @@ export interface TransactionDetails {
   date: string | Date;
   client?: {
     name: string;
-    phone?: string;
+    telephone?: string;
     accountNumber?: string;
   };
   // For transfers
@@ -299,8 +299,8 @@ const DrawerContent = React.memo(function DrawerContent({
               </h3>
               <div className="bg-surface-muted/50 rounded-xl p-4 space-y-3">
                 <DetailRow label="Nom" value={transaction.client.name} />
-                {transaction.client.phone && (
-                  <DetailRow label="Téléphone" value={transaction.client.phone} />
+                {transaction.client.telephone && (
+                  <DetailRow label="Téléphone" value={transaction.client.telephone} />
                 )}
                 <DetailRow
                   label="Compte"
@@ -425,7 +425,7 @@ export default function TransactionDetailDrawer({
       client: {
         nom: clientNom,
         prenom: clientPrenom,
-        telephone: transaction.client?.phone,
+        telephone: transaction.client?.telephone,
         numeroCompte: transaction.client?.accountNumber,
       },
       agent: {

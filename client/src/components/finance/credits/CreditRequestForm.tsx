@@ -5,7 +5,6 @@ import { SelectField, SearchableSelect } from '../../ui';
 import { formatClientName, resolveStorageUrl } from '../../../lib/format';
 import { toast } from '../../../lib/toast';
 import { StatutDemande, TypeCredit, TYPE_CREDIT_OPTIONS, normalizeDureeUnite, normalizeFrequenceRemboursement } from '@shared/enum/status-constants';
-import useSmartDuration from '../../../hooks/credits/useSmartDuration';
 import { useCurrency } from '../../../contexts/CurrencyContext';
 
 
@@ -17,7 +16,7 @@ interface Client {
   segment: string;
   tauxRemboursement: number;
   creditTotal: number;
-  photoUrl?: string;
+  photoProfile?: string;
   isEligible?: boolean;
   ineligibilityReason?: string;
   // Champs pour clients éligibles au crédit
@@ -87,25 +86,6 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId }: Cred
     [creditPlans, formData.credit_plan_id]
   );
   
-  // Smart Duration Hook
-  const { validateDuration } = useSmartDuration({
-    selectedPlan,
-    amount: parseFloat(formData.montant_demande) || 0,
-    frequence: formData.frequence_remboursement
-  });
-
-  // Duration Validation State
-  const durationValidation = useMemo(() => {
-    return validateDuration(
-      parseInt(formData.duree_valeur) || 0, 
-      formData.duree_unite
-    );
-  }, [validateDuration, formData.duree_valeur, formData.duree_unite]);
-
-  const RATE_BASE = 20;
-  const RATE_MIN = 10;
-  const RATE_MAX = 24;
-
   const [calculatedData, setCalculatedData] = useState({
     montantTotal: 0,
     montantEcheance: 0,
@@ -153,12 +133,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId }: Cred
   };
 
   const handleApplyPlan = (planId: string) => {
-    if (!planId) {
-      // Deselect plan — clear locked fields
-      setFormData(prev => ({ ...prev, credit_plan_id: '', montant_frais_engagement: '' }));
-      setSchedulePreview(null);
-      return;
-    }
+    if (!planId) return;
     const plan = creditPlans.find(p => p.id === planId);
     if (!plan) return;
 
@@ -216,13 +191,6 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId }: Cred
     }
   }, [convertirDureeEnJours]);
 
-  // Set default rate only if no plan selected and no rate set yet
-  useEffect(() => {
-    if (!selectedPlan && !formData.taux_interet) {
-      setFormData(prev => prev.taux_interet ? prev : { ...prev, taux_interet: String(RATE_BASE) });
-    }
-  }, [selectedPlan]);
-
   useEffect(() => {
     calculateLoan();
   }, [formData.montant_demande, formData.duree_valeur, formData.duree_unite, formData.taux_interet, formData.frequence_remboursement, formData.revenus_mensuels, formData.charges_mensuelles, schedulePreview]);
@@ -231,14 +199,14 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId }: Cred
   const fetchSchedulePreview = useCallback(async () => {
     const montant = parseFloat(formData.montant_demande);
     const dureeValeur = parseInt(formData.duree_valeur);
-    if (!montant || !dureeValeur || !formData.frequence_remboursement) return;
+    if (!montant || !dureeValeur || !formData.frequence_remboursement || !selectedPlan) return;
 
     setScheduleLoading(true);
     setScheduleError(null);
 
     try {
       const plan = selectedPlan;
-      const planConfig = plan ? {
+      const planConfig = {
         dureeValeur: plan.dureeValeur,
         dureeUnite: plan.dureeUnite,
         frequenceRemboursement: plan.frequenceRemboursement,
@@ -256,28 +224,9 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId }: Cred
         weekdaysMask: plan.weekdaysMask ?? 127,
         shiftNonWorkingDay: plan.shiftNonWorkingDay || 'NEXT',
         allowManualFirstDueDate: plan.allowManualFirstDueDate || false,
-      } : {
-        // Default plan config when no plan is selected
-        dureeValeur: dureeValeur,
-        dureeUnite: formData.duree_unite,
-        frequenceRemboursement: formData.frequence_remboursement,
-        tauxInteret: formData.taux_interet || '20',
-        interestMethod: 'FLAT',
-        interestRatePeriod: 'MONTHLY',
-        dayCountConvention: '30_360',
-        interestRoundingMode: 'ROUND',
-        interestRoundingUnit: 1,
-        amortizationType: 'EQUAL_INSTALLMENTS',
-        firstDueRule: 'NEXT_DAY',
-        gracePeriodDays: 0,
-        preferredWeekday: null,
-        calendarMode: 'ALL_DAYS',
-        weekdaysMask: 127,
-        shiftNonWorkingDay: 'NEXT',
-        allowManualFirstDueDate: false,
       };
 
-      const fees = plan?.fees?.filter((f: any) => f.isActive !== false).map((f: any) => ({
+      const fees = plan.fees?.filter((f: any) => f.isActive !== false).map((f: any) => ({
         feeType: f.feeType,
         label: f.label,
         calcType: f.calcType,
@@ -354,7 +303,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId }: Cred
         segment: c.segment || 'Standard',
         tauxRemboursement: parseFloat(c.tauxRemboursement) || 100,
         creditTotal: parseFloat(c.creditTotal) || 0,
-        photoUrl: c.photoUrl,
+        photoProfile: c.photoProfile,
         compteCourantId: c.compteCourantId,
         compteCourantNumero: c.compteCourantNumero,
         compteCourantSolde: parseFloat(c.compteCourantSolde) || 0,
@@ -445,12 +394,14 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId }: Cred
     const newErrors: Record<string, string> = {};
 
     if (!formData.client_id) newErrors.client_id = 'Client requis';
-    
+
     // Vérifier l'éligibilité avant de valider
     const client = clients.find(c => c.id === formData.client_id);
     if (client && client.isEligible === false) {
         newErrors.client_id = `Inéligible : ${client.ineligibilityReason}`;
     }
+
+    if (!formData.credit_plan_id) newErrors.credit_plan_id = 'Plan de crédit requis';
 
     if (!formData.montant_demande || parseFloat(formData.montant_demande) <= 0) {
       newErrors.montant_demande = 'Montant invalide';
@@ -458,7 +409,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId }: Cred
       const montant = parseFloat(formData.montant_demande);
       const min = selectedPlan.montantMin;
       const max = selectedPlan.montantMax;
-      
+
       if (min && montant < min) {
         newErrors.montant_demande = `Le montant minimum pour ce plan est de ${fmt(min)}`;
       }
@@ -475,15 +426,6 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId }: Cred
     if (!formData.objet_credit.trim()) newErrors.objet_credit = 'Objet requis';
     if (!formData.revenus_mensuels || parseFloat(formData.revenus_mensuels) <= 0) {
       newErrors.revenus_mensuels = 'Revenus requis';
-    }
-
-
-
-    if (!selectedPlan) {
-      const tauxValue = parseFloat(formData.taux_interet);
-      if (Number.isNaN(tauxValue) || tauxValue < RATE_MIN || tauxValue > RATE_MAX) {
-        newErrors.taux_interet = `Le taux doit être entre ${RATE_MIN}% et ${RATE_MAX}%`;
-      }
     }
 
     setErrors(newErrors);
@@ -507,10 +449,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId }: Cred
     try {
       const dureeValeur = parseInt(formData.duree_valeur, 10);
 
-      // Utiliser le taux du plan sélectionné s'il existe, sinon le taux saisi
-      const tauxFinal = selectedPlan
-        ? String(selectedPlan.tauxInteret)
-        : formData.taux_interet;
+      const tauxFinal = String(selectedPlan!.tauxInteret);
 
       // Nombre d'échéances depuis le preview (moteur de calcul) ou calcul local en fallback
       const nombreEcheances = schedulePreview?.summary?.numberOfInstallments
@@ -523,7 +462,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId }: Cred
 
       await demandeCreditApi.create({
         clientId: formData.client_id,
-        creditPlanId: formData.credit_plan_id || null,
+        creditPlanId: formData.credit_plan_id,
         montantDemande: formData.montant_demande,
         tauxInteret: tauxFinal,
         frequenceRemboursement: formData.frequence_remboursement,
@@ -601,12 +540,18 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId }: Cred
     value: client.id,
     label: client.nom,
     subLabel: `Remb: ${client.tauxRemboursement}%`,
-    image: getPhotoUrl(client.photoUrl),
+    image: getPhotoUrl(client.photoProfile),
     disabled: client.isEligible === false,
     disabledReason: client.ineligibilityReason
   })), [clients]);
 
 
+
+  const planOptions = useMemo(() => activePlans.map(p => ({
+    value: p.id,
+    label: p.nom,
+    subLabel: p.description || p.typeCredit,
+  })), [activePlans]);
 
   const typeCreditOptions = TYPE_CREDIT_OPTIONS;
 
@@ -652,6 +597,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId }: Cred
         if (clients.find(c => c.id === formData.client_id)?.isEligible === false) {
             newErrors.client_id = 'Client inéligible'; isValid = false;
         }
+        if (!formData.credit_plan_id) { newErrors.credit_plan_id = 'Plan de crédit requis'; isValid = false; }
         if (!formData.montant_demande || parseFloat(formData.montant_demande) <= 0) {
             newErrors.montant_demande = 'Montant requis'; isValid = false;
         } else if (selectedPlan) {
@@ -768,17 +714,19 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId }: Cred
                 <div className="grid grid-cols-2 gap-4">
                    <div className="space-y-1.5">
                       <label className="text-[10px] font-bold text-content-muted uppercase tracking-wider ml-1">Plan de Crédit</label>
-                      <SelectField
-                        label=""
-                        name="creditPlanId"
-                        value={formData.credit_plan_id}
-                        onChange={(e) => handleApplyPlan(e.target.value)}
-                        options={[
-                            { value: '', label: 'Standard (Aucun plan)' },
-                            ...activePlans.map(p => ({ value: p.id, label: p.nom }))
-                        ]}
-                        className="h-12 bg-surface-base border-edge text-content-primary focus:border-accent/50"
-                      />
+                      <div className="relative h-12 z-10">
+                        <SearchableSelect
+                          label=""
+                          name="credit_plan_id"
+                          value={formData.credit_plan_id}
+                          onChange={(value) => handleApplyPlan(String(value))}
+                          options={planOptions}
+                          required
+                          error={errors.credit_plan_id}
+                          placeholder="Rechercher un plan..."
+                          className="h-12 text-base"
+                        />
+                      </div>
                    </div>
                    <div className="space-y-1.5">
                       <label className="text-[10px] font-bold text-content-muted uppercase tracking-wider ml-1">Objet du financement</label>
@@ -834,7 +782,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId }: Cred
            {/* STEP 2: MODALITÉS */}
            {step === 2 && (
              <div className="space-y-6 animate-in slide-in-from-right-4 fade-in duration-300">
-                {/* Info bar when plan is selected */}
+                {/* Plan info bar */}
                 {selectedPlan && (
                   <div className="flex items-start gap-2 p-3 rounded-lg bg-status-info/5 border border-status-info/20">
                     <Info size={14} className="text-status-info mt-0.5 shrink-0" />
@@ -846,7 +794,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId }: Cred
                       {selectedPlan.amortizationType === 'EQUAL_INSTALLMENTS' ? 'Échéances constantes' :
                        selectedPlan.amortizationType === 'EQUAL_PRINCIPAL' ? 'Capital constant' :
                        'Ballon (intérêts puis capital)'}
-                      <span className="text-content-muted ml-1">(les champs ci-dessous sont imposés par le plan)</span>
+                      <span className="text-content-muted ml-1">(imposé par le plan)</span>
                     </div>
                   </div>
                 )}
@@ -860,8 +808,8 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId }: Cred
                          value={formData.type_credit}
                          onChange={(e) => setFormData({...formData, type_credit: e.target.value})}
                          options={typeCreditOptions}
-                         disabled={!!selectedPlan}
-                         className={`h-12 bg-surface-base border-edge text-content-primary ${selectedPlan ? 'opacity-60 cursor-not-allowed' : ''}`}
+                         disabled
+                         className="h-12 bg-surface-base border-edge text-content-primary opacity-60 cursor-not-allowed"
                       />
                    </div>
                    <div className="space-y-1.5">
@@ -872,8 +820,8 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId }: Cred
                          value={formData.frequence_remboursement}
                          onChange={(e) => setFormData({...formData, frequence_remboursement: e.target.value, duree_valeur: '', duree_unite: 'MONTH'})}
                          options={frequenceOptions}
-                         disabled={!!selectedPlan}
-                         className={`h-12 bg-surface-base border-edge text-content-primary ${selectedPlan ? 'opacity-60 cursor-not-allowed' : ''}`}
+                         disabled
+                         className="h-12 bg-surface-base border-edge text-content-primary opacity-60 cursor-not-allowed"
                          error={errors.frequence_remboursement}
                       />
                    </div>
@@ -881,64 +829,31 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId }: Cred
 
                 <div className="space-y-2">
                    <label className="text-[10px] font-bold text-content-muted uppercase tracking-wider ml-1">Durée du crédit</label>
-                   {formData.frequence_remboursement ? (
-                       <>
-                        <div className="flex gap-2 h-14">
-                            <input
-                                inputMode="numeric"
-                                pattern="[0-9]*"
-                                className={`flex-1 h-full bg-surface-base border border-edge rounded-xl px-4 text-xl font-bold text-content-primary focus:border-accent outline-none ${selectedPlan ? 'opacity-60 cursor-not-allowed' : ''}`}
-                                value={formData.duree_valeur}
-                                onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormData({...formData, duree_valeur: v}); }}
-                                placeholder="0"
-                                readOnly={!!selectedPlan}
-                            />
-                            <div className="w-40 h-full">
-                                <SelectField
-                                    label=""
-                                    name="duree_unite"
-                                    value={formData.duree_unite}
-                                    onChange={(e) => setFormData({...formData, duree_unite: e.target.value as any})}
-                                    options={[
-                                        { value: 'DAY', label: 'Jours' },
-                                        { value: 'WEEK', label: 'Semaines' },
-                                        { value: 'MONTH', label: 'Mois' }
-                                    ]}
-                                    disabled={!!selectedPlan}
-                                    className={`!h-14 bg-surface-base border-edge text-content-primary rounded-xl ${selectedPlan ? 'opacity-60 cursor-not-allowed' : ''}`}
-                                />
-                            </div>
-                        </div>
-
-                        {/* Quick Chips (hidden when plan selected) */}
-                        {!selectedPlan && (
-                          <div className="flex gap-2">
-                              {[30, 60, 90, 180].map(d => (
-                                  <button
-                                      key={d}
-                                      type="button"
-                                      onClick={() => setFormData({...formData, duree_valeur: String(d), duree_unite: 'DAY'})}
-                                      className="px-4 py-2 bg-surface-base hover:bg-surface border border-edge hover:border-edge rounded-lg text-xs font-medium text-content-muted hover:text-content-primary transition-all"
-                                  >
-                                      {d} jours
-                                  </button>
-                              ))}
-                              <div className="h-8 w-px bg-surface mx-2"></div>
-                              <div className="text-xs text-content-muted flex items-center italic">
-                                  {durationValidation && (
-                                      <span className={durationValidation.type === 'error' ? 'text-status-danger' : 'text-status-warning'}>
-                                          {durationValidation.message}
-                                      </span>
-                                  )}
-                              </div>
-                          </div>
-                        )}
-                       </>
-                   ) : (
-                       <div className="p-4 border border-dashed border-edge rounded-xl text-center text-content-muted text-sm">
-                           Veuillez d'abord sélectionner une fréquence
+                   <div className="flex gap-2 h-14">
+                       <input
+                           inputMode="numeric"
+                           pattern="[0-9]*"
+                           className="flex-1 h-full bg-surface-base border border-edge rounded-xl px-4 text-xl font-bold text-content-primary opacity-60 cursor-not-allowed"
+                           value={formData.duree_valeur}
+                           placeholder="0"
+                           readOnly
+                       />
+                       <div className="w-40 h-full">
+                           <SelectField
+                               label=""
+                               name="duree_unite"
+                               value={formData.duree_unite}
+                               onChange={(e) => setFormData({...formData, duree_unite: e.target.value as any})}
+                               options={[
+                                   { value: 'DAY', label: 'Jours' },
+                                   { value: 'WEEK', label: 'Semaines' },
+                                   { value: 'MONTH', label: 'Mois' }
+                               ]}
+                               disabled
+                               className="!h-14 bg-surface-base border-edge text-content-primary rounded-xl opacity-60 cursor-not-allowed"
+                           />
                        </div>
-                   )}
+                   </div>
                 </div>
              </div>
            )}
@@ -1029,10 +944,9 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId }: Cred
                       <label className="text-[10px] font-bold text-content-muted uppercase tracking-wider ml-1">Taux d'intérêt (%)</label>
                       <input
                         inputMode="decimal"
-                        className={`w-full h-12 bg-surface-base border border-edge rounded-lg px-4 text-content-primary ${selectedPlan ? 'opacity-60 cursor-not-allowed font-bold' : ''}`}
+                        className="w-full h-12 bg-surface-base border border-edge rounded-lg px-4 text-content-primary opacity-60 cursor-not-allowed font-bold"
                         value={formData.taux_interet}
-                        onChange={e => { const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); setFormData({...formData, taux_interet: v}); }}
-                        readOnly={!!selectedPlan}
+                        readOnly
                       />
                    </div>
                    <div className="space-y-1.5">

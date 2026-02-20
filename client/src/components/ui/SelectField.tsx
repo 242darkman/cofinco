@@ -23,8 +23,8 @@ export interface SelectOption {
 }
 
 export interface SelectFieldProps extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'size'> {
-  label: string;
-  name: string;
+  label?: string;
+  name?: string;
   options: SelectOption[] | string[];
   error?: string;
   helperText?: string;

@@ -49,7 +49,7 @@ export function useJournalSync(): UseJournalSyncReturn {
     error: null,
   });
   const [pendingCount, setPendingCount] = useState(0);
-  const refreshTimerRef = useRef<ReturnType<typeof setInterval>>();
+  const refreshTimerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
   // Subscribe to journal sync events
   useEffect(() => {

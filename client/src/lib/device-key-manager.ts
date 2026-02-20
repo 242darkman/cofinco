@@ -40,17 +40,17 @@ export async function initializeDeviceKey(agentId: string): Promise<void> {
   const agentIdNum = parseInt(agentId, 10) || 0;
 
   // 1. Try to load existing active key
-  const existingKey = await getActiveDeviceKey(agentIdNum);
+  const existingKey = await getActiveDeviceKey(agentId);
 
   if (existingKey) {
     // Load into memory
     setActiveSigningKey(existingKey.privateKey, existingKey.keyId);
 
     // Check if rotation needed
-    const needsRotation = await needsKeyRotation(agentIdNum);
+    const needsRotation = await needsKeyRotation(agentId);
     if (needsRotation && isNetworkUsable()) {
       // Rotate in background (non-blocking)
-      performKeyRotation(agentIdNum, existingKey.keyId).catch((err) => {
+      performKeyRotation(agentId, existingKey.keyId).catch((err) => {
         console.warn('[DeviceKeyManager] Key rotation failed (will retry):', err);
       });
     }
@@ -66,7 +66,7 @@ export async function initializeDeviceKey(agentId: string): Promise<void> {
   const { keyId, publicKeyJwk, keyPair } = await generateDeviceKeyPair();
 
   // Store in IndexedDB (private key stays in CryptoKey, non-extractable)
-  await storeDeviceKey(keyId, publicKeyJwk, keyPair.privateKey, agentIdNum);
+  await storeDeviceKey(keyId, publicKeyJwk, keyPair.privateKey, agentId);
 
   // Activate in memory
   setActiveSigningKey(keyPair.privateKey, keyId);
@@ -108,7 +108,7 @@ async function registerKeyWithServer(
 
     if (response.ok) {
       await markKeyServerRegistered(keyId);
-      console.log('[DeviceKeyManager] Key registered with server:', keyId.slice(0, 12) + '...');
+      if (import.meta.env.DEV) console.log('[DeviceKeyManager] Key registered with server:', keyId.slice(0, 12) + '...');
     } else {
       console.warn('[DeviceKeyManager] Server key registration failed:', response.status);
     }
@@ -120,10 +120,10 @@ async function registerKeyWithServer(
 /**
  * Rotate the active key: generate new, mark old as rotated.
  */
-async function performKeyRotation(agentIdNum: number, oldKeyId: string): Promise<void> {
+async function performKeyRotation(agentId: string, oldKeyId: string): Promise<void> {
   const { keyId: newKeyId, publicKeyJwk, keyPair } = await generateDeviceKeyPair();
 
-  await rotateDeviceKey(oldKeyId, newKeyId, publicKeyJwk, keyPair.privateKey, agentIdNum);
+  await rotateDeviceKey(oldKeyId, newKeyId, publicKeyJwk, keyPair.privateKey, agentId);
 
   // Activate new key
   setActiveSigningKey(keyPair.privateKey, newKeyId);
@@ -131,5 +131,5 @@ async function performKeyRotation(agentIdNum: number, oldKeyId: string): Promise
   // Register new key with server
   await registerKeyWithServer(newKeyId, publicKeyJwk);
 
-  console.log('[DeviceKeyManager] Key rotated:', oldKeyId.slice(0, 12) + '... → ' + newKeyId.slice(0, 12) + '...');
+  if (import.meta.env.DEV) console.log('[DeviceKeyManager] Key rotated:', oldKeyId.slice(0, 12) + '... → ' + newKeyId.slice(0, 12) + '...');
 }

@@ -47,7 +47,7 @@ interface Tontine {
   updatedAt: string;
   tontineMembers?: {
     clients: {
-      photoUrl?: string;
+      photoProfile?: string;
     }
   }[];
 }
@@ -171,7 +171,7 @@ export default function Tontines() {
           <div className="flex -space-x-2">
             {(row.tontineMembers || []).slice(0, 3).map((m, i) => (
               <div key={i} className="w-5 h-5 rounded-full bg-surface-subtle border border-edge overflow-hidden">
-                 {m.clients?.photoUrl && <img src={m.clients.photoUrl} className="w-full h-full object-cover" />}
+                 {m.clients?.photoProfile && <img src={m.clients.photoProfile} className="w-full h-full object-cover" />}
               </div>
             ))}
           </div>

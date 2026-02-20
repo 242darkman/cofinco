@@ -115,7 +115,7 @@ export const ReceiptActions: React.FC<ReceiptActionsProps> = ({
         await navigator.share(shareData);
       } catch (err) {
         // User cancelled
-        console.log('Share cancelled');
+        if (import.meta.env.DEV) console.log('Share cancelled');
       }
     } else {
       // Fallback: copy to clipboard

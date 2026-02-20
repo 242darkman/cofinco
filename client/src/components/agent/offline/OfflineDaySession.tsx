@@ -65,7 +65,7 @@ export default function OfflineDaySession({ agentId, agenceId }: OfflineDaySessi
     hasDiscrepancy: boolean;
   } | null>(null);
 
-  const { pendingCount, hasPending } = useOfflinePendingCount();
+  const { count: pendingCount, hasPending } = useOfflinePendingCount();
   const journalSync = useJournalSync();
 
   // Load current session

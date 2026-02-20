@@ -70,7 +70,7 @@ function App() {
 
   // Handler pour la déconnexion automatique (session expirée, 401, etc.)
   const handleSessionExpired = useCallback((reason?: string) => {
-    console.log('Session expired, logging out...', reason);
+    if (import.meta.env.DEV) console.log('Session expired, logging out...', reason);
 
     // Afficher un toast d'erreur avec la raison
     const message = reason || 'Votre session a expiré. Veuillez vous reconnecter.';

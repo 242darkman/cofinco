@@ -13,6 +13,25 @@ import {
 } from '../../../hooks/accounting/useAccounting';
 
 // ─────────────────────────────────────────────────────────────────────────────
+// jsPDF / autoTable helper types
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Extends jsPDF with the `lastAutoTable` property added by jspdf-autotable */
+interface JsPDFWithAutoTable {
+  lastAutoTable?: { finalY: number };
+}
+
+/** Cell definition accepted by jspdf-autotable body rows */
+interface AutoTableCellDef {
+  content: string;
+  colSpan?: number;
+  styles?: Record<string, unknown>;
+}
+
+/** A body row can contain plain strings or cell objects */
+type AutoTableBodyRow = (string | AutoTableCellDef)[];
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Types (mirror server-side gl-reporting-service types)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -197,7 +216,7 @@ export default function RapportsOHADA() {
       });
 
       // Equilibre indicator
-      const finalY = (doc as any).lastAutoTable?.finalY ?? startY + 60;
+      const finalY = (doc as unknown as JsPDFWithAutoTable).lastAutoTable?.finalY ?? startY + 60;
       const balanced = Math.abs(d.grandTotalDebit - d.grandTotalCredit) < 0.01;
       doc.setFontSize(10);
       doc.setFillColor(balanced ? 34 : 239, balanced ? 197 : 68, balanced ? 94 : 68);
@@ -219,7 +238,7 @@ export default function RapportsOHADA() {
     if (!d) { toast.warning('Aucune donnée à exporter'); return; }
     try {
       const { XLSX } = await loadExportLibraries();
-      const actifRows: Record<string, any>[] = [];
+      const actifRows: Record<string, string | number>[] = [];
       for (const sec of d.actif) {
         actifRows.push({ 'Compte': sec.titre, 'Intitulé': '', 'Montant': '' });
         for (const l of sec.lignes) actifRows.push({ 'Compte': l.numeroCompte, 'Intitulé': l.intitule, 'Montant': l.montant });
@@ -227,7 +246,7 @@ export default function RapportsOHADA() {
       }
       actifRows.push({ 'Compte': '', 'Intitulé': 'TOTAL ACTIF', 'Montant': d.totalActif });
 
-      const passifRows: Record<string, any>[] = [];
+      const passifRows: Record<string, string | number>[] = [];
       for (const sec of d.passif) {
         passifRows.push({ 'Compte': sec.titre, 'Intitulé': '', 'Montant': '' });
         for (const l of sec.lignes) passifRows.push({ 'Compte': l.numeroCompte, 'Intitulé': l.intitule, 'Montant': l.montant });
@@ -266,13 +285,13 @@ export default function RapportsOHADA() {
       doc.text('ACTIF', 14, y);
       y += 4;
 
-      const actifBody: string[][] = [];
+      const actifBody: AutoTableBodyRow[] = [];
       for (const sec of d.actif) {
-        actifBody.push([{ content: sec.titre, colSpan: 2, styles: { fontStyle: 'bold', fillColor: [226, 232, 240] } } as any, '']);
+        actifBody.push([{ content: sec.titre, colSpan: 2, styles: { fontStyle: 'bold', fillColor: [226, 232, 240] } }, '']);
         for (const l of sec.lignes) actifBody.push([l.numeroCompte, l.intitule, fmt(l.montant)]);
-        actifBody.push(['', 'Sous-total', { content: fmt(sec.sousTotal), styles: { fontStyle: 'bold' } } as any]);
+        actifBody.push(['', 'Sous-total', { content: fmt(sec.sousTotal), styles: { fontStyle: 'bold' } }]);
       }
-      actifBody.push([{ content: 'TOTAL ACTIF', colSpan: 2, styles: { fontStyle: 'bold', fillColor: [30, 58, 138], textColor: 255 } } as any, '', { content: fmt(d.totalActif), styles: { fontStyle: 'bold', fillColor: [30, 58, 138], textColor: 255 } } as any]);
+      actifBody.push([{ content: 'TOTAL ACTIF', colSpan: 2, styles: { fontStyle: 'bold', fillColor: [30, 58, 138], textColor: 255 } }, '', { content: fmt(d.totalActif), styles: { fontStyle: 'bold', fillColor: [30, 58, 138], textColor: 255 } }]);
 
       autoTable(doc, {
         startY: y,
@@ -284,7 +303,7 @@ export default function RapportsOHADA() {
         margin: { left: 14, right: 14 },
       });
 
-      y = (doc as any).lastAutoTable?.finalY != null ? (doc as any).lastAutoTable.finalY + 8 : y + 80;
+      y = (doc as unknown as JsPDFWithAutoTable).lastAutoTable?.finalY != null ? (doc as unknown as JsPDFWithAutoTable).lastAutoTable!.finalY + 8 : y + 80;
 
       // PASSIF section
       doc.setFontSize(12);
@@ -292,13 +311,13 @@ export default function RapportsOHADA() {
       doc.text('PASSIF', 14, y);
       y += 4;
 
-      const passifBody: string[][] = [];
+      const passifBody: AutoTableBodyRow[] = [];
       for (const sec of d.passif) {
-        passifBody.push([{ content: sec.titre, colSpan: 2, styles: { fontStyle: 'bold', fillColor: [237, 233, 254] } } as any, '']);
+        passifBody.push([{ content: sec.titre, colSpan: 2, styles: { fontStyle: 'bold', fillColor: [237, 233, 254] } }, '']);
         for (const l of sec.lignes) passifBody.push([l.numeroCompte, l.intitule, fmt(l.montant)]);
-        passifBody.push(['', 'Sous-total', { content: fmt(sec.sousTotal), styles: { fontStyle: 'bold' } } as any]);
+        passifBody.push(['', 'Sous-total', { content: fmt(sec.sousTotal), styles: { fontStyle: 'bold' } }]);
       }
-      passifBody.push([{ content: 'TOTAL PASSIF', colSpan: 2, styles: { fontStyle: 'bold', fillColor: [126, 34, 206], textColor: 255 } } as any, '', { content: fmt(d.totalPassif), styles: { fontStyle: 'bold', fillColor: [126, 34, 206], textColor: 255 } } as any]);
+      passifBody.push([{ content: 'TOTAL PASSIF', colSpan: 2, styles: { fontStyle: 'bold', fillColor: [126, 34, 206], textColor: 255 } }, '', { content: fmt(d.totalPassif), styles: { fontStyle: 'bold', fillColor: [126, 34, 206], textColor: 255 } }]);
 
       autoTable(doc, {
         startY: y,
@@ -311,7 +330,7 @@ export default function RapportsOHADA() {
       });
 
       // Equilibre indicator
-      const fy = (doc as any).lastAutoTable?.finalY ?? y + 60;
+      const fy = (doc as unknown as JsPDFWithAutoTable).lastAutoTable?.finalY ?? y + 60;
       doc.setFillColor(d.equilibre ? 34 : 239, d.equilibre ? 197 : 68, d.equilibre ? 94 : 68);
       doc.roundedRect(14, fy + 6, 180, 12, 2, 2, 'F');
       doc.setTextColor(255);
@@ -338,7 +357,7 @@ export default function RapportsOHADA() {
     try {
       const { XLSX } = await loadExportLibraries();
 
-      const chargesRows: Record<string, any>[] = [];
+      const chargesRows: Record<string, string | number>[] = [];
       for (const sec of d.charges) {
         chargesRows.push({ 'Compte': sec.titre, 'Intitulé': '', 'Montant': '' });
         for (const l of sec.lignes) chargesRows.push({ 'Compte': l.numeroCompte, 'Intitulé': l.intitule, 'Montant': l.montant });
@@ -346,7 +365,7 @@ export default function RapportsOHADA() {
       }
       chargesRows.push({ 'Compte': '', 'Intitulé': 'TOTAL CHARGES', 'Montant': d.totalCharges });
 
-      const produitsRows: Record<string, any>[] = [];
+      const produitsRows: Record<string, string | number>[] = [];
       for (const sec of d.produits) {
         produitsRows.push({ 'Compte': sec.titre, 'Intitulé': '', 'Montant': '' });
         for (const l of sec.lignes) produitsRows.push({ 'Compte': l.numeroCompte, 'Intitulé': l.intitule, 'Montant': l.montant });
@@ -392,13 +411,13 @@ export default function RapportsOHADA() {
       doc.text('PRODUITS', 14, y);
       y += 4;
 
-      const produitsBody: string[][] = [];
+      const produitsBody: AutoTableBodyRow[] = [];
       for (const sec of d.produits) {
-        produitsBody.push([{ content: sec.titre, colSpan: 2, styles: { fontStyle: 'bold', fillColor: [220, 252, 231] } } as any, '']);
+        produitsBody.push([{ content: sec.titre, colSpan: 2, styles: { fontStyle: 'bold', fillColor: [220, 252, 231] } }, '']);
         for (const l of sec.lignes) produitsBody.push([l.numeroCompte, l.intitule, fmt(l.montant)]);
-        produitsBody.push(['', 'Sous-total', { content: fmt(sec.sousTotal), styles: { fontStyle: 'bold' } } as any]);
+        produitsBody.push(['', 'Sous-total', { content: fmt(sec.sousTotal), styles: { fontStyle: 'bold' } }]);
       }
-      produitsBody.push([{ content: 'TOTAL PRODUITS', colSpan: 2, styles: { fontStyle: 'bold', fillColor: [34, 197, 94], textColor: 255 } } as any, '', { content: fmt(d.totalProduits), styles: { fontStyle: 'bold', fillColor: [34, 197, 94], textColor: 255 } } as any]);
+      produitsBody.push([{ content: 'TOTAL PRODUITS', colSpan: 2, styles: { fontStyle: 'bold', fillColor: [34, 197, 94], textColor: 255 } }, '', { content: fmt(d.totalProduits), styles: { fontStyle: 'bold', fillColor: [34, 197, 94], textColor: 255 } }]);
 
       autoTable(doc, {
         startY: y,
@@ -410,7 +429,7 @@ export default function RapportsOHADA() {
         margin: { left: 14, right: 14 },
       });
 
-      y = (doc as any).lastAutoTable?.finalY != null ? (doc as any).lastAutoTable.finalY + 8 : y + 60;
+      y = (doc as unknown as JsPDFWithAutoTable).lastAutoTable?.finalY != null ? (doc as unknown as JsPDFWithAutoTable).lastAutoTable!.finalY + 8 : y + 60;
 
       // CHARGES section
       doc.setFontSize(12);
@@ -418,13 +437,13 @@ export default function RapportsOHADA() {
       doc.text('CHARGES', 14, y);
       y += 4;
 
-      const chargesBody: string[][] = [];
+      const chargesBody: AutoTableBodyRow[] = [];
       for (const sec of d.charges) {
-        chargesBody.push([{ content: sec.titre, colSpan: 2, styles: { fontStyle: 'bold', fillColor: [254, 226, 226] } } as any, '']);
+        chargesBody.push([{ content: sec.titre, colSpan: 2, styles: { fontStyle: 'bold', fillColor: [254, 226, 226] } }, '']);
         for (const l of sec.lignes) chargesBody.push([l.numeroCompte, l.intitule, fmt(l.montant)]);
-        chargesBody.push(['', 'Sous-total', { content: fmt(sec.sousTotal), styles: { fontStyle: 'bold' } } as any]);
+        chargesBody.push(['', 'Sous-total', { content: fmt(sec.sousTotal), styles: { fontStyle: 'bold' } }]);
       }
-      chargesBody.push([{ content: 'TOTAL CHARGES', colSpan: 2, styles: { fontStyle: 'bold', fillColor: [239, 68, 68], textColor: 255 } } as any, '', { content: fmt(d.totalCharges), styles: { fontStyle: 'bold', fillColor: [239, 68, 68], textColor: 255 } } as any]);
+      chargesBody.push([{ content: 'TOTAL CHARGES', colSpan: 2, styles: { fontStyle: 'bold', fillColor: [239, 68, 68], textColor: 255 } }, '', { content: fmt(d.totalCharges), styles: { fontStyle: 'bold', fillColor: [239, 68, 68], textColor: 255 } }]);
 
       autoTable(doc, {
         startY: y,
@@ -437,7 +456,7 @@ export default function RapportsOHADA() {
       });
 
       // Résultat Net
-      const fy = (doc as any).lastAutoTable?.finalY ?? y + 60;
+      const fy = (doc as unknown as JsPDFWithAutoTable).lastAutoTable?.finalY ?? y + 60;
       const profit = d.resultatNet >= 0;
       doc.setFillColor(profit ? 34 : 239, profit ? 197 : 68, profit ? 94 : 68);
       doc.roundedRect(14, fy + 6, 180, 14, 2, 2, 'F');
@@ -459,7 +478,7 @@ export default function RapportsOHADA() {
     if (!d || d.lignes.length === 0) { toast.warning('Aucune donnée à exporter'); return; }
     try {
       const { XLSX } = await loadExportLibraries();
-      const rows = d.lignes.filter(l => l.solde !== 0).map(l => ({
+      const rows: Record<string, string | number>[] = d.lignes.filter(l => l.solde !== 0).map(l => ({
         'Compte': l.numeroCompte,
         'Intitulé': l.intitule,
         'Classe': l.classe,
@@ -471,7 +490,7 @@ export default function RapportsOHADA() {
       rows.push({
         'Compte': 'TOTAUX',
         'Intitulé': '',
-        'Classe': '' as any,
+        'Classe': '',
         'Type': 'Actif',
         'Solde': d.totalActif,
         'Sens Normal': '',
@@ -480,7 +499,7 @@ export default function RapportsOHADA() {
       rows.push({
         'Compte': '',
         'Intitulé': '',
-        'Classe': '' as any,
+        'Classe': '',
         'Type': 'Passif',
         'Solde': d.totalPassif,
         'Sens Normal': '',
@@ -513,7 +532,7 @@ export default function RapportsOHADA() {
 
       const activeLignes = d.lignes.filter(l => l.solde !== 0);
       let currentClasse = -1;
-      const body: any[][] = [];
+      const body: AutoTableBodyRow[] = [];
 
       for (const l of activeLignes) {
         if (l.classe !== currentClasse) {
@@ -546,7 +565,7 @@ export default function RapportsOHADA() {
       });
 
       // Totaux summary
-      const fy = (doc as any).lastAutoTable?.finalY ?? startY + 100;
+      const fy = (doc as unknown as JsPDFWithAutoTable).lastAutoTable?.finalY ?? startY + 100;
       autoTable(doc, {
         startY: fy + 6,
         body: [

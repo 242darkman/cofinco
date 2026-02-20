@@ -25,7 +25,7 @@ interface PendingCredit {
     id: string;
     nom: string;
     prenom: string;
-    photoUrl?: string;
+    photoProfile?: string;
   };
 }
 
@@ -287,8 +287,8 @@ export default function PendingDisbursements({
                     />
 
                     <div className="w-9 h-9 rounded-full bg-surface border border-edge overflow-hidden shrink-0">
-                      {credit.client.photoUrl ? (
-                        <img src={resolveStorageUrl(credit.client.photoUrl)} className="w-full h-full object-cover" alt="" />
+                      {credit.client.photoProfile ? (
+                        <img src={resolveStorageUrl(credit.client.photoProfile)} className="w-full h-full object-cover" alt="" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
                           <User size={16} className="text-content-muted" />

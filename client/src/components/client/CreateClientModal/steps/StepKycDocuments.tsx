@@ -37,7 +37,7 @@ export default function StepKycDocuments({
       {/* KYC Status Badge */}
       <div className="flex items-center justify-between">
         <h4 className="text-xs font-semibold text-content-primary">Pièce d'identité & KYC</h4>
-        <Badge rawValue="PENDING" size="sm">En attente</Badge>
+        <Badge rawValue size="sm">En attente</Badge>
       </div>
 
       {/* Type pièce & N° */}
