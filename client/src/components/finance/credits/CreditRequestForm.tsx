@@ -138,7 +138,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
 
   const loadCreditPlans = async () => {
     try {
-      const plans = await creditPlanApi.getAll({ actif: true });
+      const plans = await creditPlanApi.getAll({ isActive: true });
       setCreditPlans(plans || []);
     } catch (error) {
       console.error('Erreur chargement plans credit:', error);
@@ -407,11 +407,16 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
         ? String(selectedPlan.tauxInteret)
         : formData.taux_interet || suggestedRate.toFixed(1);
       
-      // Utiliser les frais de dossier du plan s'ils sont définis
-      const fraisDossierPlan = selectedPlan?.fraisDossier;
-      const montantFraisEngagement = fraisDossierPlan 
-        ? String(fraisDossierPlan)
-        : null;
+      // Calculer les frais upfront depuis les fees du plan
+      const upfrontFees = (selectedPlan?.fees || [])
+        .filter((f: any) => f.collectionMode === 'UPFRONT' || f.collectionMode === 'ON_DISBURSEMENT')
+        .reduce((sum: number, f: any) => {
+          if (f.calcType === 'PERCENTAGE') {
+            return sum + (parseFloat(formData.montant_demande) || 0) * parseFloat(f.value) / 100;
+          }
+          return sum + parseFloat(f.value || '0');
+        }, 0);
+      const montantFraisEngagement = upfrontFees > 0 ? String(Math.round(upfrontFees)) : null;
 
       await demandeCreditApi.create({
         clientId: formData.client_id,
@@ -852,11 +857,18 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
                       />
                    </div>
                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-content-muted uppercase tracking-wider ml-1">Frais de dossier</label>
-                      <input 
-                        type="text" 
-                        className="w-full h-12 bg-surface-base border border-edge rounded-lg px-4 text-content-primary" 
-                        value={selectedPlan?.fraisDossier || '0'}
+                      <label className="text-[10px] font-bold text-content-muted uppercase tracking-wider ml-1">Frais d'engagement</label>
+                      <input
+                        type="text"
+                        className="w-full h-12 bg-surface-base border border-edge rounded-lg px-4 text-content-primary"
+                        value={(() => {
+                          const fees = (selectedPlan?.fees || []).filter((f: any) => f.collectionMode === 'UPFRONT' || f.collectionMode === 'ON_DISBURSEMENT');
+                          if (fees.length === 0) return '0';
+                          return fees.reduce((sum: number, f: any) => {
+                            if (f.calcType === 'PERCENTAGE') return sum + (parseFloat(formData.montant_demande) || 0) * parseFloat(f.value) / 100;
+                            return sum + parseFloat(f.value || '0');
+                          }, 0).toLocaleString();
+                        })()}
                         readOnly
                       />
                    </div>
@@ -888,10 +900,13 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId, userRo
                              <div className="text-[10px] text-content-muted font-medium">
                                 Intérêts: <span className="text-content-secondary">{Math.round(calculatedData.montantTotal - (parseFloat(formData.montant_demande) || 0)).toLocaleString()}</span>
                              </div>
-                             {(selectedPlan?.fraisDossier) && (
+                             {(selectedPlan?.fees?.length > 0) && (
                                 <div className="text-[10px] text-content-muted font-medium">
                                     Frais: <span className="text-content-secondary">
-                                        {(selectedPlan?.fraisDossier).toLocaleString()}
+                                        {selectedPlan.fees.reduce((sum: number, f: any) => {
+                                          if (f.calcType === 'PERCENTAGE') return sum + (parseFloat(formData.montant_demande) || 0) * parseFloat(f.value) / 100;
+                                          return sum + parseFloat(f.value || '0');
+                                        }, 0).toLocaleString()}
                                     </span>
                                 </div>
                              )}

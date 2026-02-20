@@ -1,11 +1,11 @@
 import { relations } from "drizzle-orm";
 import { users, loginAttempts } from "./auth";
 import { clients } from "./clients";
-import { credits, remboursements, comptes, transactionsCompte, plansEpargne, sessionsCaisse, operationsCaisse, mouvementsFinanciers } from "./finance";
+import { credits, remboursements, comptes, transactionsCompte, plansEpargne, sessionsCaisse, operationsCaisse, mouvementsFinanciers, creditPlans, creditPlanFees } from "./finance";
 import { tontines, membresTontine, contributionsTontine, tontineAlertes, tontinePenalites } from "./tontines";
 import { agentsTerrain, prospections, visitesTerrain, paiementsTerrain, factures, lignesFactures, remisesTerrain, comptageBillets } from "./operations";
 
-import { notifications, pushSubscriptions } from "./settings";
+import { notifications, pushSubscriptions, creditPlanVersions, creditPenaltyStructures, holidayCalendars, holidayDates } from "./settings";
 import { transferts } from "./transferts";
 import { clientTags, clientActivities } from "./clients";
 import { clientScoreEvents, clientScoreState } from "./scoring";
@@ -249,6 +249,46 @@ export const clientScoreStateRelations = relations(clientScoreState, ({ one }) =
   client: one(clients, {
     fields: [clientScoreState.clientId],
     references: [clients.id],
+  }),
+}));
+
+// Credit Plans
+export const creditPlansRelations = relations(creditPlans, ({ many }) => ({
+  fees: many(creditPlanFees),
+  versions: many(creditPlanVersions),
+  penaltyStructures: many(creditPenaltyStructures),
+}));
+
+export const creditPlanFeesRelations = relations(creditPlanFees, ({ one }) => ({
+  plan: one(creditPlans, {
+    fields: [creditPlanFees.planId],
+    references: [creditPlans.id],
+  }),
+}));
+
+export const creditPlanVersionsRelations = relations(creditPlanVersions, ({ one }) => ({
+  plan: one(creditPlans, {
+    fields: [creditPlanVersions.planId],
+    references: [creditPlans.id],
+  }),
+}));
+
+export const creditPenaltyStructuresRelations = relations(creditPenaltyStructures, ({ one }) => ({
+  plan: one(creditPlans, {
+    fields: [creditPenaltyStructures.planId],
+    references: [creditPlans.id],
+  }),
+}));
+
+// Holiday Calendars
+export const holidayCalendarsRelations = relations(holidayCalendars, ({ many }) => ({
+  dates: many(holidayDates),
+}));
+
+export const holidayDatesRelations = relations(holidayDates, ({ one }) => ({
+  calendar: one(holidayCalendars, {
+    fields: [holidayDates.calendarId],
+    references: [holidayCalendars.id],
   }),
 }));
 

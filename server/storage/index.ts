@@ -16,7 +16,7 @@ import {
     Tontine, InsertTontine, MembreTontine, InsertMembreTontine, ContributionTontine, InsertContributionTontine,
     TontineRegle, InsertTontineRegle, TontinePenalite, InsertTontinePenalite,
     TontinePlan, InsertTontinePlan,
-    UserCreditPlan, InsertCreditPlan,
+    UserCreditPlan, InsertCreditPlan, CreditPlanFee, InsertCreditPlanFee,
     SessionCaisse, InsertSessionCaisse, OperationCaisse, InsertOperationCaisse, AgentTerrain, InsertAgentTerrain,
     CaisseTransfert, InsertCaisseTransfert,
     Prospection, InsertProspection, VisiteTerrain, InsertVisiteTerrain, PaiementTerrain, InsertPaiementTerrain,
@@ -85,10 +85,10 @@ export interface IStorage {
     }, userId?: string): Promise<{ credit: Credit; mouvement: any }>;
 
     // Credit Plans
-    getCreditPlan(id: string): Promise<UserCreditPlan | undefined>;
-    getAllCreditPlans(filter?: { actif?: boolean, agenceId?: string }): Promise<UserCreditPlan[]>;
-    createCreditPlan(plan: InsertCreditPlan): Promise<UserCreditPlan>;
-    updateCreditPlan(id: string, plan: Partial<InsertCreditPlan>): Promise<UserCreditPlan | undefined>;
+    getCreditPlan(id: string): Promise<(UserCreditPlan & { fees: CreditPlanFee[] }) | undefined>;
+    getAllCreditPlans(filter?: { isActive?: boolean, agenceId?: string }): Promise<(UserCreditPlan & { fees: CreditPlanFee[] })[]>;
+    createCreditPlan(plan: InsertCreditPlan, fees?: InsertCreditPlanFee[]): Promise<UserCreditPlan & { fees: CreditPlanFee[] }>;
+    updateCreditPlan(id: string, plan: Partial<InsertCreditPlan>, fees?: InsertCreditPlanFee[], expectedVersion?: number): Promise<(UserCreditPlan & { fees: CreditPlanFee[] }) | undefined>;
     deleteCreditPlan(id: string): Promise<boolean>;
 
     // Echeances Credits

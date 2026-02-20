@@ -1,12 +1,8 @@
-import React, { useState } from 'react';
-import { CreditCard, Settings, Wallet } from 'lucide-react';
-import { Card, Button } from '../ui';
+import React from 'react';
+import { CreditCard } from 'lucide-react';
 import AdminCreditPlansGestion from './AdminCreditPlansGestion';
-import AdminCreditSettings from './AdminCreditSettings';
 
 export default function AdminCreditsGestion() {
-  const [activeTab, setActiveTab] = useState<'plans' | 'settings'>('plans');
-
   return (
     <div className="space-y-2">
       {/* Header */}
@@ -22,39 +18,7 @@ export default function AdminCreditsGestion() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b border-edge mb-4 px-2">
-         <button
-          onClick={() => setActiveTab('plans')}
-          className={`px-3 py-1.5 text-sm font-medium transition-colors border-b-2 flex items-center gap-2 ${
-            activeTab === 'plans' 
-            ? 'text-status-info border-status-info' 
-            : 'text-content-muted border-transparent hover:text-content-secondary'
-          }`}
-        >
-          <Wallet size={14} />
-          Plans de Crédit
-        </button>
-        <button
-          onClick={() => setActiveTab('settings')}
-          className={`px-3 py-1.5 text-sm font-medium transition-colors border-b-2 flex items-center gap-2 ${
-            activeTab === 'settings' 
-            ? 'text-status-info border-status-info' 
-            : 'text-content-muted border-transparent hover:text-content-secondary'
-          }`}
-        >
-          <Settings size={14} />
-          Paramètres Généraux
-        </button>
-      </div>
-
-      {activeTab === 'plans' && (
-        <AdminCreditPlansGestion />
-      )}
-      
-      {activeTab === 'settings' && (
-        <AdminCreditSettings />
-      )}
+      <AdminCreditPlansGestion />
     </div>
   );
 }

@@ -75,104 +75,167 @@ import { countSuggestionService } from "../services/caisse/count-suggestion-serv
 import { isIncomingOperation, isOutgoingOperation, getOperationDelta, CAISSE_IN_OPERATIONS } from "@shared/config/caisse-operations";
 import { paymentService } from "../services/mobile-money/payment-service";
 import { MethodePaiement } from "@shared/enum/status-constants";
-import { D, roundMoney, splitEvenly } from "../lib/money";
+import { D, roundMoney } from "../lib/money";
 import { currencySymbol } from "@shared/config/currency";
-
-/**
- * Génère l'échéancier d'un crédit actif (si pas encore généré).
- * Appelé automatiquement au décaissement et disponible via l'API.
- */
-async function generateCreditScheduleIfNeeded(creditId: string): Promise<void> {
-  const credit = await storage.getCredit(creditId);
-  if (!credit) return;
-  if (credit.statut !== StatutCredit.ACTIVE && credit.statut !== StatutCredit.LATE) return;
-
-  // Ne pas regénérer si des échéances existent déjà
-  const existing = await storage.getEcheancesByCredit(creditId);
-  if (existing.length > 0) return;
-
-  const startDate = new Date(credit.dateDebut || Date.now());
-  const dAmount = D(credit.montant);
-  const dRate = D(credit.taux).div(100);
-  const duration = credit.duree;
-  if (!duration || duration <= 0) return;
-
-  const dTotalAmount = dAmount.times(D(1).plus(dRate));
-  const dInterestTotal = dTotalAmount.minus(dAmount);
-  const capitalParts = splitEvenly(dAmount, duration);
-  const interestParts = splitEvenly(dInterestTotal, duration);
-
-  const schedule: any[] = [];
-  let currentDate = new Date(startDate);
-
-  for (let i = 1; i <= duration; i++) {
-    if (credit.echeance === FrequenceRemboursement.WEEKLY) {
-      currentDate.setDate(currentDate.getDate() + 7);
-    } else if (credit.echeance === FrequenceRemboursement.BI_MONTHLY) {
-      currentDate.setDate(currentDate.getDate() + 15);
-    } else if (credit.echeance === FrequenceRemboursement.DAILY) {
-      currentDate.setDate(currentDate.getDate() + 1);
-    } else {
-      currentDate.setMonth(currentDate.getMonth() + 1);
-    }
-
-    const dCapital = capitalParts[i - 1];
-    const dInterest = interestParts[i - 1];
-
-    schedule.push({
-      creditId,
-      numeroEcheance: i,
-      dateEcheance: new Date(currentDate),
-      montantCapital: roundMoney(dCapital),
-      montantInteret: roundMoney(dInterest),
-      montantTotal: roundMoney(dCapital.plus(dInterest)),
-      montantPaye: "0",
-      statut: "UPCOMING",
-    });
-  }
-
-  await storage.createEcheances(schedule);
-  logger.info({ creditId, echeances: schedule.length }, 'Échéancier généré automatiquement');
-}
+import { generateCreditSchedule } from "../storage/finance";
 
 export function registerFinanceRoutes(app: Express) {
+  // ============================================================
   // Credit Plans Routes
+  // ============================================================
+
   app.get("/api/credit-plans", requireAuth, async (req, res) => {
-    const agenceFilter = req.agenceFilter as { agence?: string } | null;
-    const filter: any = {};
-    
-    // Si pas admin, filtrer par agence ou global (agenceId IS NULL)
-    // Mais pour l'instant, on laisse voir tous les plans actifs
-    
-    // Si query param ?actif=true
-    if (req.query.actif === 'true') filter.actif = true;
-    
-    const plans = await storage.getAllCreditPlans(filter);
-    res.json(plans);
+    try {
+      const filter: { isActive?: boolean; agenceId?: string } = {};
+      if (req.query.isActive === "true") filter.isActive = true;
+      if (req.query.agenceId) filter.agenceId = String(req.query.agenceId);
+
+      const plans = await storage.getAllCreditPlans(filter);
+      res.json(plans);
+    } catch (err: any) {
+      logger.error(err, "Erreur GET /api/credit-plans");
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  app.get("/api/credit-plans/:id", requireAuth, async (req, res) => {
+    try {
+      const plan = await storage.getCreditPlan(req.params.id);
+      if (!plan) return res.status(404).json({ message: "Plan non trouve" });
+      res.json(plan);
+    } catch (err: any) {
+      logger.error(err, "Erreur GET /api/credit-plans/:id");
+      res.status(500).json({ message: "Erreur serveur" });
+    }
   });
 
   app.post("/api/credit-plans", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.PLAN_CREDIT), requireAgenceAccess(), async (req, res) => {
-    const data = normalizeKeysDeep(req.body) as any;
-    
-    // Validation basique
-    if (!data.nom) return res.status(400).json({ message: "Le nom est obligatoire" });
-    
-    const parsed = insertCreditPlanSchema.parse(data);
-    const plan = await storage.createCreditPlan(parsed);
-    res.status(201).json(plan);
+    try {
+      const data = normalizeKeysDeep(req.body) as any;
+      const { fees, ...planData } = data;
+
+      if (!planData.nom) return res.status(400).json({ message: "Le nom est obligatoire" });
+      if (!planData.taux_interet && !planData.tauxInteret) return res.status(400).json({ message: "Le taux d'interet est obligatoire" });
+
+      planData.createdBy = (req as any).user?.id;
+      planData.updatedBy = (req as any).user?.id;
+
+      const parsed = insertCreditPlanSchema.parse(planData);
+      const plan = await storage.createCreditPlan(parsed, fees || []);
+      res.status(201).json(plan);
+    } catch (err: any) {
+      logger.error(err, "Erreur POST /api/credit-plans");
+      if (err.name === "ZodError") return res.status(400).json({ message: "Donnees invalides", errors: err.errors });
+      res.status(500).json({ message: "Erreur serveur" });
+    }
   });
 
   app.patch("/api/credit-plans/:id", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.PLAN_CREDIT), async (req, res) => {
-    const data = normalizeKeysDeep(req.body) as any;
-    const plan = await storage.updateCreditPlan(req.params.id, data);
-    if (!plan) return res.status(404).json({ message: "Plan non trouvé" });
-    res.json(plan);
+    try {
+      const data = normalizeKeysDeep(req.body) as any;
+      const { fees, expectedVersion, ...planData } = data;
+
+      planData.updatedBy = (req as any).user?.id;
+
+      const plan = await storage.updateCreditPlan(
+        req.params.id,
+        planData,
+        fees,
+        expectedVersion,
+      );
+      if (!plan) return res.status(404).json({ message: "Plan non trouve" });
+      res.json(plan);
+    } catch (err: any) {
+      if (err.message?.startsWith("CONFLICT")) {
+        return res.status(409).json({ message: err.message });
+      }
+      logger.error(err, "Erreur PATCH /api/credit-plans/:id");
+      res.status(500).json({ message: "Erreur serveur" });
+    }
   });
 
   app.delete("/api/credit-plans/:id", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.PLAN_CREDIT), async (req, res) => {
-    const success = await storage.deleteCreditPlan(req.params.id);
-    if (!success) return res.status(404).json({ message: "Plan non trouvé" });
-    res.json({ success: true });
+    try {
+      const success = await storage.deleteCreditPlan(req.params.id);
+      if (!success) return res.status(404).json({ message: "Plan non trouve" });
+      res.json({ success: true });
+    } catch (err: any) {
+      logger.error(err, "Erreur DELETE /api/credit-plans/:id");
+      res.status(500).json({ message: "Erreur serveur" });
+    }
+  });
+
+  // Preview schedule (accepts full plan config, no save needed)
+  app.post("/api/credit-plans/preview-schedule", requireAuth, async (req, res) => {
+    try {
+      const { D: toDecimal } = await import("../lib/money");
+      const { generateSchedule } = await import("../services/credit-plan");
+      const { planConfig, principal, disbursementDate } = req.body;
+
+      if (!planConfig || !principal || !disbursementDate) {
+        return res.status(400).json({ message: "planConfig, principal et disbursementDate sont requis" });
+      }
+
+      const principalNum = Number(principal);
+      if (!Number.isFinite(principalNum) || principalNum <= 0) {
+        return res.status(400).json({ message: "Le montant du capital doit être un nombre positif" });
+      }
+
+      const disbDate = new Date(disbursementDate);
+      if (isNaN(disbDate.getTime())) {
+        return res.status(400).json({ message: "Date de décaissement invalide" });
+      }
+
+      let customFirst: Date | undefined;
+      if (req.body.customFirstDueDate) {
+        customFirst = new Date(req.body.customFirstDueDate);
+        if (isNaN(customFirst.getTime())) {
+          return res.status(400).json({ message: "Date de première échéance invalide" });
+        }
+        if (customFirst <= disbDate) {
+          return res.status(400).json({ message: "La date de première échéance doit être postérieure au décaissement" });
+        }
+      }
+
+      const result = generateSchedule({
+        principal: toDecimal(principal),
+        disbursementDate: disbDate,
+        plan: planConfig,
+        fees: req.body.fees || [],
+        customFirstDueDate: customFirst,
+      });
+
+      // Serialize Decimal values to strings for JSON
+      const serialized = {
+        rows: result.rows.map(r => ({
+          number: r.number,
+          date: r.date.toISOString().slice(0, 10),
+          capitalPayment: r.capitalPayment.toFixed(0),
+          interestPayment: r.interestPayment.toFixed(0),
+          feePayment: r.feePayment.toFixed(0),
+          totalPayment: r.totalPayment.toFixed(0),
+          balanceAfter: r.balanceAfter.toFixed(0),
+        })),
+        summary: {
+          totalCapital: result.summary.totalCapital.toFixed(0),
+          totalInterest: result.summary.totalInterest.toFixed(0),
+          totalFees: result.summary.totalFees.toFixed(0),
+          totalDue: result.summary.totalDue.toFixed(0),
+          numberOfInstallments: result.summary.numberOfInstallments,
+        },
+        upfrontFees: result.upfrontFees.map(f => ({
+          feeType: f.feeType,
+          label: f.label,
+          amount: f.amount.toFixed(0),
+          collectionMode: f.collectionMode,
+        })),
+      };
+
+      res.json(serialized);
+    } catch (err: any) {
+      logger.error(err, "Erreur POST /api/credit-plans/preview-schedule");
+      res.status(500).json({ message: "Erreur de calcul", details: err.message });
+    }
   });
 
   // Credits
@@ -357,7 +420,7 @@ export function registerFinanceRoutes(app: Express) {
         montant: montantDecaissement.toString(),
         taux: demande.tauxInteret,
         duree: data.duree || demande.nombreEcheances || demande.dureeValeur,
-        typeCredit: demande.typeCredit || 'Personnel',
+        typeCredit: demande.typeCredit || 'PERSONAL',
         objetCredit: demande.objetCredit,
         demandeId: demande.id,
         statut: statutInitial,
@@ -454,7 +517,7 @@ export function registerFinanceRoutes(app: Express) {
 
               // Générer l'échéancier automatiquement à l'activation
               try {
-                await generateCreditScheduleIfNeeded(credit.id);
+                await generateCreditSchedule(credit.id);
               } catch (scheduleErr) {
                 logger.warn({ err: scheduleErr, creditId: credit.id }, 'Échéancier non généré (non bloquant)');
               }
@@ -1099,7 +1162,7 @@ export function registerFinanceRoutes(app: Express) {
         return res.status(400).json({ message: "Un échéancier existe déjà pour ce crédit" });
       }
 
-      await generateCreditScheduleIfNeeded(creditId);
+      await generateCreditSchedule(creditId);
       const created = await storage.getEcheancesByCredit(creditId);
       res.json(created);
 
@@ -1957,7 +2020,6 @@ export function registerFinanceRoutes(app: Express) {
       // 3. Compute fee amount
       const montant = parseFloat(
         (demande as any).montantFraisEngagement
-        || (demande as any).fraisDossier
         || (Number(demande.montantDemande || 0) * 0.10).toString()
       );
 

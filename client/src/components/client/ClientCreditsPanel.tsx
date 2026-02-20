@@ -13,6 +13,7 @@ import {
   CREDIT_STATUS_COLORS,
   ECHEANCE_CREDIT_STATUS_COLORS,
 } from '../../lib/status-labels';
+import { typeCreditLabel } from '../../lib/credit-labels';
 import {
   STATUT_ECHEANCE_CREDIT_LABELS,
 } from '@shared/enum/status-constants';
@@ -218,7 +219,7 @@ function CreditCard_({ credit, defaultExpanded }: { credit: any; defaultExpanded
               <span className="text-sm font-bold text-content-primary truncate">{c.numeroCredit || 'Crédit'}</span>
             </div>
             {c.typeCredit && (
-              <span className="text-[10px] text-content-muted">{c.typeCredit}{c.objetCredit ? ` - ${c.objetCredit}` : ''}</span>
+              <span className="text-[10px] text-content-muted">{typeCreditLabel(c.typeCredit)}{c.objetCredit ? ` - ${c.objetCredit}` : ''}</span>
             )}
           </div>
           <span className={`text-[10px] px-2 py-0.5 rounded-full border shrink-0 font-medium ${statusColor}`}>

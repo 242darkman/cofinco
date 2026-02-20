@@ -12,6 +12,7 @@ import { fr } from 'date-fns/locale';
 import { format } from 'date-fns';
 import { SkeletonCard } from '../../ui/Skeleton';
 import { CreditTimeline } from './CreditTimeline';
+import { typeCreditLabel } from '../../../lib/credit-labels';
 
 interface Credit {
   id: string;
@@ -30,7 +31,7 @@ interface Credit {
   garanties?: string;
   nombre_echeances_total?: number;
   nombre_echeances_payees?: number;
-  fraisDossierPaye?: boolean;
+  fraisEngagementPayes?: boolean;
   remboursementAutomatique?: boolean;
   remboursementCompteId?: string;
   prochaineEcheance?: string;
@@ -237,11 +238,11 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
                   Dossier Crédit
                 </h2>
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wide shrink-0 ${
-                    credit.fraisDossierPaye
+                    credit.fraisEngagementPayes
                     ? 'bg-status-success-bg text-status-success border-status-success/20'
                     : 'bg-status-warning-bg text-status-warning border-status-warning/20'
                 }`}>
-                    {credit.fraisDossierPaye ? 'Frais Payés' : 'Frais Non Payés'}
+                    {credit.fraisEngagementPayes ? 'Frais Payes' : 'Frais Non Payes'}
                 </span>
               </div>
               <p className="text-xs sm:text-sm text-content-muted font-medium mt-1 truncate">
@@ -399,7 +400,7 @@ export default function CreditDetailModal({ creditId, onClose }: CreditDetailMod
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     <div className="flex flex-col">
                       <span className="text-content-muted text-xs mb-0.5">Type</span>
-                      <span className="text-content-primary font-medium text-xs">{credit.typeCredit || 'Standard'}</span>
+                      <span className="text-content-primary font-medium text-xs">{typeCreditLabel(credit.typeCredit)}</span>
                     </div>
                     <div className="flex flex-col">
                       <span className="text-content-muted text-xs mb-0.5">Durée</span>

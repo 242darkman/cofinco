@@ -1,7 +1,9 @@
-import { pgTable, text, varchar, integer, boolean, numeric, timestamp, uuid, json, bigint } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, numeric, timestamp, uuid, json, bigint, date, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
-import { users } from "./auth"; // Assuming auth is created
+import { users } from "./auth";
+import { agences } from "./agences";
+import { creditPlans } from "./finance";
 import { DEFAULT_CURRENCY } from "../config/currency";
 
 // Helper to generate agency code (crypto-secure)
@@ -422,14 +424,16 @@ export type TransferTemplate = typeof transferTemplates.$inferSelect;
 
 export const creditPlanVersions = pgTable("credit_plan_versions", {
   id: uuid("id").primaryKey().defaultRandom(),
-  planId: uuid("plan_id").notNull(), // References credit plan
+  planId: uuid("plan_id").notNull().references(() => creditPlans.id, { onDelete: "cascade" }),
   version: integer("version").notNull(),
   snapshot: json("snapshot").notNull().$type<Record<string, any>>(),
   changedBy: uuid("changed_by").references(() => users.id),
   changedAt: timestamp("changed_at").defaultNow(),
   changeReason: text("change_reason"),
   isCurrent: boolean("is_current").default(false),
-});
+}, (t) => ({
+  idxPlan: index("idx_credit_plan_versions_plan").on(t.planId),
+}));
 
 export const insertCreditPlanVersionSchema = createInsertSchema(creditPlanVersions).omit({ id: true, changedAt: true });
 export type InsertCreditPlanVersion = z.infer<typeof insertCreditPlanVersionSchema>;
@@ -441,7 +445,7 @@ export type CreditPlanVersion = typeof creditPlanVersions.$inferSelect;
 
 export const creditPenaltyStructures = pgTable("credit_penalty_structures", {
   id: uuid("id").primaryKey().defaultRandom(),
-  planId: uuid("plan_id").notNull(), // References credit plan
+  planId: uuid("plan_id").notNull().references(() => creditPlans.id, { onDelete: "cascade" }),
   daysLateMin: integer("days_late_min").notNull(),
   daysLateMax: integer("days_late_max"),
   penaltyType: varchar("penalty_type", { length: 20 }).notNull(), // 'FIXED', 'PERCENTAGE', 'COMPOUND'
@@ -450,7 +454,9 @@ export const creditPenaltyStructures = pgTable("credit_penalty_structures", {
   gracePeriodDays: integer("grace_period_days").default(0),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => ({
+  idxPlan: index("idx_credit_penalty_structures_plan").on(t.planId),
+}));
 
 export const insertCreditPenaltyStructureSchema = createInsertSchema(creditPenaltyStructures).omit({ id: true, createdAt: true });
 export type InsertCreditPenaltyStructure = z.infer<typeof insertCreditPenaltyStructureSchema>;
@@ -625,3 +631,37 @@ export const insertCurrencyPresetSchema = createInsertSchema(currencyPresets).om
 });
 export type InsertCurrencyPreset = z.infer<typeof insertCurrencyPresetSchema>;
 export type CurrencyPreset = typeof currencyPresets.$inferSelect;
+
+// ============================================================
+// Holiday Calendars — calendriers de jours feries pour plans de credit
+// ============================================================
+
+export const holidayCalendars = pgTable("holiday_calendars", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  nom: text("nom").notNull(),
+  description: text("description"),
+  agenceId: uuid("agence_id").references(() => agences.id), // null = global
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertHolidayCalendarSchema = createInsertSchema(holidayCalendars).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertHolidayCalendar = z.infer<typeof insertHolidayCalendarSchema>;
+export type HolidayCalendar = typeof holidayCalendars.$inferSelect;
+
+export const holidayDates = pgTable("holiday_dates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  calendarId: uuid("calendar_id").notNull().references(() => holidayCalendars.id, { onDelete: "cascade" }),
+  date: date("date").notNull(),
+  name: text("name").notNull(),
+  isRecurring: boolean("is_recurring").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  idxCalendar: index("idx_holiday_dates_calendar").on(t.calendarId),
+  uqCalendarDate: uniqueIndex("uq_holiday_dates_calendar_date").on(t.calendarId, t.date),
+}));
+
+export const insertHolidayDateSchema = createInsertSchema(holidayDates).omit({ id: true, createdAt: true });
+export type InsertHolidayDate = z.infer<typeof insertHolidayDateSchema>;
+export type HolidayDate = typeof holidayDates.$inferSelect;

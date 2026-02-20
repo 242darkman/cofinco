@@ -1071,10 +1071,10 @@ export const creditApi = {
 
 // Credit Plans API
 export const creditPlanApi = {
-  getAll: (params?: { actif?: boolean, agenceId?: string }) => {
+  getAll: (params?: { isActive?: boolean; agenceId?: string }) => {
     const queryParams = new URLSearchParams();
-    if (params?.actif !== undefined) queryParams.append('actif', String(params.actif));
-    // agenceId might be used for filtering admin view
+    if (params?.isActive !== undefined) queryParams.append('isActive', String(params.isActive));
+    if (params?.agenceId) queryParams.append('agenceId', params.agenceId);
     const query = queryParams.toString();
     return request<any[]>(`/credit-plans${query ? `?${query}` : ''}`);
   },

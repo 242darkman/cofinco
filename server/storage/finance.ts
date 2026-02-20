@@ -7,7 +7,7 @@ import {
   } from "@shared/schema";
 import { createLogger } from "../lib/logger";
 import { randomInt, randomBytes } from "crypto";
-import { D, roundMoney, splitEvenly } from "../lib/money";
+import { D, roundMoney } from "../lib/money";
 
 const logger = createLogger('Finance');
 
@@ -56,7 +56,7 @@ export { DecaissementInsufficientFundsError, InsufficientFundsError, type Insuff
     caisseTransferts, type CaisseTransfert, type InsertCaisseTransfert,
     type Agence, type CaisseAssignation,
     type DureeSuggeree, type InsertDureeSuggeree,
-    creditPlans, type UserCreditPlan, type InsertCreditPlan, insertCreditPlanSchema,
+    creditPlans, creditPlanFees, type UserCreditPlan, type InsertCreditPlan, type CreditPlanFee, type InsertCreditPlanFee, insertCreditPlanSchema,
     creditRefundRequests, type CreditRefundRequest, type InsertCreditRefundRequest,
     echeancesCredits, type EcheanceCredit, type InsertEcheanceCredit
   } from "@shared/schema";
@@ -216,7 +216,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
   }
 
   // Credits
-  export async function getCredit(id: string): Promise<Credit & { fraisDossierPaye?: boolean } | undefined> {
+  export async function getCredit(id: string): Promise<Credit & { fraisEngagementPayes?: boolean } | undefined> {
     const [result] = await db.select({
       credit: credits,
       demande: demandesCredit
@@ -229,7 +229,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
 
     return {
       ...enrichCreditData(result.credit),
-      fraisDossierPaye: result.demande?.fraisEngagementPayes || false
+      fraisEngagementPayes: result.demande?.fraisEngagementPayes || false
     };
   }
   
@@ -401,33 +401,105 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     return updated;
   }
 
-  export async function getAllCreditPlans(filter: { actif?: boolean, agenceId?: string } = {}): Promise<UserCreditPlan[]> {
+  export async function getAllCreditPlans(filter: { isActive?: boolean, agenceId?: string } = {}): Promise<(UserCreditPlan & { fees: CreditPlanFee[] })[]> {
     const conditions = [];
-    if (filter.actif !== undefined) conditions.push(eq(creditPlans.actif, filter.actif));
+    if (filter.isActive !== undefined) conditions.push(eq(creditPlans.isActive, filter.isActive));
     if (filter.agenceId) conditions.push(eq(creditPlans.agenceId, filter.agenceId));
-    
-    return db.select().from(creditPlans)
-      .where(and(...conditions))
+
+    const plans = await db.select().from(creditPlans)
+      .where(conditions.length ? and(...conditions) : undefined)
       .orderBy(desc(creditPlans.createdAt));
+
+    if (plans.length === 0) return [];
+
+    const planIds = plans.map(p => p.id);
+    const fees = await db.select().from(creditPlanFees)
+      .where(inArray(creditPlanFees.planId, planIds))
+      .orderBy(creditPlanFees.sortOrder);
+
+    const feesByPlan = new Map<string, CreditPlanFee[]>();
+    for (const fee of fees) {
+      const list = feesByPlan.get(fee.planId) || [];
+      list.push(fee);
+      feesByPlan.set(fee.planId, list);
+    }
+
+    return plans.map(p => ({ ...p, fees: feesByPlan.get(p.id) || [] }));
   }
 
-  export async function getCreditPlan(id: string): Promise<UserCreditPlan | undefined> {
+  export async function getCreditPlan(id: string): Promise<(UserCreditPlan & { fees: CreditPlanFee[] }) | undefined> {
     const [plan] = await db.select().from(creditPlans).where(eq(creditPlans.id, id));
-    return plan;
+    if (!plan) return undefined;
+
+    const fees = await db.select().from(creditPlanFees)
+      .where(eq(creditPlanFees.planId, id))
+      .orderBy(creditPlanFees.sortOrder);
+
+    return { ...plan, fees };
   }
 
-  export async function createCreditPlan(plan: InsertCreditPlan): Promise<UserCreditPlan> {
-    const [newPlan] = await db.insert(creditPlans).values(plan).returning();
-    return newPlan;
+  export async function createCreditPlan(
+    plan: InsertCreditPlan,
+    fees: InsertCreditPlanFee[] = [],
+  ): Promise<UserCreditPlan & { fees: CreditPlanFee[] }> {
+    return await db.transaction(async (tx) => {
+      const [newPlan] = await tx.insert(creditPlans).values(plan).returning();
+
+      const insertedFees: CreditPlanFee[] = [];
+      if (fees.length > 0) {
+        const feesWithPlanId = fees.map((f, i) => ({ ...f, planId: newPlan.id, sortOrder: i }));
+        const result = await tx.insert(creditPlanFees).values(feesWithPlanId).returning();
+        insertedFees.push(...result);
+      }
+
+      return { ...newPlan, fees: insertedFees };
+    });
   }
 
-  export async function updateCreditPlan(id: string, plan: Partial<InsertCreditPlan>): Promise<UserCreditPlan | undefined> {
-    const [updated] = await db.update(creditPlans).set(plan).where(eq(creditPlans.id, id)).returning();
-    return updated;
+  export async function updateCreditPlan(
+    id: string,
+    plan: Partial<InsertCreditPlan>,
+    fees?: InsertCreditPlanFee[],
+    expectedVersion?: number,
+  ): Promise<(UserCreditPlan & { fees: CreditPlanFee[] }) | undefined> {
+    return await db.transaction(async (tx) => {
+      // Optimistic locking
+      if (expectedVersion !== undefined) {
+        const [existing] = await tx.select({ version: creditPlans.version }).from(creditPlans).where(eq(creditPlans.id, id));
+        if (!existing || existing.version !== expectedVersion) {
+          throw new Error("CONFLICT: Le plan a ete modifie par un autre utilisateur");
+        }
+      }
+
+      const updateData = {
+        ...plan,
+        version: sql`${creditPlans.version} + 1`,
+        updatedAt: new Date(),
+      };
+      const [updated] = await tx.update(creditPlans).set(updateData).where(eq(creditPlans.id, id)).returning();
+      if (!updated) return undefined;
+
+      // Replace fees if provided
+      let resultFees: CreditPlanFee[];
+      if (fees !== undefined) {
+        await tx.delete(creditPlanFees).where(eq(creditPlanFees.planId, id));
+        resultFees = [];
+        if (fees.length > 0) {
+          const feesWithPlanId = fees.map((f, i) => ({ ...f, planId: id, sortOrder: i }));
+          resultFees = await tx.insert(creditPlanFees).values(feesWithPlanId).returning();
+        }
+      } else {
+        resultFees = await tx.select().from(creditPlanFees)
+          .where(eq(creditPlanFees.planId, id))
+          .orderBy(creditPlanFees.sortOrder);
+      }
+
+      return { ...updated, fees: resultFees };
+    });
   }
 
   export async function deleteCreditPlan(id: string): Promise<boolean> {
-    const result = await db.update(creditPlans).set({ actif: false }).where(eq(creditPlans.id, id)).returning();
+    const result = await db.update(creditPlans).set({ isActive: false }).where(eq(creditPlans.id, id)).returning();
     return result.length > 0;
   }
   
@@ -3607,14 +3679,14 @@ export async function createFactureForDepotInitial(data: {
 }
 
 /**
- * Automatically generate payment schedule for a credit
+ * Automatically generate payment schedule for a credit using the plan engine.
  */
 export async function generateCreditSchedule(
   creditId: string,
   tx?: PgTransaction<any, any, any>
 ): Promise<EcheanceCredit[]> {
   const executor = tx || db;
-  
+
   // 1. Get Credit
   const [credit] = await executor.select().from(credits).where(eq(credits.id, creditId));
   if (!credit) throw new Error("Credit not found for schedule generation");
@@ -3623,51 +3695,33 @@ export async function generateCreditSchedule(
   const existing = await executor.select().from(echeancesCredits).where(eq(echeancesCredits.creditId, creditId));
   if (existing.length > 0) return existing;
 
-  // 3. Calculate Schedule
+  // 3. Generate using the plan engine
+  const { generateSchedule, buildLegacyPlanConfig } = await import("../services/credit-plan");
+
   const startDate = new Date(credit.dateDebut || Date.now());
-  const dAmount = D(credit.montant);
-  const dRate = D(credit.taux).div(100);
-  const duration = credit.duree || 1;
-  const frequency = credit.echeance as string;
+  const planConfig = buildLegacyPlanConfig({
+    taux: credit.taux,
+    duree: credit.duree || 1,
+    echeance: credit.echeance as string,
+  });
 
-  // Simple Interest Calculation (Decimal: exact division + remainder handling)
-  const dTotalAmount = dAmount.times(D(1).plus(dRate));
-  const dInterestTotal = dTotalAmount.minus(dAmount);
+  const result = generateSchedule({
+    principal: D(credit.montant),
+    disbursementDate: startDate,
+    plan: planConfig,
+    fees: [],
+  });
 
-  // Split evenly with remainder absorbed by last installment
-  const capitalParts = splitEvenly(dAmount, duration);
-  const interestParts = splitEvenly(dInterestTotal, duration);
-
-  const schedule: InsertEcheanceCredit[] = [];
-  let currentDate = new Date(startDate);
-
-  for (let i = 1; i <= duration; i++) {
-    // Advance date based on frequency
-    if (frequency === FrequenceRemboursement.WEEKLY) {
-      currentDate.setDate(currentDate.getDate() + 7);
-    } else if (frequency === FrequenceRemboursement.BI_MONTHLY) {
-      currentDate.setDate(currentDate.getDate() + 15);
-    } else if (frequency === FrequenceRemboursement.DAILY) {
-      currentDate.setDate(currentDate.getDate() + 1);
-    } else {
-      // MONTHLY default
-      currentDate.setMonth(currentDate.getMonth() + 1);
-    }
-
-    const dCapital = capitalParts[i - 1];
-    const dInterest = interestParts[i - 1];
-
-    schedule.push({
-      creditId: credit.id,
-      numeroEcheance: i,
-      dateEcheance: new Date(currentDate),
-      montantCapital: roundMoney(dCapital),
-      montantInteret: roundMoney(dInterest),
-      montantTotal: roundMoney(dCapital.plus(dInterest)),
-      statut: 'UPCOMING',
-      sequence: i
-    });
-  }
+  const schedule: InsertEcheanceCredit[] = result.rows.map((row) => ({
+    creditId: credit.id,
+    numeroEcheance: row.number,
+    dateEcheance: row.date,
+    montantCapital: roundMoney(row.capitalPayment),
+    montantInteret: roundMoney(row.interestPayment),
+    montantTotal: roundMoney(row.totalPayment),
+    statut: 'UPCOMING',
+    sequence: row.number,
+  }));
 
   if (schedule.length === 0) return [];
 

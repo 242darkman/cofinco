@@ -39,18 +39,11 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
     if (demande.montantFraisEngagement) {
       return parseFloat(demande.montantFraisEngagement);
     }
-    if (demande.planCredit?.fraisDossier) {
-      return parseFloat(demande.plan_credit.frais_dossier);
-    }
-    if (demande.fraisDossier) {
-      return parseFloat(demande.fraisDossier);
-    }
     return (demande.montantDemande || 0) * 0.10;
   }, [demande]);
 
   const feeSource = useMemo(() => {
     if (demande.montantFraisEngagement) return 'demande';
-    if (demande.planCredit?.fraisDossier || demande.fraisDossier) return 'plan';
     return 'calculated';
   }, [demande]);
 
@@ -388,7 +381,7 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
               <div className="text-right">
                 <div className="text-2xl font-black text-status-success">{formatMoney(feeAmount)}</div>
                 <p className="text-[9px] text-content-muted uppercase tracking-wide">
-                  {feeSource === 'plan' ? 'Selon plan crédit' : feeSource === 'demande' ? 'Montant fixe' : '10% du crédit'}
+                  {feeSource === 'demande' ? 'Montant fixe' : '10% du crédit'}
                 </p>
               </div>
             </div>

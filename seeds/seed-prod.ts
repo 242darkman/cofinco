@@ -3072,11 +3072,11 @@ async function seedProductsCatalog(context: SeedContext, dryRun: boolean): Promi
   }
   results.push({ table: 'produitsCompte', action: 'created', count: produits.length });
 
-  // Credit Plans - delete all existing then insert canonical plans
+  // Credit Plans - delete all existing then insert canonical plans (new schema)
   const creditPlansData = [
-    { nom: 'Pamba', description: 'Crédit Pamba', typeCredit: 'Personnel', montantMin: '50000', montantMax: '100000', tauxInteret: '10', dureeValeur: 10, dureeUnite: 'DAY', frequenceRemboursement: 'DAILY', conditions: [] as string[], actif: true },
-    { nom: 'Solidaire-Fidel 1', description: 'Crédit Solidaire-Fidel 1', typeCredit: 'Personnel', montantMin: '200000', montantMax: '300000', tauxInteret: '12', dureeValeur: 84, dureeUnite: 'DAY', frequenceRemboursement: 'WEEKLY', conditions: [] as string[], actif: true },
-    { nom: 'Scolaire', description: 'Crédit Scolaire', typeCredit: 'Personnel', montantMin: '50000', montantMax: '100000', tauxInteret: '21', dureeValeur: 42, dureeUnite: 'DAY', frequenceRemboursement: 'WEEKLY', conditions: [] as string[], actif: true },
+    { nom: 'Pamba', description: 'Credit Pamba', typeCredit: 'PERSONAL' as const, montantMin: '50000', montantMax: '100000', tauxInteret: '10', dureeValeur: 10, dureeUnite: 'DAY' as const, frequenceRemboursement: 'DAILY' as const, conditions: [] as string[], isActive: true },
+    { nom: 'Solidaire-Fidel 1', description: 'Credit Solidaire-Fidel 1', typeCredit: 'PERSONAL' as const, montantMin: '200000', montantMax: '300000', tauxInteret: '12', dureeValeur: 84, dureeUnite: 'DAY' as const, frequenceRemboursement: 'WEEKLY' as const, conditions: [] as string[], isActive: true },
+    { nom: 'Scolaire', description: 'Credit Scolaire', typeCredit: 'PERSONAL' as const, montantMin: '50000', montantMax: '100000', tauxInteret: '21', dureeValeur: 42, dureeUnite: 'DAY' as const, frequenceRemboursement: 'WEEKLY' as const, conditions: [] as string[], isActive: true },
   ];
 
   await db.delete(creditPlans);

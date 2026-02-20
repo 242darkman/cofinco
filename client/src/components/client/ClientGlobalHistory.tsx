@@ -13,17 +13,12 @@ import {
 } from 'lucide-react';
 import { Card } from '../ui';
 import { ALL_STATUS_LABELS } from '../../lib/status-labels';
+import { typeCreditLabel } from '../../lib/credit-labels';
 
 const TYPE_COMPTE_LABELS: Record<string, string> = {
     SAVINGS: 'Épargne',
     CURRENT: 'Courant',
     BLOCKED: 'Bloqué',
-};
-
-const TYPE_CREDIT_LABELS: Record<string, string> = {
-    PERSONAL: 'Personnel',
-    REAL_ESTATE: 'Immobilier',
-    COMMERCIAL: 'Commercial',
 };
 
 interface HistoryItem {
@@ -53,7 +48,7 @@ function getContextDetail(item: HistoryItem): string | null {
         parts.push(`Compte ${typeLabel} ${item.numeroCompte}`.trim());
     }
     if (item.numeroCredit) {
-        const typeLabel = item.typeCredit ? TYPE_CREDIT_LABELS[item.typeCredit] || item.typeCredit : '';
+        const typeLabel = typeCreditLabel(item.typeCredit);
         parts.push(`Crédit ${typeLabel} ${item.numeroCredit}`.trim());
     }
     if (item.nomTontine) {

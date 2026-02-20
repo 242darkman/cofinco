@@ -13,6 +13,7 @@ import { formatMoney, formatClientName } from '../../../lib/format';
 import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import { validateAmount, VALIDATION_LIMITS } from '../../../lib/validation';
 import { Badge, ConfirmDialog } from '../../ui';
+import { typeCreditLabel, frequenceLabel, frequenceEcheanceLabel, dureeUniteLabel } from '../../../lib/credit-labels';
 import { ReevaluationEligibilityCheck } from './ReevaluationEligibilityCheck';
 import { ReevaluationModal } from './ReevaluationModal';
 import { CreditTimeline } from './CreditTimeline';
@@ -602,11 +603,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                 <div className="bg-surface rounded-lg p-3 border border-edge hover:border-status-info/50 transition-colors">
                     <div className="flex items-center gap-2 text-content-muted text-xs mb-1">
                         <Wallet size={14} className="text-status-info" />
-                        {['Journalier', 'DAILY'].includes(demande.frequenceRemboursement) ? 'Échéance Journalière' :
-                         ['Hebdomadaire', 'WEEKLY'].includes(demande.frequenceRemboursement) ? 'Échéance Hebdo' :
-                         ['Bimensuel', 'BIMONTHLY'].includes(demande.frequenceRemboursement) ? 'Échéance Bimensuelle' :
-                         ['Trimestriel', 'QUARTERLY'].includes(demande.frequenceRemboursement) ? 'Échéance Trimestrielle' :
-                         'Mensualité Est'}
+                        {frequenceEcheanceLabel(demande.frequenceRemboursement)}
                     </div>
                     <div className="text-lg md:text-xl font-bold text-content-primary">{formatMoney(mensualite)}</div>
                 </div>
@@ -728,12 +725,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                                 <div className="text-xs text-content-muted mb-1">Durée</div>
                                 <div className="text-sm text-content-primary font-medium">
                                     {demande.dureeValeur} <span className="text-content-muted lowercase">
-                                        {['Jour', 'day', 'Day', 'JOUR', 'DAY'].includes(demande.dureeUnite)
-                                            ? (demande.dureeValeur === 1 ? 'jour' : 'jours') :
-                                         ['Semaine', 'week', 'Week', 'SEMAINE', 'WEEK'].includes(demande.dureeUnite)
-                                            ? (demande.dureeValeur === 1 ? 'semaine' : 'semaines') :
-                                         ['Mois', 'month', 'Month', 'MOIS', 'MONTH'].includes(demande.dureeUnite)
-                                            ? 'mois' : demande.dureeUnite}
+                                        {dureeUniteLabel(demande.dureeUnite, demande.dureeValeur > 1)}
                                     </span>
                                 </div>
                             </div>
@@ -741,10 +733,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                                 <div className="text-xs text-content-muted mb-1">Nb Échéances</div>
                                 <div className="text-sm text-content-primary font-medium">
                                     {nombreEcheancesCalc} <span className="text-content-muted text-xs">
-                                        ({demande.frequenceRemboursement === 'DAILY' ? 'Journalier' : 
-                                          demande.frequenceRemboursement === 'WEEKLY' ? 'Hebdomadaire' : 
-                                          demande.frequenceRemboursement === 'MONTHLY' ? 'Mensuel' : 
-                                          demande.frequenceRemboursement})
+                                        ({frequenceLabel(demande.frequenceRemboursement)})
                                     </span>
                                 </div>
                             </div>
@@ -755,9 +744,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                             <div>
                                 <div className="text-xs text-content-muted mb-1">Type Crédit</div>
                                 <div className="text-sm text-content-primary font-medium truncate">
-                                    {demande.typeCredit === 'PERSONAL' ? 'Personnel' : 
-                                     demande.typeCredit === 'BUSINESS' ? 'Business' : 
-                                     (demande.typeCredit || 'Standard')}
+                                    {typeCreditLabel(demande.typeCredit)}
                                 </div>
                             </div>
                         </div>

@@ -6,7 +6,7 @@ import { clients } from "./clients";
 import { users } from "./auth";
 import { agences } from "./agences";
 // import { caisses } from "./operations"; // Removed circular dependency
-import { dureeUniteEnum, frequenceRemboursementEnum, methodePaiementEnum, statutDemandeEnum, typeRevenuEnum, typeCreditEnum, typeEvenementEnum, sourceModuleEnum, sensMouvementEnum, statutTransactionEnum, typeTauxInteretEnum, typeTransactionEpargneEnum, typeOperationCaisseEnum, statutTransfertCaisseEnum, typePaiementTerrainEnum, typeCompteEnum, statutCompteEnum, motifBlocageEnum, statutReevaluationEnum, typeElementNouveauEnum, statutCreditEnum, statutCaisseMainEnum, statutSessionCaisseEnum, statutEnqueteCreditEnum, statutPlanEpargneEnum, statutObjectifEpargneEnum, statutVersementAutoEnum, statutDecaissementProgEnum, frequenceVirementEnum, statutAuditVirementEnum, statutRunVirementEnum, statutEnqueteComplementaireEnum, statutRefundRequestEnum, disbursementChannelEnum, disbursementStatusEnum, statutEcheanceCreditEnum, agentRecommendationEnum, riskLevelEnum, suspensionReasonEnum, closureRequestStatusEnum, closurePayoutStatusEnum, closurePayoutMethodEnum, openingRequestStatusEnum, caisseRequestCategoryEnum, caisseRequestStatusEnum } from "@shared/enum/enums";
+import { dureeUniteEnum, frequenceRemboursementEnum, methodePaiementEnum, statutDemandeEnum, typeRevenuEnum, typeCreditEnum, typeEvenementEnum, sourceModuleEnum, sensMouvementEnum, statutTransactionEnum, typeTauxInteretEnum, typeTransactionEpargneEnum, typeOperationCaisseEnum, statutTransfertCaisseEnum, typePaiementTerrainEnum, typeCompteEnum, statutCompteEnum, motifBlocageEnum, statutReevaluationEnum, typeElementNouveauEnum, statutCreditEnum, statutCaisseMainEnum, statutSessionCaisseEnum, statutEnqueteCreditEnum, statutPlanEpargneEnum, statutObjectifEpargneEnum, statutVersementAutoEnum, statutDecaissementProgEnum, frequenceVirementEnum, statutAuditVirementEnum, statutRunVirementEnum, statutEnqueteComplementaireEnum, statutRefundRequestEnum, disbursementChannelEnum, disbursementStatusEnum, statutEcheanceCreditEnum, agentRecommendationEnum, riskLevelEnum, suspensionReasonEnum, closureRequestStatusEnum, closurePayoutStatusEnum, closurePayoutMethodEnum, openingRequestStatusEnum, caisseRequestCategoryEnum, caisseRequestStatusEnum, firstDueRuleEnum, calendarModeEnum, shiftNonWorkingDayEnum, interestMethodEnum, interestRatePeriodEnum, dayCountConventionEnum, roundingModeEnum, amortizationTypeEnum, feeTypeEnum, feeCalcTypeEnum, feeCollectionModeEnum, lateFeeTypeEnum, penaltyApplicationEnum, prepaymentFeeTypeEnum, guaranteeReleaseRuleEnum } from "@shared/enum/enums";
 import { factures } from "./operations";
 import { coffresForts } from "./coffres-forts";
 
@@ -41,29 +41,122 @@ export const insertInterestRateSchema = createInsertSchema(interestRates).omit({
 export type InsertInterestRate = z.infer<typeof insertInterestRateSchema>;
 export type InterestRate = typeof interestRates.$inferSelect;
 
-// Credits table
+// Credit Plans
 export const creditPlans = pgTable("credit_plans", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  // === IDENTITE ===
+  id: uuid("id").primaryKey().defaultRandom(),
   nom: text("nom").notNull(),
   description: text("description"),
-  typeCredit: text("type_credit").notNull(), // Personnel, Immobilier, Commercial
+  typeCredit: typeCreditEnum("type_credit").notNull().default("PERSONAL"),
+
+  // === MONTANTS ===
   montantMin: numeric("montant_min"),
   montantMax: numeric("montant_max"),
-  tauxInteret: numeric("taux_interet").notNull(), // Pourcentage
+
+  // === DUREE & REMBOURSEMENT ===
   dureeValeur: integer("duree_valeur").notNull(),
-  dureeUnite: text("duree_unite").notNull(), // Jour, Semaine, Mois
-  frequenceRemboursement: text("frequence_remboursement").notNull(), // Journalier, Hebdomadaire, Mensuel...
-  fraisDossier: numeric("frais_dossier"), // Montant fixe ou pourcentage (à gérer logiquement)
-  conditions: text("conditions").array(), // Liste de conditions requises
-  documentsRequis: text("documents_requis").array(), // Documents nécessaires
-  actif: boolean("actif").default(true),
-  agenceId: text("agence_id"), // NULL = Global, sinon spécifique agence
+  dureeUnite: dureeUniteEnum("duree_unite").notNull(),
+  frequenceRemboursement: frequenceRemboursementEnum("frequence_remboursement").notNull(),
+
+  // === INTERETS ===
+  tauxInteret: numeric("taux_interet").notNull(),
+  interestMethod: interestMethodEnum("interest_method").notNull().default("FLAT"),
+  interestRatePeriod: interestRatePeriodEnum("interest_rate_period").notNull().default("MONTHLY"),
+  dayCountConvention: dayCountConventionEnum("day_count_convention").notNull().default("30_360"),
+  interestRoundingMode: roundingModeEnum("interest_rounding_mode").notNull().default("ROUND"),
+  interestRoundingUnit: integer("interest_rounding_unit").notNull().default(1),
+  amortizationType: amortizationTypeEnum("amortization_type").notNull().default("EQUAL_INSTALLMENTS"),
+  allowPartialPayments: boolean("allow_partial_payments").notNull().default(true),
+
+  // === CALENDRIER & PREMIERE ECHEANCE ===
+  firstDueRule: firstDueRuleEnum("first_due_rule").notNull().default("NEXT_DAY"),
+  gracePeriodDays: integer("grace_period_days").notNull().default(0),
+  preferredWeekday: integer("preferred_weekday"), // 0=dimanche ... 6=samedi
+  calendarMode: calendarModeEnum("calendar_mode").notNull().default("ALL_DAYS"),
+  weekdaysMask: integer("weekdays_mask").notNull().default(127), // bitmask 1111111
+  shiftNonWorkingDay: shiftNonWorkingDayEnum("shift_non_working_day").notNull().default("NEXT"),
+  holidayCalendarId: uuid("holiday_calendar_id"), // FK ajoutée dans relations
+  allowManualFirstDueDate: boolean("allow_manual_first_due_date").notNull().default(false),
+
+  // === RETARD & PENALITES ===
+  lateFeeEnabled: boolean("late_fee_enabled").notNull().default(true),
+  lateFeeGraceDays: integer("late_fee_grace_days").notNull().default(0),
+  lateFeeType: lateFeeTypeEnum("late_fee_type").notNull().default("PERCENTAGE"),
+  lateFeeValue: numeric("late_fee_value").notNull().default("2"),
+  lateInterestEnabled: boolean("late_interest_enabled").notNull().default(false),
+  lateInterestRate: numeric("late_interest_rate"),
+  penaltyCap: numeric("penalty_cap"),
+  penaltyApplication: penaltyApplicationEnum("penalty_application").notNull().default("PER_INSTALLMENT"),
+
+  // === REMBOURSEMENT ANTICIPE ===
+  prepaymentAllowed: boolean("prepayment_allowed").notNull().default(true),
+  prepaymentFeeType: prepaymentFeeTypeEnum("prepayment_fee_type").notNull().default("NONE"),
+  prepaymentFeeValue: numeric("prepayment_fee_value"),
+  prepaymentInterestRebate: boolean("prepayment_interest_rebate").notNull().default(false),
+
+  // === ELIGIBILITE ===
+  minSegment: text("min_segment"), // RISQUE | STANDARD | PREMIUM | VIP
+  minScoreGlobal: integer("min_score_global"),
+  minPointsFidelite: integer("min_points_fidelite"),
+  minTauxRemboursement: numeric("min_taux_remboursement"),
+  kycRequired: boolean("kyc_required").notNull().default(false),
+  maxDebtToIncomeRatio: numeric("max_debt_to_income_ratio"),
+  requireSavingsAccount: boolean("require_savings_account").notNull().default(false),
+
+  // === GARANTIES ===
+  collateralRequired: boolean("collateral_required").notNull().default(false),
+  collateralTypes: text("collateral_types").array(),
+  guaranteeDepositPercent: numeric("guarantee_deposit_percent"),
+  guaranteeDepositMin: numeric("guarantee_deposit_min"),
+  guaranteeReleaseRule: guaranteeReleaseRuleEnum("guarantee_release_rule").default("ON_FULL_REPAYMENT"),
+
+  // === GOUVERNANCE ===
+  isActive: boolean("is_active").notNull().default(true),
+  effectiveFrom: timestamp("effective_from"),
+  effectiveTo: timestamp("effective_to"),
+  version: integer("version").notNull().default(1),
+  updatedBy: uuid("updated_by"),
+  createdBy: uuid("created_by"),
+
+  // === META ===
+  conditions: text("conditions").array(),
+  documentsRequis: text("documents_requis").array(),
+  agenceId: text("agence_id"), // NULL = Global
   createdAt: timestamp("created_at").defaultNow(),
-});
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => ({
+  idxActive: index("idx_credit_plans_active").on(t.isActive),
+  idxAgence: index("idx_credit_plans_agence").on(t.agenceId),
+  idxType: index("idx_credit_plans_type").on(t.typeCredit),
+}));
 
 export const insertCreditPlanSchema = createInsertSchema(creditPlans);
 export type UserCreditPlan = typeof creditPlans.$inferSelect;
 export type InsertCreditPlan = typeof creditPlans.$inferInsert;
+
+// Credit Plan Fees
+export const creditPlanFees = pgTable("credit_plan_fees", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  planId: uuid("plan_id").notNull().references(() => creditPlans.id, { onDelete: "cascade" }),
+  feeType: feeTypeEnum("fee_type").notNull(),
+  label: text("label"),
+  calcType: feeCalcTypeEnum("calc_type").notNull().default("FIXED"),
+  value: numeric("value").notNull(),
+  minAmount: numeric("min_amount"),
+  maxAmount: numeric("max_amount"),
+  collectionMode: feeCollectionModeEnum("collection_mode").notNull().default("UPFRONT"),
+  isRefundable: boolean("is_refundable").notNull().default(false),
+  accountingCode: text("accounting_code"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  idxPlan: index("idx_credit_plan_fees_plan").on(t.planId),
+}));
+
+export const insertCreditPlanFeeSchema = createInsertSchema(creditPlanFees);
+export type CreditPlanFee = typeof creditPlanFees.$inferSelect;
+export type InsertCreditPlanFee = typeof creditPlanFees.$inferInsert;
 
 export const credits = pgTable(
   "credits",
