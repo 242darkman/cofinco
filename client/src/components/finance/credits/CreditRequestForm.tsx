@@ -792,6 +792,14 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId }: Cred
                 </div>
 
                 {/* Hero Amount */}
+                {(() => {
+                   const planMin = selectedPlan ? parseFloat(selectedPlan.montantMin) : NaN;
+                   const planMax = selectedPlan ? parseFloat(selectedPlan.montantMax) : NaN;
+                   const isFixedAmount = !isNaN(planMin) && !isNaN(planMax) && planMin === planMax;
+                   const hasRange = !isNaN(planMin) && !isNaN(planMax) && planMin !== planMax;
+                   const montant = parseFloat(formData.montant_demande) || 0;
+                   const rangeError = hasRange && montant > 0 && (montant < planMin || montant > planMax);
+                   return (
                 <div className="flex-1 flex flex-col justify-center pb-4">
                    <label className="text-center text-xs font-bold text-content-muted uppercase tracking-wider mb-4">{label('Montant Demandé')}</label>
                    <div className="relative max-w-sm mx-auto w-full">
@@ -800,13 +808,26 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId }: Cred
                         pattern="[0-9]*"
                         value={formData.montant_demande}
                         onChange={e => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormData({...formData, montant_demande: v}); }}
-                        className={`w-full h-24 bg-surface-base/50 border-2 ${errors.montant_demande ? 'border-status-danger/50' : 'border-edge'} focus:border-accent/50 rounded-2xl pl-8 pr-8 text-5xl font-black text-content-primary text-center outline-none transition-all placeholder:text-content-primary`}
+                        className={`w-full h-24 bg-surface-base/50 border-2 ${errors.montant_demande ? 'border-status-danger/50' : 'border-edge'} focus:border-accent/50 rounded-2xl pl-8 pr-8 text-5xl font-black text-content-primary text-center outline-none transition-all placeholder:text-content-primary ${isFixedAmount ? 'opacity-60 cursor-not-allowed' : ''}`}
                         placeholder="0"
-                        autoFocus
+                        readOnly={isFixedAmount}
+                        autoFocus={!isFixedAmount}
                       />
                       <span className="absolute left-6 top-1/2 -translate-y-1/2 text-content-secondary opacity-20 text-3xl font-black">{currency.symbol}</span>
                    </div>
+                   {isFixedAmount && (
+                     <div className="mt-2 text-center text-xs font-medium text-content-muted">
+                       Montant fixé par le plan
+                     </div>
+                   )}
+                   {hasRange && (
+                     <div className={`mt-2 text-center text-xs font-medium ${rangeError ? 'text-status-danger' : 'text-content-muted'}`}>
+                       Min {fmt(planMin)} — Max {fmt(planMax)}
+                     </div>
+                   )}
                 </div>
+                   );
+                })()}
              </div>
            )}
 
