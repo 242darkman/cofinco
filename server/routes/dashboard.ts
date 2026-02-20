@@ -109,14 +109,14 @@ export function registerDashboardRoutes(app: Express) {
           enCours: sql<number>`COUNT(CASE WHEN ${credits.statut} = ${StatutCredit.ACTIVE} THEN 1 END)`,
           enAttente: sql<number>`COUNT(CASE WHEN ${credits.statut} = ${StatutCredit.PENDING} THEN 1 END)`,
           enRetard: sql<number>`COUNT(CASE WHEN ${credits.statut} = ${StatutCredit.LATE} THEN 1 END)`,
-          montantTotal: sql<number>`COALESCE(SUM(CASE WHEN ${credits.statut} NOT IN (${StatutCredit.CANCELLED}) THEN ${credits.montant} ELSE 0 END), 0)`,
-          montantDecaisse: sql<number>`COALESCE(SUM(CASE WHEN ${credits.statut} IN (${StatutCredit.ACTIVE}, ${StatutCredit.PAID}, ${StatutCredit.LATE}) THEN ${credits.montant} * (1 + COALESCE(${credits.taux}, 0) / 100) ELSE 0 END), 0)`,
+          capitalTotal: sql<number>`COALESCE(SUM(CASE WHEN ${credits.statut} NOT IN (${StatutCredit.CANCELLED}) THEN ${credits.montant} ELSE 0 END), 0)`, /* montant = capital principal demandé */
+          totalDecaisse: sql<number>`COALESCE(SUM(CASE WHEN ${credits.statut} IN (${StatutCredit.ACTIVE}, ${StatutCredit.PAID}, ${StatutCredit.LATE}) THEN ${credits.totalDu}::numeric ELSE 0 END), 0)`, /* totalDu = capital + intérêts + frais */
           montantRecouvre: sql<number>`COALESCE(SUM(
             CASE WHEN ${credits.statut} IN (${StatutCredit.ACTIVE}, ${StatutCredit.PAID}, ${StatutCredit.LATE})
-            THEN (${credits.montant} * (1 + COALESCE(${credits.taux}, 0) / 100) - COALESCE(CAST(${credits.soldeRestant} AS NUMERIC), 0))
+            THEN (${credits.totalDu}::numeric - ${credits.soldeRestant}::numeric)
             ELSE 0 END
-          ), 0)`,
-          montantEnAttente: sql<number>`COALESCE(SUM(CASE WHEN ${credits.statut} = ${StatutCredit.PENDING} THEN ${credits.montant} ELSE 0 END), 0)`
+          ), 0)`, /* totalDu − soldeRestant = montant effectivement remboursé */
+          capitalEnAttente: sql<number>`COALESCE(SUM(CASE WHEN ${credits.statut} = ${StatutCredit.PENDING} THEN ${credits.montant} ELSE 0 END), 0)` /* capital des crédits en attente de décaissement */
         }).from(credits).where(withAgence(credits)),
 
         // 3. Epargnes statistics - ONLY Savings accounts
@@ -357,7 +357,7 @@ export function registerDashboardRoutes(app: Express) {
       const recentCreditsData = weeklyCredits[0];
 
       // Calculate taux recouvrement
-      const montantDecaisse = Number(creditsData.montantDecaisse) || 0;
+      const montantDecaisse = Number(creditsData.totalDecaisse) || 0;
       const montantRecouvre = Number(creditsData.montantRecouvre) || 0;
       
       const tauxRecouvrement = montantDecaisse > 0 
@@ -374,10 +374,10 @@ export function registerDashboardRoutes(app: Express) {
           creditsEnCours: Number(creditsData.enCours) || 0,
           creditsEnAttente: Number(creditsData.enAttente) || 0,
           creditsRetard: Number(creditsData.enRetard) || 0,
-          montantCreditsTotal: Number(creditsData.montantTotal) || 0,
-          montantDecaisse: montantDecaisse,
+          capitalTotal: Number(creditsData.capitalTotal) || 0,
+          totalDecaisse: montantDecaisse,
           montantRecouvre: montantRecouvre,
-          montantEnAttente: Number(creditsData.montantEnAttente) || 0,
+          capitalEnAttente: Number(creditsData.capitalEnAttente) || 0,
           tauxRecouvrement: tauxRecouvrement,
           totalEpargnes: epargnesData.total,
           epargneActive: Number(epargnesData.actifs) || 0,

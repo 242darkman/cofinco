@@ -49,6 +49,13 @@ import {
   DureeUnite as DureeUniteEnum,
   FrequenceRemboursement,
 } from "@shared/enum/status-constants";
+import type {
+  StatutCreditDz,
+  StatutDemandeDz,
+  DisbursementStatusDz,
+  DisbursementChannelDz,
+  StatutEnqueteCreditDz,
+} from "@shared/enum/enums";
 import { requireAuth } from "../auth";
 import { requireAgenceAccess, requireAgenceIdAccess } from "../middleware";
 import { attachAbility, requireAbility, requireDisbursement, hasAbility, Actions, Subjects } from "../authorization";
@@ -117,8 +124,8 @@ export function registerFinanceRoutes(app: Express) {
       if (!planData.nom) return res.status(400).json({ message: "Le nom est obligatoire" });
       if (!planData.taux_interet && !planData.tauxInteret) return res.status(400).json({ message: "Le taux d'intérêt est obligatoire" });
 
-      planData.createdBy = (req as any).user?.id;
-      planData.updatedBy = (req as any).user?.id;
+      planData.createdBy = req.user?.id;
+      planData.updatedBy = req.user?.id;
 
       const parsed = insertCreditPlanSchema.parse(planData);
       const plan = await storage.createCreditPlan(parsed, fees || []);
@@ -136,7 +143,7 @@ export function registerFinanceRoutes(app: Express) {
       const data = normalizeKeysDeep(req.body) as any;
       const { fees, expectedVersion, ...planData } = data;
 
-      planData.updatedBy = (req as any).user?.id;
+      planData.updatedBy = req.user?.id;
 
       const plan = await storage.updateCreditPlan(
         req.params.id,
@@ -173,7 +180,7 @@ export function registerFinanceRoutes(app: Express) {
   app.post("/api/credit-plans/preview-schedule", requireAuth, async (req, res) => {
     try {
       // Simple rate-limit: max 10 requests per 30s per user
-      const userId = (req as any).user?.id || "anon";
+      const userId = req.user?.id || "anon";
       const now = Date.now();
       const window = 30_000;
       const maxRequests = 10;
@@ -306,8 +313,13 @@ export function registerFinanceRoutes(app: Express) {
           data.numeroCredit = `CRED-${data.id.substring(0, 8).toUpperCase()}`;
        }
 
+       // Plan de crédit obligatoire
+       if (!data.creditPlanId) {
+         return res.status(400).json({ message: "Un plan de crédit est requis pour créer un crédit" });
+       }
+
        const parsed = insertCreditSchema.parse(data);
-       
+
        // Vérifier que le client appartient à l'agence de l'utilisateur
        const agenceFilter = req.agenceFilter as { agenceId?: string; agence?: string } | null;
        if (agenceFilter?.agenceId) {
@@ -421,8 +433,8 @@ export function registerFinanceRoutes(app: Express) {
         statutInitial = StatutCredit.WAITING_DISBURSEMENT;
         disbursementStatus = 'PENDING';
       } else if (disbursementChannel === 'MOBILE_MONEY') {
-        // Canal MOBILE_MONEY: En attente du callback API (à implémenter)
-        statutInitial = estProgramme ? StatutCredit.PENDING : StatutCredit.ACTIVE;
+        // Canal MOBILE_MONEY: En attente du callback PawaPay pour confirmer le paiement
+        statutInitial = StatutCredit.WAITING_DISBURSEMENT;
         disbursementStatus = 'PROCESSING';
       } else {
         // Canal ACCOUNT (par défaut): Flux existant
@@ -443,17 +455,18 @@ export function registerFinanceRoutes(app: Express) {
         typeCredit: demande.typeCredit || 'PERSONAL',
         objetCredit: demande.objetCredit,
         demandeId: demande.id,
-        creditPlanId: demande.creditPlanId || null,
+        creditPlanId: demande.creditPlanId,
         statut: statutInitial,
         echeance: demande.frequenceRemboursement,
         dateDebut: new Date(dateDecaissement),
         dateFin: data.dateFin ? new Date(data.dateFin) : null,
         dateSolvabilite: data.dateSolvabilite ? new Date(data.dateSolvabilite) : null,
-        soldeRestant: data.soldeRestant || roundMoney(D(montantDecaissement).times(D(1).plus(D(demande.tauxInteret).div(100)))),
+        soldeRestant: data.soldeRestant || montantDecaissement.toString(), // Placeholder — recalculé par generateCreditSchedule
+        totalDu: data.soldeRestant || montantDecaissement.toString(), // Placeholder — recalculé par generateCreditSchedule
         agenceId: compteCourant.agenceId,
         // Nouveaux champs multi-canal
-        disbursementChannel: disbursementChannel as any,
-        disbursementStatus: disbursementStatus as any,
+        disbursementChannel: disbursementChannel as DisbursementChannelDz,
+        disbursementStatus: disbursementStatus as DisbursementStatusDz,
       };
 
       // Guard: Cancel any orphan credits from previous failed disbursement attempts
@@ -463,7 +476,7 @@ export function registerFinanceRoutes(app: Express) {
 
       for (const existing of existingCreditsForDemande) {
         if (existing.statut === StatutCredit.PENDING || existing.statut === StatutCredit.WAITING_DISBURSEMENT) {
-          await storage.updateCredit(existing.id, { statut: StatutCredit.CANCELLED as any });
+          await storage.updateCredit(existing.id, { statut: StatutCredit.CANCELLED as StatutCreditDz });
           logger.warn({ creditId: existing.id, demandeId: demande.id }, 'Cancelled orphan credit from previous failed disbursement');
         } else if (existing.statut === StatutCredit.ACTIVE) {
           // An active credit already exists for this demande — prevent duplicate
@@ -505,14 +518,43 @@ export function registerFinanceRoutes(app: Express) {
           message = `Ordre de paiement envoyé à la caisse. Le client ${clientName} doit se présenter au guichet pour récupérer ${montantDecaissement.toLocaleString()} ${currencySymbol()}.`;
           break;
 
-        case 'MOBILE_MONEY':
-          // ===== CANAL MOBILE MONEY =====
-          // TODO: Intégrer avec le Payment Gateway (Orange Money, MTN MoMo, etc.)
-          // Pour l'instant, on simule un succès
-          message = `Paiement Mobile Money initié pour ${montantDecaissement.toLocaleString()} ${currencySymbol()}. Le client recevra une notification SMS.`;
-          // Note: Dans une implémentation réelle, on appellerait PaymentGateway.disburse()
-          // et le statut passerait à ACTIVE après le callback de confirmation
+        case 'MOBILE_MONEY': {
+          // ===== CANAL MOBILE MONEY (PawaPay) =====
+          const mobilePhone = client?.telephone;
+          if (!mobilePhone) {
+            await storage.updateCredit(credit.id, { statut: StatutCredit.CANCELLED as StatutCreditDz, disbursementStatus: 'FAILED' as DisbursementStatusDz });
+            return res.status(400).json({ message: "Le client n'a pas de numéro de téléphone enregistré. Décaissement Mobile Money impossible." });
+          }
+
+          const provider = (data.provider?.toUpperCase() || '') as 'MTN' | 'AIRTEL';
+          if (!provider || !['MTN', 'AIRTEL'].includes(provider)) {
+            await storage.updateCredit(credit.id, { statut: StatutCredit.CANCELLED as StatutCreditDz, disbursementStatus: 'FAILED' as DisbursementStatusDz });
+            return res.status(400).json({ message: "Opérateur Mobile Money requis (MTN ou AIRTEL)." });
+          }
+
+          try {
+            const payoutIntent = await paymentService.initiatePayout({
+              provider,
+              amount: montantDecaissement,
+              phone: mobilePhone,
+              clientId: demande.clientId,
+              compteId: compteCourant.id,
+              creditId: credit.id,
+              description: `Décaissement crédit ${numeroCredit}`,
+              agenceId: compteCourant.agenceId || undefined,
+              idempotencyKey: `disburse-${credit.id}`,
+            }, user?.id);
+
+            message = `Paiement Mobile Money ${provider} initié pour ${montantDecaissement.toLocaleString()} ${currencySymbol()} vers ${mobilePhone}. Le crédit sera activé après confirmation du transfert.`;
+            logger.info({ creditId: credit.id, intentId: payoutIntent.id, provider }, 'Mobile Money disbursement initiated');
+          } catch (payoutError) {
+            logger.error({ err: payoutError, creditId: credit.id }, 'Mobile Money disbursement failed');
+            await storage.updateCredit(credit.id, { statut: StatutCredit.CANCELLED as StatutCreditDz, disbursementStatus: 'FAILED' as DisbursementStatusDz });
+            const errorMsg = payoutError instanceof Error ? payoutError.message : 'Erreur inconnue';
+            return res.status(500).json({ message: `Échec du décaissement Mobile Money: ${errorMsg}` });
+          }
           break;
+        }
 
         case 'ACCOUNT':
         default:
@@ -530,17 +572,25 @@ export function registerFinanceRoutes(app: Express) {
 
               // Succès: Activer le crédit et marquer le décaissement comme complété
               await storage.updateCredit(credit.id, {
-                statut: StatutCredit.ACTIVE as any,
-                disbursementStatus: 'COMPLETED' as any,
+                statut: StatutCredit.ACTIVE as StatutCreditDz,
+                disbursementStatus: 'COMPLETED' as DisbursementStatusDz,
                 disbursedAt: new Date(),
                 disbursedBy: user?.id
               });
 
-              // Générer l'échéancier automatiquement à l'activation
+              // Générer l'échéancier automatiquement à l'activation (obligatoire)
               try {
                 await generateCreditSchedule(credit.id);
               } catch (scheduleErr) {
-                logger.warn({ err: scheduleErr, creditId: credit.id }, 'Échéancier non généré (non bloquant)');
+                // Échéancier obligatoire — rétrograder le crédit
+                logger.error({ err: scheduleErr, creditId: credit.id }, 'Échec génération échéancier — crédit rétrogradé à PENDING');
+                await storage.updateCredit(credit.id, {
+                  statut: StatutCredit.PENDING as StatutCreditDz,
+                  disbursementStatus: 'FAILED' as DisbursementStatusDz,
+                });
+                return res.status(500).json({
+                  message: "Le décaissement a été effectué mais la génération de l'échéancier a échoué. Le crédit est en attente de correction manuelle.",
+                });
               }
 
               // Score event: INITIAL_SCORE for newly disbursed credit
@@ -566,8 +616,8 @@ export function registerFinanceRoutes(app: Express) {
               // (PENDING → CANCELLED est autorisé par la state machine)
               try {
                 await storage.updateCredit(credit.id, {
-                  statut: StatutCredit.CANCELLED as any,
-                  disbursementStatus: 'PENDING' as any
+                  statut: StatutCredit.CANCELLED as StatutCreditDz,
+                  disbursementStatus: 'PENDING' as DisbursementStatusDz
                 });
                 logger.info({ creditId: credit.id }, 'Crédit annulé après échec du décaissement');
               } catch (cleanupErr) {
@@ -904,7 +954,7 @@ export function registerFinanceRoutes(app: Express) {
       // Mettre à jour le crédit
       const updatedCredit = await storage.updateCredit(creditId, {
         statut: StatutCredit.CANCELLED,
-        disbursementStatus: 'COMPLETED' as any // Completed = processed (even if cancelled)
+        disbursementStatus: 'COMPLETED' as DisbursementStatusDz // Completed = processed (even if cancelled)
       });
 
       // Mettre à jour la demande associée si elle existe
@@ -1238,17 +1288,17 @@ export function registerFinanceRoutes(app: Express) {
             const s = row.status || '';
             const c = Number(row.count);
 
-            if ([StatutDemande.PENDING_FEES].includes(s as any)) {
+            if (([StatutDemande.PENDING_FEES] as readonly string[]).includes(s)) {
                 mapping.toProcess += c;
-            } else if ([StatutDemande.READY_FOR_INVESTIGATION, StatutDemande.UNDER_INVESTIGATION, StatutDemande.INVESTIGATION_COMPLETE].includes(s as any)) {
+            } else if (([StatutDemande.READY_FOR_INVESTIGATION, StatutDemande.UNDER_INVESTIGATION, StatutDemande.INVESTIGATION_COMPLETE] as readonly string[]).includes(s)) {
                 mapping.investigation += c;
             } else if (s === StatutDemande.PENDING_APPROVAL) {
                 mapping.approval += c;
-            } else if ([StatutDemande.APPROVED, StatutDemande.APPROVED_AFTER_REEVALUATION].includes(s as any)) {
+            } else if (([StatutDemande.APPROVED, StatutDemande.APPROVED_AFTER_REEVALUATION] as readonly string[]).includes(s)) {
                 mapping.commission += c;
             } else if (s === StatutDemande.REEVALUATION_IN_PROGRESS) {
                 mapping.reevaluation += c;
-            } else if ([StatutDemande.REJECTED, StatutDemande.CANCELLED, StatutDemande.DEFINITIVELY_REJECTED, StatutDemande.DELETED].includes(s as any)) {
+            } else if (([StatutDemande.REJECTED, StatutDemande.CANCELLED, StatutDemande.DEFINITIVELY_REJECTED, StatutDemande.DELETED] as readonly string[]).includes(s)) {
                 mapping.archives += c;
             }
         }
@@ -1281,6 +1331,11 @@ export function registerFinanceRoutes(app: Express) {
           const { randomInt } = await import('crypto');
           const randomSuffix = randomInt(1000, 10000).toString();
           data.numeroDemande = `DEM-${dateStr}-${randomSuffix}`;
+      }
+
+      // Plan de crédit obligatoire
+      if (!data.creditPlanId) {
+        return res.status(400).json({ message: "Un plan de crédit est requis pour créer une demande" });
       }
 
       // Validation coherence frequence/duree
@@ -1322,29 +1377,27 @@ export function registerFinanceRoutes(app: Express) {
         }
       }
 
-      // Validation du plan de crédit si fourni
-      if (data.creditPlanId) {
-        const plan = await storage.getCreditPlan(data.creditPlanId);
-        if (!plan) {
-          return res.status(400).json({ message: "Plan de crédit introuvable" });
-        }
-        if (!plan.isActive) {
-          return res.status(400).json({ message: "Ce plan de crédit n'est plus actif" });
-        }
-        const now = new Date();
-        if (plan.effectiveFrom && new Date(plan.effectiveFrom) > now) {
-          return res.status(400).json({ message: "Ce plan n'est pas encore en vigueur" });
-        }
-        if (plan.effectiveTo && new Date(plan.effectiveTo) < now) {
-          return res.status(400).json({ message: "Ce plan de crédit a expiré" });
-        }
-        const montant = parseFloat(data.montantDemande);
-        if (plan.montantMin && montant < parseFloat(plan.montantMin)) {
-          return res.status(400).json({ message: `Montant minimum pour ce plan : ${plan.montantMin}` });
-        }
-        if (plan.montantMax && montant > parseFloat(plan.montantMax)) {
-          return res.status(400).json({ message: `Montant maximum pour ce plan : ${plan.montantMax}` });
-        }
+      // Validation du plan de crédit (obligatoire, déjà vérifié L1287)
+      const plan = await storage.getCreditPlan(data.creditPlanId);
+      if (!plan) {
+        return res.status(400).json({ message: "Plan de crédit introuvable" });
+      }
+      if (!plan.isActive) {
+        return res.status(400).json({ message: "Ce plan de crédit n'est plus actif" });
+      }
+      const now = new Date();
+      if (plan.effectiveFrom && new Date(plan.effectiveFrom) > now) {
+        return res.status(400).json({ message: "Ce plan n'est pas encore en vigueur" });
+      }
+      if (plan.effectiveTo && new Date(plan.effectiveTo) < now) {
+        return res.status(400).json({ message: "Ce plan de crédit a expiré" });
+      }
+      const montant = parseFloat(data.montantDemande);
+      if (plan.montantMin && montant < parseFloat(plan.montantMin)) {
+        return res.status(400).json({ message: `Montant minimum pour ce plan : ${plan.montantMin}` });
+      }
+      if (plan.montantMax && montant > parseFloat(plan.montantMax)) {
+        return res.status(400).json({ message: `Montant maximum pour ce plan : ${plan.montantMax}` });
       }
 
       const parsed = insertDemandeCreditSchema.parse(data);
@@ -1721,7 +1774,7 @@ export function registerFinanceRoutes(app: Express) {
       // Allow reassignment for READY_FOR_INVESTIGATION (assigned but agent hasn't started)
       // or UNDER_INVESTIGATION (agent started but hasn't progressed)
       const allowedReassignStatuses = [StatutDemande.READY_FOR_INVESTIGATION, StatutDemande.UNDER_INVESTIGATION];
-      if (!allowedReassignStatuses.includes(demande.statut as any)) {
+      if (!(allowedReassignStatuses as readonly string[]).includes(demande.statut ?? '')) {
         return res.status(400).json({ message: "Cette demande ne peut pas être réassignée dans son statut actuel." });
       }
 
@@ -2451,7 +2504,7 @@ export function registerFinanceRoutes(app: Express) {
             StatutDemande.REJECTED,
             StatutDemande.DEFINITIVELY_REJECTED
           ];
-          const isDecided = decisionStatuses.includes(demande.statut as any);
+          const isDecided = (decisionStatuses as readonly string[]).includes(demande.statut ?? '');
           if (isDecided || demande.dateRejet) {
               const isRejected = demande.statut === StatutDemande.REJECTED || demande.statut === StatutDemande.DEFINITIVELY_REJECTED;
               timeline.push({
@@ -2533,7 +2586,7 @@ export function registerFinanceRoutes(app: Express) {
           // Quand on enregistre le formulaire d'enquête, l'enquête est TERMINÉE
           if (enquete.demandeId) {
               logger.info({ demandeId: enquete.demandeId, newStatut: StatutDemande.INVESTIGATION_COMPLETE }, 'Updating demande status');
-              await storage.updateDemandeCredit(enquete.demandeId, { statut: StatutDemande.INVESTIGATION_COMPLETE as any });
+              await storage.updateDemandeCredit(enquete.demandeId, { statut: StatutDemande.INVESTIGATION_COMPLETE as StatutDemandeDz });
               logger.info('Demande status updated successfully');
           } else {
               logger.warn({ enqueteId: enquete.id }, 'No demandeId on enquete - status not updated');
@@ -2784,7 +2837,7 @@ export function registerFinanceRoutes(app: Express) {
 
       // IDEMPOTENCE CHECK: Verify enquete is not already processed
       const terminalStatuses = [StatutEnquete.APPROVED, StatutEnquete.REJECTED, StatutEnquete.REDUCED];
-      if (terminalStatuses.includes(enquete.statut as any)) {
+      if ((terminalStatuses as readonly string[]).includes(enquete.statut)) {
           return res.status(409).json({
               message: "Cette enquête a déjà été traitée",
               statut_actuel: enquete.statut,
@@ -2809,12 +2862,12 @@ export function registerFinanceRoutes(app: Express) {
       if (enquete.demandeId) {
           // Step 1: Transition to INVESTIGATION_COMPLETE (enquête terminée)
           await storage.updateDemandeCredit(enquete.demandeId, {
-              statut: StatutDemande.INVESTIGATION_COMPLETE as any
+              statut: StatutDemande.INVESTIGATION_COMPLETE as StatutDemandeDz
           });
 
           // Step 2: Transition to PENDING_APPROVAL (en attente d'approbation par le comité)
           await storage.updateDemandeCredit(enquete.demandeId, {
-              statut: StatutDemande.PENDING_APPROVAL as any,
+              statut: StatutDemande.PENDING_APPROVAL as StatutDemandeDz,
               montantApprouve: montant_approuve ? montant_approuve.toString() : undefined
           });
 
@@ -2877,7 +2930,7 @@ export function registerFinanceRoutes(app: Express) {
                 const { recordScoreEvent } = await import('../services/scoring-engine');
                 await recordScoreEvent({
                     clientId: credit.clientId,
-                    agenceId: userAgence,
+                    agenceId: userAgence || undefined,
                     eventType: 'CREDIT_REMBOURSEMENT',
                     refId: result.remboursement.id,
                     refType: 'remboursement',
@@ -2889,7 +2942,7 @@ export function registerFinanceRoutes(app: Express) {
                 if (credit.statut === 'PAID' || credit.statut === 'CLOSED' || Number(credit.soldeRestant) === 0) {
                     await recordScoreEvent({
                         clientId: credit.clientId,
-                        agenceId: userAgence,
+                        agenceId: userAgence || undefined,
                         eventType: 'CREDIT_SOLDE',
                         refId: `solde-${data.creditId}`,
                         refType: 'credit',
@@ -3692,7 +3745,7 @@ export function registerFinanceRoutes(app: Express) {
                 // Also check if client is frozen
                 if (parsed.clientId) {
                     const client = await storage.getClient(parsed.clientId);
-                    if (client && [StatutClient.INACTIVE, StatutClient.SUSPENDED].includes(client.statut as any)) {
+                    if (client && ([StatutClient.INACTIVE, StatutClient.SUSPENDED] as readonly string[]).includes(client.statut)) {
                         return res.status(403).json({
                             message: `Client ${client.statut}. Les opérations de débit ne sont pas autorisées.`
                         });
@@ -3721,7 +3774,7 @@ export function registerFinanceRoutes(app: Express) {
                     const { recordScoreEvent } = await import('../services/scoring-engine');
                     await recordScoreEvent({
                         clientId: parsed.clientId,
-                        agenceId: session.agenceId,
+                        agenceId: session.agenceId || undefined,
                         eventType: 'EPARGNE_DEPOT',
                         refId: operation.id,
                         refType: 'operation_caisse',
@@ -3926,10 +3979,14 @@ export function registerFinanceRoutes(app: Express) {
       // Notification WS à l'agence de destination
       const wsInstance = getWsInstance();
       if (wsInstance) {
-          // Trouver le nom de l'agence destination pour cibler (TODO: mapper ID vers Nom ou utiliser ID dans WS)
-          // Pour l'instant on broadcast global ou on essaie de cibler.
-          // On envoie un event 'caisse-update' générique
-          wsInstance.broadcast({ type: "CAISSE_UPDATE", payload: { type: 'transfert_new', id: transfert.id } });
+          // Cibler l'agence de destination
+          if (rawData.agenceDestId) {
+            wsInstance.broadcastToAgency(rawData.agenceDestId, { type: "CAISSE_UPDATE", payload: { subtype: 'transfert_new', id: transfert.id } });
+          }
+          // Aussi notifier l'agence source
+          if (rawData.agenceSourceId) {
+            wsInstance.broadcastToAgency(rawData.agenceSourceId, { type: "CAISSE_UPDATE", payload: { subtype: 'transfert_new', id: transfert.id } });
+          }
       }
 
       res.status(201).json(transfert);
@@ -4735,7 +4792,7 @@ export function registerFinanceRoutes(app: Express) {
   app.post("/api/caisses/:id/liquidate", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE), async (req, res) => {
     try {
       const { id } = req.params;
-      const userId = (req as any).session?.userId;
+      const userId = req.session?.userId;
 
       // 1. Get Caisse
       const [caisse] = await db.select().from(schema.caisses).where(eq(schema.caisses.id, id));

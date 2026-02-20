@@ -37,6 +37,13 @@ import { getOrCreateDigitalCaisse, updateDigitalCaisseSolde } from "./mm-caisse-
 import { allocateCreditRepayment } from "../credit-allocation-service";
 import { canMemberWithdraw } from "../tontine-logic";
 import { TypeOperationCaisse, MethodePaiement } from "@shared/enum/status-constants";
+import type {
+  TypePaiementTerrainDz,
+  TypeOperationCaisseDz,
+  StatutCreditDz,
+  DisbursementStatusDz,
+  StatutPaymentIntentDz,
+} from "@shared/enum/enums";
 import { operatorToCorrespondent, correspondentToOperator, resolveOperatorFromPhone } from "./providers/pawapay/pawapay-config";
 import { createLogger } from "../../lib/logger";
 import { currencyCode } from "@shared/config/currency";
@@ -452,6 +459,19 @@ class PaymentService {
           logger.warn({ err: error }, 'Could not notify closure service of payout failure');
         }
       }
+
+      // Mark credit disbursement as failed (keep WAITING_DISBURSEMENT so it can be retried)
+      if (intent.creditId && intent.type === "PAYOUT") {
+        try {
+          const { updateCredit } = await import("../../storage/finance");
+          await updateCredit(intent.creditId, {
+            disbursementStatus: 'FAILED' as DisbursementStatusDz,
+          });
+          logger.warn({ intentId: intent.id, creditId: intent.creditId, errorCode }, 'Credit disbursement payout failed');
+        } catch (error) {
+          logger.error({ err: error, creditId: intent.creditId }, 'Could not update credit after payout failure');
+        }
+      }
     } else if (normalizedStatus === "EXPIRED") {
       await storage.updatePaymentIntent(intent.id, {
         status: "EXPIRED",
@@ -625,7 +645,7 @@ class PaymentService {
           await tx.insert(transactionsCompte).values({
             compteId: intent.compteId,
             mouvementId: mouvement.id,
-            typePaiement: typePaiement as any,
+            typePaiement: typePaiement as TypePaiementTerrainDz,
             sens: "CREDIT",
             montant: creditAmount.toString(),
             soldeApres: nouveauSolde,
@@ -680,7 +700,7 @@ class PaymentService {
                   sessionId: activeSession.id,
                   mouvementId: mouvement.id,
                   clientId: intent.clientId,
-                  typeOperation: this.mapToOperationType(intent) as any,
+                  typeOperation: this.mapToOperationType(intent) as TypeOperationCaisseDz,
                   montant: caisseAmount.toString(),
                   methodePaiement: MethodePaiement.MOBILE_MONEY,
                   reference: `MM-${operator}-${intent.externalRef}`,
@@ -857,7 +877,7 @@ class PaymentService {
           await tx.insert(transactionsCompte).values({
             compteId: intent.compteId,
             mouvementId: mouvement.id,
-            typePaiement: typePaiement as any,
+            typePaiement: typePaiement as TypePaiementTerrainDz,
             sens: "DEBIT",
             montant: debitAmount.toString(),
             soldeApres: nouveauSolde,
@@ -894,7 +914,7 @@ class PaymentService {
                   sessionId: activeSession.id,
                   mouvementId: mouvement.id,
                   clientId: intent.clientId,
-                  typeOperation: opType as any,
+                  typeOperation: opType as TypeOperationCaisseDz,
                   montant: debitAmount.toString(),
                   methodePaiement: MethodePaiement.MOBILE_MONEY,
                   reference: `MM-${operator}-${intent.externalRef}`,
@@ -963,6 +983,55 @@ class PaymentService {
         logger.info({ intentId: intent.id, commissionId: metadata.commissionId }, 'Commission payout finalized');
       } catch (error) {
         logger.error({ intentId: intent.id, err: error }, 'Failed to finalize commission after payout');
+      }
+    }
+
+    // Post-payout hook: activate credit after successful Mobile Money disbursement
+    if (intent.creditId && typePaiement === "CREDIT_DISBURSEMENT") {
+      try {
+        const { updateCredit, generateCreditSchedule } = await import("../../storage/finance");
+        const { StatutCredit } = await import("@shared/enum/status-constants");
+
+        await updateCredit(intent.creditId, {
+          statut: StatutCredit.ACTIVE as StatutCreditDz,
+          disbursementStatus: 'COMPLETED' as DisbursementStatusDz,
+          disbursedAt: new Date(),
+          disbursedBy: intent.createdBy,
+        });
+
+        // Générer l'échéancier (obligatoire, même pattern que le canal ACCOUNT)
+        try {
+          await generateCreditSchedule(intent.creditId);
+        } catch (scheduleErr) {
+          logger.error({ err: scheduleErr, creditId: intent.creditId }, 'Échec génération échéancier après décaissement MM — crédit rétrogradé');
+          await updateCredit(intent.creditId, {
+            statut: 'PENDING' as StatutCreditDz,
+            disbursementStatus: 'FAILED' as DisbursementStatusDz,
+          });
+        }
+
+        // Broadcast WebSocket notification
+        try {
+          const { getWsInstance } = await import("../../ws-server");
+          const wsInstance = getWsInstance();
+          if (wsInstance) {
+            wsInstance.broadcast({
+              type: "CAISSE_UPDATE" as any,
+              payload: {
+                subtype: 'LOAN_DISBURSEMENT_CONFIRMED',
+                creditId: intent.creditId,
+                channel: 'MOBILE_MONEY',
+                provider: (intent as any).operator || intent.provider,
+                amount: parseFloat(intent.amount),
+                timestamp: new Date().toISOString(),
+              }
+            });
+          }
+        } catch (_wsErr) { /* non-critical */ }
+
+        logger.info({ intentId: intent.id, creditId: intent.creditId }, 'Credit activated after Mobile Money disbursement');
+      } catch (error) {
+        logger.error({ intentId: intent.id, creditId: intent.creditId, err: error }, 'Failed to activate credit after payout');
       }
     }
   }

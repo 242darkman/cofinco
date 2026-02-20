@@ -179,6 +179,7 @@ export const credits = pgTable(
     dateSolde: timestamp("date_solde"),
     soldeAvant2Mois: boolean("solde_avant_2_mois").default(false),
     soldeRestant: numeric("solde_restant"),
+    totalDu: numeric("total_du").notNull().default("0"), // Total dû initial (principal + intérêts + frais) calculé par le moteur d'échéancier
     echeance: text("echeance").default("DAILY"),
 
     // Suivi des échéances

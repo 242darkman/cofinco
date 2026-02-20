@@ -13,10 +13,10 @@ export interface DashboardStats {
     creditsEnCours: number;
     creditsEnAttente: number;
     creditsRetard: number;
-    montantCreditsTotal: number;
-    montantDecaisse: number;
+    capitalTotal: number;
+    totalDecaisse: number;
     montantRecouvre: number;
-    montantEnAttente: number;
+    capitalEnAttente: number;
     tauxRecouvrement: number;
     totalEpargnes: number;
     epargneActive: number;
@@ -107,10 +107,10 @@ function lightweightToFullStats(light: LightweightStats): DashboardStats {
       creditsEnCours: light.kpis.creditsEnCours,
       creditsEnAttente: 0,
       creditsRetard: light.kpis.creditsEnRetard,
-      montantCreditsTotal: 0,
-      montantDecaisse: 0,
+      capitalTotal: 0,
+      totalDecaisse: 0,
       montantRecouvre: 0,
-      montantEnAttente: 0,
+      capitalEnAttente: 0,
       tauxRecouvrement: 0,
       totalEpargnes: 0,
       epargneActive: 0,
