@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Search, Filter, ArrowDownLeft, ArrowUpRight, Calendar, Download, FileText, Loader2 } from 'lucide-react';
 import { Badge } from '../ui';
+import { ALL_STATUS_LABELS } from '../../lib/status-labels';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -121,7 +122,7 @@ export default function AccountHistory({ compteId, numeroCompte, isOpen, onClose
       const data = filteredTransactions.map(t => ({
         Date: safeFormatDate(t.createdAt),
         Description: t.displayDescription,
-        Type: t.typePaiement || t.type,
+        Type: ALL_STATUS_LABELS[t.typePaiement || t.type || ''] || t.typePaiement || t.type,
         Reference: t.displayRef,
         Sens: t.sens,
         Montant: t.montant,
@@ -306,7 +307,7 @@ export default function AccountHistory({ compteId, numeroCompte, isOpen, onClose
                               <div>
                                   <p className="text-content-primary font-medium">{t.displayDescription}</p>
                                   <p className="text-xs text-content-muted mt-0.5 flex items-center gap-2">
-                                      {t.type} 
+                                      {(t.type && ALL_STATUS_LABELS[t.type]) || t.type}
                                       {t.displayRef !== '-' && <span className="px-1.5 py-0.5 rounded bg-surface text-[10px] text-content-muted">Ref: {t.displayRef}</span>}
                                   </p>
                               </div>

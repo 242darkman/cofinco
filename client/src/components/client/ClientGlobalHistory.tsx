@@ -20,10 +20,17 @@ const TYPE_COMPTE_LABELS: Record<string, string> = {
     BLOCKED: 'Bloqué',
 };
 
+const TYPE_CREDIT_LABELS: Record<string, string> = {
+    PERSONAL: 'Personnel',
+    REAL_ESTATE: 'Immobilier',
+    COMMERCIAL: 'Commercial',
+};
+
 interface HistoryItem {
     id: string;
     date: string;
     type: string;
+    description?: string;
     sens: 'DEBIT' | 'CREDIT';
     montant: number;
     sourceModule: string;
@@ -33,6 +40,26 @@ interface HistoryItem {
     icon: string;
     numeroCompte?: string | null;
     typeCompte?: string | null;
+    numeroCredit?: string | null;
+    typeCredit?: string | null;
+    nomTontine?: string | null;
+}
+
+/** Build a contextual subtitle from account/credit/tontine info */
+function getContextDetail(item: HistoryItem): string | null {
+    const parts: string[] = [];
+    if (item.numeroCompte) {
+        const typeLabel = item.typeCompte ? TYPE_COMPTE_LABELS[item.typeCompte] || item.typeCompte : '';
+        parts.push(`Compte ${typeLabel} ${item.numeroCompte}`.trim());
+    }
+    if (item.numeroCredit) {
+        const typeLabel = item.typeCredit ? TYPE_CREDIT_LABELS[item.typeCredit] || item.typeCredit : '';
+        parts.push(`Crédit ${typeLabel} ${item.numeroCredit}`.trim());
+    }
+    if (item.nomTontine) {
+        parts.push(`Tontine ${item.nomTontine}`);
+    }
+    return parts.length > 0 ? parts.join(' · ') : null;
 }
 
 interface HistoryResponse {
@@ -190,14 +217,17 @@ export default function ClientGlobalHistory({ clientId }: ClientGlobalHistoryPro
                         {/* Details */}
                         <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-content-primary truncate">
-                                {ALL_STATUS_LABELS[item.type] || item.type.replace(/_/g, ' ')}
-                                {item.numeroCompte && (
-                                    <span className="font-normal text-content-muted">
-                                        {' · '}Compte {item.typeCompte ? TYPE_COMPTE_LABELS[item.typeCompte] || item.typeCompte : ''} {item.numeroCompte}
-                                    </span>
-                                )}
+                                {item.description || ALL_STATUS_LABELS[item.type] || item.type.replace(/_/g, ' ')}
                             </p>
-                            <p className="text-xs text-content-muted">
+                            {(() => {
+                                const context = getContextDetail(item);
+                                return context ? (
+                                    <p className="text-xs text-content-muted truncate">
+                                        {context}
+                                    </p>
+                                ) : null;
+                            })()}
+                            <p className="text-[11px] text-content-muted">
                                 {new Date(item.date).toLocaleDateString('fr-FR', {
                                     day: '2-digit',
                                     month: 'short',

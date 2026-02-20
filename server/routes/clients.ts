@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createLogger } from "../lib/logger";
-import { insertTagSchema, insertClientTagSchema, insertClientActivitySchema, clientTags, clientActivities, users, clients, agences, professions, membresTontine, mouvementsFinanciers, comptes, remboursements, contributionsTontine, clientDocumentSchema, clientDocumentsArraySchema, type ClientDocument } from "@shared/schema";
+import { insertTagSchema, insertClientTagSchema, insertClientActivitySchema, clientTags, clientActivities, users, clients, agences, professions, membresTontine, mouvementsFinanciers, comptes, credits, tontines, remboursements, contributionsTontine, clientDocumentSchema, clientDocumentsArraySchema, type ClientDocument } from "@shared/schema";
+import { getTransactionLabel } from "@shared/config/transaction-labels";
 
 const logger = createLogger('Routes:Clients');
 import {
@@ -1828,14 +1829,19 @@ export function registerClientRoutes(app: Express) {
         
 
         
-        // Get all movements for this client, with account info
+        // Get all movements for this client, with account/credit/tontine info
         const movements = await db.select({
             mouvement: mouvementsFinanciers,
             numeroCompte: comptes.numeroCompte,
             typeCompte: comptes.typeCompte,
+            numeroCredit: credits.numeroCredit,
+            typeCredit: credits.typeCredit,
+            nomTontine: tontines.nom,
         })
             .from(mouvementsFinanciers)
             .leftJoin(comptes, eq(mouvementsFinanciers.compteId, comptes.id))
+            .leftJoin(credits, eq(mouvementsFinanciers.creditId, credits.id))
+            .leftJoin(tontines, eq(mouvementsFinanciers.tontineId, tontines.id))
             .where(and(
                 eq(mouvementsFinanciers.clientId, clientId),
                 gte(mouvementsFinanciers.dateOperation, oneYearAgo)
@@ -1844,21 +1850,35 @@ export function registerClientRoutes(app: Express) {
             .limit(limit)
             .offset((page - 1) * limit);
 
-        // Transform to unified history format
+        // Transform to unified history format with enriched descriptions
         const history = movements.map((row: any) => {
             const m = row.mouvement;
+            const meta = (m.metadata as Record<string, unknown>) || {};
+            // Build metadata for label generation, preferring live JOINed data
+            const labelMeta = {
+                numeroCredit: row.numeroCredit || (meta.numeroCredit as string) || undefined,
+                tontineName: row.nomTontine || (meta.tontineName as string) || undefined,
+                compteDestNumero: (meta.compteDestNumero as string) || undefined,
+                compteSourceNumero: (meta.compteSourceNumero as string) || undefined,
+            };
+            const description = getTransactionLabel(m.typePaiement, labelMeta);
+
             return {
                 id: m.id,
                 date: m.dateOperation,
                 type: m.typePaiement || m.sourceModule,
+                description,
                 sens: m.sens,
                 montant: Number(m.montant),
-                source_module: m.sourceModule,
+                sourceModule: m.sourceModule,
                 reference: m.reference,
-                reference_externe: m.referenceExterne,
+                referenceExterne: m.referenceExterne,
                 statut: m.statut,
                 numeroCompte: row.numeroCompte || null,
                 typeCompte: row.typeCompte || null,
+                numeroCredit: row.numeroCredit || null,
+                typeCredit: row.typeCredit || null,
+                nomTontine: row.nomTontine || null,
                 icon: getTransactionIcon(m.sourceModule, m.typePaiement),
             };
         });

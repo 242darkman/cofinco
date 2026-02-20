@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { formatMoney } from '../../../lib/format';
 import { Badge } from '../../ui';
-import { getStatusLabel, OPERATION_STATUS_LABELS } from '../../../lib/status-labels';
+import { getStatusLabel, OPERATION_STATUS_LABELS, ALL_STATUS_LABELS } from '../../../lib/status-labels';
 import { isIncomingOperation } from '@shared/config/caisse-operations';
 
 // --- Types ---
@@ -69,9 +69,13 @@ const normalizeStatus = (status: string): OperationStatus => {
   return 'SUCCESS';
 };
 
-/** Formats the description to replace internal English terms with French labels */
+/** Formats the description: translates raw enum codes to French labels */
 const formatDescription = (description: string): string => {
   if (!description) return '';
+  // If it's a raw enum value (ALL_CAPS_WITH_UNDERSCORES), translate via label map
+  if (/^[A-Z][A-Z0-9_]+$/.test(description) && ALL_STATUS_LABELS[description]) {
+    return ALL_STATUS_LABELS[description];
+  }
   return description
     .replace(/\bSAVINGS\b/g, 'ÉPARGNE')
     .replace(/\bCURRENT\b/g, 'COURANT')
