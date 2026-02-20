@@ -17,6 +17,7 @@ import { typeCreditLabel, frequenceLabel, frequenceEcheanceLabel, dureeUniteLabe
 import { ReevaluationEligibilityCheck } from './ReevaluationEligibilityCheck';
 import { ReevaluationModal } from './ReevaluationModal';
 import { CreditTimeline } from './CreditTimeline';
+import EnqueteTimeline from './EnqueteWizard/components/EnqueteTimeline';
 import { StatutDemande } from '@shared/enum/status-constants';
 
 interface Demande {
@@ -96,6 +97,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
   const [isEligibleForReevaluation, setIsEligibleForReevaluation] = useState(false);
   const [enquetes, setEnquetes] = useState<any[]>([]);
   const [expandedEnquete, setExpandedEnquete] = useState<string | null>(null);
+  const [supervisorNotes, setSupervisorNotes] = useState('');
   
   // Scheduled disbursement
   const [scheduledDisbursement, setScheduledDisbursement] = useState(false);
@@ -405,10 +407,20 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
 
       await demandeCreditApi.update(demande.id, updateData);
 
+      // Save supervisor notes on the latest enquête
+      if (supervisorNotes.trim() && enquetes.length > 0) {
+        fetch(`/api/enquetes-credit/${enquetes[0].id}/supervisor-notes`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ supervisorNotes: sanitizeInput(supervisorNotes) }),
+        }).catch(() => { /* Non-blocking */ });
+      }
+
       const successMessage = scheduledDisbursement
         ? `Crédit approuvé. Décaissement programmé pour le ${new Date(disbursementDate).toLocaleDateString('fr-FR')}.`
         : `Crédit approuvé. Dossier transféré à la Commission Crédit pour décaissement.`;
-      
+
       toast.success(successMessage);
       onSuccess();
     } catch (error) {
@@ -418,7 +430,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
       setLoading(false);
       setShowConfirmApprove(false);
     }
-  }, [demande, montantBase, commentaire, scheduledDisbursement, disbursementDate, onSuccess]);
+  }, [demande, montantBase, commentaire, scheduledDisbursement, disbursementDate, onSuccess, supervisorNotes, enquetes]);
   
   const handleReject = useCallback(async () => {
     setLoading(true);
@@ -439,10 +451,20 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
 
       await demandeCreditApi.update(demande.id, payload);
 
-      const successMessage = reimbursementAmount 
+      // Save supervisor notes on the latest enquête
+      if (supervisorNotes.trim() && enquetes.length > 0) {
+        fetch(`/api/enquetes-credit/${enquetes[0].id}/supervisor-notes`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ supervisorNotes: sanitizeInput(supervisorNotes) }),
+        }).catch(() => { /* Non-blocking */ });
+      }
+
+      const successMessage = reimbursementAmount
         ? `Demande rejetée. Remboursement de ${formatMoney(Number(reimbursementAmount))} initié.`
         : 'Demande de crédit rejetée';
-      
+
       toast.success(successMessage, { duration: 5000 });
       onSuccess();
     } catch (error) {
@@ -452,7 +474,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
       setLoading(false);
       setShowConfirmReject(false);
     }
-  }, [demande.id, commentaire, reimbursementAmount, onSuccess]);
+  }, [demande.id, commentaire, reimbursementAmount, onSuccess, supervisorNotes, enquetes]);
 
   const handleSubmitAction = useCallback(() => {
     if (!validateForm()) {
@@ -785,6 +807,9 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                                          {/* Enhanced Expanded View - RESTORED FULL DETAILS */}
                                          {expandedEnquete === (enquete.id || idx) && (
                                              <div className="mt-3 pl-11 pr-2 pb-1 text-sm space-y-3 animation-fade-in border-t border-edge-subtle pt-3">
+                                                 {/* Enquête progression timeline */}
+                                                 <EnqueteTimeline enquete={enquete} compact />
+
                                                  {/* Financial Grid */}
                                                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                                      <div className="bg-surface-base/50 p-2 rounded border border-edge-subtle text-center">
@@ -842,7 +867,59 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                                                      </div>
                                                  </div>
 
-                                                 {/* Analysis & Comments - RESTORED EVALUATION */}
+                                                 {/* Agent Recommendation Panel */}
+                                                 {enquete.agentRecommendation && (
+                                                     <div className={`p-3 rounded-lg border ${
+                                                         enquete.agentRecommendation === 'APPROVE' ? 'bg-status-success-bg border-status-success/20' :
+                                                         enquete.agentRecommendation === 'APPROVE_WITH_CONDITIONS' ? 'bg-status-warning-bg border-status-warning/20' :
+                                                         'bg-status-danger-bg border-status-danger/20'
+                                                     }`}>
+                                                         <div className="flex items-center justify-between mb-2">
+                                                             <span className="text-xs font-semibold uppercase flex items-center gap-1.5 text-content-secondary">
+                                                                 <UserCheck size={12} /> Recommandation Agent
+                                                             </span>
+                                                             <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                                                                 enquete.agentRecommendation === 'APPROVE' ? 'bg-status-success/20 text-status-success' :
+                                                                 enquete.agentRecommendation === 'APPROVE_WITH_CONDITIONS' ? 'bg-status-warning/20 text-status-warning' :
+                                                                 'bg-status-danger/20 text-status-danger'
+                                                             }`}>
+                                                                 {enquete.agentRecommendation === 'APPROVE' ? 'Favorable' :
+                                                                  enquete.agentRecommendation === 'APPROVE_WITH_CONDITIONS' ? 'Sous conditions' : 'Défavorable'}
+                                                             </span>
+                                                         </div>
+                                                         <div className="grid grid-cols-2 gap-2 text-xs">
+                                                             {enquete.recommendedAmount && (
+                                                                 <div>
+                                                                     <span className="text-content-muted">Montant recommandé</span>
+                                                                     <p className="text-content-primary font-bold">{formatMoney(Number(enquete.recommendedAmount))}</p>
+                                                                 </div>
+                                                             )}
+                                                             {enquete.riskLevel && (
+                                                                 <div>
+                                                                     <span className="text-content-muted">Niveau de risque</span>
+                                                                     <p className={`font-bold ${
+                                                                         enquete.riskLevel === 'LOW' ? 'text-status-success' :
+                                                                         enquete.riskLevel === 'MEDIUM' ? 'text-status-warning' : 'text-status-danger'
+                                                                     }`}>
+                                                                         {enquete.riskLevel === 'LOW' ? 'Faible' :
+                                                                          enquete.riskLevel === 'MEDIUM' ? 'Moyen' : 'Élevé'}
+                                                                     </p>
+                                                                 </div>
+                                                             )}
+                                                         </div>
+                                                         {enquete.riskFactors && enquete.riskFactors.length > 0 && (
+                                                             <div className="flex flex-wrap gap-1 mt-2">
+                                                                 {enquete.riskFactors.map((f: string, fi: number) => (
+                                                                     <span key={fi} className="px-1.5 py-0.5 rounded bg-surface/50 text-[10px] text-content-muted border border-edge-subtle">
+                                                                         {f}
+                                                                     </span>
+                                                                 ))}
+                                                             </div>
+                                                         )}
+                                                     </div>
+                                                 )}
+
+                                                {/* Analysis & Comments */}
                                                  <div className="space-y-2">
                                                      {enquete.evaluationActivite && (
                                                          <div className="bg-surface-base/50 p-3 rounded border border-edge-subtle">
@@ -854,15 +931,28 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                                                              </p>
                                                          </div>
                                                      )}
-                                                     
+
+                                                     {(enquete.observations || (!enquete.agentRecommendation && enquete.recommandation)) && (
                                                      <div className="bg-surface-base/50 p-3 rounded border border-edge-subtle">
                                                          <span className="text-content-muted block mb-1 text-xs uppercase font-semibold flex items-center gap-2">
-                                                            <MessageSquare size={12} className="text-status-info" /> Avis / Recommandation
+                                                            <MessageSquare size={12} className="text-status-info" /> Observations
                                                          </span>
                                                          <p className="text-content-primary italic text-sm">
-                                                             "{enquete.recommandation || enquete.observations || 'Aucune observation'}"
+                                                             "{enquete.observations || enquete.recommandation || 'Aucune observation'}"
                                                          </p>
                                                      </div>
+                                                     )}
+
+                                                     {enquete.supervisorNotes && (
+                                                     <div className="bg-accent/5 p-3 rounded border border-accent/20">
+                                                         <span className="text-content-muted block mb-1 text-xs uppercase font-semibold flex items-center gap-2">
+                                                            <FileText size={12} className="text-accent" /> Notes du superviseur
+                                                         </span>
+                                                         <p className="text-content-primary italic text-sm">
+                                                             "{enquete.supervisorNotes}"
+                                                         </p>
+                                                     </div>
+                                                     )}
                                                  </div>
                                                  
                                                  {/* Agent */}
@@ -908,6 +998,14 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                                 placeholder="Ajouter une note d'approbation (optionnel)..."
                             />
 
+                            <textarea
+                                value={supervisorNotes}
+                                onChange={(e) => setSupervisorNotes(e.target.value)}
+                                className="w-full bg-surface-base border border-edge rounded-lg p-3 text-content-primary text-sm focus:ring-2 focus:ring-accent/50 outline-none"
+                                rows={2}
+                                placeholder="Notes du superviseur sur l'enquête (optionnel)..."
+                            />
+
                             <div className="flex gap-4 items-start bg-surface-base/50 p-3 rounded-lg border border-edge-subtle">
                                 <input
                                   type="checkbox"
@@ -941,6 +1039,14 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                                 className="w-full bg-surface-base border border-status-danger/30 rounded-lg p-3 text-content-primary text-sm focus:ring-2 focus:ring-status-danger outline-none"
                                 rows={2}
                                 placeholder="Raison du rejet (Obligatoire)..."
+                            />
+
+                            <textarea
+                                value={supervisorNotes}
+                                onChange={(e) => setSupervisorNotes(e.target.value)}
+                                className="w-full bg-surface-base border border-edge rounded-lg p-3 text-content-primary text-sm focus:ring-2 focus:ring-accent/50 outline-none"
+                                rows={2}
+                                placeholder="Notes du superviseur sur l'enquête (optionnel)..."
                             />
                             {/* Refund option if fees paid */}
                             {demande.fraisEngagementPayes && demande.montantFraisEngagement && demande.montantFraisEngagement > 0 && (
