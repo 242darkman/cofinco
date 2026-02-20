@@ -14,3 +14,5 @@ export { TransferHistoryPrintTemplate } from './TransferHistoryPrintTemplate';
 export type { TransferHistoryData } from './TransferHistoryPrintTemplate';
 export { CreditSchedulePDF } from './CreditScheduleTemplate';
 export { ClosingReportTemplate } from './ClosingReportTemplate';
+export { EnqueteReportTemplate } from './EnqueteReportTemplate';
+export type { EnqueteReportData } from './EnqueteReportTemplate';
