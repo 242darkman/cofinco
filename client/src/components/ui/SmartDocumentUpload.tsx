@@ -6,7 +6,7 @@ import { useImageCompression } from '../../hooks/useImageCompression';
 import { useSecureDocument } from '../../hooks/useSecureDocument';
 import { validateFileSize } from '../../lib/file-validation';
 
-export type DocumentType = 'ID_CARD_FRONT' | 'ID_CARD_BACK' | 'PROOF_OF_ADDRESS' | 'AVATAR' | 'OTHER';
+export type DocumentType = 'ID_CARD_FRONT' | 'ID_CARD_BACK' | 'PASSPORT' | 'DRIVING_LICENSE' | 'RESIDENT_CARD' | 'PROOF_OF_ADDRESS' | 'CONTRACT' | 'AVATAR' | 'OTHER';
 
 export interface UploadedDocument {
   id: string;

@@ -57,6 +57,16 @@ import { StatutCompte, TypeCompte, MethodePaiement, MotifBlocage, SuspensionReas
 import { dispatchDomainEvent } from "../services/notifications/domain-events/event-registry";
 import { currencySymbol } from "@shared/config/currency";
 
+// Helper: determine required KYC document types based on the client's typePiece
+function getRequiredKycTypes(typePiece: string | null | undefined): string[] {
+  switch (typePiece) {
+    case 'PASSPORT':         return ['PASSPORT'];
+    case 'PERMIS_CONDUIRE':  return ['DRIVING_LICENSE'];
+    case 'CARTE_RESIDENT':   return ['RESIDENT_CARD'];
+    default:                 return ['ID_CARD_FRONT', 'ID_CARD_BACK']; // CNI or unset
+  }
+}
+
 // Validation schemas
 const createCompteSchema = z.object({
   clientId: z.string().uuid(),
@@ -618,12 +628,13 @@ export function registerComptesRoutes(app: Express) {
       const [client] = await db.select({
         id: clients.id,
         documents: clients.documents,
+        typePiece: clients.typePiece,
       }).from(clients).where(eq(clients.id, clientId));
 
       if (!client) return res.status(404).json({ error: "Client non trouvé" });
 
-      // Required document types for account activation
-      const requiredTypes = ['ID_CARD_FRONT', 'ID_CARD_BACK'];
+      // Required document types for account activation (depends on client's typePiece)
+      const requiredTypes = getRequiredKycTypes(client.typePiece);
       const recommendedTypes = ['PROOF_OF_ADDRESS'];
 
       // Parse documents from JSONB
@@ -656,19 +667,29 @@ export function registerComptesRoutes(app: Express) {
         kycStatus = 'INCOMPLETE';
       }
 
+      const docTypeLabels: Record<string, string> = {
+        ID_CARD_FRONT: 'Pièce d\'identité (recto)',
+        ID_CARD_BACK: 'Pièce d\'identité (verso)',
+        PASSPORT: 'Passeport',
+        DRIVING_LICENSE: 'Permis de conduire',
+        RESIDENT_CARD: 'Carte de résident',
+        PROOF_OF_ADDRESS: 'Justificatif de domicile',
+        CONTRACT: 'Contrat de travail',
+      };
+
       res.json({
         clientId,
         kycStatus,
         canActivate: allRequiredPresent, // Allow if docs present (even if not yet verified)
         requiredDocuments: requiredTypes.map(type => ({
           type,
-          label: type === 'ID_CARD_FRONT' ? 'Pièce d\'identité (recto)' : type === 'ID_CARD_BACK' ? 'Pièce d\'identité (verso)' : type,
+          label: docTypeLabels[type] || type,
           present: presentTypes.has(type),
           verified: verifiedTypes.has(type),
         })),
         recommendedDocuments: recommendedTypes.map(type => ({
           type,
-          label: type === 'PROOF_OF_ADDRESS' ? 'Justificatif de domicile' : type,
+          label: docTypeLabels[type] || type,
           present: presentTypes.has(type),
           verified: verifiedTypes.has(type),
         })),
@@ -1835,15 +1856,15 @@ export function registerComptesRoutes(app: Express) {
             if (!data.skipKycCheck) {
                 const [compte] = await db.select({ clientId: comptes.clientId }).from(comptes).where(eq(comptes.id, req.params.id));
                 if (compte?.clientId) {
-                    const [client] = await db.select({ documents: clients.documents }).from(clients).where(eq(clients.id, compte.clientId));
+                    const [client] = await db.select({ documents: clients.documents, typePiece: clients.typePiece }).from(clients).where(eq(clients.id, compte.clientId));
                     const docs: any[] = Array.isArray(client?.documents) ? (client.documents as any[]) : [];
-                    const requiredTypes = ['ID_CARD_FRONT', 'ID_CARD_BACK'];
+                    const requiredTypes = getRequiredKycTypes(client?.typePiece);
                     const presentTypes = new Set(docs.map(d => (d as any).documentType));
                     const missingRequired = requiredTypes.filter(t => !presentTypes.has(t));
                     if (missingRequired.length > 0) {
                         return res.status(422).json({
                             error: "KYC_INCOMPLETE",
-                            message: `Documents KYC manquants: ${missingRequired.map(t => t === 'ID_CARD_FRONT' ? 'Pièce identité (recto)' : 'Pièce identité (verso)').join(', ')}`,
+                            message: `Documents KYC manquants: ${missingRequired.join(', ')}`,
                             missingDocuments: missingRequired,
                             canOverride: true,
                         });
@@ -1993,9 +2014,9 @@ export function registerComptesRoutes(app: Express) {
 
             // KYC check si pas ignoré
             if (!skipKycCheck && compte.clientId) {
-              const [client] = await db.select({ documents: clients.documents }).from(clients).where(eq(clients.id, compte.clientId));
+              const [client] = await db.select({ documents: clients.documents, typePiece: clients.typePiece }).from(clients).where(eq(clients.id, compte.clientId));
               const docs: any[] = Array.isArray(client?.documents) ? (client.documents as any[]) : [];
-              const requiredTypes = ['ID_CARD_FRONT', 'ID_CARD_BACK'];
+              const requiredTypes = getRequiredKycTypes(client?.typePiece);
               const presentTypes = new Set(docs.map(d => (d as any).documentType));
               const missingRequired = requiredTypes.filter(t => !presentTypes.has(t));
 

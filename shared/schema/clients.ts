@@ -11,7 +11,11 @@ import { pays } from "./pays";
 export const documentTypeEnum = z.enum([
   'ID_CARD_FRONT',
   'ID_CARD_BACK',
+  'PASSPORT',
+  'DRIVING_LICENSE',
+  'RESIDENT_CARD',
   'PROOF_OF_ADDRESS',
+  'CONTRACT',
   'AVATAR',
   'OTHER'
 ]);

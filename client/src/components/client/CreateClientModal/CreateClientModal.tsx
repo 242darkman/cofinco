@@ -139,7 +139,10 @@ export default function CreateClientModal({ isOpen, onClose, onSave, fromEmploye
       if (files.idFront) {
         const key = await uploadEntityFile(files.idFront, 'kyc', tempEntityId);
         if (key) {
-          const docType = formData.typePiece === 'PASSPORT' ? 'PASSPORT' : 'ID_CARD_FRONT';
+          const docType = formData.typePiece === 'PASSPORT' ? 'PASSPORT'
+            : formData.typePiece === 'PERMIS_CONDUIRE' ? 'DRIVING_LICENSE'
+            : formData.typePiece === 'CARTE_RESIDENT' ? 'RESIDENT_CARD'
+            : 'ID_CARD_FRONT';
           documents.push({
             id: crypto.randomUUID(), documentType: docType,
             documentName: files.idFront.name, documentUrl: key,

@@ -150,7 +150,11 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
   const [uploadedDocs, setUploadedDocs] = useState<Record<DocumentType, UploadedDocument | null>>({
     ID_CARD_FRONT: null,
     ID_CARD_BACK: null,
+    PASSPORT: null,
+    DRIVING_LICENSE: null,
+    RESIDENT_CARD: null,
     PROOF_OF_ADDRESS: null,
+    CONTRACT: null,
     AVATAR: null,
     OTHER: null,
   });
@@ -174,7 +178,11 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
     const docs: Record<DocumentType, UploadedDocument | null> = {
       ID_CARD_FRONT: null,
       ID_CARD_BACK: null,
+      PASSPORT: null,
+      DRIVING_LICENSE: null,
+      RESIDENT_CARD: null,
       PROOF_OF_ADDRESS: null,
+      CONTRACT: null,
       AVATAR: null,
       OTHER: null,
     };

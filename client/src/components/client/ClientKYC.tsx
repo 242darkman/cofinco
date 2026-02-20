@@ -48,13 +48,13 @@ const translateDocumentType = (docType: string): string => {
   switch (docType) {
     case 'ID_CARD_FRONT': return 'Pièce d\'identité (Recto)';
     case 'ID_CARD_BACK': return 'Pièce d\'identité (Verso)';
+    case 'PASSPORT': return 'Passeport';
+    case 'DRIVING_LICENSE': return 'Permis de conduire';
+    case 'RESIDENT_CARD': return 'Carte de résident';
     case 'PROOF_OF_ADDRESS': return 'Justificatif de domicile';
+    case 'CONTRACT': return 'Contrat de travail';
     case 'AVATAR': return 'Photo de profil';
     case 'OTHER': return 'Autre';
-    case 'ID Card': return 'Carte d\'identité';
-    case 'Passport': return 'Passeport';
-    case 'Contract': return 'Contrat';
-    case 'Photo': return 'Photo';
     default: return docType;
   }
 };
@@ -62,7 +62,7 @@ const translateDocumentType = (docType: string): string => {
 interface ClientDocument {
   id: string;
   clientId: string;
-  documentType: 'ID Card' | 'Passport' | 'Contract' | 'Photo' | 'Other' | 'ID_CARD_FRONT' | 'ID_CARD_BACK' | 'PROOF_OF_ADDRESS' | 'AVATAR' | 'OTHER';
+  documentType: 'ID_CARD_FRONT' | 'ID_CARD_BACK' | 'PASSPORT' | 'DRIVING_LICENSE' | 'RESIDENT_CARD' | 'PROOF_OF_ADDRESS' | 'CONTRACT' | 'AVATAR' | 'OTHER';
   documentName: string;
   documentUrl: string;
   ownerId?: string;
@@ -229,7 +229,7 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
   const [uploading, setUploading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [newDoc, setNewDoc] = useState({
-    type: 'ID Card' as ClientDocument['documentType'],
+    type: 'ID_CARD_FRONT' as ClientDocument['documentType'],
     name: '',
     url: '',
     notes: ''
@@ -272,7 +272,7 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
                   return {
                     id: `legacy-${index}-${Date.now()}`,
                     clientId: clientId,
-                    documentType: 'ID Card' as const,
+                    documentType: 'ID_CARD_FRONT' as const,
                     documentName: `Document ${index + 1}`,
                     documentUrl: item,
                     status: 'pending' as const,
@@ -289,7 +289,7 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
               clientDocs = [{
                 id: `legacy-0-${Date.now()}`,
                 clientId: clientId,
-                documentType: 'ID Card' as const,
+                documentType: 'ID_CARD_FRONT' as const,
                 documentName: 'Pièce d\'identité',
                 documentUrl: photoUrlField,
                 status: 'pending' as const,
@@ -350,7 +350,7 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
       if (!updateRes.ok) throw new Error('Erreur ajout document');
 
       setDocuments(updatedDocs);
-      setNewDoc({ type: 'ID Card', name: '', url: '', notes: '' });
+      setNewDoc({ type: 'ID_CARD_FRONT', name: '', url: '', notes: '' });
       setShowForm(false);
       setCurrentPage(1);
       onUpdate?.();
@@ -493,11 +493,13 @@ export default function ClientKYC({ clientId, onUpdate }: ClientKYCProps) {
                 onChange={(e) => setNewDoc(prev => ({ ...prev, type: e.target.value as ClientDocument['documentType'] }))}
                 className="w-full bg-surface-base border border-edge rounded-lg px-3 py-2 text-content-primary text-sm focus:ring-1 focus:ring-accent outline-none"
                 >
-                <option value="ID Card">Carte d'identité</option>
-                <option value="Passport">Passeport</option>
-                <option value="Contract">Contrat</option>
-                <option value="Photo">Photo</option>
-                <option value="Other">Autre</option>
+                <option value="ID_CARD_FRONT">Carte d'identité</option>
+                <option value="PASSPORT">Passeport</option>
+                <option value="DRIVING_LICENSE">Permis de conduire</option>
+                <option value="RESIDENT_CARD">Carte de résident</option>
+                <option value="PROOF_OF_ADDRESS">Justificatif de domicile</option>
+                <option value="CONTRACT">Contrat de travail</option>
+                <option value="OTHER">Autre</option>
                 </select>
             </div>
 
