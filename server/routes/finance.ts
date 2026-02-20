@@ -21,6 +21,7 @@ import {
   coffresForts,
   transactionsCompte,
   enquetesCredit,
+  creditPlans,
   professions,
   activityTypes
 } from "@shared/schema";
@@ -1691,6 +1692,7 @@ export function registerFinanceRoutes(app: Express) {
       const enqueteValues: Record<string, any> = {
         clientId: demande.clientId,
         demandeId: id,
+        creditPlanId: demande.creditPlanId || null,
         montantDemande: demande.montantDemande?.toString() || "0",
         objetCredit: demande.objetCredit || "À définir",
         assignedAgentId,
@@ -2356,10 +2358,54 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   app.get("/api/demandes-credit/:id/enquete", requireAuth, async (req, res) => {
-      const enquetes = await storage.getEnqueteByDemandeId(req.params.id);
-      if (!enquetes || enquetes.length === 0) return res.status(404).json({ message: "Enquête non trouvée" });
-      // Return the most recent enquête for this demande
-      res.json(enquetes[0]);
+      const enquetesList = await storage.getEnqueteByDemandeId(req.params.id);
+      if (!enquetesList || enquetesList.length === 0) return res.status(404).json({ message: "Enquête non trouvée" });
+      const enquete = enquetesList[0];
+      // Enrich with credit plan data
+      const planId = enquete.creditPlanId;
+      let creditPlanData = null;
+      if (planId) {
+          const [plan] = await db.select().from(creditPlans).where(eq(creditPlans.id, planId)).limit(1);
+          if (plan) {
+              creditPlanData = {
+                  id: plan.id, nom: plan.nom, montantMin: plan.montantMin, montantMax: plan.montantMax,
+                  tauxInteret: plan.tauxInteret, dureeValeur: plan.dureeValeur, dureeUnite: plan.dureeUnite,
+                  frequenceRemboursement: plan.frequenceRemboursement, collateralRequired: plan.collateralRequired,
+                  collateralTypes: plan.collateralTypes, documentsRequis: plan.documentsRequis,
+                  maxDebtToIncomeRatio: plan.maxDebtToIncomeRatio, guaranteeDepositPercent: plan.guaranteeDepositPercent,
+                  interestMethod: plan.interestMethod, amortizationType: plan.amortizationType,
+              };
+          }
+      } else {
+          // Fallback: get plan from the demande
+          const demande = await storage.getDemandeCredit(req.params.id);
+          if (demande?.creditPlanId) {
+              const [plan] = await db.select().from(creditPlans).where(eq(creditPlans.id, demande.creditPlanId)).limit(1);
+              if (plan) {
+                  creditPlanData = {
+                      id: plan.id, nom: plan.nom, montantMin: plan.montantMin, montantMax: plan.montantMax,
+                      tauxInteret: plan.tauxInteret, dureeValeur: plan.dureeValeur, dureeUnite: plan.dureeUnite,
+                      frequenceRemboursement: plan.frequenceRemboursement, collateralRequired: plan.collateralRequired,
+                      collateralTypes: plan.collateralTypes, documentsRequis: plan.documentsRequis,
+                      maxDebtToIncomeRatio: plan.maxDebtToIncomeRatio, guaranteeDepositPercent: plan.guaranteeDepositPercent,
+                      interestMethod: plan.interestMethod, amortizationType: plan.amortizationType,
+                  };
+              }
+          }
+      }
+      // Enrich with client situation
+      let clientSituation = null;
+      if (enquete.clientId) {
+          const [client] = await db.select().from(clients).where(eq(clients.id, enquete.clientId)).limit(1);
+          if (client) {
+              clientSituation = {
+                  situationMatrimoniale: client.situationMatrimoniale,
+                  nombrePersonnesCharge: client.nombrePersonnesCharge,
+                  statutLogement: client.statutLogement,
+              };
+          }
+      }
+      res.json({ ...enquete, creditPlan: creditPlanData, clientSituation });
   });
 
   // Obtenir le détail du scoring pour une demande
@@ -2706,12 +2752,19 @@ export function registerFinanceRoutes(app: Express) {
         userTelephone: schema.users.telephone,
         professionNom: professions.nom,
         activityTypeNom: activityTypes.nom,
+        demande: demandesCredit,
+        plan: creditPlans,
       })
         .from(enquetesCredit)
         .leftJoin(clients, eq(enquetesCredit.clientId, clients.id))
         .leftJoin(schema.users, eq(clients.userId, schema.users.id))
         .leftJoin(professions, eq(clients.professionId, professions.id))
         .leftJoin(activityTypes, eq(clients.activityTypeId, activityTypes.id))
+        .leftJoin(demandesCredit, eq(enquetesCredit.demandeId, demandesCredit.id))
+        .leftJoin(creditPlans, eq(
+          sql`COALESCE(${enquetesCredit.creditPlanId}, ${demandesCredit.creditPlanId})`,
+          creditPlans.id
+        ))
         .where(eq(enquetesCredit.assignedAgentId, targetUserId))
         .orderBy(desc(enquetesCredit.createdAt));
 
@@ -2722,13 +2775,34 @@ export function registerFinanceRoutes(app: Express) {
           prenom: r.userPrenom,
           telephone: r.userTelephone,
           adresseDomicile: r.client?.adresseDomicile,
-          // Activity & revenue fields from client profile (for pre-filling investigation form)
           typeActivite: r.activityTypeNom || null,
           revenuMensuel: r.client?.revenuMensuel,
           revenuJournalier: r.client?.revenuJournalier,
           typeRevenu: r.client?.typeRevenu,
           profession: r.professionNom || r.client?.professionAutreTexte || null,
           lieuActivite: r.client?.lieuActivite,
+        } : null,
+        clientSituation: r.client ? {
+          situationMatrimoniale: r.client.situationMatrimoniale,
+          nombrePersonnesCharge: r.client.nombrePersonnesCharge,
+          statutLogement: r.client.statutLogement,
+        } : null,
+        creditPlan: r.plan ? {
+          id: r.plan.id,
+          nom: r.plan.nom,
+          montantMin: r.plan.montantMin,
+          montantMax: r.plan.montantMax,
+          tauxInteret: r.plan.tauxInteret,
+          dureeValeur: r.plan.dureeValeur,
+          dureeUnite: r.plan.dureeUnite,
+          frequenceRemboursement: r.plan.frequenceRemboursement,
+          collateralRequired: r.plan.collateralRequired,
+          collateralTypes: r.plan.collateralTypes,
+          documentsRequis: r.plan.documentsRequis,
+          maxDebtToIncomeRatio: r.plan.maxDebtToIncomeRatio,
+          guaranteeDepositPercent: r.plan.guaranteeDepositPercent,
+          interestMethod: r.plan.interestMethod,
+          amortizationType: r.plan.amortizationType,
         } : null,
       }));
 
@@ -2793,6 +2867,11 @@ export function registerFinanceRoutes(app: Express) {
       if (data.riskLevel) updatePayload.riskLevel = data.riskLevel;
       if (data.riskFactors) updatePayload.riskFactors = data.riskFactors;
 
+      // Client situation (observed by agent, propagated to client after validation)
+      if (data.situationMatrimoniale) updatePayload.situationMatrimoniale = data.situationMatrimoniale;
+      if (data.personnesCharge != null) updatePayload.personnesCharge = parseInt(data.personnesCharge) || 0;
+      if (data.typeHabitation) updatePayload.typeHabitation = data.typeHabitation;
+
       // Geo data
       if (data.geoLatitude != null) updatePayload.geoLatitude = data.geoLatitude.toString();
       if (data.geoLongitude != null) updatePayload.geoLongitude = data.geoLongitude.toString();
@@ -2816,10 +2895,51 @@ export function registerFinanceRoutes(app: Express) {
         // Non-blocking
       }
 
-      // Notify
+      // Notify via WebSocket
       const wsInstance = getWsInstance();
       if (wsInstance) {
         wsInstance.broadcast({ type: "CREDIT_UPDATE", payload: { type: 'investigation_submitted', id, demandeId: enquete.demandeId, agentId: enquete.assignedAgentId } });
+
+        // Targeted notification to supervisors/approvers
+        const userAgence = req.session.user?.agence;
+        if (userAgence) {
+          const agentName = req.session.user?.nom ? `${req.session.user.prenom || ''} ${req.session.user.nom}`.trim() : 'Agent terrain';
+          wsInstance.broadcastToAgency(userAgence, {
+            type: "NOTIFICATION",
+            payload: {
+              message: `Enquête soumise par ${agentName}`,
+              subtype: 'investigation_submitted',
+              demandeId: enquete.demandeId,
+              enqueteId: id,
+              recommendation: data.agentRecommendation || null,
+            }
+          });
+          wsInstance.broadcastToAgency(userAgence, { type: "DASHBOARD_UPDATE", payload: {} });
+        }
+      }
+
+      // Domain event for notification pipeline
+      if (enquete.demandeId) {
+        try {
+          const demande = await storage.getDemandeCredit(enquete.demandeId);
+          const agentUser = req.session.user;
+          dispatchDomainEvent({
+            type: "CREDIT_INVESTIGATION_SUBMITTED",
+            data: {
+              demandeId: enquete.demandeId,
+              numeroDemande: demande?.numeroDemande || '',
+              enqueteId: id,
+              clientId: enquete.clientId || demande?.clientId || '',
+              agentName: agentUser?.nom ? `${agentUser.prenom || ''} ${agentUser.nom}`.trim() : 'Agent terrain',
+              agentRecommendation: data.agentRecommendation || undefined,
+              riskLevel: data.riskLevel || undefined,
+              agenceId: agentUser?.agence || undefined,
+            },
+            timestamp: new Date(),
+          });
+        } catch {
+          // Non-blocking
+        }
       }
 
       res.json({ success: true, enquete: updated });
@@ -2830,7 +2950,7 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   app.post("/api/enquetes-credit/:id/valider", requireAuth, attachAbility, requireAbility(Actions.APPROVE, Subjects.DEMANDE_CREDIT), async (req, res) => {
-      const { decision, montant_approuve, commentaire, raison } = req.body;
+      const { decision, montant_approuve, commentaire, raison, supervisorNotes } = req.body;
 
       const enquete = await storage.getEnqueteCredit(req.params.id);
       if (!enquete) return res.status(404).json({ message: "Enquête non trouvée" });
@@ -2852,26 +2972,55 @@ export function registerFinanceRoutes(app: Express) {
           ? StatutEnquete.REJECTED
           : StatutEnquete.REDUCED;
 
+      // Validate montant_approuve against plan range if available
+      const planId = enquete.creditPlanId;
+      if (montant_approuve && planId) {
+          const [plan] = await db.select().from(creditPlans).where(eq(creditPlans.id, planId)).limit(1);
+          if (plan) {
+              const min = parseFloat(plan.montantMin || '0');
+              const max = parseFloat(plan.montantMax || 'Infinity');
+              const approved = parseFloat(montant_approuve);
+              if (approved < min || approved > max) {
+                  return res.status(400).json({
+                      message: `Le montant approuvé (${approved}) est hors des limites du plan "${plan.nom}" (${min} - ${max})`,
+                  });
+              }
+          }
+      }
+
       const updatedEnquete = await storage.updateEnqueteCredit(req.params.id, {
           statut: statutEnquete,
-          recommandation: commentaire || raison // Store comment
+          recommandation: commentaire || raison,
+          supervisorNotes: supervisorNotes || null,
+          reviewedAt: new Date(),
+          reviewedBy: req.session?.user?.id,
       });
 
+      // Propagate client situation data on approval
+      if (statutEnquete === StatutEnquete.APPROVED && enquete.clientId) {
+          const clientUpdates: Record<string, any> = {};
+          if (enquete.situationMatrimoniale) {
+              clientUpdates.situationMatrimoniale = enquete.situationMatrimoniale;
+          }
+          if (enquete.personnesCharge != null && enquete.personnesCharge !== undefined) {
+              clientUpdates.nombrePersonnesCharge = enquete.personnesCharge;
+          }
+          if (Object.keys(clientUpdates).length > 0) {
+              await storage.updateClient(enquete.clientId, clientUpdates);
+          }
+      }
+
       // Update Demande status - Workflow: UNDER_INVESTIGATION -> INVESTIGATION_COMPLETE -> PENDING_APPROVAL
-      // The enquête validation moves the demande to PENDING_APPROVAL for committee decision
       if (enquete.demandeId) {
-          // Step 1: Transition to INVESTIGATION_COMPLETE (enquête terminée)
           await storage.updateDemandeCredit(enquete.demandeId, {
               statut: StatutDemande.INVESTIGATION_COMPLETE as StatutDemandeDz
           });
 
-          // Step 2: Transition to PENDING_APPROVAL (en attente d'approbation par le comité)
           await storage.updateDemandeCredit(enquete.demandeId, {
               statut: StatutDemande.PENDING_APPROVAL as StatutDemandeDz,
               montantApprouve: montant_approuve ? montant_approuve.toString() : undefined
           });
 
-          // Notify
           const wsInstance = getWsInstance();
           if (wsInstance) {
                wsInstance.broadcast({ type: "CREDIT_UPDATE", payload: { type: 'demande_updated', id: enquete.demandeId, statut: StatutDemande.PENDING_APPROVAL } });
@@ -2879,6 +3028,23 @@ export function registerFinanceRoutes(app: Express) {
       }
 
       res.json(updatedEnquete);
+  });
+
+  // PATCH supervisor notes on an enquête (works regardless of status)
+  app.patch("/api/enquetes-credit/:id/supervisor-notes", requireAuth, attachAbility, requireAbility(Actions.APPROVE, Subjects.DEMANDE_CREDIT), async (req, res) => {
+    try {
+      const { supervisorNotes } = req.body;
+      const enquete = await storage.getEnqueteCredit(req.params.id);
+      if (!enquete) return res.status(404).json({ message: "Enquête non trouvée" });
+
+      const updated = await storage.updateEnqueteCredit(req.params.id, {
+        supervisorNotes: supervisorNotes ?? null,
+      });
+      res.json({ success: true, enquete: updated });
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur mise à jour supervisor notes');
+      res.status(500).json({ message: error.message || "Erreur" });
+    }
   });
 
   // Remboursements avec allocation FIFO automatique
