@@ -459,6 +459,22 @@ export function registerFinanceRoutes(app: Express) {
                 logger.warn({ err: scheduleErr, creditId: credit.id }, 'Échéancier non généré (non bloquant)');
               }
 
+              // Score event: INITIAL_SCORE for newly disbursed credit
+              try {
+                const { recordScoreEvent } = await import('../services/scoring-engine');
+                await recordScoreEvent({
+                  clientId: demande.clientId,
+                  agenceId: credit.agenceId ?? undefined,
+                  eventType: 'INITIAL_SCORE',
+                  refId: credit.id,
+                  refType: 'credit',
+                  montant: montantDecaissement,
+                  createdBy: user?.id,
+                });
+              } catch (scoreErr) {
+                logger.warn({ err: scoreErr, creditId: credit.id }, 'Score event INITIAL_SCORE failed (non-blocking)');
+              }
+
             } catch (err: any) {
               logger.error({ err, creditId: credit.id }, 'Erreur Ledger lors du décaissement');
 

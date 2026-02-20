@@ -63,6 +63,7 @@ export default function ClientScoreTab({ client }: ClientScoreTabProps) {
   const {
     state, history, historyTotal, trend, percentile,
     stateLoading, historyLoading, trendLoading, percentileLoading,
+    stateError,
     historyPage, setHistoryPage, historyHasMore,
     recalculate, recalculating,
     addBonus, addingBonus,
@@ -74,9 +75,10 @@ export default function ClientScoreTab({ client }: ClientScoreTabProps) {
   const [bonusPoints, setBonusPoints] = useState('');
   const [bonusDescription, setBonusDescription] = useState('');
 
+  const noScoreYet = !state && !stateLoading && !!stateError;
   const segment = state?.segment || client.segment || SegmentClient.STANDARD;
   const segmentStyle = SEGMENT_STYLES[segment] || SEGMENT_STYLES[SegmentClient.STANDARD];
-  const scoreGlobal = state?.scoreGlobal ?? 50;
+  const scoreGlobal = state?.scoreGlobal ?? (client as any).score ?? 50;
 
   async function handleRecalculate() {
     try {
@@ -113,6 +115,27 @@ export default function ClientScoreTab({ client }: ClientScoreTabProps) {
         <Skeleton className="h-52 w-full rounded-xl" />
         <Skeleton className="h-64 w-full rounded-xl col-span-full" />
       </div>
+    );
+  }
+
+  // No score computed yet — prompt recalculation
+  if (noScoreYet) {
+    return (
+      <Card variant="default" padding="none" className="overflow-hidden">
+        <div className="p-6 text-center">
+          <div className="p-3 bg-surface-subtle rounded-full w-fit mx-auto mb-3">
+            <BarChart3 size={24} className="text-content-muted" />
+          </div>
+          <h3 className="text-sm font-bold text-content-primary mb-1">Aucun score calculé</h3>
+          <p className="text-xs text-content-muted mb-4">Ce client n'a pas encore de score. Lancez un premier calcul pour initialiser le scoring.</p>
+          {canManage && (
+            <Button onClick={handleRecalculate} disabled={recalculating} variant="primary" size="sm">
+              <RefreshCw size={14} className={recalculating ? 'animate-spin' : ''} />
+              {recalculating ? 'Calcul en cours...' : 'Calculer le score'}
+            </Button>
+          )}
+        </div>
+      </Card>
     );
   }
 

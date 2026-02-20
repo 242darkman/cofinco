@@ -259,6 +259,7 @@ export async function getTontinesByClient(clientId: string): Promise<Array<Membr
       position: membresTontine.position,
       aRecuBenefice: membresTontine.aRecuBenefice,
       dateBenefice: membresTontine.dateBenefice,
+      lateCount: membresTontine.lateCount,
       createdAt: membresTontine.createdAt,
       tontine: tontines
     })

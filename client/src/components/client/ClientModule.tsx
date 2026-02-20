@@ -572,14 +572,31 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
                       )
                     },
                     {
+                      key: 'score',
+                      label: 'Score',
+                      hideOnMobile: true,
+                      headerAlign: 'center',
+                      align: 'center',
+                      format: (_, item) => {
+                        const score = item.score ?? 0;
+                        const color = score >= 80 ? 'text-status-success' : score >= 65 ? 'text-status-info' : score >= 40 ? 'text-status-warning' : 'text-status-danger';
+                        return (
+                          <div className="flex items-center justify-center gap-1">
+                            <BarChart3 size={12} className={color} />
+                            <span className={`text-xs font-bold ${color}`}>{score}</span>
+                          </div>
+                        );
+                      }
+                    },
+                    {
                       key: 'statut',
                       label: 'Statut',
                       headerAlign: 'center',
                       align: 'center',
                       format: (_, item) => (
                         <div className="flex justify-center">
-                          <Badge 
-                            value={getStatusLabel(item.statut, STATUT_CLIENT_LABELS)} 
+                          <Badge
+                            value={getStatusLabel(item.statut, STATUT_CLIENT_LABELS)}
                             className={getStatusColor(item.statut, CLIENT_STATUS_COLORS)}
                             size="sm"
                           />

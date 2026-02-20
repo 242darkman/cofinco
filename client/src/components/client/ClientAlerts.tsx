@@ -250,6 +250,8 @@ export default function ClientAlerts({ client, onUpdate, onCountChange, onNaviga
           type="button"
           onClick={() => setLevelFilter(levelFilter === 'critical' ? 'all' : 'critical')}
           className="text-left"
+          aria-pressed={levelFilter === 'critical'}
+          aria-label={`Filtrer alertes critiques (${criticalAlerts.length})`}
         >
           <Card
             variant="default"
@@ -273,6 +275,8 @@ export default function ClientAlerts({ client, onUpdate, onCountChange, onNaviga
           type="button"
           onClick={() => setLevelFilter(levelFilter === 'warning' ? 'all' : 'warning')}
           className="text-left"
+          aria-pressed={levelFilter === 'warning'}
+          aria-label={`Filtrer avertissements (${warningAlerts.length})`}
         >
           <Card
             variant="default"
@@ -296,6 +300,8 @@ export default function ClientAlerts({ client, onUpdate, onCountChange, onNaviga
           type="button"
           onClick={() => setLevelFilter(levelFilter === 'info' ? 'all' : 'info')}
           className="text-left"
+          aria-pressed={levelFilter === 'info'}
+          aria-label={`Filtrer informations (${infoAlerts.length})`}
         >
           <Card
             variant="default"
@@ -412,6 +418,7 @@ export default function ClientAlerts({ client, onUpdate, onCountChange, onNaviga
                             onClick={() => handleResolveAlert(alert.alertType)}
                             className="text-content-muted hover:text-content-primary p-1 hover:bg-surface-elevated/50 rounded transition shrink-0"
                             title="Marquer comme resolu (expire apres 30 jours)"
+                            aria-label={`Resoudre l'alerte ${ALERT_TYPE_LABELS[alert.alertType] || alert.alertType}`}
                           >
                             <X size={16} />
                           </button>
@@ -429,7 +436,7 @@ export default function ClientAlerts({ client, onUpdate, onCountChange, onNaviga
                       {alert.action && (
                         <div className="flex items-start gap-2 flex-1 min-w-0">
                           <Lightbulb size={12} className="text-accent shrink-0 mt-0.5" />
-                          <p className="text-xs text-accent/80 truncate">{alert.action}</p>
+                          <p className="text-xs text-accent/80 truncate" title={alert.action}>{alert.action}</p>
                         </div>
                       )}
                       {alert.targetTab && onNavigateToTab && (
@@ -456,6 +463,8 @@ export default function ClientAlerts({ client, onUpdate, onCountChange, onNaviga
           <button
             onClick={() => setShowResolved(!showResolved)}
             className="w-full flex items-center justify-between p-4 hover:bg-surface/50 transition-colors"
+            aria-expanded={showResolved}
+            aria-label="Afficher l'historique des resolutions"
           >
             <div className="flex items-center gap-2">
               <RotateCcw size={16} className="text-content-muted" />
@@ -490,9 +499,20 @@ export default function ClientAlerts({ client, onUpdate, onCountChange, onNaviga
                         </p>
                       </div>
                     </div>
-                    <span className="text-[10px] text-content-muted bg-surface-subtle px-2 py-0.5 rounded-full">
-                      Expire dans {Math.max(0, 30 - Math.floor((Date.now() - new Date(entry.resolvedAt).getTime()) / (1000 * 60 * 60 * 24)))}j
-                    </span>
+                    {(() => {
+                      const daysLeft = 30 - Math.floor((Date.now() - new Date(entry.resolvedAt).getTime()) / (1000 * 60 * 60 * 24));
+                      return (
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                          daysLeft <= 0
+                            ? 'text-status-danger bg-status-danger-bg'
+                            : daysLeft <= 7
+                            ? 'text-status-warning bg-status-warning-bg'
+                            : 'text-content-muted bg-surface-subtle'
+                        }`}>
+                          {daysLeft <= 0 ? 'Expire' : `Expire dans ${daysLeft}j`}
+                        </span>
+                      );
+                    })()}
                   </div>
                 ))}
               </div>

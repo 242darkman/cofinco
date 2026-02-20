@@ -61,15 +61,9 @@ async function seedScoring() {
       batch.map(async (client) => {
         try {
           if (isForce) {
-            // Force: record RECALCUL_COMPLET event + full recalculation
-            await recordScoreEvent({
-              clientId: client.id,
-              agenceId: client.agenceId || undefined,
-              eventType: "RECALCUL_COMPLET",
-              refId: `force-recalc-${client.id}-${Date.now()}`,
-              refType: "script",
-              reason: "Recalcul forcé via seed-scoring --force",
-            });
+            // Force: full recalculation (no event ledger entry)
+            const { recalculateClientScore } = await import('../services/scoring-engine');
+            await recalculateClientScore(client.id);
           } else {
             // Normal: record INITIAL_SCORE event (idempotent via refId)
             await recordScoreEvent({

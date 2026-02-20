@@ -145,10 +145,10 @@ export async function recordScoreEvent(input: ScoreEventInput): Promise<{
     .limit(1);
 
   if (existing.length > 0) {
-    const state = await getOrCreateScoreState(input.clientId);
+    const state = await getScoreState(input.clientId);
     return {
       isNew: false,
-      result: {
+      result: state ? {
         scoreGlobal: state.scoreGlobal,
         segment: state.segment,
         scorePayment: state.scorePayment,
@@ -157,7 +157,7 @@ export async function recordScoreEvent(input: ScoreEventInput): Promise<{
         scoreCompliance: state.scoreCompliance,
         tauxRemboursement: parseFloat(state.tauxRemboursement),
         totalPointsFidelite: state.totalPointsFidelite,
-      },
+      } : { scoreGlobal: 50, segment: 'Standard', scorePayment: 50, scoreLoyalty: 50, scoreEngagement: 50, scoreCompliance: 50, tauxRemboursement: '100', totalPointsFidelite: 0 },
     };
   }
 
@@ -442,7 +442,7 @@ function calculateComplianceScore(client: any): number {
   let score = 0;
 
   // KYC status (up to 50 points)
-  if (client.kycStatus === "VERIFIED" || client.kycStatus === "COMPLETE") score += 50;
+  if (client.kycStatus === "VERIFIED") score += 50;
   else if (client.kycStatus === "PARTIAL") score += 25;
   else score += 10; // PENDING
 
@@ -637,23 +637,6 @@ function getAncienneteMois(client: any): number {
   return Math.floor((Date.now() - dateCreation.getTime()) / (1000 * 60 * 60 * 24 * 30));
 }
 
-async function getOrCreateScoreState(clientId: string) {
-  let state = await db.query.clientScoreState.findFirst({
-    where: eq(clientScoreState.clientId, clientId),
-  });
-
-  if (!state) {
-    const client = await db.query.clients.findFirst({ where: eq(clients.id, clientId) });
-    const [inserted] = await db.insert(clientScoreState).values({
-      clientId,
-      agenceId: client?.agenceId || undefined,
-    }).returning();
-    state = inserted;
-  }
-
-  return state;
-}
-
 async function upsertScoreState(
   clientId: string,
   agenceId: string | undefined,
@@ -672,29 +655,24 @@ async function upsertScoreState(
   },
   txDb: any = db,
 ) {
-  const existing = await txDb.query.clientScoreState.findFirst({
-    where: eq(clientScoreState.clientId, clientId),
-  });
-
   const now = new Date();
 
-  if (existing) {
-    await txDb.update(clientScoreState).set({
+  await txDb.insert(clientScoreState).values({
+    clientId,
+    agenceId,
+    ...data,
+    lastEventAt: now,
+    lastRecalcAt: now,
+  }).onConflictDoUpdate({
+    target: clientScoreState.clientId,
+    set: {
       agenceId,
       ...data,
       lastEventAt: now,
       lastRecalcAt: now,
       updatedAt: now,
-    }).where(eq(clientScoreState.clientId, clientId));
-  } else {
-    await txDb.insert(clientScoreState).values({
-      clientId,
-      agenceId,
-      ...data,
-      lastEventAt: now,
-      lastRecalcAt: now,
-    });
-  }
+    },
+  });
 }
 
 // ============================================================================

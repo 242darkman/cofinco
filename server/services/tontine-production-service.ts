@@ -1296,6 +1296,24 @@ export async function applyLatePenalties(agenceId: string): Promise<{ applied: n
         })
         .where(eq(membresTontine.id, member.id));
 
+      // Score event: TONTINE_PENALITE for penalty incurrence
+      if (member.clientId) {
+        try {
+          const { recordScoreEvent } = await import('./scoring-engine');
+          await recordScoreEvent({
+            clientId: member.clientId,
+            agenceId: tontine.agenceId ?? undefined,
+            eventType: 'TONTINE_PENALITE',
+            refId: `tontine-penalty-${schedule.id}`,
+            refType: 'tontine_penalite',
+            montant: penaltyAmount,
+            reason: `Retard de paiement - Période ${schedule.periodNumber}`,
+          });
+        } catch (scoreErr) {
+          logger.warn({ err: scoreErr, memberId: member.id }, 'Score event TONTINE_PENALITE failed (non-blocking)');
+        }
+      }
+
       // Domain events: overdue + penalty applied
       if (member.clientId) {
         const daysOverdue = Math.floor(

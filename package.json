@@ -18,6 +18,8 @@
     "db:reset-financial": "node --env-file=.env --import tsx scripts/reset-financial-data.ts",
     "db:reset-financial:force": "node --env-file=.env --import tsx scripts/reset-financial-data.ts -- --force",
     "db:validate": "node --env-file=.env --import tsx scripts/validate-seed.ts",
+    "db:seed:scoring": "node --env-file=.env --import tsx server/scripts/seed-scoring.ts",
+    "db:seed:scoring:force": "node --env-file=.env --import tsx server/scripts/seed-scoring.ts -- --force",
     "db:clean-dead-letters": "node --env-file=.env --import tsx scripts/clean-dead-letter-jobs.ts",
     "db:clean-dead-letters:force": "node --env-file=.env --import tsx scripts/clean-dead-letter-jobs.ts -- --force",
     "audit:integrity": "node --env-file=.env --import tsx scripts/audit-integrity.ts",

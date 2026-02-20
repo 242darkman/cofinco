@@ -3,7 +3,7 @@
  *
  * Evalue les conditions de risque du client et retourne les alertes actives.
  * Les resolutions sont persistees dans le champ JSONB `alerts` du client.
- * Les resolutions expirent apres RESOLUTION_EXPIRY_DAYS jours — les alertes
+ * Les resolutions expirent apres N jours (configurable via ALERT_THRESHOLDS) — les alertes
  * reapparaissent si la condition persiste.
  *
  * firstSeenAt tracking: persiste la date de premiere detection de chaque
@@ -20,24 +20,28 @@ import { currencySymbol } from "@shared/config/currency";
 // CONSTANTS & TYPES
 // ============================================================================
 
-/** Resolution expires after this many days — alert reappears if condition persists */
-const RESOLUTION_EXPIRY_DAYS = 30;
-
-/** Low balance threshold in currency units */
-const LOW_BALANCE_THRESHOLD = 1000;
-
-/** Client inactivity threshold in days */
-const INACTIVITY_DAYS = 90;
-
-/** ID expiration warning thresholds in days */
-const ID_EXPIRY_CRITICAL_DAYS = 30;
-const ID_EXPIRY_WARNING_DAYS = 90;
-
-/** Score thresholds */
-const SCORE_DROP_THRESHOLD = 40;
-
-/** Temporal escalation: warning alerts older than this become critical */
-const ESCALATION_DAYS = 30;
+/**
+ * Configurable alert thresholds.
+ * Override individual values via `Object.assign(ALERT_THRESHOLDS, { ... })` at startup.
+ */
+export const ALERT_THRESHOLDS = {
+  /** Resolution expires after this many days — alert reappears if condition persists */
+  resolutionExpiryDays: 30,
+  /** Low balance threshold in currency units */
+  lowBalanceThreshold: 1000,
+  /** Client inactivity threshold in days */
+  inactivityDays: 90,
+  /** ID expiration critical threshold in days */
+  idExpiryCriticalDays: 30,
+  /** ID expiration warning threshold in days */
+  idExpiryWarningDays: 90,
+  /** Score below this triggers score_drop alert */
+  scoreDropThreshold: 40,
+  /** Repayment rate below this triggers payment_overdue */
+  paymentOverdueRate: 70,
+  /** Temporal escalation: warning alerts older than this (days) become critical */
+  escalationDays: 30,
+};
 
 export const KNOWN_ALERT_TYPES = [
   "payment_overdue",
@@ -145,7 +149,7 @@ function daysBetween(d1: Date, d2: Date): number {
 function isResolutionExpired(resolvedAt: string): boolean {
   const resolved = new Date(resolvedAt);
   const now = new Date();
-  return daysBetween(resolved, now) > RESOLUTION_EXPIRY_DAYS;
+  return daysBetween(resolved, now) > ALERT_THRESHOLDS.resolutionExpiryDays;
 }
 
 /** Parse the alerts JSONB from client, handling old (array) and new (object) format */
@@ -217,11 +221,11 @@ export async function evaluateClientAlerts(
       // Use persisted firstSeenAt or fallback to now
       const createdAt = trackingMap.get(type) || nowIso;
 
-      // Temporal escalation: warning alerts older than ESCALATION_DAYS become critical
+      // Temporal escalation: warning alerts older than escalationDays become critical
       let effectiveLevel = level;
       if (level === "warning") {
         const ageInDays = daysBetween(new Date(createdAt), now);
-        if (ageInDays >= ESCALATION_DAYS) {
+        if (ageInDays >= ALERT_THRESHOLDS.escalationDays) {
           effectiveLevel = "critical";
         }
       }
@@ -240,17 +244,7 @@ export async function evaluateClientAlerts(
     }
   };
 
-  // 1. Taux de remboursement critique (< 70%)
-  const tauxRemboursement = Number(client.tauxRemboursement || 0);
-  if (tauxRemboursement > 0 && tauxRemboursement < 70) {
-    pushAlert(
-      "payment_overdue",
-      "critical",
-      `Taux de remboursement critique (${tauxRemboursement}%). Action requise.`
-    );
-  }
-
-  // 2. Documents KYC manquants
+  // 1. Documents KYC manquants
   const documents = Array.isArray(client.documents) ? client.documents : [];
   if (documents.length === 0) {
     pushAlert(
@@ -269,9 +263,11 @@ export async function evaluateClientAlerts(
     }
   }
 
-  // 3. Credit en retard
+  // 2. Credit en retard + Taux de remboursement
+  let hasActiveCredits = false;
   try {
     const credits = await getCreditsByClient(clientId);
+    hasActiveCredits = credits.length > 0;
     const lateCredits = credits.filter(
       (c) => c.statut === StatutCredit.LATE
     );
@@ -290,6 +286,16 @@ export async function evaluateClientAlerts(
     // Non-blocking: credits may not exist for all clients
   }
 
+  // 3. Taux de remboursement critique (includes 0% when credits exist)
+  const tauxRemboursement = Number(client.tauxRemboursement || 0);
+  if (tauxRemboursement < ALERT_THRESHOLDS.paymentOverdueRate && (tauxRemboursement > 0 || hasActiveCredits)) {
+    pushAlert(
+      "payment_overdue",
+      "critical",
+      `Taux de remboursement critique (${tauxRemboursement}%). Action requise.`
+    );
+  }
+
   // 4. Solde faible
   try {
     const comptes = await getComptesByClient(clientId);
@@ -300,7 +306,7 @@ export async function evaluateClientAlerts(
     );
     if (
       compteCourant &&
-      Number(compteCourant.soldeCourant) < LOW_BALANCE_THRESHOLD
+      Number(compteCourant.soldeCourant) < ALERT_THRESHOLDS.lowBalanceThreshold
     ) {
       pushAlert(
         "low_balance",
@@ -323,13 +329,13 @@ export async function evaluateClientAlerts(
         "critical",
         `Piece d'identite expiree depuis ${Math.abs(daysUntilExpiry)} jour(s). Renouvellement urgent.`
       );
-    } else if (daysUntilExpiry <= ID_EXPIRY_CRITICAL_DAYS) {
+    } else if (daysUntilExpiry <= ALERT_THRESHOLDS.idExpiryCriticalDays) {
       pushAlert(
         "id_expiring",
         "critical",
         `Piece d'identite expire dans ${daysUntilExpiry} jour(s). Renouvellement urgent.`
       );
-    } else if (daysUntilExpiry <= ID_EXPIRY_WARNING_DAYS) {
+    } else if (daysUntilExpiry <= ALERT_THRESHOLDS.idExpiryWarningDays) {
       pushAlert(
         "id_expiring",
         "warning",
@@ -354,7 +360,7 @@ export async function evaluateClientAlerts(
   if (client.derniereActivite) {
     const lastActivity = new Date(client.derniereActivite);
     const inactiveDays = daysBetween(lastActivity, now);
-    if (inactiveDays > INACTIVITY_DAYS) {
+    if (inactiveDays > ALERT_THRESHOLDS.inactivityDays) {
       pushAlert(
         "client_inactive",
         "info",
@@ -367,15 +373,15 @@ export async function evaluateClientAlerts(
   try {
     const memberships = await getTontinesByClient(clientId);
     const lateMembers = memberships.filter(
-      (m) => (m as any).lateCount > 0
+      (m) => m.lateCount > 0
     );
     if (lateMembers.length > 0) {
       const totalLate = lateMembers.reduce(
-        (sum, m) => sum + Number((m as any).lateCount || 0),
+        (sum, m) => sum + Number(m.lateCount || 0),
         0
       );
       const tontineNames = lateMembers
-        .map((m) => (m as any).tontine?.nom || "Tontine")
+        .map((m) => m.tontine?.nom || "Tontine")
         .join(", ");
       pushAlert(
         "tontine_late",
@@ -389,7 +395,7 @@ export async function evaluateClientAlerts(
 
   // 9. Score en chute — segment Risque ou score < seuil
   const clientScore = Number(client.score ?? 50);
-  if (clientScore < SCORE_DROP_THRESHOLD) {
+  if (clientScore < ALERT_THRESHOLDS.scoreDropThreshold) {
     pushAlert(
       "score_drop",
       "critical",

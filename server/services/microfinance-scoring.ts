@@ -79,6 +79,10 @@ const SEUILS = {
 // FONCTION PRINCIPALE
 // ============================================================================
 
+/**
+ * @deprecated Utilisé uniquement pour l'analyse de demande de crédit (scoring d'éligibilité).
+ * Pour le score client global, utiliser `recalculateClientScore` de `scoring-engine.ts`.
+ */
 export async function calculerScoreMicrofinance(factors: ScoringFactors): Promise<ScoringResult> {
   const { clientId, montantDemande, dureeMois, revenuMensuel, chargesMensuelles } = factors;
 

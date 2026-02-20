@@ -16,10 +16,14 @@ import {
   TrendingUp,
   Activity,
   ArrowUpRight,
-  Database
+  Database,
+  BarChart3
 } from 'lucide-react';
 
+import { useQuery } from '@tanstack/react-query';
 import { Button, Card, Badge, ProgressBar } from '../ui';
+import { clientApi } from '../../lib/api-client';
+import { scoreKeys } from '../../lib/query-keys';
 import { useAgence } from '../../contexts/AgenceContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useDashboardStats } from '../../hooks/dashboard/useDashboardStats';
@@ -69,6 +73,13 @@ export default function Dashboard({
 
   // Treasury v2: Single Source of Truth depuis le Grand Livre (GL)
   const { data: encaisse, isLoading: encaisseLoading } = useEncaisse(selectedAgence?.id);
+
+  // Scoring stats for selected agency
+  const { data: scoreStats } = useQuery({
+    queryKey: scoreKeys.agencyStats(selectedAgence?.id),
+    queryFn: () => clientApi.getAgencyScoreStats(selectedAgence?.id),
+    staleTime: 120_000,
+  });
 
   // Scroll container refs and state for fade indicators
   const mainScrollRef = useRef<HTMLDivElement>(null);
@@ -480,6 +491,56 @@ export default function Dashboard({
                </div>
              </Card>
           </section>
+
+          {/* Section: Scoring Clients */}
+          {scoreStats && scoreStats.length > 0 && (() => {
+            const agg = scoreStats.reduce((acc, s) => ({
+              totalClients: acc.totalClients + s.totalClients,
+              sumScore: acc.sumScore + s.avgScore * s.totalClients,
+              VIP: acc.VIP + s.segments.VIP,
+              Premium: acc.Premium + s.segments.Premium,
+              Standard: acc.Standard + s.segments.Standard,
+              Risque: acc.Risque + s.segments.Risque,
+            }), { totalClients: 0, sumScore: 0, VIP: 0, Premium: 0, Standard: 0, Risque: 0 });
+            const avgScore = agg.totalClients > 0 ? Math.round(agg.sumScore / agg.totalClients) : 0;
+            const scoreColor = avgScore >= 80 ? 'text-status-success' : avgScore >= 65 ? 'text-status-info' : avgScore >= 40 ? 'text-status-warning' : 'text-status-danger';
+            return (
+              <section className="space-y-2" aria-labelledby="scoring-section-title">
+                <h3 id="scoring-section-title" className="text-xs font-semibold text-content-muted uppercase tracking-widest flex items-center gap-1.5">
+                  <BarChart3 size={12} aria-hidden="true" />
+                  Scoring Clients
+                </h3>
+                <Card variant="default" padding="sm" className="bg-surface/40 p-2.5">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] text-content-muted">Score moyen</span>
+                    <span className={`text-lg font-bold ${scoreColor}`}>{avgScore}</span>
+                  </div>
+                  <div className="space-y-1">
+                    {([
+                      { label: 'VIP', count: agg.VIP, color: 'bg-status-success' },
+                      { label: 'Premium', count: agg.Premium, color: 'bg-status-info' },
+                      { label: 'Standard', count: agg.Standard, color: 'bg-status-warning' },
+                      { label: 'Risque', count: agg.Risque, color: 'bg-status-danger' },
+                    ] as const).map(seg => (
+                      <div key={seg.label} className="flex items-center gap-2">
+                        <span className="text-[10px] text-content-muted w-14">{seg.label}</span>
+                        <div className="flex-1 h-1.5 bg-surface-elevated rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${seg.color}`}
+                            style={{ width: `${agg.totalClients > 0 ? (seg.count / agg.totalClients) * 100 : 0}%` }}
+                          />
+                        </div>
+                        <span className="text-[10px] font-medium text-content-secondary w-6 text-right">{seg.count}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="text-[9px] text-content-muted mt-1.5 text-right">
+                    {agg.totalClients} client{agg.totalClients > 1 ? 's' : ''}
+                  </div>
+                </Card>
+              </section>
+            );
+          })()}
         </aside>
 
       </div>

@@ -1324,20 +1324,24 @@ export function registerClientRoutes(app: Express) {
       res.json(act);
   });
 
-  // Recalculate Score (full recalc from real data)
+  // Helper: verify client belongs to user's agency (non-admin only)
+  async function checkClientScoreAccess(req: any, res: any): Promise<boolean> {
+    if (req.session.user?.role === SystemRole.ADMIN) return true;
+    const cl = await db.query.clients.findFirst({
+      where: eq(clients.id, req.params.id),
+      columns: { id: true, agenceId: true },
+    });
+    if (!cl) { res.status(404).json({ message: "Client introuvable" }); return false; }
+    if (cl.agenceId !== req.session.user?.agenceId) { res.status(403).json({ message: "Accès refusé" }); return false; }
+    return true;
+  }
+
+  // Recalculate Score (full recalc from real data — no event ledger entry)
   app.post("/api/clients/:id/score", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.LOYALTY), async (req, res) => {
       try {
-        const result = await recordScoreEvent({
-          clientId: req.params.id,
-          eventType: "RECALCUL_COMPLET",
-          refId: `recalc-${req.params.id}-${Date.now()}`,
-          refType: "manual",
-          reason: req.body.reason || "Recalcul manuel",
-          createdBy: req.session.user!.id,
-        });
-
-        // SCORE_UPDATED is already broadcast by recalculateClientScore()
-        res.json(result.result);
+        if (!await checkClientScoreAccess(req, res)) return;
+        const result = await recalculateClientScore(req.params.id);
+        res.json(result);
       } catch (error) {
           logger.error({ err: error }, 'Score calculation error');
           res.status(500).json({ message: "Score calculation failed" });
@@ -1347,6 +1351,7 @@ export function registerClientRoutes(app: Express) {
   // Score event history (audit trail)
   app.get("/api/clients/:id/score-history", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.LOYALTY), async (req, res) => {
       try {
+        if (!await checkClientScoreAccess(req, res)) return;
         const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 50));
         const offset = Math.max(0, parseInt(req.query.offset as string) || 0);
         const result = await getScoreHistory(req.params.id, limit, offset);
@@ -1360,6 +1365,7 @@ export function registerClientRoutes(app: Express) {
   // Score state (current component breakdown)
   app.get("/api/clients/:id/score-state", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.LOYALTY), async (req, res) => {
       try {
+        if (!await checkClientScoreAccess(req, res)) return;
         const state = await getScoreState(req.params.id);
         if (!state) return res.status(404).json({ message: "Score state not found" });
         res.json(state);
@@ -1372,6 +1378,7 @@ export function registerClientRoutes(app: Express) {
   // Score trend (monthly evolution)
   app.get("/api/clients/:id/score-trend", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.LOYALTY), async (req, res) => {
       try {
+        if (!await checkClientScoreAccess(req, res)) return;
         const months = Math.min(24, Math.max(1, parseInt(req.query.months as string) || 12));
         const trend = await getScoreTrend(req.params.id, months);
         res.json(trend);
@@ -1384,6 +1391,7 @@ export function registerClientRoutes(app: Express) {
   // Score percentile (ranking within agency)
   app.get("/api/clients/:id/score-percentile", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.LOYALTY), async (req, res) => {
       try {
+        if (!await checkClientScoreAccess(req, res)) return;
         const percentile = await getScorePercentile(req.params.id);
         if (!percentile) return res.status(404).json({ message: "Score state not found" });
         res.json(percentile);
@@ -1415,6 +1423,7 @@ export function registerClientRoutes(app: Express) {
   // Manual bonus/malus (admin only — requires MANAGE on LOYALTY subject)
   app.post("/api/clients/:id/score-bonus", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.LOYALTY), async (req, res) => {
       try {
+        if (!await checkClientScoreAccess(req, res)) return;
         const clientId = req.params.id;
         const { points, description } = req.body;
 
@@ -1854,6 +1863,7 @@ export function registerClientRoutes(app: Express) {
 
       const { evaluateClientAlerts } = await import("../services/client-alerts");
       const result = await evaluateClientAlerts(req.params.id);
+      res.set("Cache-Control", "private, max-age=30");
       res.json(result);
     } catch (error) {
       logger.error({ err: error }, 'Error evaluating client alerts');

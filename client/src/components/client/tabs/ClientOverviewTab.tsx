@@ -41,7 +41,7 @@ export default function ClientOverviewTab({ client, onNavigateToTab }: ClientOve
   const [showSavingsModal, setShowSavingsModal] = useState(false);
   const [showCreditsPanel, setShowCreditsPanel] = useState(false);
 
-  const { data: alertSummary } = useQuery<AlertSummary>({
+  const { data: alertSummary, isLoading: alertsLoading } = useQuery<AlertSummary>({
     queryKey: ['client-alerts-summary', client.id],
     queryFn: async () => {
       const res = await fetch(`/api/clients/${client.id}/alerts`, { credentials: 'include' });
@@ -109,8 +109,13 @@ export default function ClientOverviewTab({ client, onNavigateToTab }: ClientOve
   const distribution = raw.distribution ?? [];
   return (
     <>
+      {/* Alert banner skeleton while loading */}
+      {alertsLoading && (
+        <Skeleton className="h-14 w-full rounded-xl mb-4" />
+      )}
+
       {/* Alert banner — visible only when critical/warning alerts exist */}
-      {alertSummary && alertSummary.total > 0 && (
+      {!alertsLoading && alertSummary && alertSummary.total > 0 && (
         <button
           type="button"
           onClick={() => onNavigateToTab?.('alertes')}
