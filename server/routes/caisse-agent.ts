@@ -49,6 +49,7 @@ import { db } from "../db";
 import { users } from "@shared/schema/auth";
 import { eq } from "drizzle-orm";
 import { handleInsufficientFundsError } from "../middleware/financial-validation";
+import { getWsInstance } from "../ws-server";
 
 export const caisseAgentRouter = Router();
 
@@ -228,6 +229,20 @@ caisseAgentRouter.post("/operations-terrain/bulk-approve", async (req, res) => {
       ipAddress: req.ip,
       userAgent: req.headers["user-agent"],
     });
+
+    // Broadcast CAISSE_UPDATE pour rafraîchir l'historique de caisse
+    try {
+      const ws = getWsInstance();
+      if (ws) {
+        ws.broadcast({
+          type: "CAISSE_UPDATE",
+          payload: { source: "agent_terrain_bulk_approval" },
+        });
+      }
+    } catch {
+      // WebSocket broadcast is non-critical
+    }
+
     res.json(result);
   } catch (error: any) {
     logger.error({ err: error }, 'Bulk approve error');
@@ -291,6 +306,23 @@ caisseAgentRouter.post(
           error: result.error,
           code: result.errorCode,
         });
+      }
+
+      // Broadcast CAISSE_UPDATE pour rafraîchir l'historique de caisse en temps réel
+      try {
+        const ws = getWsInstance();
+        if (ws && result.operation) {
+          ws.broadcast({
+            type: "CAISSE_UPDATE",
+            payload: {
+              source: "agent_terrain_approval",
+              operationId: result.operation.id,
+              type: result.operation.type,
+            },
+          });
+        }
+      } catch {
+        // WebSocket broadcast is non-critical
       }
 
       res.json({

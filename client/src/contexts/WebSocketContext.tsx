@@ -528,13 +528,16 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          break;
 
       case "CAISSE_UPDATE":
-         // Invalidation des queries caisse (sessions, opérations, supervision)
+         // Invalidation des queries caisse (sessions, opérations, supervision, historique)
          debounceInvalidate(caisseKeys.sessions());
          debounceInvalidate(caisseKeys.sessionActive());
          debounceInvalidate(caisseKeys.operations());
          debounceInvalidate(caisseKeys.operationsToday());
          debounceInvalidate(caisseKeys.supervision());
          debounceInvalidate(caisseKeys.all);
+         // Historique de caisse (prefix match: invalide toutes les caisses)
+         debounceInvalidate(['caisse-historique']);
+         debounceInvalidate(['caisse-historique-summary']);
          // Rafraîchir la page Trésorerie (statuts caisses/coffres)
          debounceInvalidate(treasuryKeys.stats());
          // Filet de sécurité: rafraîchir aussi le dashboard principal

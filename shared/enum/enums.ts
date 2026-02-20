@@ -202,6 +202,9 @@ export const typeOperationCaisseEnum = pgEnum("type_operation_caisse", [
   "FEE_REFUND",
   // Provisionnement agent terrain
   "AGENT_PROVISIONING",
+  // Remise / clôture agent terrain → caisse
+  "AGENT_SETTLEMENT",
+  "AGENT_SESSION_CLOSE",
 ]);
 
 export const statutTransfertCaisseEnum = pgEnum("statut_transfert_caisse_enum", [

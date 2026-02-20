@@ -316,9 +316,9 @@ export const FEATURE_DESCRIPTIONS = {
     helpText: 'Consultez les demandes de crédit, validez les dossiers, décaissez les prêts et suivez les remboursements. Les échéances en retard sont signalées automatiquement.'
   },
   'finance.epargne': {
-    title: 'Épargne',
-    subtitle: 'Comptes d\'épargne et dépôts à terme',
-    helpText: 'Gérez les comptes d\'épargne de vos clients : ouvertures, versements, retraits. Configurez les objectifs d\'épargne et suivez l\'évolution des soldes.'
+    title: 'Comptes',
+    subtitle: 'Gestion des comptes clients : courants, épargne et bloqués',
+    helpText: 'Ouvrez et gérez les comptes de vos clients (courant, épargne, bloqué). Effectuez les versements et retraits, définissez des objectifs d\'épargne, et suivez l\'évolution des soldes en temps réel.'
   },
   'finance.tontines': {
     title: 'Tontines',

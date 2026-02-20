@@ -43,6 +43,7 @@ import {
   contributionsTontine,
   remboursements,
   transactionsCompte,
+  operationsCaisse,
 } from "@shared/schema";
 import { StatutTransaction, TypeCompte, TypeOperationCaisse, TypeOperationTerrain, type TypeOperationCaisseType } from "@shared/enum/status-constants";
 import { eq, sql, and, isNull, asc, desc } from "drizzle-orm";
@@ -1027,6 +1028,34 @@ export class ApprovalService {
       // Session active: utiliser updateSessionSolde pour synchroniser
       // session.montantFermetureTheorique ET caisses.solde
       await updateSessionSolde(tx, activeSession.id, montant, true);
+
+      // Créer operationsCaisse pour que l'entrée apparaisse dans l'historique de caisse
+      const [agentInfo] = await tx
+        .select({ nom: employes.nom, prenom: employes.prenom })
+        .from(agentsTerrain)
+        .innerJoin(employes, eq(agentsTerrain.employeId, employes.id))
+        .where(eq(agentsTerrain.id, operation.agentId))
+        .limit(1);
+      const agentDisplayName = agentInfo
+        ? `${agentInfo.prenom || ''} ${agentInfo.nom || ''}`.trim()
+        : operation.agentId;
+
+      await tx.insert(operationsCaisse).values({
+        sessionId: activeSession.id,
+        mouvementId: mouvementCaisse.id,
+        typeOperation: "AGENT_SETTLEMENT" as any,
+        statut: StatutTransaction.POSTED,
+        montant: operation.montant,
+        methodePaiement: "CASH",
+        reference: refCaisse,
+        description: `Remise agent terrain - ${agentDisplayName}`,
+        createdBy: approvedBy,
+        metadata: {
+          operationTerrainId: operation.id,
+          agentId: operation.agentId,
+          caisseAgentId: operation.caisseAgentId,
+        },
+      });
     } else {
       // Pas de session active: mettre à jour seulement caisses.solde
       // La prochaine session reprendra ce solde à l'ouverture

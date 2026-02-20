@@ -31,6 +31,8 @@ import {
   evenementsOutbox,
   sessionsCaisse,
   caisses,
+  operationsCaisse,
+  users,
   remboursements,
   transactionsCompte,
   contributionsTontine,
@@ -365,8 +367,46 @@ export class RemiseSettlementService {
       allMouvements.push(mouvementEntreeCaisse);
 
       // Mettre à jour la caisse destination
-      if (params.sessionCaisseId) {
-        await updateSessionSolde(tx, params.sessionCaisseId, montantRemise, true);
+      let targetSessionId = params.sessionCaisseId || null;
+      if (!targetSessionId) {
+        const [activeCaisseSession] = await tx
+          .select({ id: sessionsCaisse.id })
+          .from(sessionsCaisse)
+          .where(and(
+            eq(sessionsCaisse.caisseId, remise.caisseDestinationId!),
+            isNull(sessionsCaisse.closedAt)
+          ))
+          .limit(1);
+        if (activeCaisseSession) targetSessionId = activeCaisseSession.id;
+      }
+
+      if (targetSessionId) {
+        await updateSessionSolde(tx, targetSessionId, montantRemise, true);
+
+        // Lookup agent name for description
+        const [agentUser] = await tx
+          .select({ nom: users.nom, prenom: users.prenom })
+          .from(users)
+          .where(eq(users.id, remise.agentId));
+        const agentDisplayName = agentUser
+          ? `${agentUser.prenom || ''} ${agentUser.nom || ''}`.trim()
+          : remise.agentId;
+
+        await tx.insert(operationsCaisse).values({
+          sessionId: targetSessionId,
+          mouvementId: mouvementEntreeCaisse.id,
+          typeOperation: "AGENT_SETTLEMENT" as any,
+          statut: StatutTransaction.POSTED,
+          montant: remise.montantCalcule,
+          methodePaiement: "CASH",
+          reference: refCaisse,
+          description: `Remise agent terrain - ${agentDisplayName}`,
+          createdBy: params.validatedBy,
+          metadata: {
+            remiseId: remise.id,
+            agentId: remise.agentId,
+          },
+        });
       } else {
         await tx
           .update(caisses)

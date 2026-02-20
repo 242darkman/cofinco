@@ -239,6 +239,7 @@ const TRANSACTION_LABEL_GENERATORS: Record<string, (metadata?: TransactionMetada
   // OPÉRATIONS AGENTS / SESSIONS
   // ═══════════════════════════════════════════════════════════════════
   AGENT_PROVISIONING: () => 'APPROVISIONNEMENT AGENT',
+  AGENT_SETTLEMENT: () => 'REMISE AGENT TERRAIN',
   AGENT_SESSION_CLOSE: () => 'CLÔTURE SESSION AGENT',
   SESSION_CLOSING_TRANSFER: () => 'TRANSFERT CLÔTURE SESSION',
 

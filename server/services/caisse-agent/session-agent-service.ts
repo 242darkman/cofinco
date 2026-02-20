@@ -624,8 +624,10 @@ export class SessionAgentService {
           .returning();
 
         // 2. Créer mouvement financier: retour fonds agent → caisse
+        let mouvementReturnId: string | null = null;
+        let refReturn: string | null = null;
         if (montantRetourne > 0) {
-          const refReturn = generateReference("CAISSE_AGENT" as any);
+          refReturn = generateReference("CAISSE_AGENT" as any);
           const [mouvementReturn] = await tx
             .insert(mouvementsFinanciers)
             .values({
@@ -649,6 +651,7 @@ export class SessionAgentService {
               },
             })
             .returning();
+          mouvementReturnId = mouvementReturn.id;
 
           // 3. Post GL: D 521 / C 573xxx
           const glResult = await postGlForMouvement(
@@ -747,13 +750,53 @@ export class SessionAgentService {
 
         // 6. Update destination caisse balance
         if (montantRetourne > 0) {
-          await tx
-            .update(caisses)
-            .set({
-              solde: sql`${caisses.solde} + ${montantRetourne}`,
-              updatedAt: new Date(),
-            })
-            .where(eq(caisses.id, session.destinationCaisseId));
+          // Vérifier s'il y a une session caisse active
+          const [activeCaisseSession] = await tx
+            .select({ id: sessionsCaisse.id })
+            .from(sessionsCaisse)
+            .where(and(
+              eq(sessionsCaisse.caisseId, session.destinationCaisseId),
+              isNull(sessionsCaisse.closedAt)
+            ))
+            .limit(1);
+
+          if (activeCaisseSession) {
+            await updateSessionSolde(tx, activeCaisseSession.id, montantRetourne, true);
+
+            // Lookup agent name for description
+            const [agentUser] = await tx
+              .select({ nom: users.nom, prenom: users.prenom })
+              .from(users)
+              .where(eq(users.id, session.agentId));
+            const agentDisplayName = agentUser
+              ? `${agentUser.prenom || ''} ${agentUser.nom || ''}`.trim()
+              : session.agentId;
+
+            await tx.insert(operationsCaisse).values({
+              sessionId: activeCaisseSession.id,
+              mouvementId: mouvementReturnId,
+              typeOperation: "AGENT_SESSION_CLOSE" as any,
+              statut: StatutTransaction.POSTED,
+              montant: String(montantRetourne),
+              methodePaiement: "CASH",
+              reference: refReturn!,
+              description: `Clôture session agent - ${agentDisplayName}`,
+              createdBy: params.finalizedBy,
+              metadata: {
+                sessionAgentId: session.id,
+                agentId: session.agentId,
+              },
+            });
+          } else {
+            // Pas de session active: fallback direct sur caisses.solde
+            await tx
+              .update(caisses)
+              .set({
+                solde: sql`${caisses.solde} + ${montantRetourne}`,
+                updatedAt: new Date(),
+              })
+              .where(eq(caisses.id, session.destinationCaisseId));
+          }
         }
 
         // 7. Finalize session → CLOSED
@@ -876,8 +919,10 @@ export class SessionAgentService {
           .returning();
 
         // 4. Financial movement: return funds agent → caisse
+        let mouvementReturnId: string | null = null;
+        let refReturn: string | null = null;
         if (montantRetourne > 0) {
-          const refReturn = generateReference("CAISSE_AGENT" as any);
+          refReturn = generateReference("CAISSE_AGENT" as any);
           const [mouvementReturn] = await tx
             .insert(mouvementsFinanciers)
             .values({
@@ -901,6 +946,8 @@ export class SessionAgentService {
               },
             })
             .returning();
+
+          mouvementReturnId = mouvementReturn.id;
 
           // GL: D 521 / C 573xxx
           const glResult = await postGlForMouvement(
@@ -1179,13 +1226,52 @@ export class SessionAgentService {
 
         // 8. Credit destination caisse
         if (montantRetourne > 0) {
-          await tx
-            .update(caisses)
-            .set({
-              solde: sql`${caisses.solde} + ${montantRetourne}`,
-              updatedAt: new Date(),
-            })
-            .where(eq(caisses.id, params.destinationCaisseId));
+          const [activeCaisseSession] = await tx
+            .select({ id: sessionsCaisse.id })
+            .from(sessionsCaisse)
+            .where(and(
+              eq(sessionsCaisse.caisseId, params.destinationCaisseId),
+              isNull(sessionsCaisse.closedAt)
+            ))
+            .limit(1);
+
+          if (activeCaisseSession) {
+            await updateSessionSolde(tx, activeCaisseSession.id, montantRetourne, true);
+
+            // Lookup agent name for description
+            const [agentUser] = await tx
+              .select({ nom: users.nom, prenom: users.prenom })
+              .from(users)
+              .where(eq(users.id, session.agentId));
+            const agentDisplayName = agentUser
+              ? `${agentUser.prenom || ''} ${agentUser.nom || ''}`.trim()
+              : session.agentId;
+
+            await tx.insert(operationsCaisse).values({
+              sessionId: activeCaisseSession.id,
+              mouvementId: mouvementReturnId,
+              typeOperation: "AGENT_SESSION_CLOSE" as any,
+              statut: StatutTransaction.POSTED,
+              montant: String(montantRetourne),
+              methodePaiement: "CASH",
+              reference: refReturn!,
+              description: `Clôture session agent (remise) - ${agentDisplayName}`,
+              createdBy: params.closedBy,
+              metadata: {
+                sessionAgentId: session.id,
+                agentId: session.agentId,
+              },
+            });
+          } else {
+            // Fallback: direct caisse balance update (no active session)
+            await tx
+              .update(caisses)
+              .set({
+                solde: sql`${caisses.solde} + ${montantRetourne}`,
+                updatedAt: new Date(),
+              })
+              .where(eq(caisses.id, params.destinationCaisseId));
+          }
         }
 
         // 9. Update session → CLOSED (skip CLOSING intermediate state)
