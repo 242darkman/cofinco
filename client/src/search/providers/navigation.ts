@@ -136,7 +136,7 @@ const NAVIGATION_ITEMS: SearchResult[] = [
     icon: Wallet,
     iconBg: 'bg-status-info-bg text-status-info',
     type: 'navigation',
-    moduleKey: 'epargnes',
+    moduleKey: 'comptes',
     permission: { action: Actions.VIEW, subject: Subjects.COMPTES },
   },
   {

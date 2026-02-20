@@ -25,7 +25,7 @@ interface Objectif {
   description: string;
 }
 
-interface EpargneSavingsGoalsProps {
+interface CompteSavingsGoalsProps {
   compteId: string;
   compteSolde: number;
   onClose: () => void;
@@ -38,7 +38,7 @@ interface FormErrors {
   general?: string;
 }
 
-export default function EpargneSavingsGoals({ compteId, compteSolde, onClose }: EpargneSavingsGoalsProps) {
+export default function CompteSavingsGoals({ compteId, compteSolde, onClose }: CompteSavingsGoalsProps) {
   const queryClient = useQueryClient();
   const [submitting, setSubmitting] = useState(false);
   const [showForm, setShowForm] = useState(false);

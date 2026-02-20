@@ -36,7 +36,7 @@ interface Compte {
   };
 }
 
-interface EpargneTransactionFormProps {
+interface CompteTransactionFormProps {
   compte: Compte;
   type: 'Dépôt' | 'Retrait';
   onClose: () => void;
@@ -57,7 +57,7 @@ const PAYMENT_MODES: { id: ModePaiement; icon: typeof Banknote; label: string }[
   { id: 'TRANSFER', icon: Building, label: 'Virement' },
 ];
 
-export default function EpargneTransactionForm({ compte, type, onClose, onSuccess }: EpargneTransactionFormProps) {
+export default function CompteTransactionForm({ compte, type, onClose, onSuccess }: CompteTransactionFormProps) {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const networkStatus = useNetworkStatus();

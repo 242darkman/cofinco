@@ -62,7 +62,7 @@ interface ProduitCompte {
   } | null;
 }
 
-interface EpargneAccountFormProps {
+interface CompteAccountFormProps {
   onClose: () => void;
   onSuccess: () => void;
   clientId?: string;
@@ -79,7 +79,7 @@ const normalizeTypeCompte = (value: string): TypeCompte => {
   return 'CURRENT';
 };
 
-export default function EpargneAccountForm({ onClose, onSuccess, clientId }: EpargneAccountFormProps) {
+export default function CompteAccountForm({ onClose, onSuccess, clientId }: CompteAccountFormProps) {
   const { mobileMoneyEnabled } = useFeatureFlags();
   // Data State
   const [clients, setClients] = useState<Client[]>([]);

@@ -4,12 +4,12 @@ import { Plus, Search, Users, DollarSign, Filter, Activity, PiggyBank } from 'lu
 import { FeatureHeader, FEATURE_DESCRIPTIONS } from '../../ui/FeatureHeader';
 import { toast } from 'sonner';
 import { compteEpargneApi, sessionCaisseApi } from '../../../lib/api-client';
-import EpargneAccountForm from './EpargneAccountForm';
-import EpargneTransactionForm from './EpargneTransactionForm';
+import CompteAccountForm from './CompteAccountForm';
+import CompteTransactionForm from './CompteTransactionForm';
 import AccountDetailSlideOver from './AccountDetailSlideOver';
 import AccountsList, { ACCOUNT_STATUS_FILTER_OPTIONS } from './AccountsList';
-import EpargneInterestCalculator from './EpargneInterestCalculator';
-import EpargneSavingsGoals from './EpargneSavingsGoals';
+import CompteInterestCalculator from './CompteInterestCalculator';
+import CompteSavingsGoals from './CompteSavingsGoals';
 import ComptesBloquesSection from '../operations/ComptesBloquesSection';
 import { ProtectedFeature, usePermissions } from '../../auth/ProtectedFeature';
 import { getAccountBalance } from '../../../lib/account-config';
@@ -40,13 +40,13 @@ interface Compte {
   } | null;
 }
 
-interface EpargnesProps {
+interface ComptesProps {
   activeView?: string;
 }
 
 const ITEMS_PER_PAGE = 15;
 
-export default function Epargnes({ activeView }: EpargnesProps) {
+export default function Comptes({ activeView }: ComptesProps) {
   const queryClient = useQueryClient();
 
   // UI state (modals, forms, selections)
@@ -99,7 +99,7 @@ export default function Epargnes({ activeView }: EpargnesProps) {
 
   useEffect(() => {
     if (activeView) {
-      if (activeView === 'epargnes-list' || activeView === 'epargnes-transactions') {
+      if (activeView === 'comptes-list' || activeView === 'comptes-transactions') {
         setActiveTab(TypeCompte.CURRENT);
       }
     }
@@ -410,7 +410,7 @@ export default function Epargnes({ activeView }: EpargnesProps) {
       </div>
 
       {showAccountForm && (
-        <EpargneAccountForm
+        <CompteAccountForm
           onClose={() => setShowAccountForm(false)}
           onSuccess={() => {
             setShowAccountForm(false);
@@ -420,7 +420,7 @@ export default function Epargnes({ activeView }: EpargnesProps) {
       )}
 
       {selectedCompte && selectedCompte.clients && transactionType && (
-        <EpargneTransactionForm
+        <CompteTransactionForm
           compte={selectedCompte as Compte & { clients: NonNullable<Compte['clients']> }}
           type={transactionType}
           onClose={() => {
@@ -458,7 +458,7 @@ export default function Epargnes({ activeView }: EpargnesProps) {
       )}
 
       {showInterestCalc && interestCompte && (
-        <EpargneInterestCalculator
+        <CompteInterestCalculator
           compte={interestCompte}
           onClose={() => {
             setShowInterestCalc(false);
@@ -473,7 +473,7 @@ export default function Epargnes({ activeView }: EpargnesProps) {
       )}
 
       {showGoals && goalsCompte && (
-        <EpargneSavingsGoals
+        <CompteSavingsGoals
           compteId={goalsCompte.id}
           compteSolde={goalsCompte.solde}
           onClose={() => {

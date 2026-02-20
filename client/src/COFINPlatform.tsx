@@ -12,7 +12,7 @@ const Tontines = lazy(() => import('./components/finance/tontine/Tontines'));
 const Credits = lazy(() => import('./components/finance/credits/Credits'));
 const TransfertArgent = lazy(() => import('./components/finance/transfert/TransfertArgent'));
 const CreditRequestForm = lazy(() => import('./components/finance/credits/CreditRequestForm'));
-const Epargnes = lazy(() => import('./components/finance/epargne/Epargnes'));
+const Comptes = lazy(() => import('./components/finance/compte/Comptes'));
 const CaisseDashboard = lazy(() => import('./components/finance/caisse/CaisseDashboard'));
 const CoffreFortDashboard = lazy(() => import('./components/finance/caisse/CoffreFortDashboard').then(m => ({ default: m.CoffreFortDashboard })));
 const ComptabiliteSageOHADA = lazy(() => import('./components/finance/accounting/ComptabiliteSageOHADA'));
@@ -318,10 +318,10 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
             <CreditRefundsPage />
           </Suspense>
         );
-      case 'epargnes':
+      case 'comptes':
         return (
-          <Suspense fallback={<ModuleLoadingFallback moduleName="Épargnes" />}>
-            <Epargnes activeView={currentSubModule} />
+          <Suspense fallback={<ModuleLoadingFallback moduleName="Comptes" />}>
+            <Comptes activeView={currentSubModule} />
           </Suspense>
         );
       case 'agentTerrain':

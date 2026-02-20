@@ -18,7 +18,7 @@ interface Compte {
   } | null;
 }
 
-interface EpargneInterestCalculatorProps {
+interface CompteInterestCalculatorProps {
   compte: Compte;
   onClose: () => void;
   onSuccess: () => void;
@@ -32,7 +32,7 @@ const PERIODE_CONFIG: Record<Periode, { days: number; label: string; description
   year: { days: 365, label: 'Annuel', description: '365 jours' },
 };
 
-export default function EpargneInterestCalculator({ compte, onClose, onSuccess }: EpargneInterestCalculatorProps) {
+export default function CompteInterestCalculator({ compte, onClose, onSuccess }: CompteInterestCalculatorProps) {
   const [loading, setLoading] = useState(false);
   const [periode, setPeriode] = useState<Periode>('month');
   const [showConfirm, setShowConfirm] = useState(false);

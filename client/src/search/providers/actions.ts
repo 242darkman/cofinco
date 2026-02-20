@@ -47,7 +47,7 @@ const ACTION_ITEMS: SearchResult[] = [
     icon: PlusCircle,
     iconBg: 'bg-status-info-bg text-status-info',
     type: 'action',
-    moduleKey: 'epargnes',
+    moduleKey: 'comptes',
     permission: { action: Actions.CREATE, subject: Subjects.COMPTE },
   },
   {

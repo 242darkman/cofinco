@@ -14,7 +14,7 @@ interface MobileBottomNavProps {
 
 const NAV_ITEMS: Array<{ key: string; labelKey: string; icon: typeof LayoutDashboard; requiredModule?: AppModule }> = [
   { key: 'dashboard', labelKey: 'menuDashboard', icon: LayoutDashboard, requiredModule: 'Dashboard' },
-  { key: 'epargnes', labelKey: 'menuCompte', icon: PiggyBank, requiredModule: 'Comptes' },
+  { key: 'comptes', labelKey: 'menuCompte', icon: PiggyBank, requiredModule: 'Comptes' },
   { key: 'transfert', labelKey: 'menuTransfert', icon: ArrowLeftRight, requiredModule: 'Communications' },
 ];
 

@@ -8,7 +8,7 @@ import type { AppAbility } from './casl';
 // Lazy load components
 const Dashboard = lazy(() => import('@/components/dashboard/Dashboard'));
 const Credits = lazy(() => import('@/components/finance/credits/Credits'));
-const Epargnes = lazy(() => import('@/components/finance/epargne/Epargnes'));
+const Comptes = lazy(() => import('@/components/finance/compte/Comptes'));
 const Tontines = lazy(() => import('@/components/finance/tontine/Tontines'));
 const Comptabilite = lazy(() => import('@/components/finance/accounting/ComptabiliteSageOHADA'));
 const RessourcesHumaines = lazy(() => import('@/components/hr/RessourcesHumaines'));
@@ -129,15 +129,15 @@ export const ROUTES: RouteConfig[] = [
     group: 'Services Clients',
   },
   {
-    key: 'epargnes',
-    path: '/epargnes',
-    component: Epargnes,
+    key: 'comptes',
+    path: '/comptes',
+    component: Comptes,
     requiredModule: 'Comptes',
     label: 'Comptes',
     labelKey: 'menuCompte',
     group: 'Services Clients',
     subRoutes: [
-      { path: '/epargnes/comptes', subModule: 'comptes', label: 'Tous les comptes' },
+      { path: '/comptes/tous', subModule: 'comptes', label: 'Tous les comptes' },
     ],
   },
   {

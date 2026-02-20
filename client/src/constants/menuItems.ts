@@ -31,7 +31,7 @@ export const PLATFORM_MENU_ITEMS: MenuItem[] = [
   { labelKey: 'menuClients', icon: Users, key: 'clients', section: 'services' },
   { labelKey: 'menuCredits', icon: Banknote, key: 'credits', section: 'services' },
   { labelKey: 'menuRemboursements', icon: Undo2, key: 'remboursements', section: 'services' },
-  { labelKey: 'menuCompte', icon: PiggyBank, key: 'epargnes', section: 'services' },
+  { labelKey: 'menuCompte', icon: PiggyBank, key: 'comptes', section: 'services' },
   { labelKey: 'menuTontines', icon: CircleDollarSign, key: 'tontines', section: 'services' },
 
   // Opérations

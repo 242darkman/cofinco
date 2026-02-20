@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { StatutCompte } from '@shared/enum/status-constants';
 import { Lock, Plus, Eye, TrendingUp, Calendar, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import CompteBloqueForm from './CompteBloqueForm';
-import AccountDetailSlideOver from '../epargne/AccountDetailSlideOver';
+import AccountDetailSlideOver from '../compte/AccountDetailSlideOver';
 import StatCard from '../../ui/StatCard';
 import ResponsiveTable from '../../ui/ResponsiveTable';
 import Badge from '../../ui/Badge';

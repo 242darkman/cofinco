@@ -9,7 +9,7 @@ import AccountCard from './AccountCard';
 import AccountHistory from './AccountHistory';
 import SuspendAccountModal from './SuspendAccountModal';
 import ClosureWizard from './ClosureWizard';
-import EpargneAccountForm from '../finance/epargne/EpargneAccountForm';
+import CompteAccountForm from '../finance/compte/CompteAccountForm';
 import { StatutCompte, type StatutCompteType, TypeCompte } from '@shared/enum/status-constants';
 import { Actions } from '@shared/ability/actions';
 import { Subjects } from '@shared/ability/subjects';
@@ -287,7 +287,7 @@ export default function ClientAccounts({ clientId, agenceId }: ClientAccountsPro
 
       {/* Account Creation Wizard */}
       {showAccountWizard && (
-        <EpargneAccountForm
+        <CompteAccountForm
           clientId={clientId}
           onClose={() => setShowAccountWizard(false)}
           onSuccess={() => {

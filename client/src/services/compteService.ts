@@ -28,7 +28,7 @@ export interface TransactionEpargne {
   created_by?: string;
 }
 
-export class EpargneService {
+export class CompteService {
   async getAllComptes(filters?: {
     clientId?: string;
     status?: string;
@@ -167,4 +167,4 @@ export class EpargneService {
   }
 }
 
-export const epargneService = new EpargneService();
+export const compteService = new CompteService();
