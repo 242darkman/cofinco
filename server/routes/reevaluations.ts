@@ -497,13 +497,14 @@ export function registerReevaluationRoutes(app: Express) {
       
       res.status(201).json({
         success: true,
-        enquete: result.enquete
+        enquete: result.enquete,
+        creditPlanId: result.creditPlanId,
       });
     } catch (error: any) {
       logger.error({ err: error }, 'Error starting enquete');
-      res.status(400).json({ 
-        success: false, 
-        error: { code: "ENQUETE_FAILED", message: "Erreur interne du serveur" } 
+      res.status(400).json({
+        success: false,
+        error: { code: "ENQUETE_FAILED", message: "Erreur interne du serveur" }
       });
     }
   });
@@ -724,7 +725,7 @@ export function registerReevaluationRoutes(app: Express) {
     try {
       const { statut, limit = '50', offset = '0' } = req.query;
 
-      // Build query with client join
+      // Build query with client + demande joins
       let baseQuery = db.select({
         id: reevaluationsCredit.id,
         numeroReevaluation: reevaluationsCredit.numeroReevaluation,
@@ -741,6 +742,7 @@ export function registerReevaluationRoutes(app: Express) {
         createdAt: reevaluationsCredit.createdAt,
         dateDecisionComite: reevaluationsCredit.dateDecisionComite,
         decisionComite: reevaluationsCredit.decisionComite,
+        creditPlanId: demandesCredit.creditPlanId,
         // Architecture V3: nom/prenom sont dans users
         client: {
           nom: users.nom,
@@ -749,6 +751,7 @@ export function registerReevaluationRoutes(app: Express) {
         }
       })
       .from(reevaluationsCredit)
+      .leftJoin(demandesCredit, eq(reevaluationsCredit.demandeId, demandesCredit.id))
       .leftJoin(clients, eq(reevaluationsCredit.clientId, clients.id))
       .leftJoin(users, eq(clients.userId, users.id));
 

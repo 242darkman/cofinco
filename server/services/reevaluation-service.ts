@@ -11,6 +11,7 @@ import {
   demandesCredit,
   reevaluationsCredit,
   enquetesComplementaires,
+  enquetesCredit,
   scoringHistory,
   reevaluationAuditLogs,
   configReevaluation,
@@ -397,13 +398,25 @@ export async function startEnqueteComplementaire(
     throw new Error(transitionValid.message);
   }
   
-  // 3. Create inquiry with temporary numero (will be set properly)
+  // 3. Resolve creditPlanId from the demande and link initial enquête
+  const [demande] = await db.select({
+    creditPlanId: demandesCredit.creditPlanId,
+  }).from(demandesCredit).where(eq(demandesCredit.id, reevaluation.demandeId)).limit(1);
+
+  const [initialEnquete] = await db.select({ id: enquetesCredit.id })
+    .from(enquetesCredit)
+    .where(eq(enquetesCredit.demandeId, reevaluation.demandeId))
+    .orderBy(desc(enquetesCredit.createdAt))
+    .limit(1);
+
+  // 4. Create inquiry
   const numeroEnquete = `ENQC-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`;
-  
+
   const [enquete] = await db.insert(enquetesComplementaires).values({
     reevaluationId: reevaluation.id,
     demandeId: reevaluation.demandeId,
     clientId: reevaluation.clientId,
+    enqueteInitialeId: initialEnquete?.id || null,
     numeroEnquete,
     objectifEnquete,
     pointsAVerifier,
@@ -439,7 +452,11 @@ export async function startEnqueteComplementaire(
     roleUtilisateur: 'Superviseur'
   });
   
-  return { success: true, enquete };
+  return {
+    success: true,
+    enquete,
+    creditPlanId: demande?.creditPlanId || null,
+  };
 }
 
 /**
