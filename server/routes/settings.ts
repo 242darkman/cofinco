@@ -43,7 +43,7 @@ const parseWithSchema = <T extends z.ZodTypeAny>(schema: T, data: unknown): z.in
 
 export function registerSettingsRoutes(app: Express) {
   // ========== SYSTEM SETTINGS ==========
-  app.get("/api/system-settings", async (req, res) => {
+  app.get("/api/system-settings", requireAuth, async (req, res) => {
     try {
       // Il n'y a qu'une seule entrée de settings, on récupère la première
       const result = await db.query.systemSettings.findFirst();
@@ -124,7 +124,7 @@ export function registerSettingsRoutes(app: Express) {
       if (wsInstance) {
           wsInstance.broadcast({ type: "SETTINGS_UPDATE", payload: { type: 'settings_changed' } });
           if (settings.devise) {
-            wsInstance.broadcast({ type: "CURRENCY_CHANGED", payload: getActiveCurrency() });
+            wsInstance.broadcast({ type: "CURRENCY_CHANGED" as any, payload: getActiveCurrency() });
           }
       }
 

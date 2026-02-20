@@ -140,7 +140,7 @@ export function registerReevaluationRoutes(app: Express) {
   app.post("/api/demandes/:demandeId/reevaluations", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.REEVALUATION), async (req: Request, res: Response) => {
     try {
       const { demandeId } = req.params;
-      const userId = (req as any).user?.id;
+      const userId = req.user?.id;
       
       if (!userId) {
         return res.status(401).json({ 
@@ -382,7 +382,7 @@ export function registerReevaluationRoutes(app: Express) {
    * GET /api/reevaluations/:reevaluationId
    * Get single reevaluation with details
    */
-  app.get("/api/reevaluations/:reevaluationId", async (req: Request, res: Response) => {
+  app.get("/api/reevaluations/:reevaluationId", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.REEVALUATION), async (req: Request, res: Response) => {
     try {
       const { reevaluationId } = req.params;
       
@@ -422,7 +422,7 @@ export function registerReevaluationRoutes(app: Express) {
   app.post("/api/reevaluations/:reevaluationId/eligibility/validate", requireAuth, attachAbility, requireAbility(Actions.VALIDATE_REEVALUATION, Subjects.REEVALUATION), async (req: Request, res: Response) => {
     try {
       const { reevaluationId } = req.params;
-      const userId = (req as any).user?.id;
+      const userId = req.user?.id;
       
       if (!userId) {
         return res.status(401).json({ 
@@ -466,7 +466,7 @@ export function registerReevaluationRoutes(app: Express) {
   app.post("/api/reevaluations/:reevaluationId/enquete-complementaire", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.REEVALUATION), async (req: Request, res: Response) => {
     try {
       const { reevaluationId } = req.params;
-      const userId = (req as any).user?.id;
+      const userId = req.user?.id;
       
       if (!userId) {
         return res.status(401).json({ 
@@ -515,7 +515,7 @@ export function registerReevaluationRoutes(app: Express) {
   app.post("/api/reevaluations/:reevaluationId/submit-to-committee", requireAuth, attachAbility, requireAbility(Actions.APPROVE, Subjects.REEVALUATION), async (req: Request, res: Response) => {
     try {
       const { reevaluationId } = req.params;
-      const userId = (req as any).user?.id;
+      const userId = req.user?.id;
       
       if (!userId) {
         return res.status(401).json({ 
@@ -584,7 +584,7 @@ export function registerReevaluationRoutes(app: Express) {
   app.post("/api/reevaluations/:reevaluationId/committee-decision", requireAuth, attachAbility, requireAbility(Actions.DECIDE_REEVALUATION, Subjects.REEVALUATION), async (req: Request, res: Response) => {
     try {
       const { reevaluationId } = req.params;
-      const userId = (req as any).user?.id;
+      const userId = req.user?.id;
       
       if (!userId) {
         return res.status(401).json({ 
@@ -653,7 +653,7 @@ export function registerReevaluationRoutes(app: Express) {
   app.post("/api/reevaluations/:reevaluationId/cancel", requireAuth, attachAbility, requireAbility(Actions.REEVALUATE, Subjects.REEVALUATION), async (req: Request, res: Response) => {
     try {
       const { reevaluationId } = req.params;
-      const userId = (req as any).user?.id;
+      const userId = req.user?.id;
       
       if (!userId) {
         return res.status(401).json({ 
@@ -693,7 +693,7 @@ export function registerReevaluationRoutes(app: Express) {
    * GET /api/reevaluations/:reevaluationId/audit-logs
    * Get audit logs for a reevaluation
    */
-  app.get("/api/reevaluations/:reevaluationId/audit-logs", async (req: Request, res: Response) => {
+  app.get("/api/reevaluations/:reevaluationId/audit-logs", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.REEVALUATION), async (req: Request, res: Response) => {
     try {
       const { reevaluationId } = req.params;
       
@@ -720,7 +720,7 @@ export function registerReevaluationRoutes(app: Express) {
    * GET /api/reevaluations
    * List all reevaluations with filters
    */
-  app.get("/api/reevaluations", async (req: Request, res: Response) => {
+  app.get("/api/reevaluations", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.REEVALUATION), async (req: Request, res: Response) => {
     try {
       const { statut, limit = '50', offset = '0' } = req.query;
 

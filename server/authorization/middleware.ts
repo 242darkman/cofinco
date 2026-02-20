@@ -20,6 +20,10 @@ import {
   AbilityContext,
 } from './ability';
 import { createLogger } from '../lib/logger';
+import { db } from '../db';
+import { users, userRoles } from '@shared/schema';
+import { eq, and } from 'drizzle-orm';
+import { normalizeRole, SystemRole } from '@shared/types/roles';
 
 const logger = createLogger('Authorization');
 
@@ -317,8 +321,27 @@ export function requireResetPassword() {
         return;
       }
 
-      // TODO: Optional ABAC check - prevent resetting admin password if not super-admin
-      // This would require fetching the target user's role and comparing
+      // ABAC check: prevent non-admin from resetting an admin's password
+      const targetUserId = req.params.id;
+      if (targetUserId) {
+        const [targetUser] = await db
+          .select({ role: userRoles.role })
+          .from(userRoles)
+          .where(and(eq(userRoles.userId, targetUserId), eq(userRoles.isPrimary, true)));
+
+        if (targetUser) {
+          const targetNormalized = normalizeRole(targetUser.role);
+          const requesterNormalized = normalizeRole(req.session?.user?.role);
+
+          if (targetNormalized === SystemRole.ADMIN && requesterNormalized !== SystemRole.ADMIN) {
+            res.status(403).json({
+              error: 'Accès refusé',
+              message: 'Seul un administrateur peut réinitialiser le mot de passe d\'un autre administrateur',
+            });
+            return;
+          }
+        }
+      }
 
       next();
     } catch (error) {

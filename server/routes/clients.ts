@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import { createLogger } from "../lib/logger";
 import { insertTagSchema, insertClientTagSchema, insertClientActivitySchema, clientTags, clientActivities, users, clients, agences, professions, membresTontine, mouvementsFinanciers, comptes, credits, tontines, remboursements, contributionsTontine, clientDocumentSchema, clientDocumentsArraySchema, type ClientDocument } from "@shared/schema";
 import { getTransactionLabel } from "@shared/config/transaction-labels";
@@ -23,7 +23,7 @@ import { getClientTags, addClientTag, removeClientTag, createTag, deleteTag, get
 import { requireAuth, hashPassword } from "../auth";
 import { attachAbility, requireAbility, requireAnyAbility } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
-import { SystemRole } from "@shared/types/roles"; // Still needed for role checks in some logic
+import { SystemRole, normalizeRole } from "@shared/types/roles"; // Still needed for role checks in some logic
 import { requireAgenceAccess, validateAgenceAction, requireAgenceIdAccess, validateAgenceIdAction } from "../middleware";
 import { logAudit } from "../audit";
 import { normalizeKeysDeep, coerceValueToSchema, parsePagination, paginateResponse } from "./utils";
@@ -1277,21 +1277,40 @@ export function registerClientRoutes(app: Express) {
       }
   });
 
+  // Helper: verify client belongs to user's agency (non-admin only)
+  async function verifyClientAccess(req: Request, clientId: string): Promise<boolean> {
+    const user = req.user;
+    if (!user) return false;
+    const role = normalizeRole(user.role);
+    // Admins can access all clients
+    if (role === SystemRole.ADMIN) return true;
+    // Non-admins: check client belongs to user's agency
+    const [client] = await db.select({ agenceId: clients.agenceId }).from(clients).where(eq(clients.id, clientId));
+    if (!client) return false;
+    return client.agenceId === req.selectedAgenceId || client.agenceId === user.agenceId;
+  }
+
   // Client Tags
   app.get("/api/clients/:id/tags", requireAuth, async (req, res) => {
-      // TODO: Vérifier accès client
+      if (!(await verifyClientAccess(req, req.params.id))) {
+        return res.status(403).json({ message: "Accès non autorisé à ce client" });
+      }
       const tags = await getClientTags(req.params.id);
       res.json(tags);
   });
 
   app.post("/api/clients/:id/tags", requireAuth, async (req, res) => {
-     // TODO: Vérifier accès client
+     if (!(await verifyClientAccess(req, req.params.id))) {
+       return res.status(403).json({ message: "Accès non autorisé à ce client" });
+     }
      const ct = await addClientTag({ ...req.body, clientId: req.params.id });
      res.json(ct);
   });
 
   app.delete("/api/clients/:id/tags/:tagId", requireAuth, async (req, res) => {
-     // TODO: Vérifier accès client
+     if (!(await verifyClientAccess(req, req.params.id))) {
+       return res.status(403).json({ message: "Accès non autorisé à ce client" });
+     }
      await removeClientTag(req.params.id, req.params.tagId);
      res.sendStatus(200);
   });
@@ -1314,13 +1333,17 @@ export function registerClientRoutes(app: Express) {
 
   // Client Activities
   app.get("/api/clients/:id/activities", requireAuth, async (req, res) => {
-      // TODO: Vérifier accès client
+      if (!(await verifyClientAccess(req, req.params.id))) {
+        return res.status(403).json({ message: "Accès non autorisé à ce client" });
+      }
       const acts = await getClientActivities(req.params.id);
       res.json(acts);
   });
 
   app.post("/api/clients/:id/activities", requireAuth, async (req, res) => {
-      // TODO: Vérifier accès client
+      if (!(await verifyClientAccess(req, req.params.id))) {
+        return res.status(403).json({ message: "Accès non autorisé à ce client" });
+      }
       const act = await logClientActivity({ ...req.body, clientId: req.params.id, userId: req.session.user!.id });
       res.json(act);
   });
@@ -1451,6 +1474,7 @@ export function registerClientRoutes(app: Express) {
         });
 
         // SCORE_UPDATED is already broadcast by recalculateClientScore()
+        const wsServer = await import("../ws-server");
         const wsInstance = wsServer.getWsInstance();
         if (wsInstance) {
             wsInstance.broadcast({ type: "CLIENT_UPDATE", payload: { clientId } });
@@ -1721,9 +1745,9 @@ export function registerClientRoutes(app: Express) {
       const clientData = {
         adresseDomicile: data.adresse,
         segment: data.segment || SegmentClient.STANDARD,
-        agenceId: data.agenceId || (req as any).selectedAgenceId,
+        agenceId: data.agenceId || req.selectedAgenceId,
         statut: 'ACTIVE' as const,
-      };
+      } as any;
 
       const result = await createClientWithUser(userData, clientData);
 
@@ -1796,7 +1820,7 @@ export function registerClientRoutes(app: Express) {
       // Forcer l'agenceId si non fournie
       const clientData = {
         ...parsed.data,
-        agenceId: parsed.data.agenceId || (req as any).selectedAgenceId,
+        agenceId: parsed.data.agenceId || req.selectedAgenceId,
       };
 
       const client = await createClientForUser(userId, clientData);

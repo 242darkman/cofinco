@@ -3,6 +3,7 @@ import { db } from "../db";
 import { eq, and, desc, asc, ilike, sql, or } from "drizzle-orm";
 import { sectors, professions, activityTypes, professionSectors, professionActivityTypes, sectorActivityTypes } from "@shared/schema";
 import { createLogger } from "../lib/logger";
+import { requireAuth } from "../auth";
 
 const logger = createLogger('Catalog');
 
@@ -10,7 +11,7 @@ export function registerCatalogRoutes(app: Express) {
   // GET /api/catalog/options — Dynamic filtering
   // Query params: profession_id, sector_id, activity_type_id
   // Returns filtered lists based on junction tables
-  app.get("/api/catalog/options", async (req, res) => {
+  app.get("/api/catalog/options", requireAuth, async (req, res) => {
     try {
       const professionId = req.query.profession_id as string | undefined;
       const sectorId = req.query.sector_id as string | undefined;
@@ -127,7 +128,7 @@ export function registerCatalogRoutes(app: Express) {
   });
 
   // GET /api/catalog/search — Autocomplete search for professions
-  app.get("/api/catalog/search", async (req, res) => {
+  app.get("/api/catalog/search", requireAuth, async (req, res) => {
     try {
       const q = (req.query.q as string || '').trim();
       const type = req.query.type as string || 'profession';
