@@ -67,11 +67,13 @@ export function useClientAlerts(clientId: string) {
         snoozed: data.snoozed || [],
       };
     },
+    enabled: !!clientId,
     staleTime: 30_000,
   });
 
   // Auto-invalidate on WebSocket events
   useEffect(() => {
+    if (!clientId) return;
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       if (!detail?.clientId || detail.clientId === clientId) {

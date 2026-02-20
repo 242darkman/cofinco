@@ -1,5 +1,5 @@
 import type { ClientWithIdentity } from '@shared/schema';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   AlertCircle, Info, X, ShieldAlert, BadgeCheck, Clock,
   ChevronDown, ChevronUp, IdCard, Shield, UserX,
@@ -10,12 +10,11 @@ import {
 import { Card, Badge, Button, Skeleton } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { toast } from '../../lib/toast';
-import { useClientAlerts } from '../../hooks/useClientAlerts';
+import { useClientAlerts, type ClientAlert } from '../../hooks/useClientAlerts';
 
 interface ClientAlertsProps {
   client: ClientWithIdentity;
   onUpdate?: () => void;
-  onCountChange?: (count: number) => void;
   onNavigateToTab?: (tabKey: string) => void;
 }
 
@@ -67,7 +66,7 @@ function formatSince(dateStr: string): string {
   return months === 1 ? 'Depuis 1 mois' : `Depuis ${months} mois`;
 }
 
-export default function ClientAlerts({ client, onUpdate, onCountChange, onNavigateToTab }: ClientAlertsProps) {
+export default function ClientAlerts({ client, onUpdate, onNavigateToTab }: ClientAlertsProps) {
   const { hasPermission } = usePermissions();
   const canResolve = hasPermission('clients', 'edit') || hasPermission('clients', 'manage');
 
@@ -81,11 +80,6 @@ export default function ClientAlerts({ client, onUpdate, onCountChange, onNaviga
   const [levelFilter, setLevelFilter] = useState<LevelFilter>('all');
   const [resolvingAll, setResolvingAll] = useState(false);
   const [dismissingType, setDismissingType] = useState<string | null>(null);
-
-  // Sync count to parent
-  useEffect(() => {
-    onCountChange?.(alerts.length);
-  }, [alerts.length, onCountChange]);
 
   const handleResolveAlert = async (alertType: string) => {
     if (!canResolve) return;
@@ -207,7 +201,7 @@ export default function ClientAlerts({ client, onUpdate, onCountChange, onNaviga
     return ALERT_TYPE_ICONS[alert.alertType] || <AlertCircle size={16} />;
   };
 
-  const getLevelVariant = (level: string): string => {
+  const getLevelVariant = (level: string): 'danger' | 'warning' | 'info' => {
     switch (level) {
       case 'critical': return 'danger';
       case 'warning': return 'warning';
@@ -417,7 +411,7 @@ export default function ClientAlerts({ client, onUpdate, onCountChange, onNaviga
                         <div className="flex items-center gap-2 flex-wrap">
                           <Badge
                             value={getLevelLabel(alert.alertLevel)}
-                            variant={getLevelVariant(alert.alertLevel) as any}
+                            variant={getLevelVariant(alert.alertLevel)}
                             size="sm"
                           />
                           <span className="text-[10px] text-content-muted font-medium uppercase">

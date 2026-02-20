@@ -500,6 +500,7 @@ export async function evaluateClientAlerts(
     const updatedJSONB: AlertsJSONB = {
       resolved: alertsData.resolved,
       tracking: updatedTracking,
+      snoozed: alertsData.snoozed,
     };
     // Fire-and-forget: don't block the response
     storage.updateClient(clientId, { alerts: updatedJSONB } as any).catch(() => {});

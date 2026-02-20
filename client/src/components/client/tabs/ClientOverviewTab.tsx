@@ -56,7 +56,7 @@ export default function ClientOverviewTab({ client, onNavigateToTab }: ClientOve
   const { data: analytics, isLoading } = useQuery<AnalyticsData>({
     queryKey: ['client-analytics', client.id],
     queryFn: async () => {
-      const res = await fetch(`/api/clients/${client.id}/analytics`);
+      const res = await fetch(`/api/clients/${client.id}/analytics`, { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch analytics');
       return res.json();
     },

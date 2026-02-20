@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useClientAlerts } from '../../hooks/useClientAlerts';
 import { Plus, Search, Filter, Download, Upload, Users, MapPin, RefreshCw, List, Eye, Edit2, Trash2, ChevronRight, FileText, CreditCard, Shield, BarChart3, AlertCircle, Building2, Send, DollarSign, UserPlus, LayoutDashboard, User, Phone, Scale, Network, TrendingUp } from 'lucide-react';
 import { Button, IconButton, Card, ResponsiveTable, Badge, ConfirmDialog, FeatureHeader, FEATURE_DESCRIPTIONS, TabGroup } from '../ui';
 import { usePermissions, ProtectedFeature } from '../auth/ProtectedFeature';
@@ -86,8 +87,6 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
   const [showBulkCommunication, setShowBulkCommunication] = useState(false);
   const [showSelectEmployee, setShowSelectEmployee] = useState(false);
   const [employeeToConvert, setEmployeeToConvert] = useState<EmployeeConversionData | null>(null);
-  const [alertCount, setAlertCount] = useState(0);
-
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
@@ -129,44 +128,9 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
     }
   }, [clientIdFromUrl, currentSubModule]);
 
-  // Fetch alert count for badge on tab (skip when Alertes tab active — onCountChange handles it)
-  const fetchAlertCount = useCallback(() => {
-    if (!viewingClient?.id) {
-      setAlertCount(0);
-      return;
-    }
-    fetch(`/api/clients/${viewingClient.id}/alerts`, { credentials: 'include' })
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (data?.active) setAlertCount(data.active.length);
-      })
-      .catch(() => {});
-  }, [viewingClient?.id]);
-
-  // Reset alert count immediately when switching clients, then fetch
-  useEffect(() => {
-    setAlertCount(0);
-    if (activeTab !== 'alertes') {
-      fetchAlertCount();
-    }
-  }, [fetchAlertCount, activeTab]);
-
-  // Auto-refresh alert badge on WebSocket events
-  useEffect(() => {
-    if (!viewingClient?.id) return;
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      if (!detail?.clientId || detail.clientId === viewingClient.id) {
-        fetchAlertCount();
-      }
-    };
-    window.addEventListener('client-update', handler);
-    window.addEventListener('score-updated', handler);
-    return () => {
-      window.removeEventListener('client-update', handler);
-      window.removeEventListener('score-updated', handler);
-    };
-  }, [viewingClient?.id, fetchAlertCount]);
+  // Alert count from shared React Query cache (no duplicate fetch)
+  const { data: alertsData } = useClientAlerts(viewingClient?.id ?? '');
+  const alertCount = useMemo(() => alertsData?.active?.length ?? 0, [alertsData]);
 
   const loadClients = async () => {
     setLoading(true);
@@ -310,7 +274,7 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
             {activeTab === 'kyc' && <ClientKYC clientId={viewingClient.id} onUpdate={loadClients} />}
             {activeTab === 'notes' && <ClientNotes clientId={viewingClient.id} />}
             {activeTab === 'transactions' && <ClientGlobalHistory clientId={viewingClient.id} />}
-            {activeTab === 'alertes' && <ClientAlerts client={viewingClient} onUpdate={loadClients} onCountChange={setAlertCount} onNavigateToTab={(tab) => navigateToPath(`/clients/${viewingClient.id}/${tab}`)} />}
+            {activeTab === 'alertes' && <ClientAlerts client={viewingClient} onUpdate={loadClients} onNavigateToTab={(tab) => navigateToPath(`/clients/${viewingClient.id}/${tab}`)} />}
             {activeTab === 'score' && <ClientScoreTab client={viewingClient} />}
           </div>
         </ClientProfileLayout>
