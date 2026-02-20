@@ -1336,11 +1336,14 @@ export function registerClientRoutes(app: Express) {
     return true;
   }
 
-  // Recalculate Score (full recalc from real data — no event ledger entry)
+  // Recalculate Score (full recalc from real data + audit event)
   app.post("/api/clients/:id/score", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.LOYALTY), async (req, res) => {
       try {
         if (!await checkClientScoreAccess(req, res)) return;
-        const result = await recalculateClientScore(req.params.id);
+        const result = await recalculateClientScore(req.params.id, {
+          source: "manual",
+          createdBy: req.session.user?.id,
+        });
         res.json(result);
       } catch (error) {
           logger.error({ err: error }, 'Score calculation error');

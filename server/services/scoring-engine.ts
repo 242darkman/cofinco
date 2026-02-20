@@ -208,11 +208,42 @@ export async function recordScoreEvent(input: ScoreEventInput): Promise<{
 
 /**
  * Public entry point: recalculate + persist + broadcast.
- * Used by manual recalculate endpoint (not within a transaction).
+ * Optionally records a RECALCUL_COMPLET audit event (idempotent per day/week).
+ * @param source - 'manual' (1/day), 'cron' (1/week), or undefined (no audit event)
  */
-export async function recalculateClientScore(clientId: string): Promise<ScoreResult> {
+export async function recalculateClientScore(
+  clientId: string,
+  options?: { source?: "manual" | "cron"; createdBy?: string },
+): Promise<ScoreResult> {
   const result = await _recalculate(clientId, db);
   _broadcastScoreUpdate(result);
+
+  // Record audit event (idempotent: manual=1/day, cron=1/week)
+  if (options?.source) {
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const refId =
+      options.source === "cron"
+        ? `recalc-cron-${clientId}-${getIsoWeek()}`
+        : `recalc-manual-${clientId}-${today}`;
+    try {
+      await db
+        .insert(clientScoreEvents)
+        .values({
+          clientId,
+          agenceId: result._meta?.agenceId,
+          eventType: "RECALCUL_COMPLET" as any,
+          refId,
+          refType: "recalculation",
+          pointsDelta: 0,
+          reason: options.source === "cron" ? "Recalcul hebdomadaire automatique" : "Recalcul manuel",
+          createdBy: options.createdBy,
+        })
+        .onConflictDoNothing();
+    } catch {
+      // Audit event failure must never break recalculation
+    }
+  }
+
   return result;
 }
 
@@ -635,6 +666,16 @@ async function getEventSummary(clientId: string, txDb: any = db): Promise<EventS
 function getAncienneteMois(client: any): number {
   const dateCreation = new Date(client.dateAdhesion || client.createdAt || new Date());
   return Math.floor((Date.now() - dateCreation.getTime()) / (1000 * 60 * 60 * 24 * 30));
+}
+
+/** Returns ISO week string like "2026-W08" for idempotent cron refIds */
+function getIsoWeek(): string {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
+  const week1 = new Date(d.getFullYear(), 0, 4);
+  const weekNum = 1 + Math.round(((d.getTime() - week1.getTime()) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7);
+  return `${d.getFullYear()}-W${String(weekNum).padStart(2, "0")}`;
 }
 
 async function upsertScoreState(

@@ -48,7 +48,7 @@ async function runBatchRecalculation(): Promise<void> {
       await Promise.allSettled(
         batch.map(async ({ clientId }) => {
           try {
-            await recalculateClientScore(clientId);
+            await recalculateClientScore(clientId, { source: "cron" });
             success++;
           } catch (err) {
             errors++;
