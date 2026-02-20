@@ -609,7 +609,7 @@ async function getSavingsData(clientId: string): Promise<{
       eq(mouvementsFinanciers.clientId, clientId),
       gte(mouvementsFinanciers.createdAt, sixMoisAgo),
       sql`${mouvementsFinanciers.sens} = 'CREDIT'`,
-      sql`${mouvementsFinanciers.typeOperation} ILIKE '%depot%' OR ${mouvementsFinanciers.typeOperation} ILIKE '%deposit%'`
+      sql`${mouvementsFinanciers.sourceModule} IN ('EPARGNE', 'CAISSE', 'COMPTE', 'CAISSE_AGENT')`
     ));
 
   return {
