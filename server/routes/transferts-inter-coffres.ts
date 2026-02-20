@@ -125,7 +125,7 @@ transfertsInterCoffresRouter.patch("/coffres/:id", attachAbility, requireAbility
 transfertsInterCoffresRouter.post("/coffres/:id/approvisionner", attachAbility, requireAbility(Actions.CREATE, Subjects.COFFRE_TRANSFERT), async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = (req as any).user?.id;
+    const userId = req.user!.id;
 
     const schema = z.object({
       montant: z.number().positive(),
@@ -211,8 +211,8 @@ transfertsInterCoffresRouter.get("/transferts", async (req, res) => {
 // POST /transferts - Créer un brouillon de transfert
 transfertsInterCoffresRouter.post("/transferts", async (req, res) => {
   try {
-    const userId = (req as any).user?.id;
-    const userRole = (req as any).user?.role;
+    const userId = req.user?.id;
+    const userRole = req.user?.role ?? '';
 
     if (!userId) {
       return res.status(401).json({ success: false, error: "Non authentifié" });
@@ -278,8 +278,8 @@ transfertsInterCoffresRouter.get("/transferts/:id", async (req, res) => {
 transfertsInterCoffresRouter.post("/transferts/:id/submit", async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = (req as any).user?.id;
-    const userRole = (req as any).user?.role;
+    const userId = req.user?.id;
+    const userRole = req.user?.role ?? '';
 
     if (!userId) {
       return res.status(401).json({ success: false, error: "Non authentifié" });
@@ -309,8 +309,8 @@ transfertsInterCoffresRouter.post("/transferts/:id/approve", async (req, res) =>
   try {
     const { id } = req.params;
     const { level } = req.query;
-    const userId = (req as any).user?.id;
-    const userRole = (req as any).user?.role;
+    const userId = req.user?.id;
+    const userRole = req.user?.role ?? '';
 
     if (!userId) {
       return res.status(401).json({ success: false, error: "Non authentifié" });
@@ -351,8 +351,8 @@ transfertsInterCoffresRouter.post("/transferts/:id/reject", async (req, res) => 
   try {
     const { id } = req.params;
     const { level } = req.query;
-    const userId = (req as any).user?.id;
-    const userRole = (req as any).user?.role;
+    const userId = req.user?.id;
+    const userRole = req.user?.role ?? '';
 
     if (!userId) {
       return res.status(401).json({ success: false, error: "Non authentifié" });
@@ -391,8 +391,8 @@ transfertsInterCoffresRouter.post("/transferts/:id/reject", async (req, res) => 
 transfertsInterCoffresRouter.post("/transferts/:id/dispatch", async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = (req as any).user?.id;
-    const userRole = (req as any).user?.role;
+    const userId = req.user?.id;
+    const userRole = req.user?.role ?? '';
 
     if (!userId) {
       return res.status(401).json({ success: false, error: "Non authentifié" });
@@ -441,8 +441,8 @@ transfertsInterCoffresRouter.post("/transferts/:id/dispatch", async (req, res) =
 transfertsInterCoffresRouter.post("/transferts/:id/receive", async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = (req as any).user?.id;
-    const userRole = (req as any).user?.role;
+    const userId = req.user?.id;
+    const userRole = req.user?.role ?? '';
 
     if (!userId) {
       return res.status(401).json({ success: false, error: "Non authentifié" });
@@ -494,8 +494,8 @@ transfertsInterCoffresRouter.post("/transferts/:id/receive", async (req, res) =>
 transfertsInterCoffresRouter.post("/transferts/:id/cancel", async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = (req as any).user?.id;
-    const userRole = (req as any).user?.role;
+    const userId = req.user?.id;
+    const userRole = req.user?.role ?? '';
 
     if (!userId) {
       return res.status(401).json({ success: false, error: "Non authentifié" });
@@ -625,7 +625,7 @@ transfertsInterCoffresRouter.get("/taches", async (req, res) => {
 transfertsInterCoffresRouter.post("/taches/:id/resolve", attachAbility, requireAbility(Actions.APPROVE, Subjects.COFFRE_TRANSFERT), async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = (req as any).user?.id;
+    const userId = req.user?.id;
 
     const schema = z.object({
       resolution: z.string().min(10),

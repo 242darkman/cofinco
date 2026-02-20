@@ -581,5 +581,7 @@ export const storage: IStorage = {
     ...operations,
     ...accounting,
     ...hr,
-    ...employesStorage
+    ...employesStorage,
+    // Stub for interface compliance
+    async getAllTypesMarches() { return []; },
 };

@@ -108,7 +108,7 @@ const revokeKeySchema = z.object({
 syncJournalRouter.post('/handshake', async (req, res) => {
   try {
     const data = handshakeSchema.parse(req.body);
-    const agentId = (req as any).user.id;
+    const agentId = req.user!.id;
 
     // Verify device key exists and is active
     const [deviceKey] = await db
@@ -192,7 +192,7 @@ syncJournalRouter.post('/handshake', async (req, res) => {
 syncJournalRouter.post('/journal', async (req, res) => {
   try {
     const { entries } = uploadBatchSchema.parse(req.body);
-    const agentId = (req as any).user.id;
+    const agentId = req.user!.id;
 
     const accepted: string[] = [];
     const rejected: Array<{ uuid: string; reason: string }> = [];
@@ -360,7 +360,7 @@ syncJournalRouter.post('/journal', async (req, res) => {
     try {
       anomalies = await OfflineAnomalyDetector.analyzeBatch(entries, agentId);
     } catch (anomalyError) {
-      logger.warn('Anomaly detection error (non-blocking):', anomalyError);
+      logger.warn({ err: anomalyError }, 'Anomaly detection error (non-blocking)');
     }
 
     // 11. Trigger reconciliation for closed sessions
@@ -371,7 +371,7 @@ syncJournalRouter.post('/journal', async (req, res) => {
         logger.info(`Reconciled ${reconciliationResults.length} session(s) for agent ${agentId}`);
       }
     } catch (reconcileError) {
-      logger.warn('Reconciliation error (non-blocking):', reconcileError);
+      logger.warn({ err: reconcileError }, 'Reconciliation error (non-blocking)');
     }
 
     // 12. Process through event reactors (non-blocking: balance WS, notifications, COBAC reports)
@@ -406,7 +406,7 @@ syncJournalRouter.post('/journal', async (req, res) => {
 
 syncJournalRouter.get('/pull', async (req, res) => {
   try {
-    const agentId = (req as any).user.id;
+    const agentId = req.user!.id;
     const since = req.query.since ? new Date(req.query.since as string) : new Date(0);
     const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
 
@@ -433,7 +433,7 @@ syncJournalRouter.get('/pull', async (req, res) => {
       hasMore: confirmedEntries.length === limit,
     });
   } catch (error) {
-    logger.error('Pull sync error:', error);
+    logger.error({ err: error }, 'Pull sync error');
     res.status(500).json({ error: 'Pull sync failed' });
   }
 });
@@ -445,7 +445,7 @@ syncJournalRouter.get('/pull', async (req, res) => {
 syncJournalRouter.post('/devices/register-key', async (req, res) => {
   try {
     const data = registerKeySchema.parse(req.body);
-    const agentId = (req as any).user.id;
+    const agentId = req.user!.id;
 
     // Check if key already registered
     const [existing] = await db
@@ -481,10 +481,10 @@ syncJournalRouter.post('/devices/register-key', async (req, res) => {
 syncJournalRouter.post('/devices/revoke-key', async (req, res) => {
   try {
     const data = revokeKeySchema.parse(req.body);
-    const requesterId = (req as any).user.id;
+    const requesterId = req.user!.id;
 
     // Only admins/supervisors can revoke keys
-    const requesterRole = (req as any).user.role;
+    const requesterRole = req.user!.role;
     const allowedRoles = ['ADMIN', 'CHEF_AGENCE', 'SUPERVISEUR'];
     if (!allowedRoles.includes(requesterRole)) {
       return res.status(403).json({ error: 'Insufficient permissions to revoke device keys' });
@@ -535,7 +535,7 @@ syncJournalRouter.get('/audit/offline-day', async (req, res) => {
     }
 
     // Only admins/supervisors can access audit data
-    const requesterRole = (req as any).user.role;
+    const requesterRole = req.user!.role;
     const allowedRoles = ['ADMIN', 'CHEF_AGENCE', 'SUPERVISEUR', 'COMPTABLE'];
     if (!allowedRoles.includes(requesterRole)) {
       return res.status(403).json({ error: 'Insufficient permissions for audit access' });
@@ -630,7 +630,7 @@ syncJournalRouter.get('/audit/offline-day', async (req, res) => {
       anomalies,
     });
   } catch (error) {
-    logger.error('Audit offline-day error:', error);
+    logger.error({ err: error }, 'Audit offline-day error');
     res.status(500).json({ error: 'Audit reconstruction failed' });
   }
 });
@@ -794,7 +794,7 @@ async function verifyEcdsaSignature(
       encoded
     );
   } catch (error) {
-    logger.error('ECDSA verification error:', error);
+    logger.error({ err: error }, 'ECDSA verification error');
     return false;
   }
 }

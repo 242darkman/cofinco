@@ -645,7 +645,7 @@ export function registerTontineRoutes(app: Express) {
   // Generate a new cycle (with schedules and turns)
   app.post("/api/tontines/:id/cycles/generate", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.TONTINE), async (req: Request, res: Response) => {
     try {
-      const agenceId = (req as any).user?.agenceId || (req.session.user as any)?.agenceId;
+      const agenceId = req.user?.agenceId || (req.session.user as any)?.agenceId;
       const userId = req.session.user?.id;
 
       if (!agenceId) {
@@ -796,7 +796,7 @@ export function registerTontineRoutes(app: Express) {
   // Reorder turns
   app.post("/api/tontines/:id/cycles/:cycleId/turns/reorder", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.TONTINE), async (req: Request, res: Response) => {
     try {
-      const agenceId = (req as any).user?.agenceId || (req.session.user as any)?.agenceId;
+      const agenceId = req.user?.agenceId || (req.session.user as any)?.agenceId;
       const userId = req.session.user?.id;
 
       if (!agenceId) {
@@ -1012,7 +1012,7 @@ export function registerTontineRoutes(app: Express) {
   // Create a distribution request
   app.post("/api/tontines/:id/distribution-requests", requireAuth, attachAbility, requireAbility(Actions.DISTRIBUTE, Subjects.TONTINE), async (req: Request, res: Response) => {
     try {
-      const agenceId = (req as any).user?.agenceId || (req.session.user as any)?.agenceId;
+      const agenceId = req.user?.agenceId || (req.session.user as any)?.agenceId;
       const userId = req.session.user?.id;
 
       if (!agenceId) {
@@ -1072,7 +1072,7 @@ export function registerTontineRoutes(app: Express) {
   // Approve and execute a distribution request
   app.post("/api/tontines/:id/distribution-requests/:requestId/approve", requireAuth, attachAbility, requireAbility(Actions.APPROVE, Subjects.TONTINE), async (req: Request, res: Response) => {
     try {
-      const agenceId = (req as any).user?.agenceId || (req.session.user as any)?.agenceId;
+      const agenceId = req.user?.agenceId || (req.session.user as any)?.agenceId;
       const userId = req.session.user?.id;
 
       if (!agenceId) {

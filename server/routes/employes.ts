@@ -339,7 +339,7 @@ export function registerEmployesRoutes(app: Express) {
           typeCompte: 'employe',
           canLogin: !!data.username,
           statut: StatutUser.ACTIVE,
-        }).returning();
+        } as any).returning();
 
         // 2. Créer l'employé lié (sans roleSystem - géré par userRoles)
         const [employe] = await tx.insert(employes).values({

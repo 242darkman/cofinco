@@ -124,7 +124,7 @@ export function registerMonitoringRoutes(app: Express): void {
     async (req, res) => {
       try {
         const { id } = req.params;
-        const user = (req as any).user;
+        const user = req.user!;
 
         const success = acknowledgeAlert(id, user.id);
 

@@ -54,6 +54,12 @@ import { db } from "../db";
 import { comptes, produitsCompte, clients, users, virementsProgrammes } from "@shared/schema";
 import { getWsInstance } from "../ws-server";
 import { StatutCompte, TypeCompte, MethodePaiement, MotifBlocage, SuspensionReason } from "@shared/enum/status-constants";
+import type {
+  TypeCompteDz,
+  SuspensionReasonDz,
+  ClosurePayoutMethodDz,
+  StatutTransactionDz,
+} from "@shared/enum/enums";
 import { dispatchDomainEvent } from "../services/notifications/domain-events/event-registry";
 import { currencySymbol } from "@shared/config/currency";
 
@@ -718,7 +724,7 @@ export function registerComptesRoutes(app: Express) {
 
       const conditions: any[] = [];
       if (actifOnly) conditions.push(eq(produitsCompte.actif, true));
-      if (typeCompte) conditions.push(eq(produitsCompte.typeCompte, typeCompte as any));
+      if (typeCompte) conditions.push(eq(produitsCompte.typeCompte, typeCompte as TypeCompteDz));
 
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
@@ -1985,7 +1991,7 @@ export function registerComptesRoutes(app: Express) {
               StatutCompte.PENDING_PAYMENT_AND_APPROVAL,
               StatutCompte.PENDING_ACTIVATION, // legacy
             ];
-            if (!batchPendingStatuses.includes(compte.statut as any)) {
+            if (!(batchPendingStatuses as readonly string[]).includes(compte.statut)) {
               results.failed.push({ accountId, numeroCompte: compte.numeroCompte, error: "Compte pas en attente de paiement" });
               continue;
             }
@@ -2724,7 +2730,7 @@ export function registerComptesRoutes(app: Express) {
         const { id, type } = req.params;
         const validTypes = [TypeCompte.SAVINGS, TypeCompte.CURRENT, TypeCompte.BLOCKED];
 
-        if (!validTypes.includes(type as any)) {
+        if (!(validTypes as readonly string[]).includes(type)) {
           return res.status(400).json({
             message: "Type de compte invalide",
             allowed: false,
@@ -3181,7 +3187,7 @@ export function registerComptesRoutes(app: Express) {
         const compte = await suspendCompte(
           {
             compteId: req.params.id,
-            reasonCode: parsed.reasonCode as any,
+            reasonCode: parsed.reasonCode as SuspensionReasonDz,
             reasonText: parsed.reasonText,
             autoLift: parsed.autoLift,
             endDate: parsed.endDate ? new Date(parsed.endDate) : undefined,
@@ -3312,7 +3318,7 @@ export function registerComptesRoutes(app: Express) {
           {
             compteId: req.params.id,
             reason: parsed.reason,
-            payoutMethod: parsed.payoutMethod as any,
+            payoutMethod: parsed.payoutMethod as ClosurePayoutMethodDz,
             payoutPhoneNumber: parsed.payoutPhoneNumber,
           },
           user!.id
@@ -3687,7 +3693,7 @@ export function registerComptesRoutes(app: Express) {
         }
 
         if (statut) {
-          conditions.push(eq(mouvementsFinanciers.statut, statut));
+          conditions.push(eq(mouvementsFinanciers.statut, statut as StatutTransactionDz));
         }
 
         if (from) {

@@ -62,7 +62,8 @@ interface AuthUser {
 }
 
 function getAuthUser(req: Request): AuthUser | null {
-  return (req as any).user || null;
+  if (!req.user) return null;
+  return { ...req.user, agenceId: req.user.agenceId ?? undefined };
 }
 
 interface ConversationWithDetails extends SelectConversation {

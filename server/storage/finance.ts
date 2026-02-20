@@ -39,6 +39,29 @@ import {
   TypeDocument,
   getTypePaiementForCompte,
 } from "@shared/enum/status-constants";
+import type {
+  StatutDemandeDz,
+  StatutCreditDz,
+  StatutCompteDz,
+  TypeCompteDz,
+  MethodePaiementDz,
+  TypeOperationCaisseDz,
+  TypePaiementTerrainDz,
+  SourceModuleDz,
+  DisbursementStatusDz,
+  DisbursementChannelDz,
+  StatutSessionCaisseDz,
+  FrequenceRemboursementDz,
+  InterestRatePeriodDz,
+  DayCountConventionDz,
+  RoundingModeDz,
+  AmortizationTypeDz,
+  FirstDueRuleDz,
+  CalendarModeDz,
+  ShiftNonWorkingDayDz,
+  FeeCollectionModeDz,
+  InterestMethodDz,
+} from "@shared/enum/enums";
 
 import { DecaissementInsufficientFundsError, InsufficientFundsError, InsufficientFundsErrorData } from "./errors";
 // Re-export for compatibility
@@ -76,18 +99,10 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     nom?: string | null;
     prenom?: string | null;
     telephone?: string | null;
-    phone?: string | null;
     photoProfile?: string | null;
-    photoUrl?: string | null;
   }
 
   export type EnrichedCredit = Credit & {
-    numero_credit: string;
-    montant_principal: number;
-    nombre_echeances_total: number;
-    nombre_echeances_payees: number;
-    jours_retard: number;
-    // camelCase aliases for frontend compatibility
     montantPrincipal: number;
     nombreEcheancesTotal: number;
     nombreEcheancesPayees: number;
@@ -102,27 +117,23 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     let jours_retard = 0;
     let nombre_echeances_payees = 0;
 
-    // Calcul basé sur le soldeRestant stocké (cohérent avec le frontend)
     const dPrincipal = D(credit.montant);
     const principal = dPrincipal.toNumber();
-    const dTaux = D(credit.taux);
     const totalEcheances = credit.duree || 1;
-    const dTotalWithInterest = dPrincipal.times(D(1).plus(dTaux.div(100)));
-    const totalWithInterest = dTotalWithInterest.toNumber();
-    const dInstallmentAmount = dTotalWithInterest.div(totalEcheances);
+    const dTotalDu = D(credit.totalDu);
+    const totalWithInterest = dTotalDu.toNumber();
+    const dInstallmentAmount = dTotalDu.div(totalEcheances);
     const installmentAmount = dInstallmentAmount.toNumber();
 
-    // Utiliser soldeRestant comme source de vérité (comme le frontend)
-    const dSoldeRestant = D(credit.soldeRestant).isZero() && !credit.soldeRestant ? dTotalWithInterest : D(credit.soldeRestant);
+    const dSoldeRestant = D(credit.soldeRestant);
     const soldeRestant = dSoldeRestant.toNumber();
-    const totalPaid = Math.max(0, dTotalWithInterest.minus(dSoldeRestant).toNumber());
+    const totalPaid = Math.max(0, dTotalDu.minus(dSoldeRestant).toNumber());
 
     // Nombre d'échéances complètement payées = montant total payé / montant échéance
     if (installmentAmount > 0) {
       nombre_echeances_payees = Math.floor(totalPaid / installmentAmount);
     }
 
-    // Calcul du retard uniquement pour les crédits actifs non soldés
     // Calcul du retard uniquement pour les crédits actifs non soldés
     if (credit.dateDebut && (credit.statut === StatutCredit.ACTIVE || credit.statut === StatutCredit.LATE)) {
         // Normaliser les dates à minuit pour éviter les problèmes de timezone
@@ -147,7 +158,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
         }
 
         // Si crédit totalement remboursé, pas de retard
-        if (D(totalPaid).gte(dTotalWithInterest.minus(0.01)) || nombre_echeances_payees >= totalEcheances) {
+        if (D(totalPaid).gte(dTotalDu.minus(0.01)) || nombre_echeances_payees >= totalEcheances) {
           jours_retard = 0;
         } else {
           // La prochaine échéance due est celle après les échéances déjà payées
@@ -192,12 +203,6 @@ import { computeSessionStatus } from "../services/caisse/session-status";
 
     return {
       ...credit,
-      numero_credit: credit.numeroCredit,
-      montant_principal: principal,
-      nombre_echeances_total: totalEcheances,
-      nombre_echeances_payees,
-      jours_retard,
-      // camelCase aliases for frontend compatibility
       montantPrincipal: principal,
       nombreEcheancesTotal: totalEcheances,
       nombreEcheancesPayees: nombre_echeances_payees,
@@ -208,9 +213,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
         nom: client.nom,
         prenom: client.prenom,
         telephone: client.telephone,
-        phone: client.telephone,
         photoProfile: client.photoProfile,
-        photoUrl: client.photoProfile,
       } : undefined
     };
   }
@@ -532,10 +535,10 @@ import { computeSessionStatus } from "../services/caisse/session-status";
         nom: user?.nom,
         prenom: user?.prenom,
         email: user?.email,
-        phone: user?.telephone,
-        photo_url: user?.photoProfile,
-        taux_remboursement: Number(client.tauxRemboursement) || 0,
-        credit_total: Number(client.creditTotal) || 0,
+        telephone: user?.telephone,
+        photoProfile: user?.photoProfile,
+        tauxRemboursement: Number(client.tauxRemboursement) || 0,
+        creditTotal: Number(client.creditTotal) || 0,
         agence: agence?.nom,
         agenceId: client.agenceId,
       } : undefined
@@ -595,10 +598,10 @@ import { computeSessionStatus } from "../services/caisse/session-status";
         nom: user?.nom,
         prenom: user?.prenom,
         email: user?.email,
-        phone: user?.telephone,
-        photo_url: user?.photoProfile,
-        taux_remboursement: Number(client.tauxRemboursement) || 0,
-        credit_total: Number(client.creditTotal) || 0,
+        telephone: user?.telephone,
+        photoProfile: user?.photoProfile,
+        tauxRemboursement: Number(client.tauxRemboursement) || 0,
+        creditTotal: Number(client.creditTotal) || 0,
         agence: agence?.nom,
         agenceId: client.agenceId,
         revenuMensuel: client.revenuMensuel,
@@ -644,7 +647,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     // Forcer le statut "PENDING_FEES" - les frais d'engagement sont obligatoires avant toute enquête
     const demandeAvecStatut = {
       ...insertDemande,
-      statut: StatutDemande.PENDING_FEES as any, // Toujours "PENDING_FEES" à la création
+      statut: StatutDemande.PENDING_FEES as StatutDemandeDz, // Toujours "PENDING_FEES" à la création
       fraisEngagementPayes: false,
       scoreCredit: scoreCredit ?? insertDemande.scoreCredit ?? null
     };
@@ -687,7 +690,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
 
     const [demande] = await db.update(demandesCredit)
       .set({
-        statut: StatutDemande.CANCELLED as any,
+        statut: StatutDemande.CANCELLED as StatutDemandeDz,
         motifRejet: motif // On utilise motifRejet pour stocker la raison de l'annulation
       })
       .where(eq(demandesCredit.id, id))
@@ -889,12 +892,12 @@ import { computeSessionStatus } from "../services/caisse/session-status";
 
     // Type filter
     if (options.typeCompte) {
-      conditions.push(eq(comptes.typeCompte, options.typeCompte as any));
+      conditions.push(eq(comptes.typeCompte, options.typeCompte as TypeCompteDz));
     }
 
     // Status filter
     if (options.statut) {
-      conditions.push(eq(comptes.statut, options.statut as any));
+      conditions.push(eq(comptes.statut, options.statut as StatutCompteDz));
     }
 
     // Search filter (by client name or account number)
@@ -970,8 +973,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
         telephone: user?.telephone,
         email: user?.email,
         agence: agence?.nom,
-        photoProfile: user?.photoProfile, // Keep original
-        photoUrl: user?.photoProfile, // Alias for frontend compatibility (Epargnes.tsx expects photoUrl)
+        photoProfile: user?.photoProfile,
       } : null
       };
     });
@@ -1113,7 +1115,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
       eq(sessionsCaisse.caissierId, userId),
       isNull(sessionsCaisse.closedAt),
       // Seules les sessions dont l'ouverture est finalisée sont considérées actives
-      inArray(sessionsCaisse.statut, ["OPEN", "CLOSING_COUNT", "CLOSING_VALIDATION"] as any)
+      inArray(sessionsCaisse.statut, ["OPEN", "CLOSING_COUNT", "CLOSING_VALIDATION"] as StatutSessionCaisseDz[])
     ));
 
     if (results.length === 0) return undefined;
@@ -1414,7 +1416,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
         conditions.push(eq(operationsCaisse.typeOperation, TypeOperationCaisse.SAVINGS_DEPOSIT));
       } else {
         // Direct enum value (e.g., CREDIT_DISBURSEMENT, CREDIT_REPAYMENT, etc.)
-        conditions.push(eq(operationsCaisse.typeOperation, type as any));
+        conditions.push(eq(operationsCaisse.typeOperation, type as TypeOperationCaisseDz));
       }
     }
 
@@ -1465,7 +1467,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
         conditions.push(inArray(mouvementsFinanciers.typePaiement, [...DEPOSIT_TYPES]));
       } else {
         // Direct enum value
-        conditions.push(eq(mouvementsFinanciers.typePaiement, type as any));
+        conditions.push(eq(mouvementsFinanciers.typePaiement, type as TypePaiementTerrainDz));
       }
     }
 
@@ -1894,7 +1896,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
             query = db.select().from(dureesSuggerees).where(
                 and(
                     eq(dureesSuggerees.actif, true),
-                    eq(dureesSuggerees.frequence, frequence as any)
+                    eq(dureesSuggerees.frequence, frequence as FrequenceRemboursementDz)
                 )
             );
         }
@@ -1906,7 +1908,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
         const [duree] = await db.select().from(dureesSuggerees).where(
             and(
                 eq(dureesSuggerees.actif, true),
-                eq(dureesSuggerees.frequence, frequence as any),
+                eq(dureesSuggerees.frequence, frequence as FrequenceRemboursementDz),
                 eq(dureesSuggerees.estRecommandee, true)
             )
         );
@@ -2032,7 +2034,7 @@ export async function createTransactionCompteWithLedger(data: {
         sens,
         montant: data.montant,
         soldeApres: nouveauSolde,
-        methodePaiement: data.methodePaiement as any,
+        methodePaiement: data.methodePaiement as MethodePaiementDz,
         observations: data.observations,
         createdBy: validatedUserId,
       }).returning();
@@ -2150,9 +2152,9 @@ export async function createOperationCaisseWithLedger(data: {
       const [operation] = await tx.insert(operationsCaisse).values({
         sessionId: data.sessionId,
         mouvementId: mouvement.id,
-        typeOperation: data.typeOperation as any,
+        typeOperation: data.typeOperation as TypeOperationCaisseDz,
         montant: data.montant,
-        methodePaiement: data.methodePaiement as any,
+        methodePaiement: data.methodePaiement as MethodePaiementDz,
         reference,
         description: data.description,
         clientId: data.clientId,
@@ -2228,7 +2230,7 @@ export async function createRemboursementWithLedger(data: {
         mouvementId: mouvement.id,
         montant: data.montant,
         dateRemboursement: new Date(),
-        methodePaiement: data.methodePaiement as any,
+        methodePaiement: data.methodePaiement as MethodePaiementDz,
         observations: data.observations,
         createdBy: validatedUserId,
         idempotencyKey: data.idempotencyKey,
@@ -2330,7 +2332,7 @@ export async function payerFraisEngagement(data: {
         mouvementId: mouvement.id,
         typeOperation: TypeOperationCaisse.ENGAGEMENT_FEE,
         montant: data.montant,
-        methodePaiement: data.methodePaiement as any,
+        methodePaiement: data.methodePaiement as MethodePaiementDz,
         reference,
         description: `Paiement frais d'engagement demande ${demande.numeroDemande}`,
         clientId: demande.clientId,
@@ -2906,13 +2908,8 @@ export async function createDecaissementWithLedger(data: {
         // Le client pourra retirer plus tard (WITHDRAWAL_CURRENT : D 4111 / C 521).
         return { credit: result, mouvement };
     }).then(async (result) => {
-        // Generate repayment schedule (echeancier)
-        try {
-            await generateCreditSchedule(data.creditId);
-        } catch (scheduleError) {
-             logger.error({ err: scheduleError, creditId: data.creditId }, 'Failed to generate credit schedule after disbursement');
-             // We don't throw here to avoid rolling back the disbursement, but it should be alerted
-        }
+        // Generate repayment schedule (echeancier) — obligatoire
+        await generateCreditSchedule(data.creditId);
         return result;
     });
 }
@@ -3046,8 +3043,8 @@ export async function processLoanCashPayout(data: {
             // Update credit to ACTIVE
             const [updatedCredit] = await tx.update(credits)
                 .set({
-                    statut: 'ACTIVE' as any,
-                    disbursementStatus: 'COMPLETED' as any,
+                    statut: 'ACTIVE' as StatutCreditDz,
+                    disbursementStatus: 'COMPLETED' as DisbursementStatusDz,
                     paymentReference: data.paymentReference,
                     disbursedAt: new Date(),
                     disbursedBy: userId,
@@ -3066,14 +3063,8 @@ export async function processLoanCashPayout(data: {
         },
         userId
     ).then(async ({ result, mouvement }) => {
-        // Generate repayment schedule (echeancier)
-        let echeances: any[] = [];
-        try {
-            echeances = await generateCreditSchedule(data.creditId);
-        } catch (scheduleError) {
-             logger.error({ err: scheduleError, creditId: data.creditId }, 'Failed to generate credit schedule after cash payout');
-        }
-
+        // Generate repayment schedule (echeancier) — obligatoire
+        const echeances = await generateCreditSchedule(data.creditId);
         return {
             credit: result as Credit,
             mouvement,
@@ -3093,9 +3084,9 @@ export async function getPendingLoanDisbursements(agenceId?: string, caisseId?: 
 }>> {
     // Build base conditions
     const baseConditions = and(
-        eq(credits.statut, 'WAITING_DISBURSEMENT' as any),
-        eq(credits.disbursementChannel, 'CASH' as any),
-        eq(credits.disbursementStatus, 'PENDING' as any),
+        eq(credits.statut, 'WAITING_DISBURSEMENT' as StatutCreditDz),
+        eq(credits.disbursementChannel, 'CASH' as DisbursementChannelDz),
+        eq(credits.disbursementStatus, 'PENDING' as DisbursementStatusDz),
         agenceId ? eq(credits.agenceId, agenceId) : undefined,
         caisseId ? or(eq(credits.targetCaisseId, caisseId), isNull(credits.targetCaisseId)) : undefined,
     );
@@ -3140,7 +3131,7 @@ export async function getMouvementsFinanciers(filter: {
   const conditions = [];
 
   if (filter.sourceModule) {
-    conditions.push(eq(mouvementsFinanciers.sourceModule, filter.sourceModule as any));
+    conditions.push(eq(mouvementsFinanciers.sourceModule, filter.sourceModule as SourceModuleDz));
   }
   if (filter.clientId) {
     conditions.push(eq(mouvementsFinanciers.clientId, filter.clientId));
@@ -3337,7 +3328,7 @@ export async function createCashTransactionWithLedger(data: {
       sessionCaisseId: data.sessionId,
       agenceId: session.session.agenceId || undefined,
       methodePaiement: data.methodePaiement,
-      typePaiement: data.typeOperation as any,
+      typePaiement: data.typeOperation as TypePaiementTerrainDz,
       idempotencyKey: data.idempotencyKey,
       referenceExterne: opReference,
       metadata: {
@@ -3372,7 +3363,7 @@ export async function createCashTransactionWithLedger(data: {
           sens: accountDelta > 0 ? "CREDIT" : "DEBIT",
           montant: data.montant,
           soldeApres: nouveauSoldeCompte,
-          methodePaiement: data.methodePaiement as any,
+          methodePaiement: data.methodePaiement as MethodePaiementDz,
           observations: data.description || `Opération Caisse: ${data.typeOperation}`,
           createdBy: validatedUserIdForTx,
         }).returning();
@@ -3385,9 +3376,9 @@ export async function createCashTransactionWithLedger(data: {
       const [operation] = await tx.insert(operationsCaisse).values({
         sessionId: data.sessionId,
         mouvementId: mouvement.id,
-        typeOperation: data.typeOperation as any,
+        typeOperation: data.typeOperation as TypeOperationCaisseDz,
         montant: data.montant,
-        methodePaiement: data.methodePaiement as any,
+        methodePaiement: data.methodePaiement as MethodePaiementDz,
         reference: opReference,
         description: data.description,
         clientId: data.clientId,
@@ -3711,20 +3702,20 @@ export async function generateCreditSchedule(
   const planConfig: import("../services/credit-plan/types").PlanConfig = {
     dureeValeur: plan.dureeValeur,
     dureeUnite: plan.dureeUnite as "DAY" | "WEEK" | "MONTH",
-    frequenceRemboursement: plan.frequenceRemboursement as any,
+    frequenceRemboursement: plan.frequenceRemboursement as FrequenceRemboursementDz,
     tauxInteret: plan.tauxInteret,
-    interestMethod: plan.interestMethod as "FLAT" | "DECLINING_BALANCE",
-    interestRatePeriod: plan.interestRatePeriod as any,
-    dayCountConvention: plan.dayCountConvention as any,
-    interestRoundingMode: plan.interestRoundingMode as any,
+    interestMethod: plan.interestMethod as InterestMethodDz,
+    interestRatePeriod: plan.interestRatePeriod as InterestRatePeriodDz,
+    dayCountConvention: plan.dayCountConvention as DayCountConventionDz,
+    interestRoundingMode: plan.interestRoundingMode as RoundingModeDz,
     interestRoundingUnit: plan.interestRoundingUnit,
-    amortizationType: plan.amortizationType as any,
-    firstDueRule: plan.firstDueRule as any,
+    amortizationType: plan.amortizationType as AmortizationTypeDz,
+    firstDueRule: plan.firstDueRule as FirstDueRuleDz,
     gracePeriodDays: plan.gracePeriodDays,
     preferredWeekday: plan.preferredWeekday,
-    calendarMode: plan.calendarMode as any,
+    calendarMode: plan.calendarMode as CalendarModeDz,
     weekdaysMask: plan.weekdaysMask,
-    shiftNonWorkingDay: plan.shiftNonWorkingDay as any,
+    shiftNonWorkingDay: plan.shiftNonWorkingDay as ShiftNonWorkingDayDz,
     allowManualFirstDueDate: plan.allowManualFirstDueDate,
   };
 
@@ -3737,7 +3728,7 @@ export async function generateCreditSchedule(
       value: f.value,
       minAmount: f.minAmount,
       maxAmount: f.maxAmount,
-      collectionMode: f.collectionMode as any,
+      collectionMode: f.collectionMode as FeeCollectionModeDz,
     }));
 
   const result = generateSchedule({
@@ -3760,5 +3751,15 @@ export async function generateCreditSchedule(
 
   if (schedule.length === 0) return [];
 
-  return await executor.insert(echeancesCredits).values(schedule).returning();
+  const inserted = await executor.insert(echeancesCredits).values(schedule).returning();
+
+  // Mettre à jour le crédit avec le vrai totalDu et soldeRestant issus du moteur d'échéancier
+  const totalDu = roundMoney(result.summary.totalDue);
+  await executor.update(credits).set({
+    totalDu,
+    soldeRestant: totalDu,
+    montantEcheance: schedule.length > 0 ? schedule[0].montantTotal : null,
+  }).where(eq(credits.id, creditId));
+
+  return inserted;
 }

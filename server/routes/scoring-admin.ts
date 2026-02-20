@@ -183,7 +183,7 @@ scoringAdminRouter.get("/agency-stats/export", async (req, res) => {
     const stats = await getAgencyScoreStats(agenceId as string);
 
     const header = "Agence,Clients,Score Moyen,Paiement Moy.,Fidélité Moy.,Engagement Moy.,Conformité Moy.,VIP,Premium,Standard,Risque\n";
-    const rows = stats.map((r) =>
+    const rows = stats.map((r: any) =>
       [
         r.agenceId || "Toutes",
         r.totalClients,

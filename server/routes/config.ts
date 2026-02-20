@@ -364,7 +364,7 @@ async function refreshPresetsCache() {
 
   const wsInstance = getWsInstance();
   if (wsInstance) {
-    wsInstance.broadcast({ type: "PRESETS_CHANGED", payload: getPresetsCache() });
+    wsInstance.broadcast({ type: "PRESETS_CHANGED" as any, payload: getPresetsCache() });
   }
 }
 

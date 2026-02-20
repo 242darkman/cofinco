@@ -293,6 +293,7 @@ interface OpenSessionResult {
     | "GL_DISCREPANCY_BLOCKED"       // STRICT_BLOCK mode with discrepancy
     | "GL_DISCREPANCY_NO_JUSTIFICATION" // WARNING mode but no justification provided
     | "GL_READ_ERROR"                 // Error reading GL balance
+    | "NEGATIVE_OPENING_BALANCE"      // Billetage total is negative
     | "DB_ERROR";
   // GL Guard info in result
   glGuardInfo?: {

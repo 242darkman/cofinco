@@ -101,8 +101,8 @@ export class OfflineAnomalyDetector {
     // Log alerts
     if (alerts.length > 0) {
       logger.warn(
-        `Anomaly detection: ${alerts.length} alert(s) for agent ${agentId}`,
-        { alerts: alerts.map(a => ({ type: a.type, severity: a.severity })) }
+        { alerts: alerts.map(a => ({ type: a.type, severity: a.severity })) },
+        `Anomaly detection: ${alerts.length} alert(s) for agent ${agentId}`
       );
     }
 

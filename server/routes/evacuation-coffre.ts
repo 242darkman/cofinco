@@ -47,8 +47,8 @@ evacuationCoffreRouter.get("/", async (req, res) => {
 // POST / - Créer une évacuation (brouillon)
 evacuationCoffreRouter.post("/", attachAbility, requireAbility(Actions.CREATE, Subjects.EVACUATION_COFFRE), async (req, res) => {
   try {
-    const userId = (req as any).user?.id;
-    const userRole = (req as any).user?.role;
+    const userId = req.user?.id;
+    const userRole = req.user?.role ?? '';
 
     if (!userId) {
       return res.status(401).json({ success: false, error: "Non authentifié" });
@@ -159,8 +159,8 @@ evacuationCoffreRouter.get("/:id/audit-logs", async (req, res) => {
 // POST /:id/submit - Soumettre
 evacuationCoffreRouter.post("/:id/submit", async (req, res) => {
   try {
-    const userId = (req as any).user?.id;
-    const userRole = (req as any).user?.role;
+    const userId = req.user?.id;
+    const userRole = req.user?.role ?? '';
     if (!userId) return res.status(401).json({ success: false, error: "Non authentifié" });
 
     const result = await service.submitEvacuation({
@@ -182,8 +182,8 @@ evacuationCoffreRouter.post("/:id/submit", async (req, res) => {
 // POST /:id/approve - Approuver
 evacuationCoffreRouter.post("/:id/approve", attachAbility, requireAbility(Actions.APPROVE, Subjects.EVACUATION_COFFRE), async (req, res) => {
   try {
-    const userId = (req as any).user?.id;
-    const userRole = (req as any).user?.role;
+    const userId = req.user?.id;
+    const userRole = req.user?.role ?? '';
     if (!userId) return res.status(401).json({ success: false, error: "Non authentifié" });
 
     const { commentaire } = req.body || {};
@@ -208,8 +208,8 @@ evacuationCoffreRouter.post("/:id/approve", attachAbility, requireAbility(Action
 // POST /:id/reject - Rejeter
 evacuationCoffreRouter.post("/:id/reject", attachAbility, requireAbility(Actions.REJECT, Subjects.EVACUATION_COFFRE), async (req, res) => {
   try {
-    const userId = (req as any).user?.id;
-    const userRole = (req as any).user?.role;
+    const userId = req.user?.id;
+    const userRole = req.user?.role ?? '';
     if (!userId) return res.status(401).json({ success: false, error: "Non authentifié" });
 
     const schema = z.object({ reason: z.string().min(10) });
@@ -235,8 +235,8 @@ evacuationCoffreRouter.post("/:id/reject", attachAbility, requireAbility(Actions
 // POST /:id/prepare - Préparer (comptage physique, billetage, scellé)
 evacuationCoffreRouter.post("/:id/prepare", attachAbility, requireAbility(Actions.PREPARE, Subjects.EVACUATION_COFFRE), async (req, res) => {
   try {
-    const userId = (req as any).user?.id;
-    const userRole = (req as any).user?.role;
+    const userId = req.user?.id;
+    const userRole = req.user?.role ?? '';
     if (!userId) return res.status(401).json({ success: false, error: "Non authentifié" });
 
     const schema = z.object({
@@ -269,8 +269,8 @@ evacuationCoffreRouter.post("/:id/prepare", attachAbility, requireAbility(Action
 // POST /:id/dispatch - Expédier (événement comptable 1: coffre -> transit)
 evacuationCoffreRouter.post("/:id/dispatch", attachAbility, requireAbility(Actions.DISPATCH, Subjects.EVACUATION_COFFRE), async (req, res) => {
   try {
-    const userId = (req as any).user?.id;
-    const userRole = (req as any).user?.role;
+    const userId = req.user?.id;
+    const userRole = req.user?.role ?? '';
     if (!userId) return res.status(401).json({ success: false, error: "Non authentifié" });
 
     const schema = z.object({
@@ -305,8 +305,8 @@ evacuationCoffreRouter.post("/:id/dispatch", attachAbility, requireAbility(Actio
 // POST /:id/deposit - Enregistrer le dépôt (événement comptable 2: transit -> destination)
 evacuationCoffreRouter.post("/:id/deposit", attachAbility, requireAbility(Actions.DEPOSIT, Subjects.EVACUATION_COFFRE), async (req, res) => {
   try {
-    const userId = (req as any).user?.id;
-    const userRole = (req as any).user?.role;
+    const userId = req.user?.id;
+    const userRole = req.user?.role ?? '';
     if (!userId) return res.status(401).json({ success: false, error: "Non authentifié" });
 
     const schema = z.object({
@@ -339,8 +339,8 @@ evacuationCoffreRouter.post("/:id/deposit", attachAbility, requireAbility(Action
 // POST /:id/reconcile - Rapprocher ou signaler un écart
 evacuationCoffreRouter.post("/:id/reconcile", attachAbility, requireAbility(Actions.RECONCILE, Subjects.EVACUATION_COFFRE), async (req, res) => {
   try {
-    const userId = (req as any).user?.id;
-    const userRole = (req as any).user?.role;
+    const userId = req.user?.id;
+    const userRole = req.user?.role ?? '';
     if (!userId) return res.status(401).json({ success: false, error: "Non authentifié" });
 
     const schema = z.object({
@@ -371,8 +371,8 @@ evacuationCoffreRouter.post("/:id/reconcile", attachAbility, requireAbility(Acti
 // POST /:id/cancel - Annuler
 evacuationCoffreRouter.post("/:id/cancel", async (req, res) => {
   try {
-    const userId = (req as any).user?.id;
-    const userRole = (req as any).user?.role;
+    const userId = req.user?.id;
+    const userRole = req.user?.role ?? '';
     if (!userId) return res.status(401).json({ success: false, error: "Non authentifié" });
 
     const schema = z.object({ reason: z.string().min(10) });

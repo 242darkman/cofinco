@@ -228,7 +228,7 @@ export class OfflineReconciliationService {
         totalDisbursed: String(totalDisbursed),
         operationCount: String(confirmed.length),
         entryCount: String(entries.length),
-        status,
+        status: status as any,
         reconciledAt: status === 'reconciled' || status === 'auto_adjusted' ? new Date() : undefined,
       })
       .where(eq(offlineDaySessions.id, session.id));
@@ -249,11 +249,7 @@ export class OfflineReconciliationService {
       alerts,
     };
 
-    logger.info(`Reconciliation for agent ${agentId} on ${date}: ${status}`, {
-      discrepancy,
-      confirmed: confirmed.length,
-      rejected: rejected.length,
-    });
+    logger.info({ discrepancy, confirmed: confirmed.length, rejected: rejected.length }, `Reconciliation for agent ${agentId} on ${date}: ${status}`);
 
     return result;
   }

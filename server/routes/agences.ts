@@ -151,7 +151,7 @@ export function registerAgencesRoutes(app: Express) {
   app.post("/api/agences", attachAbility, requireAbility(Actions.MANAGE, Subjects.AGENCE), async (req, res) => {
     try {
       const data = req.body;
-      const userId = (req as any).session?.userId;
+      const userId = req.session?.userId;
       const coffresService = new CoffresFortsService();
 
       // Vérifier que le code_agence est unique
@@ -279,7 +279,7 @@ export function registerAgencesRoutes(app: Express) {
     try {
       const { id } = req.params;
       const data = req.body;
-      const userId = (req as any).session?.userId;
+      const userId = req.session?.userId;
 
       // Auto-fill region/GPS from ville if villeId is provided
       let regionNom = data.region;
@@ -352,7 +352,7 @@ export function registerAgencesRoutes(app: Express) {
   app.delete("/api/agences/:id", attachAbility, requireAbility(Actions.MANAGE, Subjects.AGENCE), async (req, res) => {
     try {
       const { id } = req.params;
-      const userId = (req as any).session?.userId;
+      const userId = req.session?.userId;
 
       // Vérifier qu'il n'y a pas d'utilisateurs actifs
       const [countResult] = await db
@@ -439,7 +439,7 @@ export function registerAgencesRoutes(app: Express) {
   // GET /api/me/agences - Mes agences (utilisateur connecté)
   app.get("/api/me/agences", requireAuth, async (req, res) => {
     try {
-      const userId = (req as any).session?.userId;
+      const userId = req.session?.userId;
 
       if (!userId) {
         return res.status(401).json({ error: "Non authentifié" });
@@ -484,7 +484,7 @@ export function registerAgencesRoutes(app: Express) {
     try {
       const { userId } = req.params;
       const { agenceId, isPrimary = false, role } = req.body;
-      const adminUserId = (req as any).session?.userId;
+      const adminUserId = req.session?.userId;
 
       // Vérifier que l'agence existe
       const [agence] = await db
@@ -596,7 +596,7 @@ export function registerAgencesRoutes(app: Express) {
     try {
       const { id } = req.params;
       const { isPrimary, role, actif } = req.body;
-      const adminUserId = (req as any).session?.userId;
+      const adminUserId = req.session?.userId;
 
       // Obtenir l'affectation actuelle
       const [current] = await db
@@ -674,7 +674,7 @@ export function registerAgencesRoutes(app: Express) {
   app.delete("/api/user-agences/:id", attachAbility, requireAbility(Actions.MANAGE, Subjects.AGENCE), async (req, res) => {
     try {
       const { id } = req.params;
-      const adminUserId = (req as any).session?.userId;
+      const adminUserId = req.session?.userId;
 
       // Soft delete - désactiver plutôt que supprimer
       const [updated] = await db
@@ -754,7 +754,7 @@ export function registerAgencesRoutes(app: Express) {
         targetAgenceCoffre,
         scheduledAt
       } = req.body;
-      const userId = (req as any).session?.userId;
+      const userId = req.session?.userId;
 
       // Vérifier que l'agence source existe et est active
       const [sourceAgence] = await db
@@ -813,7 +813,7 @@ export function registerAgencesRoutes(app: Express) {
   app.post("/api/agences/migrations/:id/submit", attachAbility, requireAbility(Actions.MANAGE, Subjects.AGENCE), async (req, res) => {
     try {
       const { id } = req.params;
-      const userId = (req as any).session?.userId;
+      const userId = req.session?.userId;
 
       await agencyMigrationService.submitMigration(id, userId);
 
@@ -835,7 +835,7 @@ export function registerAgencesRoutes(app: Express) {
   app.post("/api/agences/migrations/:id/execute", attachAbility, requireAbility(Actions.MANAGE, Subjects.AGENCE), async (req, res) => {
     try {
       const { id } = req.params;
-      const userId = (req as any).session?.userId;
+      const userId = req.session?.userId;
       const ipAddress = req.ip;
       const userAgent = req.get("User-Agent");
 
@@ -874,7 +874,7 @@ export function registerAgencesRoutes(app: Express) {
     try {
       const { id } = req.params;
       const { reason } = req.body;
-      const userId = (req as any).session?.userId;
+      const userId = req.session?.userId;
 
       await agencyMigrationService.cancelMigration(id, reason || "Annulée par l'administrateur", userId);
 
@@ -896,7 +896,7 @@ export function registerAgencesRoutes(app: Express) {
   app.post("/api/agences/migrations/:id/rollback", attachAbility, requireAbility(Actions.MANAGE, Subjects.AGENCE), async (req, res) => {
     try {
       const { id } = req.params;
-      const userId = (req as any).session?.userId;
+      const userId = req.session?.userId;
       const ipAddress = req.ip;
 
       const result = await agencyMigrationService.rollbackMigration(id, { userId, ipAddress });
@@ -1031,7 +1031,7 @@ export function registerAgencesRoutes(app: Express) {
     try {
       const { id } = req.params;
       const { targetAgenceClients, targetAgenceEmployes, targetAgenceCoffre } = req.body;
-      const userId = (req as any).session?.userId;
+      const userId = req.session?.userId;
 
       // Créer la migration
       const migration = await agencyMigrationService.createMigration({

@@ -8,6 +8,29 @@ import { db } from "../../db";
 import { sql } from "drizzle-orm";
 
 // =====================
+// SQL Result Row Interfaces
+// =====================
+
+interface TotalRow { total: string }
+interface EncoursRow { encours_total: string; nombre_actifs: string }
+interface DecaissementsRow { montant_total: string; nombre: string }
+interface ApprobationRow { approuvees: string; total: string }
+interface PanierMoyenRow { panier_moyen: string }
+interface RepartitionRow { plan_nom: string; count: string; montant: string; encours: string }
+interface AtRiskRow { at_risk: string }
+interface TauxRow { taux: string }
+interface DefautRow { montant_defaut: string; en_souffrance: string; montant_souffrance: string }
+interface RadiationRow { montant_radiation: string }
+interface TontinesInfoRow { actives: string; membres: string }
+interface VolumesRow { collectes: string; retires: string }
+interface ChargesProduitsRow { charges: string; produits: string; frais_commissions: string }
+interface BanqueRow { banque: string }
+interface FluxRow { entrants: string; sortants: string }
+interface SegmentRow { segment: string; total: string }
+interface AgentRow { agent_id: string; nom: string; prenom: string; decaissements: string; montant: string; clients: string }
+interface DecPeriodeRow { nombre: string; montant: string }
+
+// =====================
 // Helpers
 // =====================
 
@@ -19,7 +42,7 @@ function agencyFilterOwner(alias: string, agencyId?: string) {
   return agencyId ? sql`AND ${sql.raw(alias)}.owner_id = ${agencyId}` : sql``;
 }
 
-function num(value: any): number {
+function num(value: string | number | null | undefined): number {
   const n = Number(value);
   return isNaN(n) ? 0 : Math.round(n * 100) / 100;
 }
@@ -93,10 +116,10 @@ export async function queryCreditKpis(agencyId?: string, periodStart?: Date, per
     ORDER BY encours DESC
   `);
 
-  const row = encours.rows[0] as any;
-  const decRow = decaissements.rows[0] as any;
-  const appRow = approbation.rows[0] as any;
-  const panRow = panierMoyen.rows[0] as any;
+  const row = encours.rows[0] as unknown as EncoursRow | undefined;
+  const decRow = decaissements.rows[0] as unknown as DecaissementsRow | undefined;
+  const appRow = approbation.rows[0] as unknown as ApprobationRow | undefined;
+  const panRow = panierMoyen.rows[0] as unknown as PanierMoyenRow | undefined;
   const totalTraitees = num(appRow?.total);
 
   return {
@@ -106,7 +129,7 @@ export async function queryCreditKpis(agencyId?: string, periodStart?: Date, per
     nombreDecaissements: num(decRow?.nombre),
     tauxApprobation: totalTraitees > 0 ? Math.round(num(appRow?.approuvees) / totalTraitees * 10000) / 100 : 0,
     panierMoyen: num(panRow?.panier_moyen),
-    repartitionParPlan: (repartition.rows as any[]).map(r => ({
+    repartitionParPlan: (repartition.rows as unknown as RepartitionRow[]).map(r => ({
       planId: '',
       planNom: r.plan_nom || 'Non classé',
       count: num(r.count),
@@ -131,7 +154,7 @@ export async function queryRisqueKpis(agencyId?: string, periodStart?: Date, per
       AND c.deleted_at IS NULL
       ${af}
   `);
-  const totalPortfolio = num((portfolio.rows[0] as any)?.total);
+  const totalPortfolio = num((portfolio.rows[0] as unknown as TotalRow | undefined)?.total);
 
   // PAR30, PAR60, PAR90 — encours des crédits ayant au moins une échéance LATE > N jours
   // FIX: Removed 'DUE' status — only truly late echéances count for PAR
@@ -150,7 +173,7 @@ export async function queryRisqueKpis(agencyId?: string, periodStart?: Date, per
             AND e.date_echeance < NOW() - ${sql.raw(`INTERVAL '${days} days'`)}
         )
     `);
-    const atRisk = num((result.rows[0] as any)?.at_risk);
+    const atRisk = num((result.rows[0] as unknown as AtRiskRow | undefined)?.at_risk);
     return Math.round(atRisk / totalPortfolio * 10000) / 100;
   };
 
@@ -238,15 +261,15 @@ export async function queryRisqueKpis(agencyId?: string, periodStart?: Date, per
       ${af}
   `);
 
-  const defRow = defaut.rows[0] as any;
-  const radRow = radiation.rows[0] as any;
+  const defRow = defaut.rows[0] as unknown as DefautRow | undefined;
+  const radRow = radiation.rows[0] as unknown as RadiationRow | undefined;
   const totalActifEtDefaut = totalPortfolio;
 
   return {
     par30,
     par60,
     par90,
-    tauxRecouvrement: num((recouvrement.rows[0] as any)?.taux),
+    tauxRecouvrement: num((recouvrement.rows[0] as unknown as TauxRow | undefined)?.taux),
     tauxDefaut: totalActifEtDefaut > 0 ? Math.round(num(defRow?.montant_defaut) / totalActifEtDefaut * 10000) / 100 : 0,
     tauxRadiation: totalActifEtDefaut > 0 ? Math.round(num(radRow?.montant_radiation) / totalActifEtDefaut * 10000) / 100 : 0,
     creditsEnSouffrance: num(defRow?.en_souffrance),
@@ -312,13 +335,13 @@ export async function queryTontinesEpargneKpis(agencyId?: string, periodStart?: 
   ]);
 
   return {
-    encoursEpargne: num((epargne.rows[0] as any)?.total),
-    encoursComptesCourants: num((comptesCourants.rows[0] as any)?.total),
-    tontinesActives: num((tontinesInfo.rows[0] as any)?.actives),
-    membresTontines: num((tontinesInfo.rows[0] as any)?.membres),
-    volumesCollectes: num((volumes.rows[0] as any)?.collectes),
-    volumesRetires: num((volumes.rows[0] as any)?.retires),
-    cotisationsTontines: num((cotisations.rows[0] as any)?.total),
+    encoursEpargne: num((epargne.rows[0] as unknown as TotalRow | undefined)?.total),
+    encoursComptesCourants: num((comptesCourants.rows[0] as unknown as TotalRow | undefined)?.total),
+    tontinesActives: num((tontinesInfo.rows[0] as unknown as TontinesInfoRow | undefined)?.actives),
+    membresTontines: num((tontinesInfo.rows[0] as unknown as TontinesInfoRow | undefined)?.membres),
+    volumesCollectes: num((volumes.rows[0] as unknown as VolumesRow | undefined)?.collectes),
+    volumesRetires: num((volumes.rows[0] as unknown as VolumesRow | undefined)?.retires),
+    cotisationsTontines: num((cotisations.rows[0] as unknown as TotalRow | undefined)?.total),
   };
 }
 
@@ -372,11 +395,12 @@ export async function queryRentabiliteKpis(agencyId?: string, periodStart?: Date
     `),
   ]);
 
-  const interetsVal = num((interets.rows[0] as any)?.total);
-  const fraisVal = num((chargesProduits.rows[0] as any)?.frais_commissions);
-  const revTontinesVal = num((revenusTontines.rows[0] as any)?.total);
-  const chargesVal = num((chargesProduits.rows[0] as any)?.charges);
-  const glProduits = num((chargesProduits.rows[0] as any)?.produits);
+  const interetsVal = num((interets.rows[0] as unknown as TotalRow | undefined)?.total);
+  const cpRow = chargesProduits.rows[0] as unknown as ChargesProduitsRow | undefined;
+  const fraisVal = num(cpRow?.frais_commissions);
+  const revTontinesVal = num((revenusTontines.rows[0] as unknown as TotalRow | undefined)?.total);
+  const chargesVal = num(cpRow?.charges);
+  const glProduits = num(cpRow?.produits);
 
   // FIX: Use GL class 7 total as authoritative totalRevenus (includes all revenue classes 70-79)
   // Fall back to component sum if GL has no entries yet
@@ -390,7 +414,7 @@ export async function queryRentabiliteKpis(agencyId?: string, periodStart?: Date
     WHERE c.statut IN ('ACTIVE', 'LATE') AND c.deleted_at IS NULL
       ${agencyFilter('c', agencyId)}
   `);
-  const encoursVal = num((encours.rows[0] as any)?.total);
+  const encoursVal = num((encours.rows[0] as unknown as TotalRow | undefined)?.total);
 
   return {
     interetsPercus: interetsVal,
@@ -465,10 +489,10 @@ export async function queryTresorerieKpis(agencyId?: string, periodStart?: Date,
       ${agencyFilter('c', agencyId)}
   `);
 
-  const soldeCaisses = num((caisses.rows[0] as any)?.total);
-  const soldeCoffres = num((coffres.rows[0] as any)?.total);
-  const soldeBanque = num((glBanque.rows[0] as any)?.banque);
-  const soldeMM = num((mmCaisses.rows[0] as any)?.total);
+  const soldeCaisses = num((caisses.rows[0] as unknown as TotalRow | undefined)?.total);
+  const soldeCoffres = num((coffres.rows[0] as unknown as TotalRow | undefined)?.total);
+  const soldeBanque = num((glBanque.rows[0] as unknown as BanqueRow | undefined)?.banque);
+  const soldeMM = num((mmCaisses.rows[0] as unknown as TotalRow | undefined)?.total);
   const totalLiquidite = soldeCaisses + soldeCoffres + soldeBanque + soldeMM;
 
   // FIX: Ratio de liquidité = Liquidités / Dépôts clients (pas encours crédit)
@@ -481,17 +505,18 @@ export async function queryTresorerieKpis(agencyId?: string, periodStart?: Date,
       AND c.deleted_at IS NULL
       ${agencyFilter('c', agencyId)}
   `);
-  const totalDeposits = num((deposits.rows[0] as any)?.total);
+  const totalDeposits = num((deposits.rows[0] as unknown as TotalRow | undefined)?.total);
+  const fluxRow = flux.rows[0] as unknown as FluxRow | undefined;
 
   return {
     soldeCaisses,
     soldeCoffres,
     soldeBanque,
     soldeMobileMoney: soldeMM,
-    fluxEntrants: num((flux.rows[0] as any)?.entrants),
-    fluxSortants: num((flux.rows[0] as any)?.sortants),
+    fluxEntrants: num(fluxRow?.entrants),
+    fluxSortants: num(fluxRow?.sortants),
     ratioLiquidite: totalDeposits > 0 ? Math.round(totalLiquidite / totalDeposits * 10000) / 100 : 0,
-    ecartsCaisses: num((ecarts.rows[0] as any)?.total),
+    ecartsCaisses: num((ecarts.rows[0] as unknown as TotalRow | undefined)?.total),
   };
 }
 
@@ -558,15 +583,15 @@ export async function queryClientsKpis(agencyId?: string, periodStart?: Date, pe
   `);
 
   const segmentMap: Record<string, number> = {};
-  for (const row of segments.rows as any[]) {
+  for (const row of segments.rows as unknown as SegmentRow[]) {
     segmentMap[row.segment || 'Standard'] = num(row.total);
   }
 
   return {
-    totalClientsActifs: num((actifs.rows[0] as any)?.total),
-    nouveauxClients: num((nouveaux.rows[0] as any)?.total),
+    totalClientsActifs: num((actifs.rows[0] as unknown as TotalRow | undefined)?.total),
+    nouveauxClients: num((nouveaux.rows[0] as unknown as TotalRow | undefined)?.total),
     clientsParSegment: segmentMap,
-    tauxRetention: num((retention.rows[0] as any)?.taux),
+    tauxRetention: num((retention.rows[0] as unknown as TauxRow | undefined)?.taux),
   };
 }
 
@@ -582,7 +607,7 @@ export async function queryRhProductiviteKpis(agencyId?: string, periodStart?: D
     WHERE e.statut = 'ACTIVE'
       ${agencyFilter('e', agencyId)}
   `);
-  const agentsActifs = num((agents.rows[0] as any)?.total);
+  const agentsActifs = num((agents.rows[0] as unknown as TotalRow | undefined)?.total);
 
   // Clients actifs, encours, et nombre de décaissements pour ratios par agent
   const [clientsTotal, encoursTotal, decPeriode] = await Promise.all([
@@ -611,9 +636,9 @@ export async function queryRhProductiviteKpis(agencyId?: string, periodStart?: D
         ${agencyFilter('c', agencyId)}
     `),
   ]);
-  const cTotal = num((clientsTotal.rows[0] as any)?.total);
-  const eTotal = num((encoursTotal.rows[0] as any)?.total);
-  const decNombre = num((decPeriode.rows[0] as any)?.nombre);
+  const cTotal = num((clientsTotal.rows[0] as unknown as TotalRow | undefined)?.total);
+  const eTotal = num((encoursTotal.rows[0] as unknown as TotalRow | undefined)?.total);
+  const decNombre = num((decPeriode.rows[0] as unknown as DecPeriodeRow | undefined)?.nombre);
 
   // FIX: Top agents — separate query with LIMIT 5 DESC
   const topQuery = await db.execute(sql`
@@ -655,7 +680,7 @@ export async function queryRhProductiviteKpis(agencyId?: string, periodStart?: D
     LIMIT 5
   `);
 
-  const mapAgentRow = (r: any) => ({
+  const mapAgentRow = (r: AgentRow) => ({
     id: r.agent_id,
     nom: r.nom,
     prenom: r.prenom,
@@ -664,8 +689,8 @@ export async function queryRhProductiviteKpis(agencyId?: string, periodStart?: D
     clients: num(r.clients),
   });
 
-  const topAgents = (topQuery.rows as any[]).map(mapAgentRow);
-  const bottomAgents = (bottomQuery.rows as any[]).map(mapAgentRow);
+  const topAgents = (topQuery.rows as unknown as AgentRow[]).map(mapAgentRow);
+  const bottomAgents = (bottomQuery.rows as unknown as AgentRow[]).map(mapAgentRow);
 
   // Masse salariale
   const salaires = await db.execute(sql`
@@ -686,6 +711,6 @@ export async function queryRhProductiviteKpis(agencyId?: string, periodStart?: D
     decaissementsParAgent: agentsActifs > 0 ? Math.round(decNombre / agentsActifs * 100) / 100 : 0,
     topAgents,
     bottomAgents,
-    masseSalariale: num((salaires.rows[0] as any)?.total),
+    masseSalariale: num((salaires.rows[0] as unknown as TotalRow | undefined)?.total),
   };
 }

@@ -56,7 +56,7 @@ export interface GlAccountBalance {
   accountNumber: string;
   glBalance: number;
   agenceId: string;
-  source: "GL_COMPUTED" | "NO_GL_DATA";
+  source: "GL_COMPUTED" | "NO_GL_DATA" | "DEDICATED_ACCOUNT";
   computedAt: string;
 }
 
@@ -606,7 +606,8 @@ class GlBalanceReaderService {
         success: true,
         balance: {
           glBalance,
-          glAccountNumber: glAccount.numeroCompte,
+          accountNumber: glAccount.numeroCompte,
+          computedAt: new Date().toISOString(),
           source: "DEDICATED_ACCOUNT",
           agenceId: agent.currentAgenceId,
         },

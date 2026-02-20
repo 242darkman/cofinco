@@ -52,7 +52,7 @@ export function registerOperationsRoutes(app: Express) {
 
   // Resolve current user's agent terrain profile (userId → agentTerrainId)
   app.get("/api/agents-terrain/me", requireAuth, async (req, res) => {
-      const userId = (req as any).user?.id || req.session?.userId;
+      const userId = req.user?.id || req.session?.userId;
       if (!userId) return res.status(401).json({ error: "Non authentifié" });
 
       const [result] = await db
@@ -544,7 +544,7 @@ export function registerOperationsRoutes(app: Express) {
 
       // 6. Auto-create current account via product system
       try {
-        const autoResult = await autoCreateCourantAccount(result.client.id, result.agenceId!, userId);
+        const autoResult = await autoCreateCourantAccount(result.client.id, (result.agenceId || '') as string, userId!);
         logger.info({ numeroCompte: autoResult.compte.numeroCompte, clientId: result.client.id, isPending: autoResult.isPending }, "Compte courant auto-created for converted prospect");
       } catch (accountError) {
         logger.error({ err: accountError, clientId: result.client.id }, "Failed to create automatic current account for converted prospect");
@@ -1040,9 +1040,9 @@ export function registerOperationsRoutes(app: Express) {
       }
 
       // Security: agents can only view their own positions
-      const currentUser = (req as any).user;
+      const currentUser = req.user;
       const userRole = normalizeRole(currentUser?.role);
-      const canSupervise = [SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR].includes(userRole);
+      const canSupervise = [SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR].includes(userRole!);
       if (!canSupervise && agent_id !== currentUser?.id) {
         return res.status(403).json({ error: "Accès interdit" });
       }

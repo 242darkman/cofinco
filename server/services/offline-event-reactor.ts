@@ -89,10 +89,7 @@ export async function processConfirmedBatch(
     }
   }
 
-  logger.info(`Processed ${entries.length} confirmed entries through reactors in ${Date.now() - startTime}ms`, {
-    agentId,
-    failures: failures.length,
-  });
+  logger.info({ agentId, failures: failures.length }, `Processed ${entries.length} confirmed entries through reactors in ${Date.now() - startTime}ms`);
 }
 
 // ========== BALANCE REACTOR ==========
@@ -293,10 +290,7 @@ async function runAnomalyNotifReactor(
     });
   }
 
-  logger.warn(`Anomaly alerts forwarded for agent ${agentId}`, {
-    count: criticalAnomalies.length,
-    types: criticalAnomalies.map(a => a.type),
-  });
+  logger.warn({ count: criticalAnomalies.length, types: criticalAnomalies.map(a => a.type) }, `Anomaly alerts forwarded for agent ${agentId}`);
 }
 
 // ========== RECONCILIATION NOTIFICATION REACTOR ==========
@@ -446,7 +440,7 @@ async function runReportReactor(entries: ConfirmedEntry[], agentId: string): Pro
           .where(eq(offlineDaySessions.id, session.id));
       }
     } catch (error) {
-      logger.warn(`Report reactor: failed to update daily report for ${agentId}/${date}:`, error);
+      logger.warn({ err: error }, `Report reactor: failed to update daily report for ${agentId}/${date}`);
     }
   }
 }

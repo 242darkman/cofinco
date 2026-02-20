@@ -369,7 +369,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     return res.status(401).json({ error: 'Non authentifié' });
   }
   // Populate req.user for route handlers
-  (req as any).user = req.session.user;
+  req.user = req.session.user;
   next();
 }
 

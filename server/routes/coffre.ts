@@ -53,7 +53,7 @@ coffreRouter.post(
         }
         body.agenceId = caisse.agenceId;
       }
-      const userId = (req as any).user?.id || req.body.userId; // Fallback dev
+      const userId = req.user?.id || req.body.userId; // Fallback dev
 
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
@@ -108,13 +108,13 @@ coffreRouter.post(
       const body = validationSchema.parse(req.body);
 
       // Verify Admin Role (or at least Manager)
-      const userRole = (req as any).user?.role;
+      const userRole = req.user?.role;
       const normalizedRole = normalizeRole(userRole);
       if (!(normalizedRole === SystemRole.ADMIN || normalizedRole === SystemRole.CHEF_AGENCE)) {
          return res.status(403).json({ error: "Action réservée aux administrateurs" });
       }
 
-      const userId = (req as any).user?.id || req.body.userId;
+      const userId = req.user?.id || req.body.userId;
 
       const result = await storage.provisionCoffreWithLedger({
         agenceId: body.agenceId,
@@ -142,7 +142,7 @@ coffreRouter.post(
       });
 
       const { approved, reasonRejection } = schema.parse(req.body);
-      const userId = (req as any).user?.id || req.body.userId;
+      const userId = req.user?.id || req.body.userId;
 
       const result = await service.validateTransfert({
         transfertId: req.params.id,
@@ -205,7 +205,7 @@ coffreRouter.post(
       });
 
       const body = schema.parse(req.body);
-      const userId = (req as any).user?.id || req.body.userId;
+      const userId = req.user?.id || req.body.userId;
 
       const result = await service.executeTransfert({
         transfertId: req.params.id,
@@ -252,7 +252,7 @@ coffreRouter.post(
         reason: z.string(),
       });
       const { reason } = schema.parse(req.body);
-      const userId = (req as any).user?.id || req.body.userId;
+      const userId = req.user?.id || req.body.userId;
 
       const result = await service.cancelTransfert({
         transfertId: req.params.id,
@@ -301,7 +301,7 @@ coffreRouter.post(
         reason: z.string().min(10, "Le motif doit faire au moins 10 caractères"),
       });
       const { reason } = reverseSchema.parse(req.body);
-      const userId = (req as any).user?.id;
+      const userId = req.user!.id;
 
       // 1. Load original transfer
       const [original] = await db
@@ -818,7 +818,7 @@ coffreRouter.put("/config", async (req, res) => {
     const body = schema.parse(req.body);
 
     // Vérification ROLE ADMIN
-    const userRole = (req as any).user?.role;
+    const userRole = req.user?.role;
     if (!isAdminRole(userRole)) {
       return res.status(403).json({ error: "Access denied. Admin only." });
     }
@@ -872,7 +872,7 @@ coffreRouter.get(
   requireAbility(Actions.CREATE, Subjects.COFFRE_TRANSFERT),
   async (req, res) => {
     try {
-      const user = (req as any).user;
+      const user = req.user;
       const agenceId = (req.query.agenceId as string) || user?.agenceId;
 
       if (!agenceId) {
@@ -898,7 +898,7 @@ coffreRouter.post(
   async (req, res) => {
     try {
       const { id } = req.params;
-      const user = (req as any).user;
+      const user = req.user;
 
       if (!user?.id) {
         return res.status(401).json({ error: "Non authentifié" });

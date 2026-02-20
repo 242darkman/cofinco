@@ -58,7 +58,7 @@ export async function createTestFixture(prefix = 'e2e'): Promise<TestFixture> {
     nom: `Agence Test ${prefix}`,
     ville: 'Brazzaville',
     codeAgence: `AG-${prefix.toUpperCase()}-${suffix}`,
-  }).onConflictDoNothing();
+  } as any).onConflictDoNothing();
 
   // Create test users with hashed passwords
   await db.insert(users).values([
@@ -89,7 +89,7 @@ export async function createTestFixture(prefix = 'e2e'): Promise<TestFixture> {
       role: 'caissier',
       agenceId: ids.agenceId,
     },
-  ]).onConflictDoNothing();
+  ] as any).onConflictDoNothing();
 
   // Insert user roles (required for V3 auth)
   await db.insert(userRoles).values([
@@ -106,7 +106,7 @@ export async function createTestFixture(prefix = 'e2e'): Promise<TestFixture> {
     email: `client-${prefix}-${suffix}@test.local`,
     numeroCompte: `CLT-${prefix.toUpperCase()}-${suffix}`,
     agenceId: ids.agenceId,
-  }).onConflictDoNothing();
+  } as any).onConflictDoNothing();
 
   return {
     ...ids,

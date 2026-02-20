@@ -123,7 +123,7 @@ const listOperationsQuerySchema = z.object({
  */
 caisseAgentRouter.get("/operations-terrain/pending/count", async (req, res) => {
   try {
-    const user = (req as any).user;
+    const user = req.user;
 
     if (!user) {
       return res.status(401).json({ error: "Non authentifié" });
@@ -156,7 +156,7 @@ caisseAgentRouter.post(
       }
 
       const data = parsed.data;
-      const userId = (req as any).user?.id;
+      const userId = req.user?.id;
 
       if (!userId) {
         return res.status(401).json({ error: "Non authentifié" });
@@ -202,7 +202,7 @@ caisseAgentRouter.post(
 caisseAgentRouter.post("/operations-terrain/bulk-approve", async (req, res) => {
   try {
     const { operationIds, password } = req.body;
-    const userId = (req as any).user?.id;
+    const userId = req.user!.id;
 
     if (!Array.isArray(operationIds) || operationIds.length === 0) {
       return res.status(400).json({ error: "Liste d'IDs invalide" });
@@ -261,8 +261,8 @@ caisseAgentRouter.post(
     try {
       const operationId = req.params.id;
       const { password } = req.body;
-      const userId = (req as any).user?.id;
-      const userRole = (req as any).user?.role;
+      const userId = req.user?.id;
+      const userRole = req.user?.role;
 
       if (!userId) {
         return res.status(401).json({ error: "Non authentifié" });
@@ -349,8 +349,8 @@ caisseAgentRouter.post(
   async (req, res) => {
     try {
       const operationId = req.params.id;
-      const userId = (req as any).user?.id;
-      const userRole = (req as any).user?.role;
+      const userId = req.user?.id;
+      const userRole = req.user?.role;
 
       if (!userId) {
         return res.status(401).json({ error: "Non authentifié" });
@@ -411,7 +411,7 @@ caisseAgentRouter.post(
   async (req, res) => {
     try {
       const operationId = req.params.id;
-      const userId = (req as any).user?.id;
+      const userId = req.user?.id;
 
       if (!userId) {
         return res.status(401).json({ error: "Non authentifié" });
@@ -463,7 +463,7 @@ caisseAgentRouter.get(
   "/operations-terrain",
   async (req, res) => {
     try {
-      const user = (req as any).user;
+      const user = req.user;
 
       if (!user) {
         return res.status(401).json({ error: "Non authentifié" });
@@ -483,7 +483,7 @@ caisseAgentRouter.get(
         dateTo: parsed.data.dateTo ? new Date(parsed.data.dateTo) : undefined,
       };
 
-      const result = await operationService.getOperations(filters, user.id, user.role, user.agenceId);
+      const result = await operationService.getOperations(filters as any, user.id, user.role, user.agenceId);
 
       res.json({
         operations: result.operations,
@@ -512,7 +512,7 @@ caisseAgentRouter.get(
   async (req, res) => {
     try {
       const operationId = req.params.id;
-      const userId = (req as any).user?.id;
+      const userId = req.user?.id;
 
       if (!userId) {
         return res.status(401).json({ error: "Non authentifié" });
@@ -556,7 +556,7 @@ caisseAgentRouter.get(
   async (req, res) => {
     try {
       const agentId = req.params.id;
-      const userId = (req as any).user?.id;
+      const userId = req.user?.id;
 
       if (!userId) {
         return res.status(401).json({ error: "Non authentifié" });
@@ -606,8 +606,8 @@ caisseAgentRouter.post(
   async (req, res) => {
     try {
       const agentId = req.params.id;
-      const userId = (req as any).user?.id;
-      const userRole = (req as any).user?.role;
+      const userId = req.user?.id;
+      const userRole = req.user?.role;
 
       if (!userId) {
         return res.status(401).json({ error: "Non authentifié" });
@@ -657,7 +657,7 @@ caisseAgentRouter.get(
   async (req, res) => {
     try {
       const agentId = req.params.id;
-      const userId = (req as any).user?.id;
+      const userId = req.user?.id;
 
       if (!userId) {
         return res.status(401).json({ error: "Non authentifié" });
@@ -679,7 +679,7 @@ caisseAgentRouter.get(
       const result = await operationService.getOperations({
         agentId,
         ...parsed.data,
-      });
+      } as any);
 
       res.json({
         operations: result.operations,
@@ -703,8 +703,8 @@ caisseAgentRouter.post(
   async (req, res) => {
     try {
       const agentId = req.params.id;
-      const userId = (req as any).user?.id;
-      const userRole = (req as any).user?.role;
+      const userId = req.user?.id;
+      const userRole = req.user?.role;
 
       if (!userId) {
         return res.status(401).json({ error: "Non authentifié" });
@@ -754,8 +754,8 @@ caisseAgentRouter.post(
   async (req, res) => {
     try {
       const agentId = req.params.id;
-      const userId = (req as any).user?.id;
-      const userRole = (req as any).user?.role;
+      const userId = req.user?.id;
+      const userRole = req.user?.role;
 
       if (!userId) {
         return res.status(401).json({ error: "Non authentifié" });
@@ -852,7 +852,7 @@ const listSessionsQuerySchema = z.object({
  */
 caisseAgentRouter.post("/sessions", async (req, res) => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = req.user?.id;
     if (!userId) {
       return res.status(401).json({ error: "Non authentifié" });
     }
@@ -897,8 +897,8 @@ caisseAgentRouter.post(
   idempotencyMiddleware("session-dispatch"),
   async (req, res) => {
     try {
-      const userId = (req as any).user?.id;
-      const userRole = (req as any).user?.role;
+      const userId = req.user?.id;
+      const userRole = req.user?.role;
 
       if (!userId) {
         return res.status(401).json({ error: "Non authentifié" });
@@ -948,7 +948,7 @@ caisseAgentRouter.post(
  */
 caisseAgentRouter.post("/sessions/:id/initiate-close", async (req, res) => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = req.user?.id;
     if (!userId) {
       return res.status(401).json({ error: "Non authentifié" });
     }
@@ -994,8 +994,8 @@ caisseAgentRouter.post(
   idempotencyMiddleware("session-finalize-close"),
   async (req, res) => {
     try {
-      const userId = (req as any).user?.id;
-      const userRole = (req as any).user?.role;
+      const userId = req.user?.id;
+      const userRole = req.user?.role;
 
       if (!userId) {
         return res.status(401).json({ error: "Non authentifié" });
@@ -1048,7 +1048,7 @@ caisseAgentRouter.post(
   idempotencyMiddleware("session-close-with-remise"),
   async (req, res) => {
     try {
-      const userId = (req as any).user?.id;
+      const userId = req.user?.id;
       if (!userId) {
         return res.status(401).json({ error: "Non authentifié" });
       }
@@ -1093,7 +1093,7 @@ caisseAgentRouter.post(
  */
 caisseAgentRouter.get("/sessions", async (req, res) => {
   try {
-    const user = (req as any).user;
+    const user = req.user;
     if (!user) {
       return res.status(401).json({ error: "Non authentifié" });
     }
@@ -1109,7 +1109,7 @@ caisseAgentRouter.get("/sessions", async (req, res) => {
     // Non-admin users can only see their agency's sessions
     const normalizedRole = normalizeRole(user.role);
     const isAdmin = normalizedRole === SystemRole.ADMIN || normalizedRole === SystemRole.SUPERVISEUR;
-    const agenceId = isAdmin ? parsed.data.agenceId : user.agenceId;
+    const agenceId = isAdmin ? parsed.data.agenceId : (user.agenceId ?? undefined);
 
     const sessions = await sessionAgentService.listSessions({
       ...parsed.data,
@@ -1129,7 +1129,7 @@ caisseAgentRouter.get("/sessions", async (req, res) => {
  */
 caisseAgentRouter.get("/sessions/active", async (req, res) => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = req.user?.id;
     if (!userId) {
       return res.status(401).json({ error: "Non authentifié" });
     }
@@ -1150,7 +1150,7 @@ caisseAgentRouter.get("/sessions/active", async (req, res) => {
  */
 caisseAgentRouter.get("/sessions/:id", async (req, res) => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = req.user?.id;
     if (!userId) {
       return res.status(401).json({ error: "Non authentifié" });
     }
@@ -1173,7 +1173,7 @@ caisseAgentRouter.get("/sessions/:id", async (req, res) => {
  */
 caisseAgentRouter.get("/sessions/:id/audit", async (req, res) => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = req.user?.id;
     if (!userId) {
       return res.status(401).json({ error: "Non authentifié" });
     }
@@ -1193,8 +1193,8 @@ caisseAgentRouter.get("/sessions/:id/audit", async (req, res) => {
  */
 caisseAgentRouter.post("/agents/:id/transfer-agency", async (req, res) => {
   try {
-    const userId = (req as any).user?.id;
-    const userRole = (req as any).user?.role;
+    const userId = req.user?.id;
+    const userRole = req.user?.role;
 
     if (!userId) {
       return res.status(401).json({ error: "Non authentifié" });
@@ -1241,7 +1241,7 @@ caisseAgentRouter.post("/agents/:id/transfer-agency", async (req, res) => {
  */
 caisseAgentRouter.get("/agents/:id/agency-history", async (req, res) => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = req.user?.id;
     if (!userId) {
       return res.status(401).json({ error: "Non authentifié" });
     }
@@ -1260,7 +1260,7 @@ caisseAgentRouter.get("/agents/:id/agency-history", async (req, res) => {
  */
 caisseAgentRouter.get("/agents/:id/gl-account", async (req, res) => {
   try {
-    const userId = (req as any).user?.id;
+    const userId = req.user?.id;
     if (!userId) {
       return res.status(401).json({ error: "Non authentifié" });
     }
@@ -1335,7 +1335,7 @@ caisseAgentRouter.post(
   idempotencyMiddleware("agent-mm-payment"),
   async (req, res) => {
     try {
-      const userId = (req as any).user?.id;
+      const userId = req.user?.id;
 
       if (!userId) {
         return res.status(401).json({ error: "Non authentifié" });
@@ -1385,7 +1385,7 @@ caisseAgentRouter.get(
   "/mm-payments",
   async (req, res) => {
     try {
-      const user = (req as any).user;
+      const user = req.user;
 
       if (!user) {
         return res.status(401).json({ error: "Non authentifié" });
@@ -1405,7 +1405,7 @@ caisseAgentRouter.get(
 
       const filter = {
         ...parsed.data,
-        agenceId: isAdmin ? parsed.data.agenceId : user.agenceId,
+        agenceId: isAdmin ? parsed.data.agenceId : (user.agenceId ?? undefined),
         from: parsed.data.from ? new Date(parsed.data.from) : undefined,
         to: parsed.data.to ? new Date(parsed.data.to) : undefined,
       };
@@ -1438,7 +1438,7 @@ caisseAgentRouter.get(
   "/mm-payments/:id",
   async (req, res) => {
     try {
-      const userId = (req as any).user?.id;
+      const userId = req.user?.id;
 
       if (!userId) {
         return res.status(401).json({ error: "Non authentifié" });
@@ -1470,7 +1470,7 @@ caisseAgentRouter.post(
   "/mm-payments/:id/cancel",
   async (req, res) => {
     try {
-      const userId = (req as any).user?.id;
+      const userId = req.user?.id;
 
       if (!userId) {
         return res.status(401).json({ error: "Non authentifié" });
@@ -1506,7 +1506,7 @@ caisseAgentRouter.get(
   "/agents/:id/mm-payments/stats",
   async (req, res) => {
     try {
-      const userId = (req as any).user?.id;
+      const userId = req.user?.id;
 
       if (!userId) {
         return res.status(401).json({ error: "Non authentifié" });

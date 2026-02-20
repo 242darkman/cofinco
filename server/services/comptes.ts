@@ -68,6 +68,11 @@ import {
   type SuspensionReasonType,
   getTypePaiementForCompte,
 } from "@shared/enum/status-constants";
+import type {
+  TypePaiementTerrainDz,
+  MethodePaiementDz,
+  TypeOperationCaisseDz,
+} from "@shared/enum/enums";
 
 // Types - Re-export from status-constants for consistency
 export type TypeCompte = TypeCompteType;
@@ -526,7 +531,7 @@ export async function deposerSurCompte(
       sessionCaisseId: data.sessionCaisseId,
       agenceId: compte.agenceId || undefined,
       methodePaiement: data.methodePaiement,
-      typePaiement: typePaiement as any,
+      typePaiement: typePaiement as TypePaiementTerrainDz,
       idempotencyKey: data.idempotencyKey,
     },
     async (tx, mouvement) => {
@@ -535,7 +540,7 @@ export async function deposerSurCompte(
         montant: data.montant,
         sessionCaisseId: data.sessionCaisseId,
         observations: data.observations,
-        typePaiement: typePaiement as any,
+        typePaiement: typePaiement as TypePaiementTerrainDz,
         methodePaiement: data.methodePaiement,
         userId
       });
@@ -591,11 +596,11 @@ export async function processCompteDepot(
     .values({
       compteId: compteId,
       mouvementId: mouvement.id,
-      typePaiement: typePaiement as any,
+      typePaiement: typePaiement as TypePaiementTerrainDz,
       sens: deriveSensFromType(typePaiement),
       montant: montant.toString(),
       soldeApres: nouveauSolde,
-      methodePaiement: methodePaiement as any,
+      methodePaiement: methodePaiement as MethodePaiementDz,
       observations: observations,
       createdBy: userId,
     } as any)
@@ -609,7 +614,7 @@ export async function processCompteDepot(
     await tx.insert(operationsCaisse).values({
       sessionId: sessionCaisseId,
       mouvementId: mouvement.id,
-      typeOperation: typePaiement as any,
+      typeOperation: typePaiement as TypeOperationCaisseDz,
       montant: montant.toString(),
       methodePaiement: "CASH",
       reference: `EPG-${mouvement.reference}`,
@@ -706,7 +711,7 @@ export async function retirerDuCompte(
       sessionCaisseId: data.sessionCaisseId,
       agenceId: compte.agenceId || undefined,
       methodePaiement: data.methodePaiement,
-      typePaiement: typePaiement as any,
+      typePaiement: typePaiement as TypePaiementTerrainDz,
       idempotencyKey: data.idempotencyKey,
     },
     async (tx, mouvement) => {
@@ -715,7 +720,7 @@ export async function retirerDuCompte(
         montant: data.montant,
         sessionCaisseId: data.sessionCaisseId,
         observations: data.observations,
-        typePaiement: typePaiement as any,
+        typePaiement: typePaiement as TypePaiementTerrainDz,
         methodePaiement: data.methodePaiement,
         userId
       });
@@ -770,11 +775,11 @@ export async function processCompteRetrait(
     .values({
       compteId: compteId,
       mouvementId: mouvement.id,
-      typePaiement: typePaiement as any,
+      typePaiement: typePaiement as TypePaiementTerrainDz,
       sens: deriveSensFromType(typePaiement),
       montant: montant.toString(),
       soldeApres: nouveauSolde,
-      methodePaiement: methodePaiement as any,
+      methodePaiement: methodePaiement as MethodePaiementDz,
       observations: observations,
       createdBy: userId,
     })
@@ -788,7 +793,7 @@ export async function processCompteRetrait(
     await tx.insert(operationsCaisse).values({
       sessionId: sessionCaisseId,
       mouvementId: mouvement.id,
-      typeOperation: typePaiement as any,
+      typeOperation: typePaiement as TypeOperationCaisseDz,
       montant: montant.toString(),
       methodePaiement: "CASH",
       reference: `EPG-${mouvement.reference}`,
@@ -1312,7 +1317,7 @@ export async function getClientPortfolio(clientId: string) {
     StatutCompteConst.PENDING_ACTIVATION, // legacy
   ];
   const totalPendingDeposit = comptesResult
-    .filter((c) => pendingStatuses.includes(c.statut as any))
+    .filter((c) => (pendingStatuses as readonly string[]).includes(c.statut))
     .reduce((sum, c) => sum + parseFloat(c.soldeCourant || "0"), 0);
 
   const totalCreditsRestant = creditsResult.reduce(
@@ -1998,7 +2003,7 @@ export async function payerDepotInitialCompte(
       StatutCompteConst.PENDING_PAYMENT_AND_APPROVAL,
       StatutCompteConst.PENDING_ACTIVATION, // Legacy support
     ];
-    if (!pendingStatuses.includes(compte.statut as any)) {
+    if (!(pendingStatuses as readonly string[]).includes(compte.statut)) {
       throw new Error("Ce compte n'est pas en attente de paiement");
     }
 
@@ -2011,7 +2016,7 @@ export async function payerDepotInitialCompte(
     // Validate payment method requirements
     if (paymentMethod === 'TRANSFER') {
       if (!data.compteSourceId) throw new Error("Compte source requis pour un virement");
-    } else if (paymentMethod !== 'TRANSFER' && !data.sessionCaisseId) {
+    } else if ((paymentMethod as string) !== 'TRANSFER' && !data.sessionCaisseId) {
       throw new Error("Session de caisse requise pour ce mode de paiement");
     }
 
@@ -2296,7 +2301,7 @@ export async function autoCreateCourantAccount(
     StatutCompteConst.PENDING_PAYMENT,
     StatutCompteConst.PENDING_PAYMENT_AND_APPROVAL,
   ];
-  const isPending = pendingStatuses.includes(result.compte.statut as any);
+  const isPending = (pendingStatuses as readonly string[]).includes(result.compte.statut);
 
   // 4. If pending, create a caisse payment request for activation
   if (isPending) {

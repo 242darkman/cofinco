@@ -167,7 +167,7 @@ export async function importEmployees(
             canLogin: true,
             statut: "ACTIVE",
             mustChangePassword: true,
-          })
+          } as any)
           .returning();
 
         // 2. Create employee

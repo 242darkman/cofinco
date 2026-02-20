@@ -51,7 +51,8 @@ import { calculateObjectifPrize } from "../services/objectif-recalculation-servi
 
 // Helper to get user from request
 function getUser(req: Request): { id: string; agenceId?: string } | null {
-  return (req as any).user || null;
+  if (!req.user) return null;
+  return { ...req.user, agenceId: req.user.agenceId ?? undefined };
 }
 
 // Helper to join agent name
@@ -376,7 +377,7 @@ export function registerAgentModulesRoutes(app: Express) {
       }
 
       // Resolve agenceId
-      const [agent] = await db.select({ agenceId: agentsTerrain.agenceId })
+      const [agent] = await db.select({ agenceId: agentsTerrain.currentAgenceId })
         .from(agentsTerrain)
         .where(eq(agentsTerrain.id, commission.agentId))
         .limit(1);
@@ -820,7 +821,7 @@ export function registerAgentModulesRoutes(app: Express) {
         typeObjectif: objectif.typeObjectif,
         oldValue: Number(objectif.valeurRealisee),
         newValue: valeurRealisee,
-        statut: updated.statut,
+        statut: updated!.statut,
       });
 
       const ws = getWsInstance();

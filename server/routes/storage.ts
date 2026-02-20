@@ -131,8 +131,8 @@ router.get('/files/:key(*)', async (req, res) => {
 router.get('/documents/:id/view', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    const user = (req as any).user as { id: string; role?: string };
-    const normalizedRole = normalizeRole(user?.role);
+    const user = req.user!;
+    const normalizedRole = normalizeRole(user.role);
 
     if (!normalizedRole) {
       return res.status(403).json({ error: 'Accès refusé' });
@@ -271,8 +271,8 @@ router.post('/entity/upload', requireAuth, upload.single('file'), async (req, re
     }
 
     // Authorization check: verify user can upload for this entity
-    const user = (req as any).user as { id: string; role?: string };
-    const normalizedRole = normalizeRole(user?.role);
+    const user = req.user!;
+    const normalizedRole = normalizeRole(user.role);
     const isPrivileged = normalizedRole === SystemRole.ADMIN || normalizedRole === SystemRole.CHEF_AGENCE;
 
     // Non-privileged users can only upload for their own entity
@@ -367,7 +367,7 @@ router.post('/entity/presigned-url', requireAuth, async (req, res) => {
  */
 router.delete('/entity/:entityType/:entityId', requireAuth, async (req, res) => {
   try {
-    const user = (req as any).user as { id: string; role?: string };
+    const user = req.user;
     const normalizedRole = normalizeRole(user?.role);
 
     // Vérification admin uniquement

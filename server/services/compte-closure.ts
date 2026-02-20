@@ -772,10 +772,10 @@ export async function createClosureMoMoPayout(
       {
         provider,
         amount: payoutAmount,
-        phone: request.payoutPhoneNumber,
+        phone: request.payoutPhoneNumber!,
         clientId: compte.clientId,
         compteId: request.compteId,
-        agenceId: compte.agenceId,
+        agenceId: compte.agenceId || undefined,
         description: `Restitution clôture compte`,
         idempotencyKey: `closure-payout-${request.id}`,
         metadata: {

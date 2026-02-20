@@ -225,6 +225,23 @@ export async function ensureCustomFunctions(): Promise<void> {
     console.log('[DB] ✓ update_updated_at_column()');
     objectCount++;
 
+    // --- DATA MIGRATIONS ---
+
+    // Backfill total_du for existing credits (one-time, idempotent)
+    try {
+      const result = await db.execute(sql`
+        UPDATE credits
+        SET total_du = CAST(montant AS NUMERIC) * (1 + COALESCE(CAST(taux AS NUMERIC), 0) / 100)
+        WHERE total_du IS NULL OR total_du = '0'
+      `);
+      const count = (result as any).rowCount || 0;
+      if (count > 0) {
+        console.log(`[DB] ✓ Backfilled total_du for ${count} credits`);
+      }
+    } catch (err) {
+      console.warn('[DB] ⚠ Failed to backfill total_du:', err instanceof Error ? err.message : err);
+    }
+
     // ========================================================================
     // 2. ACCOUNTING (OHADA) FUNCTIONS
     // ========================================================================

@@ -141,7 +141,7 @@ export async function approveOpeningRequest(
         await createCaisseRequest({
           category: "ACCOUNT_ACTIVATION",
           direction: "IN",
-          agenceId: txResult.compte.agenceId,
+          agenceId: txResult.compte.agenceId || '',
           sourceType: "compte",
           sourceId: txResult.request.compteId,
           clientId: txResult.compte.clientId,

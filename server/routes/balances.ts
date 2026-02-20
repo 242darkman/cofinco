@@ -241,7 +241,7 @@ router.post("/reconcile/session/:id/fix", requireAnyAbility([
 ]), async (req, res) => {
   try {
     const sessionId = req.params.id;
-    const userId = (req as any).user?.id;
+    const userId = req.user?.id;
 
     // 1. Récupérer la session et vérifier qu'elle existe
     const result = await balanceService.reconcileSessionCaisse(sessionId);

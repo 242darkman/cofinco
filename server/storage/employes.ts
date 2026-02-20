@@ -582,7 +582,7 @@ export async function updateEmployeWithUser(
     // 1. Mettre à jour le user si des données sont fournies
     if (userData && Object.keys(userData).length > 0) {
       await tx.update(users)
-        .set({ ...userData, updatedAt: new Date() })
+        .set({ ...userData, updatedAt: new Date() } as any)
         .where(eq(users.id, currentEmploye.userId));
     }
 
@@ -659,7 +659,7 @@ export async function updateEmployeWithUser(
     return {
       ...result[0].employe,
       user: result[0].user
-    };
+    } as any;
   });
 }
 
@@ -812,7 +812,7 @@ export async function transferEmployeToAgence(
     if (result.length === 0) return undefined;
 
     return {
-      employee: { ...result[0].employe, user: result[0].user },
+      employee: { ...result[0].employe, user: result[0].user } as any,
       fromAgenceId,
       toAgenceId: targetAgenceId,
       snapshot,

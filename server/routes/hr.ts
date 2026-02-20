@@ -1070,7 +1070,7 @@ hrRouter.post("/formations/:id/participants", getAuthUser, async (req, res) => {
 
     // Cross-broadcast to agent + add to agent planning
     try {
-      const [agentRow] = await db.select({ id: agentsTerrain.id, agenceId: agentsTerrain.agenceId })
+      const [agentRow] = await db.select({ id: agentsTerrain.id, agenceId: agentsTerrain.currentAgenceId })
         .from(agentsTerrain).where(eq(agentsTerrain.employeId, employeId));
       if (agentRow && wsInstance) {
         wsInstance.broadcast({ type: "AGENT_MODULES_UPDATE", payload: { entity: "formation", agentId: agentRow.id } });
@@ -2963,11 +2963,12 @@ hrRouter.patch("/paie/pay", getAuthUser, attachAbility, requireAbility(Actions.M
       .select({
         bulletin: bulletinsPaie,
         paymentMethod: employes.paymentMethod,
-        employeNom: employes.nom,
-        employePrenom: employes.prenom,
+        employeNom: users.nom,
+        employePrenom: users.prenom,
       })
       .from(bulletinsPaie)
       .innerJoin(employes, eq(bulletinsPaie.employeId, employes.id))
+      .innerJoin(users, eq(employes.userId, users.id))
       .where(
         and(
           eq(bulletinsPaie.payrollRunId, runId),

@@ -276,7 +276,7 @@ export function registerBrandingRoutes(app: Express) {
             fontFamily: ui?.fontFamily || "Inter",
             borderRadius: ui?.borderRadius || "lg",
           };
-          wsInstance.broadcast({ type: "BRANDING_CHANGED", payload });
+          wsInstance.broadcast({ type: "BRANDING_CHANGED" as any, payload });
           res.json(payload);
         } else {
           res.json({ success: true });

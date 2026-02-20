@@ -29,7 +29,7 @@ const logger = createLogger('Ledger');
 export type MouvementFinancier = typeof mouvementsFinanciers.$inferSelect;
 
 // Types for the ledger service
-export type SourceModule = "CAISSE" | "EPARGNE" | "CREDIT" | "TONTINE" | "TERRAIN" | "TRANSFERT" | "SYSTEME" | "CAISSE_AGENT" | "VERSEMENT_AUTO" | "DECAISSEMENT_PROGRAMME" | "COMPTE" | "COFFRE" | "MOBILE_MONEY" | "RH_PAYROLL" | "COFFRE_TRANSFER" | "INTER_COFFRE" | "EVACUATION_COFFRE";
+export type SourceModule = "CAISSE" | "EPARGNE" | "CREDIT" | "TONTINE" | "TERRAIN" | "TRANSFERT" | "SYSTEME" | "CAISSE_AGENT" | "VERSEMENT_AUTO" | "DECAISSEMENT_PROGRAMME" | "COMPTE" | "COFFRE" | "MOBILE_MONEY" | "RH_PAYROLL" | "COFFRE_TRANSFER" | "INTER_COFFRE" | "EVACUATION_COFFRE" | "FRAIS";
 export type SensMouvement = "DEBIT" | "CREDIT";
 export type TypeEvenement =
   | "MOUVEMENT_CREE"
@@ -105,6 +105,7 @@ export function generateReference(sourceModule: SourceModule | "TIC" | "EVC" | "
     EVACUATION_COFFRE: "EVC",
     EVC: "EVC",
     SAL: "SAL",
+    FRAIS: "FRA",
   };
   
   return `${prefixes[sourceModule]}-${year}${month}${day}-${time}${random}`;
@@ -150,7 +151,7 @@ export async function createMouvementFinancier(
   const [mouvement] = await tx.insert(mouvementsFinanciers).values({
     montant: data.montant,
     sens: data.sens,
-    sourceModule: data.sourceModule,
+    sourceModule: data.sourceModule as any,
     typePaiement: data.typePaiement as any,
     methodePaiement: data.methodePaiement as any,
     clientId: data.clientId,

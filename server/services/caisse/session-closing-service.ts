@@ -136,6 +136,7 @@ export interface FinalizeCloseResult {
     | "NOT_YOUR_SESSION"
     | "INVALID_STATUS"
     | "AMOUNT_MISMATCH"
+    | "NEGATIVE_AMOUNT"
     | "COFFRE_NOT_FOUND"
     | "DB_ERROR";
 }
@@ -738,7 +739,7 @@ export class SessionClosingService {
     } = params;
 
     try {
-      return await db.transaction(async (tx) => {
+      return await db.transaction(async (tx): Promise<FinalizeCloseResult> => {
         // 1. Récupérer la session
         const [session] = await tx
           .select()

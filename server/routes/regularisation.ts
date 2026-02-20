@@ -86,7 +86,7 @@ regularisationRouter.get(
       }
 
       const { statut, type, priorite, source, limit, offset, assignedToMe, dateFrom, dateTo } = parsed.data;
-      const userId = (req as any).session?.user?.id;
+      const userId = req.session?.user?.id;
 
       // Construire les conditions de filtrage pour les deux sources
       const buildConditions = (table: typeof tachesRegularisation | typeof tachesRegularisationCoffreCaisse) => {
@@ -479,7 +479,7 @@ regularisationRouter.post(
   async (req, res) => {
     try {
       const { source, id } = req.params;
-      const userId = (req as any).session?.user?.id;
+      const userId = req.session?.user?.id;
 
       if (!userId) {
         return res.status(401).json({ error: "Non authentifié" });

@@ -61,7 +61,7 @@ export async function recalculateAgentCommission(agentId: string): Promise<void>
 
     // Get agent's agenceId
     const [agent] = await db
-      .select({ agenceId: agentsTerrain.agenceId })
+      .select({ agenceId: agentsTerrain.currentAgenceId })
       .from(agentsTerrain)
       .where(eq(agentsTerrain.id, agentId))
       .limit(1);

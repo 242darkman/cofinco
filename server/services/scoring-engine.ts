@@ -16,6 +16,7 @@
 import { db } from "../db";
 import {
   clients,
+  users,
   credits,
   comptes,
   echeancesCredits,
@@ -187,7 +188,7 @@ export async function recordScoreEvent(input: ScoreEventInput): Promise<{
       createdBy: input.createdBy,
     }).onConflictDoNothing();
 
-    return _recalculate(input.clientId, tx);
+    return _recalculate(input.clientId, tx as any);
   });
 
   // 5. Side effects AFTER transaction commit (WS + domain events)
@@ -323,7 +324,7 @@ async function _recalculate(clientId: string, txDb: DbOrTx): Promise<RecalcResul
     updatedAt: new Date(),
   }).where(eq(clients.id, clientId));
 
-  const clientName = [client.prenom, client.nom].filter(Boolean).join(' ') || undefined;
+  const clientName = [(client as any).prenom, (client as any).nom].filter(Boolean).join(' ') || undefined;
 
   return {
     scoreGlobal,
@@ -572,7 +573,7 @@ async function getCreditData(clientId: string): Promise<CreditDataSummary> {
     WHERE credit_id IN (${sql.join(creditIds.map((id) => sql`${id}`), sql`, `)})
   `);
 
-  const row = (stats as any).rows?.[0] || stats[0] || {};
+  const row = (stats as any).rows?.[0] || (stats as any)[0] || {};
   const paidCount = parseInt(row.paid_count) || 0;
   const dueCount = parseInt(row.due_count) || 0;
   const avgLateDays = parseFloat(row.avg_late_days) || 0;
@@ -883,11 +884,12 @@ export async function getAdminScoreEvents(filters: AdminEventsFilter) {
     reason: clientScoreEvents.reason,
     createdBy: clientScoreEvents.createdBy,
     createdAt: clientScoreEvents.createdAt,
-    clientNom: clients.nom,
-    clientPrenom: clients.prenom,
+    clientNom: users.nom,
+    clientPrenom: users.prenom,
   })
     .from(clientScoreEvents)
     .leftJoin(clients, eq(clientScoreEvents.clientId, clients.id))
+    .leftJoin(users, eq(clients.userId, users.id))
     .where(where)
     .orderBy(desc(clientScoreEvents.createdAt))
     .limit(limit)
@@ -935,11 +937,12 @@ export async function getAdminScoreStates(filters: AdminStatesFilter) {
     totalIncidents: clientScoreState.totalIncidents,
     totalEpargneDepots: clientScoreState.totalEpargneDepots,
     updatedAt: clientScoreState.updatedAt,
-    clientNom: clients.nom,
-    clientPrenom: clients.prenom,
+    clientNom: users.nom,
+    clientPrenom: users.prenom,
   })
     .from(clientScoreState)
     .leftJoin(clients, eq(clientScoreState.clientId, clients.id))
+    .leftJoin(users, eq(clients.userId, users.id))
     .where(where)
     .orderBy(desc(clientScoreState.scoreGlobal))
     .limit(limit)

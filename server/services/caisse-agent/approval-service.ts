@@ -44,8 +44,15 @@ import {
   remboursements,
   transactionsCompte,
   operationsCaisse,
+  users,
 } from "@shared/schema";
 import { StatutTransaction, TypeCompte, TypeOperationCaisse, TypeOperationTerrain, type TypeOperationCaisseType } from "@shared/enum/status-constants";
+import type {
+  TypePaiementTerrainDz,
+  SourceModuleDz,
+  TypeOperationCaisseDz,
+  TypeEvenementDz,
+} from "@shared/enum/enums";
 import { eq, sql, and, isNull, asc, desc } from "drizzle-orm";
 import { generateReference, updateCreditSolde, updateSessionSolde, type MouvementFinancier } from "../ledger";
 import { postGlForMouvement } from "../accounting-posting-service";
@@ -275,7 +282,7 @@ export class ApprovalService {
     }
 
     // 1. Créer mouvement CaisseAgent (Débit = Augmente la créance envers l'agent)
-    const refCaisseAgent = generateReference("CAISSE_AGENT" as any);
+    const refCaisseAgent = generateReference("CAISSE_AGENT");
     const [mouvementCaisseAgent] = await tx
       .insert(mouvementsFinanciers)
       .values({
@@ -287,8 +294,8 @@ export class ApprovalService {
         reference: refCaisseAgent,
         agentId: operation.agentId,
         clientId: operation.clientId,
-        typePaiement: "MISC_COLLECTION" as any, // Type pour matching des règles comptables
-        sourceModule: "CAISSE_AGENT" as any,
+        typePaiement: "MISC_COLLECTION" as TypePaiementTerrainDz, // Type pour matching des règles comptables
+        sourceModule: "CAISSE_AGENT" as SourceModuleDz,
         sourceTable: "operations_terrain",
         sourceId: operation.id,
         createdBy: approvedBy,
@@ -448,7 +455,7 @@ export class ApprovalService {
         : "AGENT_WITHDRAWAL_SAVINGS";
 
     // 3. Créer mouvement CaisseAgent (CREDIT = diminue la créance / solde agent)
-    const refCaisseAgent = generateReference("CAISSE_AGENT" as any);
+    const refCaisseAgent = generateReference("CAISSE_AGENT");
     const [mouvementCaisseAgent] = await tx
       .insert(mouvementsFinanciers)
       .values({
@@ -460,8 +467,8 @@ export class ApprovalService {
         reference: refCaisseAgent,
         agentId: operation.agentId,
         clientId: operation.clientId,
-        typePaiement: typePaiement as any,
-        sourceModule: "CAISSE_AGENT" as any,
+        typePaiement: typePaiement as TypePaiementTerrainDz,
+        sourceModule: "CAISSE_AGENT" as SourceModuleDz,
         sourceTable: "operations_terrain",
         sourceId: operation.id,
         createdBy: approvedBy,
@@ -518,7 +525,7 @@ export class ApprovalService {
         agentId: operation.agentId,
         clientId: operation.clientId,
         compteId: metadata.compteId,
-        typePaiement: glTypePaiement as any, // AGENT_WITHDRAWAL_* pour GL
+        typePaiement: glTypePaiement as TypePaiementTerrainDz, // AGENT_WITHDRAWAL_* pour GL
         sourceModule: "EPARGNE",
         sourceTable: "operations_terrain",
         sourceId: operation.id,
@@ -540,7 +547,7 @@ export class ApprovalService {
     await tx.insert(transactionsCompte).values({
       compteId: metadata.compteId,
       mouvementId: mouvementCompte.id,
-      typePaiement: glTypePaiement as any,
+      typePaiement: glTypePaiement as TypePaiementTerrainDz,
       sens: "DEBIT", // Retrait = argent sort du compte
       statut: StatutTransaction.POSTED,
       montant: operation.montant,
@@ -564,7 +571,7 @@ export class ApprovalService {
       .values({
         agentId: operation.agentId,
         clientId: operation.clientId!,
-        typePaiement: typePaiement as any,
+        typePaiement: typePaiement as TypePaiementTerrainDz,
         montant: operation.montant,
         methodePaiement: "CASH",
         reference: refPaiement,
@@ -605,7 +612,7 @@ export class ApprovalService {
     const metadata = operation.metadata as OperationTerrainMetadata | null;
 
     // 1. Créer mouvement CaisseAgent (Crédit = entrée)
-    const refCaisseAgent = generateReference("CAISSE_AGENT" as any);
+    const refCaisseAgent = generateReference("CAISSE_AGENT");
     const [mouvementCaisseAgent] = await tx
       .insert(mouvementsFinanciers)
       .values({
@@ -617,7 +624,7 @@ export class ApprovalService {
         reference: refCaisseAgent,
         agentId: operation.agentId,
         clientId: operation.clientId,
-        sourceModule: "CAISSE_AGENT" as any,
+        sourceModule: "CAISSE_AGENT" as SourceModuleDz,
         sourceTable: "operations_terrain",
         sourceId: operation.id,
         createdBy: approvedBy,
@@ -939,7 +946,7 @@ export class ApprovalService {
     }
 
     // 2. Créer mouvement CaisseAgent (Débit = sortie)
-    const refCaisseAgent = generateReference("CAISSE_AGENT" as any);
+    const refCaisseAgent = generateReference("CAISSE_AGENT");
     const [mouvementCaisseAgent] = await tx
       .insert(mouvementsFinanciers)
       .values({
@@ -950,8 +957,8 @@ export class ApprovalService {
         methodePaiement: "CASH",
         reference: refCaisseAgent,
         agentId: operation.agentId,
-        typePaiement: "MISC_DISBURSEMENT" as any, // Type pour matching des règles comptables
-        sourceModule: "CAISSE_AGENT" as any,
+        typePaiement: "MISC_DISBURSEMENT" as TypePaiementTerrainDz, // Type pour matching des règles comptables
+        sourceModule: "CAISSE_AGENT" as SourceModuleDz,
         sourceTable: "operations_terrain",
         sourceId: operation.id,
         createdBy: approvedBy,
@@ -991,7 +998,7 @@ export class ApprovalService {
         methodePaiement: "CASH",
         reference: refCaisse,
         agentId: operation.agentId,
-        typePaiement: "CASH_TRANSFER" as any, // Type spécifique pour réception remise agent
+        typePaiement: "CASH_TRANSFER" as TypePaiementTerrainDz, // Type spécifique pour réception remise agent
         sourceModule: "CAISSE",
         sourceTable: "operations_terrain",
         sourceId: operation.id,
@@ -1031,9 +1038,10 @@ export class ApprovalService {
 
       // Créer operationsCaisse pour que l'entrée apparaisse dans l'historique de caisse
       const [agentInfo] = await tx
-        .select({ nom: employes.nom, prenom: employes.prenom })
+        .select({ nom: users.nom, prenom: users.prenom })
         .from(agentsTerrain)
         .innerJoin(employes, eq(agentsTerrain.employeId, employes.id))
+        .innerJoin(users, eq(employes.userId, users.id))
         .where(eq(agentsTerrain.id, operation.agentId))
         .limit(1);
       const agentDisplayName = agentInfo
@@ -1043,7 +1051,7 @@ export class ApprovalService {
       await tx.insert(operationsCaisse).values({
         sessionId: activeSession.id,
         mouvementId: mouvementCaisse.id,
-        typeOperation: "AGENT_SETTLEMENT" as any,
+        typeOperation: "AGENT_SETTLEMENT" as TypeOperationCaisseDz,
         statut: StatutTransaction.POSTED,
         montant: operation.montant,
         methodePaiement: "CASH",
@@ -1300,7 +1308,7 @@ export class ApprovalService {
 
       // 6. Créer événement outbox pour notification
       await tx.insert(evenementsOutbox).values({
-        type: "OPERATION_TERRAIN_REJECTED" as any,
+        type: "OPERATION_TERRAIN_REJECTED" as TypeEvenementDz,
         aggregateType: "operation_terrain",
         aggregateId: operation.id,
         payload: {
@@ -1328,7 +1336,7 @@ export class ApprovalService {
     const eventType = operation.statut === "SETTLED" ? "OPERATION_TERRAIN_SETTLED" : "OPERATION_TERRAIN_APPROVED";
     
     await tx.insert(evenementsOutbox).values({
-      type: eventType as any,
+      type: eventType as TypeEvenementDz,
       aggregateType: "operation_terrain",
       aggregateId: operation.id,
       payload: {
@@ -1342,7 +1350,7 @@ export class ApprovalService {
 
     // Événement de changement de solde caisse agent
     await tx.insert(evenementsOutbox).values({
-      type: "CAISSE_AGENT_SOLDE_CHANGE" as any,
+      type: "CAISSE_AGENT_SOLDE_CHANGE" as TypeEvenementDz,
       aggregateType: "caisse_agent",
       aggregateId: operation.caisseAgentId,
       payload: {
@@ -1357,7 +1365,7 @@ export class ApprovalService {
     // Pour COLLECT_CASH, notifier aussi le client si pertinent
     if (operation.type === "COLLECT_CASH" && operation.clientId) {
       await tx.insert(evenementsOutbox).values({
-        type: "MOUVEMENT_CREE" as any,
+        type: "MOUVEMENT_CREE" as TypeEvenementDz,
         aggregateType: "client",
         aggregateId: operation.clientId,
         payload: {

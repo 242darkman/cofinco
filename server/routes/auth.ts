@@ -2228,13 +2228,13 @@ export function registerAuthRoutes(app: Express) {
   // Check if current user has a specific permission
   app.get("/api/permissions/check", requireAuth, async (req, res) => {
     try {
-      const user = (req as any).user;
+      const user = req.user!;
       const { module, action } = req.query;
 
       if (!module || !action) {
         return res.status(400).json({ message: "Module et action requis" });
       }
-      
+
       // Construct expected code (simple heuristic, might need refinement if 'module' param != module name)
       // Usually module param here is 'Caisse', 'Clients' etc. or 'caisse', 'clients'.
       // Code convention is lowercase: 'caisse.view'.

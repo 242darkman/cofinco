@@ -42,6 +42,12 @@ import {
   type AgentSessionConfig,
 } from "@shared/schema";
 import { StatutTransaction, TypeOperationCaisse } from "@shared/enum/status-constants";
+import type {
+  TypePaiementTerrainDz,
+  SourceModuleDz,
+  TypeOperationCaisseDz,
+  StatutSessionAgentDz,
+} from "@shared/enum/enums";
 import { generateReference, updateCreditSolde, updateSessionSolde } from "../ledger";
 import { postGlForMouvement } from "../accounting-posting-service";
 import { agentGlProvisioningService } from "./agent-gl-provisioning-service";
@@ -267,7 +273,7 @@ export class SessionAgentService {
         }
 
         // 3. Créer l'opération PROVISIONING
-        const reference = generateReference("CAISSE_AGENT" as any);
+        const reference = generateReference("CAISSE_AGENT");
         const [operation] = await tx
           .insert(operationsTerrain)
           .values({
@@ -291,7 +297,7 @@ export class SessionAgentService {
           .returning();
 
         // 4. Créer mouvement financier (agent side)
-        const refAgent = generateReference("CAISSE_AGENT" as any);
+        const refAgent = generateReference("CAISSE_AGENT");
         const [mouvementAgent] = await tx
           .insert(mouvementsFinanciers)
           .values({
@@ -302,8 +308,8 @@ export class SessionAgentService {
             methodePaiement: "CASH",
             reference: refAgent,
             agentId: session.agentId,
-            typePaiement: "AGENT_PROVISIONING" as any,
-            sourceModule: "CAISSE_AGENT" as any,
+            typePaiement: "AGENT_PROVISIONING" as TypePaiementTerrainDz,
+            sourceModule: "CAISSE_AGENT" as SourceModuleDz,
             sourceTable: "operations_terrain",
             sourceId: operation.id,
             agenceId: session.agenceId,
@@ -371,7 +377,7 @@ export class SessionAgentService {
         }
 
         // 7a. Create caisse-side mouvement (CREDIT = money leaves caisse)
-        const refCaisse = generateReference("CAISSE" as any);
+        const refCaisse = generateReference("CAISSE");
         const [mouvementCaisse] = await tx
           .insert(mouvementsFinanciers)
           .values({
@@ -383,8 +389,8 @@ export class SessionAgentService {
             reference: refCaisse,
             agentId: session.agentId,
             sessionCaisseId: activeSessionCaisse.id,
-            typePaiement: "AGENT_PROVISIONING" as any,
-            sourceModule: "CAISSE" as any,
+            typePaiement: "AGENT_PROVISIONING" as TypePaiementTerrainDz,
+            sourceModule: "CAISSE" as SourceModuleDz,
             sourceTable: "operations_terrain",
             sourceId: operation.id,
             agenceId: session.agenceId,
@@ -402,7 +408,7 @@ export class SessionAgentService {
         await tx.insert(operationsCaisse).values({
           sessionId: activeSessionCaisse.id,
           mouvementId: mouvementCaisse.id,
-          typeOperation: "AGENT_PROVISIONING" as any,
+          typeOperation: "AGENT_PROVISIONING" as TypeOperationCaisseDz,
           statut: StatutTransaction.POSTED,
           montant: String(params.montantProvisionne),
           methodePaiement: "CASH",
@@ -598,7 +604,7 @@ export class SessionAgentService {
         const ecart = parseFloat(session.ecart ?? "0");
 
         // 1. Créer opération SESSION_CLOSE
-        const reference = generateReference("CAISSE_AGENT" as any);
+        const reference = generateReference("CAISSE_AGENT");
         const [closeOperation] = await tx
           .insert(operationsTerrain)
           .values({
@@ -620,14 +626,14 @@ export class SessionAgentService {
               ecart: String(ecart),
               ecartJustification: params.ecartJustification,
             },
-          })
+          } as any)
           .returning();
 
         // 2. Créer mouvement financier: retour fonds agent → caisse
         let mouvementReturnId: string | null = null;
         let refReturn: string | null = null;
         if (montantRetourne > 0) {
-          refReturn = generateReference("CAISSE_AGENT" as any);
+          refReturn = generateReference("CAISSE_AGENT");
           const [mouvementReturn] = await tx
             .insert(mouvementsFinanciers)
             .values({
@@ -638,8 +644,8 @@ export class SessionAgentService {
               methodePaiement: "CASH",
               reference: refReturn,
               agentId: session.agentId,
-              typePaiement: "AGENT_SESSION_CLOSE" as any,
-              sourceModule: "CAISSE_AGENT" as any,
+              typePaiement: "AGENT_SESSION_CLOSE" as TypePaiementTerrainDz,
+              sourceModule: "CAISSE_AGENT" as SourceModuleDz,
               sourceTable: "operations_terrain",
               sourceId: closeOperation.id,
               agenceId: session.agenceId,
@@ -684,7 +690,7 @@ export class SessionAgentService {
           const ecartAbs = Math.abs(ecart);
           const eventType = isDeficit ? "AGENT_ECART_DEFICIT" : "AGENT_ECART_SURPLUS";
 
-          const refEcart = generateReference("CAISSE_AGENT" as any);
+          const refEcart = generateReference("CAISSE_AGENT");
           const [mouvementEcart] = await tx
             .insert(mouvementsFinanciers)
             .values({
@@ -695,8 +701,8 @@ export class SessionAgentService {
               methodePaiement: "CASH",
               reference: refEcart,
               agentId: session.agentId,
-              typePaiement: eventType as any,
-              sourceModule: "CAISSE_AGENT" as any,
+              typePaiement: eventType as TypePaiementTerrainDz,
+              sourceModule: "CAISSE_AGENT" as SourceModuleDz,
               sourceTable: "sessions_agent",
               sourceId: session.id,
               agenceId: session.agenceId,
@@ -775,7 +781,7 @@ export class SessionAgentService {
             await tx.insert(operationsCaisse).values({
               sessionId: activeCaisseSession.id,
               mouvementId: mouvementReturnId,
-              typeOperation: "AGENT_SESSION_CLOSE" as any,
+              typeOperation: "AGENT_SESSION_CLOSE" as TypeOperationCaisseDz,
               statut: StatutTransaction.POSTED,
               montant: String(montantRetourne),
               methodePaiement: "CASH",
@@ -893,7 +899,7 @@ export class SessionAgentService {
         const montantRetourne = params.montantPhysique;
 
         // 3. Create SESSION_CLOSE operation
-        const reference = generateReference("CAISSE_AGENT" as any);
+        const reference = generateReference("CAISSE_AGENT");
         const [closeOperation] = await tx
           .insert(operationsTerrain)
           .values({
@@ -915,14 +921,14 @@ export class SessionAgentService {
               ecart: String(ecart),
               ecartJustification: params.ecartJustification,
             },
-          })
+          } as any)
           .returning();
 
         // 4. Financial movement: return funds agent → caisse
         let mouvementReturnId: string | null = null;
         let refReturn: string | null = null;
         if (montantRetourne > 0) {
-          refReturn = generateReference("CAISSE_AGENT" as any);
+          refReturn = generateReference("CAISSE_AGENT");
           const [mouvementReturn] = await tx
             .insert(mouvementsFinanciers)
             .values({
@@ -933,8 +939,8 @@ export class SessionAgentService {
               methodePaiement: "CASH",
               reference: refReturn,
               agentId: session.agentId,
-              typePaiement: "AGENT_SESSION_CLOSE" as any,
-              sourceModule: "CAISSE_AGENT" as any,
+              typePaiement: "AGENT_SESSION_CLOSE" as TypePaiementTerrainDz,
+              sourceModule: "CAISSE_AGENT" as SourceModuleDz,
               sourceTable: "operations_terrain",
               sourceId: closeOperation.id,
               agenceId: session.agenceId,
@@ -977,7 +983,7 @@ export class SessionAgentService {
           const ecartAbs = Math.abs(ecart);
           const eventType = isDeficit ? "AGENT_ECART_DEFICIT" : "AGENT_ECART_SURPLUS";
 
-          const refEcart = generateReference("CAISSE_AGENT" as any);
+          const refEcart = generateReference("CAISSE_AGENT");
           const [mouvementEcart] = await tx
             .insert(mouvementsFinanciers)
             .values({
@@ -988,8 +994,8 @@ export class SessionAgentService {
               methodePaiement: "CASH",
               reference: refEcart,
               agentId: session.agentId,
-              typePaiement: eventType as any,
-              sourceModule: "CAISSE_AGENT" as any,
+              typePaiement: eventType as TypePaiementTerrainDz,
+              sourceModule: "CAISSE_AGENT" as SourceModuleDz,
               sourceTable: "sessions_agent",
               sourceId: session.id,
               agenceId: session.agenceId,
@@ -1250,7 +1256,7 @@ export class SessionAgentService {
             await tx.insert(operationsCaisse).values({
               sessionId: activeCaisseSession.id,
               mouvementId: mouvementReturnId,
-              typeOperation: "AGENT_SESSION_CLOSE" as any,
+              typeOperation: "AGENT_SESSION_CLOSE" as TypeOperationCaisseDz,
               statut: StatutTransaction.POSTED,
               montant: String(montantRetourne),
               methodePaiement: "CASH",
@@ -1474,7 +1480,7 @@ export class SessionAgentService {
     const conditions = [];
     if (filters.agentId) conditions.push(eq(sessionsAgent.agentId, filters.agentId));
     if (filters.agenceId) conditions.push(eq(sessionsAgent.agenceId, filters.agenceId));
-    if (filters.statut) conditions.push(eq(sessionsAgent.statut, filters.statut as any));
+    if (filters.statut) conditions.push(eq(sessionsAgent.statut, filters.statut as StatutSessionAgentDz));
     // Filter by target caisse: show sessions targeting this caisse OR with no specific target
     if (filters.sourceCaisseId) {
       conditions.push(

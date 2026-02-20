@@ -56,7 +56,7 @@ caisseAdminRouter.post(
   async (req, res) => {
     try {
       const sessionId = req.params.id;
-      const userId = (req as any).session?.user?.id;
+      const userId = req.session?.user?.id;
 
       if (!userId) {
         return res.status(401).json({ error: "Non authentifié" });
@@ -148,7 +148,7 @@ caisseAdminRouter.post(
   async (req, res) => {
     try {
       const caisseId = req.params.id;
-      const userId = (req as any).session?.user?.id;
+      const userId = req.session?.user?.id;
 
       if (!userId) {
         return res.status(401).json({ error: "Non authentifié" });
@@ -1877,7 +1877,7 @@ caisseAdminRouter.post(
   async (req, res) => {
     try {
       const caisseId = req.params.id;
-      const userId = (req as any).user?.id;
+      const userId = req.user?.id;
       const parsed = balanceCorrectionSchema.safeParse(req.body);
 
       if (!parsed.success) {
