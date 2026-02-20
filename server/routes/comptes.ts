@@ -2251,7 +2251,7 @@ export function registerComptesRoutes(app: Express) {
             clientId: compte.clientId,
             agenceId: compte.agenceId || undefined,
             eventType: 'COMPTE_BLOQUE',
-            refId: `blocage-${compte.id}`,
+            refId: `blocage-${compte.id}-${new Date().toISOString().slice(0, 10)}`,
             refType: 'compte',
             reason: parsed.motif,
             createdBy: user?.id,

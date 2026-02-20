@@ -155,7 +155,7 @@ export async function recordScoreEvent(input: ScoreEventInput): Promise<{
         scoreLoyalty: state.scoreLoyalty,
         scoreEngagement: state.scoreEngagement,
         scoreCompliance: state.scoreCompliance,
-        tauxRemboursement: parseFloat(state.tauxRemboursement),
+        tauxRemboursement: state.tauxRemboursement,
         totalPointsFidelite: state.totalPointsFidelite,
       } : { scoreGlobal: 50, segment: 'Standard', scorePayment: 50, scoreLoyalty: 50, scoreEngagement: 50, scoreCompliance: 50, tauxRemboursement: '100', totalPointsFidelite: 0 },
     };
