@@ -218,6 +218,41 @@ const TRANSACTION_LABEL_GENERATORS: Record<string, (metadata?: TransactionMetada
       : 'DÉCAISSEMENT DIVERS',
 
   CLOSURE_PAYOUT: () => 'RETRAIT CLÔTURE COMPTE',
+
+  // ═══════════════════════════════════════════════════════════════════
+  // FRAIS D'OUVERTURE / CLÔTURE
+  // ═══════════════════════════════════════════════════════════════════
+  OPENING_FEE: () => "FRAIS D'OUVERTURE",
+  CLOSING_FEE: () => 'FRAIS DE CLÔTURE',
+  MAINTENANCE_FEE: () => 'FRAIS DE TENUE DE COMPTE',
+
+  // ═══════════════════════════════════════════════════════════════════
+  // COMMISSIONS & PRIMES
+  // ═══════════════════════════════════════════════════════════════════
+  COMMISSION: () => 'COMMISSION',
+  AGENT_COMMISSION: () => 'COMMISSION AGENT',
+  PROSPECTION_PRIME: () => 'PRIME DE PROSPECTION',
+  FEE_REFUND: () => 'REMBOURSEMENT DE FRAIS',
+  SALARY_PAYMENT: () => 'PAIEMENT SALAIRE',
+
+  // ═══════════════════════════════════════════════════════════════════
+  // OPÉRATIONS AGENTS / SESSIONS
+  // ═══════════════════════════════════════════════════════════════════
+  AGENT_PROVISIONING: () => 'APPROVISIONNEMENT AGENT',
+  AGENT_SESSION_CLOSE: () => 'CLÔTURE SESSION AGENT',
+  SESSION_CLOSING_TRANSFER: () => 'TRANSFERT CLÔTURE SESSION',
+
+  // ═══════════════════════════════════════════════════════════════════
+  // MOBILE MONEY - FRAIS
+  // ═══════════════════════════════════════════════════════════════════
+  OPERATOR_FEE: () => 'FRAIS OPÉRATEUR MOBILE',
+  MM_FEE_REVENUE: () => 'REVENU FRAIS MOBILE MONEY',
+
+  // ═══════════════════════════════════════════════════════════════════
+  // TRANSIT COFFRE
+  // ═══════════════════════════════════════════════════════════════════
+  COFFRE_TRANSIT_OUT: () => 'ENVOI TRANSIT COFFRE',
+  COFFRE_TRANSIT_IN: () => 'RÉCEPTION TRANSIT COFFRE',
 };
 
 /**
