@@ -51,6 +51,7 @@ const ALERT_TYPE_LABELS: Record<string, string> = {
   credit_late: 'Credit en retard',
   low_balance: 'Solde faible',
   id_expiring: 'Piece d\'identite',
+  id_expired: 'Piece expiree',
   kyc_expired: 'KYC expire',
   client_inactive: 'Inactivite',
   tontine_late: 'Retard tontine',
@@ -64,6 +65,7 @@ const ALERT_TYPE_ICONS: Record<string, React.ReactElement> = {
   credit_late: <CreditCard size={16} />,
   low_balance: <Wallet size={16} />,
   id_expiring: <IdCard size={16} />,
+  id_expired: <IdCard size={16} />,
   kyc_expired: <Shield size={16} />,
   client_inactive: <UserX size={16} />,
   tontine_late: <Users size={16} />,
@@ -87,12 +89,14 @@ export default function ClientAlerts({ client, onUpdate, onCountChange, onNaviga
   const [alerts, setAlerts] = useState<ClientAlert[]>([]);
   const [resolved, setResolved] = useState<ResolvedEntry[]>([]);
   const [loading, setLoading] = useState(false);
+  const [fetchError, setFetchError] = useState(false);
   const [showResolved, setShowResolved] = useState(false);
   const [levelFilter, setLevelFilter] = useState<LevelFilter>('all');
   const [resolvingAll, setResolvingAll] = useState(false);
 
   const fetchAlerts = useCallback(async () => {
     setLoading(true);
+    setFetchError(false);
     try {
       const res = await fetch(`/api/clients/${client.id}/alerts`, { credentials: 'include' });
       if (!res.ok) throw new Error('Erreur chargement alertes');
@@ -107,6 +111,7 @@ export default function ClientAlerts({ client, onUpdate, onCountChange, onNaviga
       setResolved(data.resolved || []);
     } catch (error) {
       console.error('Erreur chargement alertes:', error);
+      setFetchError(true);
     } finally {
       setLoading(false);
     }
@@ -120,7 +125,7 @@ export default function ClientAlerts({ client, onUpdate, onCountChange, onNaviga
   // Sync count to parent
   useEffect(() => {
     onCountChange?.(alerts.length);
-  }, [alerts.length]);
+  }, [alerts.length, onCountChange]);
 
   // Auto-refresh on WebSocket events (client update, score change, account change)
   useEffect(() => {
@@ -140,25 +145,34 @@ export default function ClientAlerts({ client, onUpdate, onCountChange, onNaviga
 
   const handleResolveAlert = async (alertType: string) => {
     if (!canResolve) return;
+
+    // Save state for rollback
+    const prevAlerts = alerts;
+    const prevResolved = resolved;
+
+    // Optimistic update
+    const dismissed = alerts.find(a => a.alertType === alertType);
+    setAlerts(prev => prev.filter(a => a.alertType !== alertType));
+    if (dismissed) {
+      setResolved(prev => [
+        { alertType, resolvedAt: new Date().toISOString() },
+        ...prev.filter(r => r.alertType !== alertType),
+      ]);
+    }
+
     try {
       const res = await fetch(`/api/clients/${client.id}/alerts/${alertType}/resolve`, {
         method: 'POST',
         credentials: 'include',
       });
       if (!res.ok) throw new Error('Erreur resolution alerte');
-
-      // Optimistically update
-      const dismissed = alerts.find(a => a.alertType === alertType);
-      setAlerts(prev => prev.filter(a => a.alertType !== alertType));
-      if (dismissed) {
-        setResolved(prev => [
-          { alertType, resolvedAt: new Date().toISOString() },
-          ...prev.filter(r => r.alertType !== alertType),
-        ]);
-      }
       onUpdate?.();
     } catch (error) {
       console.error('Erreur resolution alerte:', error);
+      // Rollback on failure
+      setAlerts(prevAlerts);
+      setResolved(prevResolved);
+      toast.error('Erreur lors de la resolution');
     }
   };
 
@@ -336,6 +350,18 @@ export default function ClientAlerts({ client, onUpdate, onCountChange, onNaviga
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent" />
+          </div>
+        ) : fetchError ? (
+          <div className="text-center py-12 border border-dashed border-status-danger/30 rounded-lg bg-status-danger-bg/30">
+            <div className="w-16 h-16 bg-status-danger-bg rounded-full flex items-center justify-center mx-auto mb-4">
+              <AlertCircle size={32} className="text-status-danger" />
+            </div>
+            <p className="text-status-danger font-bold text-lg">Erreur de chargement</p>
+            <p className="text-content-muted text-sm mb-3">Impossible de recuperer les alertes du client.</p>
+            <Button variant="outline" size="sm" onClick={fetchAlerts}>
+              <RotateCcw size={14} />
+              Reessayer
+            </Button>
           </div>
         ) : filteredAlerts.length === 0 ? (
           <div className="text-center py-12 border border-dashed border-edge rounded-lg bg-surface/20">

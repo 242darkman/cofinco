@@ -46,6 +46,7 @@ export const KNOWN_ALERT_TYPES = [
   "credit_late",
   "low_balance",
   "id_expiring",
+  "id_expired",
   "kyc_expired",
   "client_inactive",
   "tontine_late",
@@ -100,6 +101,7 @@ const ALERT_TARGET_TABS: Record<string, string> = {
   credit_late: "comptes",
   low_balance: "comptes",
   id_expiring: "kyc-legal",
+  id_expired: "kyc-legal",
   kyc_expired: "kyc-legal",
   client_inactive: "transactions",
   tontine_late: "comptes",
@@ -120,6 +122,8 @@ const ALERT_ACTIONS: Record<string, string> = {
     "Informer le client sur les options de depot disponibles.",
   id_expiring:
     "Demander le renouvellement de la piece d'identite avant expiration.",
+  id_expired:
+    "La piece d'identite est expiree. Renouvellement urgent requis.",
   kyc_expired:
     "Lancer la procedure de renouvellement KYC. Suspendre les operations si necessaire.",
   client_inactive:
@@ -308,14 +312,14 @@ export async function evaluateClientAlerts(
     // Non-blocking
   }
 
-  // 5. Piece d'identite expirant / expiree
+  // 5. Piece d'identite expiree (separate type) vs expirant bientot
   if (client.dateExpirationPiece) {
     const expiryDate = new Date(client.dateExpirationPiece);
     const daysUntilExpiry = daysBetween(now, expiryDate);
 
     if (daysUntilExpiry < 0) {
       pushAlert(
-        "id_expiring",
+        "id_expired",
         "critical",
         `Piece d'identite expiree depuis ${Math.abs(daysUntilExpiry)} jour(s). Renouvellement urgent.`
       );

@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { ClientWithIdentity } from '@shared/schema';
 import { DollarSign, CreditCard, PiggyBank, Star, ChevronRight, Wallet, BarChart3, AlertTriangle } from 'lucide-react';
 import { Card, Modal, Button, Skeleton, ProgressBar } from '../../ui';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import ClientTags from '../ClientTags';
 import ClientCreditsPanel from '../ClientCreditsPanel';
 import { KycHealthIndicator } from '../shared/ClientBadges';
@@ -37,28 +37,46 @@ interface AlertSummary {
 
 export default function ClientOverviewTab({ client, onNavigateToTab }: ClientOverviewTabProps) {
   const { currency } = useCurrency();
+  const queryClient = useQueryClient();
   const [showSavingsModal, setShowSavingsModal] = useState(false);
   const [showCreditsPanel, setShowCreditsPanel] = useState(false);
 
   const { data: alertSummary } = useQuery<AlertSummary>({
     queryKey: ['client-alerts-summary', client.id],
     queryFn: async () => {
-      const res = await fetch(`/api/clients/${client.id}/alerts`);
+      const res = await fetch(`/api/clients/${client.id}/alerts`, { credentials: 'include' });
       if (!res.ok) return { critical: 0, warning: 0, total: 0 };
       const data = await res.json();
       const active = data.active || [];
       const critical = active.filter((a: any) => a.alertLevel === 'critical').length;
       const warning = active.filter((a: any) => a.alertLevel === 'warning').length;
       const topCritical = active.find((a: any) => a.alertLevel === 'critical');
+      const topWarning = active.find((a: any) => a.alertLevel === 'warning');
       return {
         critical,
         warning,
         total: active.length,
-        topMessage: topCritical?.message,
+        topMessage: topCritical?.message || topWarning?.message,
       };
     },
     staleTime: 30000,
   });
+
+  // Invalidate alert summary when WebSocket events fire
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail?.clientId || detail.clientId === client.id) {
+        queryClient.invalidateQueries({ queryKey: ['client-alerts-summary', client.id] });
+      }
+    };
+    window.addEventListener('client-update', handler);
+    window.addEventListener('score-updated', handler);
+    return () => {
+      window.removeEventListener('client-update', handler);
+      window.removeEventListener('score-updated', handler);
+    };
+  }, [client.id, queryClient]);
 
   const { data: analytics, isLoading } = useQuery<AnalyticsData>({
     queryKey: ['client-analytics', client.id],

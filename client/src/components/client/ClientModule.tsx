@@ -129,7 +129,7 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
     }
   }, [clientIdFromUrl, currentSubModule]);
 
-  // Fetch alert count for badge on tab
+  // Fetch alert count for badge on tab (skip when Alertes tab active — onCountChange handles it)
   const fetchAlertCount = useCallback(() => {
     if (!viewingClient?.id) {
       setAlertCount(0);
@@ -143,9 +143,13 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
       .catch(() => {});
   }, [viewingClient?.id]);
 
+  // Reset alert count immediately when switching clients, then fetch
   useEffect(() => {
-    fetchAlertCount();
-  }, [fetchAlertCount]);
+    setAlertCount(0);
+    if (activeTab !== 'alertes') {
+      fetchAlertCount();
+    }
+  }, [fetchAlertCount, activeTab]);
 
   // Auto-refresh alert badge on WebSocket events
   useEffect(() => {
