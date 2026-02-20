@@ -2244,6 +2244,22 @@ export function registerComptesRoutes(app: Express) {
           agenceId: compte.agenceId || undefined,
         });
 
+        // Score event: account blocked
+        try {
+          const { recordScoreEvent } = await import('../services/scoring-engine');
+          await recordScoreEvent({
+            clientId: compte.clientId,
+            agenceId: compte.agenceId || undefined,
+            eventType: 'COMPTE_BLOQUE',
+            refId: `blocage-${compte.id}-${Date.now()}`,
+            refType: 'compte',
+            reason: parsed.motif,
+            createdBy: user?.id,
+          });
+        } catch (scoreErr) {
+          logger.error({ err: scoreErr }, 'Scoring event error (account blocked)');
+        }
+
         res.json(
           {
             ...compte,

@@ -53,6 +53,7 @@ import type {
   HrSanctionCreatedData,
   HrSanctionNotifiedData,
   HrSanctionFinalizedData,
+  ClientSegmentChangedData,
 } from "./event-types";
 
 // ============================================================================
@@ -1608,5 +1609,22 @@ export async function handleSystemJobFailed(data: any) {
   logNotificationEvent("error", "Domain event: SYSTEM_JOB_FAILED", {
     correlationId: `job-fail-${data.jobId || 'unknown'}`,
     status: "LOGGED",
+  });
+}
+
+export async function handleClientSegmentChanged(data: ClientSegmentChangedData) {
+  const direction = data.scoreGlobal >= 65 ? 'upgrade' : 'downgrade';
+
+  // In-app notification via the notification service
+  await emitNotificationEvent("CLIENT_SEGMENT_CHANGED", data, {
+    inAppRecipients: data.agenceId
+      ? [{ agenceId: data.agenceId, title: `Changement de segment client`, body: `${data.clientName || 'Client'} : ${data.previousSegment} → ${data.newSegment}`, metadata: { clientId: data.clientId, direction } }]
+      : [],
+  });
+
+  logNotificationEvent("info", `Segment changed: ${data.previousSegment} → ${data.newSegment}`, {
+    correlationId: `segment-${data.clientId}`,
+    status: "SENT",
+    metadata: { clientId: data.clientId, scoreGlobal: data.scoreGlobal },
   });
 }

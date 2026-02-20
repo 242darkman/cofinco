@@ -517,11 +517,6 @@ export interface IStorage {
     getBalance(dateDebut: string, dateFin: string): Promise<any[]>;
     getJournauxStats(): Promise<any[]>;
 
-    // Loyalty
-    addLoyaltyPoints(clientId: string, points: number, source: string, description?: string, transactionAmount?: number): Promise<void>;
-    calculateEngagementScore(clientId: string): Promise<number>;
-    getLoyaltyHistory(clientId: string): Promise<any[]>;
-
     // HR
     getConges(filter?: { statut?: string; employeId?: string }): Promise<any[]>;
     createConge(conge: any): Promise<any>;

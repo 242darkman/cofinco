@@ -51,6 +51,7 @@ import {
   handleHrSanctionFinalized,
   handleCreditInstallmentLate,
   handleSystemJobFailed,
+  handleClientSegmentChanged,
 } from "./event-handlers";
 
 // ============================================================================
@@ -109,6 +110,7 @@ const handlerRegistry: Record<DomainEventType, EventHandler> = {
   PAIEMENT_TERRAIN_VALIDATED: handlePaiementTerrainValidated,
   CREDIT_INSTALLMENT_LATE: handleCreditInstallmentLate,
   SYSTEM_JOB_FAILED: handleSystemJobFailed,
+  CLIENT_SEGMENT_CHANGED: handleClientSegmentChanged,
 };
 
 const logger = createLogger('DomainEvents');

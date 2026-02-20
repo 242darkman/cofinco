@@ -20,7 +20,6 @@ import { registerRbacRoutes } from "./routes/rbac";
 import { registerAgencesRoutes } from "./routes/agences";
 import { registerEmployesRoutes } from "./routes/employes";
 import { registerDepartmentsRoutes } from "./routes/departments";
-import loyaltyRouter from "./routes/loyalty";
 import { registerOtpRoutes } from "./routes/otp";
 import { registerConfigRoutes, registerSecurityConfigRoutes } from "./routes/config";
 import { registerBrandingRoutes } from "./routes/branding";
@@ -97,7 +96,6 @@ export function registerRoutes(app: Express): Server {
   registerNotificationsRoutes(app); // Notifications System (caisse + general)
   registerPushRoutes(app); // Push Notifications (Web Push API)
   app.use("/api/hr", hrRouter); // HR Module
-  app.use("/api/loyalty", loyaltyRouter); // Loyalty Points System
 
   registerSettingsRoutes(app); // System settings, reset
   

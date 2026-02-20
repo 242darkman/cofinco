@@ -2226,7 +2226,8 @@ export function registerFinanceRoutes(app: Express) {
         return res.status(404).json({ message: "Demande non trouvée" });
       }
 
-      const { calculerScoreMicrofinance, mettreAJourScoreClient } = await import('../services/microfinance-scoring');
+      const { calculerScoreMicrofinance } = await import('../services/microfinance-scoring');
+      const { recalculateClientScore } = await import('../services/scoring-engine');
 
       // Convertir la durée en mois
       let dureeMois = demande.dureeValeur || 1;
@@ -2249,8 +2250,8 @@ export function registerFinanceRoutes(app: Express) {
         scoreCredit: scoringResult.score
       });
 
-      // Mettre à jour le score du client
-      await mettreAJourScoreClient(demande.clientId);
+      // Recalculer le score global du client via le scoring engine
+      await recalculateClientScore(demande.clientId);
 
       res.json({
         message: "Score recalculé avec succès",
@@ -2739,6 +2740,38 @@ export function registerFinanceRoutes(app: Express) {
 
         if (wsInstance && userAgence) {
             wsInstance.broadcastToAgency(userAgence, { type: "DASHBOARD_UPDATE", payload: {} });
+        }
+
+        // Score events: credit repayment + credit fully paid
+        try {
+            const credit = await storage.getCredit(data.creditId);
+            if (credit?.clientId) {
+                const { recordScoreEvent } = await import('../services/scoring-engine');
+                await recordScoreEvent({
+                    clientId: credit.clientId,
+                    agenceId: userAgence,
+                    eventType: 'CREDIT_REMBOURSEMENT',
+                    refId: result.remboursement.id,
+                    refType: 'remboursement',
+                    montant: Number(data.montant),
+                    createdBy: user?.id,
+                });
+
+                // CREDIT_SOLDE bonus when credit is fully paid off
+                if (credit.statut === 'PAID' || credit.statut === 'CLOSED' || Number(credit.soldeRestant) === 0) {
+                    await recordScoreEvent({
+                        clientId: credit.clientId,
+                        agenceId: userAgence,
+                        eventType: 'CREDIT_SOLDE',
+                        refId: `solde-${data.creditId}`,
+                        refType: 'credit',
+                        montant: Number(credit.montant),
+                        createdBy: user?.id,
+                    });
+                }
+            }
+        } catch (err) {
+            logger.error({ err }, 'Scoring event error (credit repayment)');
         }
 
         // Retourner la réponse enrichie avec les allocations
@@ -3553,19 +3586,20 @@ export function registerFinanceRoutes(app: Express) {
                 idempotencyKey: parsed.idempotencyKey || undefined
             }, user.id);
 
-            // Side Effects (Loyalty, WS) - Kept outside transaction critical path for now or could be moved to events
+            // Side Effects (Scoring, WS)
             try {
                 const isSavingsDeposit = ['DEPOSIT_SAVINGS', 'SAVINGS_DEPOSIT'].includes(parsed.typeOperation);
                 if (parsed.clientId && isSavingsDeposit && parsed.montant) {
-                    const points = Math.floor(Number(parsed.montant) / 1000);
-                    await storage.addLoyaltyPoints(
-                        parsed.clientId,
-                        points,
-                        'EPARGNE',
-                        `Versement de ${parsed.montant} ${currencySymbol()}`,
-                        Number(parsed.montant)
-                    );
-                    await storage.calculateEngagementScore(parsed.clientId);
+                    const { recordScoreEvent } = await import('../services/scoring-engine');
+                    await recordScoreEvent({
+                        clientId: parsed.clientId,
+                        agenceId: session.agenceId,
+                        eventType: 'EPARGNE_DEPOT',
+                        refId: operation.id,
+                        refType: 'operation_caisse',
+                        montant: Number(parsed.montant),
+                        createdBy: user.id,
+                    });
                 }
 
                 const wsInstance = getWsInstance();

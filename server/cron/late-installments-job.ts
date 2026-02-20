@@ -60,12 +60,23 @@ async function runLateInstallmentsJob() {
               clientId: client.id,
               clientName: `${user.prenom || ''} ${user.nom || ''}`.trim(),
               agenceId: credit.agenceId,
-              // Inclure le nombre d'échéances en retard si nécessaire
               metadata: {
                 markedAt: new Date().toISOString()
               }
             },
             timestamp: new Date()
+          });
+
+          // Score event: incident retard
+          const { recordScoreEvent } = await import('../services/scoring-engine');
+          const today = new Date().toISOString().slice(0, 10);
+          await recordScoreEvent({
+            clientId: client.id,
+            agenceId: credit.agenceId ?? undefined,
+            eventType: 'INCIDENT_RETARD',
+            refId: `late-${creditId}-${today}`,
+            refType: 'credit',
+            metadata: { creditId, numeroCredit: credit.numeroCredit },
           });
         }
       } catch (err) {

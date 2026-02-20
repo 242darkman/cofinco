@@ -981,3 +981,28 @@ export const actionAuditEvacuationEnum = pgEnum("action_audit_evacuation_enum", 
   "DISCREPANCY_FLAGGED",
   "CANCELLED",
 ]);
+
+// ============================================
+// SCORING EVENTS
+// ============================================
+
+export const scoreEventTypeEnum = pgEnum("score_event_type_enum", [
+  // Positive events
+  "EPARGNE_DEPOT",
+  "CREDIT_REMBOURSEMENT",
+  "CREDIT_SOLDE",
+  "TONTINE_CONTRIBUTION",
+  "KYC_VERIFIED",
+  "PROFILE_COMPLETED",
+  // Negative events
+  "INCIDENT_RETARD",
+  "INCIDENT_DEFAUT",
+  "TONTINE_PENALITE",
+  "COMPTE_BLOQUE",
+  // Manual adjustments
+  "BONUS_MANUEL",
+  "MALUS_MANUEL",
+  // Lifecycle
+  "INITIAL_SCORE",
+  "RECALCUL_COMPLET",
+]);

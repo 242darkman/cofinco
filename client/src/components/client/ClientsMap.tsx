@@ -141,10 +141,10 @@ export default function ClientsMap({ clients: propClients, height = '500px', sho
   };
 
   const segmentColors: Record<string, string> = {
-    'Premium': 'bg-status-warning',
-    'Gold': 'bg-status-warning',
+    'VIP': 'bg-status-warning',
+    'Premium': 'bg-status-info',
     'Standard': 'bg-status-success',
-    'Nouveau': 'bg-status-info',
+    'Risque': 'bg-status-danger',
     'all': 'bg-accent'
   };
 

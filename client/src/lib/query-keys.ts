@@ -165,6 +165,20 @@ export const clientKeys = {
   // Détails
   detail: (clientId: string) => ['client', clientId] as const,
   portfolio: (clientId: string) => ['client-portfolio', clientId] as const,
+
+  // Scoring
+  scoreState: (clientId: string) => ['client', clientId, 'score-state'] as const,
+  scoreHistory: (clientId: string) => ['client', clientId, 'score-history'] as const,
+  scoreTrend: (clientId: string) => ['client', clientId, 'score-trend'] as const,
+  scorePercentile: (clientId: string) => ['client', clientId, 'score-percentile'] as const,
+};
+
+// ============================================
+// SCORING (cross-client)
+// ============================================
+
+export const scoreKeys = {
+  agencyStats: (agenceId?: string) => ['scoring', 'agency-stats', agenceId] as const,
 };
 
 // ============================================
@@ -305,14 +319,6 @@ export const hrKeys = {
   avantages: () => ['/api/hr/avantages'] as const,
   organigramme: () => ['/api/hr/organigramme'] as const,
   avances: () => ['/api/hr/avances'] as const,
-};
-
-// ============================================
-// LOYALTY
-// ============================================
-
-export const loyaltyKeys = {
-  all: ['/api/loyalty'] as const,
 };
 
 // ============================================

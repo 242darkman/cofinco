@@ -1,6 +1,6 @@
 import React from 'react';
 import type { ClientWithIdentity } from '@shared/schema';
-import { Edit2, Trash2, Phone, Mail, User, Calendar, MapPin, Globe } from 'lucide-react';
+import { Edit2, Trash2, Phone, Mail, User, Calendar, MapPin, Globe, BarChart3 } from 'lucide-react';
 import { Card, Badge, Button } from '../ui';
 import { usePermissions, ProtectedFeature } from '../auth/ProtectedFeature';
 import { formatClientName, resolveStorageUrl, iso2ToFlag, formatPhoneNumber } from '../../lib/format';
@@ -98,6 +98,22 @@ export default function ClientIdentityCard({ client, onEdit, onDelete }: ClientI
               size="sm"
             />
           </div>
+
+          {/* Score indicator */}
+          {client.score != null && (
+            <div className="flex items-center gap-1.5 mt-2">
+              <BarChart3 size={12} className="text-content-muted" />
+              <span className={`text-sm font-bold tabular-nums ${
+                client.score >= 80 ? 'text-status-success' :
+                client.score >= 65 ? 'text-status-info' :
+                client.score >= 40 ? 'text-status-warning' :
+                'text-status-danger'
+              }`}>
+                {client.score}
+              </span>
+              <span className="text-[10px] text-content-muted">/ 100</span>
+            </div>
+          )}
 
           {/* Code client */}
           {(client as any).codeClient && (

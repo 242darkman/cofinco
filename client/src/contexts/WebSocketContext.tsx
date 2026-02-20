@@ -47,7 +47,7 @@ type MessageType =
   | "CREDIT_UPDATE" | "CLIENT_UPDATE" | "COMPTE_UPDATE"
   | "CAISSE_UPDATE" | "TONTINE_UPDATE" | "OPERATIONS_UPDATE"
   | "EMPLOYE_UPDATE" | "AGENCE_UPDATE" | "HR_UPDATE"
-  | "ACCOUNTING_UPDATE" | "LIQUIDITY_CHANGED" | "LOYALTY_UPDATE"
+  | "ACCOUNTING_UPDATE" | "LIQUIDITY_CHANGED" | "SCORE_UPDATED"
   | "SETTINGS_UPDATE" | "RBAC_UPDATE"
 
   // =============================================
@@ -713,8 +713,9 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          debounceInvalidate(["/api/employes"]);
          break;
 
-      case "LOYALTY_UPDATE":
-         debounceInvalidate(["/api/loyalty"]);
+      case "SCORE_UPDATED":
+         debounceInvalidate(["/api/clients"]);
+         window.dispatchEvent(new CustomEvent('score-updated', { detail: message.payload }));
          break;
 
       case "REALTIME_EVENT":

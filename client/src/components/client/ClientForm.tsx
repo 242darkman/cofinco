@@ -606,18 +606,22 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
           ) : (
             <div /> // Placeholder for grid alignment
           )}
-          <SelectField
-            label="Segment"
-            name="segment"
-            value={formData.segment ?? SegmentClient.STANDARD}
-            onChange={(e) => handleChange('segment', e.target.value)}
-            options={[
-              { value: SegmentClient.STANDARD, label: SEGMENT_CLIENT_LABELS[SegmentClient.STANDARD] },
-              { value: SegmentClient.PREMIUM, label: SEGMENT_CLIENT_LABELS[SegmentClient.PREMIUM] },
-              { value: SegmentClient.VIP, label: SEGMENT_CLIENT_LABELS[SegmentClient.VIP] },
-              { value: SegmentClient.RISQUE, label: SEGMENT_CLIENT_LABELS[SegmentClient.RISQUE] },
-            ]}
-          />
+          {/* Segment is auto-calculated by the scoring engine */}
+          {client && (
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-content-secondary">Segment</label>
+              <div className="flex items-center h-[38px]">
+                <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+                  formData.segment === SegmentClient.VIP ? 'bg-status-warning-bg text-status-warning' :
+                  formData.segment === SegmentClient.PREMIUM ? 'bg-status-info-bg text-status-info' :
+                  formData.segment === SegmentClient.RISQUE ? 'bg-status-danger-bg text-status-danger' :
+                  'bg-surface-subtle text-content-secondary'
+                }`}>
+                  {SEGMENT_CLIENT_LABELS[formData.segment as keyof typeof SEGMENT_CLIENT_LABELS] || formData.segment || 'Standard'}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Section Profil Professionnel - Compact */}

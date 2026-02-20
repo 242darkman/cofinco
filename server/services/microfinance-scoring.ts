@@ -12,7 +12,6 @@ import {
   comptes,
   remboursements,
   mouvementsFinanciers,
-  demandesCredit
 } from "@shared/schema";
 import { membresTontine, contributionsTontine, tontinePenalites } from "@shared/schema/tontines";
 import { eq, and, gte, lte, desc, sql, count, sum, avg, or } from "drizzle-orm";
@@ -659,48 +658,3 @@ function calculerScoreAnciennete(
   };
 }
 
-// ============================================================================
-// FONCTION UTILITAIRE POUR MISE À JOUR AUTOMATIQUE
-// ============================================================================
-
-export async function mettreAJourScoreClient(clientId: string): Promise<{ score: number; segment: string }> {
-  // Récupérer la dernière demande pour avoir les paramètres
-  const derniereDemande = await db.query.demandesCredit.findFirst({
-    where: eq(demandesCredit.clientId, clientId),
-    orderBy: desc(demandesCredit.createdAt)
-  });
-
-  const client = await db.query.clients.findFirst({
-    where: eq(clients.id, clientId)
-  });
-
-  if (!client) {
-    throw new Error("Client non trouvé");
-  }
-
-  // Calculer avec des valeurs par défaut si pas de demande
-  const result = await calculerScoreMicrofinance({
-    clientId,
-    montantDemande: derniereDemande ? parseFloat(derniereDemande.montantDemande) : 100000,
-    dureeMois: derniereDemande?.dureeValeur || 6,
-    revenuMensuel: parseFloat(client.revenuMensuel || '0'),
-    chargesMensuelles: derniereDemande?.chargesMensuelles ? parseFloat(derniereDemande.chargesMensuelles.toString()) : 0
-  });
-
-  // Déterminer le segment basé sur le score
-  let segment: string = SegmentClient.STANDARD;
-  if (result.score >= 75) segment = SegmentClient.VIP;
-  else if (result.score >= 60) segment = SegmentClient.PREMIUM;
-  else if (result.score < 40) segment = SegmentClient.RISQUE;
-
-  // Mettre à jour le client
-  await db.update(clients)
-    .set({
-      score: result.score,
-      segment,
-      updatedAt: new Date()
-    })
-    .where(eq(clients.id, clientId));
-
-  return { score: result.score, segment };
-}

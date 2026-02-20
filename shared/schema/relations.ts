@@ -8,11 +8,14 @@ import { agentsTerrain, prospections, visitesTerrain, paiementsTerrain, factures
 import { notifications, pushSubscriptions } from "./settings";
 import { transferts } from "./transferts";
 import { clientTags, clientActivities } from "./clients";
+import { clientScoreEvents, clientScoreState } from "./scoring";
 
-export const clientsRelations = relations(clients, ({ many }) => ({
+export const clientsRelations = relations(clients, ({ many, one }) => ({
   credits: many(credits),
   comptes: many(comptes),
   membresTontine: many(membresTontine),
+  scoreEvents: many(clientScoreEvents),
+  scoreState: one(clientScoreState),
 }));
 
 export const creditsRelations = relations(credits, ({ one, many }) => ({
@@ -232,6 +235,20 @@ export const comptageBilletsRelations = relations(comptageBillets, ({ one }) => 
   session: one(sessionsCaisse, {
     fields: [comptageBillets.sessionId],
     references: [sessionsCaisse.id],
+  }),
+}));
+
+export const clientScoreEventsRelations = relations(clientScoreEvents, ({ one }) => ({
+  client: one(clients, {
+    fields: [clientScoreEvents.clientId],
+    references: [clients.id],
+  }),
+}));
+
+export const clientScoreStateRelations = relations(clientScoreState, ({ one }) => ({
+  client: one(clients, {
+    fields: [clientScoreState.clientId],
+    references: [clients.id],
   }),
 }));
 

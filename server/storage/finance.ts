@@ -538,7 +538,8 @@ import { computeSessionStatus } from "../services/caisse/session-status";
   
   export async function createDemandeCredit(insertDemande: InsertDemandeCredit): Promise<DemandeCredit> {
     // Import dynamique pour éviter les dépendances circulaires
-    const { calculerScoreMicrofinance, mettreAJourScoreClient } = await import('../services/microfinance-scoring');
+    const { calculerScoreMicrofinance } = await import('../services/microfinance-scoring');
+    const { recalculateClientScore } = await import('../services/scoring-engine');
 
     // Calculer automatiquement le score de crédit
     let scoreCredit: number | null = null;
@@ -561,8 +562,8 @@ import { computeSessionStatus } from "../services/caisse/session-status";
 
       scoreCredit = scoringResult.score;
 
-      // Mettre à jour le score du client également
-      await mettreAJourScoreClient(insertDemande.clientId).catch((err) => logger.error({ err }, 'Error updating client score'));
+      // Recalculer le score global du client via le scoring engine
+      await recalculateClientScore(insertDemande.clientId).catch((err) => logger.error({ err }, 'Error updating client score'));
     } catch (error) {
       logger.error({ err: error }, 'Error calculating credit score');
       // Continuer sans score en cas d'erreur

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import type { ClientWithIdentity } from '@shared/schema';
-import { DollarSign, CreditCard, PiggyBank, Star, ChevronRight, Wallet } from 'lucide-react';
-import { Card, Modal, Button, Skeleton } from '../../ui';
+import { DollarSign, CreditCard, PiggyBank, Star, ChevronRight, Wallet, BarChart3 } from 'lucide-react';
+import { Card, Modal, Button, Skeleton, ProgressBar } from '../../ui';
 import { useQuery } from '@tanstack/react-query';
 import ClientTags from '../ClientTags';
 import ClientCreditsPanel from '../ClientCreditsPanel';
@@ -169,7 +169,38 @@ export default function ClientOverviewTab({ client }: ClientOverviewTabProps) {
               <h3 className="text-sm font-bold text-content-primary tracking-tight">Segment & Fidelite</h3>
             </div>
 
-            <div className="grid sm:grid-cols-3 gap-4">
+            <div className="grid sm:grid-cols-4 gap-4">
+              {/* Score Global */}
+              <div className="p-3 rounded-lg bg-surface-subtle/30 border border-edge-subtle">
+                <div className="flex items-center gap-2 mb-2">
+                  <BarChart3 size={13} className="text-accent" />
+                  <span className="text-xs text-content-muted uppercase tracking-wide">Score</span>
+                </div>
+                <div className="flex items-end gap-1.5 mb-2">
+                  <span className={`text-2xl font-bold tabular-nums ${
+                    (client.score ?? 50) >= 80 ? 'text-status-success' :
+                    (client.score ?? 50) >= 65 ? 'text-status-info' :
+                    (client.score ?? 50) >= 40 ? 'text-status-warning' :
+                    'text-status-danger'
+                  }`}>
+                    {client.score ?? 50}
+                  </span>
+                  <span className="text-[10px] text-content-muted pb-0.5">/ 100</span>
+                </div>
+                <ProgressBar
+                  value={client.score ?? 50}
+                  max={100}
+                  color={
+                    (client.score ?? 50) >= 80 ? 'success' :
+                    (client.score ?? 50) >= 65 ? 'primary' :
+                    (client.score ?? 50) >= 40 ? 'warning' :
+                    'danger'
+                  }
+                  size="sm"
+                  animate
+                />
+              </div>
+
               {/* Segment */}
               <div className="flex items-center justify-between p-3 rounded-lg bg-surface-subtle/30 border border-edge-subtle">
                 <span className="text-xs text-content-muted uppercase tracking-wide">Segment</span>

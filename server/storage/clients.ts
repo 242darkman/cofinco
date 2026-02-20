@@ -1,7 +1,7 @@
-import { clients, sectors, professions, activityTypes, tags, clientTags, clientActivities, users, agences, historiquePoints, userRoles, pays } from "@shared/schema";
+import { clients, sectors, professions, activityTypes, tags, clientTags, clientActivities, users, agences, userRoles, pays } from "@shared/schema";
 import { SystemRole } from "@shared/types/roles";
 import { StatutUser, SegmentClient, TypePiece } from "@shared/enum/status-constants";
-import { type Client, type InsertClient, type ClientTag, type InsertClientTag, type Tag, type InsertTag, type ClientActivity, type InsertClientActivity, type User, type InsertHistoriquePoints } from "@shared/schema";
+import { type Client, type InsertClient, type ClientTag, type InsertClientTag, type Tag, type InsertTag, type ClientActivity, type InsertClientActivity, type User } from "@shared/schema";
 import { db } from "../db";
 import { eq, desc, and, isNull, sql, inArray, aliasedTable } from "drizzle-orm";
 import { z } from "zod";
@@ -123,7 +123,7 @@ export const createClientApiSchema = z.object({
   notes: z.any().optional().nullable(),
   referencesPersonnes: z.any().optional().nullable(),
   sectorId: z.preprocess(v => v === '' ? null : v, z.string().uuid().optional().nullable()),
-  segment: z.string().optional().default(SegmentClient.STANDARD),
+  segment: z.string().optional().nullable(), // Auto-calculated by scoring engine
   frequenceCarte: z.string().optional().nullable(),
   latitude: z.string().optional().nullable().transform(v => v === '' ? null : v),
   longitude: z.string().optional().nullable().transform(v => v === '' ? null : v),
@@ -912,78 +912,6 @@ export async function logClientActivity(activity: InsertClientActivity): Promise
 
 export async function getClientActivities(clientId: string): Promise<ClientActivity[]> {
     return db.select().from(clientActivities).where(eq(clientActivities.clientId, clientId)).orderBy(desc(clientActivities.createdAt));
-}
-
-// Loyalty Points System
-
-export async function addLoyaltyPoints(
-  clientId: string,
-  points: number,
-  type: string,
-  description: string,
-  montantAssocie?: number
-): Promise<void> {
-  // Add to history
-  await db.insert(historiquePoints).values({
-    clientId,
-    points,
-    type,
-    description,
-    montantAssocie
-  });
-
-  // Update client total
-  await db
-    .update(clients)
-    .set({
-      pointsFidelite: sql`${clients.pointsFidelite} + ${points}`,
-      derniereActivite: new Date()
-    })
-    .where(eq(clients.id, clientId));
-}
-
-export async function calculateEngagementScore(clientId: string): Promise<number> {
-  const client = await getClient(clientId);
-  if (!client) return 0;
-
-  // Score components (0-100)
-  const epargneScore = Math.min(30, (parseFloat(client.epargneTotal?.toString() || '0') / 1000000) * 30);
-  const remboursementScore = Math.min(40, parseFloat(client.tauxRemboursement?.toString() || '100') * 0.4);
-  
-  // Calculate transaction frequency (last 30 days)
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  const recentActivities = await db
-    .select()
-    .from(clientActivities)
-    .where(and(
-      eq(clientActivities.clientId, clientId),
-      sql`${clientActivities.createdAt} >= ${thirtyDaysAgo}`
-    ));
-  const frequenceScore = Math.min(20, (recentActivities.length / 10) * 20);
-
-  // Calculate seniority
-  const inscriptionDate = client.dateAdhesion || client.createdAt || new Date();
-  const monthsSinceInscription = (Date.now() - new Date(inscriptionDate).getTime()) / (1000 * 60 * 60 * 24 * 30);
-  const ancienneteScore = Math.min(10, (monthsSinceInscription / 12) * 10);
-
-  const totalScore = Math.round(epargneScore + remboursementScore + frequenceScore + ancienneteScore);
-
-  // Update client score
-  await db
-    .update(clients)
-    .set({ scoreEngagement: totalScore })
-    .where(eq(clients.id, clientId));
-
-  return totalScore;
-}
-
-export async function getLoyaltyHistory(clientId: string): Promise<any[]> {
-  return db
-    .select()
-    .from(historiquePoints)
-    .where(eq(historiquePoints.clientId, clientId))
-    .orderBy(desc(historiquePoints.createdAt));
 }
 
 // ============================================

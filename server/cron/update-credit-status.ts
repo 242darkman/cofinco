@@ -31,7 +31,7 @@ export async function updateOverdueCredits() {
     // - Status is 'ACTIVE' (Greenfield: only EN values)
     // - prochaine_echeance (next due date) is in the past
     const overdueCredits = await db
-      .select({ id: credits.id, numeroCredit: credits.numeroCredit, statut: credits.statut })
+      .select({ id: credits.id, clientId: credits.clientId, agenceId: credits.agenceId, numeroCredit: credits.numeroCredit, statut: credits.statut })
       .from(credits)
       .where(
         and(
@@ -104,6 +104,57 @@ export async function updateOverdueCredits() {
       // Apply late penalties (C18) — runs after status transition
       const penaltyResult = await applyLatePenalties(validCreditIds);
       logger.info({ penalties: penaltyResult }, 'Penalties applied after status update');
+
+      // Score events: INCIDENT_RETARD for each credit marked late
+      try {
+        const { recordScoreEvent } = await import('../services/scoring-engine');
+        const today = new Date().toISOString().slice(0, 10);
+        for (const credit of overdueCredits) {
+          if (validCreditIds.includes(credit.id) && credit.clientId) {
+            await recordScoreEvent({
+              clientId: credit.clientId,
+              agenceId: credit.agenceId ?? undefined,
+              eventType: 'INCIDENT_RETARD',
+              refId: `late-${credit.id}-${today}`,
+              refType: 'credit',
+              metadata: { creditId: credit.id, numeroCredit: credit.numeroCredit },
+            }).catch(err => logger.error({ err, creditId: credit.id }, 'Scoring event error (late credit)'));
+          }
+        }
+      } catch (err) {
+        logger.error({ err }, 'Scoring events batch error (late credits)');
+      }
+    }
+
+    // Score events: INCIDENT_DEFAUT for credits LATE > 90 days
+    try {
+      const defaultedCredits = await db
+        .select({ id: credits.id, clientId: credits.clientId, agenceId: credits.agenceId, numeroCredit: credits.numeroCredit })
+        .from(credits)
+        .where(and(
+          sql`${credits.statut} = 'LATE'`,
+          sql`${credits.prochaineEcheance} < NOW() - INTERVAL '90 days'`
+        ));
+
+      if (defaultedCredits.length > 0) {
+        const { recordScoreEvent } = await import('../services/scoring-engine');
+        const month = new Date().toISOString().slice(0, 7); // monthly idempotency
+        for (const credit of defaultedCredits) {
+          if (credit.clientId) {
+            await recordScoreEvent({
+              clientId: credit.clientId,
+              agenceId: credit.agenceId ?? undefined,
+              eventType: 'INCIDENT_DEFAUT',
+              refId: `defaut-${credit.id}-${month}`,
+              refType: 'credit',
+              metadata: { creditId: credit.id, numeroCredit: credit.numeroCredit },
+            }).catch(err => logger.error({ err, creditId: credit.id }, 'Scoring event error (defaulted credit)'));
+          }
+        }
+        logger.info({ count: defaultedCredits.length }, 'Defaulted credits scored');
+      }
+    } catch (err) {
+      logger.error({ err }, 'Scoring events error (defaulted credits)');
     }
 
     return {

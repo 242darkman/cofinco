@@ -220,7 +220,7 @@ export function registerTontineRoutes(app: Express) {
             }
         }
 
-        // Domain event: contribution received
+        // Domain event: contribution received + scoring
         if (parsed.clientId) {
           const tontineInfo = await storage.getTontine(parsed.tontineId);
           dispatchDomainEvent({
@@ -236,6 +236,23 @@ export function registerTontineRoutes(app: Express) {
             },
             timestamp: new Date(),
           });
+
+          // Score event: tontine contribution
+          try {
+            const { recordScoreEvent } = await import('../services/scoring-engine');
+            await recordScoreEvent({
+              clientId: parsed.clientId,
+              agenceId: tontineInfo?.agenceId ?? undefined,
+              eventType: 'TONTINE_CONTRIBUTION',
+              refId: (contrib as any)?.id || (contrib as any)?.reference || `tontine-${parsed.tontineId}-${Date.now()}`,
+              refType: 'contribution_tontine',
+              montant: Number(parsed.montant || 0),
+              metadata: { tontineId: parsed.tontineId, tontineName: tontineInfo?.nom },
+              createdBy: req.session.user!.id,
+            });
+          } catch (err) {
+            logger.error({ err }, 'Scoring event error (tontine contribution)');
+          }
         }
 
         res.json(contrib);
@@ -409,7 +426,23 @@ export function registerTontineRoutes(app: Express) {
         userId
       );
 
-      // 5. WS notifications
+      // 5. Score event — partial rehabilitation for paying off penalty
+      try {
+        const { recordScoreEvent } = await import('../services/scoring-engine');
+        await recordScoreEvent({
+          clientId: membre.clientId,
+          agenceId: tontine.agenceId ?? undefined,
+          eventType: 'TONTINE_CONTRIBUTION',
+          refId: `penalite-paid-${penaliteId}`,
+          refType: 'tontine_penalite',
+          montant,
+          createdBy: userId,
+        });
+      } catch (scoreErr) {
+        logger.error({ err: scoreErr, penaliteId }, 'Failed to record penalty payment score event');
+      }
+
+      // 6. WS notifications
       const wsInstance = getWsInstance();
       if (wsInstance) {
         wsInstance.broadcast({

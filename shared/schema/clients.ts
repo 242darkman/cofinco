@@ -1,4 +1,4 @@
-import { pgTable, pgEnum, text, varchar, integer, numeric, boolean, timestamp, uuid, serial, jsonb, index } from "drizzle-orm/pg-core";
+import { pgTable, pgEnum, text, integer, numeric, boolean, timestamp, uuid, jsonb, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { agences } from "./agences";
@@ -308,21 +308,4 @@ export const insertClientActivitySchema = createInsertSchema(clientActivities).o
 export type InsertClientActivity = z.infer<typeof insertClientActivitySchema>;
 export type ClientActivity = typeof clientActivities.$inferSelect;
 
-// Historique des points de fidélité
-export const historiquePoints = pgTable("historique_points", {
-  id: serial("id").primaryKey(),
-  clientId: uuid("client_id").notNull().references(() => clients.id),
-  points: integer("points").notNull(), // Positif = gain, Négatif = dépense
-  type: varchar("type").notNull(), // 'EPARGNE', 'CREDIT_REMBOURSEMENT', 'TONTINE', 'BONUS', 'DEPENSE'
-  description: text("description"),
-  montantAssocie: integer("montant_associe"), // Montant de la transaction qui a généré les points
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-}, (t) => ({
-  idxClientId: index("idx_historique_points_client_id").on(t.clientId),
-  idxClientCreatedAt: index("idx_historique_points_client_created").on(t.clientId, t.createdAt),
-}));
-
-export const insertHistoriquePointsSchema = createInsertSchema(historiquePoints).omit({ id: true, createdAt: true });
-export type InsertHistoriquePoints = z.infer<typeof insertHistoriquePointsSchema>;
-export type HistoriquePoints = typeof historiquePoints.$inferSelect;
 

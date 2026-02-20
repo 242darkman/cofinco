@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Search, Filter, X, Calendar, DollarSign, MapPin } from 'lucide-react';
-import { StatutClient, STATUT_CLIENT_LABELS } from '@shared/enum/status-constants';
+import { StatutClient, STATUT_CLIENT_LABELS, SegmentClient, SEGMENT_CLIENT_LABELS } from '@shared/enum/status-constants';
 
 interface ClientSearchProps {
   onSearch: (filters: SearchFilters) => void;
@@ -118,9 +118,10 @@ export default function ClientSearch({ onSearch, onClose }: ClientSearchProps) {
                 className="w-full bg-surface-elevated text-content-primary px-4 py-2 rounded-lg border border-edge-strong focus:outline-none focus:ring-2 focus:ring-accent"
               >
                 <option value="all">Tous les segments</option>
-                <option value="VIP">VIP</option>
-                <option value="Standard">Standard</option>
-                <option value="Nouveau">Nouveau</option>
+                <option value={SegmentClient.VIP}>{SEGMENT_CLIENT_LABELS[SegmentClient.VIP]}</option>
+                <option value={SegmentClient.PREMIUM}>{SEGMENT_CLIENT_LABELS[SegmentClient.PREMIUM]}</option>
+                <option value={SegmentClient.STANDARD}>{SEGMENT_CLIENT_LABELS[SegmentClient.STANDARD]}</option>
+                <option value={SegmentClient.RISQUE}>{SEGMENT_CLIENT_LABELS[SegmentClient.RISQUE]}</option>
               </select>
             </div>
           </div>

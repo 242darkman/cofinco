@@ -42,6 +42,7 @@ import { scheduleGlReconciliationMonitoring } from "./cron/gl-reconciliation-mon
 import { scheduleAutoFix } from "./cron/gl-auto-fix";
 import { startAccessCodeCleanupCron } from "./cron/access-code-cleanup";
 import { startDailyIntegrityAuditCron } from "./cron/daily-integrity-audit";
+import { startScoreRecalculationCron } from "./cron/score-recalculation";
 import { startAutoLiftSuspensionCron } from "./cron/auto-lift-suspension";
 import { startInterestAccrualCron } from "./cron/interest-accrual";
 import { StorageService } from "./services/storage-service";
@@ -381,6 +382,10 @@ app.get("/api/health", async (_req, res) => {
     // Start Interest Accrual Cron (SYSCOHADA art. 46 — D 2718 / C 7071 monthly)
     startInterestAccrualCron();
     logger.info('Interest accrual cron started (1st of month at 02:00)');
+
+    // Start Score Recalculation Cron (weekly — keeps tenure-based scores fresh)
+    startScoreRecalculationCron();
+    logger.info('Score recalculation cron started (Sunday 03:00)');
 
     logger.info('All cron jobs started: disbursements, repayments, credit-status, migrations, reconciliation, temp-permissions, balance-reconciliation, mm-reconciliation-report, treasury-reconciliation, gl-reconciliation-monitor, gl-auto-fix, late-installments, daily-integrity-audit, auto-lift-suspension');
 

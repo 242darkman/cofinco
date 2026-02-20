@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, Download, Upload, Users, MapPin, RefreshCw, List, Eye, Edit2, Trash2, ChevronRight, FileText, CreditCard, Shield, BarChart3, AlertCircle, Building2, Send, DollarSign, UserPlus, LayoutDashboard, User, Phone, Scale, Network } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Plus, Search, Filter, Download, Upload, Users, MapPin, RefreshCw, List, Eye, Edit2, Trash2, ChevronRight, FileText, CreditCard, Shield, BarChart3, AlertCircle, Building2, Send, DollarSign, UserPlus, LayoutDashboard, User, Phone, Scale, Network, TrendingUp } from 'lucide-react';
 import { Button, IconButton, Card, ResponsiveTable, Badge, ConfirmDialog, FeatureHeader, FEATURE_DESCRIPTIONS, TabGroup } from '../ui';
 import { usePermissions, ProtectedFeature } from '../auth/ProtectedFeature';
 import ClientForm from './ClientForm';
@@ -21,6 +21,7 @@ import ClientKYC from './ClientKYC';
 import ClientNotes from './ClientNotes';
 import ClientGlobalHistory from './ClientGlobalHistory';
 import ClientAlerts from './ClientAlerts';
+import ClientScoreTab from './tabs/ClientScoreTab';
 import ClientBulkCommunication from './ClientBulkCommunication';
 import ClientSearch from './ClientSearch';
 import SelectEmployeeForConversionModal from './SelectEmployeeForConversionModal';
@@ -46,7 +47,7 @@ interface ClientModuleProps {
   activeSubModule?: string;
 }
 
-const CLIENT_TAB_IDS = ['overview', 'profil', 'coordonnees', 'kyc-legal', 'references', 'comptes', 'kyc', 'notes', 'transactions', 'alertes'] as const;
+const CLIENT_TAB_IDS = ['overview', 'profil', 'coordonnees', 'kyc-legal', 'references', 'comptes', 'kyc', 'notes', 'transactions', 'alertes', 'score'] as const;
 
 export default function ClientModule({ onModuleChange, activeSubModule }: ClientModuleProps) {
   // RBAC permissions
@@ -129,7 +130,7 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
   }, [clientIdFromUrl, currentSubModule]);
 
   // Fetch alert count for badge on tab
-  useEffect(() => {
+  const fetchAlertCount = useCallback(() => {
     if (!viewingClient?.id) {
       setAlertCount(0);
       return;
@@ -141,6 +142,27 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
       })
       .catch(() => {});
   }, [viewingClient?.id]);
+
+  useEffect(() => {
+    fetchAlertCount();
+  }, [fetchAlertCount]);
+
+  // Auto-refresh alert badge on WebSocket events
+  useEffect(() => {
+    if (!viewingClient?.id) return;
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail?.clientId || detail.clientId === viewingClient.id) {
+        fetchAlertCount();
+      }
+    };
+    window.addEventListener('client-update', handler);
+    window.addEventListener('score-updated', handler);
+    return () => {
+      window.removeEventListener('client-update', handler);
+      window.removeEventListener('score-updated', handler);
+    };
+  }, [viewingClient?.id, fetchAlertCount]);
 
   const loadClients = async () => {
     setLoading(true);
@@ -269,6 +291,7 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
               { key: 'notes', label: 'Notes', icon: Edit2 },
               { key: 'transactions', label: 'Transactions', icon: DollarSign },
               { key: 'alertes', label: 'Alertes', icon: AlertCircle, badge: alertCount > 0 ? alertCount : undefined, badgeClassName: alertCount > 0 ? 'bg-status-danger text-white' : undefined },
+              { key: 'score', label: 'Score', icon: TrendingUp },
             ]}
           />
 
@@ -283,7 +306,8 @@ export default function ClientModule({ onModuleChange, activeSubModule }: Client
             {activeTab === 'kyc' && <ClientKYC clientId={viewingClient.id} onUpdate={loadClients} />}
             {activeTab === 'notes' && <ClientNotes clientId={viewingClient.id} />}
             {activeTab === 'transactions' && <ClientGlobalHistory clientId={viewingClient.id} />}
-            {activeTab === 'alertes' && <ClientAlerts client={viewingClient} onUpdate={loadClients} onCountChange={setAlertCount} />}
+            {activeTab === 'alertes' && <ClientAlerts client={viewingClient} onUpdate={loadClients} onCountChange={setAlertCount} onNavigateToTab={(tab) => navigateToPath(`/clients/${viewingClient.id}/${tab}`)} />}
+            {activeTab === 'score' && <ClientScoreTab client={viewingClient} />}
           </div>
         </ClientProfileLayout>
 

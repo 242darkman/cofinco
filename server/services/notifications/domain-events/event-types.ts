@@ -62,7 +62,9 @@ export type DomainEventType =
   | "PROSPECT_CONVERTED"
   | "PAIEMENT_TERRAIN_VALIDATED"
   | "CREDIT_INSTALLMENT_LATE"
-  | "SYSTEM_JOB_FAILED";
+  | "SYSTEM_JOB_FAILED"
+  // Scoring
+  | "CLIENT_SEGMENT_CHANGED";
 
 // ============================================================================
 // EVENT DATA INTERFACES
@@ -531,6 +533,17 @@ export interface SystemJobFailedData {
   jobName: string;
   error: string;
   timestamp: string;
+}
+
+// Scoring
+
+export interface ClientSegmentChangedData {
+  clientId: string;
+  clientName?: string;
+  previousSegment: string;
+  newSegment: string;
+  scoreGlobal: number;
+  agenceId?: string;
 }
 
 export interface DomainEvent<T = unknown> {

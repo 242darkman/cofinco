@@ -51,7 +51,7 @@ export const DEFAULT_FORM_DATA: CreateClientFormData = {
   dateDebutActivite: '',
   // Étape 4
   sourceFonds: '', typeRevenu: 'Mensuel', revenuMensuel: '', revenuJournalier: '',
-  sectorId: '', segment: 'Standard', agenceId: '', agentReferentId: '',
+  sectorId: '', segment: 'Standard', agenceId: '', agentReferentId: '',  // segment kept in type but not editable (auto-calculated)
   clientOrigin: 'OTHER',
   // Étape 5
   referencesPersonnes: [], isPep: false, pepDetails: '', consentementDonnees: false,

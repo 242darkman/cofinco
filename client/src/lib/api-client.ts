@@ -707,7 +707,120 @@ export const clientApi = {
   delete: (id: string) => request<void>(`/clients/${id}`, {
     method: 'DELETE',
   }),
+
+  // Scoring
+  getScoreState: (clientId: string) => request<ClientScoreState>(`/clients/${clientId}/score-state`),
+  getScoreHistory: (clientId: string, params?: { limit?: number; offset?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.limit) qs.set('limit', String(params.limit));
+    if (params?.offset) qs.set('offset', String(params.offset));
+    const q = qs.toString();
+    return request<ScoreHistoryResponse>(`/clients/${clientId}/score-history${q ? `?${q}` : ''}`);
+  },
+  recalculateScore: (clientId: string, reason?: string) =>
+    request<ScoreResult>(`/clients/${clientId}/score`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+  addScoreBonus: (clientId: string, data: { points: number; description: string }) =>
+    request<{ success: boolean; message: string; scoreGlobal: number; segment: string }>(
+      `/clients/${clientId}/score-bonus`,
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
+  getScoreTrend: (clientId: string, months?: number) =>
+    request<ScoreTrendPoint[]>(`/clients/${clientId}/score-trend${months ? `?months=${months}` : ''}`),
+  getScorePercentile: (clientId: string) =>
+    request<ScorePercentile>(`/clients/${clientId}/score-percentile`),
+  getAgencyScoreStats: (agenceId?: string) =>
+    request<AgencyScoreStats[]>(`/scoring/agency-stats${agenceId ? `?agenceId=${agenceId}` : ''}`),
 };
+
+// ============================================================================
+// SCORING TYPES
+// ============================================================================
+
+export interface ScoreResult {
+  scoreGlobal: number;
+  segment: string;
+  scorePayment: number;
+  scoreLoyalty: number;
+  scoreEngagement: number;
+  scoreCompliance: number;
+  tauxRemboursement: string;
+  totalPointsFidelite: number;
+}
+
+export interface ClientScoreState {
+  id: string;
+  clientId: string;
+  agenceId?: string;
+  scorePayment: number;
+  scoreLoyalty: number;
+  scoreEngagement: number;
+  scoreCompliance: number;
+  scoreGlobal: number;
+  segment: string;
+  tauxRemboursement: string;
+  totalPointsFidelite: number;
+  totalCreditsRembourses: number;
+  totalIncidents: number;
+  totalEpargneDepots: number;
+  lastEventAt?: string;
+  lastRecalcAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ClientScoreEvent {
+  id: string;
+  clientId: string;
+  agenceId?: string;
+  eventType: string;
+  refId: string;
+  refType: string;
+  pointsDelta: number;
+  montant?: string;
+  reason?: string;
+  metadata?: any;
+  createdBy?: string;
+  createdAt: string;
+}
+
+export interface ScoreHistoryResponse {
+  rows: ClientScoreEvent[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface ScoreTrendPoint {
+  month: string;
+  pointsDelta: number;
+  eventCount: number;
+}
+
+export interface ScorePercentile {
+  rank: number;
+  total: number;
+  percentile: number;
+  agenceId?: string;
+}
+
+export interface AgencyScoreStats {
+  agenceId: string;
+  totalClients: number;
+  avgScore: number;
+  avgPayment: number;
+  avgLoyalty: number;
+  avgEngagement: number;
+  avgCompliance: number;
+  segments: {
+    VIP: number;
+    Premium: number;
+    Standard: number;
+    Risque: number;
+  };
+}
 
 // ============================================================================
 // TYPES D'ERREURS STRUCTURÉES

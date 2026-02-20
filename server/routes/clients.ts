@@ -27,7 +27,7 @@ import { SystemRole } from "@shared/types/roles"; // Still needed for role check
 import { requireAgenceAccess, validateAgenceAction, requireAgenceIdAccess, validateAgenceIdAction } from "../middleware";
 import { logAudit } from "../audit";
 import { normalizeKeysDeep, coerceValueToSchema, parsePagination, paginateResponse } from "./utils";
-import { calculateClientScore } from "../scoring-service";
+import { recalculateClientScore, recordScoreEvent, getScoreHistory, getScoreState, getScoreTrend, getAgencyScoreStats, getScorePercentile } from "../services/scoring-engine";
 import { z } from "zod";
 import { db } from "../db";
 import { eq, sql, or, isNull, and, gte, lte, desc } from "drizzle-orm";
@@ -799,6 +799,28 @@ export function registerClientRoutes(app: Express) {
       // Insertion en masse via le storage (qui gère la transaction)
       const clients = await storage.createClientsBulk(data);
 
+      // Score initial pour chaque client importé (non-bloquant)
+      try {
+        const batchSize = 20;
+        for (let i = 0; i < clients.length; i += batchSize) {
+          const batch = clients.slice(i, i + batchSize);
+          await Promise.allSettled(
+            batch.map(c =>
+              recordScoreEvent({
+                clientId: c.id,
+                agenceId: c.agenceId || undefined,
+                eventType: 'INITIAL_SCORE',
+                refId: `initial-${c.id}`,
+                refType: 'client',
+                createdBy: req.session.user?.id,
+              })
+            )
+          );
+        }
+      } catch (scoreErr) {
+        logger.error({ err: scoreErr }, 'Failed to seed scores for bulk import');
+      }
+
       await logAudit(
         req,
         "IMPORT_CLIENTS_BULK",
@@ -955,6 +977,20 @@ export function registerClientRoutes(app: Express) {
           agenceId: client.agenceId || undefined,
         });
 
+        // Score initial
+        try {
+          await recordScoreEvent({
+            clientId: client.id,
+            agenceId: client.agenceId || undefined,
+            eventType: 'INITIAL_SCORE',
+            refId: `initial-${client.id}`,
+            refType: 'client',
+            createdBy: req.session.user?.id,
+          });
+        } catch (scoreErr) {
+          logger.error({ err: scoreErr, clientId: client.id }, 'Failed to create initial score');
+        }
+
         // Update Dashboard & Lists via WebSocket
         const wsServer = await import("../ws-server"); // Dynamic import for ESM
         const wsInstance = wsServer.getWsInstance();
@@ -1068,6 +1104,43 @@ export function registerClientRoutes(app: Express) {
         }
         // ====== END BUSINESS LOGIC ======
 
+        // Score events: KYC_VERIFIED and PROFILE_COMPLETED
+        try {
+          if (client) {
+            // KYC_VERIFIED: when KYC status changes to VERIFIED/COMPLETE
+            const kycVerified = ['VERIFIED', 'COMPLETE'].includes(client.kycStatus || '');
+            const wasKycVerified = ['VERIFIED', 'COMPLETE'].includes(existing.kycStatus || '');
+            if (kycVerified && !wasKycVerified) {
+              await recordScoreEvent({
+                clientId: client.id,
+                agenceId: client.agenceId || undefined,
+                eventType: 'KYC_VERIFIED',
+                refId: `kyc-${client.id}`,
+                refType: 'client',
+                createdBy: req.session.user?.id,
+              });
+            }
+
+            // PROFILE_COMPLETED: when profile reaches completeness threshold (4+ fields)
+            const profileFields = [client.adresseDomicile, client.professionId, client.numeroPiece, client.typePiece, client.villeId, client.paysResidenceId];
+            const oldProfileFields = [existing.adresseDomicile, existing.professionId, existing.numeroPiece, existing.typePiece, existing.villeId, existing.paysResidenceId];
+            const newComplete = profileFields.filter(Boolean).length;
+            const oldComplete = oldProfileFields.filter(Boolean).length;
+            if (newComplete >= 4 && oldComplete < 4) {
+              await recordScoreEvent({
+                clientId: client.id,
+                agenceId: client.agenceId || undefined,
+                eventType: 'PROFILE_COMPLETED',
+                refId: `profile-${client.id}`,
+                refType: 'client',
+                createdBy: req.session.user?.id,
+              });
+            }
+          }
+        } catch (scoreErr) {
+          logger.error({ err: scoreErr }, 'Scoring event error (client update)');
+        }
+
         await logAudit(
             req,
             "UPDATE_CLIENT",
@@ -1078,7 +1151,6 @@ export function registerClientRoutes(app: Express) {
             "low"
         );
 
-        // Update Lists
         // Update Lists
         const wsServer = await import("../ws-server");
         const wsInstance = wsServer.getWsInstance();
@@ -1252,22 +1324,127 @@ export function registerClientRoutes(app: Express) {
       res.json(act);
   });
 
-  // Calculate Score
-  app.post("/api/clients/:id/score", requireAuth, async (req, res) => {
+  // Recalculate Score (full recalc from real data)
+  app.post("/api/clients/:id/score", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.LOYALTY), async (req, res) => {
       try {
-        const result = await calculateClientScore(req.params.id);
+        const result = await recordScoreEvent({
+          clientId: req.params.id,
+          eventType: "RECALCUL_COMPLET",
+          refId: `recalc-${req.params.id}-${Date.now()}`,
+          refType: "manual",
+          reason: req.body.reason || "Recalcul manuel",
+          createdBy: req.session.user!.id,
+        });
 
-        // Notify update
-        const wsModule = await import("../ws-server");
-        const wsInstance = wsModule.getWsInstance();
-        if (wsInstance) {
-            wsInstance.broadcast({ type: "CLIENT_UPDATE", payload: { clientId: req.params.id } });
-        }
-
-        res.json(result);
+        // SCORE_UPDATED is already broadcast by recalculateClientScore()
+        res.json(result.result);
       } catch (error) {
           logger.error({ err: error }, 'Score calculation error');
           res.status(500).json({ message: "Score calculation failed" });
+      }
+  });
+
+  // Score event history (audit trail)
+  app.get("/api/clients/:id/score-history", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.LOYALTY), async (req, res) => {
+      try {
+        const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 50));
+        const offset = Math.max(0, parseInt(req.query.offset as string) || 0);
+        const result = await getScoreHistory(req.params.id, limit, offset);
+        res.json(result);
+      } catch (error) {
+          logger.error({ err: error }, 'Score history error');
+          res.status(500).json({ message: "Failed to fetch score history" });
+      }
+  });
+
+  // Score state (current component breakdown)
+  app.get("/api/clients/:id/score-state", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.LOYALTY), async (req, res) => {
+      try {
+        const state = await getScoreState(req.params.id);
+        if (!state) return res.status(404).json({ message: "Score state not found" });
+        res.json(state);
+      } catch (error) {
+          logger.error({ err: error }, 'Score state error');
+          res.status(500).json({ message: "Failed to fetch score state" });
+      }
+  });
+
+  // Score trend (monthly evolution)
+  app.get("/api/clients/:id/score-trend", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.LOYALTY), async (req, res) => {
+      try {
+        const months = Math.min(24, Math.max(1, parseInt(req.query.months as string) || 12));
+        const trend = await getScoreTrend(req.params.id, months);
+        res.json(trend);
+      } catch (error) {
+          logger.error({ err: error }, 'Score trend error');
+          res.status(500).json({ message: "Failed to fetch score trend" });
+      }
+  });
+
+  // Score percentile (ranking within agency)
+  app.get("/api/clients/:id/score-percentile", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.LOYALTY), async (req, res) => {
+      try {
+        const percentile = await getScorePercentile(req.params.id);
+        if (!percentile) return res.status(404).json({ message: "Score state not found" });
+        res.json(percentile);
+      } catch (error) {
+          logger.error({ err: error }, 'Score percentile error');
+          res.status(500).json({ message: "Failed to fetch score percentile" });
+      }
+  });
+
+  // Agency score stats (segment distribution, averages)
+  app.get("/api/scoring/agency-stats", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.LOYALTY), async (req, res) => {
+      try {
+        const agenceId = req.query.agenceId as string | undefined;
+        const stats = await getAgencyScoreStats(agenceId);
+        res.json(stats);
+      } catch (error) {
+          logger.error({ err: error }, 'Agency score stats error');
+          res.status(500).json({ message: "Failed to fetch agency score stats" });
+      }
+  });
+
+  // Manual bonus/malus (admin only — requires MANAGE on LOYALTY subject)
+  app.post("/api/clients/:id/score-bonus", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.LOYALTY), async (req, res) => {
+      try {
+        const clientId = req.params.id;
+        const { points, description } = req.body;
+
+        if (!points || !description) {
+            return res.status(400).json({ error: "Points et description requis" });
+        }
+
+        if (Math.abs(points) > 200) {
+            return res.status(400).json({ error: "Bonus/malus limité à ±200 points" });
+        }
+
+        const eventType = points > 0 ? 'BONUS_MANUEL' : 'MALUS_MANUEL';
+        const result = await recordScoreEvent({
+            clientId,
+            eventType,
+            refId: `${eventType.toLowerCase()}-${clientId}-${Date.now()}`,
+            refType: 'manual',
+            montant: Math.abs(points),
+            reason: description,
+            createdBy: req.session.user!.id,
+        });
+
+        // SCORE_UPDATED is already broadcast by recalculateClientScore()
+        const wsInstance = wsServer.getWsInstance();
+        if (wsInstance) {
+            wsInstance.broadcast({ type: "CLIENT_UPDATE", payload: { clientId } });
+        }
+
+        res.json({
+            success: true,
+            message: `${points} points ajoutés`,
+            scoreGlobal: result.result.scoreGlobal,
+            segment: result.result.segment,
+        });
+      } catch (error) {
+          logger.error({ err: error }, 'Erreur ajout bonus');
+          res.status(500).json({ error: "Erreur serveur" });
       }
   });
 
@@ -1530,6 +1707,20 @@ export function registerClientRoutes(app: Express) {
 
       const result = await createClientWithUser(userData, clientData);
 
+      // Score initial
+      try {
+        await recordScoreEvent({
+          clientId: result.client.id,
+          agenceId: result.client.agenceId || undefined,
+          eventType: 'INITIAL_SCORE',
+          refId: `initial-${result.client.id}`,
+          refType: 'client',
+          createdBy: req.session.user?.id,
+        });
+      } catch (scoreErr) {
+        logger.error({ err: scoreErr, clientId: result.client.id }, 'Failed to create initial score');
+      }
+
       await logAudit(
         req,
         "CREATE_CLIENT_WITH_USER",
@@ -1589,6 +1780,20 @@ export function registerClientRoutes(app: Express) {
       };
 
       const client = await createClientForUser(userId, clientData);
+
+      // Score initial
+      try {
+        await recordScoreEvent({
+          clientId: client.id,
+          agenceId: client.agenceId || undefined,
+          eventType: 'INITIAL_SCORE',
+          refId: `initial-${client.id}`,
+          refType: 'client',
+          createdBy: req.session.user?.id,
+        });
+      } catch (scoreErr) {
+        logger.error({ err: scoreErr, clientId: client.id }, 'Failed to create initial score');
+      }
 
       // Auto-création d'un compte courant via le système produit
       let compteCourant = null;

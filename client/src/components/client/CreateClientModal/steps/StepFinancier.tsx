@@ -10,12 +10,6 @@ function formatNumber(val: string): string {
   return val.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 }
 
-const SEGMENT_OPTIONS = [
-  { value: 'Standard', label: 'Standard' },
-  { value: 'Premium', label: 'Premium' },
-  { value: 'VIP', label: 'VIP' },
-  { value: 'Entreprise', label: 'Entreprise' },
-];
 
 export default function StepFinancier({
   formData, updateField, errors, markTouched, isConversion, isAdmin, referenceData,
@@ -89,23 +83,16 @@ export default function StepFinancier({
         />
       </div>
 
-      {/* Secteur & Segment */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-        <SearchableSelect
-          label="Secteur / Marché" name="sectorId"
-          options={sectorOptions}
-          value={formData.sectorId}
-          onChange={handleSectorChange}
-          placeholder={catalogLoading ? 'Chargement...' : 'Sélectionner...'}
-          required
-          disabled={catalogLoading}
-        />
-        <SelectField
-          label="Segment" name="segment" value={formData.segment}
-          onChange={(e) => updateField('segment', e.target.value)}
-          options={SEGMENT_OPTIONS}
-        />
-      </div>
+      {/* Secteur */}
+      <SearchableSelect
+        label="Secteur / Marché" name="sectorId"
+        options={sectorOptions}
+        value={formData.sectorId}
+        onChange={handleSectorChange}
+        placeholder={catalogLoading ? 'Chargement...' : 'Sélectionner...'}
+        required
+        disabled={catalogLoading}
+      />
 
       {/* Agence (admin) & Agent */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">

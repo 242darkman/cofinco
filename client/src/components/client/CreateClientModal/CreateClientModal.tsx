@@ -187,7 +187,7 @@ export default function CreateClientModal({ isOpen, onClose, onSave, fromEmploye
           typeRevenu: formData.typeRevenu,
           revenuMensuel: formData.typeRevenu === 'Mensuel' ? formData.revenuMensuel : undefined,
           revenuJournalier: formData.typeRevenu === 'Journalier' ? formData.revenuJournalier : undefined,
-          segment: formData.segment,
+
           agenceId: formData.agenceId || user?.agenceId,
           agentReferentId: formData.agentReferentId || undefined,
           clientOrigin: 'EMPLOYEE_CONVERSION',
@@ -249,7 +249,7 @@ export default function CreateClientModal({ isOpen, onClose, onSave, fromEmploye
           typeRevenu: formData.typeRevenu,
           revenuMensuel: formData.typeRevenu === 'Mensuel' ? formData.revenuMensuel : undefined,
           revenuJournalier: formData.typeRevenu === 'Journalier' ? formData.revenuJournalier : undefined,
-          segment: formData.segment,
+
           agenceId: formData.agenceId || user?.agenceId,
           agentReferentId: formData.agentReferentId || undefined,
           clientOrigin: formData.clientOrigin,
