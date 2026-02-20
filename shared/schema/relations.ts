@@ -1,7 +1,7 @@
 import { relations } from "drizzle-orm";
 import { users, loginAttempts } from "./auth";
 import { clients } from "./clients";
-import { credits, remboursements, comptes, transactionsCompte, plansEpargne, sessionsCaisse, operationsCaisse, mouvementsFinanciers, creditPlans, creditPlanFees } from "./finance";
+import { credits, remboursements, comptes, transactionsCompte, plansEpargne, sessionsCaisse, operationsCaisse, mouvementsFinanciers, creditPlans, creditPlanFees, demandesCredit } from "./finance";
 import { tontines, membresTontine, contributionsTontine, tontineAlertes, tontinePenalites } from "./tontines";
 import { agentsTerrain, prospections, visitesTerrain, paiementsTerrain, factures, lignesFactures, remisesTerrain, comptageBillets } from "./operations";
 
@@ -22,6 +22,10 @@ export const creditsRelations = relations(credits, ({ one, many }) => ({
   client: one(clients, {
     fields: [credits.clientId],
     references: [clients.id],
+  }),
+  creditPlan: one(creditPlans, {
+    fields: [credits.creditPlanId],
+    references: [creditPlans.id],
   }),
   remboursements: many(remboursements),
 }));
@@ -257,6 +261,8 @@ export const creditPlansRelations = relations(creditPlans, ({ many }) => ({
   fees: many(creditPlanFees),
   versions: many(creditPlanVersions),
   penaltyStructures: many(creditPenaltyStructures),
+  demandesCredit: many(demandesCredit),
+  credits: many(credits),
 }));
 
 export const creditPlanFeesRelations = relations(creditPlanFees, ({ one }) => ({

@@ -3696,20 +3696,55 @@ export async function generateCreditSchedule(
   if (existing.length > 0) return existing;
 
   // 3. Generate using the plan engine
-  const { generateSchedule, buildLegacyPlanConfig } = await import("../services/credit-plan");
-
+  const { generateSchedule } = await import("../services/credit-plan");
   const startDate = new Date(credit.dateDebut || Date.now());
-  const planConfig = buildLegacyPlanConfig({
-    taux: credit.taux,
-    duree: credit.duree || 1,
-    echeance: credit.echeance as string,
-  });
+
+  if (!credit.creditPlanId) {
+    throw new Error("Impossible de générer l'échéancier : aucun plan de crédit associé (creditPlanId manquant)");
+  }
+
+  const plan = await getCreditPlan(credit.creditPlanId);
+  if (!plan) {
+    throw new Error(`Plan de crédit introuvable : ${credit.creditPlanId}`);
+  }
+
+  const planConfig: import("../services/credit-plan/types").PlanConfig = {
+    dureeValeur: plan.dureeValeur,
+    dureeUnite: plan.dureeUnite as "DAY" | "WEEK" | "MONTH",
+    frequenceRemboursement: plan.frequenceRemboursement as any,
+    tauxInteret: plan.tauxInteret,
+    interestMethod: plan.interestMethod as "FLAT" | "DECLINING_BALANCE",
+    interestRatePeriod: plan.interestRatePeriod as any,
+    dayCountConvention: plan.dayCountConvention as any,
+    interestRoundingMode: plan.interestRoundingMode as any,
+    interestRoundingUnit: plan.interestRoundingUnit,
+    amortizationType: plan.amortizationType as any,
+    firstDueRule: plan.firstDueRule as any,
+    gracePeriodDays: plan.gracePeriodDays,
+    preferredWeekday: plan.preferredWeekday,
+    calendarMode: plan.calendarMode as any,
+    weekdaysMask: plan.weekdaysMask,
+    shiftNonWorkingDay: plan.shiftNonWorkingDay as any,
+    allowManualFirstDueDate: plan.allowManualFirstDueDate,
+  };
+
+  const feeConfigs: import("../services/credit-plan/types").FeeConfig[] = plan.fees
+    .filter((f) => f.isActive)
+    .map((f) => ({
+      feeType: f.feeType,
+      label: f.label,
+      calcType: f.calcType as "FIXED" | "PERCENTAGE",
+      value: f.value,
+      minAmount: f.minAmount,
+      maxAmount: f.maxAmount,
+      collectionMode: f.collectionMode as any,
+    }));
 
   const result = generateSchedule({
     principal: D(credit.montant),
     disbursementDate: startDate,
     plan: planConfig,
-    fees: [],
+    fees: feeConfigs,
   });
 
   const schedule: InsertEcheanceCredit[] = result.rows.map((row) => ({

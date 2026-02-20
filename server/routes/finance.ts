@@ -443,6 +443,7 @@ export function registerFinanceRoutes(app: Express) {
         typeCredit: demande.typeCredit || 'PERSONAL',
         objetCredit: demande.objetCredit,
         demandeId: demande.id,
+        creditPlanId: demande.creditPlanId || null,
         statut: statutInitial,
         echeance: demande.frequenceRemboursement,
         dateDebut: new Date(dateDecaissement),
@@ -1314,6 +1315,31 @@ export function registerFinanceRoutes(app: Express) {
         const client = await storage.getClient(data.clientId);
         if (client) {
           data.agenceId = client.agenceId;
+        }
+      }
+
+      // Validation du plan de crédit si fourni
+      if (data.creditPlanId) {
+        const plan = await storage.getCreditPlan(data.creditPlanId);
+        if (!plan) {
+          return res.status(400).json({ message: "Plan de crédit introuvable" });
+        }
+        if (!plan.isActive) {
+          return res.status(400).json({ message: "Ce plan de crédit n'est plus actif" });
+        }
+        const now = new Date();
+        if (plan.effectiveFrom && new Date(plan.effectiveFrom) > now) {
+          return res.status(400).json({ message: "Ce plan n'est pas encore en vigueur" });
+        }
+        if (plan.effectiveTo && new Date(plan.effectiveTo) < now) {
+          return res.status(400).json({ message: "Ce plan de crédit a expiré" });
+        }
+        const montant = parseFloat(data.montantDemande);
+        if (plan.montantMin && montant < parseFloat(plan.montantMin)) {
+          return res.status(400).json({ message: `Montant minimum pour ce plan : ${plan.montantMin}` });
+        }
+        if (plan.montantMax && montant > parseFloat(plan.montantMax)) {
+          return res.status(400).json({ message: `Montant maximum pour ce plan : ${plan.montantMax}` });
         }
       }
 

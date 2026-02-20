@@ -165,6 +165,7 @@ export const credits = pgTable(
     numeroCredit: text("numero_credit").notNull().unique(),
     clientId: uuid("client_id").notNull().references(() => clients.id),
     demandeId: uuid("demande_id").references(() => demandesCredit.id), // Added for linking back to application (fees, etc)
+    creditPlanId: uuid("credit_plan_id").references(() => creditPlans.id, { onDelete: "set null" }),
     enqueteId: uuid("enquete_id").references(() => enquetesCredit.id, { onDelete: "set null" }),
     montant: numeric("montant").notNull(),
     taux: numeric("taux").notNull(),
@@ -293,6 +294,7 @@ export const demandesCredit = pgTable(
     numeroDemande: text("numero_demande").notNull().unique(),
     clientId: uuid("client_id").notNull().references(() => clients.id),
     agenceId: uuid("agence_id").notNull().references(() => agences.id), // Added missing agenceId reference
+    creditPlanId: uuid("credit_plan_id").references(() => creditPlans.id, { onDelete: "set null" }),
 
     montantDemande: numeric("montant_demande").notNull(),
     tauxInteret: numeric("taux_interet").notNull(),
