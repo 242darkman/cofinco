@@ -67,17 +67,7 @@ async function runLateInstallmentsJob() {
             timestamp: new Date()
           });
 
-          // Score event: incident retard
-          const { recordScoreEvent } = await import('../services/scoring-engine');
-          const today = new Date().toISOString().slice(0, 10);
-          await recordScoreEvent({
-            clientId: client.id,
-            agenceId: credit.agenceId ?? undefined,
-            eventType: 'INCIDENT_RETARD',
-            refId: `late-${creditId}-${today}`,
-            refType: 'credit',
-            metadata: { creditId, numeroCredit: credit.numeroCredit },
-          });
+          // NOTE: INCIDENT_RETARD scoring event is handled by update-credit-status cron (same refId pattern)
         }
       } catch (err) {
         logger.error({ err, creditId }, 'Failed to dispatch event for late credit');

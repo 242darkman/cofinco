@@ -1348,21 +1348,7 @@ export async function applyLatePenalties(agenceId: string): Promise<{ applied: n
           timestamp: new Date(),
         });
 
-        // Score event: tontine penalty
-        try {
-          const { recordScoreEvent } = await import('./scoring-engine');
-          await recordScoreEvent({
-            clientId: member.clientId,
-            agenceId,
-            eventType: 'TONTINE_PENALITE',
-            refId: `penalite-${member.id}-${schedule.id}`,
-            refType: 'tontine_penalite',
-            montant: penaltyAmount,
-            reason: `Retard de paiement - Période ${schedule.periodNumber}`,
-          });
-        } catch (scoreErr) {
-          // Scoring failure never blocks tontine operations
-        }
+        // NOTE: Score event already recorded above (refId: tontine-penalty-${schedule.id})
       }
 
       // Check if member should be suspended

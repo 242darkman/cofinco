@@ -858,7 +858,6 @@ export interface AdminScoreStatesFilter {
 export interface AdminScoreStateRow extends ClientScoreState {
   clientNom?: string;
   clientPrenom?: string;
-  totalIncidents?: number;
 }
 
 export interface AdminScoreStatesResponse {

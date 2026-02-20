@@ -1740,6 +1740,22 @@ export function registerComptesRoutes(app: Express) {
               timestamp: new Date(),
               agenceId: compteInfo.agenceId || undefined,
             });
+
+            // Score event: EPARGNE_DEPOT (direct deposit path)
+            try {
+              const { recordScoreEvent } = await import('../services/scoring-engine');
+              await recordScoreEvent({
+                clientId: compteInfo.clientId,
+                agenceId: compteInfo.agenceId || undefined,
+                eventType: 'EPARGNE_DEPOT',
+                refId: `depot-${result.mouvement.id}`,
+                refType: 'mouvement_financier',
+                montant: parsed.montant,
+                createdBy: user?.id,
+              });
+            } catch (scoreErr) {
+              logger.warn({ err: scoreErr, compteId: req.params.id }, 'Score event EPARGNE_DEPOT failed (non-blocking)');
+            }
           }
         }
 

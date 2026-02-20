@@ -34,25 +34,5 @@ export * from "./device-keys";
 export * from "./kpi";
 export * from "./scoring";
 
-// Relations - Need to be defined here or in a separate file to avoid circular dependencies
-// if they were in individual files. OR we can put relations in `relations.ts`.
-// For now, I will re-export them from where they are OR define them here if they cross boundaries.
-
-// Actually, relations often depend on multiple tables.
-// The relations definitions in original schema were:
-// `clientsRelations` -> credits, comptesEpargne, membresTontine
-// `creditsRelations` -> client, repayments
-// etc.
-// Since I separated tables, I need to import them all to define relations.
-// I will create `relations.ts` in `shared/schema/` and export it in index.
-
-import { relations } from "drizzle-orm";
-
- 
- 
-import { membresTontine, contributionsTontine, tontines } from "./tontines";
-import { factures, lignesFactures, modelesFactures } from "./operations";
-// Circular dependency risk if I import from "." inside relations.ts which is exported by "."?
-// Better to import from specific files in relations.ts.
-
+// Relations are defined in relations.ts (imports specific files to avoid circular deps)
 export * from "./relations";

@@ -13,6 +13,7 @@ const createMockBuilder = (result: any = []) => {
   const arr = Array.isArray(result) ? result : [result];
   const builder: any = {
     from: vi.fn().mockReturnThis(),
+    leftJoin: vi.fn().mockReturnThis(),
     where: vi.fn().mockReturnThis(),
     limit: vi.fn().mockReturnThis(),
     offset: vi.fn().mockReturnThis(),
@@ -88,6 +89,8 @@ import {
   getScoreTrend,
   getScorePercentile,
   getAgencyScoreStats,
+  getAdminScoreEvents,
+  getAdminScoreStates,
 } from 'server/services/scoring-engine';
 
 // ============================================================================
@@ -688,6 +691,88 @@ describe('Scoring Engine', () => {
       expect(result.scoreGlobal).toBeLessThan(40);
     });
 
+    it('should assign VIP for high-scoring client with repaid credits and tenure', async () => {
+      const vipClient = {
+        ...MOCK_CLIENT,
+        dateAdhesion: new Date(Date.now() - 400 * 24 * 60 * 60 * 1000).toISOString(), // ~13 months
+        createdAt: new Date(Date.now() - 400 * 24 * 60 * 60 * 1000).toISOString(),
+      };
+
+      (db.query.clients.findFirst as any).mockResolvedValue(vipClient);
+      // 3 paid credits → creditsSoldes=3 >= 2 ✓
+      (db.query.credits.findMany as any).mockResolvedValue([
+        { id: 'c1', clientId: 'client-1', statut: 'PAID' },
+        { id: 'c2', clientId: 'client-1', statut: 'PAID' },
+        { id: 'c3', clientId: 'client-1', statut: 'PAID' },
+      ]);
+      // 2 savings accounts with 500k+ total balance
+      (db.query.comptes.findMany as any).mockResolvedValue([
+        { id: 'cpt1', clientId: 'client-1', statut: 'ACTIF', soldeCourant: '300000' },
+        { id: 'cpt2', clientId: 'client-1', statut: 'ACTIF', soldeCourant: '250000' },
+      ]);
+      // 2 tontine participations with 100k+ cotisations
+      (db.query.membresTontine.findMany as any).mockResolvedValue([
+        { tontineId: 't1', statut: 'ACTIF', totalCotisations: '60000' },
+        { tontineId: 't2', statut: 'ACTIF', totalCotisations: '50000' },
+      ]);
+      // Perfect repayment: 30/30 installments, 0 late days
+      mockExecute.mockResolvedValue({ rows: [{ paid_count: '30', due_count: '30', avg_late_days: '0' }] });
+      // db.select() is used by getSavingsData (cnt) AND getEventSummary (totalPoints, etc.)
+      // Both run in parallel; return combined object that satisfies both queries
+      mockSelect.mockReturnValue(createMockBuilder([{
+        cnt: 15,           // depots6Mois=15 for savings engagement
+        totalPoints: 500,  // high points for loyalty
+        totalDepots: 20,   // high for engagement + loyalty
+        totalRemboursements: 10,
+        totalCotisationsTontine: 5,
+        totalIncidents: 0,
+      }]));
+
+      const result = await recalculateClientScore('client-1');
+
+      expect(result.segment).toBe('VIP');
+      expect(result.scoreGlobal).toBeGreaterThanOrEqual(80);
+    });
+
+    it('should assign Premium for good client with 1+ repaid credit and 6+ months', async () => {
+      const premiumClient = {
+        ...MOCK_CLIENT,
+        dateAdhesion: new Date(Date.now() - 200 * 24 * 60 * 60 * 1000).toISOString(), // ~6.5 months
+        createdAt: new Date(Date.now() - 200 * 24 * 60 * 60 * 1000).toISOString(),
+      };
+
+      (db.query.clients.findFirst as any).mockResolvedValue(premiumClient);
+      // 2 paid credits → creditsSoldes=2 >= 1 ✓
+      (db.query.credits.findMany as any).mockResolvedValue([
+        { id: 'c1', clientId: 'client-1', statut: 'PAID' },
+        { id: 'c2', clientId: 'client-1', statut: 'PAID' },
+      ]);
+      // Savings with decent balance
+      (db.query.comptes.findMany as any).mockResolvedValue([
+        { id: 'cpt1', clientId: 'client-1', statut: 'ACTIF', soldeCourant: '200000' },
+      ]);
+      // 1 tontine participation
+      (db.query.membresTontine.findMany as any).mockResolvedValue([
+        { tontineId: 't1', statut: 'ACTIF', totalCotisations: '50000' },
+      ]);
+      // Good repayment: 20/20 installments, 0 late days
+      mockExecute.mockResolvedValue({ rows: [{ paid_count: '20', due_count: '20', avg_late_days: '0' }] });
+      // Combined mock for both getSavingsData and getEventSummary
+      mockSelect.mockReturnValue(createMockBuilder([{
+        cnt: 8,
+        totalPoints: 200,
+        totalDepots: 12,
+        totalRemboursements: 5,
+        totalCotisationsTontine: 3,
+        totalIncidents: 0,
+      }]));
+
+      const result = await recalculateClientScore('client-1');
+
+      expect(result.segment).toBe('Premium');
+      expect(result.scoreGlobal).toBeGreaterThanOrEqual(65);
+    });
+
     it('should assign Standard for established client with no credits', async () => {
       const establishedClient = {
         ...MOCK_CLIENT,
@@ -829,6 +914,89 @@ describe('Scoring Engine', () => {
       expect(result!.total).toBe(50);
       expect(result!.percentile).toBe(80); // 40/50 = 80%
       expect(result!.agenceId).toBe('agence-1');
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // Admin query helpers
+  // --------------------------------------------------------------------------
+
+  describe('getAdminScoreEvents', () => {
+    it('should return paginated events with total count', async () => {
+      const mockRows = [
+        { id: 'evt-1', clientId: 'client-1', eventType: 'EPARGNE_DEPOT', clientNom: 'Dupont', clientPrenom: 'Jean' },
+        { id: 'evt-2', clientId: 'client-2', eventType: 'CREDIT_REMBOURSEMENT', clientNom: 'Martin', clientPrenom: 'Paul' },
+      ];
+      mockSelect
+        .mockReturnValueOnce(createMockBuilder(mockRows))
+        .mockReturnValueOnce(createMockBuilder([{ total: 25 }]));
+
+      const result = await getAdminScoreEvents({ limit: 10, offset: 0 });
+
+      expect(result.rows).toEqual(mockRows);
+      expect(result.total).toBe(25);
+      expect(result.limit).toBe(10);
+      expect(result.offset).toBe(0);
+    });
+
+    it('should cap limit at 200', async () => {
+      mockSelect
+        .mockReturnValueOnce(createMockBuilder([]))
+        .mockReturnValueOnce(createMockBuilder([{ total: 0 }]));
+
+      const result = await getAdminScoreEvents({ limit: 500 });
+
+      expect(result.limit).toBe(200);
+    });
+
+    it('should accept filters without error', async () => {
+      mockSelect
+        .mockReturnValueOnce(createMockBuilder([]))
+        .mockReturnValueOnce(createMockBuilder([{ total: 0 }]));
+
+      const result = await getAdminScoreEvents({
+        agenceId: 'agence-1',
+        eventType: 'EPARGNE_DEPOT',
+        dateFrom: '2026-01-01',
+        dateTo: '2026-02-01',
+        clientId: 'client-1',
+      });
+
+      expect(result.rows).toEqual([]);
+      expect(result.total).toBe(0);
+    });
+  });
+
+  describe('getAdminScoreStates', () => {
+    it('should return paginated states with total count', async () => {
+      const mockRows = [
+        { id: 'state-1', clientId: 'client-1', scoreGlobal: 85, segment: 'VIP', clientNom: 'Dupont', clientPrenom: 'Jean' },
+        { id: 'state-2', clientId: 'client-2', scoreGlobal: 45, segment: 'Standard', clientNom: 'Martin', clientPrenom: 'Paul' },
+      ];
+      mockSelect
+        .mockReturnValueOnce(createMockBuilder(mockRows))
+        .mockReturnValueOnce(createMockBuilder([{ total: 100 }]));
+
+      const result = await getAdminScoreStates({ limit: 20, offset: 10 });
+
+      expect(result.rows).toEqual(mockRows);
+      expect(result.total).toBe(100);
+      expect(result.limit).toBe(20);
+      expect(result.offset).toBe(10);
+    });
+
+    it('should accept segment and agenceId filters', async () => {
+      mockSelect
+        .mockReturnValueOnce(createMockBuilder([]))
+        .mockReturnValueOnce(createMockBuilder([{ total: 0 }]));
+
+      const result = await getAdminScoreStates({
+        agenceId: 'agence-1',
+        segment: 'VIP',
+      });
+
+      expect(result.rows).toEqual([]);
+      expect(result.total).toBe(0);
     });
   });
 });

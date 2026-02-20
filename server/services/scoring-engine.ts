@@ -31,6 +31,8 @@ import { createLogger } from "../lib/logger";
 
 const logger = createLogger("ScoringEngine");
 
+type DbOrTx = typeof db;
+
 // ============================================================================
 // WEIGHTS & THRESHOLDS
 // ============================================================================
@@ -248,7 +250,7 @@ export async function recalculateClientScore(
 }
 
 /** Internal: full recalculation + DB persistence. Accepts db or tx for write atomicity. */
-async function _recalculate(clientId: string, txDb: any): Promise<RecalcResult> {
+async function _recalculate(clientId: string, txDb: DbOrTx): Promise<RecalcResult> {
   // Reads use txDb so getEventSummary sees just-inserted events within a transaction
   const [client, creditData, savingsData, tontineData, eventSummary] = await Promise.all([
     txDb.query.clients.findFirst({ where: eq(clients.id, clientId) }),
@@ -637,7 +639,7 @@ async function getTontineData(clientId: string): Promise<{
   };
 }
 
-async function getEventSummary(clientId: string, txDb: any = db): Promise<EventSummary> {
+async function getEventSummary(clientId: string, txDb: DbOrTx = db): Promise<EventSummary> {
   const rows = await txDb
     .select({
       totalPoints: sql<number>`COALESCE(SUM(${clientScoreEvents.pointsDelta}), 0)`,
@@ -694,7 +696,7 @@ async function upsertScoreState(
     totalIncidents: number;
     totalEpargneDepots: number;
   },
-  txDb: any = db,
+  txDb: DbOrTx = db,
 ) {
   const now = new Date();
 
@@ -931,6 +933,7 @@ export async function getAdminScoreStates(filters: AdminStatesFilter) {
     tauxRemboursement: clientScoreState.tauxRemboursement,
     totalPointsFidelite: clientScoreState.totalPointsFidelite,
     totalIncidents: clientScoreState.totalIncidents,
+    totalEpargneDepots: clientScoreState.totalEpargneDepots,
     updatedAt: clientScoreState.updatedAt,
     clientNom: clients.nom,
     clientPrenom: clients.prenom,
