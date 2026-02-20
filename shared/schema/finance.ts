@@ -351,6 +351,7 @@ export const enquetesCredit = pgTable("enquetes_credit", {
   id: uuid("id").primaryKey().defaultRandom(),
   clientId: uuid("client_id").notNull().references(() => clients.id),
   demandeId: uuid("demande_id").references(() => demandesCredit.id),
+  creditPlanId: uuid("credit_plan_id").references(() => creditPlans.id, { onDelete: "set null" }),
   montantDemande: numeric("montant_demande").notNull(),
   objetCredit: text("objet_credit").notNull(),
   
@@ -377,6 +378,7 @@ export const enquetesCredit = pgTable("enquetes_credit", {
   chargesMensuelles: numeric("charges_mensuelles"),
   autrePrets: numeric("autre_prets").default("0"),
   personnesCharge: integer("personnes_charge").default(0),
+  situationMatrimoniale: text("situation_matrimoniale"),
   typeHabitation: text("type_habitation"),
 
   // Données complémentaires (JSON)
