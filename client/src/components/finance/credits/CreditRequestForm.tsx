@@ -4,7 +4,6 @@ import { clientSearchApi, demandeCreditApi, creditPlanApi, clientApi } from '../
 import { SelectField, SearchableSelect } from '../../ui';
 import { formatClientName, resolveStorageUrl } from '../../../lib/format';
 import { toast } from '../../../lib/toast';
-import { SystemRole } from '@shared/types/roles';
 import { StatutDemande, TypeCredit, TYPE_CREDIT_OPTIONS, normalizeDureeUnite, normalizeFrequenceRemboursement } from '@shared/enum/status-constants';
 import useSmartDuration from '../../../hooks/credits/useSmartDuration';
 import { useCurrency } from '../../../contexts/CurrencyContext';
@@ -37,7 +36,6 @@ interface CreditRequestFormProps {
   onClose: () => void;
   onSuccess: () => void;
   clientId?: string;
-  userRole?: SystemRole | string;
 }
 
 export default function CreditRequestForm({ onClose, onSuccess, clientId }: CreditRequestFormProps) {
@@ -46,8 +44,6 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId }: Cred
   const [loading, setLoading] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [rateOverrideEnabled, setRateOverrideEnabled] = useState(false);
-  const [rateOverrideReason, setRateOverrideReason] = useState('');
 
   // Credit Plans state
   const [creditPlans, setCreditPlans] = useState<any[]>([]);
@@ -92,7 +88,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId }: Cred
   );
   
   // Smart Duration Hook
-  const { suggestedDurations, calculateInstallment, validateDuration } = useSmartDuration({
+  const { validateDuration } = useSmartDuration({
     selectedPlan,
     amount: parseFloat(formData.montant_demande) || 0,
     frequence: formData.frequence_remboursement
@@ -128,7 +124,6 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId }: Cred
 
     // Listen for real-time client updates
     const handleClientUpdate = () => {
-        console.log("🔄 Real-time update: Reloading clients...");
         loadClients("");
     };
 
@@ -162,7 +157,6 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId }: Cred
       // Deselect plan — clear locked fields
       setFormData(prev => ({ ...prev, credit_plan_id: '', montant_frais_engagement: '' }));
       setSchedulePreview(null);
-      setRateOverrideEnabled(false);
       return;
     }
     const plan = creditPlans.find(p => p.id === planId);
@@ -193,9 +187,8 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId }: Cred
       montant_demande: fixedMontant !== undefined ? fixedMontant : prev.montant_demande,
       montant_frais_engagement: '', // Will be pre-filled from schedule preview
     }));
-    // Reset schedule preview & override state
+    // Reset schedule preview
     setSchedulePreview(null);
-    setRateOverrideEnabled(false);
   };
 
 
@@ -467,10 +460,10 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId }: Cred
       const max = selectedPlan.montantMax;
       
       if (min && montant < min) {
-        newErrors.montant_demande = `Le montant minimum pour ce plan est de ${min.toLocaleString()} ${currency.symbol}`;
+        newErrors.montant_demande = `Le montant minimum pour ce plan est de ${fmt(min)}`;
       }
       if (max && montant > max) {
-        newErrors.montant_demande = `Le montant maximum pour ce plan est de ${max.toLocaleString()} ${currency.symbol}`;
+        newErrors.montant_demande = `Le montant maximum pour ce plan est de ${fmt(max)}`;
       }
     }
     if (!formData.frequence_remboursement) {
@@ -486,13 +479,10 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId }: Cred
 
 
 
-    if (rateOverrideEnabled) {
-      const overrideValue = parseFloat(formData.taux_interet);
-      if (Number.isNaN(overrideValue) || overrideValue < RATE_MIN || overrideValue > RATE_MAX) {
-        newErrors.taux_interet = `Le taux doit etre entre ${RATE_MIN}% et ${RATE_MAX}%`;
-      }
-      if (!rateOverrideReason.trim()) {
-        newErrors.taux_override_reason = 'Motif d\'override requis';
+    if (!selectedPlan) {
+      const tauxValue = parseFloat(formData.taux_interet);
+      if (Number.isNaN(tauxValue) || tauxValue < RATE_MIN || tauxValue > RATE_MAX) {
+        newErrors.taux_interet = `Le taux doit être entre ${RATE_MIN}% et ${RATE_MAX}%`;
       }
     }
 
@@ -515,13 +505,6 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId }: Cred
     setLoading(true);
 
     try {
-      const overridePayload = rateOverrideEnabled
-        ? {
-            tauxInteretOverride: formData.taux_interet,
-            tauxOverrideReason: rateOverrideReason,
-          }
-        : {};
-
       const dureeValeur = parseInt(formData.duree_valeur, 10);
 
       // Utiliser le taux du plan sélectionné s'il existe, sinon le taux saisi
@@ -555,7 +538,6 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId }: Cred
         chargesMensuelles: formData.charges_mensuelles,
         statut: StatutDemande.PENDING_FEES,
         montantFraisEngagement,
-        ...overridePayload,
       });
 
       onSuccess();
@@ -667,11 +649,17 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId }: Cred
 
      if (currentStep === 1) {
         if (!formData.client_id) { newErrors.client_id = 'Client requis'; isValid = false; }
-        if (clients.find(c => c.id === formData.client_id)?.isEligible === false) { 
-            newErrors.client_id = 'Client inéligible'; isValid = false; 
+        if (clients.find(c => c.id === formData.client_id)?.isEligible === false) {
+            newErrors.client_id = 'Client inéligible'; isValid = false;
         }
         if (!formData.montant_demande || parseFloat(formData.montant_demande) <= 0) {
             newErrors.montant_demande = 'Montant requis'; isValid = false;
+        } else if (selectedPlan) {
+            const montant = parseFloat(formData.montant_demande);
+            const min = selectedPlan.montantMin ? parseFloat(selectedPlan.montantMin) : null;
+            const max = selectedPlan.montantMax ? parseFloat(selectedPlan.montantMax) : null;
+            if (min && montant < min) { newErrors.montant_demande = `Montant minimum : ${fmt(min)}`; isValid = false; }
+            if (max && montant > max) { newErrors.montant_demande = `Montant maximum : ${fmt(max)}`; isValid = false; }
         }
         if (!formData.objet_credit.trim()) { newErrors.objet_credit = 'Objet requis'; isValid = false; }
      }
@@ -1022,7 +1010,7 @@ export default function CreditRequestForm({ onClose, onSuccess, clientId }: Cred
                         inputMode="decimal"
                         className={`w-full h-12 bg-surface-base border border-edge rounded-lg px-4 text-content-primary ${selectedPlan ? 'opacity-60 cursor-not-allowed font-bold' : ''}`}
                         value={formData.taux_interet}
-                        onChange={e => { const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); setRateOverrideEnabled(true); setFormData({...formData, taux_interet: v}); }}
+                        onChange={e => { const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); setFormData({...formData, taux_interet: v}); }}
                         readOnly={!!selectedPlan}
                       />
                    </div>

@@ -1183,13 +1183,17 @@ export function registerFinanceRoutes(app: Express) {
         return res.status(400).json({ message: "Un échéancier existe déjà pour ce crédit" });
       }
 
+      if (!credit.creditPlanId) {
+        return res.status(400).json({ message: "Ce crédit n'a pas de plan de crédit associé. Impossible de générer l'échéancier." });
+      }
+
       await generateCreditSchedule(creditId);
       const created = await storage.getEcheancesByCredit(creditId);
       res.json(created);
 
     } catch (error: any) {
       logger.error({ err: error }, "Error generating schedule");
-      res.status(500).json({ message: "Erreur lors de la génération de l'échéancier" });
+      res.status(500).json({ message: error.message || "Erreur lors de la génération de l'échéancier" });
     }
   });
 
