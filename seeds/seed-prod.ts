@@ -71,7 +71,7 @@ import {
 } from '@shared/schema';
 import { pays } from '@shared/schema/pays';
 import { seedRegions, migrateCongoDeptsToRegions, seedDepartementsADM2, cleanupLegacyDepts, loadGeonamesStaging, enrichFromStaging } from './seed-geography-world';
-import { departments, jobPositions, employes, payrollConfig, conventionsCollectives, qualificationCoefficients, chargeDefinitions, rubriqueDefinitions, payrollGlMapping, irppBaremes } from '@shared/schema';
+import { departments, jobPositions, employes, payrollConfig, conventionsCollectives, qualificationCoefficients, chargeDefinitions, rubriqueDefinitions, payrollGlMapping, irppBaremes, evaluationTemplates, evaluationCriteria, hrAlertConfig } from '@shared/schema';
 import { accountingRules } from '@shared/schema/accounting';
 import { caissesAgent } from '@shared/schema/caisse-agent';
 import { agentsTerrain } from '@shared/schema/operations';
@@ -3723,6 +3723,49 @@ async function seedHRBootstrap(context: SeedContext, dryRun: boolean): Promise<S
   } else {
     results.push({ table: 'payrollGlMapping', action: 'skipped', count: 0, details: 'exists' });
   }
+
+  // Evaluation Template par défaut
+  const [existingTemplate] = await db.select().from(evaluationTemplates).where(eq(evaluationTemplates.isDefault, true)).limit(1);
+  if (!existingTemplate) {
+    const [tmpl] = await db.insert(evaluationTemplates).values({
+      nom: 'Évaluation Annuelle Standard',
+      description: 'Template par défaut pour les évaluations annuelles de performance',
+      isDefault: true,
+      actif: true,
+    }).returning();
+    const defaultCriteria = [
+      { templateId: tmpl.id, libelle: 'Qualité du travail', categorie: 'TECHNIQUE', poids: 20, ordre: 1 },
+      { templateId: tmpl.id, libelle: 'Productivité', categorie: 'TECHNIQUE', poids: 15, ordre: 2 },
+      { templateId: tmpl.id, libelle: 'Respect des délais', categorie: 'OBJECTIFS', poids: 15, ordre: 3 },
+      { templateId: tmpl.id, libelle: 'Communication', categorie: 'COMPORTEMENT', poids: 10, ordre: 4 },
+      { templateId: tmpl.id, libelle: "Travail d'équipe", categorie: 'COMPORTEMENT', poids: 10, ordre: 5 },
+      { templateId: tmpl.id, libelle: 'Initiative', categorie: 'COMPORTEMENT', poids: 10, ordre: 6 },
+      { templateId: tmpl.id, libelle: 'Leadership', categorie: 'LEADERSHIP', poids: 10, ordre: 7 },
+      { templateId: tmpl.id, libelle: 'Développement des compétences', categorie: 'OBJECTIFS', poids: 10, ordre: 8 },
+    ];
+    await db.insert(evaluationCriteria).values(defaultCriteria);
+    results.push({ table: 'evaluationTemplates', action: 'created', count: 1, details: '8 critères (100%)' });
+  } else {
+    results.push({ table: 'evaluationTemplates', action: 'skipped', count: 0, details: 'default exists' });
+  }
+
+  // HR Alert Config par défaut
+  const alertConfigs = [
+    { alertType: 'FIN_PERIODE_ESSAI', enabled: true, reminderDays: [30, 15, 7, 1], channels: ['IN_APP'], description: "Rappel fin de période d'essai" },
+    { alertType: 'EXPIRATION_CDD', enabled: true, reminderDays: [60, 30, 15, 7], channels: ['IN_APP'], description: 'Rappel expiration contrat CDD' },
+    { alertType: 'DOCUMENT_EXPIRANT', enabled: true, reminderDays: [30, 15, 7], channels: ['IN_APP'], description: 'Rappel documents expirants' },
+    { alertType: 'ANNIVERSAIRE_TRAVAIL', enabled: true, reminderDays: [7], channels: ['IN_APP'], description: 'Anniversaires de travail' },
+    { alertType: 'VISITE_MEDICALE', enabled: true, reminderDays: [30, 15, 7], channels: ['IN_APP'], description: 'Rappel visite médicale' },
+  ];
+  let alertCreated = 0;
+  for (const cfg of alertConfigs) {
+    const [existing] = await db.select().from(hrAlertConfig).where(eq(hrAlertConfig.alertType, cfg.alertType));
+    if (!existing) {
+      await db.insert(hrAlertConfig).values(cfg);
+      alertCreated++;
+    }
+  }
+  results.push({ table: 'hrAlertConfig', action: alertCreated > 0 ? 'created' : 'skipped', count: alertCreated });
 
   return results;
 }

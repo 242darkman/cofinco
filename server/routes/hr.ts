@@ -45,6 +45,14 @@ import {
   payrollRunIssues,
   conventionsCollectives,
   qualificationCoefficients,
+  evaluationTemplates,
+  evaluationCriteria,
+  evaluationCampaigns,
+  evaluations,
+  evaluationResponses,
+  hrAlertConfig,
+  hrAlerts,
+  payrollTransferFiles,
 } from "@shared/schema";
 import { agentsTerrain, agentPlannings } from "@shared/schema";
 import { systemSettings } from "@shared/schema/settings";
@@ -72,6 +80,9 @@ import { enqueueNotification } from "../services/notifications/notification-serv
 import multer from "multer";
 import { importEmployees, parseCsv } from "../services/hr-import-service";
 import { StorageService } from "../services/storage-service";
+import { generateCampaignEvaluations, computeEvaluationScore, finalizeEvaluation } from "../services/evaluation-service";
+import { getTransferPreview, generateTransferFile } from "../services/payroll-transfer-service";
+import * as hrStorage from "../storage/hr";
 
 const csvUpload = multer({
   storage: multer.memoryStorage(),
@@ -4943,5 +4954,529 @@ hrRouter.delete("/documents/:id", getAuthUser, attachAbility, requireAbility(Act
     } catch (error) {
         logger.error({ err: error }, 'Erreur suppression document');
         res.status(500).json({ error: "Erreur lors de la suppression" });
+    }
+});
+
+// =============================================================================
+// EVALUATION TEMPLATES
+// =============================================================================
+
+// GET /api/hr/evaluations/templates
+hrRouter.get("/evaluations/templates", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const templates = await hrStorage.getEvaluationTemplates({ actif: true });
+        res.json(templates);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur récupération templates évaluation");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// POST /api/hr/evaluations/templates
+hrRouter.post("/evaluations/templates", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const { criteria, ...templateData } = req.body;
+
+        if (!templateData.nom) return res.status(400).json({ error: "Le nom est requis" });
+        if (!criteria?.length) return res.status(400).json({ error: "Au moins un critère est requis" });
+
+        const totalPoids = criteria.reduce((sum: number, c: any) => sum + (c.poids || 0), 0);
+        if (totalPoids !== 100) return res.status(400).json({ error: `Le total des poids doit être 100% (actuel: ${totalPoids}%)` });
+
+        const user = (req as any).user;
+        const template = await hrStorage.createEvaluationTemplate(
+            { ...templateData, createdBy: user.id, agenceId: user.agenceId },
+            criteria
+        );
+        res.status(201).json(template);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur création template évaluation");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// PUT /api/hr/evaluations/templates/:id
+hrRouter.put("/evaluations/templates/:id", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const { criteria, ...templateData } = req.body;
+
+        if (criteria) {
+            const totalPoids = criteria.reduce((sum: number, c: any) => sum + (c.poids || 0), 0);
+            if (totalPoids !== 100) return res.status(400).json({ error: `Le total des poids doit être 100% (actuel: ${totalPoids}%)` });
+        }
+
+        const template = await hrStorage.updateEvaluationTemplate(req.params.id, templateData, criteria);
+        if (!template) return res.status(404).json({ error: "Template introuvable" });
+        res.json(template);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur modification template évaluation");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// DELETE /api/hr/evaluations/templates/:id
+hrRouter.delete("/evaluations/templates/:id", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        await hrStorage.deleteEvaluationTemplate(req.params.id);
+        res.json({ success: true });
+    } catch (error) {
+        logger.error({ err: error }, "Erreur suppression template évaluation");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// =============================================================================
+// EVALUATION CAMPAIGNS
+// =============================================================================
+
+// GET /api/hr/evaluations/campaigns
+hrRouter.get("/evaluations/campaigns", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const { statut } = req.query;
+        const campaigns = await hrStorage.getEvaluationCampaigns({ statut: statut as string });
+        res.json(campaigns);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur récupération campagnes");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// POST /api/hr/evaluations/campaigns
+hrRouter.post("/evaluations/campaigns", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const user = (req as any).user;
+
+        const campaign = await hrStorage.createEvaluationCampaign({
+            ...req.body,
+            createdBy: user.id,
+            agenceId: user.agenceId,
+        });
+
+        // Générer les évaluations si la campagne est directement activée
+        if (campaign.statut === "ACTIVE") {
+            const result = await generateCampaignEvaluations(campaign.id);
+            return res.status(201).json({ ...campaign, generated: result.created });
+        }
+
+        res.status(201).json(campaign);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur création campagne");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// PATCH /api/hr/evaluations/campaigns/:id/status
+hrRouter.patch("/evaluations/campaigns/:id/status", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const { statut } = req.body;
+        if (!statut) return res.status(400).json({ error: "Statut requis" });
+
+        const campaign = await hrStorage.updateEvaluationCampaign(req.params.id, { statut });
+        if (!campaign) return res.status(404).json({ error: "Campagne introuvable" });
+
+        // Si activation, générer les évaluations
+        if (statut === "ACTIVE") {
+            const result = await generateCampaignEvaluations(campaign.id);
+            return res.json({ ...campaign, generated: result.created });
+        }
+
+        res.json(campaign);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur changement statut campagne");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// =============================================================================
+// EVALUATIONS (Individual)
+// =============================================================================
+
+// GET /api/hr/evaluations
+hrRouter.get("/evaluations", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        const user = (req as any).user;
+        const { campaignId, employeId, statut } = req.query;
+        const isRH = req.ability?.can(Actions.MANAGE, Subjects.RH);
+
+        // Trouver l'employé correspondant à l'utilisateur connecté
+        const [currentEmploye] = await db.select().from(employes).where(eq(employes.userId, user.id));
+
+        const filters: any = {};
+        if (campaignId) filters.campaignId = campaignId;
+        if (statut) filters.statut = statut;
+
+        if (isRH) {
+            if (employeId) filters.employeId = employeId;
+        } else if (currentEmploye) {
+            // Les managers voient les évaluations de leur équipe
+            const isManager = await db.select({ id: employes.id }).from(employes).where(eq(employes.managerId, currentEmploye.id)).limit(1);
+            if (isManager.length > 0) {
+                filters.managerId = currentEmploye.id;
+            } else {
+                filters.employeId = currentEmploye.id;
+            }
+        } else {
+            return res.json([]);
+        }
+
+        const evals = await hrStorage.getEvaluations(filters);
+        res.json(evals);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur récupération évaluations");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// GET /api/hr/evaluations/:id
+hrRouter.get("/evaluations/:id", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        const eval_ = await hrStorage.getEvaluationById(req.params.id);
+        if (!eval_) return res.status(404).json({ error: "Évaluation introuvable" });
+
+        // Charger les critères du template de la campagne
+        const [campaign] = await db.select().from(evaluationCampaigns).where(eq(evaluationCampaigns.id, eval_.campaignId));
+        const criteria = campaign?.templateId
+            ? await db.select().from(evaluationCriteria).where(eq(evaluationCriteria.templateId, campaign.templateId)).orderBy(evaluationCriteria.ordre)
+            : [];
+
+        // Charger les réponses
+        const responses = await hrStorage.getEvaluationResponses(eval_.id);
+
+        res.json({ ...eval_, criteria, responses, campaign });
+    } catch (error) {
+        logger.error({ err: error }, "Erreur récupération évaluation");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// GET /api/hr/evaluations/:id/comparison
+hrRouter.get("/evaluations/:id/comparison", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        const eval_ = await hrStorage.getEvaluationById(req.params.id);
+        if (!eval_) return res.status(404).json({ error: "Évaluation introuvable" });
+
+        const [campaign] = await db.select().from(evaluationCampaigns).where(eq(evaluationCampaigns.id, eval_.campaignId));
+        const criteria = campaign?.templateId
+            ? await db.select().from(evaluationCriteria).where(eq(evaluationCriteria.templateId, campaign.templateId)).orderBy(evaluationCriteria.ordre)
+            : [];
+
+        const selfResponses = await hrStorage.getEvaluationResponses(eval_.id, "SELF");
+        const managerResponses = await hrStorage.getEvaluationResponses(eval_.id, "MANAGER");
+
+        const selfMap = new Map(selfResponses.map(r => [r.criteriaId, r]));
+        const managerMap = new Map(managerResponses.map(r => [r.criteriaId, r]));
+
+        const comparison = criteria.map(c => ({
+            criteriaId: c.id,
+            libelle: c.libelle,
+            categorie: c.categorie,
+            poids: c.poids,
+            selfRating: selfMap.get(c.id)?.rating || null,
+            selfComment: selfMap.get(c.id)?.commentaire || null,
+            managerRating: managerMap.get(c.id)?.rating || null,
+            managerComment: managerMap.get(c.id)?.commentaire || null,
+            gap: (selfMap.get(c.id)?.rating && managerMap.get(c.id)?.rating)
+                ? (selfMap.get(c.id)!.rating - managerMap.get(c.id)!.rating)
+                : null,
+        }));
+
+        res.json({
+            evaluation: eval_,
+            comparison,
+            selfScore: eval_.selfEvalScore,
+            managerScore: eval_.managerEvalScore,
+            finalScore: eval_.finalScore,
+        });
+    } catch (error) {
+        logger.error({ err: error }, "Erreur comparaison évaluation");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// POST /api/hr/evaluations/:id/self-eval
+hrRouter.post("/evaluations/:id/self-eval", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        const user = (req as any).user;
+        const eval_ = await hrStorage.getEvaluationById(req.params.id);
+        if (!eval_) return res.status(404).json({ error: "Évaluation introuvable" });
+
+        // Vérifier que l'utilisateur est bien l'employé
+        const [emp] = await db.select().from(employes).where(eq(employes.userId, user.id));
+        if (!emp || emp.id !== eval_.employeId) {
+            return res.status(403).json({ error: "Vous ne pouvez compléter que votre propre auto-évaluation" });
+        }
+
+        const { responses, commentaire } = req.body;
+        if (!responses?.length) return res.status(400).json({ error: "Les réponses sont requises" });
+
+        // Sauvegarder les réponses
+        await hrStorage.batchUpsertResponses(eval_.id, "SELF", responses);
+
+        // Calculer le score
+        const score = await computeEvaluationScore(eval_.id, "SELF");
+
+        // Mettre à jour l'évaluation
+        await hrStorage.updateEvaluation(eval_.id, {
+            selfEvalStatus: "COMPLETED",
+            selfEvalSubmittedAt: new Date(),
+            selfEvalScore: score.toFixed(2),
+            selfCommentaire: commentaire || null,
+            statut: eval_.managerEvalStatus === "COMPLETED" ? "MANAGER_REVIEW" : "SELF_COMPLETED",
+        });
+
+        const wsInstance = getWsInstance();
+        wsInstance?.broadcast({ type: 'HR_UPDATE', payload: { entity: 'evaluation', action: 'updated', id: eval_.id } });
+
+        res.json({ success: true, score });
+    } catch (error) {
+        logger.error({ err: error }, "Erreur soumission auto-évaluation");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// POST /api/hr/evaluations/:id/manager-eval
+hrRouter.post("/evaluations/:id/manager-eval", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        const user = (req as any).user;
+        const eval_ = await hrStorage.getEvaluationById(req.params.id);
+        if (!eval_) return res.status(404).json({ error: "Évaluation introuvable" });
+
+        // Vérifier que l'utilisateur est le manager ou RH
+        const isRH = req.ability?.can(Actions.MANAGE, Subjects.RH);
+        if (!isRH) {
+            const [emp] = await db.select().from(employes).where(eq(employes.userId, user.id));
+            if (!emp || emp.id !== eval_.managerId) {
+                return res.status(403).json({ error: "Non autorisé à évaluer cet employé" });
+            }
+        }
+
+        const { responses, commentaire, recommandation } = req.body;
+        if (!responses?.length) return res.status(400).json({ error: "Les réponses sont requises" });
+
+        // Sauvegarder les réponses
+        await hrStorage.batchUpsertResponses(eval_.id, "MANAGER", responses);
+
+        // Calculer le score
+        const score = await computeEvaluationScore(eval_.id, "MANAGER");
+
+        // Mettre à jour l'évaluation
+        await hrStorage.updateEvaluation(eval_.id, {
+            managerEvalStatus: "COMPLETED",
+            managerEvalSubmittedAt: new Date(),
+            managerEvalScore: score.toFixed(2),
+            managerCommentaire: commentaire || null,
+            recommandation: recommandation || null,
+            statut: "MANAGER_REVIEW",
+        });
+
+        const wsInstance = getWsInstance();
+        wsInstance?.broadcast({ type: 'HR_UPDATE', payload: { entity: 'evaluation', action: 'updated', id: eval_.id } });
+
+        res.json({ success: true, score });
+    } catch (error) {
+        logger.error({ err: error }, "Erreur soumission évaluation manager");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// PATCH /api/hr/evaluations/:id/finalize
+hrRouter.patch("/evaluations/:id/finalize", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+
+        const { actionPlan, trainingRecommendations, recommandation } = req.body;
+        const eval_ = await hrStorage.getEvaluationById(req.params.id);
+        if (!eval_) return res.status(404).json({ error: "Évaluation introuvable" });
+
+        // Mettre à jour le plan d'action si fourni
+        if (actionPlan !== undefined || trainingRecommendations !== undefined || recommandation !== undefined) {
+            await hrStorage.updateEvaluation(eval_.id, {
+                ...(actionPlan !== undefined && { actionPlan }),
+                ...(trainingRecommendations !== undefined && { trainingRecommendations }),
+                ...(recommandation !== undefined && { recommandation }),
+            });
+        }
+
+        const finalScore = await finalizeEvaluation(eval_.id);
+
+        const wsInstance = getWsInstance();
+        wsInstance?.broadcast({ type: 'HR_UPDATE', payload: { entity: 'evaluation', action: 'updated', id: eval_.id } });
+
+        res.json({ success: true, finalScore });
+    } catch (error) {
+        logger.error({ err: error }, "Erreur finalisation évaluation");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// GET /api/hr/evaluations/analytics/history
+hrRouter.get("/evaluations/analytics/history", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        const { employeId } = req.query;
+        if (!employeId) return res.status(400).json({ error: "employeId requis" });
+        const history = await hrStorage.getEmployeeEvaluationHistory(employeId as string);
+        res.json(history);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur historique évaluations");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// GET /api/hr/evaluations/analytics/campaign-summary
+hrRouter.get("/evaluations/analytics/campaign-summary", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const { campaignId } = req.query;
+        if (!campaignId) return res.status(400).json({ error: "campaignId requis" });
+
+        const evals = await hrStorage.getEvaluations({ campaignId: campaignId as string });
+        const total = evals.length;
+        const finalized = evals.filter(e => e.statut === "FINALIZED").length;
+        const selfCompleted = evals.filter(e => e.selfEvalStatus === "COMPLETED").length;
+        const managerCompleted = evals.filter(e => e.managerEvalStatus === "COMPLETED").length;
+        const scores = evals.filter(e => e.finalScore).map(e => parseFloat(e.finalScore!));
+        const avgScore = scores.length > 0 ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1) : null;
+
+        const byRecommandation: Record<string, number> = {};
+        evals.filter(e => e.recommandation).forEach(e => {
+            byRecommandation[e.recommandation!] = (byRecommandation[e.recommandation!] || 0) + 1;
+        });
+
+        res.json({ total, finalized, selfCompleted, managerCompleted, avgScore, byRecommandation });
+    } catch (error) {
+        logger.error({ err: error }, "Erreur summary campagne");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// =============================================================================
+// HR ALERTS
+// =============================================================================
+
+// GET /api/hr/alerts
+hrRouter.get("/alerts", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const user = (req as any).user;
+        const alerts = await hrStorage.getUpcomingAlerts(30, user.agenceId);
+        res.json(alerts);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur récupération alertes");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// GET /api/hr/alerts/stats
+hrRouter.get("/alerts/stats", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const user = (req as any).user;
+        const stats = await hrStorage.getAlertStats(user.agenceId);
+        res.json(stats);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur stats alertes");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// POST /api/hr/alerts/:id/acknowledge
+hrRouter.post("/alerts/:id/acknowledge", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const user = (req as any).user;
+        const alert = await hrStorage.acknowledgeAlert(req.params.id, user.id);
+        if (!alert) return res.status(404).json({ error: "Alerte introuvable" });
+        res.json(alert);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur acknowledge alerte");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// POST /api/hr/alerts/:id/dismiss
+hrRouter.post("/alerts/:id/dismiss", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const user = (req as any).user;
+        const { reason } = req.body;
+        const alert = await hrStorage.dismissAlert(req.params.id, user.id, reason);
+        if (!alert) return res.status(404).json({ error: "Alerte introuvable" });
+        res.json(alert);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur dismiss alerte");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// GET /api/hr/alerts/config
+hrRouter.get("/alerts/config", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const configs = await hrStorage.getAlertConfigs();
+        res.json(configs);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur config alertes");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// PUT /api/hr/alerts/config/:type
+hrRouter.put("/alerts/config/:type", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const config = await hrStorage.updateAlertConfig(req.params.type, req.body);
+        if (!config) return res.status(404).json({ error: "Config introuvable" });
+        res.json(config);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur MAJ config alerte");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// =============================================================================
+// PAYROLL TRANSFER FILES
+// =============================================================================
+
+// GET /api/hr/paie/runs/:runId/transfer-preview
+hrRouter.get("/paie/runs/:runId/transfer-preview", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const preview = await getTransferPreview(parseInt(req.params.runId));
+        res.json(preview);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur aperçu virement");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// POST /api/hr/paie/runs/:runId/generate-transfer
+hrRouter.post("/paie/runs/:runId/generate-transfer", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const user = (req as any).user;
+        const result = await generateTransferFile(parseInt(req.params.runId), user.id);
+        res.json(result);
+    } catch (error: any) {
+        logger.error({ err: error }, "Erreur génération fichier virement");
+        res.status(400).json({ error: error.message || "Erreur lors de la génération" });
+    }
+});
+
+// GET /api/hr/paie/runs/:runId/transfer-files
+hrRouter.get("/paie/runs/:runId/transfer-files", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const files = await hrStorage.getTransferFiles(parseInt(req.params.runId));
+        res.json(files);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur récupération fichiers virement");
+        res.status(500).json({ error: "Erreur serveur" });
     }
 });

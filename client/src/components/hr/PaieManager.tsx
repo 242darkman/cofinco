@@ -13,6 +13,7 @@ import { isAdminRole } from '@shared/types/roles';
 import SalaryAdvances from './SalaryAdvances';
 import PayrollConfigPanel from './PayrollConfigPanel';
 import { PayslipViewer } from './PayslipViewer';
+import TransferFileModal from './TransferFileModal';
 import { formatMoney } from '../../lib/format';
 
 // Status badge config
@@ -52,6 +53,9 @@ export default function PaieManager() {
 
   // PayslipViewer state
   const [viewerBulletinId, setViewerBulletinId] = useState<number | null>(null);
+
+  // Transfer file modal
+  const [transferRunId, setTransferRunId] = useState<number | null>(null);
 
   // Re-run dialog
   const [rerunDialogOpen, setRerunDialogOpen] = useState(false);
@@ -254,6 +258,12 @@ export default function PaieManager() {
               <Button size="sm" variant="outline" icon={RotateCcw} onClick={() => handleRerunOpen(run.id)} isLoading={isRerunning}
                 className="h-7 text-[11px] border-status-warning/50 text-status-warning hover:bg-status-warning-bg">
                 Re-run
+              </Button>
+            )}
+            {['VALIDATED', 'PAID'].includes(run.status) && (
+              <Button size="sm" variant="outline" icon={Banknote} onClick={() => setTransferRunId(run.id)}
+                className="h-7 text-[11px] border-accent/50 text-accent hover:bg-accent/10">
+                Virement
               </Button>
             )}
             <Button size="sm" variant="ghost" icon={Download} onClick={() => handleExportRun(bulletins)} className="h-7 text-[11px]">
@@ -611,6 +621,13 @@ export default function PaieManager() {
         isOpen={viewerBulletinId !== null}
         onClose={() => setViewerBulletinId(null)}
         bulletinId={viewerBulletinId}
+      />
+
+      {/* Transfer File Modal */}
+      <TransferFileModal
+        isOpen={transferRunId !== null}
+        onClose={() => setTransferRunId(null)}
+        runId={transferRunId}
       />
     </div>
   );

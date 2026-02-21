@@ -1,4 +1,4 @@
-import { eq, desc, and, sql, gte, lte } from "drizzle-orm";
+import { eq, desc, and, sql, gte, lte, not, inArray } from "drizzle-orm";
 import { db } from "../db";
 import {
   demandesConges,
@@ -9,7 +9,15 @@ import {
   avantages, Avantage,
   avantagesEmployes, InsertAvantageEmploye, AvantageEmploye,
   presences, Presence, users, horairesTravail, employes,
-  jobPositions, departments
+  jobPositions, departments,
+  evaluationTemplates, evaluationCriteria, evaluationCampaigns, evaluations, evaluationResponses,
+  hrAlertConfig, hrAlerts, payrollTransferFiles,
+  type EvaluationTemplate, type InsertEvaluationTemplate,
+  type EvaluationCriteria as EvalCriteria, type InsertEvaluationCriteria,
+  type EvaluationCampaign, type InsertEvaluationCampaign,
+  type Evaluation, type InsertEvaluation,
+  type EvaluationResponse, type InsertEvaluationResponse,
+  type HrAlertConfig, type HrAlert,
 } from "@shared/schema";
 import { StatutUser, StatutConge, StatutCandidature, StatutPresence, StatutBulletin, ModeCalculPaie } from "@shared/enum/status-constants";
 
@@ -450,7 +458,7 @@ export async function getHrStats(): Promise<any> {
     const employesCount = await db.select({ count: sql<number>`count(*)` }).from(employes);
     const congesEnAttente = await db.select({ count: sql<number>`count(*)` }).from(demandesConges).where(eq(demandesConges.statut, StatutConge.PENDING));
     const recrutementsEnCours = await db.select({ count: sql<number>`count(*)` }).from(candidatures).where(eq(candidatures.statut, StatutCandidature.PENDING));
-    
+
     // Payroll total current month (approx)
     const currentMonth = new Date().toISOString().slice(0, 7);
     const masseSalariale = await db.select({ total: sql<number>`sum(${bulletinsPaie.salaireNet})` })
@@ -462,4 +470,236 @@ export async function getHrStats(): Promise<any> {
         recrutementsEnCours: recrutementsEnCours[0]?.count || 0,
         masseSalariale: masseSalariale[0]?.total || 0
     };
+}
+
+// =============================================================================
+// EVALUATION TEMPLATES
+// =============================================================================
+
+export async function getEvaluationTemplates(filters?: { actif?: boolean; agenceId?: string }) {
+    const conditions = [];
+    if (filters?.actif !== undefined) conditions.push(eq(evaluationTemplates.actif, filters.actif));
+    if (filters?.agenceId) conditions.push(eq(evaluationTemplates.agenceId, filters.agenceId));
+
+    const templates = conditions.length > 0
+        ? await db.select().from(evaluationTemplates).where(and(...conditions)).orderBy(desc(evaluationTemplates.createdAt))
+        : await db.select().from(evaluationTemplates).orderBy(desc(evaluationTemplates.createdAt));
+
+    // Charger les critères pour chaque template
+    const templateIds = templates.map(t => t.id);
+    const allCriteria = templateIds.length > 0
+        ? await db.select().from(evaluationCriteria).where(inArray(evaluationCriteria.templateId, templateIds)).orderBy(evaluationCriteria.ordre)
+        : [];
+
+    return templates.map(t => ({
+        ...t,
+        criteria: allCriteria.filter(c => c.templateId === t.id),
+        criteriaCount: allCriteria.filter(c => c.templateId === t.id).length,
+    }));
+}
+
+export async function createEvaluationTemplate(data: InsertEvaluationTemplate, criteria: InsertEvaluationCriteria[]) {
+    const [template] = await db.insert(evaluationTemplates).values(data).returning();
+    if (criteria.length > 0) {
+        await db.insert(evaluationCriteria).values(criteria.map(c => ({ ...c, templateId: template.id })));
+    }
+    return template;
+}
+
+export async function updateEvaluationTemplate(id: string, data: Partial<InsertEvaluationTemplate>, criteria?: InsertEvaluationCriteria[]) {
+    const [template] = await db.update(evaluationTemplates).set({ ...data, updatedAt: new Date() }).where(eq(evaluationTemplates.id, id)).returning();
+    if (criteria) {
+        await db.delete(evaluationCriteria).where(eq(evaluationCriteria.templateId, id));
+        if (criteria.length > 0) {
+            await db.insert(evaluationCriteria).values(criteria.map(c => ({ ...c, templateId: id })));
+        }
+    }
+    return template;
+}
+
+export async function deleteEvaluationTemplate(id: string) {
+    await db.delete(evaluationTemplates).where(eq(evaluationTemplates.id, id));
+}
+
+// =============================================================================
+// EVALUATION CAMPAIGNS
+// =============================================================================
+
+export async function getEvaluationCampaigns(filters?: { statut?: string; agenceId?: string }) {
+    const conditions = [];
+    if (filters?.statut) conditions.push(eq(evaluationCampaigns.statut, filters.statut));
+    if (filters?.agenceId) conditions.push(eq(evaluationCampaigns.agenceId, filters.agenceId));
+
+    const campaigns = conditions.length > 0
+        ? await db.select().from(evaluationCampaigns).where(and(...conditions)).orderBy(desc(evaluationCampaigns.createdAt))
+        : await db.select().from(evaluationCampaigns).orderBy(desc(evaluationCampaigns.createdAt));
+
+    // Ajouter les stats par campagne
+    const campaignIds = campaigns.map(c => c.id);
+    if (campaignIds.length === 0) return [];
+
+    const stats = await db
+        .select({
+            campaignId: evaluations.campaignId,
+            total: sql<number>`count(*)`,
+            finalized: sql<number>`count(*) filter (where ${evaluations.statut} = 'FINALIZED')`,
+            avgScore: sql<number>`avg(${evaluations.finalScore}::numeric) filter (where ${evaluations.finalScore} is not null)`,
+        })
+        .from(evaluations)
+        .where(inArray(evaluations.campaignId, campaignIds))
+        .groupBy(evaluations.campaignId);
+
+    const statsMap = new Map(stats.map(s => [s.campaignId, s]));
+
+    return campaigns.map(c => ({
+        ...c,
+        totalEvaluations: statsMap.get(c.id)?.total || 0,
+        finalizedCount: statsMap.get(c.id)?.finalized || 0,
+        avgScore: statsMap.get(c.id)?.avgScore ? Number(statsMap.get(c.id)!.avgScore).toFixed(1) : null,
+    }));
+}
+
+export async function createEvaluationCampaign(data: InsertEvaluationCampaign) {
+    const [campaign] = await db.insert(evaluationCampaigns).values(data).returning();
+    return campaign;
+}
+
+export async function updateEvaluationCampaign(id: string, data: Partial<InsertEvaluationCampaign>) {
+    const [campaign] = await db.update(evaluationCampaigns).set({ ...data, updatedAt: new Date() }).where(eq(evaluationCampaigns.id, id)).returning();
+    return campaign;
+}
+
+// =============================================================================
+// EVALUATIONS
+// =============================================================================
+
+export async function getEvaluations(filters: { campaignId?: string; employeId?: string; managerId?: string; statut?: string }) {
+    const conditions = [];
+    if (filters.campaignId) conditions.push(eq(evaluations.campaignId, filters.campaignId));
+    if (filters.employeId) conditions.push(eq(evaluations.employeId, filters.employeId));
+    if (filters.managerId) conditions.push(eq(evaluations.managerId, filters.managerId));
+    if (filters.statut) conditions.push(eq(evaluations.statut, filters.statut));
+
+    return conditions.length > 0
+        ? await db.select().from(evaluations).where(and(...conditions)).orderBy(desc(evaluations.createdAt))
+        : await db.select().from(evaluations).orderBy(desc(evaluations.createdAt));
+}
+
+export async function getEvaluationById(id: string) {
+    const [eval_] = await db.select().from(evaluations).where(eq(evaluations.id, id));
+    return eval_ || null;
+}
+
+export async function updateEvaluation(id: string, data: Partial<InsertEvaluation>) {
+    const [eval_] = await db.update(evaluations).set({ ...data, updatedAt: new Date() }).where(eq(evaluations.id, id)).returning();
+    return eval_;
+}
+
+// =============================================================================
+// EVALUATION RESPONSES
+// =============================================================================
+
+export async function getEvaluationResponses(evaluationId: string, responseType?: string) {
+    const conditions = [eq(evaluationResponses.evaluationId, evaluationId)];
+    if (responseType) conditions.push(eq(evaluationResponses.responseType, responseType));
+    return db.select().from(evaluationResponses).where(and(...conditions));
+}
+
+export async function batchUpsertResponses(evalId: string, responseType: string, responses: Array<{ criteriaId: string; rating: number; commentaire?: string }>) {
+    // Supprimer les réponses existantes pour ce type
+    await db.delete(evaluationResponses).where(
+        and(eq(evaluationResponses.evaluationId, evalId), eq(evaluationResponses.responseType, responseType))
+    );
+    // Insérer les nouvelles
+    if (responses.length > 0) {
+        await db.insert(evaluationResponses).values(
+            responses.map(r => ({ evaluationId: evalId, responseType, ...r }))
+        );
+    }
+}
+
+export async function getEmployeeEvaluationHistory(employeId: string) {
+    return db
+        .select({
+            evaluationId: evaluations.id,
+            campaignNom: evaluationCampaigns.nom,
+            campaignType: evaluationCampaigns.type,
+            dateFin: evaluationCampaigns.dateFin,
+            finalScore: evaluations.finalScore,
+            recommandation: evaluations.recommandation,
+            statut: evaluations.statut,
+        })
+        .from(evaluations)
+        .innerJoin(evaluationCampaigns, eq(evaluations.campaignId, evaluationCampaigns.id))
+        .where(eq(evaluations.employeId, employeId))
+        .orderBy(desc(evaluationCampaigns.dateFin));
+}
+
+// =============================================================================
+// HR ALERTS
+// =============================================================================
+
+export async function getUpcomingAlerts(daysAhead: number = 30, agenceId?: string) {
+    const today = new Date().toISOString().split('T')[0];
+    const future = new Date();
+    future.setDate(future.getDate() + daysAhead);
+    const futureStr = future.toISOString().split('T')[0];
+
+    const conditions = [
+        eq(hrAlerts.status, 'PENDING'),
+        gte(hrAlerts.eventDate, today),
+        lte(hrAlerts.eventDate, futureStr),
+    ];
+    if (agenceId) conditions.push(eq(hrAlerts.agenceId, agenceId));
+
+    return db.select().from(hrAlerts).where(and(...conditions)).orderBy(hrAlerts.eventDate);
+}
+
+export async function getAlertStats(agenceId?: string) {
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    const j7 = new Date(today); j7.setDate(j7.getDate() + 7);
+    const j15 = new Date(today); j15.setDate(j15.getDate() + 15);
+    const j30 = new Date(today); j30.setDate(j30.getDate() + 30);
+
+    const conditions = [eq(hrAlerts.status, 'PENDING'), gte(hrAlerts.eventDate, todayStr)];
+    if (agenceId) conditions.push(eq(hrAlerts.agenceId, agenceId));
+
+    const alerts = await db.select({ eventDate: hrAlerts.eventDate }).from(hrAlerts).where(and(...conditions));
+
+    let urgent = 0, warning = 0, info = 0;
+    for (const a of alerts) {
+        const d = new Date(a.eventDate);
+        if (d <= j7) urgent++;
+        else if (d <= j15) warning++;
+        else if (d <= j30) info++;
+    }
+    return { urgent, warning, info, total: alerts.length };
+}
+
+export async function acknowledgeAlert(id: string, userId: string) {
+    const [alert] = await db.update(hrAlerts).set({ status: 'ACKNOWLEDGED', acknowledgedBy: userId, acknowledgedAt: new Date(), updatedAt: new Date() }).where(eq(hrAlerts.id, id)).returning();
+    return alert;
+}
+
+export async function dismissAlert(id: string, userId: string, reason?: string) {
+    const [alert] = await db.update(hrAlerts).set({ status: 'DISMISSED', dismissedBy: userId, dismissedAt: new Date(), dismissReason: reason || null, updatedAt: new Date() }).where(eq(hrAlerts.id, id)).returning();
+    return alert;
+}
+
+export async function getAlertConfigs() {
+    return db.select().from(hrAlertConfig).orderBy(hrAlertConfig.alertType);
+}
+
+export async function updateAlertConfig(alertType: string, updates: Partial<HrAlertConfig>) {
+    const [config] = await db.update(hrAlertConfig).set({ ...updates, updatedAt: new Date() }).where(eq(hrAlertConfig.alertType, alertType)).returning();
+    return config;
+}
+
+// =============================================================================
+// PAYROLL TRANSFER FILES
+// =============================================================================
+
+export async function getTransferFiles(runId: number) {
+    return db.select().from(payrollTransferFiles).where(eq(payrollTransferFiles.payrollRunId, runId)).orderBy(desc(payrollTransferFiles.createdAt));
 }

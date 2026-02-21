@@ -45,6 +45,7 @@ import { startDailyIntegrityAuditCron } from "./cron/daily-integrity-audit";
 import { startScoreRecalculationCron } from "./cron/score-recalculation";
 import { startAutoLiftSuspensionCron } from "./cron/auto-lift-suspension";
 import { startInterestAccrualCron } from "./cron/interest-accrual";
+import { startHrAlertsGeneratorCron } from "./cron/hr-alerts-generator";
 import { StorageService } from "./services/storage-service";
 
 const app = express();
@@ -386,6 +387,10 @@ app.get("/api/health", async (_req, res) => {
     // Start Score Recalculation Cron (weekly — keeps tenure-based scores fresh)
     startScoreRecalculationCron();
     logger.info('Score recalculation cron started (Sunday 03:00)');
+
+    // Start HR Alerts Generator Cron (daily at 06:00 — scans for upcoming HR events)
+    startHrAlertsGeneratorCron();
+    logger.info('HR alerts generator cron started (daily 06:00)');
 
     logger.info('All cron jobs started: disbursements, repayments, credit-status, migrations, reconciliation, temp-permissions, balance-reconciliation, mm-reconciliation-report, treasury-reconciliation, gl-reconciliation-monitor, gl-auto-fix, late-installments, daily-integrity-audit, auto-lift-suspension');
 

@@ -319,6 +319,7 @@ export const ROUTES: RouteConfig[] = [
       { path: '/ressources-humaines/avantages', subModule: 'avantages', label: 'Avantages & Primes' },
       { path: '/ressources-humaines/paie', subModule: 'paie', label: 'Paie & Docs' },
       { path: '/ressources-humaines/recrutement', subModule: 'recrutement', label: 'Recrutement' },
+      { path: '/ressources-humaines/evaluations', subModule: 'evaluations', label: 'Évaluations' },
       { path: '/ressources-humaines/organigramme', subModule: 'organigramme', label: 'Organigramme' },
     ],
   },

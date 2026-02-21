@@ -42,9 +42,21 @@ export const employes = pgTable("employes", {
   paymentMethod: varchar("payment_method", { length: 20 }).default("CASH"), // 'CASH', 'TRANSFER', 'MOBILE_MONEY', 'CHECK'
   paymentDetails: text("payment_details"), // Coordonnées bancaires, N° Mobile Money, etc.
 
+  // Coordonnées bancaires (virement)
+  bankName: varchar("bank_name", { length: 100 }),
+  bankCode: varchar("bank_code", { length: 10 }),
+  branchCode: varchar("branch_code", { length: 10 }),
+  bankAccountNumber: varchar("bank_account_number", { length: 50 }),
+  accountKey: varchar("account_key", { length: 5 }),
+
   // Classification
   coefficient: integer("coefficient"),                         // Coefficient salarial (ex: 100, 150, 220)
   categorie: varchar("categorie", { length: 20 }),            // Catégorie (ex: 'CADRE', 'AGENT_MAITRISE', 'OUVRIER')
+
+  // Contrat & Période d'essai
+  dateFinContrat: date("date_fin_contrat"),       // Date fin CDD
+  dateFinEssai: date("date_fin_essai"),           // Date fin période d'essai
+  prochaineMedicale: date("prochaine_medicale"),  // Prochaine visite médicale
 
   // Sortie
   dateSortie: date("date_sortie"),

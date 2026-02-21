@@ -2,6 +2,7 @@ import React from 'react';
 import { BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Users, TrendingDown, Briefcase } from 'lucide-react';
 import { useHrAnalytics } from '../../hooks/hr/useHrAnalytics';
+import HrAlertsPanel from './HrAlertsPanel';
 
 const PIE_COLORS = ['#10b981', '#f59e0b', '#ef4444'];
 
@@ -82,6 +83,9 @@ export default function HrAnalyticsDashboard() {
           </div>
         </div>
       </div>
+
+      {/* HR Alerts */}
+      <HrAlertsPanel />
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 flex-1 min-h-0">

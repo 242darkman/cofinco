@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { TabGroup, ConfirmDialog, PageHeader, FeatureHeader, FEATURE_DESCRIPTIONS } from '../ui';
-import { Users, Calendar, UserPlus, AlertTriangle, Gift, GraduationCap, ClipboardCheck, Building2, FileText, Upload, BarChart3 } from 'lucide-react';
+import { Users, Calendar, UserPlus, AlertTriangle, Gift, GraduationCap, ClipboardCheck, Building2, FileText, Upload, BarChart3, Star } from 'lucide-react';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 
@@ -26,6 +26,7 @@ import OrganigrammeView from './OrganigrammeView';
 import PaieManager from './PaieManager';
 import ImportEmployeesModal from './ImportEmployeesModal';
 import HrAnalyticsDashboard from './HrAnalyticsDashboard';
+import EvaluationsManager from './EvaluationsManager';
 import ProspectionPrimeConfig from '../admin/ProspectionPrimeConfig';
 
 const TABS = [
@@ -37,6 +38,7 @@ const TABS = [
   { key: 'sanctions', label: 'Sanctions', icon: AlertTriangle },
   { key: 'avantages', label: 'Avantages & Primes', icon: Gift },
   { key: 'paie', label: 'Paie & Docs', icon: FileText },
+  { key: 'evaluations', label: 'Évaluations', icon: Star },
   { key: 'recrutement', label: 'Recrutement', icon: UserPlus },
   { key: 'organigramme', label: 'Organigramme', icon: Building2 }
 ];
@@ -282,6 +284,9 @@ export default function RessourcesHumaines() {
       case 'paie':
         return <PaieManager />;
 
+      case 'evaluations':
+        return <EvaluationsManager />;
+
       case 'recrutement':
         return (
           <RecrutementManager
@@ -392,6 +397,14 @@ export default function RessourcesHumaines() {
           agenceId: editingEmploye.agenceId || null,
           jobPositionId: editingEmploye.jobPositionId || null,
           modeCalculPaie: editingEmploye.modeCalculPaie || 'MONTHLY',
+          bankName: editingEmploye.bankName || '',
+          bankCode: editingEmploye.bankCode || '',
+          branchCode: editingEmploye.branchCode || '',
+          bankAccountNumber: editingEmploye.bankAccountNumber || '',
+          accountKey: editingEmploye.accountKey || '',
+          dateFinContrat: editingEmploye.dateFinContrat || null,
+          dateFinEssai: editingEmploye.dateFinEssai || null,
+          prochaineMedicale: editingEmploye.prochaineMedicale || null,
         } : {
           matricule: '',
           nom: '',

@@ -9,6 +9,9 @@ import { notifications, pushSubscriptions, creditPlanVersions, creditPenaltyStru
 import { transferts } from "./transferts";
 import { clientTags, clientActivities } from "./clients";
 import { clientScoreEvents, clientScoreState } from "./scoring";
+import { evaluationTemplates, evaluationCriteria, evaluationCampaigns, evaluations, evaluationResponses, hrAlerts, payrollTransferFiles, payrollRuns } from "./hr";
+import { employes } from "./employes";
+import { agences } from "./agences";
 
 export const clientsRelations = relations(clients, ({ many, one }) => ({
   credits: many(credits),
@@ -338,5 +341,47 @@ export const holidayDatesRelations = relations(holidayDates, ({ one }) => ({
     fields: [holidayDates.calendarId],
     references: [holidayCalendars.id],
   }),
+}));
+
+// Evaluation Templates
+export const evaluationTemplatesRelations = relations(evaluationTemplates, ({ many, one }) => ({
+  criteria: many(evaluationCriteria),
+  campaigns: many(evaluationCampaigns),
+  creator: one(users, { fields: [evaluationTemplates.createdBy], references: [users.id] }),
+  agence: one(agences, { fields: [evaluationTemplates.agenceId], references: [agences.id] }),
+}));
+
+export const evaluationCriteriaRelations = relations(evaluationCriteria, ({ one }) => ({
+  template: one(evaluationTemplates, { fields: [evaluationCriteria.templateId], references: [evaluationTemplates.id] }),
+}));
+
+export const evaluationCampaignsRelations = relations(evaluationCampaigns, ({ one, many }) => ({
+  template: one(evaluationTemplates, { fields: [evaluationCampaigns.templateId], references: [evaluationTemplates.id] }),
+  evaluations: many(evaluations),
+  agence: one(agences, { fields: [evaluationCampaigns.agenceId], references: [agences.id] }),
+  creator: one(users, { fields: [evaluationCampaigns.createdBy], references: [users.id] }),
+}));
+
+export const evaluationsRelations = relations(evaluations, ({ one, many }) => ({
+  campaign: one(evaluationCampaigns, { fields: [evaluations.campaignId], references: [evaluationCampaigns.id] }),
+  employe: one(employes, { fields: [evaluations.employeId], references: [employes.id], relationName: "evaluationEmploye" }),
+  manager: one(employes, { fields: [evaluations.managerId], references: [employes.id], relationName: "evaluationManager" }),
+  responses: many(evaluationResponses),
+}));
+
+export const evaluationResponsesRelations = relations(evaluationResponses, ({ one }) => ({
+  evaluation: one(evaluations, { fields: [evaluationResponses.evaluationId], references: [evaluations.id] }),
+  criteria: one(evaluationCriteria, { fields: [evaluationResponses.criteriaId], references: [evaluationCriteria.id] }),
+}));
+
+// HR Alerts
+export const hrAlertsRelations = relations(hrAlerts, ({ one }) => ({
+  employe: one(employes, { fields: [hrAlerts.employeId], references: [employes.id] }),
+  agence: one(agences, { fields: [hrAlerts.agenceId], references: [agences.id] }),
+}));
+
+// Payroll Transfer Files
+export const payrollTransferFilesRelations = relations(payrollTransferFiles, ({ one }) => ({
+  payrollRun: one(payrollRuns, { fields: [payrollTransferFiles.payrollRunId], references: [payrollRuns.id] }),
 }));
 

@@ -42,6 +42,16 @@ export interface Employe {
   situationFamiliale?: 'CELIBATAIRE' | 'MARIE' | 'VEUF' | 'DIVORCE' | null;
   nombreEnfantsCharge?: number | null;
   niu?: string | null;
+  // Coordonnées bancaires
+  bankName?: string | null;
+  bankCode?: string | null;
+  branchCode?: string | null;
+  bankAccountNumber?: string | null;
+  accountKey?: string | null;
+  // Dates contrat
+  dateFinContrat?: string | null;
+  dateFinEssai?: string | null;
+  prochaineMedicale?: string | null;
   // Sortie
   typeCompte?: 'employe' | 'client' | 'both';
   dateSortie?: string | null;
@@ -86,6 +96,16 @@ export interface EmployeFormData {
   situationFamiliale?: 'CELIBATAIRE' | 'MARIE' | 'VEUF' | 'DIVORCE';
   nombreEnfantsCharge?: string;
   niu?: string;
+  // Coordonnées bancaires
+  bankName?: string;
+  bankCode?: string;
+  branchCode?: string;
+  bankAccountNumber?: string;
+  accountKey?: string;
+  // Dates contrat
+  dateFinContrat?: string | null;
+  dateFinEssai?: string | null;
+  prochaineMedicale?: string | null;
   // Sortie
   dateSortie?: string | null;
   motifSortie?: 'DEMISSION' | 'LICENCIEMENT' | 'FIN_CDD' | 'RETRAITE' | 'DECES' | null;

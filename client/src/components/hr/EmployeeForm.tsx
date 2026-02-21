@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { X, Save, AlertTriangle, Upload, User, Users, Link, Building2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, Save, AlertTriangle, Upload, User, Users, Link, Building2, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { Employe, EmployeFormData } from '../../hooks/hr/useEmployes';
 import { Modal, FormField, SelectField, Button, ConfirmDialog } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
@@ -972,6 +972,93 @@ export default function EmployeeForm({
               </div>
             </div>
   
+            {/* Section Coordonnées Bancaires */}
+            <div className="p-3 bg-accent/5 border border-accent/20 rounded-lg space-y-3">
+              <div className="flex items-center gap-2">
+                <Building2 size={16} className="text-accent" />
+                <h4 className="text-sm font-semibold text-content-primary">Coordonnées Bancaires</h4>
+                <span className="text-[10px] text-content-muted">(virement)</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <FormField
+                  label="Nom de la Banque"
+                  name="bankName"
+                  value={formData.bankName || ''}
+                  onChange={(e) => updateField('bankName', e.target.value)}
+                  placeholder="Ex: BGFI Bank Congo"
+                  className="py-1"
+                />
+                <FormField
+                  label="Code Banque"
+                  name="bankCode"
+                  value={formData.bankCode || ''}
+                  onChange={(e) => updateField('bankCode', e.target.value)}
+                  placeholder="Ex: 30011"
+                  className="py-1"
+                />
+                <FormField
+                  label="Code Guichet"
+                  name="branchCode"
+                  value={formData.branchCode || ''}
+                  onChange={(e) => updateField('branchCode', e.target.value)}
+                  placeholder="Ex: 00100"
+                  className="py-1"
+                />
+                <FormField
+                  label="Numéro de Compte"
+                  name="bankAccountNumber"
+                  value={formData.bankAccountNumber || ''}
+                  onChange={(e) => updateField('bankAccountNumber', e.target.value)}
+                  placeholder="Ex: 0000123456"
+                  className="py-1"
+                />
+                <FormField
+                  label="Clé RIB"
+                  name="accountKey"
+                  value={formData.accountKey || ''}
+                  onChange={(e) => updateField('accountKey', e.target.value)}
+                  placeholder="Ex: 97"
+                  className="py-1"
+                />
+              </div>
+            </div>
+
+            {/* Section Dates Contrat */}
+            <div className="p-3 bg-status-warning-bg border border-status-warning/20 rounded-lg space-y-3">
+              <div className="flex items-center gap-2">
+                <Calendar size={16} className="text-status-warning" />
+                <h4 className="text-sm font-semibold text-content-primary">Dates clés du contrat</h4>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <FormField
+                  label="Fin Période d'Essai"
+                  name="dateFinEssai"
+                  type="date"
+                  value={formData.dateFinEssai || ''}
+                  onChange={(e) => updateField('dateFinEssai', e.target.value)}
+                  className="py-1"
+                />
+                <FormField
+                  label="Fin de Contrat (CDD)"
+                  name="dateFinContrat"
+                  type="date"
+                  value={formData.dateFinContrat || ''}
+                  onChange={(e) => updateField('dateFinContrat', e.target.value)}
+                  className="py-1"
+                />
+                <FormField
+                  label="Prochaine Visite Médicale"
+                  name="prochaineMedicale"
+                  type="date"
+                  value={formData.prochaineMedicale || ''}
+                  onChange={(e) => updateField('prochaineMedicale', e.target.value)}
+                  className="py-1"
+                />
+              </div>
+            </div>
+
             {/* Section Situation Familiale & Fiscale */}
             <div className="p-6 bg-status-info-bg border border-status-info/30 rounded-xl">
               <div className="flex items-center gap-2 mb-6 text-content-primary font-bold text-base">

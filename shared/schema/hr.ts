@@ -1103,3 +1103,242 @@ export const SituationFamiliale = {
   VEUF: 'VEUF',
   DIVORCE: 'DIVORCE',
 } as const;
+
+// =============================================================================
+// EVALUATIONS DE PERFORMANCE
+// =============================================================================
+
+export const CampaignType = {
+  ANNUAL: 'ANNUAL',
+  SEMI_ANNUAL: 'SEMI_ANNUAL',
+  QUARTERLY: 'QUARTERLY',
+  CUSTOM: 'CUSTOM',
+} as const;
+export type CampaignTypeType = typeof CampaignType[keyof typeof CampaignType];
+
+export const CampaignStatus = {
+  DRAFT: 'DRAFT',
+  ACTIVE: 'ACTIVE',
+  CLOSED: 'CLOSED',
+  ARCHIVED: 'ARCHIVED',
+} as const;
+export type CampaignStatusType = typeof CampaignStatus[keyof typeof CampaignStatus];
+
+export const EvaluationStatus = {
+  DRAFT: 'DRAFT',
+  SELF_COMPLETED: 'SELF_COMPLETED',
+  MANAGER_REVIEW: 'MANAGER_REVIEW',
+  FINALIZED: 'FINALIZED',
+} as const;
+export type EvaluationStatusType = typeof EvaluationStatus[keyof typeof EvaluationStatus];
+
+export const Recommandation = {
+  MAINTAIN: 'MAINTAIN',
+  PROMOTE: 'PROMOTE',
+  TRAINING_NEEDED: 'TRAINING_NEEDED',
+  WARNING: 'WARNING',
+  PIP: 'PIP',
+} as const;
+export type RecommandationType = typeof Recommandation[keyof typeof Recommandation];
+
+export const CriteriaCategory = {
+  TECHNIQUE: 'TECHNIQUE',
+  COMPORTEMENT: 'COMPORTEMENT',
+  OBJECTIFS: 'OBJECTIFS',
+  LEADERSHIP: 'LEADERSHIP',
+  AUTRE: 'AUTRE',
+} as const;
+export type CriteriaCategoryType = typeof CriteriaCategory[keyof typeof CriteriaCategory];
+
+/** Modèles d'évaluation réutilisables */
+export const evaluationTemplates = pgTable("evaluation_templates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  nom: varchar("nom", { length: 200 }).notNull(),
+  description: text("description"),
+  actif: boolean("actif").default(true),
+  isDefault: boolean("is_default").default(false),
+  agenceId: uuid("agence_id").references(() => agences.id, { onDelete: "cascade" }),
+  createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+/** Critères d'un modèle d'évaluation */
+export const evaluationCriteria = pgTable("evaluation_criteria", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  templateId: uuid("template_id").notNull().references(() => evaluationTemplates.id, { onDelete: "cascade" }),
+  libelle: varchar("libelle", { length: 250 }).notNull(),
+  description: text("description"),
+  categorie: varchar("categorie", { length: 50 }).notNull(), // TECHNIQUE, COMPORTEMENT, OBJECTIFS, LEADERSHIP, AUTRE
+  poids: integer("poids").notNull().default(10), // Poids en % (total d'un template = 100)
+  ordre: integer("ordre").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+/** Campagnes d'évaluation */
+export const evaluationCampaigns = pgTable("evaluation_campaigns", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  nom: varchar("nom", { length: 200 }).notNull(),
+  description: text("description"),
+  type: varchar("type", { length: 30 }).notNull().default("ANNUAL"),
+  dateDebut: date("date_debut").notNull(),
+  dateFin: date("date_fin").notNull(),
+  statut: varchar("statut", { length: 30 }).notNull().default("DRAFT"),
+  targetType: varchar("target_type", { length: 30 }).notNull().default("ALL"), // ALL, DEPARTMENT, POSITION, CUSTOM
+  targetFilter: json("target_filter").$type<string[]>(), // IDs de départements, postes ou employés selon targetType
+  templateId: uuid("template_id").references(() => evaluationTemplates.id, { onDelete: "set null" }),
+  selfEvalDeadline: date("self_eval_deadline"),
+  managerEvalDeadline: date("manager_eval_deadline"),
+  agenceId: uuid("agence_id").references(() => agences.id, { onDelete: "cascade" }),
+  createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+/** Évaluations individuelles (une par employé par campagne) */
+export const evaluations = pgTable("evaluations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  campaignId: uuid("campaign_id").notNull().references(() => evaluationCampaigns.id, { onDelete: "cascade" }),
+  employeId: uuid("employe_id").notNull().references(() => employes.id, { onDelete: "cascade" }),
+  employeNom: varchar("employe_nom", { length: 255 }).notNull(),
+  managerId: uuid("manager_id").references(() => employes.id, { onDelete: "set null" }),
+  managerNom: varchar("manager_nom", { length: 255 }),
+
+  selfEvalStatus: varchar("self_eval_status", { length: 30 }).default("NOT_STARTED"), // NOT_STARTED, IN_PROGRESS, COMPLETED
+  selfEvalSubmittedAt: timestamp("self_eval_submitted_at"),
+  managerEvalStatus: varchar("manager_eval_status", { length: 30 }).default("NOT_STARTED"),
+  managerEvalSubmittedAt: timestamp("manager_eval_submitted_at"),
+
+  statut: varchar("statut", { length: 30 }).notNull().default("DRAFT"),
+  selfEvalScore: numeric("self_eval_score", { precision: 5, scale: 2 }),
+  managerEvalScore: numeric("manager_eval_score", { precision: 5, scale: 2 }),
+  finalScore: numeric("final_score", { precision: 5, scale: 2 }),
+
+  recommandation: varchar("recommandation", { length: 30 }),
+  selfCommentaire: text("self_commentaire"),
+  managerCommentaire: text("manager_commentaire"),
+  actionPlan: text("action_plan"),
+  trainingRecommendations: json("training_recommendations").$type<string[]>(),
+
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  finalizedAt: timestamp("finalized_at"),
+});
+
+/** Réponses critère par critère (self + manager) */
+export const evaluationResponses = pgTable("evaluation_responses", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  evaluationId: uuid("evaluation_id").notNull().references(() => evaluations.id, { onDelete: "cascade" }),
+  criteriaId: uuid("criteria_id").notNull().references(() => evaluationCriteria.id, { onDelete: "cascade" }),
+  responseType: varchar("response_type", { length: 20 }).notNull(), // SELF, MANAGER
+  rating: integer("rating").notNull(), // 1-5
+  commentaire: text("commentaire"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Insert schemas & types
+export const insertEvaluationTemplateSchema = createInsertSchema(evaluationTemplates).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertEvaluationCriteriaSchema = createInsertSchema(evaluationCriteria).omit({ id: true, createdAt: true });
+export const insertEvaluationCampaignSchema = createInsertSchema(evaluationCampaigns).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertEvaluationSchema = createInsertSchema(evaluations).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertEvaluationResponseSchema = createInsertSchema(evaluationResponses).omit({ id: true, createdAt: true, updatedAt: true });
+
+export type EvaluationTemplate = typeof evaluationTemplates.$inferSelect;
+export type InsertEvaluationTemplate = z.infer<typeof insertEvaluationTemplateSchema>;
+export type EvaluationCriteria = typeof evaluationCriteria.$inferSelect;
+export type InsertEvaluationCriteria = z.infer<typeof insertEvaluationCriteriaSchema>;
+export type EvaluationCampaign = typeof evaluationCampaigns.$inferSelect;
+export type InsertEvaluationCampaign = z.infer<typeof insertEvaluationCampaignSchema>;
+export type Evaluation = typeof evaluations.$inferSelect;
+export type InsertEvaluation = z.infer<typeof insertEvaluationSchema>;
+export type EvaluationResponse = typeof evaluationResponses.$inferSelect;
+export type InsertEvaluationResponse = z.infer<typeof insertEvaluationResponseSchema>;
+
+// =============================================================================
+// ALERTES RH
+// =============================================================================
+
+export const HrAlertType = {
+  FIN_PERIODE_ESSAI: 'FIN_PERIODE_ESSAI',
+  EXPIRATION_CDD: 'EXPIRATION_CDD',
+  DOCUMENT_EXPIRANT: 'DOCUMENT_EXPIRANT',
+  ANNIVERSAIRE_TRAVAIL: 'ANNIVERSAIRE_TRAVAIL',
+  VISITE_MEDICALE: 'VISITE_MEDICALE',
+} as const;
+export type HrAlertTypeType = typeof HrAlertType[keyof typeof HrAlertType];
+
+export const HrAlertStatus = {
+  PENDING: 'PENDING',
+  ACKNOWLEDGED: 'ACKNOWLEDGED',
+  DISMISSED: 'DISMISSED',
+  EXPIRED: 'EXPIRED',
+} as const;
+export type HrAlertStatusType = typeof HrAlertStatus[keyof typeof HrAlertStatus];
+
+/** Configuration des alertes par type */
+export const hrAlertConfig = pgTable("hr_alert_config", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  alertType: varchar("alert_type", { length: 50 }).notNull().unique(),
+  enabled: boolean("enabled").notNull().default(true),
+  reminderDays: json("reminder_days").$type<number[]>().notNull().default([30, 15, 7, 1]),
+  channels: json("channels").$type<string[]>().notNull().default(['IN_APP']),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+/** Alertes RH générées */
+export const hrAlerts = pgTable("hr_alerts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  alertType: varchar("alert_type", { length: 50 }).notNull(),
+  employeId: uuid("employe_id").notNull().references(() => employes.id, { onDelete: "cascade" }),
+  employeNom: varchar("employe_nom", { length: 255 }).notNull(),
+  eventDate: date("event_date").notNull(),
+  eventLabel: text("event_label").notNull(),
+  metadata: json("metadata").$type<Record<string, any>>(),
+  status: varchar("status", { length: 20 }).notNull().default("PENDING"),
+  acknowledgedBy: uuid("acknowledged_by").references(() => users.id, { onDelete: "set null" }),
+  acknowledgedAt: timestamp("acknowledged_at"),
+  dismissedBy: uuid("dismissed_by").references(() => users.id, { onDelete: "set null" }),
+  dismissedAt: timestamp("dismissed_at"),
+  dismissReason: text("dismiss_reason"),
+  agenceId: uuid("agence_id").references(() => agences.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => ({
+  idxAlertTypeStatus: index("idx_hr_alerts_type_status").on(t.alertType, t.status),
+  idxEventDate: index("idx_hr_alerts_event_date").on(t.eventDate),
+  idxEmployeId: index("idx_hr_alerts_employe").on(t.employeId),
+}));
+
+export const insertHrAlertConfigSchema = createInsertSchema(hrAlertConfig).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertHrAlertSchema = createInsertSchema(hrAlerts).omit({ id: true, createdAt: true, updatedAt: true });
+
+export type HrAlertConfig = typeof hrAlertConfig.$inferSelect;
+export type InsertHrAlertConfig = z.infer<typeof insertHrAlertConfigSchema>;
+export type HrAlert = typeof hrAlerts.$inferSelect;
+export type InsertHrAlert = z.infer<typeof insertHrAlertSchema>;
+
+// =============================================================================
+// FICHIERS DE VIREMENT PAIE
+// =============================================================================
+
+/** Fichiers de virement générés par run de paie */
+export const payrollTransferFiles = pgTable("payroll_transfer_files", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  payrollRunId: integer("payroll_run_id").notNull().references(() => payrollRuns.id, { onDelete: "cascade" }),
+  fileName: text("file_name").notNull(),
+  storageKey: text("storage_key").notNull(),
+  format: varchar("format", { length: 10 }).notNull().default("CSV"),
+  employeeCount: integer("employee_count").notNull(),
+  totalAmount: numeric("total_amount", { precision: 14, scale: 0 }).notNull(),
+  generatedBy: uuid("generated_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  idxRunId: index("idx_transfer_files_run").on(t.payrollRunId),
+}));
+
+export const insertPayrollTransferFileSchema = createInsertSchema(payrollTransferFiles).omit({ id: true, createdAt: true });
+export type PayrollTransferFile = typeof payrollTransferFiles.$inferSelect;
+export type InsertPayrollTransferFile = z.infer<typeof insertPayrollTransferFileSchema>;
