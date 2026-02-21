@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { AlertTriangle, CheckCircle, XCircle, Ban, DollarSign, Clock, Filter, ShieldOff } from 'lucide-react';
+import { AlertTriangle, CheckCircle, XCircle, Ban, DollarSign, Clock, Filter, ShieldOff, Plus } from 'lucide-react';
 import { Card, Button, Badge } from '../../ui';
 import { tontineApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
@@ -39,6 +39,11 @@ export default function TontinePenalties({ tontineId, onUpdate }: TontinePenalti
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [typeFilter, setTypeFilter] = useState<string>('');
 
+  // Manual penalty creation
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [createData, setCreateData] = useState({ membreId: '', montant: '', penaltyType: 'CUSTOM', motif: '' });
+  const [creating, setCreating] = useState(false);
+
   const fetchData = useCallback(async () => {
     if (!tontineId) return;
     setLoading(true);
@@ -59,6 +64,31 @@ export default function TontinePenalties({ tontineId, onUpdate }: TontinePenalti
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const handleCreatePenalty = useCallback(async () => {
+    if (!createData.membreId || !createData.montant) {
+      toast.warning('Membre et montant requis');
+      return;
+    }
+    setCreating(true);
+    try {
+      await tontineApi.createPenalty(tontineId, {
+        membreId: createData.membreId,
+        montant: Number(createData.montant),
+        penaltyType: createData.penaltyType || 'CUSTOM',
+        motif: createData.motif || undefined,
+      });
+      toast.success('Penalite creee');
+      setShowCreateForm(false);
+      setCreateData({ membreId: '', montant: '', penaltyType: 'CUSTOM', motif: '' });
+      await fetchData();
+      onUpdate?.();
+    } catch (error) {
+      toast.error(handleApiError(error, 'Erreur lors de la creation'));
+    } finally {
+      setCreating(false);
+    }
+  }, [tontineId, createData, fetchData, onUpdate]);
 
   const getMemberName = useCallback((membreId: string) => {
     const m = membres.find((m: any) => m.id === membreId);
@@ -183,6 +213,63 @@ export default function TontinePenalties({ tontineId, onUpdate }: TontinePenalti
             </select>
           )}
         </div>
+      )}
+
+      {/* Create penalty button */}
+      <div className="flex justify-end">
+        <Button size="sm" variant="outline" icon={Plus} onClick={() => setShowCreateForm(!showCreateForm)}>
+          {showCreateForm ? 'Annuler' : 'Nouvelle penalite'}
+        </Button>
+      </div>
+
+      {/* Create penalty form */}
+      {showCreateForm && (
+        <Card className="p-3 bg-accent/5 border-accent/20">
+          <p className="text-xs font-semibold text-content-primary mb-3">Creer une penalite manuelle</p>
+          <div className="space-y-2">
+            <select
+              value={createData.membreId}
+              onChange={e => setCreateData(p => ({ ...p, membreId: e.target.value }))}
+              className="w-full px-2 py-1.5 bg-input border border-input-border rounded text-xs text-content-primary focus:border-input-focus focus:outline-none"
+            >
+              <option value="">Selectionner un membre...</option>
+              {membres.map((m: any) => (
+                <option key={m.id} value={m.id}>
+                  {m.client?.nom || ''} {m.client?.prenom || ''}
+                </option>
+              ))}
+            </select>
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="number"
+                value={createData.montant}
+                onChange={e => setCreateData(p => ({ ...p, montant: e.target.value }))}
+                placeholder={`Montant (${sym})`}
+                className="px-2 py-1.5 bg-input border border-input-border rounded text-xs text-content-primary focus:border-input-focus focus:outline-none"
+              />
+              <select
+                value={createData.penaltyType}
+                onChange={e => setCreateData(p => ({ ...p, penaltyType: e.target.value }))}
+                className="px-2 py-1.5 bg-input border border-input-border rounded text-xs text-content-primary focus:border-input-focus focus:outline-none"
+              >
+                <option value="CUSTOM">Personnalise</option>
+                <option value="LATE">Retard</option>
+                <option value="ABSENCE">Absence</option>
+                <option value="WITHDRAWAL_FEE">Frais de retrait</option>
+              </select>
+            </div>
+            <input
+              type="text"
+              value={createData.motif}
+              onChange={e => setCreateData(p => ({ ...p, motif: e.target.value }))}
+              placeholder="Motif (optionnel)"
+              className="w-full px-2 py-1.5 bg-input border border-input-border rounded text-xs text-content-primary focus:border-input-focus focus:outline-none"
+            />
+            <Button size="sm" variant="primary" onClick={handleCreatePenalty} disabled={creating || !createData.membreId || !createData.montant} isLoading={creating} fullWidth>
+              Creer la penalite
+            </Button>
+          </div>
+        </Card>
       )}
 
       {/* Waive reason form */}

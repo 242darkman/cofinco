@@ -1597,6 +1597,8 @@ export const tontineApi = {
 
   // Penalties
   getPenalties: (tontineId: string) => request<any[]>(`/tontines/${tontineId}/penalites`),
+  createPenalty: (tontineId: string, data: { membreId: string; montant: number; penaltyType?: string; motif?: string; dateFaute?: string }) =>
+    request<any>(`/tontines/${tontineId}/penalites`, { method: 'POST', body: JSON.stringify(data) }),
   payPenalty: (tontineId: string, penaliteId: string) =>
     request<any>(`/tontines/${tontineId}/penalites/${penaliteId}/pay`, { method: 'POST' }),
   waivePenalty: (penaliteId: string, reason?: string) =>

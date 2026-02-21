@@ -5,6 +5,8 @@ import {
   StatutMembreTontine
 } from '@shared/enum/status-constants';
 import { Check, DollarSign, User, X, AlertTriangle, Wallet, TrendingDown, Banknote, Smartphone, Clock, Play, CheckCircle, Ban } from 'lucide-react';
+import ConfirmDialog from '../../ui/ConfirmDialog';
+import { useConfirmDialog } from '../../../hooks/useConfirmDialog';
 import mtnLogo from '@/assets/logos/mtn-logo.png';
 import airtelLogo from '@/assets/logos/airtel-logo.png';
 
@@ -83,6 +85,7 @@ const statusConfig: Record<string, { label: string; variant: 'success' | 'warnin
 
 export default function TontineDistributions({ tontineId, montantContribution, tourActuel, nombreMembres, onUpdate }: TontineDistributionsProps) {
   const sym = currencySymbol();
+  const { confirmState, openConfirm, closeConfirm, handleConfirm } = useConfirmDialog();
   const [distributions, setDistributions] = useState<DistributionRequest[]>([]);
   const [membres, setMembres] = useState<Membre[]>([]);
   const [loading, setLoading] = useState(false);
@@ -224,33 +227,54 @@ export default function TontineDistributions({ tontineId, montantContribution, t
 
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  const handleApprove = useCallback(async (dist: DistributionRequest) => {
-    setActionLoading(dist.id);
-    try {
-      await tontineApi.approveDistribution(tontineId, dist.id);
-      toast.success('Distribution approuvée');
-      fetchData();
-      onUpdate();
-    } catch (error) {
-      toast.error(handleApiError(error, "Erreur lors de l'approbation"));
-    } finally {
-      setActionLoading(null);
-    }
-  }, [tontineId, fetchData, onUpdate]);
+  const handleApprove = useCallback((dist: DistributionRequest) => {
+    const m = dist.beneficiaryMemberId ? membres.find(x => x.id === dist.beneficiaryMemberId) : null;
+    const memberName = m ? formatClientName(m.client.nom, m.client.prenom) : 'Inconnu';
+    const amount = Number(dist.netAmount || dist.amountRequested || 0);
+    openConfirm({
+      title: 'Approuver la distribution',
+      message: `Approuver la distribution de ${amount.toLocaleString()} ${sym} pour ${memberName} ? Cette action declenchera le paiement.`,
+      variant: 'info',
+      confirmText: 'Approuver',
+      onConfirm: async () => {
+        setActionLoading(dist.id);
+        try {
+          await tontineApi.approveDistribution(tontineId, dist.id);
+          toast.success('Distribution approuvee');
+          fetchData();
+          onUpdate();
+        } catch (error) {
+          toast.error(handleApiError(error, "Erreur lors de l'approbation"));
+        } finally {
+          setActionLoading(null);
+        }
+      },
+    });
+  }, [tontineId, fetchData, onUpdate, openConfirm, sym, membres]);
 
-  const handleCancel = useCallback(async (dist: DistributionRequest) => {
-    setActionLoading(dist.id);
-    try {
-      await tontineApi.cancelDistribution(tontineId, dist.id, 'Annulé manuellement');
-      toast.success('Distribution annulée');
-      fetchData();
-      onUpdate();
-    } catch (error) {
-      toast.error(handleApiError(error, "Erreur lors de l'annulation"));
-    } finally {
-      setActionLoading(null);
-    }
-  }, [tontineId, fetchData, onUpdate]);
+  const handleCancel = useCallback((dist: DistributionRequest) => {
+    const m = dist.beneficiaryMemberId ? membres.find(x => x.id === dist.beneficiaryMemberId) : null;
+    const memberName = m ? formatClientName(m.client.nom, m.client.prenom) : 'Inconnu';
+    openConfirm({
+      title: 'Annuler la distribution',
+      message: `Annuler la distribution pour ${memberName} ? Cette action est irreversible.`,
+      variant: 'danger',
+      confirmText: 'Annuler la distribution',
+      onConfirm: async () => {
+        setActionLoading(dist.id);
+        try {
+          await tontineApi.cancelDistribution(tontineId, dist.id, 'Annule manuellement');
+          toast.success('Distribution annulee');
+          fetchData();
+          onUpdate();
+        } catch (error) {
+          toast.error(handleApiError(error, "Erreur lors de l'annulation"));
+        } finally {
+          setActionLoading(null);
+        }
+      },
+    });
+  }, [tontineId, fetchData, onUpdate, openConfirm, membres]);
 
   // Helper functions
   const getDistributionAmount = (dist: DistributionRequest) => {
@@ -638,6 +662,16 @@ export default function TontineDistributions({ tontineId, montantContribution, t
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={confirmState.isOpen}
+        onClose={closeConfirm}
+        onConfirm={handleConfirm}
+        title={confirmState.title || ''}
+        message={confirmState.message || ''}
+        variant={confirmState.variant}
+        confirmText={confirmState.confirmText}
+      />
     </div>
   );
 }

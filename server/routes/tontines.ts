@@ -270,13 +270,17 @@ export function registerTontineRoutes(app: Express) {
 
   // Update membre tontine (cotisation auto etc)
   app.patch("/api/tontines/:id/membres/:membreId", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.TONTINE_MEMBRE), async (req, res) => {
+    try {
       const data = normalizeKeysDeep(req.body);
-      // Ensure tontine exists
       const tontine = await storage.getTontine(req.params.id);
       if (!tontine) return res.status(404).json({ message: "Tontine not found" });
 
       const updated = await storage.updateMembreTontine(req.params.membreId, data as any);
       res.json(updated);
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur mise à jour membre tontine');
+      res.status(400).json({ message: error.message || "Erreur lors de la mise à jour du membre" });
+    }
   });
 
   // Pay join fee for a member
@@ -617,18 +621,51 @@ export function registerTontineRoutes(app: Express) {
     res.json(penalites);
   });
 
-  app.patch("/api/tontine-penalites/:id", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.TONTINE), async (req, res) => {
-    const data = normalizeKeysDeep(req.body);
-    const parsed = insertTontinePenaliteSchema.partial().parse(data);
-    const updated = await storage.updateTontinePenalite(req.params.id, parsed);
+  // Create penalty manually (B1)
+  app.post("/api/tontines/:id/penalites", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.TONTINE), async (req: Request, res: Response) => {
+    try {
+      const data = normalizeKeysDeep(req.body) as Record<string, unknown>;
+      const parsed = insertTontinePenaliteSchema.parse({
+        ...data,
+        tontineId: req.params.id,
+        autoApplied: false,
+      });
+      const penalite = await storage.createTontinePenalite(parsed);
 
-    // Notify
-    const wsInstance = getWsInstance();
-    if (wsInstance) {
-        wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: 'penalite_updated', id: req.params.id } });
+      const wsInstance = getWsInstance();
+      if (wsInstance) {
+        wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: 'penalite_created', tontineId: req.params.id } });
+      }
+
+      res.json(penalite);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Erreur de validation", errors: error.errors });
+      }
+      logger.error({ err: error }, 'Erreur création pénalité manuelle');
+      res.status(400).json({ message: error.message || "Erreur lors de la création de la pénalité" });
     }
+  });
 
-    res.json(updated);
+  app.patch("/api/tontine-penalites/:id", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.TONTINE), async (req, res) => {
+    try {
+      const data = normalizeKeysDeep(req.body);
+      const parsed = insertTontinePenaliteSchema.partial().parse(data);
+      const updated = await storage.updateTontinePenalite(req.params.id, parsed);
+
+      const wsInstance = getWsInstance();
+      if (wsInstance) {
+        wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: 'penalite_updated', id: req.params.id } });
+      }
+
+      res.json(updated);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Erreur de validation", errors: error.errors });
+      }
+      logger.error({ err: error }, 'Erreur mise à jour pénalité');
+      res.status(400).json({ message: error.message || "Erreur lors de la mise à jour" });
+    }
   });
 
   /**

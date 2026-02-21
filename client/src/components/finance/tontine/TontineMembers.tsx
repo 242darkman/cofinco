@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Plus, UserPlus, Trash2, CheckCircle, X, Gift, User, Search, TrendingUp, AlertCircle, Clock, Settings, Wallet, Check, CheckCheck, AlertTriangle, Download, LogOut, UserMinus, RefreshCw, UserRoundPlus, CreditCard } from 'lucide-react';
+import { Plus, UserPlus, Trash2, CheckCircle, X, Gift, User, Search, TrendingUp, AlertCircle, Clock, Settings, Wallet, Check, CheckCheck, AlertTriangle, Download, LogOut, UserMinus, RefreshCw, UserRoundPlus, CreditCard, Ban, RotateCcw } from 'lucide-react';
 import { Card, Button, IconButton } from '../../ui';
 import { TontineTimelineHorizontal } from './TontineTimeline';
 import ConfirmDialog from '../../ui/ConfirmDialog';
@@ -321,6 +321,48 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
     });
   }, [tontineId, openConfirm, fetchMembres, onUpdate]);
 
+  // Suspend member
+  const handleSuspendMember = useCallback((membre: TontineMembre) => {
+    const memberName = formatClientName(membre.client?.nom, membre.client?.prenom);
+    openConfirm({
+      title: 'Suspendre le membre',
+      message: `Suspendre ${escapeHtml(memberName)} ? Le membre ne pourra plus cotiser ni recevoir de benefice tant qu'il est suspendu.`,
+      variant: 'warning',
+      confirmText: 'Suspendre',
+      onConfirm: async () => {
+        try {
+          await tontineApi.suspendMember(tontineId, membre.id, 'Suspension manuelle');
+          toast.success('Membre suspendu');
+          fetchMembres();
+          onUpdate();
+        } catch (error) {
+          toast.error(handleApiError(error, 'Erreur lors de la suspension'));
+        }
+      },
+    });
+  }, [tontineId, openConfirm, fetchMembres, onUpdate]);
+
+  // Reinstate member
+  const handleReinstateMember = useCallback((membre: TontineMembre) => {
+    const memberName = formatClientName(membre.client?.nom, membre.client?.prenom);
+    openConfirm({
+      title: 'Reintegrer le membre',
+      message: `Reintegrer ${escapeHtml(memberName)} ? Le membre pourra de nouveau cotiser et recevoir des benefices.`,
+      variant: 'info',
+      confirmText: 'Reintegrer',
+      onConfirm: async () => {
+        try {
+          await tontineApi.reinstateMember(tontineId, membre.id);
+          toast.success('Membre reintegre');
+          fetchMembres();
+          onUpdate();
+        } catch (error) {
+          toast.error(handleApiError(error, 'Erreur lors de la reintegration'));
+        }
+      },
+    });
+  }, [tontineId, openConfirm, fetchMembres, onUpdate]);
+
   // Replace member
   const [replacingMemberId, setReplacingMemberId] = useState<string | null>(null);
   const [replacementClientId, setReplacementClientId] = useState('');
@@ -618,6 +660,27 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
                             type="button"
                           >
                             <CreditCard size={14} />
+                          </button>
+                        )}
+                        {/* Suspend / Reinstate */}
+                        {(membre.status || membre.statut) === StatutMembreTontine.ACTIVE && !membre.exitRequestedAt && (
+                          <button
+                            onClick={() => handleSuspendMember(membre)}
+                            className="text-content-muted hover:text-status-danger transition-colors p-1 rounded-lg hover:bg-status-danger-bg"
+                            title="Suspendre"
+                            type="button"
+                          >
+                            <Ban size={14} />
+                          </button>
+                        )}
+                        {(membre.status || membre.statut) === 'SUSPENDED' && (
+                          <button
+                            onClick={() => handleReinstateMember(membre)}
+                            className="text-content-muted hover:text-status-success transition-colors p-1 rounded-lg hover:bg-status-success-bg"
+                            title="Reintegrer"
+                            type="button"
+                          >
+                            <RotateCcw size={14} />
                           </button>
                         )}
                         {/* Exit request / approve */}

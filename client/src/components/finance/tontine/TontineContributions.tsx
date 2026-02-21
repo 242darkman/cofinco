@@ -964,7 +964,7 @@ export default function TontineContributions({ tontineId }: TontineContributions
                   {PAYMENT_MODE_OPTIONS.map((option) => {
                     const modeDisabled = isOffline
                       ? option.value !== MethodePaiement.CASH
-                      : (option.value !== MethodePaiement.CASH && option.value !== MethodePaiement.MOBILE_MONEY);
+                      : false;
                     return (
                     <button
                       key={option.value}
@@ -985,9 +985,11 @@ export default function TontineContributions({ tontineId }: TontineContributions
                     </button>
                     );
                   })}
-                  <div className="col-span-2 text-[10px] text-content-muted italic text-center mt-1">
-                    {isOffline ? '* Mode hors ligne — espèces uniquement' : '* Virement et Chèque bientôt disponibles'}
-                  </div>
+                  {isOffline && (
+                    <div className="col-span-2 text-[10px] text-content-muted italic text-center mt-1">
+                      * Mode hors ligne — especes uniquement
+                    </div>
+                  )}
 
                 </div>
               </div>
