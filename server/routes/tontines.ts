@@ -400,6 +400,51 @@ export function registerTontineRoutes(app: Express) {
     }
   });
 
+  // MID-CYCLE JOIN
+  app.post("/api/tontines/:id/mid-cycle-join", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.TONTINE_MEMBRE), async (req, res) => {
+    try {
+      const { clientId } = req.body;
+      if (!clientId) return res.status(400).json({ message: "clientId requis" });
+
+      const result = await tontineLifecycleService.midCycleJoin(
+        req.params.id, clientId, req.session.user!.id
+      );
+      const wsInstance = getWsInstance();
+      if (wsInstance) wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: "mid_cycle_join", tontineId: req.params.id } });
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // MEMBER SUSPENSION
+  app.post("/api/tontines/:id/membres/:membreId/suspend", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.TONTINE_MEMBRE), async (req, res) => {
+    try {
+      const { reason } = req.body;
+      const result = await tontineLifecycleService.suspendMember(
+        req.params.id, req.params.membreId, reason || "Suspendu par l'administrateur"
+      );
+      const wsInstance = getWsInstance();
+      if (wsInstance) wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: "member_suspended", tontineId: req.params.id } });
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/tontines/:id/membres/:membreId/reinstate", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.TONTINE_MEMBRE), async (req, res) => {
+    try {
+      const result = await tontineLifecycleService.reinstateMember(
+        req.params.id, req.params.membreId
+      );
+      const wsInstance = getWsInstance();
+      if (wsInstance) wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: "member_reinstated", tontineId: req.params.id } });
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   // ROLE MANAGEMENT
   app.patch("/api/tontines/:id/membres/:membreId/role", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.TONTINE_MEMBRE), async (req, res) => {
     try {

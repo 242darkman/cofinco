@@ -130,6 +130,8 @@ interface TontineRules {
   maxAdvanceTours: number;
   payoutOrderMode: string;
   allowSwapPayoutOrder: boolean;
+  arrearsPolicy: string;
+  suspensionPolicy: string;
 }
 
 // ============================================================================
@@ -161,6 +163,8 @@ async function getTontineRules(tontineId: string): Promise<TontineRules> {
       maxAdvanceTours: tontines.maxAdvanceTours,
       payoutOrderMode: tontines.payoutOrderMode,
       allowSwapPayoutOrder: tontines.allowSwapPayoutOrder,
+      arrearsPolicy: tontines.arrearsPolicy,
+      suspensionPolicy: tontines.suspensionPolicy,
     })
     .from(tontines)
     .where(eq(tontines.id, tontineId))
@@ -190,6 +194,8 @@ async function getTontineRules(tontineId: string): Promise<TontineRules> {
     maxAdvanceTours: tontine.maxAdvanceTours ?? 3,
     payoutOrderMode: tontine.payoutOrderMode ?? 'FIXED_BY_ADMIN',
     allowSwapPayoutOrder: tontine.allowSwapPayoutOrder ?? false,
+    arrearsPolicy: tontine.arrearsPolicy ?? 'MUST_PAY_BEFORE_PAYOUT',
+    suspensionPolicy: tontine.suspensionPolicy ?? 'SUSPEND_MEMBER',
   };
 }
 
@@ -678,6 +684,15 @@ export async function calculateRetirable(
   } else if (!member.joinFeePaid) {
     peutRetirer = false;
     raison = "Frais d'adhésion non payés";
+  } else if (member.statut === "SUSPENDED") {
+    peutRetirer = false;
+    raison = "Membre suspendu";
+  }
+
+  // Enforce arrears policy
+  if (peutRetirer && rules.arrearsPolicy === 'MUST_PAY_BEFORE_PAYOUT' && penalitesADeduire > 0 && !rules.penaltyDeductedFromPayout) {
+    peutRetirer = false;
+    raison = `Arriérés impayés: ${penalitesADeduire.toLocaleString()}. Réglez les pénalités avant la distribution.`;
   }
 
   // Calculate retirable amount

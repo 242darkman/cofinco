@@ -26,6 +26,8 @@ import TontineCalendar from './TontineCalendar';
 import TontineConfig from './TontineConfig';
 import TontinePenalties from './TontinePenalties';
 import TontineTurnManager from './TontineTurnManager';
+import TontineSchedules from './TontineSchedules';
+import TontineAuditTrail from './TontineAuditTrail';
 import { currencySymbol } from '@shared/config/currency';
 
 // Extends the DB schema type with computed fields returned by the API
@@ -51,7 +53,7 @@ export default function Tontines() {
   const [showForm, setShowForm] = useState(false);
   const [editingTontine, setEditingTontine] = useState<Tontine | null>(null);
   const [selectedTontine, setSelectedTontine] = useState<Tontine | null>(null);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'config' | 'membres' | 'contributions' | 'distributions' | 'tours' | 'penalites' | 'calendar'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'config' | 'membres' | 'contributions' | 'distributions' | 'tours' | 'penalites' | 'echeancier' | 'audit' | 'calendar'>('dashboard');
 
   useEffect(() => {
     fetchTontines();
@@ -339,6 +341,8 @@ export default function Tontines() {
               { key: 'distributions', label: 'Distributions' },
               { key: 'tours', label: 'Tours' },
               { key: 'penalites', label: 'Penalites' },
+              { key: 'echeancier', label: 'Echeancier' },
+              { key: 'audit', label: 'Audit' },
               { key: 'calendar', label: 'Calendrier' },
             ]}
             variant="underline"
@@ -374,6 +378,12 @@ export default function Tontines() {
               )}
               {activeTab === 'penalites' && (
                 <TontinePenalties tontineId={selectedTontine.id} onUpdate={fetchTontines} />
+              )}
+              {activeTab === 'echeancier' && (
+                <TontineSchedules tontineId={selectedTontine.id} />
+              )}
+              {activeTab === 'audit' && (
+                <TontineAuditTrail tontineId={selectedTontine.id} />
               )}
               {activeTab === 'calendar' && (
                 <TontineCalendar

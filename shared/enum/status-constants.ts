@@ -1294,6 +1294,7 @@ export const MODE_DISTRIBUTION_TONTINE_OPTIONS = Object.entries(MODE_DISTRIBUTIO
 export const StatutMembreTontine = {
   ACTIVE: "ACTIVE",
   INACTIVE: "INACTIVE",
+  SUSPENDED: "SUSPENDED",
   EXCLUDED: "EXCLUDED",
   RETIRED: "RETIRÉ",
 } as const;
@@ -1304,6 +1305,7 @@ export type StatutMembreTontineType = (typeof StatutMembreTontine)[keyof typeof 
 export const STATUT_MEMBRE_TONTINE_LABELS: Record<StatutMembreTontineType, string> = {
   [StatutMembreTontine.ACTIVE]: "Actif",
   [StatutMembreTontine.INACTIVE]: "Inactif",
+  [StatutMembreTontine.SUSPENDED]: "Suspendu",
   [StatutMembreTontine.EXCLUDED]: "Exclu",
   [StatutMembreTontine.RETIRED]: "Retiré",
 };

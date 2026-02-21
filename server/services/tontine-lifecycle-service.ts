@@ -12,6 +12,7 @@ import {
   tontines,
   membresTontine,
   tontineCycles,
+  tontineSchedules,
   TontineStatus,
   TontineCycleStatus,
 } from "@shared/schema/tontines";
@@ -390,6 +391,192 @@ async function assignMemberRole(
 }
 
 // ============================================================================
+// MID-CYCLE JOIN
+// ============================================================================
+
+interface MidCycleJoinResult {
+  memberId: string;
+  position: number;
+  missedPeriods: number;
+}
+
+/**
+ * Add a member mid-cycle. The member joins the active cycle but
+ * won't receive distributions for already-completed turns.
+ */
+async function midCycleJoin(
+  tontineId: string,
+  clientId: string,
+  userId: string,
+): Promise<MidCycleJoinResult> {
+  const tontine = await db.select().from(tontines).where(eq(tontines.id, tontineId)).then(r => r[0]);
+  if (!tontine) throw new Error("Tontine introuvable");
+
+  if (!tontine.allowMidCycleJoin) {
+    throw new Error("L'adhesion en cours de cycle n'est pas autorisee pour cette tontine");
+  }
+
+  if (tontine.statut !== TontineStatus.ACTIVE) {
+    throw new Error("La tontine doit etre active pour accepter de nouveaux membres");
+  }
+
+  // Check max members
+  const currentMembers = (tontine.membresActuels || 0);
+  if (currentMembers >= tontine.nombreMembres) {
+    throw new Error("Le nombre maximum de membres est atteint");
+  }
+
+  // Check if client already a member
+  const existing = await db.select().from(membresTontine)
+    .where(and(
+      eq(membresTontine.tontineId, tontineId),
+      eq(membresTontine.clientId, clientId),
+      eq(membresTontine.statut, StatutMembreTontine.ACTIVE),
+    ))
+    .limit(1);
+
+  if (existing.length > 0) {
+    throw new Error("Ce client est deja membre actif de cette tontine");
+  }
+
+  // Get next position
+  const [maxPos] = await db
+    .select({ max: sql<number>`COALESCE(MAX(position), 0)` })
+    .from(membresTontine)
+    .where(eq(membresTontine.tontineId, tontineId));
+
+  const position = (maxPos?.max || 0) + 1;
+
+  // Count closed schedules in the active cycle (missed periods for catch-up tracking)
+  const [activeCycle] = await db
+    .select({ id: tontineCycles.id })
+    .from(tontineCycles)
+    .where(and(
+      eq(tontineCycles.tontineId, tontineId),
+      eq(tontineCycles.status, TontineCycleStatus.OPEN),
+    ))
+    .limit(1);
+
+  let missedPeriods = 0;
+  if (activeCycle) {
+    const [result] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(tontineSchedules)
+      .where(and(
+        eq(tontineSchedules.tontineId, tontineId),
+        eq(tontineSchedules.cycleId, activeCycle.id),
+        eq(tontineSchedules.status, 'CLOSED'),
+      ));
+    missedPeriods = result?.count || 0;
+  }
+
+  // Create member
+  const [newMember] = await db.insert(membresTontine).values({
+    tontineId,
+    clientId,
+    position,
+    statut: StatutMembreTontine.ACTIVE,
+    dateAdhesion: new Date(),
+    totalCotisations: "0",
+    totalRecus: "0",
+    aRecuBenefice: false,
+    joinFeePaid: !tontine.joinFeeEnabled,
+  }).returning();
+
+  // Increment member count
+  await db.update(tontines)
+    .set({
+      membresActuels: sql`COALESCE(${tontines.membresActuels}, 0) + 1`,
+      updatedAt: new Date(),
+    })
+    .where(eq(tontines.id, tontineId));
+
+  logger.info({ tontineId, clientId, memberId: newMember.id, position, joinedBy: userId }, "Mid-cycle join");
+
+  dispatchDomainEvent({
+    type: "TONTINE_MEMBER_JOINED",
+    data: {
+      tontineId,
+      tontineName: tontine.nom,
+      clientId,
+      montantCotisation: Number(tontine.montantCotisation || 0),
+      frequence: tontine.frequence || 'Mensuelle',
+      position,
+      midCycle: true,
+      agenceId: tontine.agenceId ?? undefined,
+    },
+    timestamp: new Date(),
+  });
+
+  return {
+    memberId: newMember.id,
+    position,
+    missedPeriods: missedPeriods || 0,
+  };
+}
+
+// ============================================================================
+// MEMBER SUSPENSION
+// ============================================================================
+
+/**
+ * Suspend a member (typically triggered by arrears policy).
+ */
+async function suspendMember(
+  tontineId: string,
+  memberId: string,
+  reason: string,
+): Promise<{ memberId: string; suspended: boolean }> {
+  const member = await db.select().from(membresTontine)
+    .where(and(eq(membresTontine.id, memberId), eq(membresTontine.tontineId, tontineId)))
+    .then(r => r[0]);
+
+  if (!member) throw new Error("Membre introuvable");
+  if (member.statut !== StatutMembreTontine.ACTIVE) {
+    throw new Error("Seuls les membres actifs peuvent etre suspendus");
+  }
+
+  await db.update(membresTontine)
+    .set({
+      statut: "SUSPENDED" as any,
+      updatedAt: new Date(),
+    })
+    .where(eq(membresTontine.id, memberId));
+
+  logger.info({ tontineId, memberId, reason }, "Member suspended");
+
+  return { memberId, suspended: true };
+}
+
+/**
+ * Reinstate a suspended member.
+ */
+async function reinstateMember(
+  tontineId: string,
+  memberId: string,
+): Promise<{ memberId: string; reinstated: boolean }> {
+  const member = await db.select().from(membresTontine)
+    .where(and(eq(membresTontine.id, memberId), eq(membresTontine.tontineId, tontineId)))
+    .then(r => r[0]);
+
+  if (!member) throw new Error("Membre introuvable");
+  if (member.statut !== ("SUSPENDED" as any)) {
+    throw new Error("Seuls les membres suspendus peuvent etre reactives");
+  }
+
+  await db.update(membresTontine)
+    .set({
+      statut: StatutMembreTontine.ACTIVE,
+      updatedAt: new Date(),
+    })
+    .where(eq(membresTontine.id, memberId));
+
+  logger.info({ tontineId, memberId }, "Member reinstated");
+
+  return { memberId, reinstated: true };
+}
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
@@ -399,5 +586,8 @@ export default {
   approveMemberExit,
   replaceMember,
   assignMemberRole,
+  midCycleJoin,
+  suspendMember,
+  reinstateMember,
   VALID_TRANSITIONS,
 };
