@@ -1948,7 +1948,12 @@ export const STATUT_PRESENCE_LABELS: Record<StatutPresenceType, string> = {
 export const StatutBulletin = {
   DRAFT: "DRAFT",
   VALIDATED: "VALIDATED",
+  SCHEDULED: "SCHEDULED",
+  PENDING_CAISSE: "PENDING_CAISSE",
+  PAYOUT_PENDING: "PAYOUT_PENDING",
+  PAYOUT_PROCESSING: "PAYOUT_PROCESSING",
   PAID: "PAID",
+  PAYMENT_FAILED: "PAYMENT_FAILED",
   CANCELLED: "CANCELLED",
 } as const;
 
@@ -1958,7 +1963,12 @@ export type StatutBulletinType = (typeof StatutBulletin)[keyof typeof StatutBull
 export const STATUT_BULLETIN_LABELS: Record<StatutBulletinType, string> = {
   [StatutBulletin.DRAFT]: "Brouillon",
   [StatutBulletin.VALIDATED]: "Validé",
+  [StatutBulletin.SCHEDULED]: "Programmé",
+  [StatutBulletin.PENDING_CAISSE]: "En attente caisse",
+  [StatutBulletin.PAYOUT_PENDING]: "Paiement en attente",
+  [StatutBulletin.PAYOUT_PROCESSING]: "Paiement en cours",
   [StatutBulletin.PAID]: "Payé",
+  [StatutBulletin.PAYMENT_FAILED]: "Échec paiement",
   [StatutBulletin.CANCELLED]: "Annulé",
 };
 
@@ -2650,3 +2660,46 @@ export const RELATION_REFERENCE_LABELS: Record<RelationReferenceType, string> = 
 export const RELATION_REFERENCE_OPTIONS = Object.entries(RELATION_REFERENCE_LABELS).map(
   ([value, label]) => ({ value, label })
 );
+
+// ============================================================================
+// SALARY PAYMENT JOB
+// ============================================================================
+
+export const SalaryPaymentJobStatus = {
+  CREATED: "CREATED",
+  SCHEDULED: "SCHEDULED",
+  QUEUED: "QUEUED",
+  PROCESSING: "PROCESSING",
+  SUCCEEDED: "SUCCEEDED",
+  FAILED: "FAILED",
+  CANCELLED: "CANCELLED",
+} as const;
+export type SalaryPaymentJobStatusType = typeof SalaryPaymentJobStatus[keyof typeof SalaryPaymentJobStatus];
+
+export const SALARY_PAYMENT_JOB_STATUS_LABELS: Record<SalaryPaymentJobStatusType, string> = {
+  [SalaryPaymentJobStatus.CREATED]: "Créé",
+  [SalaryPaymentJobStatus.SCHEDULED]: "Programmé",
+  [SalaryPaymentJobStatus.QUEUED]: "En file d'attente",
+  [SalaryPaymentJobStatus.PROCESSING]: "En cours",
+  [SalaryPaymentJobStatus.SUCCEEDED]: "Réussi",
+  [SalaryPaymentJobStatus.FAILED]: "Échoué",
+  [SalaryPaymentJobStatus.CANCELLED]: "Annulé",
+};
+
+export const PaymentExecutionMode = {
+  IMMEDIATE: "IMMEDIATE",
+  SCHEDULED: "SCHEDULED",
+} as const;
+export type PaymentExecutionModeType = typeof PaymentExecutionMode[keyof typeof PaymentExecutionMode];
+
+export const BULLETIN_STATUS_LABELS: Record<string, string> = {
+  DRAFT: "Brouillon",
+  VALIDATED: "Validé",
+  SCHEDULED: "Programmé",
+  PENDING_CAISSE: "En attente caisse",
+  PAYOUT_PENDING: "Paiement en attente",
+  PAYOUT_PROCESSING: "Paiement en cours",
+  PAID: "Payé",
+  PAYMENT_FAILED: "Échec paiement",
+  CANCELLED: "Annulé",
+};

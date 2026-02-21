@@ -1,4 +1,5 @@
-import { pgTable, varchar, text, date, timestamp, integer, serial, uuid, boolean, json, numeric, inet, doublePrecision, index, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, varchar, text, date, timestamp, integer, serial, uuid, boolean, json, numeric, inet, doublePrecision, index, uniqueIndex, jsonb } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
 import { users } from "./auth";
@@ -648,8 +649,12 @@ export type LeaveStatusType = typeof LeaveStatus[keyof typeof LeaveStatus];
 export const BulletinStatus = {
   DRAFT: 'DRAFT',
   VALIDATED: 'VALIDATED',
+  SCHEDULED: 'SCHEDULED',
   PENDING_CAISSE: 'PENDING_CAISSE',
+  PAYOUT_PENDING: 'PAYOUT_PENDING',
+  PAYOUT_PROCESSING: 'PAYOUT_PROCESSING',
   PAID: 'PAID',
+  PAYMENT_FAILED: 'PAYMENT_FAILED',
   CANCELLED: 'CANCELLED',
 } as const;
 export type BulletinStatusType = typeof BulletinStatus[keyof typeof BulletinStatus];
@@ -1703,3 +1708,95 @@ export const tempsImputes = pgTable("temps_imputes", {
 export const insertTempsImputeSchema = createInsertSchema(tempsImputes).omit({ id: true, createdAt: true });
 export type InsertTempsImpute = z.infer<typeof insertTempsImputeSchema>;
 export type TempsImpute = typeof tempsImputes.$inferSelect;
+
+// ============================================================================
+// SALARY PAYMENT JOBS
+// Orchestration des paiements salaires (scheduling, status tracking, liens)
+// ============================================================================
+
+export const SalaryPaymentJobStatus = {
+  CREATED: 'CREATED',
+  SCHEDULED: 'SCHEDULED',
+  QUEUED: 'QUEUED',
+  PROCESSING: 'PROCESSING',
+  SUCCEEDED: 'SUCCEEDED',
+  FAILED: 'FAILED',
+  CANCELLED: 'CANCELLED',
+} as const;
+export type SalaryPaymentJobStatusType = typeof SalaryPaymentJobStatus[keyof typeof SalaryPaymentJobStatus];
+
+export const PaymentExecutionMode = {
+  IMMEDIATE: 'IMMEDIATE',
+  SCHEDULED: 'SCHEDULED',
+} as const;
+export type PaymentExecutionModeType = typeof PaymentExecutionMode[keyof typeof PaymentExecutionMode];
+
+export const salaryPaymentJobs = pgTable("salary_payment_jobs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+
+  // Liens vers le bulletin et le run
+  bulletinId: integer("bulletin_id").notNull().references(() => bulletinsPaie.id, { onDelete: "restrict" }),
+  payrollRunId: integer("payroll_run_id").notNull().references(() => payrollRuns.id, { onDelete: "restrict" }),
+  employeId: uuid("employe_id").notNull().references(() => employes.id, { onDelete: "restrict" }),
+  agenceId: uuid("agence_id").references(() => agences.id, { onDelete: "set null" }),
+
+  // Méthode et mode de paiement
+  paymentMethod: varchar("payment_method", { length: 20 }).notNull(), // CASH | MOBILE_MONEY | TRANSFER | CHECK
+  executionMode: varchar("execution_mode", { length: 20 }).notNull(), // IMMEDIATE | SCHEDULED
+  scheduledAt: timestamp("scheduled_at"),                              // Date programmée (requis si SCHEDULED)
+  amount: numeric("amount", { precision: 14, scale: 0 }).notNull(),
+  currency: varchar("currency", { length: 3 }).notNull().default("XAF"),
+
+  // Status & lifecycle
+  status: varchar("status", { length: 20 }).notNull().default("CREATED"),
+  failureReason: text("failure_reason"),
+  failureCode: varchar("failure_code", { length: 50 }),
+  retryCount: integer("retry_count").notNull().default(0),
+  maxRetries: integer("max_retries").notNull().default(3),
+  nextRetryAt: timestamp("next_retry_at"),
+
+  // Mobile Money specifics (nullable — only for MOBILE_MONEY)
+  msisdn: text("msisdn"),                                             // Numéro Mobile Money
+  operator: varchar("operator", { length: 10 }),                      // MTN | AIRTEL
+  correspondent: varchar("correspondent", { length: 30 }),            // MTN_MOMO_COG | AIRTEL_COG
+  paymentIntentId: uuid("payment_intent_id"),                         // FK vers payment_intents.id (pas de ref pour éviter circular)
+
+  // Cash specifics (nullable — only for CASH)
+  caisseRequestId: uuid("caisse_request_id"),                         // FK vers caisse_payment_requests.id
+
+  // GL tracking (rempli lors du paiement effectif)
+  mouvementId: uuid("mouvement_id"),                                  // FK vers mouvements_financiers.id
+  ecritureId: uuid("ecriture_id"),
+
+  // Idempotency & audit
+  idempotencyKey: text("idempotency_key").notNull(),
+  createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+  processedBy: uuid("processed_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  processedAt: timestamp("processed_at"),
+  completedAt: timestamp("completed_at"),
+
+  metadata: jsonb("metadata"),
+}, (t) => ({
+  // Index pour le cron scheduler : jobs SCHEDULED arrivés à échéance
+  idxStatusScheduledAt: index("idx_salary_payment_jobs_status_scheduled").on(t.status, t.scheduledAt),
+  // Index pour retrouver les jobs d'un run
+  idxRunId: index("idx_salary_payment_jobs_run").on(t.payrollRunId),
+  // Index sur le bulletin
+  idxBulletinId: index("idx_salary_payment_jobs_bulletin").on(t.bulletinId),
+  // Index pour le payment intent
+  idxPaymentIntentId: index("idx_salary_payment_jobs_intent").on(t.paymentIntentId),
+  // Unique idempotency key
+  uqIdempotencyKey: uniqueIndex("uq_salary_payment_jobs_idempotency").on(t.idempotencyKey),
+  // Contrainte : montant > 0
+  chkAmountPos: sql`CONSTRAINT chk_salary_payment_jobs_amount_pos CHECK (${t.amount} > 0)`,
+}));
+
+export const insertSalaryPaymentJobSchema = createInsertSchema(salaryPaymentJobs).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertSalaryPaymentJob = z.infer<typeof insertSalaryPaymentJobSchema>;
+export type SalaryPaymentJob = typeof salaryPaymentJobs.$inferSelect;
