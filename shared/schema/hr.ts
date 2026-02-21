@@ -1579,3 +1579,116 @@ export const bankReconciliationLines = pgTable("bank_reconciliation_lines", {
 export const insertBankReconciliationLineSchema = createInsertSchema(bankReconciliationLines).omit({ id: true, createdAt: true });
 export type BankReconciliationLine = typeof bankReconciliationLines.$inferSelect;
 export type InsertBankReconciliationLine = z.infer<typeof insertBankReconciliationLineSchema>;
+
+// =============================================================================
+// GESTION DU TEMPS PROJET
+// =============================================================================
+
+export const ProjectStatus = {
+  DRAFT: 'DRAFT',
+  ACTIVE: 'ACTIVE',
+  ON_HOLD: 'ON_HOLD',
+  COMPLETED: 'COMPLETED',
+  CANCELLED: 'CANCELLED',
+} as const;
+export type ProjectStatusType = typeof ProjectStatus[keyof typeof ProjectStatus];
+
+export const ProjetRole = {
+  MANAGER: 'MANAGER',
+  MEMBER: 'MEMBER',
+  OBSERVER: 'OBSERVER',
+} as const;
+export type ProjetRoleType = typeof ProjetRole[keyof typeof ProjetRole];
+
+export const TimesheetStatus = {
+  DRAFT: 'DRAFT',
+  SUBMITTED: 'SUBMITTED',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+} as const;
+export type TimesheetStatusType = typeof TimesheetStatus[keyof typeof TimesheetStatus];
+
+export const projetsRh = pgTable("projets_rh", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  code: varchar("code", { length: 30 }).notNull().unique(),
+  nom: varchar("nom", { length: 200 }).notNull(),
+  description: text("description"),
+  client: varchar("client", { length: 200 }),
+  responsableId: uuid("responsable_id").references(() => employes.id, { onDelete: "set null" }),
+  agenceId: uuid("agence_id").references(() => agences.id, { onDelete: "cascade" }),
+  budgetHeures: integer("budget_heures"),
+  budgetMontant: integer("budget_montant"),
+  dateDebut: date("date_debut").notNull(),
+  dateFin: date("date_fin"),
+  statut: varchar("statut", { length: 20 }).notNull().default("DRAFT"),
+  createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => ({
+  idxStatut: index("idx_projets_rh_statut").on(t.statut),
+  idxAgence: index("idx_projets_rh_agence").on(t.agenceId),
+}));
+
+export const insertProjetRhSchema = createInsertSchema(projetsRh).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertProjetRh = z.infer<typeof insertProjetRhSchema>;
+export type ProjetRh = typeof projetsRh.$inferSelect;
+
+export const projetMembres = pgTable("projet_membres", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  projetId: uuid("projet_id").notNull().references(() => projetsRh.id, { onDelete: "cascade" }),
+  employeId: uuid("employe_id").notNull().references(() => employes.id, { onDelete: "cascade" }),
+  role: varchar("role", { length: 20 }).notNull().default("MEMBER"),
+  dateAjout: date("date_ajout"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  idxProjet: index("idx_projet_membres_projet").on(t.projetId),
+  idxEmploye: index("idx_projet_membres_employe").on(t.employeId),
+}));
+
+export const insertProjetMembreSchema = createInsertSchema(projetMembres).omit({ id: true, createdAt: true });
+export type InsertProjetMembre = z.infer<typeof insertProjetMembreSchema>;
+export type ProjetMembre = typeof projetMembres.$inferSelect;
+
+export const feuillesTemps = pgTable("feuilles_temps", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  employeId: uuid("employe_id").notNull().references(() => employes.id, { onDelete: "cascade" }),
+  employeNom: varchar("employe_nom", { length: 255 }).notNull(),
+  semaine: varchar("semaine", { length: 10 }).notNull(),
+  dateDebut: date("date_debut").notNull(),
+  dateFin: date("date_fin").notNull(),
+  totalHeures: numeric("total_heures", { precision: 6, scale: 2 }).default("0"),
+  statut: varchar("statut", { length: 20 }).notNull().default("DRAFT"),
+  soumisAt: timestamp("soumis_at"),
+  approuvePar: uuid("approuve_par").references(() => users.id, { onDelete: "set null" }),
+  approuveAt: timestamp("approuve_at"),
+  rejeteMotif: text("rejete_motif"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => ({
+  idxEmployeSemaine: index("idx_feuilles_temps_employe_semaine").on(t.employeId, t.semaine),
+  idxStatut: index("idx_feuilles_temps_statut").on(t.statut),
+}));
+
+export const insertFeuilleTempsSchema = createInsertSchema(feuillesTemps).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertFeuilleTemps = z.infer<typeof insertFeuilleTempsSchema>;
+export type FeuilleTemps = typeof feuillesTemps.$inferSelect;
+
+export const tempsImputes = pgTable("temps_imputes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  feuilleTempsId: uuid("feuille_temps_id").notNull().references(() => feuillesTemps.id, { onDelete: "cascade" }),
+  projetId: uuid("projet_id").notNull().references(() => projetsRh.id, { onDelete: "restrict" }),
+  date: date("date").notNull(),
+  heures: numeric("heures", { precision: 4, scale: 2 }).notNull(),
+  description: text("description"),
+  presenceId: integer("presence_id"),
+  tauxHoraireSnapshot: integer("taux_horaire_snapshot"),
+  coutCalcule: integer("cout_calcule"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  idxFeuilleProjet: index("idx_temps_imputes_feuille_projet").on(t.feuilleTempsId, t.projetId),
+  idxProjetDate: index("idx_temps_imputes_projet_date").on(t.projetId, t.date),
+}));
+
+export const insertTempsImputeSchema = createInsertSchema(tempsImputes).omit({ id: true, createdAt: true });
+export type InsertTempsImpute = z.infer<typeof insertTempsImputeSchema>;
+export type TempsImpute = typeof tempsImputes.$inferSelect;

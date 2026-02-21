@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { TabGroup, ConfirmDialog, PageHeader, FeatureHeader, FEATURE_DESCRIPTIONS } from '../ui';
-import { Users, Calendar, UserPlus, AlertTriangle, Gift, GraduationCap, ClipboardCheck, Building2, FileText, Upload, BarChart3, Star, Briefcase, FileBarChart, FolderOpen } from 'lucide-react';
+import { Users, Calendar, UserPlus, AlertTriangle, Gift, GraduationCap, ClipboardCheck, Building2, FileText, Upload, BarChart3, Star, Briefcase, FileBarChart, FolderOpen, Clock } from 'lucide-react';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 
@@ -31,6 +31,7 @@ import ProspectionPrimeConfig from '../admin/ProspectionPrimeConfig';
 import PositionManager from './PositionManager';
 import HrReportsTab from './HrReportsTab';
 import MesDocumentsTab from './MesDocumentsTab';
+import TempsProjetManager from './TempsProjetManager';
 
 const TABS = [
   { key: 'dashboard', label: 'Tableau de bord', icon: BarChart3 },
@@ -45,6 +46,7 @@ const TABS = [
   { key: 'postes', label: 'Postes', icon: Briefcase },
   { key: 'recrutement', label: 'Recrutement', icon: UserPlus },
   { key: 'rapports', label: 'Rapports', icon: FileBarChart },
+  { key: 'temps-projet', label: 'Temps Projet', icon: Clock },
   { key: 'mes-documents', label: 'Documents', icon: FolderOpen },
   { key: 'organigramme', label: 'Organigramme', icon: Building2 }
 ];
@@ -310,6 +312,9 @@ export default function RessourcesHumaines() {
 
       case 'rapports':
         return <HrReportsTab />;
+
+      case 'temps-projet':
+        return <TempsProjetManager />;
 
       case 'mes-documents':
         return <MesDocumentsTab />;

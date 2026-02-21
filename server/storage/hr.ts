@@ -16,6 +16,7 @@ import {
   hrDocumentRequests,
   jobOffers, payrollPaymentBatches, payrollBatchItems,
   bankReconciliationSessions, bankReconciliationLines,
+  projetsRh, projetMembres, feuillesTemps, tempsImputes,
   type EvaluationTemplate, type InsertEvaluationTemplate,
   type EvaluationCriteria as EvalCriteria, type InsertEvaluationCriteria,
   type EvaluationCampaign, type InsertEvaluationCampaign,
@@ -23,6 +24,7 @@ import {
   type EvaluationResponse, type InsertEvaluationResponse,
   type HrAlertConfig, type HrAlert,
   type InsertHrDocumentRequest, type HrDocumentRequest,
+  type InsertProjetRh, type InsertProjetMembre, type InsertFeuilleTemps, type InsertTempsImpute,
 } from "@shared/schema";
 import { StatutUser, StatutConge, StatutCandidature, StatutPresence, StatutBulletin, ModeCalculPaie } from "@shared/enum/status-constants";
 
@@ -1106,4 +1108,399 @@ export async function updateReconciliationSessionStats(sessionId: string) {
       unmatchedCount: unmatchedLines.length,
     })
     .where(eq(bankReconciliationSessions.id, sessionId));
+}
+
+// ================================================
+// PROJETS RH - Gestion du temps projet
+// ================================================
+
+export async function getProjects(filter?: { statut?: string; agenceId?: string }) {
+  const conditions = [];
+  if (filter?.statut) conditions.push(eq(projetsRh.statut, filter.statut));
+  if (filter?.agenceId) conditions.push(eq(projetsRh.agenceId, filter.agenceId));
+
+  const query = db.select().from(projetsRh);
+  if (conditions.length > 0) {
+    return await query.where(and(...conditions)).orderBy(desc(projetsRh.createdAt));
+  }
+  return await query.orderBy(desc(projetsRh.createdAt));
+}
+
+export async function getProjectById(id: string) {
+  const [project] = await db.select().from(projetsRh).where(eq(projetsRh.id, id));
+  if (!project) return null;
+
+  const membres = await db.select({
+    id: projetMembres.id,
+    projetId: projetMembres.projetId,
+    employeId: projetMembres.employeId,
+    role: projetMembres.role,
+    dateAjout: projetMembres.dateAjout,
+    employeNom: sql<string>`(SELECT u."fullName" FROM users u JOIN employes e ON e."user_id" = u.id WHERE e.id = ${projetMembres.employeId})`,
+    employeMatricule: sql<string>`(SELECT e.matricule FROM employes e WHERE e.id = ${projetMembres.employeId})`,
+  }).from(projetMembres).where(eq(projetMembres.projetId, id));
+
+  return { ...project, membres };
+}
+
+export async function getEmployeeProjects(employeId: string) {
+  const memberRows = await db.select({ projetId: projetMembres.projetId })
+    .from(projetMembres).where(eq(projetMembres.employeId, employeId));
+  if (memberRows.length === 0) return [];
+  const projectIds = memberRows.map(r => r.projetId);
+  return await db.select().from(projetsRh)
+    .where(and(inArray(projetsRh.id, projectIds), not(eq(projetsRh.statut, 'CANCELLED'))))
+    .orderBy(desc(projetsRh.createdAt));
+}
+
+export async function createProject(data: InsertProjetRh) {
+  const [project] = await db.insert(projetsRh).values(data).returning();
+  return project;
+}
+
+export async function updateProject(id: string, data: Partial<InsertProjetRh>) {
+  const [project] = await db.update(projetsRh).set({ ...data, updatedAt: new Date() })
+    .where(eq(projetsRh.id, id)).returning();
+  return project;
+}
+
+export async function addProjectMember(data: InsertProjetMembre) {
+  const [member] = await db.insert(projetMembres).values(data).returning();
+  return member;
+}
+
+export async function removeProjectMember(projetId: string, employeId: string) {
+  await db.delete(projetMembres)
+    .where(and(eq(projetMembres.projetId, projetId), eq(projetMembres.employeId, employeId)));
+}
+
+// ================================================
+// FEUILLES DE TEMPS - Timesheets
+// ================================================
+
+export async function getTimesheets(filter?: { employeId?: string; statut?: string; semaine?: string }) {
+  const conditions = [];
+  if (filter?.employeId) conditions.push(eq(feuillesTemps.employeId, filter.employeId));
+  if (filter?.statut) conditions.push(eq(feuillesTemps.statut, filter.statut));
+  if (filter?.semaine) conditions.push(eq(feuillesTemps.semaine, filter.semaine));
+
+  const query = db.select().from(feuillesTemps);
+  if (conditions.length > 0) {
+    return await query.where(and(...conditions)).orderBy(desc(feuillesTemps.dateDebut));
+  }
+  return await query.orderBy(desc(feuillesTemps.dateDebut));
+}
+
+export async function getTimesheetById(id: string) {
+  const [sheet] = await db.select().from(feuillesTemps).where(eq(feuillesTemps.id, id));
+  if (!sheet) return null;
+
+  const entries = await db.select({
+    id: tempsImputes.id,
+    feuilleTempsId: tempsImputes.feuilleTempsId,
+    projetId: tempsImputes.projetId,
+    date: tempsImputes.date,
+    heures: tempsImputes.heures,
+    description: tempsImputes.description,
+    tauxHoraireSnapshot: tempsImputes.tauxHoraireSnapshot,
+    coutCalcule: tempsImputes.coutCalcule,
+    projetNom: sql<string>`(SELECT nom FROM projets_rh WHERE id = ${tempsImputes.projetId})`,
+    projetCode: sql<string>`(SELECT code FROM projets_rh WHERE id = ${tempsImputes.projetId})`,
+  }).from(tempsImputes).where(eq(tempsImputes.feuilleTempsId, id))
+    .orderBy(asc(tempsImputes.date), asc(tempsImputes.projetId));
+
+  return { ...sheet, entries };
+}
+
+export async function createOrGetTimesheet(data: InsertFeuilleTemps) {
+  // Check if a timesheet already exists for this employee + week
+  const [existing] = await db.select().from(feuillesTemps)
+    .where(and(
+      eq(feuillesTemps.employeId, data.employeId),
+      eq(feuillesTemps.semaine, data.semaine),
+    ));
+  if (existing) return existing;
+  const [sheet] = await db.insert(feuillesTemps).values(data).returning();
+  return sheet;
+}
+
+export async function submitTimesheet(id: string) {
+  // Recalculate total hours
+  const entries = await db.select().from(tempsImputes).where(eq(tempsImputes.feuilleTempsId, id));
+  const totalHeures = entries.reduce((sum, e) => sum + parseFloat(e.heures), 0);
+
+  const [sheet] = await db.update(feuillesTemps).set({
+    statut: 'SUBMITTED',
+    totalHeures: totalHeures.toFixed(2),
+    soumisAt: new Date(),
+    updatedAt: new Date(),
+  }).where(eq(feuillesTemps.id, id)).returning();
+  return sheet;
+}
+
+export async function approveTimesheet(id: string, approuveParId: string) {
+  // Get the timesheet with employee info for cost calculation
+  const [sheet] = await db.select().from(feuillesTemps).where(eq(feuillesTemps.id, id));
+  if (!sheet) return null;
+
+  const [emp] = await db.select().from(employes).where(eq(employes.id, sheet.employeId));
+  if (!emp) return null;
+
+  // Calculate hourly rate based on pay mode
+  let hourlyRate = 0;
+  if (emp.modeCalculPaie === 'HOURLY') {
+    hourlyRate = emp.tauxHoraire || 0;
+  } else if (emp.modeCalculPaie === 'DAILY') {
+    hourlyRate = Math.round((emp.tauxJournalier || 0) / 8);
+  } else {
+    // MONTHLY: divide by 173.33 (standard monthly hours)
+    hourlyRate = Math.round((emp.salaireBase || 0) / 173.33);
+  }
+
+  // Update each time entry with cost snapshot
+  const entries = await db.select().from(tempsImputes).where(eq(tempsImputes.feuilleTempsId, id));
+  for (const entry of entries) {
+    const heures = parseFloat(entry.heures);
+    const cout = Math.round(heures * hourlyRate);
+    await db.update(tempsImputes).set({
+      tauxHoraireSnapshot: hourlyRate,
+      coutCalcule: cout,
+    }).where(eq(tempsImputes.id, entry.id));
+  }
+
+  const totalHeures = entries.reduce((sum, e) => sum + parseFloat(e.heures), 0);
+
+  const [updated] = await db.update(feuillesTemps).set({
+    statut: 'APPROVED',
+    totalHeures: totalHeures.toFixed(2),
+    approuvePar: approuveParId,
+    approuveAt: new Date(),
+    updatedAt: new Date(),
+  }).where(eq(feuillesTemps.id, id)).returning();
+  return updated;
+}
+
+export async function rejectTimesheet(id: string, motif: string) {
+  const [sheet] = await db.update(feuillesTemps).set({
+    statut: 'REJECTED',
+    rejeteMotif: motif,
+    updatedAt: new Date(),
+  }).where(eq(feuillesTemps.id, id)).returning();
+  return sheet;
+}
+
+// ================================================
+// TEMPS IMPUTES - Time entries
+// ================================================
+
+export async function upsertTimeEntry(data: InsertTempsImpute) {
+  // Check if an entry already exists for this timesheet + project + date
+  const [existing] = await db.select().from(tempsImputes)
+    .where(and(
+      eq(tempsImputes.feuilleTempsId, data.feuilleTempsId),
+      eq(tempsImputes.projetId, data.projetId),
+      eq(tempsImputes.date, data.date),
+    ));
+
+  if (existing) {
+    const [updated] = await db.update(tempsImputes).set({
+      heures: data.heures,
+      description: data.description,
+    }).where(eq(tempsImputes.id, existing.id)).returning();
+    return updated;
+  }
+
+  const [entry] = await db.insert(tempsImputes).values(data).returning();
+  return entry;
+}
+
+export async function deleteTimeEntry(entryId: string) {
+  await db.delete(tempsImputes).where(eq(tempsImputes.id, entryId));
+}
+
+// ================================================
+// REPORTING - Project cost & employee allocation
+// ================================================
+
+export async function getProjectCostSummary(projetId: string) {
+  const result = await db.select({
+    totalHeures: sql<number>`COALESCE(SUM(CAST(${tempsImputes.heures} AS numeric)), 0)`,
+    totalCout: sql<number>`COALESCE(SUM(${tempsImputes.coutCalcule}), 0)`,
+    nbEntries: sql<number>`COUNT(*)::int`,
+  }).from(tempsImputes)
+    .where(eq(tempsImputes.projetId, projetId));
+
+  // Get breakdown by employee
+  const byEmployee = await db.select({
+    employeId: feuillesTemps.employeId,
+    employeNom: feuillesTemps.employeNom,
+    totalHeures: sql<number>`COALESCE(SUM(CAST(${tempsImputes.heures} AS numeric)), 0)`,
+    totalCout: sql<number>`COALESCE(SUM(${tempsImputes.coutCalcule}), 0)`,
+  }).from(tempsImputes)
+    .innerJoin(feuillesTemps, eq(tempsImputes.feuilleTempsId, feuillesTemps.id))
+    .where(eq(tempsImputes.projetId, projetId))
+    .groupBy(feuillesTemps.employeId, feuillesTemps.employeNom);
+
+  return { ...(result[0] || { totalHeures: 0, totalCout: 0, nbEntries: 0 }), byEmployee };
+}
+
+export async function getEmployeeTimeAllocation(employeId: string, from?: string, to?: string) {
+  const conditions = [eq(feuillesTemps.employeId, employeId)];
+  if (from) conditions.push(gte(feuillesTemps.dateDebut, from));
+  if (to) conditions.push(lte(feuillesTemps.dateFin, to));
+
+  const sheets = await db.select({ id: feuillesTemps.id })
+    .from(feuillesTemps).where(and(...conditions));
+
+  if (sheets.length === 0) return { byProject: [], totalHeures: 0 };
+
+  const sheetIds = sheets.map(s => s.id);
+
+  const byProject = await db.select({
+    projetId: tempsImputes.projetId,
+    projetNom: sql<string>`(SELECT nom FROM projets_rh WHERE id = ${tempsImputes.projetId})`,
+    projetCode: sql<string>`(SELECT code FROM projets_rh WHERE id = ${tempsImputes.projetId})`,
+    totalHeures: sql<number>`COALESCE(SUM(CAST(${tempsImputes.heures} AS numeric)), 0)`,
+    totalCout: sql<number>`COALESCE(SUM(${tempsImputes.coutCalcule}), 0)`,
+  }).from(tempsImputes)
+    .where(inArray(tempsImputes.feuilleTempsId, sheetIds))
+    .groupBy(tempsImputes.projetId);
+
+  const totalHeures = byProject.reduce((s, p) => s + Number(p.totalHeures), 0);
+
+  return { byProject, totalHeures };
+}
+
+// ================================================
+// MON ESPACE - Employee self-service
+// ================================================
+
+export async function getMyDashboard(employeId: string) {
+  // Leave balance
+  const congesResult = await db.select({
+    total: sql<number>`COUNT(*)::int`,
+    enAttente: sql<number>`COUNT(*) FILTER (WHERE ${demandesConges.statut} = 'En attente')::int`,
+    approuve: sql<number>`COUNT(*) FILTER (WHERE ${demandesConges.statut} = 'Approuvé')::int`,
+  }).from(demandesConges)
+    .where(eq(demandesConges.employeId, employeId));
+
+  // Recent payslips (last 3)
+  const derniersBulletins = await db.select()
+    .from(bulletinsPaie)
+    .where(eq(bulletinsPaie.employeId, employeId))
+    .orderBy(desc(bulletinsPaie.annee), desc(bulletinsPaie.mois))
+    .limit(3);
+
+  // Presence stats for current month
+  const now = new Date();
+  const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+  const monthEnd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()).padStart(2, '0')}`;
+  const presenceStats = await db.select({
+    total: sql<number>`COUNT(*)::int`,
+    presents: sql<number>`COUNT(*) FILTER (WHERE ${presences.statut} = 'Présent')::int`,
+    retards: sql<number>`COUNT(*) FILTER (WHERE ${presences.statut} = 'Retard')::int`,
+    absents: sql<number>`COUNT(*) FILTER (WHERE ${presences.statut} = 'Absent')::int`,
+    heuresTravaillees: sql<number>`COALESCE(SUM(${presences.heuresTravaillees}), 0)`,
+  }).from(presences)
+    .where(and(
+      eq(presences.employeId, employeId),
+      gte(presences.date, monthStart),
+      lte(presences.date, monthEnd),
+    ));
+
+  // Pending document requests
+  const documentsEnCours = await db.select({ count: sql<number>`COUNT(*)::int` })
+    .from(hrDocumentRequests)
+    .where(and(
+      eq(hrDocumentRequests.employeId, employeId),
+      not(eq(hrDocumentRequests.statut, 'DELIVERED')),
+      not(eq(hrDocumentRequests.statut, 'REJECTED')),
+    ));
+
+  // Recent evaluations
+  const evaluationsRecentes = await db.select()
+    .from(evaluations)
+    .where(eq(evaluations.employeId, employeId))
+    .orderBy(desc(evaluations.createdAt))
+    .limit(3);
+
+  return {
+    conges: congesResult[0] || { total: 0, enAttente: 0, approuve: 0 },
+    derniersBulletins,
+    presenceMois: presenceStats[0] || { total: 0, presents: 0, retards: 0, absents: 0, heuresTravaillees: 0 },
+    documentsEnCours: documentsEnCours[0]?.count || 0,
+    evaluationsRecentes,
+  };
+}
+
+export async function getMyPresence(employeId: string, mois?: string) {
+  const conditions = [eq(presences.employeId, employeId)];
+  if (mois) {
+    // mois format: "2026-02"
+    conditions.push(sql`to_char(${presences.date}::date, 'YYYY-MM') = ${mois}`);
+  }
+
+  return await db.select().from(presences)
+    .where(and(...conditions))
+    .orderBy(desc(presences.date));
+}
+
+export async function getMyEvaluations(employeId: string) {
+  return await db.select({
+    id: evaluations.id,
+    campaignId: evaluations.campaignId,
+    employeId: evaluations.employeId,
+    evaluatorId: evaluations.evaluatorId,
+    status: evaluations.status,
+    overallScore: evaluations.overallScore,
+    overallComment: evaluations.overallComment,
+    createdAt: evaluations.createdAt,
+    completedAt: evaluations.completedAt,
+    evaluatorNom: sql<string>`(SELECT u."fullName" FROM users u JOIN employes e ON e."user_id" = u.id WHERE e.id = ${evaluations.evaluatorId})`,
+  }).from(evaluations)
+    .where(eq(evaluations.employeId, employeId))
+    .orderBy(desc(evaluations.createdAt));
+}
+
+export async function updateMyProfile(employeId: string, data: {
+  telephone?: string;
+  adresse?: string;
+  email?: string;
+  bankName?: string;
+  bankCode?: string;
+  branchCode?: string;
+  bankAccountNumber?: string;
+  accountKey?: string;
+  paymentMethod?: string;
+  paymentDetails?: string;
+  situationFamiliale?: string;
+  nombreEnfantsCharge?: number;
+}) {
+  // Only allow updating personal/contact fields, NOT salary/contract
+  const allowedFields: any = { updatedAt: new Date() };
+  if (data.bankName !== undefined) allowedFields.bankName = data.bankName;
+  if (data.bankCode !== undefined) allowedFields.bankCode = data.bankCode;
+  if (data.branchCode !== undefined) allowedFields.branchCode = data.branchCode;
+  if (data.bankAccountNumber !== undefined) allowedFields.bankAccountNumber = data.bankAccountNumber;
+  if (data.accountKey !== undefined) allowedFields.accountKey = data.accountKey;
+  if (data.paymentMethod !== undefined) allowedFields.paymentMethod = data.paymentMethod;
+  if (data.paymentDetails !== undefined) allowedFields.paymentDetails = data.paymentDetails;
+  if (data.situationFamiliale !== undefined) allowedFields.situationFamiliale = data.situationFamiliale;
+  if (data.nombreEnfantsCharge !== undefined) allowedFields.nombreEnfantsCharge = data.nombreEnfantsCharge;
+
+  // Update user table for contact info
+  const [emp] = await db.select().from(employes).where(eq(employes.id, employeId));
+  if (!emp) return null;
+
+  if (data.telephone || data.adresse || data.email) {
+    const userFields: any = {};
+    if (data.telephone) userFields.telephone = data.telephone;
+    if (data.adresse) userFields.adresse = data.adresse;
+    if (data.email) userFields.email = data.email;
+    await db.update(users).set(userFields).where(eq(users.id, emp.userId));
+  }
+
+  const [updated] = await db.update(employes).set(allowedFields)
+    .where(eq(employes.id, employeId)).returning();
+  return updated;
 }

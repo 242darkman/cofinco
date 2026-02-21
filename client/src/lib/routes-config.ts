@@ -27,6 +27,7 @@ const AdminVirementsProgrammes = lazy(() => import('@/components/admin/AdminVire
 // const ReconciliationPage = lazy(() => import('@/pages/finance/ReconciliationPage')); // Masqué temporairement
 const TresoreriePage = lazy(() => import('@/pages/finance/TresoreriePage'));
 const KpiDashboard = lazy(() => import('@/components/kpi/KpiDashboard'));
+const MonEspace = lazy(() => import('@/components/mon-espace/MonEspace'));
 
 /**
  * Mapping sous-route URL → sous-module interne
@@ -323,6 +324,7 @@ export const ROUTES: RouteConfig[] = [
       { path: '/ressources-humaines/rapports', subModule: 'rapports', label: 'Rapports' },
       { path: '/ressources-humaines/mes-documents', subModule: 'mes-documents', label: 'Documents' },
       { path: '/ressources-humaines/evaluations', subModule: 'evaluations', label: 'Évaluations' },
+      { path: '/ressources-humaines/temps-projet', subModule: 'temps-projet', label: 'Temps Projet' },
       { path: '/ressources-humaines/organigramme', subModule: 'organigramme', label: 'Organigramme' },
     ],
   },
@@ -368,6 +370,23 @@ export const ROUTES: RouteConfig[] = [
     label: 'Messages',
     labelKey: 'menuMessages',
     group: 'Système',
+  },
+  {
+    key: 'mon-espace',
+    path: '/mon-espace',
+    component: MonEspace,
+    label: 'Mon Espace',
+    labelKey: 'menuMonEspace',
+    group: 'Système',
+    subRoutes: [
+      { path: '/mon-espace/dashboard', subModule: 'dashboard', label: 'Dashboard' },
+      { path: '/mon-espace/profil', subModule: 'profil', label: 'Mon Profil' },
+      { path: '/mon-espace/presence', subModule: 'presence', label: 'Présence' },
+      { path: '/mon-espace/conges', subModule: 'conges', label: 'Congés' },
+      { path: '/mon-espace/bulletins', subModule: 'bulletins', label: 'Bulletins' },
+      { path: '/mon-espace/documents', subModule: 'documents', label: 'Documents' },
+      { path: '/mon-espace/evaluations', subModule: 'evaluations', label: 'Évaluations' },
+    ],
   },
   {
     key: 'profil',

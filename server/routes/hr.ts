@@ -6307,3 +6307,292 @@ hrRouter.post("/paie/reconciliation/:id/complete", getAuthUser, attachAbility, a
         res.status(500).json({ error: "Erreur serveur" });
     }
 });
+
+// ================================================
+// PROJETS RH - Gestion du temps projet
+// ================================================
+
+// GET /api/hr/projects
+hrRouter.get("/projects", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const { statut, agenceId } = req.query as { statut?: string; agenceId?: string };
+        const projects = await hrStorage.getProjects({ statut, agenceId });
+        res.json(projects);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur liste projets");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// POST /api/hr/projects
+hrRouter.post("/projects", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const user = (req as any).user;
+        const project = await hrStorage.createProject({ ...req.body, createdBy: user.id });
+        res.status(201).json(project);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur création projet");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// GET /api/hr/projects/:id
+hrRouter.get("/projects/:id", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const project = await hrStorage.getProjectById(req.params.id);
+        if (!project) return res.status(404).json({ error: "Projet introuvable" });
+        res.json(project);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur détail projet");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// PUT /api/hr/projects/:id
+hrRouter.put("/projects/:id", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const project = await hrStorage.updateProject(req.params.id, req.body);
+        if (!project) return res.status(404).json({ error: "Projet introuvable" });
+        res.json(project);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur modification projet");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// DELETE /api/hr/projects/:id (soft delete - sets status to CANCELLED)
+hrRouter.delete("/projects/:id", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const project = await hrStorage.updateProject(req.params.id, { statut: 'CANCELLED' });
+        if (!project) return res.status(404).json({ error: "Projet introuvable" });
+        res.json(project);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur annulation projet");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// POST /api/hr/projects/:id/members
+hrRouter.post("/projects/:id/members", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const member = await hrStorage.addProjectMember({
+            projetId: req.params.id,
+            ...req.body,
+        });
+        res.status(201).json(member);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur ajout membre projet");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// DELETE /api/hr/projects/:id/members/:employeId
+hrRouter.delete("/projects/:id/members/:employeId", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        await hrStorage.removeProjectMember(req.params.id, req.params.employeId);
+        res.json({ success: true });
+    } catch (error) {
+        logger.error({ err: error }, "Erreur retrait membre projet");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// GET /api/hr/projects/:id/cost-summary
+hrRouter.get("/projects/:id/cost-summary", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const summary = await hrStorage.getProjectCostSummary(req.params.id);
+        res.json(summary);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur résumé coûts projet");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// ================================================
+// FEUILLES DE TEMPS - Timesheets
+// ================================================
+
+// GET /api/hr/timesheets
+hrRouter.get("/timesheets", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const { employeId, statut, semaine } = req.query as { employeId?: string; statut?: string; semaine?: string };
+        const sheets = await hrStorage.getTimesheets({ employeId, statut, semaine });
+        res.json(sheets);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur liste feuilles de temps");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// GET /api/hr/timesheets/:id
+hrRouter.get("/timesheets/:id", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const sheet = await hrStorage.getTimesheetById(req.params.id);
+        if (!sheet) return res.status(404).json({ error: "Feuille de temps introuvable" });
+        res.json(sheet);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur détail feuille de temps");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// POST /api/hr/timesheets
+hrRouter.post("/timesheets", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        const user = (req as any).user;
+        // Any authenticated user can create their own timesheet
+        const sheet = await hrStorage.createOrGetTimesheet(req.body);
+        res.status(201).json(sheet);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur création feuille de temps");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// PUT /api/hr/timesheets/:id/entries
+hrRouter.put("/timesheets/:id/entries", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        const entry = await hrStorage.upsertTimeEntry({
+            feuilleTempsId: req.params.id,
+            ...req.body,
+        });
+        res.json(entry);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur upsert entrée temps");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// DELETE /api/hr/timesheets/:id/entries/:entryId
+hrRouter.delete("/timesheets/:id/entries/:entryId", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        await hrStorage.deleteTimeEntry(req.params.entryId);
+        res.json({ success: true });
+    } catch (error) {
+        logger.error({ err: error }, "Erreur suppression entrée temps");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// PATCH /api/hr/timesheets/:id/submit
+hrRouter.patch("/timesheets/:id/submit", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        const sheet = await hrStorage.submitTimesheet(req.params.id);
+        res.json(sheet);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur soumission feuille de temps");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// PATCH /api/hr/timesheets/:id/approve
+hrRouter.patch("/timesheets/:id/approve", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const user = (req as any).user;
+        const sheet = await hrStorage.approveTimesheet(req.params.id, user.id);
+        if (!sheet) return res.status(404).json({ error: "Feuille de temps introuvable" });
+        res.json(sheet);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur approbation feuille de temps");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// PATCH /api/hr/timesheets/:id/reject
+hrRouter.patch("/timesheets/:id/reject", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const { motif } = req.body;
+        const sheet = await hrStorage.rejectTimesheet(req.params.id, motif || '');
+        res.json(sheet);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur rejet feuille de temps");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// GET /api/hr/time-allocation/:employeId
+hrRouter.get("/time-allocation/:employeId", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const { from, to } = req.query as { from?: string; to?: string };
+        const allocation = await hrStorage.getEmployeeTimeAllocation(req.params.employeId, from, to);
+        res.json(allocation);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur allocation temps employé");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// ================================================
+// MON ESPACE - Portail employé self-service
+// ================================================
+
+// GET /api/hr/my/dashboard
+hrRouter.get("/my/dashboard", getAuthUser, async (req, res) => {
+    try {
+        const user = (req as any).user;
+        const [emp] = await db.select().from(employes).where(eq(employes.userId, user.id));
+        if (!emp) return res.status(404).json({ error: "Profil employé introuvable" });
+        const dashboard = await hrStorage.getMyDashboard(emp.id);
+        res.json(dashboard);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur dashboard Mon Espace");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// GET /api/hr/my/presence
+hrRouter.get("/my/presence", getAuthUser, async (req, res) => {
+    try {
+        const user = (req as any).user;
+        const [emp] = await db.select().from(employes).where(eq(employes.userId, user.id));
+        if (!emp) return res.status(404).json({ error: "Profil employé introuvable" });
+        const { mois } = req.query as { mois?: string };
+        const presenceList = await hrStorage.getMyPresence(emp.id, mois);
+        res.json(presenceList);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur présence Mon Espace");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// GET /api/hr/my/evaluations
+hrRouter.get("/my/evaluations", getAuthUser, async (req, res) => {
+    try {
+        const user = (req as any).user;
+        const [emp] = await db.select().from(employes).where(eq(employes.userId, user.id));
+        if (!emp) return res.status(404).json({ error: "Profil employé introuvable" });
+        const evals = await hrStorage.getMyEvaluations(emp.id);
+        res.json(evals);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur évaluations Mon Espace");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// PUT /api/hr/my/profile
+hrRouter.put("/my/profile", getAuthUser, async (req, res) => {
+    try {
+        const user = (req as any).user;
+        const [emp] = await db.select().from(employes).where(eq(employes.userId, user.id));
+        if (!emp) return res.status(404).json({ error: "Profil employé introuvable" });
+        const updated = await hrStorage.updateMyProfile(emp.id, req.body);
+        if (!updated) return res.status(404).json({ error: "Mise à jour échouée" });
+        res.json(updated);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur mise à jour profil Mon Espace");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
