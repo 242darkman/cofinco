@@ -172,6 +172,8 @@ export default function TontineDashboard({
     m.status === StatutClient.ACTIVE || m.statut === StatutClient.ACTIVE
   ).length;
 
+  const membresAuto = membres.filter((m: any) => m.cotisationAutomatique).length;
+
   const potCollecte = Number(stats.potCollecte || 0);
   const potDistribue = Number(stats.potDistribue || 0);
   const soldeNet = potCollecte - potDistribue;
@@ -231,6 +233,11 @@ export default function TontineDashboard({
           <div className="text-xl font-bold text-content-primary">
             {membresActifs}<span className="text-content-muted text-sm">/{totalMembres}</span>
           </div>
+          {membresAuto > 0 && (
+            <div className="text-[10px] text-status-info/80 mt-1">
+              {membresAuto} auto-cotisant{membresAuto > 1 ? 's' : ''}
+            </div>
+          )}
         </Card>
 
         <Card className="bg-gradient-to-br from-status-info/10 to-status-info/5 border-status-info/20 p-3">

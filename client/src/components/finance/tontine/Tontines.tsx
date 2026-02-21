@@ -364,7 +364,14 @@ export default function Tontines() {
                 />
               )}
               {activeTab === 'config' && (
-                <TontineConfig tontineId={selectedTontine.id} />
+                <TontineConfig
+                  tontineId={selectedTontine.id}
+                  onEdit={canEditTontines ? () => {
+                    setEditingTontine(selectedTontine);
+                    setPreSelectedPlanId(undefined);
+                    setShowForm(true);
+                  } : undefined}
+                />
               )}
               {activeTab === 'membres' && <TontineMembers tontineId={selectedTontine.id} maxMembres={selectedTontine.nombreMembres} onUpdate={fetchTontines} />}
               {activeTab === 'contributions' && <TontineContributions tontineId={selectedTontine.id} />}

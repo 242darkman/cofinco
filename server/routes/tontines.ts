@@ -92,14 +92,15 @@ async function validateMemberKycAndSegment(tontineId: string, clientId: string):
 
 export function registerTontineRoutes(app: Express) {
   app.get("/api/tontines", requireAuth, requireAgenceAccess("agenceId"), async (req, res) => {
-      // req.agenceFilter est injecté par requireAgenceAccess avec l'agenceId
+    try {
       const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
-
-      // On passe le filtre directement au storage qui l'applique en SQL
       const filter = agenceFilter ? { agence: agenceFilter.agenceId } : {};
       const tontines = await storage.getAllTontines(filter);
-
       res.json(tontines);
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur chargement tontines');
+      res.status(500).json({ message: error.message || "Erreur chargement tontines" });
+    }
   });
 
   // Create tontine (roles: admin, chef, superviseur)
@@ -139,10 +140,10 @@ export function registerTontineRoutes(app: Express) {
   });
 
   app.get("/api/tontines/:id", requireAuth, requireAgenceAccess("agenceId"), async (req, res) => {
+    try {
       const tontine = await storage.getTontine(req.params.id);
       if (!tontine) return res.status(404).json({ message: "Tontine not found" });
 
-      // Vérifier accès via gestionnaire
       const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
       if (agenceFilter && tontine.gestionnaireId) {
         const [employe] = await db.select({ agenceId: employes.agenceId })
@@ -154,6 +155,10 @@ export function registerTontineRoutes(app: Express) {
       }
 
       res.json(tontine);
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur chargement tontine');
+      res.status(500).json({ message: error.message || "Erreur chargement tontine" });
+    }
   });
 
   // Update tontine (roles: admin, chef, superviseur)
@@ -187,16 +192,32 @@ export function registerTontineRoutes(app: Express) {
 
   // Delete tontine (roles: admin, chef)
   app.delete("/api/tontines/:id", requireAuth, attachAbility, requireAbility(Actions.DELETE, Subjects.TONTINE), async (req, res) => {
+    try {
       const tontine = await storage.getTontine(req.params.id);
       if (!tontine) return res.status(404).json({ message: "Tontine not found" });
 
       const success = await storage.deleteTontine(req.params.id);
+
+      const wsInstance = getWsInstance();
+      if (wsInstance) {
+        wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: 'tontine_deleted', id: req.params.id } });
+      }
+
       res.json({ success });
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur suppression tontine');
+      res.status(500).json({ message: error.message || "Erreur suppression tontine" });
+    }
   });
 
   app.get("/api/tontines/:id/membres", requireAuth, async (req, res) => {
+    try {
       const membres = await storage.getMembresTontine(req.params.id);
       res.json(membres);
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur chargement membres tontine');
+      res.status(500).json({ message: error.message || "Erreur chargement membres" });
+    }
   });
 
   // Add membre to tontine (roles: admin, chef, superviseur)
@@ -258,6 +279,7 @@ export function registerTontineRoutes(app: Express) {
 
   // Remove membre from tontine
   app.delete("/api/tontines/:id/membres/:membreId", requireAuth, attachAbility, requireAbility(Actions.DELETE, Subjects.TONTINE_MEMBRE), async (req, res) => {
+    try {
       const success = await storage.updateMembreTontine(req.params.membreId, { statut: 'Retiré', deletedAt: new Date() } as any);
 
       // Decrement member count
@@ -265,7 +287,16 @@ export function registerTontineRoutes(app: Express) {
         membresActuels: sql`GREATEST(0, COALESCE(${tontines.membresActuels}, 0) - 1)`,
       } as any);
 
+      const wsInstance = getWsInstance();
+      if (wsInstance) {
+        wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: 'membre_removed', tontineId: req.params.id, membreId: req.params.membreId } });
+      }
+
       res.json({ success: !!success });
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur suppression membre tontine');
+      res.status(500).json({ message: error.message || "Erreur suppression membre" });
+    }
   });
 
   // Update membre tontine (cotisation auto etc)
@@ -1346,6 +1377,39 @@ export function registerTontineRoutes(app: Express) {
     } catch (error: any) {
       logger.error({ err: error }, "Erreur approbation swap");
       res.status(400).json({ message: error.message || "Erreur approbation swap" });
+    }
+  });
+
+  // Reject a pending swap
+  app.post("/api/tontines/:id/swap/:auditId/reject", requireAuth, attachAbility, requireAbility(Actions.APPROVE, Subjects.TONTINE), async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.user?.id;
+      const { reason } = req.body || {};
+
+      // Update the audit entry status to REJECTED
+      const [updated] = await db
+        .update(tontineTurnAudit)
+        .set({
+          status: 'REJECTED',
+          details: sql`COALESCE(${tontineTurnAudit.details}, '{}'::jsonb) || jsonb_build_object('rejectedBy', ${userId}, 'rejectedAt', ${new Date().toISOString()}, 'rejectReason', ${reason || 'Rejeté manuellement'})`,
+        } as any)
+        .where(eq(tontineTurnAudit.id, req.params.auditId))
+        .returning();
+
+      if (!updated) return res.status(404).json({ message: "Entrée d'audit non trouvée" });
+
+      const wsInstance = getWsInstance();
+      if (wsInstance) {
+        wsInstance.broadcast({
+          type: "TONTINE_UPDATE",
+          payload: { type: "swap_rejected", tontineId: req.params.id },
+        });
+      }
+
+      res.json({ success: true, audit: updated });
+    } catch (error: any) {
+      logger.error({ err: error }, "Erreur rejet swap");
+      res.status(400).json({ message: error.message || "Erreur rejet swap" });
     }
   });
 

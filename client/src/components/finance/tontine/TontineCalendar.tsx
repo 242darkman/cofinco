@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Calendar, ChevronLeft, ChevronRight, CheckCircle, Clock } from 'lucide-react';
 import { Card, Badge, IconButton, ProgressBar } from '../../ui';
+import { tontineApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import {
   StatutEcheanceTontine,
@@ -64,25 +65,16 @@ export default function TontineCalendar({
     if (!tontineId) return;
     setLoading(true);
     try {
-      const response = await fetch(`/api/tontines/${tontineId}/echeances`);
-      if (!response.ok) throw new Error('Erreur serveur');
-      const data: Array<{
-        tour: number;
-        date: string;
-        beneficiaire: string | null;
-        statut: string;
-        contributions_recues: number;
-        contributions_attendues: number;
-      }> = await response.json();
+      const data = await tontineApi.getEcheances(tontineId);
 
       setEcheances(
-        data.map((item) => ({
+        (data || []).map((item: any) => ({
           tour: item.tour,
           date: new Date(item.date),
           beneficiaire: item.beneficiaire,
           statut: mapTurnStatus(item.statut),
-          contributionsRecues: item.contributions_recues,
-          contributionsAttendues: item.contributions_attendues,
+          contributionsRecues: item.contributions_recues ?? item.contributionsRecues ?? 0,
+          contributionsAttendues: item.contributions_attendues ?? item.contributionsAttendues ?? 0,
         }))
       );
     } catch (error) {

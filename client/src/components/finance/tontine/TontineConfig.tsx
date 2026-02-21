@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Settings, Calendar, Shuffle, AlertTriangle, DoorOpen, Wallet, Shield, LayoutTemplate, ChevronDown, ChevronUp } from 'lucide-react';
-import { Card, Badge } from '../../ui';
+import { Settings, Calendar, Shuffle, AlertTriangle, DoorOpen, Wallet, Shield, LayoutTemplate, ChevronDown, ChevronUp, Edit2 } from 'lucide-react';
+import { Card, Badge, Button } from '../../ui';
 import { tontineApi, tontinePlanApi } from '../../../lib/api-client';
 import { currencySymbol } from '@shared/config/currency';
 import {
@@ -30,6 +30,7 @@ const END_RULE_OPTIONS = [
 
 interface TontineConfigProps {
   tontineId: string;
+  onEdit?: () => void;
 }
 
 function findLabel(options: { value: string; label: string }[], value: string | null | undefined): string {
@@ -89,7 +90,7 @@ function formatWeekdays(mask: number | null | undefined): string {
     .join(', ') || 'Aucun';
 }
 
-export default function TontineConfig({ tontineId }: TontineConfigProps) {
+export default function TontineConfig({ tontineId, onEdit }: TontineConfigProps) {
   const sym = currencySymbol();
   const [tontine, setTontine] = useState<any>(null);
   const [planName, setPlanName] = useState<string | null>(null);
@@ -134,6 +135,15 @@ export default function TontineConfig({ tontineId }: TontineConfigProps) {
             <span className="text-xs font-semibold text-accent">{planName || tontine.planId}</span>
           </div>
         </Card>
+      )}
+
+      {/* Edit button */}
+      {onEdit && (
+        <div className="flex justify-end">
+          <Button size="sm" variant="outline" icon={Edit2} onClick={onEdit}>
+            Modifier la configuration
+          </Button>
+        </div>
       )}
 
       {/* General */}

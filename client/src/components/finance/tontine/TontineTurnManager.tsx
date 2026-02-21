@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { GripVertical, Lock, Unlock, SkipForward, CheckCircle, Clock, DollarSign, AlertTriangle, History, RefreshCw, ArrowRightLeft } from 'lucide-react';
+import { GripVertical, Lock, Unlock, SkipForward, CheckCircle, Clock, DollarSign, AlertTriangle, History, RefreshCw, ArrowRightLeft, XCircle } from 'lucide-react';
 import { Card, Button, Badge } from '../../ui';
 import { tontineApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
@@ -46,6 +46,11 @@ export default function TontineTurnManager({ tontineId, onUpdate }: TontineTurnM
   // Pending swap approvals
   const [pendingSwaps, setPendingSwaps] = useState<any[]>([]);
   const [approvingSwap, setApprovingSwap] = useState<string | null>(null);
+
+  // Turn details expansion
+  const [expandedTurnId, setExpandedTurnId] = useState<string | null>(null);
+  const [turnContributions, setTurnContributions] = useState<any[]>([]);
+  const [loadingContribs, setLoadingContribs] = useState(false);
 
   const currentCycle = dashboard?.currentCycle;
 
@@ -234,10 +239,49 @@ export default function TontineTurnManager({ tontineId, onUpdate }: TontineTurnM
     }
   }, [tontineId, fetchData, onUpdate]);
 
+  const handleRejectSwap = useCallback((auditId: string) => {
+    openConfirm({
+      title: 'Rejeter cet echange',
+      message: 'Rejeter cette demande d\'echange de tours ? Le demandeur sera notifie.',
+      variant: 'danger',
+      confirmText: 'Rejeter',
+      onConfirm: async () => {
+        setApprovingSwap(auditId);
+        try {
+          await tontineApi.rejectSwap(tontineId, auditId, 'Rejete par l\'administrateur');
+          toast.success('Echange rejete');
+          fetchData();
+          onUpdate?.();
+        } catch (error) {
+          toast.error(handleApiError(error, "Erreur lors du rejet"));
+        } finally {
+          setApprovingSwap(null);
+        }
+      },
+    });
+  }, [tontineId, openConfirm, fetchData, onUpdate]);
+
   const handleToggleAudit = useCallback(() => {
     if (!showAudit) fetchAudit();
     setShowAudit(!showAudit);
   }, [showAudit, fetchAudit]);
+
+  const handleToggleTurnDetail = useCallback(async (turnId: string, turnNumber: number) => {
+    if (expandedTurnId === turnId) {
+      setExpandedTurnId(null);
+      return;
+    }
+    setExpandedTurnId(turnId);
+    setLoadingContribs(true);
+    try {
+      const contribs = await tontineApi.getContributions(tontineId);
+      setTurnContributions((contribs || []).filter((c: any) => c.tourNumero === turnNumber));
+    } catch {
+      setTurnContributions([]);
+    } finally {
+      setLoadingContribs(false);
+    }
+  }, [tontineId, expandedTurnId]);
 
   if (loading) {
     return (
@@ -334,16 +378,28 @@ export default function TontineTurnManager({ tontineId, onUpdate }: TontineTurnM
                     {swap.changedAt && new Date(swap.changedAt).toLocaleString('fr-FR')}
                   </p>
                 </div>
-                <Button
-                  size="sm"
-                  variant="primary"
-                  icon={CheckCircle}
-                  onClick={() => handleApproveSwap(swap.id)}
-                  disabled={approvingSwap === swap.id}
-                  className="text-xs shrink-0"
-                >
-                  {approvingSwap === swap.id ? '...' : 'Approuver'}
-                </Button>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    icon={CheckCircle}
+                    onClick={() => handleApproveSwap(swap.id)}
+                    disabled={approvingSwap === swap.id}
+                    className="text-xs"
+                  >
+                    {approvingSwap === swap.id ? '...' : 'Approuver'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    icon={XCircle}
+                    onClick={() => handleRejectSwap(swap.id)}
+                    disabled={approvingSwap === swap.id}
+                    className="text-xs text-status-danger"
+                  >
+                    Rejeter
+                  </Button>
+                </div>
               </div>
             </Card>
           ))}
@@ -409,31 +465,58 @@ export default function TontineTurnManager({ tontineId, onUpdate }: TontineTurnM
               <p className="text-[10px] font-semibold text-content-muted uppercase tracking-wider">Complétés</p>
               {completedTurns.map((turn) => {
                 const cfg = turnStatusConfig[turn.status] || turnStatusConfig.SCHEDULED;
+                const isExpanded = expandedTurnId === turn.id;
                 return (
-                  <Card key={turn.id} className="p-3 opacity-70">
-                    <div className="flex items-center gap-3">
-                      <div className="w-7 h-7 rounded-full bg-surface-subtle flex items-center justify-center text-xs font-bold text-content-muted shrink-0">
-                        {turn.turnNumber}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-content-primary truncate">
-                            {getMemberName(turn.beneficiaryMemberId)}
-                          </span>
-                          <Badge variant={cfg.variant} value={cfg.label} size="sm" />
+                  <div key={turn.id}>
+                    <Card
+                      className="p-3 opacity-70 cursor-pointer hover:opacity-90 transition-opacity"
+                      onClick={() => handleToggleTurnDetail(turn.id, turn.turnNumber)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-7 h-7 rounded-full bg-surface-subtle flex items-center justify-center text-xs font-bold text-content-muted shrink-0">
+                          {turn.turnNumber}
                         </div>
-                        <div className="flex items-center gap-3 text-[10px] text-content-muted mt-0.5">
-                          {turn.amountPaidOut > 0 && (
-                            <span className="text-status-success">{Number(turn.amountPaidOut).toLocaleString()} {sym} payé</span>
-                          )}
-                          {turn.amountExpected > 0 && (
-                            <span>Attendu: {Number(turn.amountExpected).toLocaleString()} {sym}</span>
-                          )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-content-primary truncate">
+                              {getMemberName(turn.beneficiaryMemberId)}
+                            </span>
+                            <Badge variant={cfg.variant} value={cfg.label} size="sm" />
+                          </div>
+                          <div className="flex items-center gap-3 text-[10px] text-content-muted mt-0.5">
+                            {turn.amountPaidOut > 0 && (
+                              <span className="text-status-success">{Number(turn.amountPaidOut).toLocaleString()} {sym} paye</span>
+                            )}
+                            {turn.amountExpected > 0 && (
+                              <span>Attendu: {Number(turn.amountExpected).toLocaleString()} {sym}</span>
+                            )}
+                          </div>
                         </div>
+                        {turn.isLocked && <Lock size={12} className="text-content-muted shrink-0" />}
                       </div>
-                      {turn.isLocked && <Lock size={12} className="text-content-muted shrink-0" />}
-                    </div>
-                  </Card>
+                    </Card>
+                    {isExpanded && (
+                      <div className="ml-10 mt-1 mb-2 space-y-1">
+                        {loadingContribs ? (
+                          <p className="text-[10px] text-content-muted py-2">Chargement...</p>
+                        ) : turnContributions.length === 0 ? (
+                          <p className="text-[10px] text-content-muted py-2">Aucune cotisation pour ce tour</p>
+                        ) : (
+                          turnContributions.map((c: any, i: number) => (
+                            <div key={i} className="flex items-center justify-between px-3 py-1.5 rounded bg-surface-subtle/50 border border-edge-subtle">
+                              <span className="text-[10px] text-content-primary">
+                                {c.client?.nom || c.tontineMembres?.clients?.nom || 'Membre'}
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-medium text-content-primary">{Number(c.montant || 0).toLocaleString()} {sym}</span>
+                                <span className="text-[9px] text-content-muted">{c.methodePaiement || ''}</span>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>

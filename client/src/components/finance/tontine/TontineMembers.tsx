@@ -473,8 +473,9 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
      setConfigMember(membre);
      setLoadingAccounts(true);
      try {
-         const accounts = await compteEpargneApi.getByClient(membre.clientId);
-         setMemberAccounts(accounts || []);
+         const result = await compteEpargneApi.getByClient(membre.clientId);
+         // Handle both paginated { data: [...] } and flat array responses
+         setMemberAccounts(Array.isArray(result) ? result : (result?.data || []));
      } catch(e) {
          console.error("Error loading accounts", e);
          toast.error("Impossible de charger les comptes du membre");
@@ -640,6 +641,25 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
                             <span className="px-1.5 py-0.5 rounded bg-accent/10 text-accent text-[10px] font-bold">
                               {membre.groupRole}
                             </span>
+                          )}
+                          {membre.cotisationAutomatique && (
+                            <span className="px-1.5 py-0.5 rounded bg-status-info-bg text-status-info text-[10px] font-bold" title="Cotisation automatique activee">
+                              Auto
+                            </span>
+                          )}
+                          {(membre.lateCount > 0 || membre.absenceCount > 0) && (
+                            <>
+                              {membre.lateCount > 0 && (
+                                <span className="px-1.5 py-0.5 rounded bg-status-warning-bg text-status-warning text-[10px] font-bold" title={`${membre.lateCount} retard(s)`}>
+                                  {membre.lateCount} retard{membre.lateCount > 1 ? 's' : ''}
+                                </span>
+                              )}
+                              {membre.absenceCount > 0 && (
+                                <span className="px-1.5 py-0.5 rounded bg-status-danger-bg text-status-danger text-[10px] font-bold" title={`${membre.absenceCount} absence(s)`}>
+                                  {membre.absenceCount} abs.
+                                </span>
+                              )}
+                            </>
                           )}
                           {membre.exitRequestedAt && !membre.dateBenefice && (
                             <span className="px-1.5 py-0.5 rounded bg-status-warning-bg text-status-warning text-[10px] font-bold">

@@ -1609,6 +1609,15 @@ export const tontineApi = {
 
   // Reconciliation
   getReconciliation: (tontineId: string) => request<any>(`/tontines/${tontineId}/reconciliation`),
+
+  // Calendar / Echeances
+  getEcheances: (tontineId: string) => request<any[]>(`/tontines/${tontineId}/echeances`),
+
+  // Reject swap
+  rejectSwap: (tontineId: string, auditId: string, reason?: string) =>
+    request<any>(`/tontines/${tontineId}/swap/${auditId}/reject`, {
+      method: 'POST', body: JSON.stringify({ reason }),
+    }),
 };
 
 // Tontine Plans API
