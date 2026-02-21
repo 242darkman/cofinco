@@ -513,6 +513,7 @@ async function processSalaryPayment(
           .set({
             statut: "PAID",
             datePaiement: new Date().toISOString().split("T")[0],
+            paiementMouvementId: mouvement.id,
           } as any)
           .where(eq(bulletinsPaie.id, parseInt(request.sourceId)));
       }
@@ -521,6 +522,18 @@ async function processSalaryPayment(
     },
     userId
   );
+
+  // Notify salary payment service of caisse validation (for job tracking)
+  if (request.sourceId) {
+    try {
+      const { handleCaisseValidation } = await import("./salary-payment-service");
+      await handleCaisseValidation(parseInt(request.sourceId), mouvement.id);
+    } catch (error) {
+      // Non-bloquant : le bulletin est déjà marqué PAID
+      const importLogger = (await import("../lib/logger")).createLogger("CaisseQueueService");
+      importLogger.warn({ sourceId: request.sourceId, err: error }, "Could not notify salary payment service of caisse validation");
+    }
+  }
 
   return mouvement.id;
 }

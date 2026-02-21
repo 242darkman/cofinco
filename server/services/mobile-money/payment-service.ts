@@ -472,6 +472,16 @@ class PaymentService {
           logger.error({ err: error, creditId: intent.creditId }, 'Could not update credit after payout failure');
         }
       }
+
+      // Notify salary payment service if this was a salary payout
+      if (metadata?.useCase === "SALARY_PAYOUT" && metadata?.jobId) {
+        try {
+          const { handlePayoutFailure } = await import("../salary-payment-service");
+          await handlePayoutFailure(metadata.jobId as string, errorCode, errorMessage);
+        } catch (error) {
+          logger.warn({ err: error, jobId: metadata.jobId }, 'Could not notify salary payment service of payout failure');
+        }
+      }
     } else if (normalizedStatus === "EXPIRED") {
       await storage.updatePaymentIntent(intent.id, {
         status: "EXPIRED",
@@ -1032,6 +1042,17 @@ class PaymentService {
         logger.info({ intentId: intent.id, creditId: intent.creditId }, 'Credit activated after Mobile Money disbursement');
       } catch (error) {
         logger.error({ intentId: intent.id, creditId: intent.creditId, err: error }, 'Failed to activate credit after payout');
+      }
+    }
+
+    // Post-payout hook: finalize salary payment after successful Mobile Money payout
+    if (metadata?.useCase === "SALARY_PAYOUT" && metadata?.jobId) {
+      try {
+        const { handlePayoutSuccess } = await import("../salary-payment-service");
+        await handlePayoutSuccess(metadata.jobId as string, mouvement.id);
+        logger.info({ intentId: intent.id, jobId: metadata.jobId }, 'Salary payout finalized');
+      } catch (error) {
+        logger.error({ intentId: intent.id, jobId: metadata.jobId, err: error }, 'Failed to finalize salary payout');
       }
     }
   }
