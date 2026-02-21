@@ -20,6 +20,7 @@ import {
   RefreshCcw,
   Briefcase,
   BarChart3,
+  UserCog,
 } from 'lucide-react';
 import { MenuItem } from '../types/layout';
 
@@ -54,6 +55,7 @@ export const PLATFORM_MENU_ITEMS: MenuItem[] = [
   { labelKey: 'menuTresorerie', icon: Landmark, key: 'tresorerie', section: 'admin' },
   // { labelKey: 'menuReconciliation', icon: RefreshCcw, key: 'reconciliation', section: 'admin' }, // Masqué temporairement
   { labelKey: 'menuMessages', icon: MessageSquare, key: 'messages', section: 'admin' },
+  { labelKey: 'menuMonEspace', icon: UserCog, key: 'mon-espace', section: 'admin' },
   { labelKey: 'menuProfil', icon: UserCircle, key: 'profil', section: 'admin' },
 ];
 
