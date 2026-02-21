@@ -3844,6 +3844,23 @@ export function registerFinanceRoutes(app: Express) {
 
         const parsed = insertOperationCaisseSchema.parse(data);
 
+        // ====== SERVER-SIDE AMOUNT VALIDATION ======
+        const montantNum = Number(parsed.montant);
+        const MIN_OPERATION_AMOUNT = 100;
+        const MAX_OPERATION_AMOUNT = 100_000_000_000; // 100 milliards FCFA
+
+        if (isNaN(montantNum) || montantNum < MIN_OPERATION_AMOUNT) {
+            return res.status(400).json({
+                message: `Le montant minimum est de ${MIN_OPERATION_AMOUNT.toLocaleString('fr-FR')} FCFA.`
+            });
+        }
+        if (montantNum > MAX_OPERATION_AMOUNT) {
+            return res.status(400).json({
+                message: `Le montant maximum est de ${MAX_OPERATION_AMOUNT.toLocaleString('fr-FR')} FCFA.`
+            });
+        }
+        // ====== END AMOUNT VALIDATION ======
+
         // Targeted Account Resolution
         let targetCompteId = data.compteId;
         
@@ -3904,9 +3921,18 @@ export function registerFinanceRoutes(app: Express) {
             if (isDebitOperation) {
                 const targetAccount = await storage.getCompte(targetCompteId);
                 if (targetAccount?.blocageActif) {
-                    return res.status(403).json({ 
-                        message: `Ce compte est gelé (${targetAccount.blocageMotif || 'Blocage administratif'}). Les retraits ne sont pas autorisés.` 
+                    return res.status(403).json({
+                        message: `Ce compte est gelé (${targetAccount.blocageMotif || 'Blocage administratif'}). Les retraits ne sont pas autorisés.`
                     });
+                }
+                // Check sufficient balance for withdrawals
+                if (targetAccount) {
+                    const solde = parseFloat(targetAccount.solde || '0');
+                    if (montantNum > solde) {
+                        return res.status(400).json({
+                            message: `Solde insuffisant. Solde disponible: ${solde.toLocaleString('fr-FR')} FCFA, montant demandé: ${montantNum.toLocaleString('fr-FR')} FCFA.`
+                        });
+                    }
                 }
                 // Also check if client is frozen
                 if (parsed.clientId) {
