@@ -6,7 +6,7 @@ import { usePermissions } from '../auth/ProtectedFeature';
 import { toast } from '../../lib/toast';
 import { useEntityUpload } from '../../hooks/useEntityUpload';
 import { StatutUser } from '@shared/enum/status-constants';
-import { agenceApi, paysApi, localityApi } from '../../lib/api-client';
+import { agenceApi, paysApi, localityApi, villeApi } from '../../lib/api-client';
 import StepIdentite from './employee-wizard/StepIdentite';
 import StepDocuments from './employee-wizard/StepDocuments';
 import StepContrat from './employee-wizard/StepContrat';
@@ -146,6 +146,11 @@ export default function EmployeeForm({
   const [localitiesLoading, setLocalitiesLoading] = useState(false);
   const localitiesCacheRef = useRef<Record<string, LocalityOption[]>>({});
 
+  // Ville (address city) search
+  const [villesList, setVillesList] = useState<Array<{ id: string; nom: string; regionNom: string | null }>>([]);
+  const [villesLoading, setVillesLoading] = useState(false);
+  const villeSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Document uploads
   const [uploadedDocs, setUploadedDocs] = useState<Record<string, any>>({});
 
@@ -214,6 +219,26 @@ export default function EmployeeForm({
       setLocalitiesLoading(false);
     }
   }, []);
+
+  // --- Fetch villes for address city ---
+  const fetchVilles = useCallback(async (search?: string) => {
+    setVillesLoading(true);
+    try {
+      const data = await villeApi.getAll({ search: search || undefined, limit: 200 });
+      setVillesList(data.map((v: any) => ({ id: v.id, nom: v.nom, regionNom: v.regionNom ?? null })));
+    } catch {
+      setVillesList([]);
+    } finally {
+      setVillesLoading(false);
+    }
+  }, []);
+
+  const handleVilleSearch = useCallback((query: string) => {
+    if (villeSearchDebounceRef.current) clearTimeout(villeSearchDebounceRef.current);
+    villeSearchDebounceRef.current = setTimeout(() => {
+      fetchVilles(query.trim().length >= 2 ? query.trim() : undefined);
+    }, 300);
+  }, [fetchVilles]);
 
   // --- Validation ---
   const validateStep = useCallback((stepIndex: number): Record<string, string> => {
@@ -460,7 +485,7 @@ export default function EmployeeForm({
     loadAgences();
   }, []);
 
-  // Load pays
+  // Load pays + initial villes batch
   useEffect(() => {
     const loadPays = async () => {
       try {
@@ -471,7 +496,8 @@ export default function EmployeeForm({
       }
     };
     loadPays();
-  }, []);
+    fetchVilles();
+  }, [fetchVilles]);
 
   // Load departments & positions
   useEffect(() => {
@@ -680,6 +706,9 @@ export default function EmployeeForm({
             localitiesList={localitiesList}
             localitiesLoading={localitiesLoading}
             fetchLocalitiesByPays={fetchLocalitiesByPays}
+            villesList={villesList}
+            villesLoading={villesLoading}
+            onVilleSearch={handleVilleSearch}
             validationErrors={validationErrors}
           />
         );

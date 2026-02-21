@@ -40,6 +40,10 @@ interface StepIdentiteProps {
   localitiesList: Array<{ id: string; type: 'CITY' | 'DISTRICT'; name: string; regionName?: string | null }>;
   localitiesLoading: boolean;
   fetchLocalitiesByPays: (paysId: string) => void;
+  // Ville (address city) search
+  villesList: Array<{ id: string; nom: string; regionNom: string | null }>;
+  villesLoading: boolean;
+  onVilleSearch: (query: string) => void;
   // Validation
   validationErrors: Record<string, string>;
 }
@@ -63,6 +67,9 @@ export default function StepIdentite({
   localitiesList,
   localitiesLoading,
   fetchLocalitiesByPays,
+  villesList,
+  villesLoading,
+  onVilleSearch,
   validationErrors,
 }: StepIdentiteProps) {
   const isCreationMode = !editingEmploye;
@@ -80,6 +87,14 @@ export default function StepIdentite({
     value: loc.id,
     label: loc.name,
     subLabel: [loc.type === 'DISTRICT' ? 'District' : null, loc.regionName].filter(Boolean).join(' · ') || undefined,
+  }));
+
+  // Prepare ville options for address city
+  const villeOptions = villesList.map(v => ({
+    value: v.nom,
+    label: v.nom,
+    subLabel: v.regionNom || undefined,
+    hideAvatar: true,
   }));
 
   // User select options
@@ -434,14 +449,17 @@ export default function StepIdentite({
             error={validationErrors.adresse}
             containerClassName="py-1"
           />
-          <FormField
+          <SearchableSelect
             label="Ville"
             name="ville"
+            options={villeOptions}
             value={formData.ville || ''}
-            onChange={(e) => updateField('ville', e.target.value)}
-            placeholder="Ville"
+            onChange={(value) => updateField('ville', String(value))}
+            onSearchChange={onVilleSearch}
+            isLoading={villesLoading}
+            placeholder="Rechercher une ville..."
             error={validationErrors.ville}
-            containerClassName="py-1"
+            showAvatarInTrigger={false}
           />
         </div>
       </div>
