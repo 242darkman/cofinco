@@ -51,6 +51,7 @@ interface TontineContribution {
   modePaiement: PaymentMode;
   referencePaiement: string | null;
   statut: typeof StatutContributionTontine[keyof typeof StatutContributionTontine];
+  statutContribution?: 'FULL' | 'PARTIAL';
   notes: string | null;
   client: {
     nom: string;
@@ -284,13 +285,20 @@ const ContributionDetailsModal = ({ contribution, onClose }: { contribution: Ton
             </div>
           )}
 
-          <div className="flex justify-center">
+          <div className="flex justify-center gap-2">
             <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${
               contribution.statut === 'VALIDATED' ? 'bg-status-success-bg text-status-success' :
               contribution.statut === 'PENDING' ? 'bg-status-warning-bg text-status-warning' :
               'bg-status-danger-bg text-status-danger'
             }`}>
-              Statut: {ALL_STATUS_LABELS[contribution.statut] || contribution.statut}
+              {ALL_STATUS_LABELS[contribution.statut] || contribution.statut}
+            </span>
+            <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${
+              contribution.statutContribution === 'PARTIAL'
+                ? 'bg-status-warning-bg text-status-warning'
+                : 'bg-status-success-bg text-status-success'
+            }`}>
+              {contribution.statutContribution === 'PARTIAL' ? 'Partiel' : 'Complet'}
             </span>
           </div>
         </div>
@@ -521,7 +529,9 @@ export default function TontineContributions({ tontineId }: TontineContributions
   const filteredContributions = useMemo(() => {
     let filtered = contributions;
 
-    if (statusFilter !== 'all') {
+    if (statusFilter === 'PARTIAL') {
+      filtered = filtered.filter((c) => c.statutContribution === 'PARTIAL');
+    } else if (statusFilter !== 'all') {
       filtered = filtered.filter((c) => c.statut === statusFilter);
     }
 
@@ -701,6 +711,7 @@ export default function TontineContributions({ tontineId }: TontineContributions
             <option value={StatutContributionTontine.PENDING}>En attente</option>
             <option value={StatutContributionTontine.REJECTED}>Rejetée</option>
             <option value={StatutContributionTontine.LATE}>En retard</option>
+            <option value="PARTIAL">Partielles</option>
           </select>
         </div>
       )}
@@ -755,6 +766,11 @@ export default function TontineContributions({ tontineId }: TontineContributions
                       >
                         {ALL_STATUS_LABELS[contribution.statut] || contribution.statut}
                       </span>
+                      {contribution.statutContribution === 'PARTIAL' && (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase text-status-warning bg-status-warning-bg">
+                          Partiel
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-3 text-xs text-content-muted mb-2 flex-wrap">

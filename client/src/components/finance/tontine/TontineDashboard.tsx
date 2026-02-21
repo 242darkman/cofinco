@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { TrendingUp, Users, DollarSign, CheckCircle, AlertTriangle, Calendar, Activity, ArrowRight, Play, Gift, RefreshCw, ChevronDown, ChevronUp, Lock, Clock, Square } from 'lucide-react';
 import { Card, ProgressBar, Button, Badge } from '../../ui';
+import ConfirmDialog from '../../ui/ConfirmDialog';
+import { useConfirmDialog } from '../../../hooks/useConfirmDialog';
 import { toast } from '../../../lib/toast';
 import { tontineApi } from '../../../lib/api-client';
 import { StatutClient, StatutContributionTontine } from '@shared/enum/status-constants';
@@ -36,6 +38,7 @@ export default function TontineDashboard({
   const currentTour = toNumber(tourActuel);
   const contributionAmount = toNumber(montantContribution);
 
+  const { confirmState, openConfirm, closeConfirm, handleConfirm } = useConfirmDialog();
   const [loading, setLoading] = useState(false);
   const [generatingCycle, setGeneratingCycle] = useState(false);
   const [closingCycle, setClosingCycle] = useState(false);
@@ -120,19 +123,31 @@ export default function TontineDashboard({
     }
   }, [tontineId]);
 
-  const handleCloseCycle = useCallback(async () => {
+  const handleCloseCycle = useCallback(() => {
     if (!tontineId || !currentCycle?.id) return;
-    setClosingCycle(true);
-    try {
-      await tontineApi.closeCycle(tontineId, currentCycle.id);
-      toast.success('Cycle cloture avec succes');
-      fetchDashboard();
-    } catch (error: any) {
-      toast.error(error.message || 'Erreur lors de la cloture du cycle');
-    } finally {
-      setClosingCycle(false);
-    }
-  }, [tontineId, dashboard]);
+    const remaining = totalTurns - completedTurns;
+    const isEarly = remaining > 0;
+    openConfirm({
+      title: isEarly ? 'Clôturer le cycle prématurément ?' : 'Clôturer le cycle ?',
+      message: isEarly
+        ? `Il reste ${remaining} tour${remaining > 1 ? 's' : ''} non distribué${remaining > 1 ? 's' : ''} (${Math.round(progressPercent)}% complété). Cette action est irréversible.`
+        : 'Tous les tours ont été distribués. Clôturer ce cycle ?',
+      variant: isEarly ? 'warning' : 'default',
+      confirmText: 'Clôturer',
+      onConfirm: async () => {
+        setClosingCycle(true);
+        try {
+          await tontineApi.closeCycle(tontineId, currentCycle.id);
+          toast.success('Cycle clôturé avec succès');
+          fetchDashboard();
+        } catch (error: any) {
+          toast.error(error.message || 'Erreur lors de la clôture du cycle');
+        } finally {
+          setClosingCycle(false);
+        }
+      },
+    });
+  }, [tontineId, currentCycle?.id, totalTurns, completedTurns, progressPercent, openConfirm]);
 
   // Compute stats
   const stats = dashboard?.stats || {};
@@ -219,16 +234,16 @@ export default function TontineDashboard({
                   value={currentCycle.status === 'OPEN' ? 'Ouvert' : currentCycle.status === 'PAUSED' ? 'Pause' : currentCycle.status === 'CLOSED' ? 'Cloture' : currentCycle.status}
                 />
               </div>
-              {currentCycle.status === 'OPEN' && progressPercent === 100 && (
+              {currentCycle.status === 'OPEN' && (
                 <Button
                   size="xs"
-                  variant="outline"
+                  variant={progressPercent === 100 ? 'outline' : 'ghost'}
                   onClick={handleCloseCycle}
                   disabled={closingCycle}
-                  className="w-full text-[10px] mt-2"
+                  className={`w-full text-[10px] mt-2 ${progressPercent < 100 ? 'text-status-warning' : ''}`}
                   icon={closingCycle ? RefreshCw : Square}
                 >
-                  {closingCycle ? 'Cloture...' : 'Cloturer le cycle'}
+                  {closingCycle ? 'Cloture...' : progressPercent < 100 ? `Cloturer (${Math.round(progressPercent)}%)` : 'Cloturer le cycle'}
                 </Button>
               )}
             </div>
@@ -464,6 +479,16 @@ export default function TontineDashboard({
           </Button>
         </Card>
       )}
+
+      <ConfirmDialog
+        isOpen={confirmState.isOpen}
+        onClose={closeConfirm}
+        onConfirm={handleConfirm}
+        title={confirmState.title || ''}
+        message={confirmState.message || ''}
+        variant={confirmState.variant}
+        confirmText={confirmState.confirmText}
+      />
     </div>
   );
 }
