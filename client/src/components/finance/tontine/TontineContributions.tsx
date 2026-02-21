@@ -26,7 +26,7 @@ import mtnLogo from '@/assets/logos/mtn-logo.png';
 import airtelLogo from '@/assets/logos/airtel-logo.png';
 
 const MOBILE_OPERATORS = [
-  { id: 'mtn', name: 'MTN Mobile Money', color: 'bg-status-warning-bg0', prefix: '+242 05/06', logo: mtnLogo },
+  { id: 'mtn', name: 'MTN Mobile Money', color: 'bg-status-warning-bg', prefix: '+242 05/06', logo: mtnLogo },
   { id: 'airtel', name: 'Airtel Money', color: 'bg-status-danger', prefix: '+242 04', logo: airtelLogo },
 ];
 

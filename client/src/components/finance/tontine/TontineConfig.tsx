@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings, Calendar, Shuffle, AlertTriangle, DoorOpen, Wallet, Shield, LayoutTemplate, ChevronDown, ChevronUp, Edit2 } from 'lucide-react';
+import { Settings, Calendar, Shuffle, AlertTriangle, DoorOpen, Wallet, Shield, LayoutTemplate, ChevronDown, ChevronUp, Edit2, Info } from 'lucide-react';
 import { Card, Badge, Button } from '../../ui';
 import { tontineApi, tontinePlanApi } from '../../../lib/api-client';
 import { currencySymbol } from '@shared/config/currency';
@@ -269,6 +269,32 @@ export default function TontineConfig({ tontineId, onEdit }: TontineConfigProps)
           <ConfigRow label="Segment minimum" value={tontine.minSegmentRequired} />
         )}
       </Section>
+
+      {/* Metadata */}
+      {(tontine.createdAt || tontine.updatedAt || tontine.statut) && (
+        <Section icon={Info} title="Metadonnees">
+          <ConfigRow label="Statut" value={
+            tontine.statut === 'DRAFT' ? 'Brouillon'
+            : tontine.statut === 'ACTIVE' ? 'Active'
+            : tontine.statut === 'PAUSED' ? 'En pause'
+            : tontine.statut === 'COMPLETED' ? 'Terminee'
+            : tontine.statut === 'CANCELLED' ? 'Annulee'
+            : tontine.statut
+          } />
+          {tontine.createdAt && (
+            <ConfigRow label="Cree le" value={new Date(tontine.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })} />
+          )}
+          {tontine.updatedAt && (
+            <ConfigRow label="Derniere maj" value={new Date(tontine.updatedAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })} />
+          )}
+          {tontine.version != null && (
+            <ConfigRow label="Version" value={`v${tontine.version}`} />
+          )}
+          {tontine.agenceId && (
+            <ConfigRow label="Agence" value={tontine.agenceId.substring(0, 8) + '...'} />
+          )}
+        </Section>
+      )}
     </div>
   );
 }

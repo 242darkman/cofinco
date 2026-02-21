@@ -5,6 +5,7 @@ import type { TontinePlan } from "@shared/schema/tontines";
 
 function mapPlanToFormData(plan: TontinePlan): TontinePlanFormData {
   return {
+    actif: plan.actif ?? true,
     nom: plan.nom || "",
     description: plan.description || "",
     montantCotisation: plan.montantCotisation?.toString() || "",

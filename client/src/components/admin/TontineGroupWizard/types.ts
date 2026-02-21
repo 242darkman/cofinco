@@ -24,6 +24,7 @@ export interface TontineGroupFormData {
   gestionnaireId: string;
 
   // ─── Step 3: Lifecycle ───
+  statut: string;
   dateDebut: string;
   dateFin: string;
   endRule: string;

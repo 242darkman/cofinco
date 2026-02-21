@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { History, ArrowRightLeft, Lock, Unlock, SkipForward, UserPlus, Play, RefreshCw } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { History, ArrowRightLeft, Lock, Unlock, SkipForward, UserPlus, Play, RefreshCw, Filter, ArrowUpDown } from 'lucide-react';
 import { tontineApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import Badge from '../../ui/Badge';
@@ -23,6 +23,8 @@ interface Props {
   tontineId: string;
 }
 
+const ACTION_TYPES = ['INITIAL_GENERATION', 'REORDER', 'SWAP', 'SKIP', 'BENEFICIARY_CHANGE', 'LOCK', 'UNLOCK'] as const;
+
 const ACTION_CONFIG: Record<string, { label: string; icon: typeof History; variant: 'default' | 'info' | 'warning' | 'success' | 'danger' }> = {
   INITIAL_GENERATION: { label: 'Generation initiale', icon: Play, variant: 'success' },
   REORDER: { label: 'Reorganisation', icon: ArrowRightLeft, variant: 'info' },
@@ -33,9 +35,18 @@ const ACTION_CONFIG: Record<string, { label: string; icon: typeof History; varia
   UNLOCK: { label: 'Deverrouillage', icon: Unlock, variant: 'default' },
 };
 
+function getUserName(entry: AuditEntry): string {
+  if (entry.changedByUser) {
+    return `${entry.changedByUser.prenom || ''} ${entry.changedByUser.nom || ''}`.trim() || entry.changedByUser.username || '';
+  }
+  return entry.changedBy?.substring(0, 8) || '';
+}
+
 export default function TontineAuditTrail({ tontineId }: Props) {
   const [audits, setAudits] = useState<AuditEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filterType, setFilterType] = useState<string>('');
+  const [showFilters, setShowFilters] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -57,6 +68,12 @@ export default function TontineAuditTrail({ tontineId }: Props) {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  const filtered = useMemo(() => {
+    let result = audits;
+    if (filterType) result = result.filter((a) => a.actionType === filterType);
+    return result;
+  }, [audits, filterType]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12 text-content-muted text-sm">
@@ -77,22 +94,61 @@ export default function TontineAuditTrail({ tontineId }: Props) {
 
   return (
     <div className="space-y-2">
-      <h3 className="text-sm font-semibold text-content-primary mb-3">
-        Historique d'audit ({audits.length} evenements)
-      </h3>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold text-content-primary">
+          Historique d'audit ({filtered.length}{filtered.length !== audits.length ? `/${audits.length}` : ''} evenements)
+        </h3>
+        <button
+          type="button"
+          onClick={() => setShowFilters(!showFilters)}
+          className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] transition-colors ${
+            showFilters || filterType ? 'bg-accent/10 text-accent' : 'bg-surface-subtle text-content-muted hover:text-content-secondary'
+          }`}
+        >
+          <Filter size={12} />
+          Filtres
+        </button>
+      </div>
+
+      {showFilters && (
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          <button
+            type="button"
+            onClick={() => setFilterType('')}
+            className={`px-2 py-1 rounded text-[10px] transition-colors ${
+              !filterType ? 'bg-accent text-white' : 'bg-surface-subtle text-content-muted hover:text-content-secondary'
+            }`}
+          >
+            Tous
+          </button>
+          {ACTION_TYPES.map((type) => {
+            const cfg = ACTION_CONFIG[type];
+            return (
+              <button
+                key={type}
+                type="button"
+                onClick={() => setFilterType(filterType === type ? '' : type)}
+                className={`px-2 py-1 rounded text-[10px] transition-colors ${
+                  filterType === type ? 'bg-accent text-white' : 'bg-surface-subtle text-content-muted hover:text-content-secondary'
+                }`}
+              >
+                {cfg.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <div className="relative">
         {/* Timeline line */}
         <div className="absolute left-4 top-0 bottom-0 w-px bg-edge" />
 
         <div className="space-y-3">
-          {audits.map((entry, idx) => {
+          {filtered.map((entry) => {
             const cfg = ACTION_CONFIG[entry.actionType] || { label: entry.actionType, icon: History, variant: 'default' as const };
             const Icon = cfg.icon;
             const date = new Date(entry.changedAt);
-            const userName = entry.changedByUser
-              ? `${entry.changedByUser.prenom || ''} ${entry.changedByUser.nom || ''}`.trim() || entry.changedByUser.username
-              : entry.changedBy?.substring(0, 8);
+            const userName = getUserName(entry);
 
             return (
               <div key={entry.id} className="relative pl-10">
@@ -132,6 +188,14 @@ export default function TontineAuditTrail({ tontineId }: Props) {
                       </span>
                     )}
                   </div>
+
+                  {/* Show details for REORDER */}
+                  {entry.actionType === 'REORDER' && entry.oldOrder && entry.newOrder && (
+                    <div className="mt-1.5 flex items-center gap-2 text-[10px] text-content-muted bg-surface-subtle rounded px-2 py-1">
+                      <ArrowUpDown size={10} />
+                      <span>{Array.isArray(entry.oldOrder) ? entry.oldOrder.length : 0} positions modifiees</span>
+                    </div>
+                  )}
 
                   {/* Show details for LOCK/UNLOCK */}
                   {entry.metadata && (entry.actionType === 'LOCK' || entry.actionType === 'UNLOCK') && (

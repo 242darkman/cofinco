@@ -11,7 +11,7 @@ import mtnLogo from '@/assets/logos/mtn-logo.png';
 import airtelLogo from '@/assets/logos/airtel-logo.png';
 
 const MOBILE_OPERATORS = [
-  { id: 'MTN', name: 'MTN Mobile Money', color: 'bg-status-warning-bg0', logo: mtnLogo },
+  { id: 'MTN', name: 'MTN Mobile Money', color: 'bg-status-warning-bg', logo: mtnLogo },
   { id: 'AIRTEL', name: 'Airtel Money', color: 'bg-status-danger', logo: airtelLogo },
 ] as const;
 import { Card, Button, Badge, IconButton } from '../../ui';

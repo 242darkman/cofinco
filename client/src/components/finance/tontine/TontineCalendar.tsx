@@ -184,7 +184,7 @@ export default function TontineCalendar({
                              <div className="text-xs text-content-muted mt-0.5">
                                  {echeance.beneficiaire ? (
                                      <span className="flex items-center gap-1.5">
-                                         <span className="w-1.5 h-1.5 rounded-full bg-surface-muted0"></span>
+                                         <span className="w-1.5 h-1.5 rounded-full bg-content-muted"></span>
                                          {echeance.beneficiaire}
                                      </span>
                                  ) : 'Bénéficiaire non assigné'}

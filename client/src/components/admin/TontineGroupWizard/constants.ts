@@ -35,6 +35,7 @@ export const DEFAULT_FORM_DATA: TontineGroupFormData = {
   agenceId: "",
   gestionnaireId: "",
 
+  statut: "DRAFT",
   dateDebut: new Date().toISOString().split("T")[0],
   dateFin: "",
   endRule: "WHEN_ALL_RECEIVED",

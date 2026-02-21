@@ -18,6 +18,7 @@ function mapTontineToFormData(t: Tontine): TontineGroupFormData {
     agenceId: t.agenceId || "",
     gestionnaireId: t.gestionnaireId || "",
 
+    statut: t.statut || "DRAFT",
     dateDebut: t.dateDebut?.split("T")[0] || new Date().toISOString().split("T")[0],
     dateFin: t.dateFin ? t.dateFin.split("T")[0] : "",
     endRule: t.endRule || "WHEN_ALL_RECEIVED",

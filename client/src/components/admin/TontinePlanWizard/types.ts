@@ -10,6 +10,7 @@ export interface StepDefinition {
 
 export interface TontinePlanFormData {
   // ─── Step 1: General ───
+  actif: boolean;
   nom: string;
   description: string;
   montantCotisation: string;

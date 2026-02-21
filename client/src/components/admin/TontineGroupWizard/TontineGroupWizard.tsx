@@ -87,6 +87,7 @@ export default function TontineGroupWizard({ isOpen, onClose, onSave, editTontin
         gestionnaireId: formData.gestionnaireId || null,
         planId: formData.planId || null,
 
+        statut: formData.statut || "DRAFT",
         dateDebut: formData.dateDebut ? new Date(formData.dateDebut).toISOString() : null,
         dateFin: formData.dateFin ? new Date(formData.dateFin).toISOString() : null,
         endRule: formData.endRule,

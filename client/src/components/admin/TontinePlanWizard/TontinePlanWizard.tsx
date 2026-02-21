@@ -58,6 +58,7 @@ export default function TontinePlanWizard({ isOpen, onClose, onSave, editPlan }:
 
     try {
       const payload: Partial<TontinePlan> & { expectedVersion?: number } = {
+        actif: formData.actif,
         nom: formData.nom,
         description: formData.description || null,
         montantCotisation: formData.montantCotisation,

@@ -7,6 +7,26 @@ export default function StepGeneral({ formData, updateField }: StepComponentProp
 
   return (
     <div className="space-y-5">
+      <div className="flex items-center justify-between p-3 rounded-lg border border-input-border bg-input">
+        <div>
+          <span className="text-sm font-medium text-content-primary">Modele actif</span>
+          <p className="text-[10px] text-content-muted">Les modeles inactifs ne sont pas proposables lors de la creation de tontine</p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={formData.actif}
+          onClick={() => updateField("actif", !formData.actif)}
+          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+            formData.actif ? "bg-status-success" : "bg-content-muted/30"
+          }`}
+        >
+          <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+            formData.actif ? "translate-x-4" : "translate-x-0.5"
+          }`} />
+        </button>
+      </div>
+
       <div>
         <label className="block text-sm font-medium text-content-primary mb-1">
           Nom du modele <span className="text-status-danger">*</span>

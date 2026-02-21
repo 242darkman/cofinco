@@ -307,6 +307,8 @@ export function registerTontineRoutes(app: Express) {
       if (!tontine) return res.status(404).json({ message: "Tontine not found" });
 
       const updated = await storage.updateMembreTontine(req.params.membreId, data as any);
+      const wsInstance = getWsInstance();
+      if (wsInstance) wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: "membre_updated", tontineId: req.params.id, membreId: req.params.membreId } });
       res.json(updated);
     } catch (error: any) {
       logger.error({ err: error }, 'Erreur mise à jour membre tontine');
@@ -465,6 +467,8 @@ export function registerTontineRoutes(app: Express) {
       const result = await tontineLifecycleService.requestMemberExit(
         req.params.id, req.params.membreId, req.session.user!.id
       );
+      const wsInstance = getWsInstance();
+      if (wsInstance) wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: "exit_requested", tontineId: req.params.id, membreId: req.params.membreId } });
       res.json(result);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -556,6 +560,8 @@ export function registerTontineRoutes(app: Express) {
     try {
       const { role } = req.body;
       await tontineLifecycleService.assignMemberRole(req.params.id, req.params.membreId, role || null);
+      const wsInstance = getWsInstance();
+      if (wsInstance) wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: "role_assigned", tontineId: req.params.id, membreId: req.params.membreId } });
       res.json({ success: true });
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -563,8 +569,13 @@ export function registerTontineRoutes(app: Express) {
   });
 
   app.get("/api/tontines/:id/contributions", requireAuth, async (req, res) => {
+    try {
       const contribs = await storage.getContributionsByTontine(req.params.id);
       res.json(contribs);
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur chargement contributions');
+      res.status(500).json({ message: error.message || "Erreur chargement contributions" });
+    }
   });
 
   // Create contribution tontine (roles: admin, chef, caisse, superviseur)
@@ -642,14 +653,24 @@ export function registerTontineRoutes(app: Express) {
 
   // Get tontines for a specific client (their memberships)
   app.get("/api/clients/:id/tontines", requireAuth, async (req, res) => {
-    const tontines = await storage.getTontinesByClient(req.params.id);
-    res.json(tontines);
+    try {
+      const tontines = await storage.getTontinesByClient(req.params.id);
+      res.json(tontines);
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur chargement tontines client');
+      res.status(500).json({ message: error.message || "Erreur chargement tontines" });
+    }
   });
 
   // Tontine Penalites
   app.get("/api/tontines/:id/penalites", requireAuth, async (req, res) => {
-    const penalites = await storage.getTontinePenalites(req.params.id);
-    res.json(penalites);
+    try {
+      const penalites = await storage.getTontinePenalites(req.params.id);
+      res.json(penalites);
+    } catch (error: any) {
+      logger.error({ err: error }, 'Erreur chargement penalites');
+      res.status(500).json({ message: error.message || "Erreur chargement penalites" });
+    }
   });
 
   // Create penalty manually (B1)

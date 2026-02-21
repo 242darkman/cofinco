@@ -1,5 +1,6 @@
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, PenLine } from "lucide-react";
 import type { StepComponentProps } from "../types";
+import { DEFAULT_FORM_DATA as PLAN_DEFAULTS } from "../../TontinePlanWizard/constants";
 
 // Re-use step components from TontinePlanWizard
 import StepCalendar from "../../TontinePlanWizard/steps/StepCalendar";
@@ -14,17 +15,28 @@ interface OverrideSectionProps {
   enabled: boolean;
   onToggle: (v: boolean) => void;
   children: React.ReactNode;
+  hasCustomValues?: boolean;
 }
 
-function OverrideSection({ label, enabled, onToggle, children }: OverrideSectionProps) {
+function OverrideSection({ label, enabled, onToggle, children, hasCustomValues }: OverrideSectionProps) {
   return (
-    <div className="border border-edge-subtle rounded-lg overflow-hidden">
+    <div className={`border rounded-lg overflow-hidden ${
+      hasCustomValues && !enabled ? 'border-status-warning/40' : 'border-edge-subtle'
+    }`}>
       <button
         type="button"
         onClick={() => onToggle(!enabled)}
         className="w-full flex items-center justify-between px-4 py-3 bg-surface-subtle/50 hover:bg-surface-subtle transition-colors"
       >
-        <span className="text-sm font-medium text-content-primary">{label}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-content-primary">{label}</span>
+          {hasCustomValues && !enabled && (
+            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] bg-status-warning-bg text-status-warning">
+              <PenLine size={9} />
+              Modifie
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <span className="text-[10px] text-content-muted">
             {enabled ? "Personnalise" : "Herite du modele"}
@@ -43,6 +55,39 @@ function OverrideSection({ label, enabled, onToggle, children }: OverrideSection
       )}
     </div>
   );
+}
+
+// Detect if any fields in a category differ from plan defaults (indicates prior customization)
+function hasCustomCalendar(f: StepComponentProps['formData']): boolean {
+  return f.firstContributionRule !== PLAN_DEFAULTS.firstContributionRule
+    || f.collectionCalendarMode !== PLAN_DEFAULTS.collectionCalendarMode
+    || f.weekdaysMask !== PLAN_DEFAULTS.weekdaysMask
+    || f.shiftNonWorkingDay !== PLAN_DEFAULTS.shiftNonWorkingDay
+    || f.timezone !== PLAN_DEFAULTS.timezone;
+}
+function hasCustomDistribution(f: StepComponentProps['formData']): boolean {
+  return f.payoutOrderMode !== PLAN_DEFAULTS.payoutOrderMode
+    || f.allowSwapPayoutOrder !== PLAN_DEFAULTS.allowSwapPayoutOrder
+    || f.payoutRequiresContribPaid !== PLAN_DEFAULTS.payoutRequiresContribPaid
+    || f.allowPartialDistribution !== PLAN_DEFAULTS.allowPartialDistribution;
+}
+function hasCustomPenalties(f: StepComponentProps['formData']): boolean {
+  return f.penaltyEnabled !== PLAN_DEFAULTS.penaltyEnabled;
+}
+function hasCustomEntryExit(f: StepComponentProps['formData']): boolean {
+  return f.joinFeeEnabled !== PLAN_DEFAULTS.joinFeeEnabled
+    || f.exitAllowed !== PLAN_DEFAULTS.exitAllowed
+    || f.replacementAllowed !== PLAN_DEFAULTS.replacementAllowed
+    || f.allowMidCycleJoin !== PLAN_DEFAULTS.allowMidCycleJoin;
+}
+function hasCustomPayment(f: StepComponentProps['formData']): boolean {
+  return JSON.stringify(f.allowedPaymentMethods) !== JSON.stringify(PLAN_DEFAULTS.allowedPaymentMethods)
+    || f.defaultPaymentMethod !== PLAN_DEFAULTS.defaultPaymentMethod
+    || f.cashMustGoToCaisse !== PLAN_DEFAULTS.cashMustGoToCaisse;
+}
+function hasCustomGovernance(f: StepComponentProps['formData']): boolean {
+  return f.rolesEnabled !== PLAN_DEFAULTS.rolesEnabled
+    || f.minKycLevel !== PLAN_DEFAULTS.minKycLevel;
 }
 
 export default function StepOverrides({ formData, updateField }: StepComponentProps) {
@@ -90,6 +135,7 @@ export default function StepOverrides({ formData, updateField }: StepComponentPr
         label="Calendrier"
         enabled={formData.overrideCalendar}
         onToggle={(v) => updateField("overrideCalendar", v)}
+        hasCustomValues={hasCustomCalendar(formData)}
       >
         <StepCalendar {...planStepProps} />
       </OverrideSection>
@@ -98,6 +144,7 @@ export default function StepOverrides({ formData, updateField }: StepComponentPr
         label="Distribution"
         enabled={formData.overrideDistribution}
         onToggle={(v) => updateField("overrideDistribution", v)}
+        hasCustomValues={hasCustomDistribution(formData)}
       >
         <StepDistribution {...planStepProps} />
       </OverrideSection>
@@ -106,6 +153,7 @@ export default function StepOverrides({ formData, updateField }: StepComponentPr
         label="Penalites"
         enabled={formData.overridePenalties}
         onToggle={(v) => updateField("overridePenalties", v)}
+        hasCustomValues={hasCustomPenalties(formData)}
       >
         <StepPenalties {...planStepProps} />
       </OverrideSection>
@@ -114,6 +162,7 @@ export default function StepOverrides({ formData, updateField }: StepComponentPr
         label="Adhesion & Sortie"
         enabled={formData.overrideEntryExit}
         onToggle={(v) => updateField("overrideEntryExit", v)}
+        hasCustomValues={hasCustomEntryExit(formData)}
       >
         <StepEntryExit {...planStepProps} />
       </OverrideSection>
@@ -122,6 +171,7 @@ export default function StepOverrides({ formData, updateField }: StepComponentPr
         label="Paiement"
         enabled={formData.overridePayment}
         onToggle={(v) => updateField("overridePayment", v)}
+        hasCustomValues={hasCustomPayment(formData)}
       >
         <StepPayment {...planStepProps} />
       </OverrideSection>
@@ -130,6 +180,7 @@ export default function StepOverrides({ formData, updateField }: StepComponentPr
         label="Gouvernance"
         enabled={formData.overrideGovernance}
         onToggle={(v) => updateField("overrideGovernance", v)}
+        hasCustomValues={hasCustomGovernance(formData)}
       >
         <StepGovernance {...planStepProps} />
       </OverrideSection>

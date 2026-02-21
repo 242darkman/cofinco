@@ -1,9 +1,45 @@
 import type { StepComponentProps } from "../types";
 import { END_RULE_OPTIONS } from "../constants";
 
+const STATUT_OPTIONS = [
+  { value: "DRAFT", label: "Brouillon", description: "La tontine est en cours de configuration" },
+  { value: "ACTIVE", label: "Active", description: "La tontine est operationnelle" },
+];
+
 export default function StepLifecycle({ formData, updateField }: StepComponentProps) {
   return (
     <div className="space-y-5">
+      <div>
+        <label className="block text-sm font-medium text-content-primary mb-1">
+          Statut initial
+        </label>
+        <div className="grid grid-cols-2 gap-3">
+          {STATUT_OPTIONS.map((o) => (
+            <label
+              key={o.value}
+              className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                formData.statut === o.value
+                  ? "border-accent bg-accent/5"
+                  : "border-input-border bg-input hover:border-edge"
+              }`}
+            >
+              <input
+                type="radio"
+                name="statut"
+                value={o.value}
+                checked={formData.statut === o.value}
+                onChange={(e) => updateField("statut", e.target.value)}
+                className="mt-0.5 accent-accent"
+              />
+              <div>
+                <span className="text-sm font-medium text-content-primary">{o.label}</span>
+                <p className="text-[10px] text-content-muted">{o.description}</p>
+              </div>
+            </label>
+          ))}
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-content-primary mb-1">
