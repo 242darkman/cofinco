@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Calendar, CheckCircle, Clock, Lock, AlertTriangle } from 'lucide-react';
-import { tontineApi } from '../../../lib/api-client';
+import { Calendar, CheckCircle, Clock, Lock, AlertTriangle, Eye } from 'lucide-react';
+import { tontineApi, tontineScheduleApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import Badge from '../../ui/Badge';
+import Button from '../../ui/Button';
 import { currencySymbol } from '@shared/config/currency';
 
 interface Schedule {
@@ -32,6 +33,8 @@ export default function TontineSchedules({ tontineId }: Props) {
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);
   const [cycleId, setCycleId] = useState<string | null>(null);
+  const [previewData, setPreviewData] = useState<any[] | null>(null);
+  const [previewing, setPreviewing] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -55,6 +58,29 @@ export default function TontineSchedules({ tontineId }: Props) {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  const handlePreview = useCallback(async () => {
+    setPreviewing(true);
+    try {
+      const tontine = await tontineApi.getById(tontineId);
+      if (!tontine) { toast.error('Tontine introuvable'); return; }
+      const result = await tontineScheduleApi.preview({
+        frequence: tontine.frequence,
+        intervalleCotisation: tontine.intervalleCotisation || 1,
+        nombreMembres: tontine.nombreMembres,
+        montantCotisation: tontine.montantCotisation,
+        dateDebut: tontine.dateDebut,
+        collectionCalendarMode: tontine.collectionCalendarMode,
+        weekdaysMask: tontine.weekdaysMask,
+        shiftNonWorkingDay: tontine.shiftNonWorkingDay,
+      });
+      setPreviewData(result?.schedules || result || []);
+    } catch (error) {
+      toast.error(handleApiError(error, 'Erreur lors de la previsualisation'));
+    } finally {
+      setPreviewing(false);
+    }
+  }, [tontineId]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12 text-content-muted text-sm">
@@ -77,14 +103,25 @@ export default function TontineSchedules({ tontineId }: Props) {
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
         <h3 className="text-sm font-semibold text-content-primary">
           Echeancier de collecte ({schedules.length} periodes)
         </h3>
-        <div className="flex gap-3 text-[10px] text-content-muted">
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-status-info" /> En cours</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-status-success" /> Cloturee</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-edge" /> A venir</span>
+        <div className="flex items-center gap-3">
+          <div className="flex gap-3 text-[10px] text-content-muted">
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-status-info" /> En cours</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-status-success" /> Cloturee</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-edge" /> A venir</span>
+          </div>
+          <Button
+            size="sm"
+            variant="ghost"
+            icon={Eye}
+            onClick={() => previewData ? setPreviewData(null) : handlePreview()}
+            disabled={previewing}
+          >
+            {previewData ? 'Masquer' : previewing ? '...' : 'Previsualiser'}
+          </Button>
         </div>
       </div>
 
@@ -157,6 +194,34 @@ export default function TontineSchedules({ tontineId }: Props) {
           );
         })}
       </div>
+
+      {/* Schedule Preview */}
+      {previewData && previewData.length > 0 && (
+        <div className="mt-4 space-y-2">
+          <p className="text-[10px] font-semibold text-accent uppercase tracking-wider">
+            Previsualisation ({previewData.length} periodes)
+          </p>
+          <div className="space-y-1">
+            {previewData.map((p: any, i: number) => (
+              <div key={i} className="flex items-center gap-3 px-3 py-2 rounded-lg border border-accent/20 bg-accent/5">
+                <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-accent/10 text-accent shrink-0">
+                  <span className="text-xs font-bold">{p.periodNumber || i + 1}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-xs text-content-primary">
+                    {p.dueDate ? new Date(p.dueDate).toLocaleDateString('fr-FR') : `Periode ${i + 1}`}
+                  </span>
+                </div>
+                <div className="text-right shrink-0">
+                  <span className="text-xs font-medium text-content-primary">
+                    {Number(p.amountExpectedPerMember || p.amount || 0).toLocaleString()} {sym}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { TrendingUp, Users, DollarSign, CheckCircle, AlertTriangle, Calendar, Activity, ArrowRight, Play, Gift, RefreshCw, ChevronDown, ChevronUp, Lock, Clock, Square } from 'lucide-react';
+import { TrendingUp, Users, DollarSign, CheckCircle, AlertTriangle, Calendar, Activity, ArrowRight, Play, Gift, RefreshCw, ChevronDown, ChevronUp, Lock, Clock, Square, Scale, FileText } from 'lucide-react';
 import { Card, ProgressBar, Button, Badge } from '../../ui';
 import ConfirmDialog from '../../ui/ConfirmDialog';
 import { useConfirmDialog } from '../../../hooks/useConfirmDialog';
@@ -51,6 +51,8 @@ export default function TontineDashboard({
   const [membres, setMembres] = useState<any[]>([]);
   const [pendingDistributions, setPendingDistributions] = useState(0);
   const [pendingPenalties, setPendingPenalties] = useState({ count: 0, amount: 0 });
+  const [reconciliation, setReconciliation] = useState<any>(null);
+  const [cycleReport, setCycleReport] = useState<any>(null);
 
   useEffect(() => {
     fetchDashboard();
@@ -89,6 +91,18 @@ export default function TontineDashboard({
           amount: pendingPens.reduce((s: number, p: any) => s + Number(p.montant || 0), 0),
         });
       } catch { /* ignore */ }
+
+      // Fetch reconciliation
+      tontineApi.getReconciliation(tontineId)
+        .then(setReconciliation)
+        .catch(() => setReconciliation(null));
+
+      // Fetch cycle report if cycle exists
+      if (dashData?.currentCycle?.id) {
+        tontineApi.getCycleReport(tontineId, dashData.currentCycle.id)
+          .then(setCycleReport)
+          .catch(() => setCycleReport(null));
+      }
 
       // Build recent activity
       const activities = (contribData || [])
@@ -294,6 +308,80 @@ export default function TontineDashboard({
               <div className="text-[10px] text-status-danger uppercase font-semibold mb-1">Pénalités impayées</div>
               <div className="text-lg font-bold text-status-danger">{pendingPenalties.amount.toLocaleString()} FCFA</div>
               <div className="text-[10px] text-content-muted">{pendingPenalties.count} pénalité{pendingPenalties.count > 1 ? 's' : ''}</div>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* Reconciliation & Cycle Report */}
+      {currentCycle && (reconciliation || cycleReport) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Reconciliation summary */}
+          {reconciliation && (
+            <Card className="p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <Scale size={14} className="text-accent" />
+                <span className="text-xs font-semibold text-content-primary uppercase tracking-wider">Reconciliation</span>
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs">
+                  <span className="text-content-muted">Collecte attendue</span>
+                  <span className="font-medium text-content-primary">{Number(reconciliation.expectedTotal || 0).toLocaleString()} FCFA</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-content-muted">Collecte reelle</span>
+                  <span className="font-medium text-content-primary">{Number(reconciliation.actualTotal || 0).toLocaleString()} FCFA</span>
+                </div>
+                {(reconciliation.difference != null && Number(reconciliation.difference) !== 0) && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-content-muted">Ecart</span>
+                    <span className={`font-bold ${Number(reconciliation.difference) >= 0 ? 'text-status-success' : 'text-status-danger'}`}>
+                      {Number(reconciliation.difference) >= 0 ? '+' : ''}{Number(reconciliation.difference).toLocaleString()} FCFA
+                    </span>
+                  </div>
+                )}
+                {reconciliation.missingMembers > 0 && (
+                  <div className="text-[10px] text-status-warning mt-1">
+                    {reconciliation.missingMembers} membre{reconciliation.missingMembers > 1 ? 's' : ''} en retard
+                  </div>
+                )}
+              </div>
+            </Card>
+          )}
+
+          {/* Cycle report summary */}
+          {cycleReport && (
+            <Card className="p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <FileText size={14} className="text-accent" />
+                <span className="text-xs font-semibold text-content-primary uppercase tracking-wider">Rapport du cycle</span>
+              </div>
+              <div className="space-y-1.5">
+                {cycleReport.totalContributions != null && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-content-muted">Cotisations</span>
+                    <span className="font-medium text-content-primary">{Number(cycleReport.totalContributions).toLocaleString()} FCFA</span>
+                  </div>
+                )}
+                {cycleReport.totalDistributions != null && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-content-muted">Distributions</span>
+                    <span className="font-medium text-content-primary">{Number(cycleReport.totalDistributions).toLocaleString()} FCFA</span>
+                  </div>
+                )}
+                {cycleReport.totalPenalties != null && Number(cycleReport.totalPenalties) > 0 && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-content-muted">Penalites</span>
+                    <span className="font-medium text-status-danger">{Number(cycleReport.totalPenalties).toLocaleString()} FCFA</span>
+                  </div>
+                )}
+                {cycleReport.completionRate != null && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-content-muted">Taux completion</span>
+                    <span className="font-medium text-content-primary">{Math.round(Number(cycleReport.completionRate))}%</span>
+                  </div>
+                )}
+              </div>
             </Card>
           )}
         </div>

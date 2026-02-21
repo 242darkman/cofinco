@@ -22,6 +22,12 @@ import {
   WEEKDAY_LABELS,
 } from '../../admin/TontinePlanWizard/constants';
 
+const END_RULE_OPTIONS = [
+  { value: 'WHEN_ALL_RECEIVED', label: 'Quand tous ont recu' },
+  { value: 'FIXED_ROUNDS', label: 'Nombre de tours fixe' },
+  { value: 'INDEFINITE', label: 'Indefini' },
+];
+
 interface TontineConfigProps {
   tontineId: string;
 }
@@ -139,7 +145,15 @@ export default function TontineConfig({ tontineId }: TontineConfigProps) {
         )}
         <ConfigRow label={`Cotisation (${sym})`} value={Number(tontine.montantCotisation || 0).toLocaleString()} />
         <ConfigRow label="Membres" value={tontine.nombreMembres} />
+        <ConfigRow label="Membres min. pour demarrer" value={tontine.minMembersToStart > 0 ? tontine.minMembersToStart : null} />
         <ConfigRow label={`Commission plateforme`} value={tontine.tauxPlateforme ? `${tontine.tauxPlateforme}%` : null} />
+        <ConfigRow label="Regle de fin" value={findLabel(END_RULE_OPTIONS, tontine.endRule)} />
+        {tontine.endRule === 'FIXED_ROUNDS' && (
+          <ConfigRow label="Nombre de tours" value={tontine.roundCount} />
+        )}
+        {tontine.currentRound > 0 && (
+          <ConfigRow label="Tour actuel" value={tontine.currentRound} />
+        )}
       </Section>
 
       {/* Calendar */}
@@ -148,7 +162,11 @@ export default function TontineConfig({ tontineId }: TontineConfigProps) {
         <ConfigRow label="Grace (jours)" value={tontine.gracePeriodContribution > 0 ? tontine.gracePeriodContribution : null} />
         <ConfigRow label="Mode calendrier" value={findLabel(CALENDAR_MODE_OPTIONS, tontine.collectionCalendarMode)} />
         <ConfigRow label="Jours actifs" value={formatWeekdays(tontine.weekdaysMask)} />
+        <ConfigRow label="Jour prefere" value={tontine.preferredWeekday != null ? (WEEKDAY_LABELS.find(d => d.value === tontine.preferredWeekday)?.label || `Jour ${tontine.preferredWeekday}`) : null} />
         <ConfigRow label="Jour ferie" value={findLabel(SHIFT_OPTIONS, tontine.shiftNonWorkingDay)} />
+        {tontine.holidayCalendarId && (
+          <ConfigRow label="Calendrier feries" value={tontine.holidayCalendarId.slice(0, 8) + '...'} />
+        )}
         <ConfigRow label="Fuseau horaire" value={tontine.timezone} />
       </Section>
 
@@ -185,6 +203,9 @@ export default function TontineConfig({ tontineId }: TontineConfigProps) {
             <ConfigRow label="Politique arrieres" value={findLabel(ARREARS_POLICY_OPTIONS, tontine.arrearsPolicy)} />
             <ConfigRow label="Politique suspension" value={findLabel(SUSPENSION_POLICY_OPTIONS, tontine.suspensionPolicy)} />
             <ConfigRow label="Politique defaut" value={findLabel(DEFAULT_POLICY_OPTIONS, tontine.defaultPolicy)} />
+            <BoolRow label="Priorite auto penalite" value={tontine.autoPenaltyPriority} />
+            <ConfigRow label="Retards avant suspension" value={tontine.maxLateBeforeSuspend > 0 ? tontine.maxLateBeforeSuspend : null} />
+            <ConfigRow label="Retards avant exclusion" value={tontine.maxLateBeforeExclude > 0 ? tontine.maxLateBeforeExclude : null} />
             <BoolRow label="Deduite du paiement" value={tontine.penaltyDeductedFromPayout} />
             <BoolRow label="Penalite comme revenu" value={tontine.penaltyAsRevenue} />
           </>
@@ -205,6 +226,7 @@ export default function TontineConfig({ tontineId }: TontineConfigProps) {
           <ConfigRow label="Preavis (periodes)" value={tontine.exitNoticePeriods} />
         )}
         <BoolRow label="Remplacement autorise" value={tontine.replacementAllowed} />
+        <BoolRow label="Transfert d'adhesion" value={tontine.transferMembershipAllowed} />
         <BoolRow label="Adhesion en cours de cycle" value={tontine.allowMidCycleJoin} />
       </Section>
 

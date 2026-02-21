@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Plus, Users, DollarSign, Calendar, TrendingUp, Edit2, Trash2, ArrowLeft, Eye, MoreHorizontal, Coins, Target, Clock, Activity, AlertTriangle, Download, Play, Pause, CheckCircle, Ban } from 'lucide-react';
+import { Plus, Users, DollarSign, Calendar, TrendingUp, Edit2, Trash2, ArrowLeft, Eye, MoreHorizontal, Coins, Target, Clock, Activity, AlertTriangle, Download, Play, Pause, CheckCircle, Ban, LayoutTemplate } from 'lucide-react';
 import PageHeader from '../../ui/PageHeader';
 import { FeatureHeader, FEATURE_DESCRIPTIONS } from '../../ui/FeatureHeader';
 import Badge from '../../ui/Badge';
@@ -10,7 +10,7 @@ import Button from '../../ui/Button';
 import IconButton from '../../ui/IconButton';
 import TabGroup from '../../ui/TabGroup';
 import ConfirmDialog from '../../ui/ConfirmDialog';
-import { tontineApi } from '../../../lib/api-client';
+import { tontineApi, tontinePlanApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { escapeHtml } from '../../../lib/sanitize';
 import { exportToPDF } from '../../../lib/exportUtils';
@@ -53,10 +53,14 @@ export default function Tontines() {
   const [showForm, setShowForm] = useState(false);
   const [editingTontine, setEditingTontine] = useState<Tontine | null>(null);
   const [selectedTontine, setSelectedTontine] = useState<Tontine | null>(null);
+  const [plans, setPlans] = useState<any[]>([]);
+  const [preSelectedPlanId, setPreSelectedPlanId] = useState<string | undefined>();
+  const [showPlanPicker, setShowPlanPicker] = useState(false);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'config' | 'membres' | 'contributions' | 'distributions' | 'tours' | 'penalites' | 'echeancier' | 'audit' | 'calendar'>('dashboard');
 
   useEffect(() => {
     fetchTontines();
+    tontinePlanApi.getAll().then(setPlans).catch(() => {});
   }, []);
 
   const fetchTontines = useCallback(async () => {
@@ -410,17 +414,53 @@ export default function Tontines() {
             icon={<Users size={24} />}
             actions={
               canCreateTontines ? (
-                <Button
-                  onClick={() => {
-                    setEditingTontine(null);
-                    setShowForm(true);
-                  }}
-                  icon={Plus}
-                  size="sm"
-                  className="h-8 text-xs"
-                >
-                  Nouvelle Tontine
-                </Button>
+                <div className="flex items-center gap-2">
+                  {plans.length > 0 && (
+                    <div className="relative">
+                      <Button
+                        onClick={() => setShowPlanPicker(!showPlanPicker)}
+                        icon={LayoutTemplate}
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs"
+                      >
+                        Depuis un modele
+                      </Button>
+                      {showPlanPicker && (
+                        <div className="absolute right-0 top-full mt-1 bg-surface-base border border-edge rounded-lg shadow-xl z-50 w-64 max-h-60 overflow-y-auto">
+                          {plans.map((plan: any) => (
+                            <button
+                              key={plan.id}
+                              type="button"
+                              onClick={() => {
+                                setPreSelectedPlanId(plan.id);
+                                setEditingTontine(null);
+                                setShowForm(true);
+                                setShowPlanPicker(false);
+                              }}
+                              className="w-full text-left px-3 py-2 hover:bg-surface-elevated transition-colors border-b border-edge-subtle last:border-0"
+                            >
+                              <div className="text-sm font-medium text-content-primary">{plan.nom}</div>
+                              {plan.description && <div className="text-[10px] text-content-muted line-clamp-1">{plan.description}</div>}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <Button
+                    onClick={() => {
+                      setEditingTontine(null);
+                      setPreSelectedPlanId(undefined);
+                      setShowForm(true);
+                    }}
+                    icon={Plus}
+                    size="sm"
+                    className="h-8 text-xs"
+                  >
+                    Nouvelle Tontine
+                  </Button>
+                </div>
               ) : (
                 <div className="px-3 py-1 bg-status-warning-bg text-status-warning rounded-lg text-xs flex items-center gap-1.5 border border-status-warning/30">
                   <AlertTriangle size={14} />
@@ -489,6 +529,7 @@ export default function Tontines() {
         onClose={() => {
           setShowForm(false);
           setEditingTontine(null);
+          setPreSelectedPlanId(undefined);
         }}
         onSave={async (data) => {
           if (editingTontine) {
@@ -499,6 +540,7 @@ export default function Tontines() {
           fetchTontines();
         }}
         editTontine={editingTontine ?? undefined}
+        preSelectedPlanId={preSelectedPlanId}
       />
 
       {/* Confirm Dialog */}

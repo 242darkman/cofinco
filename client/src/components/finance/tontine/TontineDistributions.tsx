@@ -90,6 +90,7 @@ export default function TontineDistributions({ tontineId, montantContribution, t
   const [soldeDisponible, setSoldeDisponible] = useState<number>(0);
   const [dashboard, setDashboard] = useState<any>(null);
   const [turns, setTurns] = useState<any[]>([]);
+  const [retirableAmount, setRetirableAmount] = useState<number | null>(null);
 
   // Form state
   const [selectedMembreId, setSelectedMembreId] = useState('');
@@ -130,6 +131,14 @@ export default function TontineDistributions({ tontineId, montantContribution, t
       if (dashData?.currentCycle?.id) {
         const turnsData = await tontineApi.getTurns(tontineId, dashData.currentCycle.id);
         setTurns(turnsData || []);
+
+        // Fetch retirable amount for next beneficiary
+        const nextScheduledTurn = (turnsData || []).find((t: any) => t.status === 'SCHEDULED' || t.status === 'READY');
+        if (nextScheduledTurn?.beneficiaryMemberId) {
+          tontineApi.getRetirable(tontineId, nextScheduledTurn.beneficiaryMemberId)
+            .then((r: any) => setRetirableAmount(Number(r?.retirableAmount ?? r?.amount ?? 0)))
+            .catch(() => setRetirableAmount(null));
+        }
       }
     } catch (error) {
       toast.error(handleApiError(error, 'Erreur lors du chargement des distributions'));
@@ -343,10 +352,15 @@ export default function TontineDistributions({ tontineId, montantContribution, t
               </div>
             </div>
             <div className="text-right">
-              <div className="text-xs text-content-muted mb-0.5">Montant estimé</div>
+              <div className="text-xs text-content-muted mb-0.5">Montant estime</div>
               <div className={`text-xl font-bold ${soldeInsuffisant ? 'text-status-warning' : 'text-status-success'}`}>
                 {montantEstime.toLocaleString()} {sym}
               </div>
+              {retirableAmount != null && retirableAmount !== montantEstime && (
+                <div className="text-[10px] text-content-muted mt-0.5">
+                  Retirable: <span className="font-medium text-content-secondary">{retirableAmount.toLocaleString()} {sym}</span>
+                </div>
+              )}
             </div>
           </div>
         </Card>

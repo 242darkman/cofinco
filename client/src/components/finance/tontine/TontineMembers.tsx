@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Plus, UserPlus, Trash2, CheckCircle, X, Gift, User, Search, TrendingUp, AlertCircle, Clock, Settings, Wallet, Check, CheckCheck, AlertTriangle, Download, LogOut, UserMinus, RefreshCw } from 'lucide-react';
+import { Plus, UserPlus, Trash2, CheckCircle, X, Gift, User, Search, TrendingUp, AlertCircle, Clock, Settings, Wallet, Check, CheckCheck, AlertTriangle, Download, LogOut, UserMinus, RefreshCw, UserRoundPlus, CreditCard } from 'lucide-react';
 import { Card, Button, IconButton } from '../../ui';
 import { TontineTimelineHorizontal } from './TontineTimeline';
 import ConfirmDialog from '../../ui/ConfirmDialog';
@@ -114,6 +114,10 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
   const [loadingAccounts, setLoadingAccounts] = useState(false);
   const [updatingConfig, setUpdatingConfig] = useState(false);
 
+  // Tontine config for mid-cycle join & join fee
+  const [tontineConfig, setTontineConfig] = useState<any>(null);
+  const [payingJoinFee, setPayingJoinFee] = useState<string | null>(null);
+
   // Confirmation dialog hook
   const { confirmState, openConfirm, closeConfirm, handleConfirm } = useConfirmDialog();
 
@@ -128,6 +132,7 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
     if (tontineId) {
       fetchMembres();
       fetchClients();
+      tontineApi.getById(tontineId).then(setTontineConfig).catch(() => {});
     }
   }, [tontineId]);
 
@@ -191,6 +196,53 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
       setSubmitting(false);
     }
   }, [selectedClientId, membres.length, tontineId, fetchMembres, onUpdate]);
+
+  // Mid-cycle join
+  const handleMidCycleJoin = useCallback(async () => {
+    if (!selectedClientId) {
+      toast.warning('Veuillez selectionner un client');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await tontineApi.midCycleJoin(tontineId, selectedClientId);
+      const addedClient = clients.find(c => c.id === selectedClientId);
+      toast.success(`${addedClient?.nom || 'Membre'} ajouté en cours de cycle`);
+      setShowAddForm(false);
+      setSelectedClientId('');
+      setSearchQuery('');
+      fetchMembres();
+      onUpdate();
+    } catch (error) {
+      toast.error(handleApiError(error, "Erreur lors de l'adhesion en cours de cycle"));
+    } finally {
+      setSubmitting(false);
+    }
+  }, [selectedClientId, tontineId, clients, fetchMembres, onUpdate]);
+
+  // Pay join fee
+  const handlePayJoinFee = useCallback((membre: TontineMembre) => {
+    const memberName = formatClientName(membre.client?.nom, membre.client?.prenom);
+    openConfirm({
+      title: "Payer les frais d'adhesion",
+      message: `Confirmer le paiement des frais d'adhesion de ${Number(tontineConfig?.joinFeeAmount || 0).toLocaleString()} ${sym} pour ${memberName} ?`,
+      variant: 'info',
+      confirmText: 'Payer',
+      onConfirm: async () => {
+        setPayingJoinFee(membre.id);
+        try {
+          await tontineApi.payJoinFee(tontineId, membre.id);
+          toast.success("Frais d'adhesion payes");
+          fetchMembres();
+          onUpdate();
+        } catch (error) {
+          toast.error(handleApiError(error, "Erreur lors du paiement des frais"));
+        } finally {
+          setPayingJoinFee(null);
+        }
+      },
+    });
+  }, [tontineId, tontineConfig, sym, openConfirm, fetchMembres, onUpdate]);
 
   const handleRemoveMembre = useCallback(
     (membre: TontineMembre) => {
@@ -457,6 +509,17 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
           >
             {isFull ? 'Complet' : 'Ajouter'}
           </Button>
+          {tontineConfig?.allowMidCycleJoin && tontineConfig?.statut === 'ACTIVE' && !isFull && (
+            <Button
+              onClick={() => setShowAddForm(true)}
+              variant="outline"
+              size="sm"
+              icon={UserRoundPlus}
+              title="Adhesion en cours de cycle"
+            >
+              Mi-cycle
+            </Button>
+          )}
         </div>
       </div>
 
@@ -545,6 +608,18 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
                       </div>
 
                       <div className="flex items-center gap-0.5 shrink-0">
+                        {/* Join fee payment */}
+                        {tontineConfig?.joinFeeEnabled && !(membre as any).joinFeePaidAt && (membre.status || membre.statut) === StatutMembreTontine.ACTIVE && (
+                          <button
+                            onClick={() => handlePayJoinFee(membre)}
+                            disabled={payingJoinFee === membre.id}
+                            className="text-content-muted hover:text-accent transition-colors p-1 rounded-lg hover:bg-accent/10"
+                            title={`Payer frais d'adhesion (${Number(tontineConfig?.joinFeeAmount || 0).toLocaleString()} ${sym})`}
+                            type="button"
+                          >
+                            <CreditCard size={14} />
+                          </button>
+                        )}
                         {/* Exit request / approve */}
                         {!membre.exitRequestedAt && (membre.status || membre.statut) === StatutMembreTontine.ACTIVE && (
                           <button
@@ -777,6 +852,18 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
               <Button variant="ghost" fullWidth onClick={handleCloseModal} disabled={submitting}>
                 Annuler
               </Button>
+              {tontineConfig?.allowMidCycleJoin && tontineConfig?.statut === 'ACTIVE' && (
+                <Button
+                  variant="outline"
+                  fullWidth
+                  onClick={handleMidCycleJoin}
+                  disabled={!selectedClientId || submitting}
+                  isLoading={submitting}
+                  icon={UserRoundPlus}
+                >
+                  Mi-cycle
+                </Button>
+              )}
               <Button
                 variant="success"
                 fullWidth

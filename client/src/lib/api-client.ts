@@ -1599,6 +1599,11 @@ export const tontineApi = {
   getPenalties: (tontineId: string) => request<any[]>(`/tontines/${tontineId}/penalites`),
   payPenalty: (tontineId: string, penaliteId: string) =>
     request<any>(`/tontines/${tontineId}/penalites/${penaliteId}/pay`, { method: 'POST' }),
+  waivePenalty: (penaliteId: string, reason?: string) =>
+    request<any>(`/tontine-penalites/${penaliteId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ statut: 'WAIVED', waive_reason: reason }),
+    }),
 
   // Reconciliation
   getReconciliation: (tontineId: string) => request<any>(`/tontines/${tontineId}/reconciliation`),

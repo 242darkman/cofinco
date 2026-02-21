@@ -43,6 +43,10 @@ export default function TontineTurnManager({ tontineId, onUpdate }: TontineTurnM
   const [skipTurnId, setSkipTurnId] = useState<string | null>(null);
   const [skipReason, setSkipReason] = useState('');
 
+  // Pending swap approvals
+  const [pendingSwaps, setPendingSwaps] = useState<any[]>([]);
+  const [approvingSwap, setApprovingSwap] = useState<string | null>(null);
+
   const currentCycle = dashboard?.currentCycle;
 
   const fetchData = useCallback(async () => {
@@ -59,8 +63,18 @@ export default function TontineTurnManager({ tontineId, onUpdate }: TontineTurnM
       if (dashData?.currentCycle?.id) {
         const turnsData = await tontineApi.getTurns(tontineId, dashData.currentCycle.id);
         setTurns((turnsData || []).sort((a: any, b: any) => a.turnNumber - b.turnNumber));
+
+        // Fetch pending swap audit entries
+        try {
+          const auditData = await tontineApi.getTurnAudit(tontineId, dashData.currentCycle.id);
+          const swaps = (auditData || []).filter((a: any) =>
+            (a.actionType === 'SWAP_REQUEST' || a.action === 'SWAP_REQUEST') && a.status === 'PENDING'
+          );
+          setPendingSwaps(swaps);
+        } catch { setPendingSwaps([]); }
       } else {
         setTurns([]);
+        setPendingSwaps([]);
       }
     } catch {
       setTurns([]);
@@ -206,6 +220,20 @@ export default function TontineTurnManager({ tontineId, onUpdate }: TontineTurnM
     }
   }, [swapTurnA, swapReason, turns, tontineId, currentCycle?.id, openConfirm, getMemberName, fetchData, onUpdate]);
 
+  const handleApproveSwap = useCallback(async (auditId: string) => {
+    setApprovingSwap(auditId);
+    try {
+      await tontineApi.approveSwap(tontineId, auditId);
+      toast.success('Echange approuve');
+      fetchData();
+      onUpdate?.();
+    } catch (error) {
+      toast.error(handleApiError(error, "Erreur lors de l'approbation"));
+    } finally {
+      setApprovingSwap(null);
+    }
+  }, [tontineId, fetchData, onUpdate]);
+
   const handleToggleAudit = useCallback(() => {
     if (!showAudit) fetchAudit();
     setShowAudit(!showAudit);
@@ -285,6 +313,40 @@ export default function TontineTurnManager({ tontineId, onUpdate }: TontineTurnM
               />
             )}
           </div>
+        </div>
+      )}
+
+      {/* Pending swap approvals */}
+      {pendingSwaps.length > 0 && !showAudit && (
+        <div className="space-y-1.5">
+          <p className="text-[10px] font-semibold text-status-warning uppercase tracking-wider">
+            Echanges en attente d'approbation ({pendingSwaps.length})
+          </p>
+          {pendingSwaps.map((swap: any) => (
+            <Card key={swap.id} className="p-3 bg-status-warning-bg/30 border-status-warning/20">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-content-primary font-medium">
+                    Echange de tours demande
+                  </p>
+                  {swap.reason && <p className="text-[10px] text-content-muted italic mt-0.5">{swap.reason}</p>}
+                  <p className="text-[10px] text-content-muted mt-0.5">
+                    {swap.changedAt && new Date(swap.changedAt).toLocaleString('fr-FR')}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  icon={CheckCircle}
+                  onClick={() => handleApproveSwap(swap.id)}
+                  disabled={approvingSwap === swap.id}
+                  className="text-xs shrink-0"
+                >
+                  {approvingSwap === swap.id ? '...' : 'Approuver'}
+                </Button>
+              </div>
+            </Card>
+          ))}
         </div>
       )}
 

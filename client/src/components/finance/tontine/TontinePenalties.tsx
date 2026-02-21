@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { AlertTriangle, CheckCircle, XCircle, Ban, DollarSign, Clock, Filter } from 'lucide-react';
+import { AlertTriangle, CheckCircle, XCircle, Ban, DollarSign, Clock, Filter, ShieldOff } from 'lucide-react';
 import { Card, Button, Badge } from '../../ui';
 import { tontineApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
@@ -34,6 +34,8 @@ export default function TontinePenalties({ tontineId, onUpdate }: TontinePenalti
   const [membres, setMembres] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState<string | null>(null);
+  const [waiving, setWaiving] = useState<string | null>(null);
+  const [waiveReason, setWaiveReason] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [typeFilter, setTypeFilter] = useState<string>('');
 
@@ -85,6 +87,25 @@ export default function TontinePenalties({ tontineId, onUpdate }: TontinePenalti
       },
     });
   }, [tontineId, sym, openConfirm, fetchData, onUpdate, getMemberName]);
+
+  const handleWaivePenalty = useCallback((penalty: any) => {
+    setWaiving(penalty.id);
+    setWaiveReason('');
+  }, []);
+
+  const confirmWaive = useCallback(async () => {
+    if (!waiving || !waiveReason.trim()) return;
+    try {
+      await tontineApi.waivePenalty(waiving, waiveReason.trim());
+      toast.success('Penalite annulee (grace)');
+      setWaiving(null);
+      setWaiveReason('');
+      await fetchData();
+      onUpdate?.();
+    } catch (error) {
+      toast.error(handleApiError(error, "Erreur lors de l'annulation"));
+    }
+  }, [waiving, waiveReason, fetchData, onUpdate]);
 
   // Filtered penalties
   const filteredPenalties = useMemo(() => {
@@ -164,6 +185,31 @@ export default function TontinePenalties({ tontineId, onUpdate }: TontinePenalti
         </div>
       )}
 
+      {/* Waive reason form */}
+      {waiving && (
+        <Card className="p-3 bg-status-warning-bg/30 border-status-warning/20">
+          <p className="text-xs text-content-primary font-medium mb-2">
+            Annuler la penalite — {getMemberName(penalties.find(p => p.id === waiving)?.membreId || '')}
+          </p>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={waiveReason}
+              onChange={e => setWaiveReason(e.target.value)}
+              placeholder="Raison obligatoire..."
+              className="flex-1 px-2 py-1.5 bg-input border border-input-border rounded text-xs text-content-primary focus:border-input-focus focus:outline-none"
+              autoFocus
+            />
+            <Button size="sm" variant="warning" onClick={confirmWaive} disabled={!waiveReason.trim()}>
+              Confirmer
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => { setWaiving(null); setWaiveReason(''); }}>
+              Annuler
+            </Button>
+          </div>
+        </Card>
+      )}
+
       {/* Penalties list */}
       {filteredPenalties.length === 0 && penalties.length === 0 ? (
         <Card className="p-8 text-center">
@@ -234,16 +280,25 @@ export default function TontinePenalties({ tontineId, onUpdate }: TontinePenalti
                   </div>
 
                   {isPending && (
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      icon={DollarSign}
-                      onClick={() => handlePayPenalty(penalty)}
-                      disabled={isPaying}
-                      className="shrink-0 text-xs"
-                    >
-                      {isPaying ? '...' : 'Payer'}
-                    </Button>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        icon={DollarSign}
+                        onClick={() => handlePayPenalty(penalty)}
+                        disabled={isPaying}
+                        className="text-xs"
+                      >
+                        {isPaying ? '...' : 'Payer'}
+                      </Button>
+                      <button
+                        onClick={() => handleWaivePenalty(penalty)}
+                        className="p-1.5 rounded-lg text-content-muted hover:text-status-warning hover:bg-status-warning-bg transition-colors"
+                        title="Annuler (grace)"
+                      >
+                        <ShieldOff size={14} />
+                      </button>
+                    </div>
                   )}
                 </div>
               </Card>
