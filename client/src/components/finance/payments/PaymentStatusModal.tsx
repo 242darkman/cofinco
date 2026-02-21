@@ -29,6 +29,10 @@ export interface PaymentStatusModalProps {
   onViewDetails?: () => void;
   /** Countdown in seconds (shown during PENDING/CREATED) */
   timeLeft?: number;
+  /** Called when user clicks "Check again" after client timeout */
+  onCheckStatus?: () => void;
+  /** Whether a status check is currently in flight */
+  isCheckingStatus?: boolean;
 }
 
 const statusConfig: Record<PaymentStatus, {
@@ -100,6 +104,8 @@ export function PaymentStatusModal({
   onRetry,
   onViewDetails,
   timeLeft,
+  onCheckStatus,
+  isCheckingStatus,
 }: PaymentStatusModalProps) {
   if (!isOpen) return null;
 
@@ -171,9 +177,27 @@ export function PaymentStatusModal({
           </p>
         )}
         {isPending && timeLeft != null && timeLeft <= 0 && (
-          <p className="text-xs text-status-warning text-center mb-2">
-            Délai dépassé — vérifiez avec le client
-          </p>
+          <div className="text-center mb-2 space-y-1.5">
+            <p className="text-xs text-status-warning">
+              Délai dépassé — le paiement peut toujours être en cours côté opérateur
+            </p>
+            {onCheckStatus && (
+              <button
+                onClick={onCheckStatus}
+                disabled={isCheckingStatus}
+                className="text-xs font-medium text-accent hover:text-accent/80 transition-colors disabled:opacity-50 flex items-center gap-1.5 mx-auto"
+              >
+                {isCheckingStatus ? (
+                  <>
+                    <Loader2 size={12} className="animate-spin" />
+                    Vérification...
+                  </>
+                ) : (
+                  'Vérifier le statut'
+                )}
+              </button>
+            )}
+          </div>
         )}
         {!isPending && !timeLeft && <div className="mb-2" />}
 

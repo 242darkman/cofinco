@@ -66,6 +66,27 @@ export const UniversalPaymentSuccessModal: React.FC<UniversalPaymentSuccessModal
   const [copied, setCopied] = useState(false);
   const [animationComplete, setAnimationComplete] = useState(false);
 
+  // Play a brief success chime when modal opens
+  useEffect(() => {
+    if (!isOpen) return;
+    try {
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      // Two-note chime: C5 → E5
+      osc.frequency.setValueAtTime(523, ctx.currentTime);
+      osc.frequency.setValueAtTime(659, ctx.currentTime + 0.12);
+      gain.gain.setValueAtTime(0.08, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.3);
+      osc.onended = () => ctx.close();
+    } catch { /* AudioContext not available — silent fallback */ }
+  }, [isOpen]);
+
   // Keyboard shortcut: Escape or Enter closes the modal for quick workflow
   useEffect(() => {
     if (!isOpen) return;

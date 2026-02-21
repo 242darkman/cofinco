@@ -105,4 +105,7 @@ export interface CaisseTransaction {
   client_prenom?: string;
   clientTelephone?: string;
   client_telephone?: string;
+  statut?: string;
+  method_paiement?: string;
+  methodePaiement?: string;
 }

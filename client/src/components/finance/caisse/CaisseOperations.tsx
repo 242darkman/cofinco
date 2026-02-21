@@ -24,6 +24,7 @@ import { StatutCredit, TypeCompte, TypeOperationCaisse } from '@shared/enum/stat
 import { isIncomingOperation } from '@shared/config/caisse-operations';
 import { useOperationInfo } from './hooks/useOperationInfo';
 import { currencySymbol } from '@shared/config/currency';
+import type { CaisseTransaction } from '../../../types/finance';
 import airtelLogo from '@/assets/logos/airtel-logo.png';
 import mtnLogo from '@/assets/logos/mtn-logo.png';
 
@@ -121,7 +122,7 @@ const PROVIDERS = [
 interface CaisseOperationsProps {
   sessionId: string;
   soldeSession?: number;
-  recentTransactions?: any[];
+  recentTransactions?: CaisseTransaction[];
   onTransactionComplete?: () => void;
 }
 
@@ -156,6 +157,7 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('CREATED');
   const [showPaymentStatusModal, setShowPaymentStatusModal] = useState(false);
   const [paymentTimeLeft, setPaymentTimeLeft] = useState<number | null>(null);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [securityConfig, setSecurityConfig] = useState<SecurityConfigResponse | null>(null);
   const [showPresenceModal, setShowPresenceModal] = useState(false);
   const [sandboxInfo, setSandboxInfo] = useState<{
@@ -251,7 +253,7 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
   // ── Payment status polling with client-side timeout ──
   const CLIENT_PAYMENT_TIMEOUT = 5 * 60; // 5 minutes
 
-  // Start countdown when payment modal opens
+  // Start countdown when payment modal opens (timestamp-based for tab-switch resilience)
   useEffect(() => {
     if (!showPaymentStatusModal || !paymentIntent) {
       setPaymentTimeLeft(null);
@@ -259,15 +261,13 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
     }
     if (['SUCCESS', 'FAILED', 'EXPIRED', 'REVERSED'].includes(paymentStatus)) return;
 
+    const deadline = Date.now() + CLIENT_PAYMENT_TIMEOUT * 1000;
     setPaymentTimeLeft(CLIENT_PAYMENT_TIMEOUT);
+
     const timer = setInterval(() => {
-      setPaymentTimeLeft(prev => {
-        if (prev === null || prev <= 0) {
-          clearInterval(timer);
-          return 0;
-        }
-        return prev - 1;
-      });
+      const remaining = Math.max(0, Math.round((deadline - Date.now()) / 1000));
+      setPaymentTimeLeft(remaining);
+      if (remaining <= 0) clearInterval(timer);
     }, 1000);
     return () => clearInterval(timer);
   }, [showPaymentStatusModal, paymentIntent?.id]);
@@ -593,13 +593,16 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
         modePaiement: 'CASH'
       });
 
+      // Refresh solde and transactions immediately (don't wait for modal close)
+      onTransactionComplete?.();
+
       return true;
     } catch (error) {
       if (loadingId) toast.dismiss(loadingId);
       handleApiError(error, "Erreur lors de l'opération");
       return false;
     }
-  }, [typeOperation, typeDepot, montant, sessionId, prochaineEcheance, creditSelectionne, tontineSelectionnee, selectedClient, typeRetrait]);
+  }, [typeOperation, typeDepot, montant, sessionId, prochaineEcheance, creditSelectionne, tontineSelectionnee, selectedClient, typeRetrait, onTransactionComplete]);
 
   const validerOperationDirect = useCallback(async (operationData: any) => {
     const loadingId = toast.loading("Traitement de l'opération en cours...");
@@ -659,6 +662,31 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
     setShowSuccessModal(true);
     onTransactionComplete?.();
   }, [typeOperation, typeDepot, typeRetrait, moyenPaiement, selectedClient, user, onTransactionComplete]);
+
+  // ── Manual status check (after client timeout) ──
+  const handleCheckStatus = useCallback(async () => {
+    if (!paymentIntent?.id) return;
+    setIsCheckingStatus(true);
+    try {
+      const res = await fetch(`/api/payments/${paymentIntent.id}`, { credentials: 'include' });
+      if (res.ok) {
+        const intent: PaymentIntent = await res.json();
+        setPaymentStatus(intent.status);
+        setPaymentIntent(intent);
+        if (intent.status === 'SUCCESS') {
+          handlePaymentSuccess(intent);
+        } else if (['FAILED', 'EXPIRED', 'REVERSED'].includes(intent.status)) {
+          toast.error(`Paiement ${intent.status === 'FAILED' ? 'échoué' : intent.status === 'EXPIRED' ? 'expiré' : 'annulé'}`);
+        } else {
+          toast.info('Le paiement est toujours en attente');
+        }
+      }
+    } catch {
+      toast.error('Impossible de vérifier le statut');
+    } finally {
+      setIsCheckingStatus(false);
+    }
+  }, [paymentIntent?.id, handlePaymentSuccess]);
 
   const initiatePayment = useCallback(async (presenceData?: PresenceConfirmationData) => {
     if (!selectedClient || !typeOperation || !montant || parseFloat(montant) <= 0 || !phoneNumber) {
@@ -799,15 +827,23 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
   // ─── Keyboard Shortcuts ─────────────────────────────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      // Escape: reset form if client is selected and no modal is open
-      if (e.key === 'Escape' && selectedClient && !showSuccessModal && !showPaymentStatusModal && !confirmationData) {
+      if (e.key !== 'Escape' || showSuccessModal || showPaymentStatusModal || confirmationData) return;
+
+      // Step 1: If search has text, clear it first
+      if (searchTerm) {
+        e.preventDefault();
+        setSearchTerm('');
+        return;
+      }
+      // Step 2: If a client is selected, reset the whole form
+      if (selectedClient) {
         e.preventDefault();
         reinitialiserFormulaire();
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [selectedClient, showSuccessModal, showPaymentStatusModal, confirmationData, reinitialiserFormulaire]);
+  }, [searchTerm, selectedClient, showSuccessModal, showPaymentStatusModal, confirmationData, reinitialiserFormulaire]);
 
   // ─── Submit Dispatch ──────────────────────────────────
   const handleSubmit = useCallback(() => {
@@ -979,7 +1015,7 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
                 <span className="text-[9px] text-content-muted">{recentTransactions.length}</span>
               </div>
               <div className="divide-y divide-edge-subtle">
-                {recentTransactions.map((tx: any) => {
+                {recentTransactions.map((tx) => {
                   const isReversalTx = tx.description?.startsWith('[ANNULATION]');
                   const isReversed = tx.statut === 'REVERSED';
                   const incoming = isIncomingOperation(tx.typeOperation);
@@ -1468,6 +1504,8 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
         providerTxnId={paymentIntent?.providerTxnId}
         errorMessage={paymentIntent?.errorMessage}
         timeLeft={paymentTimeLeft ?? undefined}
+        onCheckStatus={handleCheckStatus}
+        isCheckingStatus={isCheckingStatus}
         onRetry={() => {
           setShowPaymentStatusModal(false);
           setPaymentIntent(null);

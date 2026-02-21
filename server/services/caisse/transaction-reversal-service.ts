@@ -276,10 +276,14 @@ export async function reverseOperation(req: ReversalRequest): Promise<ReversalRe
         .where(eq(transactionsCompte.mouvementId, originalMouvement!.id));
 
       if (linkedTx) {
-        // Create reversal transaction
-        const newSolde = linkedTx.soldeApres
-          ? (parseFloat(linkedTx.soldeApres) + compteDelta).toString()
-          : null;
+        // Read the current account balance (already updated by updateCompteSolde above)
+        // Using the live balance is correct even if other transactions happened
+        // between the original and this reversal.
+        const [currentCompte] = await tx
+          .select({ solde: comptes.solde })
+          .from(comptes)
+          .where(eq(comptes.id, linkedTx.compteId));
+        const newSolde = currentCompte?.solde ?? null;
 
         await tx.insert(transactionsCompte).values({
           compteId: linkedTx.compteId,
