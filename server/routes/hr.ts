@@ -2985,16 +2985,15 @@ hrRouter.patch("/paie/validate", getAuthUser, attachAbility, requireAbility(Acti
   }
 });
 
-// PATCH /api/hr/paie/pay - Payer un run de paie (VALIDATED → PAID + GL paiement)
+// PATCH /api/hr/paie/pay - Payer un run de paie (VALIDATED → PENDING/PROCESSING via salary_payment_jobs)
 hrRouter.patch("/paie/pay", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.PAIE), async (req, res) => {
   try {
-    const { runId, datePaiement } = req.body;
+    const { runId } = req.body;
 
     if (!runId) {
       return res.status(400).json(errorResponse('VALIDATION_ERROR', 'runId requis'));
     }
 
-    const paymentDate = datePaiement ? new Date(datePaiement) : new Date();
     const userId = req.user?.id || "system";
 
     const [run] = await db.select().from(payrollRuns).where(eq(payrollRuns.id, runId));
@@ -3005,14 +3004,14 @@ hrRouter.patch("/paie/pay", getAuthUser, attachAbility, requireAbility(Actions.M
       return res.status(400).json(errorResponse('INVALID_STATUS', `Le run est en statut ${run.status}, seul VALIDATED peut être payé`));
     }
 
-    // Resolve agenceId: run > user > first available
     const agenceId = run.agenceId || req.user?.agenceId;
 
-    // Get all validated bulletins with employee payment method
+    // Get all validated bulletins with employee payment method + phone
     const allBulletins = await db
       .select({
         bulletin: bulletinsPaie,
         paymentMethod: employes.paymentMethod,
+        phone: employes.phone,
         employeNom: users.nom,
         employePrenom: users.prenom,
       })
@@ -3027,90 +3026,54 @@ hrRouter.patch("/paie/pay", getAuthUser, attachAbility, requireAbility(Actions.M
         )
       );
 
-    // Split: CASH employees → caisse queue, others → immediate PAID
-    const cashBulletins = allBulletins.filter(b => b.paymentMethod === 'CASH');
-    const nonCashBulletins = allBulletins.filter(b => b.paymentMethod !== 'CASH');
-
-    // ── Non-CASH: Mark as PAID immediately ──
-    const paidIds: string[] = [];
-    if (nonCashBulletins.length > 0) {
-      const nonCashIds = nonCashBulletins.map(b => b.bulletin.id);
-      await db
-        .update(bulletinsPaie)
-        .set({
-          statut: BulletinStatus.PAID,
-          datePaiement: paymentDate.toISOString().split('T')[0],
-        })
-        .where(
-          and(
-            sql`${bulletinsPaie.id} = ANY(${nonCashIds}::int[])`,
-            eq(bulletinsPaie.payrollRunId, runId)
-          )
-        );
-      paidIds.push(...nonCashIds.map(String));
+    if (allBulletins.length === 0) {
+      return res.status(400).json(errorResponse('NO_BULLETINS', 'Aucun bulletin validé à payer'));
     }
 
-    // ── CASH: Mark as PENDING_CAISSE + create caisse requests ──
-    const pendingCaisseIds: string[] = [];
-    if (cashBulletins.length > 0) {
-      const cashIds = cashBulletins.map(b => b.bulletin.id);
-      await db
-        .update(bulletinsPaie)
-        .set({ statut: BulletinStatus.PENDING_CAISSE })
-        .where(
-          and(
-            sql`${bulletinsPaie.id} = ANY(${cashIds}::int[])`,
-            eq(bulletinsPaie.payrollRunId, runId)
-          )
-        );
-      pendingCaisseIds.push(...cashIds.map(String));
+    // Create salary payment jobs via the service
+    const { createPaymentJobs, processQueuedJob, getJobsByRunId } = await import("../services/salary-payment-service");
 
-      // Create caisse payment requests for each CASH bulletin
-      if (agenceId) {
-        const { createCaisseRequest } = await import("../services/caisse-queue-service");
-        for (const item of cashBulletins) {
-          const b = item.bulletin;
-          const net = Number(b.salaireNet);
-          if (net <= 0) continue;
+    const jobsResult = await createPaymentJobs({
+      runId,
+      bulletins: allBulletins.map(b => ({
+        bulletinId: b.bulletin.id,
+        employeId: b.bulletin.employeId,
+        paymentMethod: b.paymentMethod || "CASH",
+        salaireNet: Number(b.bulletin.salaireNet),
+        employeNom: b.employeNom || undefined,
+        employePrenom: b.employePrenom || undefined,
+        msisdn: b.phone || undefined,
+      })),
+      executionMode: "IMMEDIATE",
+      agenceId: agenceId || undefined,
+      userId,
+    });
 
-          await createCaisseRequest({
-            category: "SALARY_PAYMENT",
-            direction: "OUT",
-            agenceId,
-            sourceType: "bulletin_paie",
-            sourceId: String(b.id),
-            employeeId: b.employeId,
-            montant: net,
-            label: `Salaire ${item.employeNom || ''} ${item.employePrenom || ''}`.trim(),
-            description: `Paiement salaire ${run.period} — ${net.toLocaleString('fr-FR')} ${currencySymbol()}`,
-            metadata: {
-              payrollRunId: runId,
-              period: run.period,
-              employeNom: item.employeNom,
-              employePrenom: item.employePrenom,
-            },
-            createdBy: userId,
-          });
-        }
+    // Process CASH jobs immediately (create caisse requests)
+    for (const job of jobsResult.cashJobs) {
+      try {
+        await processQueuedJob(job);
+      } catch (err) {
+        logger.error({ jobId: job.id, err }, "Erreur traitement job CASH immédiat");
       }
     }
 
-    const totalPaid = nonCashBulletins.reduce((sum, b) => sum + Number(b.bulletin.salaireNet), 0);
-    const totalPendingCaisse = cashBulletins.reduce((sum, b) => sum + Number(b.bulletin.salaireNet), 0);
+    // Process TRANSFER/CHECK jobs immediately (mark as PROCESSING for manual confirmation)
+    for (const job of jobsResult.manualJobs) {
+      try {
+        await processQueuedJob(job);
+      } catch (err) {
+        logger.error({ jobId: job.id, err }, "Erreur traitement job TRANSFER/CHECK immédiat");
+      }
+    }
 
-    // Update run status: PAID only if no CASH bulletins are pending
-    const runStatus = cashBulletins.length === 0 ? PayrollRunStatus.PAID : PayrollRunStatus.VALIDATED;
-    await db.update(payrollRuns).set({
-      status: runStatus,
-      ...(runStatus === PayrollRunStatus.PAID ? { paidBy: userId, paidAt: new Date() } : {}),
-    }).where(eq(payrollRuns.id, runId));
-
-    // Post GL payment for non-CASH only
-    let glError: string | null = null;
-    if (agenceId && nonCashBulletins.length > 0) {
-      const freshRun = (await db.select().from(payrollRuns).where(eq(payrollRuns.id, runId)))[0];
-      const payResult = await postRunPayment(freshRun, agenceId, userId);
-      glError = payResult.error;
+    // Process MOBILE_MONEY jobs immediately (initiate payouts)
+    for (const job of jobsResult.momoJobs) {
+      try {
+        await processQueuedJob(job);
+      } catch (err) {
+        logger.error({ jobId: job.id, err }, "Erreur traitement job MOBILE_MONEY immédiat");
+      }
     }
 
     // Mark objective prizes as paid for this period
@@ -3138,6 +3101,10 @@ hrRouter.patch("/paie/pay", getAuthUser, attachAbility, requireAbility(Actions.M
       logger.error({ err: prizeErr }, "Failed to mark objective prizes as paid (non-blocking)");
     }
 
+    const totalCash = jobsResult.cashJobs.reduce((s, j) => s + Number(j.amount), 0);
+    const totalMomo = jobsResult.momoJobs.reduce((s, j) => s + Number(j.amount), 0);
+    const totalManual = jobsResult.manualJobs.reduce((s, j) => s + Number(j.amount), 0);
+
     await hrService.logAction(
       'payroll_run',
       String(runId),
@@ -3150,12 +3117,13 @@ hrRouter.patch("/paie/pay", getAuthUser, attachAbility, requireAbility(Actions.M
       },
       { statut: PayrollRunStatus.VALIDATED },
       {
-        statut: runStatus,
-        paidCount: nonCashBulletins.length,
-        pendingCaisseCount: cashBulletins.length,
-        totalPaid,
-        totalPendingCaisse,
-        datePaiement: paymentDate,
+        cashJobs: jobsResult.cashJobs.length,
+        momoJobs: jobsResult.momoJobs.length,
+        manualJobs: jobsResult.manualJobs.length,
+        totalJobs: jobsResult.total,
+        totalCash,
+        totalMomo,
+        totalManual,
       },
       undefined,
       'critical'
@@ -3168,24 +3136,184 @@ hrRouter.patch("/paie/pay", getAuthUser, attachAbility, requireAbility(Actions.M
         id: String(runId),
         extra: {
           count: allBulletins.length,
-          total: totalPaid + totalPendingCaisse,
-          pendingCaisse: cashBulletins.length,
+          total: totalCash + totalMomo + totalManual,
+          pendingCaisse: jobsResult.cashJobs.length,
+          momoPayouts: jobsResult.momoJobs.length,
+          manualConfirmation: jobsResult.manualJobs.length,
         },
       },
       req.user ? { id: req.user.id, name: req.user.nom || '' } : undefined
     );
 
     res.json(successResponse({
-      paid: nonCashBulletins.length,
-      pendingCaisse: cashBulletins.length,
-      totalPaid,
-      totalPendingCaisse,
-      runStatus,
-      glError,
+      cashJobs: jobsResult.cashJobs.length,
+      momoJobs: jobsResult.momoJobs.length,
+      manualJobs: jobsResult.manualJobs.length,
+      totalJobs: jobsResult.total,
+      totalCash,
+      totalMomo,
+      totalManual,
     }));
   } catch (error) {
     logger.error({ err: error }, 'Erreur paiement paie');
-    res.status(500).json(errorResponse('SERVER_ERROR', 'Erreur serveur'));
+    res.status(500).json(errorResponse('SERVER_ERROR', error instanceof Error ? error.message : 'Erreur serveur'));
+  }
+});
+
+// POST /api/hr/paie/schedule - Programmer un paiement batch pour une date future
+hrRouter.post("/paie/schedule", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.PAIE), async (req, res) => {
+  try {
+    const { runId, scheduledAt } = req.body;
+
+    if (!runId || !scheduledAt) {
+      return res.status(400).json(errorResponse('VALIDATION_ERROR', 'runId et scheduledAt requis'));
+    }
+
+    const scheduledDate = new Date(scheduledAt);
+    if (scheduledDate <= new Date()) {
+      return res.status(400).json(errorResponse('VALIDATION_ERROR', 'La date programmée doit être dans le futur'));
+    }
+
+    const userId = req.user?.id || "system";
+
+    const [run] = await db.select().from(payrollRuns).where(eq(payrollRuns.id, runId));
+    if (!run) {
+      return res.status(404).json(errorResponse('NOT_FOUND', 'Run non trouvé'));
+    }
+    if (run.status !== PayrollRunStatus.VALIDATED) {
+      return res.status(400).json(errorResponse('INVALID_STATUS', `Le run est en statut ${run.status}, seul VALIDATED peut être programmé`));
+    }
+
+    const agenceId = run.agenceId || req.user?.agenceId;
+
+    const allBulletins = await db
+      .select({
+        bulletin: bulletinsPaie,
+        paymentMethod: employes.paymentMethod,
+        phone: employes.phone,
+        employeNom: users.nom,
+        employePrenom: users.prenom,
+      })
+      .from(bulletinsPaie)
+      .innerJoin(employes, eq(bulletinsPaie.employeId, employes.id))
+      .innerJoin(users, eq(employes.userId, users.id))
+      .where(
+        and(
+          eq(bulletinsPaie.payrollRunId, runId),
+          eq(bulletinsPaie.statut, BulletinStatus.VALIDATED),
+          eq(bulletinsPaie.cancelled, false)
+        )
+      );
+
+    const { createPaymentJobs } = await import("../services/salary-payment-service");
+
+    const jobsResult = await createPaymentJobs({
+      runId,
+      bulletins: allBulletins.map(b => ({
+        bulletinId: b.bulletin.id,
+        employeId: b.bulletin.employeId,
+        paymentMethod: b.paymentMethod || "CASH",
+        salaireNet: Number(b.bulletin.salaireNet),
+        employeNom: b.employeNom || undefined,
+        employePrenom: b.employePrenom || undefined,
+        msisdn: b.phone || undefined,
+      })),
+      executionMode: "SCHEDULED",
+      scheduledAt: scheduledDate,
+      agenceId: agenceId || undefined,
+      userId,
+    });
+
+    await hrService.logAction(
+      'payroll_run', String(runId), 'scheduled',
+      { userId: req.user?.id, userName: req.user?.nom, userRole: req.user?.role },
+      { statut: PayrollRunStatus.VALIDATED },
+      { scheduledAt: scheduledDate, totalJobs: jobsResult.total },
+      undefined, 'medium'
+    );
+
+    res.json(successResponse({
+      scheduled: jobsResult.total,
+      scheduledAt: scheduledDate,
+    }));
+  } catch (error) {
+    logger.error({ err: error }, 'Erreur programmation paie');
+    res.status(500).json(errorResponse('SERVER_ERROR', error instanceof Error ? error.message : 'Erreur serveur'));
+  }
+});
+
+// PATCH /api/hr/paie/confirm-payment - Confirmation manuelle (TRANSFER/CHECK)
+hrRouter.patch("/paie/confirm-payment", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.PAIE), async (req, res) => {
+  try {
+    const { jobIds, reference } = req.body;
+    if (!jobIds || !Array.isArray(jobIds) || jobIds.length === 0) {
+      return res.status(400).json(errorResponse('VALIDATION_ERROR', 'jobIds requis (tableau non vide)'));
+    }
+
+    const userId = req.user?.id || "system";
+    const { confirmManualPayment } = await import("../services/salary-payment-service");
+    const result = await confirmManualPayment(jobIds, userId, reference);
+
+    res.json(successResponse(result));
+  } catch (error) {
+    logger.error({ err: error }, 'Erreur confirmation paiement');
+    res.status(500).json(errorResponse('SERVER_ERROR', error instanceof Error ? error.message : 'Erreur serveur'));
+  }
+});
+
+// PATCH /api/hr/paie/retry-payment - Relance d'un job FAILED
+hrRouter.patch("/paie/retry-payment", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.PAIE), async (req, res) => {
+  try {
+    const { jobIds } = req.body;
+    if (!jobIds || !Array.isArray(jobIds) || jobIds.length === 0) {
+      return res.status(400).json(errorResponse('VALIDATION_ERROR', 'jobIds requis'));
+    }
+
+    const userId = req.user?.id || "system";
+    const { retryJobs } = await import("../services/salary-payment-service");
+    const result = await retryJobs(jobIds, userId);
+
+    res.json(successResponse(result));
+  } catch (error) {
+    logger.error({ err: error }, 'Erreur retry paiement');
+    res.status(500).json(errorResponse('SERVER_ERROR', error instanceof Error ? error.message : 'Erreur serveur'));
+  }
+});
+
+// PATCH /api/hr/paie/cancel-payment - Annulation d'un job
+hrRouter.patch("/paie/cancel-payment", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.PAIE), async (req, res) => {
+  try {
+    const { jobIds } = req.body;
+    if (!jobIds || !Array.isArray(jobIds) || jobIds.length === 0) {
+      return res.status(400).json(errorResponse('VALIDATION_ERROR', 'jobIds requis'));
+    }
+
+    const userId = req.user?.id || "system";
+    const { cancelJobs } = await import("../services/salary-payment-service");
+    const result = await cancelJobs(jobIds, userId);
+
+    res.json(successResponse(result));
+  } catch (error) {
+    logger.error({ err: error }, 'Erreur annulation paiement');
+    res.status(500).json(errorResponse('SERVER_ERROR', error instanceof Error ? error.message : 'Erreur serveur'));
+  }
+});
+
+// GET /api/hr/paie/payment-jobs/:runId - Liste les jobs de paiement d'un run
+hrRouter.get("/paie/payment-jobs/:runId", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.PAIE), async (req, res) => {
+  try {
+    const runId = parseInt(req.params.runId);
+    if (isNaN(runId)) {
+      return res.status(400).json(errorResponse('VALIDATION_ERROR', 'runId invalide'));
+    }
+
+    const { getJobsByRunId } = await import("../services/salary-payment-service");
+    const jobs = await getJobsByRunId(runId);
+
+    res.json(successResponse({ jobs }));
+  } catch (error) {
+    logger.error({ err: error }, 'Erreur lecture payment jobs');
+    res.status(500).json(errorResponse('SERVER_ERROR', error instanceof Error ? error.message : 'Erreur serveur'));
   }
 });
 
