@@ -67,6 +67,7 @@ import {
   systemFeatureFlags,
   criticalPermissionPatterns,
   rbacVersions,
+  tontinePlans,
 } from '@shared/schema';
 import { pays } from '@shared/schema/pays';
 import { seedRegions, migrateCongoDeptsToRegions, seedDepartementsADM2, cleanupLegacyDepts, loadGeonamesStaging, enrichFromStaging } from './seed-geography-world';
@@ -74,7 +75,7 @@ import { departments, jobPositions, employes, payrollConfig, conventionsCollecti
 import { accountingRules } from '@shared/schema/accounting';
 import { caissesAgent } from '@shared/schema/caisse-agent';
 import { agentsTerrain } from '@shared/schema/operations';
-import { tontineRulesets } from '@shared/schema/tontines';
+
 import { configEcartCaisse } from '@shared/schema/caisse-closing';
 import { currencyPresets } from '@shared/schema/settings';
 import { mmFeeSchedules } from '@shared/schema/mm-fee-schedules';
@@ -3086,38 +3087,95 @@ async function seedProductsCatalog(context: SeedContext, dryRun: boolean): Promi
   }
   results.push({ table: 'creditPlans', action: 'replaced', count: creditPlansData.length });
 
-  // Tontine Rulesets - insert default ruleset
-  const [existingRuleset] = await db.select().from(tontineRulesets).where(eq(tontineRulesets.isDefault, true));
-  if (!existingRuleset) {
-    await db.insert(tontineRulesets).values({
-      name: 'Règles Standard Congo',
-      description: 'Règles par défaut pour les tontines au Congo Brazzaville',
-      isDefault: true,
-      isActive: true,
-      version: 1,
-      rules: {
-        grace_days: 2,
-        late_fee_amount: 500,
-        late_fee_percent: null,
-        max_late_count_before_suspend: 3,
-        max_late_count_before_exclude: 5,
-        allow_partial_distribution: true,
-        distribution_min_threshold_percent: 50,
-        withdrawal_fee_amount: 0,
-        withdrawal_fee_percent: 0,
-        allow_reorder_turns_until: 'BEFORE_TURN_DUE',
-        penalty_deducted_from_payout: true,
-        penalty_as_revenue: false,
-        auto_pay_penalty_priority: true,
-        min_members_to_start: 3,
-        max_advance_tours: 3,
-      },
-    });
-    results.push({ table: 'tontineRulesets', action: 'created', count: 1 });
-    logger.info('Tontine default ruleset created');
-  } else {
-    results.push({ table: 'tontineRulesets', action: 'skipped', count: 0, details: 'exists' });
+  // Tontine Plans (templates) — upsert by nom
+  const tontinePlansData = [
+    {
+      nom: 'Tontine Hebdo Standard',
+      description: 'Modele standard de tontine hebdomadaire rotative',
+      montantCotisation: '10000',
+      nombreMembres: 10,
+      frequence: 'WEEKLY',
+      tauxPlateforme: '2',
+      intervalleCotisation: 1,
+      distributionType: 'ROTATIVE_SUSU',
+      firstContributionRule: 'ON_START_DATE',
+      collectionCalendarMode: 'ALL_DAYS',
+      weekdaysMask: 127,
+      shiftNonWorkingDay: 'NEXT',
+      timezone: 'Africa/Brazzaville',
+      payoutFrequency: 'SAME_AS_CONTRIBUTION',
+      payoutOrderMode: 'FIXED_BY_ADMIN',
+      penaltyEnabled: true,
+      penaltyType: 'FIXED',
+      penaltyValue: '500',
+      penaltyApplication: 'PER_PERIOD',
+      lateGracePeriodDays: 2,
+      maxLateBeforeSuspend: 3,
+      maxLateBeforeExclude: 5,
+      joinFeeEnabled: false,
+      exitAllowed: true,
+      exitFeePercent: '0',
+      allowedPaymentMethods: ['CASH', 'MOBILE_MONEY'],
+      defaultPaymentMethod: 'CASH',
+      cashMustGoToCaisse: true,
+      feeCollectionMode: 'ON_EACH_PAYOUT',
+      rolesEnabled: true,
+      groupRoles: ['PRESIDENT', 'TRESORIER', 'SECRETAIRE'],
+      approvalsRequiredFor: ['DISTRIBUTION', 'REORDER'],
+      minKycLevel: 'NONE',
+      actif: true,
+    },
+    {
+      nom: 'Tontine Mensuelle Premium',
+      description: 'Modele de tontine mensuelle avec penalites strictes',
+      montantCotisation: '50000',
+      nombreMembres: 12,
+      frequence: 'MONTHLY',
+      tauxPlateforme: '3',
+      intervalleCotisation: 1,
+      distributionType: 'ROTATIVE_SUSU',
+      firstContributionRule: 'END_OF_MONTH',
+      collectionCalendarMode: 'BUSINESS_DAYS_ONLY',
+      weekdaysMask: 62, // Lun-Ven
+      shiftNonWorkingDay: 'NEXT',
+      timezone: 'Africa/Brazzaville',
+      payoutFrequency: 'SAME_AS_CONTRIBUTION',
+      payoutOrderMode: 'FIXED_BY_ADMIN',
+      allowSwapPayoutOrder: true,
+      swapRequiresApproval: true,
+      penaltyEnabled: true,
+      penaltyType: 'PERCENT',
+      penaltyValue: '5',
+      penaltyApplication: 'PER_PERIOD',
+      lateGracePeriodDays: 5,
+      maxLateBeforeSuspend: 2,
+      maxLateBeforeExclude: 4,
+      penaltyDeductedFromPayout: true,
+      joinFeeEnabled: true,
+      joinFeeAmount: '5000',
+      exitAllowed: true,
+      exitFeePercent: '2',
+      exitNoticePeriods: 1,
+      replacementAllowed: true,
+      allowedPaymentMethods: ['CASH', 'MOBILE_MONEY', 'WALLET_INTERNAL'],
+      defaultPaymentMethod: 'CASH',
+      cashMustGoToCaisse: true,
+      feeCollectionMode: 'ON_EACH_PAYOUT',
+      rolesEnabled: true,
+      groupRoles: ['PRESIDENT', 'TRESORIER', 'SECRETAIRE'],
+      approvalsRequiredFor: ['DISTRIBUTION', 'REORDER'],
+      minKycLevel: 'BASIC',
+      actif: true,
+    },
+  ];
+
+  for (const tp of tontinePlansData) {
+    const [existing] = await db.select().from(tontinePlans).where(eq(tontinePlans.nom, tp.nom));
+    if (!existing) {
+      await db.insert(tontinePlans).values(tp);
+    }
   }
+  results.push({ table: 'tontinePlans', action: 'created', count: tontinePlansData.length });
 
   // Tags - upsert by name
   for (const t of TAGS_DATA) {

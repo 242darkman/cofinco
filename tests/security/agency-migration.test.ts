@@ -500,7 +500,7 @@ describe("Code Cleanup — Enums & Types", () => {
       "mouvementsFinanciers", "operationsCaisse", "virementsProgrammes",
       "dossiersCredit", "membresTontine", "contributionsTontine",
       "tontineCycles", "tontineTurns", "tontineSchedules",
-      "tontineRulesets", "transfertsCoffreCaisse",
+      "transfertsCoffreCaisse",
     ];
     for (const type of volumetryTypes) {
       expect(migrationSchema).toContain(`${type}: number`);

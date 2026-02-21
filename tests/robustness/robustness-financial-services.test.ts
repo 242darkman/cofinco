@@ -41,7 +41,6 @@ vi.mock('server/db', () => ({
     query: {
       tontines: { findMany: vi.fn() },
       membresTontine: { findMany: vi.fn() },
-      tontineDistributions: { findFirst: vi.fn() },
       contributionsTontine: { findFirst: vi.fn() },
       comptes: { findMany: vi.fn() },
       credits: { findMany: vi.fn() }, 
@@ -152,7 +151,6 @@ describe('Production Readiness - Staged Features Robustness', () => {
           .mockImplementationOnce(() => createMockBuilder([mockMembre]))  // eligibleMembers
           .mockImplementationOnce(() => createMockBuilder([mockCompte])); // account lookup
 
-      vi.mocked(db.query.tontineDistributions.findFirst).mockResolvedValue(undefined);
       vi.mocked(db.query.contributionsTontine.findFirst).mockResolvedValue(undefined);
 
       // 3. Execute
