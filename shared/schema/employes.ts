@@ -3,6 +3,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { users } from "./auth";
 import { agences } from "./agences";
+import { pays } from "./pays";
 import { jobPositions, departments, type JobPosition, type Department } from "./departments";
 
 /**
@@ -38,8 +39,14 @@ export const employes = pgTable("employes", {
   // CNSS
   numeroCnss: varchar("numero_cnss", { length: 50 }).unique(),
 
+  // Pièce d'identité
+  typePiece: varchar("type_piece", { length: 20 }), // 'CNI', 'PASSPORT', 'PERMIS_CONDUIRE', 'CARTE_RESIDENT'
+  numeroPiece: text("numero_piece"),
+  dateExpirationPiece: date("date_expiration_piece"),
+  paysEmissionId: uuid("pays_emission_id").references(() => pays.id, { onDelete: "set null" }),
+
   // Paiement
-  paymentMethod: varchar("payment_method", { length: 20 }).default("CASH"), // 'CASH', 'TRANSFER', 'MOBILE_MONEY', 'CHECK'
+  paymentMethod: varchar("payment_method", { length: 20 }).default("CASH"), // 'CASH', 'TRANSFER', 'MOBILE_MONEY', 'CHECK', 'INTERNAL_WALLET'
   paymentDetails: text("payment_details"), // Coordonnées bancaires, N° Mobile Money, etc.
 
   // Coordonnées bancaires (virement)
@@ -91,12 +98,15 @@ export interface EmployeWithUser extends Employe {
     sexe: string | null;
     dateNaissance: Date | string | null;
     lieuNaissance: string | null;
+    lieuNaissanceLocalityId: string | null;
+    lieuNaissanceLocalityType: string | null;
     nationaliteId: string | null;
     paysNaissanceId: string | null;
     adresse: string | null;
     ville: string | null;
     photoProfile: string | null;
     statut: string;
+    typeCompte?: string | null;
     role?: string | null; // Rôle principal depuis userRoles
   };
   nationaliteNom?: string | null;

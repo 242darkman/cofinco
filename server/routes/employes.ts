@@ -58,6 +58,13 @@ const createEmployeWithUserSchema = z.object({
   username: z.string().optional().nullable(),
   password: z.string().optional().nullable(),
 
+  // Données utilisateur (géographie)
+  lieuNaissance: z.string().optional().nullable(),
+  lieuNaissanceLocalityId: optionalUuid.optional(),
+  lieuNaissanceLocalityType: z.string().optional().nullable(),
+  nationaliteId: optionalUuid.optional(),
+  paysNaissanceId: optionalUuid.optional(),
+
   // Données employé (RH)
   matricule: z.string().optional().nullable(),
   jobPositionId: optionalUuid.optional(),
@@ -72,6 +79,30 @@ const createEmployeWithUserSchema = z.object({
   tauxJournalier: numericString.optional(),
   modeCalculPaie: modeCalculPaieSchema.optional(),
   numeroCnss: z.string().optional().nullable(),
+  // Pièce d'identité
+  typePiece: z.string().optional().nullable(),
+  numeroPiece: z.string().optional().nullable(),
+  dateExpirationPiece: z.string().optional().nullable(),
+  paysEmissionId: optionalUuid.optional(),
+  // Paiement
+  paymentMethod: z.string().optional().nullable(),
+  paymentDetails: z.string().optional().nullable(),
+  bankName: z.string().optional().nullable(),
+  bankCode: z.string().optional().nullable(),
+  branchCode: z.string().optional().nullable(),
+  bankAccountNumber: z.string().optional().nullable(),
+  accountKey: z.string().optional().nullable(),
+  // Situation familiale & fiscale
+  situationFamiliale: z.string().optional().nullable(),
+  nombreEnfantsCharge: z.union([z.number(), z.string()]).optional().transform((val) => {
+    if (val === undefined || val === null || val === '') return undefined;
+    return typeof val === 'number' ? val : parseInt(val) || 0;
+  }),
+  niu: z.string().optional().nullable(),
+  // Dates clés contrat
+  dateFinContrat: z.string().optional().nullable(),
+  dateFinEssai: z.string().optional().nullable(),
+  prochaineMedicale: z.string().optional().nullable(),
   // Agent Terrain specific fields (optional, used when role === AGENT_TERRAIN)
   zonesAffectation: z.array(z.string()).optional(),
   objectifMensuel: z.string().optional(),
@@ -86,7 +117,12 @@ const updateEmployeWithUserSchema = z.object({
   email: z.string().email().optional().nullable(),
   telephone: z.string().optional().nullable(),
   sexe: z.enum(['M', 'F']).optional().nullable(),
-  dateNaissance: z.string().optional().nullable(), // Format: YYYY-MM-DD
+  dateNaissance: z.string().optional().nullable(),
+  lieuNaissance: z.string().optional().nullable(),
+  lieuNaissanceLocalityId: optionalUuid.optional(),
+  lieuNaissanceLocalityType: z.string().optional().nullable(),
+  nationaliteId: optionalUuid.optional(),
+  paysNaissanceId: optionalUuid.optional(),
   adresse: z.string().optional().nullable(),
   ville: z.string().optional().nullable(),
   photoProfile: z.string().optional().nullable(),
@@ -106,6 +142,33 @@ const updateEmployeWithUserSchema = z.object({
   tauxJournalier: numericString.optional(),
   modeCalculPaie: modeCalculPaieSchema.optional(),
   numeroCnss: z.string().optional().nullable(),
+  // Pièce d'identité
+  typePiece: z.string().optional().nullable(),
+  numeroPiece: z.string().optional().nullable(),
+  dateExpirationPiece: z.string().optional().nullable(),
+  paysEmissionId: optionalUuid.optional(),
+  // Paiement
+  paymentMethod: z.string().optional().nullable(),
+  paymentDetails: z.string().optional().nullable(),
+  bankName: z.string().optional().nullable(),
+  bankCode: z.string().optional().nullable(),
+  branchCode: z.string().optional().nullable(),
+  bankAccountNumber: z.string().optional().nullable(),
+  accountKey: z.string().optional().nullable(),
+  // Situation familiale & fiscale
+  situationFamiliale: z.string().optional().nullable(),
+  nombreEnfantsCharge: z.union([z.number(), z.string()]).optional().transform((val) => {
+    if (val === undefined || val === null || val === '') return undefined;
+    return typeof val === 'number' ? val : parseInt(val) || 0;
+  }),
+  niu: z.string().optional().nullable(),
+  // Dates clés contrat
+  dateFinContrat: z.string().optional().nullable(),
+  dateFinEssai: z.string().optional().nullable(),
+  prochaineMedicale: z.string().optional().nullable(),
+  // Sortie
+  dateSortie: z.string().optional().nullable(),
+  motifSortie: z.string().optional().nullable(),
 });
 
 export function registerEmployesRoutes(app: Express) {
@@ -331,6 +394,11 @@ export function registerEmployesRoutes(app: Express) {
           telephone: data.telephone || null,
           sexe: data.sexe || null,
           dateNaissance: data.dateNaissance || null,
+          lieuNaissance: data.lieuNaissance || null,
+          lieuNaissanceLocalityId: data.lieuNaissanceLocalityId || null,
+          lieuNaissanceLocalityType: data.lieuNaissanceLocalityType || null,
+          nationaliteId: data.nationaliteId || null,
+          paysNaissanceId: data.paysNaissanceId || null,
           adresse: data.adresse || null,
           ville: data.ville || null,
           photoProfile: data.photoProfile || null,
@@ -355,6 +423,23 @@ export function registerEmployesRoutes(app: Express) {
           tauxJournalier: data.tauxJournalier || 0,
           modeCalculPaie: data.modeCalculPaie || 'Mensuel',
           numeroCnss: data.numeroCnss || null,
+          typePiece: data.typePiece || null,
+          numeroPiece: data.numeroPiece || null,
+          dateExpirationPiece: data.dateExpirationPiece || null,
+          paysEmissionId: data.paysEmissionId || null,
+          paymentMethod: data.paymentMethod || 'CASH',
+          paymentDetails: data.paymentDetails || null,
+          bankName: data.bankName || null,
+          bankCode: data.bankCode || null,
+          branchCode: data.branchCode || null,
+          bankAccountNumber: data.bankAccountNumber || null,
+          accountKey: data.accountKey || null,
+          situationFamiliale: data.situationFamiliale || 'CELIBATAIRE',
+          nombreEnfantsCharge: data.nombreEnfantsCharge ?? 0,
+          niu: data.niu || null,
+          dateFinContrat: data.dateFinContrat || null,
+          dateFinEssai: data.dateFinEssai || null,
+          prochaineMedicale: data.prochaineMedicale || null,
           statut: StatutUser.ACTIVE,
         }).returning();
 
@@ -483,6 +568,11 @@ export function registerEmployesRoutes(app: Express) {
       if (data.telephone !== undefined) userData.telephone = data.telephone || null;
       if (data.sexe !== undefined) userData.sexe = data.sexe;
       if (data.dateNaissance !== undefined) userData.dateNaissance = data.dateNaissance || null;
+      if (data.lieuNaissance !== undefined) userData.lieuNaissance = data.lieuNaissance || null;
+      if (data.lieuNaissanceLocalityId !== undefined) userData.lieuNaissanceLocalityId = data.lieuNaissanceLocalityId || null;
+      if (data.lieuNaissanceLocalityType !== undefined) userData.lieuNaissanceLocalityType = data.lieuNaissanceLocalityType || null;
+      if (data.nationaliteId !== undefined) userData.nationaliteId = data.nationaliteId || null;
+      if (data.paysNaissanceId !== undefined) userData.paysNaissanceId = data.paysNaissanceId || null;
       if (data.adresse !== undefined) userData.adresse = data.adresse || null;
       if (data.ville !== undefined) userData.ville = data.ville || null;
       if (data.photoProfile !== undefined) userData.photoProfile = data.photoProfile || null;
@@ -500,6 +590,25 @@ export function registerEmployesRoutes(app: Express) {
       if (data.tauxJournalier !== undefined) employeData.tauxJournalier = data.tauxJournalier;
       if (data.modeCalculPaie !== undefined) employeData.modeCalculPaie = data.modeCalculPaie;
       if (data.numeroCnss !== undefined) employeData.numeroCnss = data.numeroCnss || null;
+      if (data.typePiece !== undefined) employeData.typePiece = data.typePiece || null;
+      if (data.numeroPiece !== undefined) employeData.numeroPiece = data.numeroPiece || null;
+      if (data.dateExpirationPiece !== undefined) employeData.dateExpirationPiece = data.dateExpirationPiece || null;
+      if (data.paysEmissionId !== undefined) employeData.paysEmissionId = data.paysEmissionId || null;
+      if (data.paymentMethod !== undefined) employeData.paymentMethod = data.paymentMethod || null;
+      if (data.paymentDetails !== undefined) employeData.paymentDetails = data.paymentDetails || null;
+      if (data.bankName !== undefined) employeData.bankName = data.bankName || null;
+      if (data.bankCode !== undefined) employeData.bankCode = data.bankCode || null;
+      if (data.branchCode !== undefined) employeData.branchCode = data.branchCode || null;
+      if (data.bankAccountNumber !== undefined) employeData.bankAccountNumber = data.bankAccountNumber || null;
+      if (data.accountKey !== undefined) employeData.accountKey = data.accountKey || null;
+      if (data.situationFamiliale !== undefined) employeData.situationFamiliale = data.situationFamiliale || null;
+      if (data.nombreEnfantsCharge !== undefined) employeData.nombreEnfantsCharge = data.nombreEnfantsCharge ?? 0;
+      if (data.niu !== undefined) employeData.niu = data.niu || null;
+      if (data.dateFinContrat !== undefined) employeData.dateFinContrat = data.dateFinContrat || null;
+      if (data.dateFinEssai !== undefined) employeData.dateFinEssai = data.dateFinEssai || null;
+      if (data.prochaineMedicale !== undefined) employeData.prochaineMedicale = data.prochaineMedicale || null;
+      if (data.dateSortie !== undefined) employeData.dateSortie = data.dateSortie || null;
+      if (data.motifSortie !== undefined) employeData.motifSortie = data.motifSortie || null;
 
       // Mise à jour (Architecture V3: passe le nouveau rôle à updateEmployeWithUser)
       const updated = await storage.updateEmployeWithUser(employeId, userData, employeData, data.role);
@@ -697,6 +806,11 @@ export function registerEmployesRoutes(app: Express) {
         role: requestedRole,
         // Champs user à mettre à jour
         dateNaissance,
+        lieuNaissance,
+        lieuNaissanceLocalityId,
+        lieuNaissanceLocalityType,
+        nationaliteId,
+        paysNaissanceId,
         adresse,
         ville,
         telephone,
@@ -718,6 +832,11 @@ export function registerEmployesRoutes(app: Express) {
 
       // Ajouter les champs user fournis (ne pas écraser si non fournis)
       if (dateNaissance !== undefined) userUpdateData.dateNaissance = dateNaissance || null;
+      if (lieuNaissance !== undefined) userUpdateData.lieuNaissance = lieuNaissance || null;
+      if (lieuNaissanceLocalityId !== undefined) userUpdateData.lieuNaissanceLocalityId = lieuNaissanceLocalityId || null;
+      if (lieuNaissanceLocalityType !== undefined) userUpdateData.lieuNaissanceLocalityType = lieuNaissanceLocalityType || null;
+      if (nationaliteId !== undefined) userUpdateData.nationaliteId = nationaliteId || null;
+      if (paysNaissanceId !== undefined) userUpdateData.paysNaissanceId = paysNaissanceId || null;
       if (adresse !== undefined) userUpdateData.adresse = adresse || null;
       if (ville !== undefined) userUpdateData.ville = ville || null;
       if (telephone !== undefined) userUpdateData.telephone = telephone || null;
