@@ -1,7 +1,7 @@
 import React from 'react';
 import { useMyDashboard } from '../../hooks/hr/useMonEspace';
 import { Card, Badge, StatCard } from '../ui';
-import { Calendar, CheckCircle, Clock, FileText, Star, Briefcase } from 'lucide-react';
+import { Calendar, CheckCircle, Clock, FileText, Star, Briefcase, Download } from 'lucide-react';
 
 function formatFCFA(value: number | string): string {
   const num = typeof value === 'string' ? parseFloat(value) : value;
@@ -148,7 +148,18 @@ export default function MonEspaceDashboard() {
                         Net : {formatFCFA(bulletin.salaireNet)}
                       </p>
                     </div>
-                    <Badge value={bulletin.statut} size="sm" />
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Badge value={bulletin.statut} size="sm" />
+                      {bulletin.pdfUrl && (
+                        <button
+                          onClick={() => window.open(bulletin.pdfUrl, '_blank')}
+                          className="p-1.5 rounded-md text-content-muted hover:text-accent hover:bg-accent/10 transition"
+                          title="Télécharger le bulletin"
+                        >
+                          <Download size={14} />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 );
               })}

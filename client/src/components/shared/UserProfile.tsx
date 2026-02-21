@@ -149,13 +149,13 @@ function EditableField({ label, value, icon: Icon, onSave, editable = true, type
   // --- MODE LECTURE (Compact) ---
   return (
     <div className="group flex items-center justify-between p-2 hover:bg-surface/50 rounded-lg transition-colors border border-transparent hover:border-edge/50 cursor-default -mx-2">
-      <div className="flex items-center gap-3 overflow-hidden">
+      <div className="flex items-center gap-3 min-w-0">
         <div className="flex-shrink-0 p-1.5 bg-surface-base rounded-md text-content-muted border border-edge group-hover:border-edge group-hover:text-accent transition-colors">
           <Icon size={14} />
         </div>
         <div className="min-w-0">
           <div className="text-[10px] text-content-muted font-medium leading-none mb-0.5">{label}</div>
-          <div className="text-xs font-medium text-content-secondary truncate leading-tight">{value || 'Non renseigné'}</div>
+          <div className="text-xs font-medium text-content-secondary leading-tight break-words">{value || 'Non renseigné'}</div>
         </div>
       </div>
       
@@ -182,7 +182,7 @@ function ReadOnlyField({ label, value, highlight }: ReadOnlyFieldProps) {
   return (
     <div className="flex flex-col">
       <div className="text-[9px] text-content-muted uppercase tracking-wider">{label}</div>
-      <div className={`text-xs font-semibold truncate ${highlight ? 'text-status-success' : 'text-content-secondary'}`}>
+      <div className={`text-xs font-semibold break-words ${highlight ? 'text-status-success' : 'text-content-secondary'}`}>
         {value || <span className="text-content-secondary">—</span>}
       </div>
     </div>
@@ -597,7 +597,7 @@ export default function UserProfile({ onUserUpdate }: UserProfileProps) {
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h1 className="text-base font-bold truncate leading-tight">{getFullName()}</h1>
+            <h1 className="text-base font-bold leading-tight">{getFullName()}</h1>
             {photoPreview && (
               <span className="text-[9px] px-1.5 py-0.5 bg-accent/10 text-accent rounded border border-accent/30">
                 Aperçu photo
