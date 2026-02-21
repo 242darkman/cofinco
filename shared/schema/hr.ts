@@ -4,6 +4,7 @@ import { z } from "zod";
 import { users } from "./auth";
 import { employes } from "./employes";
 import { agences } from "./agences";
+import { jobPositions } from "./departments";
 
 /**
  * Tables pour le module Ressources Humaines
@@ -196,6 +197,13 @@ export const candidatures = pgTable("candidatures", {
   approvalStatus: varchar("approval_status", { length: 20 }).default("NOT_STARTED"), // NOT_STARTED, IN_PROGRESS, APPROVED, REJECTED
   finalApprovedAt: timestamp("final_approved_at"),
   finalApprovedBy: uuid("final_approved_by").references(() => users.id),
+  // ATS: offre d'emploi liée + scoring
+  jobOfferId: integer("job_offer_id"),                                      // FK logique vers job_offers (défini plus bas)
+  scoreGlobal: integer("score_global"),                                     // Score global 0-100
+  scoreCompetences: integer("score_competences"),                           // Sous-score compétences
+  scoreQualification: integer("score_qualification"),                       // Sous-score qualification
+  scoreExperience: integer("score_experience"),                             // Sous-score expérience
+  source: varchar("source", { length: 20 }).default("MANUAL"),             // MANUAL, INTERNAL_PORTAL
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -1390,3 +1398,184 @@ export const insertHrDocumentRequestSchema = createInsertSchema(hrDocumentReques
 });
 export type InsertHrDocumentRequest = z.infer<typeof insertHrDocumentRequestSchema>;
 export type HrDocumentRequest = typeof hrDocumentRequests.$inferSelect;
+
+// =============================================================================
+// OFFRES D'EMPLOI / ATS
+// =============================================================================
+
+export const JobOfferStatus = {
+  DRAFT: 'DRAFT',
+  PUBLISHED: 'PUBLISHED',
+  CLOSED: 'CLOSED',
+  ARCHIVED: 'ARCHIVED',
+} as const;
+export type JobOfferStatusType = typeof JobOfferStatus[keyof typeof JobOfferStatus];
+
+export const JobOfferVisibility = {
+  INTERNAL: 'INTERNAL',
+  EXTERNAL: 'EXTERNAL',
+  BOTH: 'BOTH',
+} as const;
+export type JobOfferVisibilityType = typeof JobOfferVisibility[keyof typeof JobOfferVisibility];
+
+export const CandidatureSource = {
+  MANUAL: 'MANUAL',
+  INTERNAL_PORTAL: 'INTERNAL_PORTAL',
+} as const;
+
+export const jobOffers = pgTable("job_offers", {
+  id: serial("id").primaryKey(),
+  jobPositionId: uuid("job_position_id").notNull().references(() => jobPositions.id, { onDelete: "restrict" }),
+  titre: varchar("titre", { length: 200 }).notNull(),
+  description: text("description"),
+  competencesRequises: json("competences_requises").$type<string[]>(),
+  qualificationMinimum: varchar("qualification_minimum", { length: 50 }),
+  experienceMinAnnees: integer("experience_min_annees").default(0),
+  formationRequise: text("formation_requise"),
+  salairePropose: varchar("salaire_propose", { length: 100 }),
+  typeContrat: varchar("type_contrat", { length: 20 }),
+  lieu: varchar("lieu", { length: 200 }),
+  visibilite: varchar("visibilite", { length: 20 }).notNull().default("BOTH"),
+  statut: varchar("statut", { length: 20 }).notNull().default("DRAFT"),
+  datePublication: timestamp("date_publication"),
+  dateLimite: date("date_limite"),
+  poidsCompetences: integer("poids_competences").default(40),
+  poidsQualification: integer("poids_qualification").default(30),
+  poidsExperience: integer("poids_experience").default(30),
+  postesOuverts: integer("postes_ouverts").default(1),
+  createdBy: uuid("created_by").references(() => users.id),
+  agenceId: uuid("agence_id").references(() => agences.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => ({
+  idxStatut: index("idx_job_offers_statut").on(t.statut),
+  idxJobPositionId: index("idx_job_offers_position").on(t.jobPositionId),
+}));
+
+export const insertJobOfferSchema = createInsertSchema(jobOffers).omit({
+  id: true, createdAt: true, updatedAt: true, datePublication: true,
+});
+export type InsertJobOffer = z.infer<typeof insertJobOfferSchema>;
+export type JobOffer = typeof jobOffers.$inferSelect;
+
+// =============================================================================
+// BATCH PAYMENT TRACKING
+// =============================================================================
+
+export const PaymentBatchStatus = {
+  GENERATED: 'GENERATED',
+  SENT_TO_BANK: 'SENT_TO_BANK',
+  CONFIRMED: 'CONFIRMED',
+  REJECTED: 'REJECTED',
+} as const;
+export type PaymentBatchStatusType = typeof PaymentBatchStatus[keyof typeof PaymentBatchStatus];
+
+export const BatchItemStatus = {
+  PENDING: 'PENDING',
+  PAID: 'PAID',
+  FAILED: 'FAILED',
+} as const;
+
+export const payrollPaymentBatches = pgTable("payroll_payment_batches", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  payrollRunId: integer("payroll_run_id").notNull().references(() => payrollRuns.id, { onDelete: "cascade" }),
+  transferFileId: uuid("transfer_file_id").references(() => payrollTransferFiles.id, { onDelete: "set null" }),
+  bankName: varchar("bank_name", { length: 100 }).notNull(),
+  statut: varchar("statut", { length: 20 }).notNull().default("GENERATED"),
+  employeeCount: integer("employee_count").notNull(),
+  totalAmount: numeric("total_amount", { precision: 14, scale: 0 }).notNull(),
+  sentAt: timestamp("sent_at"),
+  sentBy: uuid("sent_by").references(() => users.id, { onDelete: "set null" }),
+  confirmedAt: timestamp("confirmed_at"),
+  confirmedBy: uuid("confirmed_by").references(() => users.id, { onDelete: "set null" }),
+  referenceExterne: varchar("reference_externe", { length: 100 }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  idxRunId: index("idx_payment_batches_run").on(t.payrollRunId),
+  idxStatut: index("idx_payment_batches_statut").on(t.statut),
+}));
+
+export const insertPayrollPaymentBatchSchema = createInsertSchema(payrollPaymentBatches).omit({ id: true, createdAt: true });
+export type PayrollPaymentBatch = typeof payrollPaymentBatches.$inferSelect;
+export type InsertPayrollPaymentBatch = z.infer<typeof insertPayrollPaymentBatchSchema>;
+
+export const payrollBatchItems = pgTable("payroll_batch_items", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  batchId: uuid("batch_id").notNull().references(() => payrollPaymentBatches.id, { onDelete: "cascade" }),
+  employeId: uuid("employe_id").notNull().references(() => employes.id, { onDelete: "cascade" }),
+  employeNom: varchar("employe_nom", { length: 255 }).notNull(),
+  bankCode: varchar("bank_code", { length: 10 }),
+  branchCode: varchar("branch_code", { length: 10 }),
+  accountNumber: varchar("account_number", { length: 30 }),
+  accountKey: varchar("account_key", { length: 5 }),
+  montantNet: integer("montant_net").notNull(),
+  statut: varchar("statut", { length: 20 }).notNull().default("PENDING"),
+  paidAt: timestamp("paid_at"),
+  failureReason: text("failure_reason"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPayrollBatchItemSchema = createInsertSchema(payrollBatchItems).omit({ id: true, createdAt: true });
+export type PayrollBatchItem = typeof payrollBatchItems.$inferSelect;
+export type InsertPayrollBatchItem = z.infer<typeof insertPayrollBatchItemSchema>;
+
+// =============================================================================
+// RAPPROCHEMENT BANCAIRE
+// =============================================================================
+
+export const ReconciliationStatus = {
+  DRAFT: 'DRAFT',
+  IN_PROGRESS: 'IN_PROGRESS',
+  COMPLETED: 'COMPLETED',
+} as const;
+
+export const ReconciliationMatchStatus = {
+  MATCHED: 'MATCHED',
+  UNMATCHED: 'UNMATCHED',
+  IGNORED: 'IGNORED',
+  DISCREPANCY: 'DISCREPANCY',
+} as const;
+
+export const bankReconciliationSessions = pgTable("bank_reconciliation_sessions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  period: varchar("period", { length: 7 }).notNull(),
+  bankName: varchar("bank_name", { length: 100 }).notNull(),
+  statut: varchar("statut", { length: 20 }).notNull().default("DRAFT"),
+  totalExpected: numeric("total_expected", { precision: 14, scale: 0 }).default("0"),
+  totalMatched: numeric("total_matched", { precision: 14, scale: 0 }).default("0"),
+  totalUnmatched: numeric("total_unmatched", { precision: 14, scale: 0 }).default("0"),
+  matchedCount: integer("matched_count").default(0),
+  unmatchedCount: integer("unmatched_count").default(0),
+  importFileName: text("import_file_name"),
+  completedAt: timestamp("completed_at"),
+  completedBy: uuid("completed_by").references(() => users.id, { onDelete: "set null" }),
+  createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  idxPeriod: index("idx_reconciliation_period").on(t.period),
+}));
+
+export const insertBankReconciliationSessionSchema = createInsertSchema(bankReconciliationSessions).omit({ id: true, createdAt: true });
+export type BankReconciliationSession = typeof bankReconciliationSessions.$inferSelect;
+export type InsertBankReconciliationSession = z.infer<typeof insertBankReconciliationSessionSchema>;
+
+export const bankReconciliationLines = pgTable("bank_reconciliation_lines", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  sessionId: uuid("session_id").notNull().references(() => bankReconciliationSessions.id, { onDelete: "cascade" }),
+  source: varchar("source", { length: 10 }).notNull(),                       // TRANSFER, BANK
+  reference: text("reference"),
+  employeNom: varchar("employe_nom", { length: 255 }),
+  montant: integer("montant").notNull(),
+  dateValeur: date("date_valeur"),
+  batchItemId: uuid("batch_item_id").references(() => payrollBatchItems.id, { onDelete: "set null" }),
+  matchStatus: varchar("match_status", { length: 20 }).notNull().default("UNMATCHED"),
+  matchedWithId: uuid("matched_with_id"),
+  ecart: integer("ecart").default(0),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertBankReconciliationLineSchema = createInsertSchema(bankReconciliationLines).omit({ id: true, createdAt: true });
+export type BankReconciliationLine = typeof bankReconciliationLines.$inferSelect;
+export type InsertBankReconciliationLine = z.infer<typeof insertBankReconciliationLineSchema>;

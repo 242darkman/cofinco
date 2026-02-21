@@ -14,6 +14,8 @@ import SalaryAdvances from './SalaryAdvances';
 import PayrollConfigPanel from './PayrollConfigPanel';
 import { PayslipViewer } from './PayslipViewer';
 import TransferFileModal from './TransferFileModal';
+import PaymentBatchManager from './PaymentBatchManager';
+import BankReconciliationPanel from './BankReconciliationPanel';
 import { formatMoney } from '../../lib/format';
 
 // Status badge config
@@ -198,10 +200,14 @@ export default function PaieManager() {
     ) : null },
   ];
 
+  // Virements tab state
+  const [virementsRunId, setVirementsRunId] = useState<number | null>(null);
+
   const tabs = [
     { key: 'my', label: 'Mes Bulletins', icon: FileText },
     ...(isRH ? [
       { key: 'generate', label: 'Gestion Paie', icon: Calculator },
+      { key: 'virements', label: 'Virements', icon: CreditCard },
       { key: 'avances', label: 'Avances', icon: Banknote },
       { key: 'config', label: 'Configuration', icon: Settings },
     ] : [])
@@ -401,6 +407,48 @@ export default function PaieManager() {
       {activeTab === 'config' && isRH ? (
         <div className="flex-1 min-h-0 bg-surface-base border border-edge rounded-lg overflow-y-auto">
           <PayrollConfigPanel />
+        </div>
+      ) : activeTab === 'virements' && isRH ? (
+        <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pl-1 pr-2 pb-2">
+          {/* Run selector for batch management */}
+          <Card padding="sm" className="bg-surface/80 border-edge">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+              <div className="flex-1">
+                <h3 className="text-sm font-bold text-content-primary flex items-center gap-2">
+                  <CreditCard size={16} className="text-accent" />
+                  Gestion des Virements
+                </h3>
+                <p className="text-xs text-content-muted mt-0.5">
+                  Suivi des lots de paiement et rapprochement bancaire
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-content-muted">Run de paie:</label>
+                <select
+                  value={virementsRunId ?? ''}
+                  onChange={(e) => setVirementsRunId(e.target.value ? Number(e.target.value) : null)}
+                  className="px-3 py-1.5 bg-input border border-input-border rounded-lg text-sm text-content-primary focus:border-input-focus outline-none"
+                >
+                  <option value="">Sélectionner un run</option>
+                  {(runs as PayrollRun[])
+                    .filter(r => ['VALIDATED', 'PAID', 'CLOSED'].includes(r.status))
+                    .sort((a, b) => b.period.localeCompare(a.period) || b.version - a.version)
+                    .map(r => (
+                      <option key={r.id} value={r.id}>
+                        {r.period} v{r.version} — {formatMoney(r.totalNet)} ({RUN_STATUS_CONFIG[r.status]?.label || r.status})
+                      </option>
+                    ))
+                  }
+                </select>
+              </div>
+            </div>
+          </Card>
+
+          {virementsRunId && (
+            <PaymentBatchManager runId={virementsRunId} />
+          )}
+
+          <BankReconciliationPanel />
         </div>
       ) : activeTab === 'avances' && isRH ? (
         <div className="flex-1 min-h-0 bg-surface-base border border-edge rounded-lg flex flex-col overflow-hidden">

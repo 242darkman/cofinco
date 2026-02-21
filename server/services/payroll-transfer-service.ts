@@ -234,3 +234,154 @@ function validateBankDetails(emp: {
 function formatAmount(amount: number): string {
   return new Intl.NumberFormat("fr-FR").format(amount);
 }
+
+/**
+ * Génère le fichier de virement au format XLSX (Excel)
+ */
+export async function generateTransferXlsx(
+  runId: number,
+  userId: string
+): Promise<{ fileId: string; xlsxBuffer: Buffer; bordereauContent: string; warnings: string[] }> {
+  const preview = await getTransferPreview(runId);
+  const warnings: string[] = [];
+
+  if (preview.valid.length === 0) {
+    throw new Error("Aucun employé avec des coordonnées bancaires complètes pour ce run");
+  }
+
+  if (preview.invalid.length > 0) {
+    warnings.push(
+      `${preview.invalid.length} employé(s) exclu(s) : coordonnées bancaires incomplètes`
+    );
+  }
+
+  const [run] = await db.select().from(payrollRuns).where(eq(payrollRuns.id, runId));
+
+  // Build XLSX using xlsx library
+  const XLSX = await import("xlsx");
+
+  const headers = ["Employé", "Banque", "Code Banque", "Code Guichet", "N° Compte", "Clé RIB", "Montant Net (FCFA)", "Référence"];
+  const rows = preview.valid.map(e => [
+    e.employeNom,
+    e.bankName,
+    e.bankCode,
+    e.branchCode,
+    e.accountNumber,
+    e.accountKey,
+    e.montantNet,
+    e.reference,
+  ]);
+
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+
+  // Set column widths
+  ws["!cols"] = [
+    { wch: 30 }, // Employé
+    { wch: 20 }, // Banque
+    { wch: 12 }, // Code Banque
+    { wch: 12 }, // Code Guichet
+    { wch: 18 }, // N° Compte
+    { wch: 8 },  // Clé RIB
+    { wch: 15 }, // Montant
+    { wch: 35 }, // Référence
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Virements");
+  const xlsxBuffer = Buffer.from(XLSX.write(wb, { type: "buffer", bookType: "xlsx" }));
+
+  // Bordereau
+  const bordereauContent = buildBordereau(run!.period, preview.valid, preview.totalAmount);
+
+  // Save record
+  const fileName = `virement_paie_${run!.period}_${Date.now()}.xlsx`;
+  const [file] = await db
+    .insert(payrollTransferFiles)
+    .values({
+      payrollRunId: runId,
+      fileName,
+      storageKey: `transfers/${runId}/${fileName}`,
+      format: "XLSX",
+      employeeCount: preview.employeeCount,
+      totalAmount: preview.totalAmount.toString(),
+      generatedBy: userId,
+    })
+    .returning();
+
+  logger.info(
+    { runId, fileId: file.id, employees: preview.employeeCount, total: preview.totalAmount, format: "XLSX" },
+    "Fichier de virement XLSX généré"
+  );
+
+  return { fileId: file.id, xlsxBuffer, bordereauContent, warnings };
+}
+
+/**
+ * Crée des batches de paiement groupés par banque à partir d'un run de paie
+ */
+export async function createPaymentBatches(
+  runId: number,
+  transferFileId: string | null,
+  userId: string
+): Promise<{ batchCount: number; totalAmount: number }> {
+  const preview = await getTransferPreview(runId);
+
+  if (preview.valid.length === 0) {
+    throw new Error("Aucun employé éligible au virement pour ce run");
+  }
+
+  // Group by bank
+  const byBank = new Map<string, TransferEntry[]>();
+  for (const entry of preview.valid) {
+    const existing = byBank.get(entry.bankName) || [];
+    existing.push(entry);
+    byBank.set(entry.bankName, existing);
+  }
+
+  const { payrollPaymentBatches, payrollBatchItems } = await import("@shared/schema");
+
+  let totalAmount = 0;
+  let batchCount = 0;
+
+  for (const [bankName, entries] of byBank) {
+    const bankTotal = entries.reduce((sum, e) => sum + e.montantNet, 0);
+    totalAmount += bankTotal;
+
+    // Create batch
+    const [batch] = await db
+      .insert(payrollPaymentBatches)
+      .values({
+        payrollRunId: runId,
+        transferFileId: transferFileId || undefined,
+        bankName,
+        statut: "GENERATED",
+        employeeCount: entries.length,
+        totalAmount: bankTotal.toString(),
+      })
+      .returning();
+
+    // Create batch items
+    await db.insert(payrollBatchItems).values(
+      entries.map(e => ({
+        batchId: batch.id,
+        employeId: e.employeId,
+        employeNom: e.employeNom,
+        bankCode: e.bankCode,
+        branchCode: e.branchCode,
+        accountNumber: e.accountNumber,
+        accountKey: e.accountKey,
+        montantNet: e.montantNet,
+        statut: "PENDING",
+      }))
+    );
+
+    batchCount++;
+  }
+
+  logger.info(
+    { runId, batchCount, totalAmount },
+    "Payment batches créés"
+  );
+
+  return { batchCount, totalAmount };
+}

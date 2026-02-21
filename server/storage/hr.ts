@@ -1,4 +1,4 @@
-import { eq, desc, and, sql, gte, lte, not, inArray, between, count, sum } from "drizzle-orm";
+import { eq, desc, and, sql, gte, lte, not, inArray, between, count, sum, asc, or } from "drizzle-orm";
 import { db } from "../db";
 import {
   demandesConges,
@@ -14,6 +14,8 @@ import {
   formationParticipants,
   hrAlertConfig, hrAlerts, payrollTransferFiles,
   hrDocumentRequests,
+  jobOffers, payrollPaymentBatches, payrollBatchItems,
+  bankReconciliationSessions, bankReconciliationLines,
   type EvaluationTemplate, type InsertEvaluationTemplate,
   type EvaluationCriteria as EvalCriteria, type InsertEvaluationCriteria,
   type EvaluationCampaign, type InsertEvaluationCampaign,
@@ -923,4 +925,185 @@ export async function updateDocumentRequest(id: string, data: Partial<HrDocument
     .where(eq(hrDocumentRequests.id, id))
     .returning();
   return result;
+}
+
+// =============================================================================
+// JOB OFFERS
+// =============================================================================
+
+export async function getJobOffers(filter?: { statut?: string; visibilite?: string }) {
+  let query = db.select({
+    offer: jobOffers,
+    positionName: jobPositions.nom,
+    positionCode: jobPositions.code,
+    departmentName: departments.nom,
+    departmentId: departments.id,
+  })
+    .from(jobOffers)
+    .innerJoin(jobPositions, eq(jobOffers.jobPositionId, jobPositions.id))
+    .innerJoin(departments, eq(jobPositions.departmentId, departments.id))
+    .orderBy(desc(jobOffers.createdAt))
+    .$dynamic();
+
+  const conditions = [];
+  if (filter?.statut) conditions.push(eq(jobOffers.statut, filter.statut));
+  if (filter?.visibilite) conditions.push(eq(jobOffers.visibilite, filter.visibilite));
+  if (conditions.length > 0) query = query.where(and(...conditions));
+
+  const results = await query;
+
+  // Get candidature counts per offer
+  const counts = await db.select({
+    jobOfferId: candidatures.jobOfferId,
+    count: count(),
+  })
+    .from(candidatures)
+    .where(sql`${candidatures.jobOfferId} IS NOT NULL`)
+    .groupBy(candidatures.jobOfferId);
+
+  const countMap = new Map(counts.map(c => [c.jobOfferId, Number(c.count)]));
+
+  return results.map(r => ({
+    ...r.offer,
+    positionName: r.positionName,
+    positionCode: r.positionCode,
+    departmentName: r.departmentName,
+    departmentId: r.departmentId,
+    candidatureCount: countMap.get(r.offer.id) || 0,
+  }));
+}
+
+export async function getJobOfferById(id: number) {
+  const [result] = await db.select({
+    offer: jobOffers,
+    positionName: jobPositions.nom,
+    positionCode: jobPositions.code,
+    departmentName: departments.nom,
+    departmentId: departments.id,
+  })
+    .from(jobOffers)
+    .innerJoin(jobPositions, eq(jobOffers.jobPositionId, jobPositions.id))
+    .innerJoin(departments, eq(jobPositions.departmentId, departments.id))
+    .where(eq(jobOffers.id, id));
+
+  if (!result) return null;
+
+  const [countResult] = await db.select({ count: count() })
+    .from(candidatures)
+    .where(eq(candidatures.jobOfferId, id));
+
+  return {
+    ...result.offer,
+    positionName: result.positionName,
+    positionCode: result.positionCode,
+    departmentName: result.departmentName,
+    departmentId: result.departmentId,
+    candidatureCount: Number(countResult?.count || 0),
+  };
+}
+
+export async function getJobOfferCandidatures(offerId: number) {
+  return db.select()
+    .from(candidatures)
+    .where(eq(candidatures.jobOfferId, offerId))
+    .orderBy(desc(candidatures.scoreGlobal));
+}
+
+export async function getInternalJobOffers() {
+  return db.select({
+    offer: jobOffers,
+    positionName: jobPositions.nom,
+    departmentName: departments.nom,
+  })
+    .from(jobOffers)
+    .innerJoin(jobPositions, eq(jobOffers.jobPositionId, jobPositions.id))
+    .innerJoin(departments, eq(jobPositions.departmentId, departments.id))
+    .where(
+      and(
+        eq(jobOffers.statut, 'PUBLISHED'),
+        or(eq(jobOffers.visibilite, 'INTERNAL'), eq(jobOffers.visibilite, 'BOTH'))
+      )
+    )
+    .orderBy(desc(jobOffers.datePublication));
+}
+
+// =============================================================================
+// PAYMENT BATCHES
+// =============================================================================
+
+export async function getPaymentBatches(runId: number) {
+  return db.select()
+    .from(payrollPaymentBatches)
+    .where(eq(payrollPaymentBatches.payrollRunId, runId))
+    .orderBy(asc(payrollPaymentBatches.bankName));
+}
+
+export async function getPaymentBatchById(batchId: string) {
+  const [batch] = await db.select()
+    .from(payrollPaymentBatches)
+    .where(eq(payrollPaymentBatches.id, batchId));
+  if (!batch) return null;
+
+  const items = await db.select()
+    .from(payrollBatchItems)
+    .where(eq(payrollBatchItems.batchId, batchId))
+    .orderBy(asc(payrollBatchItems.employeNom));
+
+  return { ...batch, items };
+}
+
+// =============================================================================
+// BANK RECONCILIATION
+// =============================================================================
+
+export async function getReconciliationSessions(filter?: { period?: string; bankName?: string }) {
+  let query = db.select()
+    .from(bankReconciliationSessions)
+    .orderBy(desc(bankReconciliationSessions.createdAt))
+    .$dynamic();
+
+  const conditions = [];
+  if (filter?.period) conditions.push(eq(bankReconciliationSessions.period, filter.period));
+  if (filter?.bankName) conditions.push(eq(bankReconciliationSessions.bankName, filter.bankName));
+  if (conditions.length > 0) query = query.where(and(...conditions));
+
+  return query;
+}
+
+export async function getReconciliationSessionById(sessionId: string) {
+  const [session] = await db.select()
+    .from(bankReconciliationSessions)
+    .where(eq(bankReconciliationSessions.id, sessionId));
+  if (!session) return null;
+
+  const lines = await db.select()
+    .from(bankReconciliationLines)
+    .where(eq(bankReconciliationLines.sessionId, sessionId))
+    .orderBy(asc(bankReconciliationLines.source), desc(bankReconciliationLines.montant));
+
+  return { ...session, lines };
+}
+
+export async function updateReconciliationSessionStats(sessionId: string) {
+  const lines = await db.select()
+    .from(bankReconciliationLines)
+    .where(eq(bankReconciliationLines.sessionId, sessionId));
+
+  const transferLines = lines.filter(l => l.source === 'TRANSFER');
+  const matchedLines = lines.filter(l => l.matchStatus === 'MATCHED');
+  const unmatchedLines = lines.filter(l => l.matchStatus === 'UNMATCHED');
+
+  const totalExpected = transferLines.reduce((s, l) => s + l.montant, 0);
+  const totalMatched = matchedLines.reduce((s, l) => s + l.montant, 0);
+  const totalUnmatched = unmatchedLines.reduce((s, l) => s + l.montant, 0);
+
+  await db.update(bankReconciliationSessions)
+    .set({
+      totalExpected: totalExpected.toString(),
+      totalMatched: totalMatched.toString(),
+      totalUnmatched: totalUnmatched.toString(),
+      matchedCount: matchedLines.length,
+      unmatchedCount: unmatchedLines.length,
+    })
+    .where(eq(bankReconciliationSessions.id, sessionId));
 }

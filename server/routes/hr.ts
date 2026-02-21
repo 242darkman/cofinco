@@ -56,6 +56,12 @@ import {
   hrDocumentRequests,
   insertHrDocumentRequestSchema,
   HrDocumentRequestStatus,
+  jobOffers,
+  JobOfferStatus,
+  payrollPaymentBatches,
+  payrollBatchItems,
+  bankReconciliationSessions,
+  bankReconciliationLines,
 } from "@shared/schema";
 import { agentsTerrain, agentPlannings } from "@shared/schema";
 import { systemSettings } from "@shared/schema/settings";
@@ -84,8 +90,9 @@ import multer from "multer";
 import { importEmployees, parseCsv } from "../services/hr-import-service";
 import { StorageService } from "../services/storage-service";
 import { generateCampaignEvaluations, computeEvaluationScore, finalizeEvaluation } from "../services/evaluation-service";
-import { getTransferPreview, generateTransferFile } from "../services/payroll-transfer-service";
+import { getTransferPreview, generateTransferFile, generateTransferXlsx, createPaymentBatches } from "../services/payroll-transfer-service";
 import * as hrStorage from "../storage/hr";
+import { scoreCandidature, scoreAllCandidatures } from "../services/candidature-scoring-service";
 
 const csvUpload = multer({
   storage: multer.memoryStorage(),
@@ -109,6 +116,18 @@ const docUpload = multer({
       cb(null, true);
     } else {
       cb(new Error("Type de fichier non supporté (PDF, JPG, PNG, DOC acceptés)"));
+    }
+  },
+});
+
+const bankStatementUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype === "text/csv" || file.originalname.endsWith(".csv") || file.originalname.endsWith(".txt")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Seuls les fichiers CSV/TXT sont acceptés"));
     }
   },
 });
@@ -2001,8 +2020,15 @@ hrRouter.post("/candidatures", getAuthUser, async (req, res) => {
       posteVise,
       experience,
       formation: formationCand,
-      statut: StatutCandidature.PENDING
+      statut: StatutCandidature.PENDING,
+      jobOfferId: req.body.jobOfferId || null,
+      source: req.body.source || 'MANUAL',
     }).returning();
+
+    // Auto-score if linked to an offer
+    if (newCandidature.jobOfferId) {
+        await scoreCandidature(newCandidature.id);
+    }
 
     // Broadcast HR Update
     const wsInstance = getWsInstance();
@@ -5634,6 +5660,650 @@ hrRouter.get("/document-requests/:id/download", getAuthUser, async (req, res) =>
         res.redirect(request.documentUrl);
     } catch (error) {
         logger.error({ err: error }, "Erreur téléchargement document");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// =============================================================================
+// JOB OFFERS / ATS
+// =============================================================================
+
+// GET /api/hr/job-offers - Liste des offres
+hrRouter.get("/job-offers", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const filter: { statut?: string; visibilite?: string } = {};
+        if (req.query.statut) filter.statut = req.query.statut as string;
+        if (req.query.visibilite) filter.visibilite = req.query.visibilite as string;
+        const offers = await hrStorage.getJobOffers(filter);
+        res.json(offers);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur récupération offres d'emploi");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// POST /api/hr/job-offers - Créer une offre
+hrRouter.post("/job-offers", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const user = (req as any).user;
+
+        const { jobPositionId, titre, description, competencesRequises, qualificationMinimum,
+            experienceMinAnnees, formationRequise, salairePropose, typeContrat, lieu,
+            visibilite, dateLimite, poidsCompetences, poidsQualification, poidsExperience,
+            postesOuverts } = req.body;
+
+        if (!jobPositionId || !titre) {
+            return res.status(400).json({ error: "jobPositionId et titre sont requis" });
+        }
+
+        const [offer] = await db.insert(jobOffers).values({
+            jobPositionId,
+            titre,
+            description: description || null,
+            competencesRequises: competencesRequises || null,
+            qualificationMinimum: qualificationMinimum || null,
+            experienceMinAnnees: experienceMinAnnees || 0,
+            formationRequise: formationRequise || null,
+            salairePropose: salairePropose || null,
+            typeContrat: typeContrat || null,
+            lieu: lieu || null,
+            visibilite: visibilite || 'BOTH',
+            statut: 'DRAFT',
+            dateLimite: dateLimite || null,
+            poidsCompetences: poidsCompetences || 40,
+            poidsQualification: poidsQualification || 30,
+            poidsExperience: poidsExperience || 30,
+            postesOuverts: postesOuverts || 1,
+            createdBy: user.id,
+            agenceId: user.agenceId || null,
+        }).returning();
+
+        const wsInstance = getWsInstance();
+        if (wsInstance) {
+            wsInstance.broadcast({ type: "HR_UPDATE", payload: { type: 'job_offer_created', id: offer.id } });
+        }
+
+        res.status(201).json(offer);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur création offre d'emploi");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// GET /api/hr/job-offers/internal - Offres publiées visibles en interne
+hrRouter.get("/job-offers/internal", getAuthUser, async (req, res) => {
+    try {
+        const offers = await hrStorage.getInternalJobOffers();
+        res.json(offers);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur récupération offres internes");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// GET /api/hr/job-offers/:id - Détail d'une offre
+hrRouter.get("/job-offers/:id", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const offer = await hrStorage.getJobOfferById(parseInt(req.params.id));
+        if (!offer) return res.status(404).json({ error: "Offre introuvable" });
+        res.json(offer);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur récupération offre d'emploi");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// PATCH /api/hr/job-offers/:id - Modifier une offre
+hrRouter.patch("/job-offers/:id", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+
+        const id = parseInt(req.params.id);
+        const updateData: any = {};
+        const allowedFields = ['titre', 'description', 'competencesRequises', 'qualificationMinimum',
+            'experienceMinAnnees', 'formationRequise', 'salairePropose', 'typeContrat', 'lieu',
+            'visibilite', 'dateLimite', 'poidsCompetences', 'poidsQualification', 'poidsExperience',
+            'postesOuverts', 'jobPositionId'];
+
+        for (const field of allowedFields) {
+            if (req.body[field] !== undefined) updateData[field] = req.body[field];
+        }
+        updateData.updatedAt = new Date();
+
+        const [updated] = await db.update(jobOffers)
+            .set(updateData)
+            .where(eq(jobOffers.id, id))
+            .returning();
+
+        if (!updated) return res.status(404).json({ error: "Offre introuvable" });
+        res.json(updated);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur modification offre d'emploi");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// POST /api/hr/job-offers/:id/publish - Publier une offre
+hrRouter.post("/job-offers/:id/publish", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+
+        const id = parseInt(req.params.id);
+        const [updated] = await db.update(jobOffers)
+            .set({ statut: 'PUBLISHED', datePublication: new Date(), updatedAt: new Date() })
+            .where(eq(jobOffers.id, id))
+            .returning();
+
+        if (!updated) return res.status(404).json({ error: "Offre introuvable" });
+
+        const wsInstance = getWsInstance();
+        if (wsInstance) {
+            wsInstance.broadcast({ type: "HR_UPDATE", payload: { type: 'job_offer_published', id: updated.id } });
+        }
+
+        res.json(updated);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur publication offre d'emploi");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// POST /api/hr/job-offers/:id/close - Fermer une offre
+hrRouter.post("/job-offers/:id/close", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+
+        const id = parseInt(req.params.id);
+        const [updated] = await db.update(jobOffers)
+            .set({ statut: 'CLOSED', updatedAt: new Date() })
+            .where(eq(jobOffers.id, id))
+            .returning();
+
+        if (!updated) return res.status(404).json({ error: "Offre introuvable" });
+        res.json(updated);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur fermeture offre d'emploi");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// GET /api/hr/job-offers/:id/candidatures - Candidatures d'une offre (triées par score)
+hrRouter.get("/job-offers/:id/candidatures", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const candidaturesList = await hrStorage.getJobOfferCandidatures(parseInt(req.params.id));
+        res.json(candidaturesList);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur récupération candidatures de l'offre");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// POST /api/hr/job-offers/:id/score-all - Re-scorer toutes les candidatures d'une offre
+hrRouter.post("/job-offers/:id/score-all", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const scored = await scoreAllCandidatures(parseInt(req.params.id));
+        res.json({ scored, message: `${scored} candidature(s) scorée(s)` });
+    } catch (error) {
+        logger.error({ err: error }, "Erreur scoring candidatures");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// POST /api/hr/job-offers/:id/apply-internal - Postuler en interne
+hrRouter.post("/job-offers/:id/apply-internal", getAuthUser, async (req, res) => {
+    try {
+        const user = (req as any).user;
+        const offerId = parseInt(req.params.id);
+
+        // Vérifier que l'offre existe et est publiée
+        const [offer] = await db.select().from(jobOffers).where(eq(jobOffers.id, offerId));
+        if (!offer || offer.statut !== 'PUBLISHED') {
+            return res.status(400).json({ error: "Offre non disponible" });
+        }
+
+        // Vérifier visibilité interne
+        if (offer.visibilite === 'EXTERNAL') {
+            return res.status(403).json({ error: "Cette offre n'est pas ouverte aux candidatures internes" });
+        }
+
+        // Récupérer profil employé
+        const [emp] = await db.select().from(employes).where(eq(employes.userId, user.id));
+        if (!emp) {
+            return res.status(400).json({ error: "Aucun profil employé associé" });
+        }
+
+        // Vérifier pas déjà candidaté
+        const [existing] = await db.select().from(candidatures)
+            .where(and(eq(candidatures.jobOfferId, offerId), eq(candidatures.email, user.email || '')));
+        if (existing) {
+            return res.status(400).json({ error: "Vous avez déjà postulé à cette offre" });
+        }
+
+        // Créer candidature auto-remplie
+        const [newCandidature] = await db.insert(candidatures).values({
+            nom: user.nom || '',
+            prenom: user.prenom || '',
+            email: user.email || '',
+            telephone: emp.phone || undefined,
+            posteVise: offer.titre,
+            experience: req.body.experience || null,
+            formation: req.body.formation || null,
+            datePostulation: new Date().toISOString().split('T')[0],
+            statut: 'NEW',
+            jobOfferId: offerId,
+            source: 'INTERNAL_PORTAL',
+        }).returning();
+
+        // Auto-score
+        await scoreCandidature(newCandidature.id);
+
+        const wsInstance = getWsInstance();
+        if (wsInstance) {
+            wsInstance.broadcast({ type: "HR_UPDATE", payload: { type: 'candidature_new', id: newCandidature.id } });
+        }
+
+        res.status(201).json(newCandidature);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur candidature interne");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// =============================================================================
+// PAYMENT BATCHES
+// =============================================================================
+
+// POST /api/hr/paie/runs/:runId/generate-transfer-xlsx - Générer XLSX
+hrRouter.post("/paie/runs/:runId/generate-transfer-xlsx", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const user = (req as any).user;
+        const result = await generateTransferXlsx(parseInt(req.params.runId), user.id);
+
+        // Send XLSX as downloadable file
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="virement_${req.params.runId}.xlsx"`);
+        res.send(result.xlsxBuffer);
+    } catch (error: any) {
+        logger.error({ err: error }, "Erreur génération fichier virement XLSX");
+        res.status(400).json({ error: error.message || "Erreur lors de la génération" });
+    }
+});
+
+// POST /api/hr/paie/runs/:runId/create-batches - Créer batches (1 par banque)
+hrRouter.post("/paie/runs/:runId/create-batches", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const user = (req as any).user;
+        const transferFileId = req.body.transferFileId || null;
+        const result = await createPaymentBatches(parseInt(req.params.runId), transferFileId, user.id);
+        res.status(201).json(result);
+    } catch (error: any) {
+        logger.error({ err: error }, "Erreur création batches de paiement");
+        res.status(400).json({ error: error.message || "Erreur serveur" });
+    }
+});
+
+// GET /api/hr/paie/runs/:runId/batches - Liste batches d'un run
+hrRouter.get("/paie/runs/:runId/batches", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const batches = await hrStorage.getPaymentBatches(parseInt(req.params.runId));
+        res.json(batches);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur récupération batches");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// GET /api/hr/paie/batches/:id - Détail d'un batch
+hrRouter.get("/paie/batches/:id", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const batch = await hrStorage.getPaymentBatchById(req.params.id);
+        if (!batch) return res.status(404).json({ error: "Batch introuvable" });
+        res.json(batch);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur récupération batch");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// PATCH /api/hr/paie/batches/:id/status - Changer statut d'un batch
+hrRouter.patch("/paie/batches/:id/status", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const user = (req as any).user;
+        const { statut, referenceExterne, notes } = req.body;
+
+        if (!statut) return res.status(400).json({ error: "Le statut est requis" });
+
+        const updateData: any = { statut };
+        if (statut === 'SENT_TO_BANK') {
+            updateData.sentAt = new Date();
+            updateData.sentBy = user.id;
+        } else if (statut === 'CONFIRMED') {
+            updateData.confirmedAt = new Date();
+            updateData.confirmedBy = user.id;
+        }
+        if (referenceExterne !== undefined) updateData.referenceExterne = referenceExterne;
+        if (notes !== undefined) updateData.notes = notes;
+
+        const [updated] = await db.update(payrollPaymentBatches)
+            .set(updateData)
+            .where(eq(payrollPaymentBatches.id, req.params.id))
+            .returning();
+
+        if (!updated) return res.status(404).json({ error: "Batch introuvable" });
+
+        // If confirmed, mark all pending items as PAID
+        if (statut === 'CONFIRMED') {
+            await db.update(payrollBatchItems)
+                .set({ statut: 'PAID', paidAt: new Date() })
+                .where(and(
+                    eq(payrollBatchItems.batchId, req.params.id),
+                    eq(payrollBatchItems.statut, 'PENDING')
+                ));
+        }
+
+        res.json(updated);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur changement statut batch");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// PATCH /api/hr/paie/batches/:batchId/items/:itemId - Marquer un item paid/failed
+hrRouter.patch("/paie/batches/:batchId/items/:itemId", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const { statut, failureReason } = req.body;
+
+        const updateData: any = { statut };
+        if (statut === 'PAID') updateData.paidAt = new Date();
+        if (failureReason) updateData.failureReason = failureReason;
+
+        const [updated] = await db.update(payrollBatchItems)
+            .set(updateData)
+            .where(eq(payrollBatchItems.id, req.params.itemId))
+            .returning();
+
+        if (!updated) return res.status(404).json({ error: "Item introuvable" });
+        res.json(updated);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur mise à jour item batch");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// =============================================================================
+// BANK RECONCILIATION
+// =============================================================================
+
+// GET /api/hr/paie/reconciliation - Liste des sessions
+hrRouter.get("/paie/reconciliation", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const filter: { period?: string; bankName?: string } = {};
+        if (req.query.period) filter.period = req.query.period as string;
+        if (req.query.bankName) filter.bankName = req.query.bankName as string;
+        const sessions = await hrStorage.getReconciliationSessions(filter);
+        res.json(sessions);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur récupération sessions rapprochement");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// POST /api/hr/paie/reconciliation - Créer une session
+hrRouter.post("/paie/reconciliation", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const user = (req as any).user;
+        const { period, bankName } = req.body;
+
+        if (!period || !bankName) {
+            return res.status(400).json({ error: "period et bankName sont requis" });
+        }
+
+        const [session] = await db.insert(bankReconciliationSessions).values({
+            period,
+            bankName,
+            statut: 'DRAFT',
+            createdBy: user.id,
+        }).returning();
+
+        // Auto-populate with transfer lines from matching batches
+        const batches = await db.select()
+            .from(payrollPaymentBatches)
+            .innerJoin(payrollBatchItems, eq(payrollBatchItems.batchId, payrollPaymentBatches.id))
+            .where(and(
+                eq(payrollPaymentBatches.bankName, bankName),
+                sql`EXISTS (SELECT 1 FROM payroll_runs pr WHERE pr.id = ${payrollPaymentBatches.payrollRunId} AND pr.period = ${period})`
+            ));
+
+        if (batches.length > 0) {
+            await db.insert(bankReconciliationLines).values(
+                batches.map(b => ({
+                    sessionId: session.id,
+                    source: 'TRANSFER' as const,
+                    reference: `Virement paie ${period} - ${b.payroll_batch_items.employeNom}`,
+                    employeNom: b.payroll_batch_items.employeNom,
+                    montant: b.payroll_batch_items.montantNet,
+                    batchItemId: b.payroll_batch_items.id,
+                    matchStatus: 'UNMATCHED' as const,
+                }))
+            );
+        }
+
+        await hrStorage.updateReconciliationSessionStats(session.id);
+        const result = await hrStorage.getReconciliationSessionById(session.id);
+        res.status(201).json(result);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur création session rapprochement");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// GET /api/hr/paie/reconciliation/:id - Détail d'une session
+hrRouter.get("/paie/reconciliation/:id", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const session = await hrStorage.getReconciliationSessionById(req.params.id);
+        if (!session) return res.status(404).json({ error: "Session introuvable" });
+        res.json(session);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur récupération session rapprochement");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// POST /api/hr/paie/reconciliation/:id/import - Importer relevé bancaire CSV
+hrRouter.post("/paie/reconciliation/:id/import", getAuthUser, attachAbility, bankStatementUpload.single('file'), async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+
+        if (!req.file) return res.status(400).json({ error: "Fichier requis" });
+
+        const sessionId = req.params.id;
+        const [session] = await db.select().from(bankReconciliationSessions)
+            .where(eq(bankReconciliationSessions.id, sessionId));
+        if (!session) return res.status(404).json({ error: "Session introuvable" });
+
+        // Parse CSV - expect columns: reference/libelle, nom, montant, date_valeur
+        const content = req.file.buffer.toString('utf-8');
+        const lines = content.split('\n').filter(l => l.trim());
+
+        if (lines.length < 2) {
+            return res.status(400).json({ error: "Le fichier doit contenir au moins un en-tête et une ligne de données" });
+        }
+
+        const separator = lines[0].includes(';') ? ';' : ',';
+        const headers = lines[0].split(separator).map(h => h.trim().toLowerCase().replace(/"/g, ''));
+
+        // Find column indices
+        const refIdx = headers.findIndex(h => h.includes('reference') || h.includes('libelle') || h.includes('ref'));
+        const nameIdx = headers.findIndex(h => h.includes('nom') || h.includes('beneficiaire') || h.includes('name'));
+        const amountIdx = headers.findIndex(h => h.includes('montant') || h.includes('amount') || h.includes('debit'));
+        const dateIdx = headers.findIndex(h => h.includes('date') || h.includes('valeur'));
+
+        if (amountIdx === -1) {
+            return res.status(400).json({ error: "Colonne montant introuvable dans le fichier" });
+        }
+
+        const bankLines = [];
+        for (let i = 1; i < lines.length; i++) {
+            const cols = lines[i].split(separator).map(c => c.trim().replace(/"/g, ''));
+            const montant = Math.abs(parseInt(cols[amountIdx]?.replace(/[^\d-]/g, '') || '0'));
+            if (montant === 0) continue;
+
+            bankLines.push({
+                sessionId,
+                source: 'BANK' as const,
+                reference: refIdx >= 0 ? cols[refIdx] || null : null,
+                employeNom: nameIdx >= 0 ? cols[nameIdx] || null : null,
+                montant,
+                dateValeur: dateIdx >= 0 ? cols[dateIdx] || null : null,
+                matchStatus: 'UNMATCHED' as const,
+            });
+        }
+
+        if (bankLines.length === 0) {
+            return res.status(400).json({ error: "Aucune ligne valide trouvée dans le fichier" });
+        }
+
+        await db.insert(bankReconciliationLines).values(bankLines);
+
+        // Update session
+        await db.update(bankReconciliationSessions)
+            .set({ importFileName: req.file.originalname, statut: 'IN_PROGRESS' })
+            .where(eq(bankReconciliationSessions.id, sessionId));
+
+        await hrStorage.updateReconciliationSessionStats(sessionId);
+        const result = await hrStorage.getReconciliationSessionById(sessionId);
+        res.json(result);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur import relevé bancaire");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// POST /api/hr/paie/reconciliation/:id/auto-match - Lancer matching automatique
+hrRouter.post("/paie/reconciliation/:id/auto-match", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+
+        const sessionId = req.params.id;
+        const allLines = await db.select()
+            .from(bankReconciliationLines)
+            .where(eq(bankReconciliationLines.sessionId, sessionId));
+
+        const transferLines = allLines.filter(l => l.source === 'TRANSFER' && l.matchStatus === 'UNMATCHED');
+        const bankLines = allLines.filter(l => l.source === 'BANK' && l.matchStatus === 'UNMATCHED');
+
+        let matchCount = 0;
+
+        for (const tl of transferLines) {
+            // Try to find a matching bank line by amount + name similarity
+            const match = bankLines.find(bl => {
+                if (bl.matchStatus !== 'UNMATCHED') return false;
+                // Exact amount match
+                if (bl.montant !== tl.montant) return false;
+                // Name similarity (optional bonus, not required)
+                return true;
+            });
+
+            if (match) {
+                // Mark both as matched
+                await db.update(bankReconciliationLines)
+                    .set({ matchStatus: 'MATCHED', matchedWithId: match.id })
+                    .where(eq(bankReconciliationLines.id, tl.id));
+                await db.update(bankReconciliationLines)
+                    .set({ matchStatus: 'MATCHED', matchedWithId: tl.id })
+                    .where(eq(bankReconciliationLines.id, match.id));
+
+                // Remove from available pool
+                match.matchStatus = 'MATCHED' as any;
+                matchCount++;
+            }
+        }
+
+        await hrStorage.updateReconciliationSessionStats(sessionId);
+        const result = await hrStorage.getReconciliationSessionById(sessionId);
+        res.json({ matchCount, session: result });
+    } catch (error) {
+        logger.error({ err: error }, "Erreur matching automatique");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// PATCH /api/hr/paie/reconciliation/:id/lines/:lineId - Match/ignore/unmatch manuel
+hrRouter.patch("/paie/reconciliation/:id/lines/:lineId", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+
+        const { matchStatus, matchedWithId, notes } = req.body;
+        const updateData: any = {};
+
+        if (matchStatus) updateData.matchStatus = matchStatus;
+        if (matchedWithId !== undefined) updateData.matchedWithId = matchedWithId;
+        if (notes !== undefined) updateData.notes = notes;
+
+        // If matching, also update the other line
+        if (matchStatus === 'MATCHED' && matchedWithId) {
+            await db.update(bankReconciliationLines)
+                .set({ matchStatus: 'MATCHED', matchedWithId: req.params.lineId })
+                .where(eq(bankReconciliationLines.id, matchedWithId));
+        }
+
+        // If unmatching, also unmatch the other line
+        if (matchStatus === 'UNMATCHED') {
+            const [currentLine] = await db.select()
+                .from(bankReconciliationLines)
+                .where(eq(bankReconciliationLines.id, req.params.lineId));
+            if (currentLine?.matchedWithId) {
+                await db.update(bankReconciliationLines)
+                    .set({ matchStatus: 'UNMATCHED', matchedWithId: null })
+                    .where(eq(bankReconciliationLines.id, currentLine.matchedWithId));
+            }
+            updateData.matchedWithId = null;
+        }
+
+        const [updated] = await db.update(bankReconciliationLines)
+            .set(updateData)
+            .where(eq(bankReconciliationLines.id, req.params.lineId))
+            .returning();
+
+        if (!updated) return res.status(404).json({ error: "Ligne introuvable" });
+
+        await hrStorage.updateReconciliationSessionStats(req.params.id);
+        res.json(updated);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur modification ligne rapprochement");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// POST /api/hr/paie/reconciliation/:id/complete - Clôturer session
+hrRouter.post("/paie/reconciliation/:id/complete", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const user = (req as any).user;
+
+        const [updated] = await db.update(bankReconciliationSessions)
+            .set({ statut: 'COMPLETED', completedAt: new Date(), completedBy: user.id })
+            .where(eq(bankReconciliationSessions.id, req.params.id))
+            .returning();
+
+        if (!updated) return res.status(404).json({ error: "Session introuvable" });
+        res.json(updated);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur clôture session rapprochement");
         res.status(500).json({ error: "Erreur serveur" });
     }
 });
