@@ -1490,6 +1490,18 @@ export const tontineApi = {
     }),
   getTurnAudit: (tontineId: string, cycleId: string) =>
     request<any[]>(`/tontines/${tontineId}/cycles/${cycleId}/audit`),
+  lockTurn: (tontineId: string, turnId: string, lock: boolean, reason?: string) =>
+    request<any>(`/tontines/${tontineId}/turns/${turnId}/lock`, {
+      method: 'POST',
+      body: JSON.stringify({ lock, reason }),
+    }),
+
+  // Join fee
+  payJoinFee: (tontineId: string, membreId: string, data?: { sessionCaisseId?: string; methodePaiement?: string }) =>
+    request<any>(`/tontines/${tontineId}/membres/${membreId}/pay-join-fee`, {
+      method: 'POST',
+      body: JSON.stringify(data || {}),
+    }),
 
   // Schedules
   getSchedules: (tontineId: string, cycleId: string) =>

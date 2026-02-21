@@ -672,6 +672,8 @@ export const TontineTurnAuditActionType = {
   SWAP: 'SWAP',
   SKIP: 'SKIP',
   BENEFICIARY_CHANGE: 'BENEFICIARY_CHANGE',
+  LOCK: 'LOCK',
+  UNLOCK: 'UNLOCK',
 } as const;
 export type TontineTurnAuditActionType = typeof TontineTurnAuditActionType[keyof typeof TontineTurnAuditActionType];
 

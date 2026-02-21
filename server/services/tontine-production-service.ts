@@ -675,6 +675,9 @@ export async function calculateRetirable(
   } else if (member.aRecuBenefice) {
     peutRetirer = false;
     raison = "Bénéfice déjà reçu pour ce cycle";
+  } else if (!member.joinFeePaid) {
+    peutRetirer = false;
+    raison = "Frais d'adhésion non payés";
   }
 
   // Calculate retirable amount
@@ -685,11 +688,8 @@ export async function calculateRetirable(
   if (rules.allowPartialDistribution) {
     const minThreshold = (droitsMembre * rules.distributionMinThresholdPct) / 100;
     if (potDisponible < minThreshold) {
-      raison = `Pot insuffisant (minimum ${rules.distributionMinThresholdPct}% requis)`;
-      // Still allow partial if pot > 0
-      if (potDisponible <= 0) {
-        peutRetirer = false;
-      }
+      peutRetirer = false;
+      raison = `Pot insuffisant: ${potDisponible.toLocaleString()} < seuil minimum ${rules.distributionMinThresholdPct}% (${minThreshold.toLocaleString()})`;
     }
   } else {
     // Full distribution only
@@ -765,6 +765,10 @@ export async function createDistributionRequest(params: {
 
     if (turn.status === TontineTurnStatus.PAID_OUT) {
       throw new Error("Ce tour a déjà été entièrement payé");
+    }
+
+    if (turn.isLocked) {
+      throw new Error("Ce tour est verrouillé. Déverrouillez-le avant de créer une demande de distribution.");
     }
 
     // Get rules

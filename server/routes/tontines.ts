@@ -7,6 +7,7 @@ import { insertTontineSchema, insertMembreTontineSchema, insertContributionTonti
     insertTontinePenaliteSchema,
     insertTontinePlanSchema,
     tontineCycles, tontineTurns, tontineSchedules, tontineDistributionRequests,
+    tontineTurnAudit, TontineTurnAuditActionType,
     membresTontine, tontinePenalites, tontines, contributionsTontine, TontinePayoutMethod,
     clients, holidayDates, holidayCalendars
 } from "@shared/schema";
@@ -151,6 +152,12 @@ export function registerTontineRoutes(app: Express) {
       }
 
       const parsed = insertMembreTontineSchema.parse(Object.assign({}, data, { tontineId: req.params.id }));
+      // Set joinFeePaid based on tontine config
+      if (tontine.joinFeeEnabled) {
+        (parsed as any).joinFeePaid = false;
+      } else {
+        (parsed as any).joinFeePaid = true;
+      }
       const membre = await storage.createMembreTontine(parsed);
 
       // Increment member count
@@ -205,6 +212,79 @@ export function registerTontineRoutes(app: Express) {
 
       const updated = await storage.updateMembreTontine(req.params.membreId, data as any);
       res.json(updated);
+  });
+
+  // Pay join fee for a member
+  app.post("/api/tontines/:id/membres/:membreId/pay-join-fee", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.TONTINE_MEMBRE), async (req: Request, res: Response) => {
+    try {
+      const tontine = await storage.getTontine(req.params.id);
+      if (!tontine) return res.status(404).json({ message: "Tontine introuvable" });
+
+      if (!tontine.joinFeeEnabled) {
+        return res.status(400).json({ message: "Les frais d'adhésion ne sont pas activés" });
+      }
+
+      const membre = await storage.getMembreTontineById(req.params.membreId);
+      if (!membre) return res.status(404).json({ message: "Membre introuvable" });
+      if (membre.joinFeePaid) return res.status(409).json({ message: "Frais d'adhésion déjà payés" });
+
+      const montant = Number(tontine.joinFeeAmount || 0);
+      if (montant <= 0) {
+        // No fee to pay, just mark as paid
+        await storage.updateMembreTontine(req.params.membreId, { joinFeePaid: true } as any);
+        return res.json({ success: true, montant: 0 });
+      }
+
+      const userId = req.session.user?.id;
+      const agenceId = tontine.agenceId;
+      const { sessionCaisseId, methodePaiement = "CASH" } = req.body;
+
+      const { mouvement } = await executeWithLedger(
+        "TONTINE",
+        {
+          montant: montant.toString(),
+          sens: "CREDIT",
+          clientId: membre.clientId,
+          tontineId: tontine.id,
+          sessionCaisseId: methodePaiement === "CASH" ? sessionCaisseId : undefined,
+          typePaiement: "TONTINE_JOIN_FEE",
+          methodePaiement,
+          agenceId: agenceId ?? undefined,
+          idempotencyKey: `JOINFEE-${req.params.membreId}`,
+          metadata: { description: `Frais d'adhésion tontine "${tontine.nom}"` },
+        },
+        async (tx, mouvement) => {
+          // Mark fee as paid
+          await tx.update(membresTontine)
+            .set({ joinFeePaid: true, updatedAt: new Date() })
+            .where(eq(membresTontine.id, req.params.membreId));
+
+          // Credit tontine balance
+          await updateTontineSolde(tx, tontine.id, montant);
+
+          // Credit session caisse if cash
+          if (methodePaiement === "CASH" && sessionCaisseId) {
+            await updateSessionSolde(tx, sessionCaisseId, montant);
+          }
+
+          return { result: mouvement };
+        },
+        userId
+      );
+
+      const wsInstance = getWsInstance();
+      if (wsInstance) {
+        wsInstance.broadcast({
+          type: "TONTINE_UPDATE",
+          payload: { type: "join_fee_paid", tontineId: tontine.id, membreId: req.params.membreId },
+        });
+      }
+
+      res.json({ success: true, mouvementId: mouvement.id, montant });
+    } catch (error: any) {
+      logger.error({ err: error }, "Erreur paiement frais d'adhésion");
+      res.status(400).json({ message: error.message || "Erreur paiement frais d'adhésion" });
+    }
   });
 
   // ============================================================================
@@ -956,6 +1036,56 @@ export function registerTontineRoutes(app: Express) {
     } catch (error: any) {
       logger.error({ err: error }, 'Erreur chargement audit');
       res.status(500).json({ message: error.message || "Erreur chargement audit" });
+    }
+  });
+
+  // Lock/unlock a turn
+  app.post("/api/tontines/:id/turns/:turnId/lock", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.TONTINE), async (req: Request, res: Response) => {
+    try {
+      const { lock, reason } = req.body;
+      const isLock = lock !== false; // default to lock
+
+      const [turn] = await db
+        .select()
+        .from(tontineTurns)
+        .where(eq(tontineTurns.id, req.params.turnId))
+        .limit(1);
+
+      if (!turn) return res.status(404).json({ message: "Tour non trouvé" });
+      if (turn.tontineId !== req.params.id) return res.status(400).json({ message: "Tour n'appartient pas à cette tontine" });
+
+      const [updated] = await db
+        .update(tontineTurns)
+        .set({
+          isLocked: isLock,
+          lockedAt: isLock ? new Date() : null,
+          lockedReason: isLock ? (reason || "Verrouillé manuellement") : null,
+          updatedAt: new Date(),
+        })
+        .where(eq(tontineTurns.id, req.params.turnId))
+        .returning();
+
+      // Audit trail
+      await db.insert(tontineTurnAudit).values({
+        tontineId: req.params.id,
+        cycleId: turn.cycleId,
+        actionType: isLock ? TontineTurnAuditActionType.LOCK : TontineTurnAuditActionType.UNLOCK,
+        performedBy: req.session.user!.id,
+        details: { turnId: turn.id, turnNumber: turn.turnNumber, reason },
+      });
+
+      const wsInstance = getWsInstance();
+      if (wsInstance) {
+        wsInstance.broadcast({
+          type: "TONTINE_UPDATE",
+          payload: { type: "turn_lock_changed", tontineId: req.params.id, turnId: turn.id, isLocked: isLock },
+        });
+      }
+
+      res.json(updated);
+    } catch (error: any) {
+      logger.error({ err: error }, "Erreur lock/unlock tour");
+      res.status(400).json({ message: error.message || "Erreur lock/unlock" });
     }
   });
 

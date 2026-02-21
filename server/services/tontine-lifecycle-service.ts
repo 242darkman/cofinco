@@ -238,7 +238,7 @@ async function approveMemberExit(
   tontineId: string,
   memberId: string,
   userId: string,
-): Promise<{ memberId: string; exitFeePercent: number; exitApprovedAt: Date }> {
+): Promise<{ memberId: string; exitFeePercent: number; exitFeeAmount: number; exitApprovedAt: Date }> {
   const tontine = await db.select().from(tontines).where(eq(tontines.id, tontineId)).then(r => r[0]);
   if (!tontine) throw new Error("Tontine introuvable");
 
@@ -250,6 +250,10 @@ async function approveMemberExit(
   if (!member.exitRequestedAt) throw new Error("Aucune demande de sortie en cours");
   if (member.exitApprovedAt) throw new Error("La sortie a deja ete approuvee");
 
+  const exitFeePercent = Number(tontine.exitFeePercent || 0);
+  const totalCotisations = parseFloat(member.totalCotisations?.toString() || "0");
+  const exitFeeAmount = exitFeePercent > 0 ? Math.round(totalCotisations * exitFeePercent / 100) : 0;
+
   const now = new Date();
   await db.update(membresTontine)
     .set({
@@ -259,6 +263,18 @@ async function approveMemberExit(
     })
     .where(eq(membresTontine.id, memberId));
 
+  // Deduct exit fee from tontine pot (retained as platform revenue)
+  if (exitFeeAmount > 0) {
+    await db.update(tontines)
+      .set({
+        solde: sql`GREATEST(0, ${tontines.solde}::numeric - ${exitFeeAmount})`,
+        updatedAt: now,
+      })
+      .where(eq(tontines.id, tontineId));
+
+    logger.info({ tontineId, memberId, exitFeeAmount, exitFeePercent }, "Exit fee deducted from pot");
+  }
+
   // Update tontine member count
   await db.update(tontines)
     .set({
@@ -267,7 +283,7 @@ async function approveMemberExit(
     })
     .where(eq(tontines.id, tontineId));
 
-  logger.info({ tontineId, memberId, approvedBy: userId }, "Member exit approved");
+  logger.info({ tontineId, memberId, approvedBy: userId, exitFeeAmount }, "Member exit approved");
 
   dispatchDomainEvent({
     type: "TONTINE_MEMBER_EXIT",
@@ -276,7 +292,8 @@ async function approveMemberExit(
       tontineName: tontine.nom,
       memberId,
       clientId: member.clientId,
-      exitFeePercent: Number(tontine.exitFeePercent || 0),
+      exitFeePercent,
+      exitFeeAmount,
       agenceId: tontine.agenceId ?? undefined,
     },
     timestamp: new Date(),
@@ -284,7 +301,8 @@ async function approveMemberExit(
 
   return {
     memberId,
-    exitFeePercent: Number(tontine.exitFeePercent || 0),
+    exitFeePercent,
+    exitFeeAmount,
     exitApprovedAt: now,
   };
 }
