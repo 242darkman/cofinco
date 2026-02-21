@@ -5,18 +5,26 @@ import { FileText, Download } from 'lucide-react';
 
 interface Bulletin {
   id: number;
-  mois: number;
-  annee: number;
-  netAPayer: number | string;
+  mois: string;           // 'YYYY-MM'
+  salaireNet: string;     // numeric string
   statut: string;
   pdfUrl?: string;
 }
 
 const MOIS_LABELS: Record<number, string> = {
-  1: 'Janvier', 2: 'Fevrier', 3: 'Mars', 4: 'Avril',
-  5: 'Mai', 6: 'Juin', 7: 'Juillet', 8: 'Aout',
-  9: 'Septembre', 10: 'Octobre', 11: 'Novembre', 12: 'Decembre',
+  1: 'Janvier', 2: 'Février', 3: 'Mars', 4: 'Avril',
+  5: 'Mai', 6: 'Juin', 7: 'Juillet', 8: 'Août',
+  9: 'Septembre', 10: 'Octobre', 11: 'Novembre', 12: 'Décembre',
 };
+
+function parseMoisStr(mois: string): { label: string; annee: string } {
+  const match = mois.match(/^(\d{4})-(\d{2})$/);
+  if (match) {
+    const moisNum = parseInt(match[2], 10);
+    return { label: MOIS_LABELS[moisNum] || `Mois ${moisNum}`, annee: match[1] };
+  }
+  return { label: mois, annee: '' };
+}
 
 function formatFCFA(value: number | string): string {
   const num = typeof value === 'string' ? parseFloat(value) : value;
@@ -28,7 +36,7 @@ export default function MesBulletinsTab() {
   const { data: rawBulletins, isLoading } = useQuery<Bulletin[]>({
     queryKey: ['/api/hr/paie/my'],
     queryFn: () =>
-      fetch('/api/hr/paie/bulletins?mine=true', { credentials: 'include' }).then((r) =>
+      fetch('/api/hr/paie/my', { credentials: 'include' }).then((r) =>
         r.json()
       ),
   });
@@ -56,7 +64,9 @@ export default function MesBulletinsTab() {
 
   return (
     <div className="space-y-2">
-      {bulletins.map((bulletin) => (
+      {bulletins.map((bulletin) => {
+        const { label, annee } = parseMoisStr(bulletin.mois);
+        return (
         <Card key={bulletin.id} padding="sm">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
@@ -65,10 +75,10 @@ export default function MesBulletinsTab() {
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-content-primary">
-                  {MOIS_LABELS[bulletin.mois] || `Mois ${bulletin.mois}`} {bulletin.annee}
+                  {label} {annee}
                 </p>
                 <p className="text-xs text-content-muted mt-0.5">
-                  Net a payer: <span className="font-semibold text-content-primary">{formatFCFA(bulletin.netAPayer)}</span>
+                  Net à payer : <span className="font-semibold text-content-primary">{formatFCFA(bulletin.salaireNet)}</span>
                 </p>
               </div>
             </div>
@@ -87,7 +97,8 @@ export default function MesBulletinsTab() {
             </div>
           </div>
         </Card>
-      ))}
+        );
+      })}
     </div>
   );
 }

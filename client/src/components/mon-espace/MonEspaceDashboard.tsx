@@ -31,10 +31,23 @@ function getScoreColor(score: number): string {
 }
 
 const MOIS_LABELS: Record<number, string> = {
-  1: 'Janvier', 2: 'Fevrier', 3: 'Mars', 4: 'Avril',
-  5: 'Mai', 6: 'Juin', 7: 'Juillet', 8: 'Aout',
-  9: 'Septembre', 10: 'Octobre', 11: 'Novembre', 12: 'Decembre',
+  1: 'Janvier', 2: 'Février', 3: 'Mars', 4: 'Avril',
+  5: 'Mai', 6: 'Juin', 7: 'Juillet', 8: 'Août',
+  9: 'Septembre', 10: 'Octobre', 11: 'Novembre', 12: 'Décembre',
 };
+
+/** Parse 'YYYY-MM' → { moisNum, annee } */
+function parseMoisStr(mois: string | number): { label: string; annee: string } {
+  const s = String(mois);
+  const match = s.match(/^(\d{4})-(\d{2})$/);
+  if (match) {
+    const moisNum = parseInt(match[2], 10);
+    return { label: MOIS_LABELS[moisNum] || `Mois ${moisNum}`, annee: match[1] };
+  }
+  // fallback: mois is a number
+  const num = typeof mois === 'number' ? mois : parseInt(s, 10);
+  return { label: MOIS_LABELS[num] || `Mois ${num}`, annee: '' };
+}
 
 export default function MonEspaceDashboard() {
   const { dashboard, isLoading } = useMyDashboard();
@@ -120,22 +133,25 @@ export default function MonEspaceDashboard() {
             <p className="text-sm text-content-muted py-3 text-center">Aucun bulletin disponible</p>
           ) : (
             <div className="space-y-2">
-              {dashboard.derniersBulletins.map((bulletin: any, index: number) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-surface-subtle border border-edge-subtle"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-content-primary">
-                      {MOIS_LABELS[bulletin.mois] || `Mois ${bulletin.mois}`} {bulletin.annee}
-                    </p>
-                    <p className="text-xs text-content-muted mt-0.5">
-                      Net: {formatFCFA(bulletin.netAPayer)}
-                    </p>
+              {dashboard.derniersBulletins.map((bulletin: any, index: number) => {
+                const { label, annee } = parseMoisStr(bulletin.mois);
+                return (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-surface-subtle border border-edge-subtle"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-content-primary">
+                        {label} {annee}
+                      </p>
+                      <p className="text-xs text-content-muted mt-0.5">
+                        Net : {formatFCFA(bulletin.salaireNet)}
+                      </p>
+                    </div>
+                    <Badge value={bulletin.statut} size="sm" />
                   </div>
-                  <Badge value={bulletin.statut} size="sm" />
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </Card>

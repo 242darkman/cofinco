@@ -1574,10 +1574,14 @@ export async function getMyDashboard(employeId: string) {
   }).from(demandesConges)
     .where(eq(demandesConges.employeId, employeId));
 
-  // Recent payslips (last 3)
+  // Recent payslips (last 3, excluding drafts and cancelled)
   const derniersBulletins = await db.select()
     .from(bulletinsPaie)
-    .where(eq(bulletinsPaie.employeId, employeId))
+    .where(and(
+      eq(bulletinsPaie.employeId, employeId),
+      not(eq(bulletinsPaie.statut, 'DRAFT')),
+      not(eq(bulletinsPaie.statut, 'CANCELLED')),
+    ))
     .orderBy(desc(bulletinsPaie.mois))
     .limit(3);
 
