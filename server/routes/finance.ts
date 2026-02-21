@@ -4012,16 +4012,29 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   // Update Opération caisse (PATCH)
+  // Only allow updating non-financial fields (description/metadata annotations).
+  // Financial fields (montant, typeOperation, statut, sessionId, etc.) are immutable
+  // after creation — changes must go through the reversal/contrepassation flow.
+  const patchOperationSchema = z.object({
+    description: z.string().max(500).optional(),
+    metadata: z.record(z.unknown()).optional(),
+  }).strict();
+
   app.patch("/api/operations-caisse/:id", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.CAISSE_OPERATION), async (req, res) => {
       try {
         const { id } = req.params;
-        const data = normalizeKeysDeep(req.body) as any;
-        
-        const updated = await storage.updateOperationCaisse(id, data);
+        const data = normalizeKeysDeep(req.body);
+        const parsed = patchOperationSchema.parse(data);
+
+        if (Object.keys(parsed).length === 0) {
+          return res.status(400).json({ message: "Aucun champ modifiable fourni" });
+        }
+
+        const updated = await storage.updateOperationCaisse(id, parsed);
         if (!updated) {
              return res.status(404).json({ message: "Opération introuvable" });
         }
-        
+
         // Notify updates
              if (updated.clientId) {
                 const wsInstance = getWsInstance();
@@ -4032,6 +4045,9 @@ export function registerFinanceRoutes(app: Express) {
              }
              res.json(updated);
       } catch (error: any) {
+         if (error instanceof z.ZodError) {
+           return res.status(400).json({ message: "Champs non autorisés ou invalides", errors: error.errors });
+         }
          logger.error({ err: error }, 'Error updating operation');
          res.status(400).json({ message: error.message || "Erreur lors de la mise à jour" });
       }

@@ -277,28 +277,30 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
     if (!paymentIntent || !showPaymentStatusModal) return;
     if (['SUCCESS', 'FAILED', 'EXPIRED', 'REVERSED'].includes(paymentStatus)) return;
 
+    let cancelled = false;
     const pollInterval = setInterval(async () => {
+      if (cancelled) return;
       try {
         const res = await fetch(`/api/payments/${paymentIntent.id}`, { credentials: 'include' });
-        if (res.ok) {
-          const intent: PaymentIntent = await res.json();
-          setPaymentStatus(intent.status);
-          setPaymentIntent(intent);
+        if (!res.ok || cancelled) return;
+        const intent: PaymentIntent = await res.json();
+        if (cancelled) return;
+        setPaymentStatus(intent.status);
+        setPaymentIntent(intent);
 
-          if (intent.status === 'SUCCESS') {
-            clearInterval(pollInterval);
-            handlePaymentSuccess(intent);
-          } else if (['FAILED', 'EXPIRED', 'REVERSED'].includes(intent.status)) {
-            clearInterval(pollInterval);
-            toast.error(`Paiement ${intent.status === 'FAILED' ? 'échoué' : intent.status === 'EXPIRED' ? 'expiré' : 'annulé'}`);
-          }
+        if (intent.status === 'SUCCESS') {
+          clearInterval(pollInterval);
+          handlePaymentSuccess(intent);
+        } else if (['FAILED', 'EXPIRED', 'REVERSED'].includes(intent.status)) {
+          clearInterval(pollInterval);
+          toast.error(`Paiement ${intent.status === 'FAILED' ? 'échoué' : intent.status === 'EXPIRED' ? 'expiré' : 'annulé'}`);
         }
       } catch (error) {
         console.error('Erreur polling paiement:', error);
       }
     }, 5000);
 
-    return () => clearInterval(pollInterval);
+    return () => { cancelled = true; clearInterval(pollInterval); };
   }, [paymentIntent?.id, paymentStatus, showPaymentStatusModal]);
 
   // ── Phone validation (sandbox) ──
@@ -817,6 +819,8 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
     setShowBilletage(false);
     setMontantError(null);
     setConfirmationData(null);
+    setShowPhysicalConfirmation(false);
+    setShowPresenceModal(false);
     setPhoneNumber('');
     setPaymentIntent(null);
     setPaymentStatus('CREATED');
@@ -827,7 +831,7 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
   // ─── Keyboard Shortcuts ─────────────────────────────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || showSuccessModal || showPaymentStatusModal || confirmationData) return;
+      if (e.key !== 'Escape' || showSuccessModal || showPaymentStatusModal || confirmationData || showPhysicalConfirmation || showPresenceModal || showConfirmDialog) return;
 
       // Step 1: If search has text, clear it first
       if (searchTerm) {
@@ -843,7 +847,7 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [searchTerm, selectedClient, showSuccessModal, showPaymentStatusModal, confirmationData, reinitialiserFormulaire]);
+  }, [searchTerm, selectedClient, showSuccessModal, showPaymentStatusModal, confirmationData, showPhysicalConfirmation, showPresenceModal, showConfirmDialog, reinitialiserFormulaire]);
 
   // ─── Submit Dispatch ──────────────────────────────────
   const handleSubmit = useCallback(() => {
@@ -1081,6 +1085,7 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
                           setShowBilletage(false);
                           setMontantError(null);
                           setMontant('');
+                          setConfirmationData(null);
                         }}
                         className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-xs font-bold transition-all ${
                           typeOperation === type
