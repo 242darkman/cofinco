@@ -6,6 +6,7 @@ import { clients } from "./clients";
 import { agences } from "./agences";
 import { mouvementsFinanciers, comptes } from "./finance";
 import { paymentIntents } from "./mobile-money";
+import { holidayCalendars } from "./settings";
 import { methodePaiementEnum, statutTransactionEnum } from "../enum/enums";
 import { sql } from "drizzle-orm";
 
@@ -16,12 +17,10 @@ export const tontines = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     nom: text("nom").notNull(),
     description: text("description"),
-    typeDistribution: text("type_distribution").notNull(),
     montantCotisation: numeric("montant_cotisation").notNull(),
     tauxPlateforme: numeric("taux_plateforme").notNull().default("0"),
     frequence: text("frequence").notNull(),
     intervalleCotisation: integer("intervalle_cotisation").default(1),
-    delaiPenalite: integer("delai_penalite").default(2),
     dateDebut: timestamp("date_debut").notNull(),
     dateFin: timestamp("date_fin"),
     nombreMembres: integer("nombre_membres").notNull(),
@@ -30,14 +29,79 @@ export const tontines = pgTable(
     solde: numeric("solde").default("0"),
     prochainTour: timestamp("prochain_tour"),
     ordreDistribution: json("ordre_distribution"),
-    regles: json("regles"),
     gestionnaireId: uuid("gestionnaire_id").references(() => users.id), // Gestionnaire de la tontine
     agenceId: uuid("agence_id").references(() => agences.id), // Agence de la tontine
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
-    // New columns for production-ready tontines
-    rulesetId: uuid("ruleset_id"), // References tontineRulesets (defined later)
     currentCycleId: uuid("current_cycle_id"), // References tontineCycles (defined later)
-    defaultPayoutMethod: text("default_payout_method").default("CASH"),
+    planId: uuid("plan_id"), // References tontinePlans — template used to create this group
+
+    // ─── Calendrier & 1ère cotisation ───
+    firstContributionRule: text("first_contribution_rule").notNull().default("ON_START_DATE"),
+    gracePeriodContribution: integer("grace_period_contribution").notNull().default(0),
+    collectionCalendarMode: text("collection_calendar_mode").notNull().default("ALL_DAYS"),
+    weekdaysMask: integer("weekdays_mask").notNull().default(127),
+    shiftNonWorkingDay: text("shift_non_working_day").notNull().default("NEXT"),
+    holidayCalendarId: uuid("holiday_calendar_id").references(() => holidayCalendars.id),
+    timezone: text("timezone").notNull().default("Africa/Brazzaville"),
+    preferredWeekday: integer("preferred_weekday"),
+
+    // ─── Distribution ───
+    distributionType: text("distribution_type").notNull().default("ROTATIVE_SUSU"),
+    payoutFrequency: text("payout_frequency").notNull().default("SAME_AS_CONTRIBUTION"),
+    payoutDayRule: text("payout_day_rule"),
+    payoutOrderMode: text("payout_order_mode").notNull().default("FIXED_BY_ADMIN"),
+    allowSwapPayoutOrder: boolean("allow_swap_payout_order").notNull().default(false),
+    swapRequiresApproval: boolean("swap_requires_approval").notNull().default(true),
+    payoutRequiresContribPaid: boolean("payout_requires_contrib_paid").notNull().default(true),
+    allowPartialDistribution: boolean("allow_partial_distribution").notNull().default(true),
+    distributionMinThresholdPct: numeric("distribution_min_threshold_pct", { precision: 5, scale: 2 }).notNull().default("50"),
+
+    // ─── Pénalités & retards ───
+    penaltyEnabled: boolean("penalty_enabled").notNull().default(false),
+    penaltyType: text("penalty_type").notNull().default("FIXED"),
+    penaltyValue: numeric("penalty_value", { precision: 15, scale: 2 }).notNull().default("0"),
+    penaltyApplication: text("penalty_application").notNull().default("PER_PERIOD"),
+    penaltyCap: numeric("penalty_cap", { precision: 15, scale: 2 }),
+    lateGracePeriodDays: integer("late_grace_period_days").notNull().default(0),
+    maxMissedContributions: integer("max_missed_contributions").notNull().default(0),
+    arrearsPolicy: text("arrears_policy").notNull().default("MUST_PAY_BEFORE_PAYOUT"),
+    suspensionPolicy: text("suspension_policy").notNull().default("SUSPEND_MEMBER"),
+    defaultPolicy: text("default_policy").notNull().default("EXCLUDE_MEMBER"),
+    maxLateBeforeSuspend: integer("max_late_before_suspend").notNull().default(3),
+    maxLateBeforeExclude: integer("max_late_before_exclude").notNull().default(5),
+    penaltyDeductedFromPayout: boolean("penalty_deducted_from_payout").notNull().default(true),
+    penaltyAsRevenue: boolean("penalty_as_revenue").notNull().default(false),
+    autoPenaltyPriority: boolean("auto_penalty_priority").notNull().default(true),
+
+    // ─── Entrée/Sortie ───
+    joinFeeEnabled: boolean("join_fee_enabled").notNull().default(false),
+    joinFeeAmount: numeric("join_fee_amount", { precision: 15, scale: 2 }).notNull().default("0"),
+    exitAllowed: boolean("exit_allowed").notNull().default(true),
+    exitFeePercent: numeric("exit_fee_percent", { precision: 5, scale: 2 }).notNull().default("0"),
+    exitNoticePeriods: integer("exit_notice_periods").notNull().default(0),
+    replacementAllowed: boolean("replacement_allowed").notNull().default(true),
+    transferMembershipAllowed: boolean("transfer_membership_allowed").notNull().default(false),
+    allowMidCycleJoin: boolean("allow_mid_cycle_join").notNull().default(false),
+
+    // ─── Paiement & Trésorerie ───
+    allowedPaymentMethods: jsonb("allowed_payment_methods").notNull().default(sql`'["CASH"]'::jsonb`),
+    defaultPaymentMethod: text("default_payment_method").notNull().default("CASH"),
+    cashMustGoToCaisse: boolean("cash_must_go_to_caisse").notNull().default(true),
+    feeCollectionMode: text("fee_collection_mode").notNull().default("ON_EACH_PAYOUT"),
+    maxAdvanceTours: integer("max_advance_tours").notNull().default(3),
+    // ─── Gouvernance ───
+    rolesEnabled: boolean("roles_enabled").notNull().default(true),
+    groupRoles: jsonb("group_roles").notNull().default(sql`'["PRESIDENT","TRESORIER","SECRETAIRE"]'::jsonb`),
+    approvalsRequiredFor: jsonb("approvals_required_for").notNull().default(sql`'["DISTRIBUTION","REORDER"]'::jsonb`),
+    minKycLevel: text("min_kyc_level").notNull().default("NONE"),
+    minSegmentRequired: text("min_segment_required"),
+
+    // ─── Cycle de vie (instance uniquement) ───
+    endRule: text("end_rule").notNull().default("WHEN_ALL_RECEIVED"),
+    roundCount: integer("round_count"),
+    currentRound: integer("current_round").notNull().default(0),
+    minMembersToStart: integer("min_members_to_start").notNull().default(3),
+
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
     deletedAt: timestamp("deleted_at"), // Soft delete
@@ -85,6 +149,11 @@ export const insertTontineSchema = (createInsertSchema(tontines as any, {
   montantCotisation: z.coerce.string(),
   tauxPlateforme: z.coerce.string().optional().default("0"),
   solde: z.coerce.string().optional().default("0"),
+  penaltyValue: z.coerce.string().optional().default("0"),
+  penaltyCap: z.coerce.string().optional().nullable(),
+  joinFeeAmount: z.coerce.string().optional().default("0"),
+  exitFeePercent: z.coerce.string().optional().default("0"),
+  distributionMinThresholdPct: z.coerce.string().optional().default("50"),
 }) as any).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
 export type InsertTontine = z.infer<typeof insertTontineSchema>;
 export type Tontine = typeof tontines.$inferSelect;
@@ -108,13 +177,16 @@ export const membresTontine = pgTable(
     cotisationAutomatique: boolean("cotisation_automatique").notNull().default(false),
     cotisationCompteId: uuid("cotisation_compte_id").references(() => comptes.id), // Optionnel
 
-    // New columns for production-ready tontines
-    rulesetId: uuid("ruleset_id"), // References tontineRulesets (defined later)
     lateCount: integer("late_count").notNull().default(0),
     absenceCount: integer("absence_count").notNull().default(0),
-    msisdn: text("msisdn"), // Phone for auto-pay MM
-    preferredProvider: text("preferred_provider"), // MTN, AIRTEL
     preferredPayoutMethod: text("preferred_payout_method").default("CASH"), // CASH, MOBILE_MONEY, WALLET
+
+    // ─── Gouvernance & Entrée/Sortie ───
+    groupRole: text("group_role"), // PRESIDENT, TRESORIER, SECRETAIRE
+    joinFeePaid: boolean("join_fee_paid").notNull().default(false),
+    exitRequestedAt: timestamp("exit_requested_at"),
+    exitApprovedAt: timestamp("exit_approved_at"),
+    replacedById: uuid("replaced_by_id"), // FK to membresTontine.id — set when member is replaced
 
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
@@ -146,14 +218,8 @@ export const contributionsTontine = pgTable(
 
     tontineId: uuid("tontine_id").notNull().references(() => tontines.id, { onDelete: "cascade" }),
     clientId: uuid("client_id").references(() => clients.id, { onDelete: "set null" }),
-    // New: explicit member reference for production-ready module
     membreId: uuid("membre_id").references(() => membresTontine.id, { onDelete: "set null" }),
     agenceId: uuid("agence_id").references(() => agences.id),
-
-    // New: cycle and schedule references for production-ready module
-    cycleId: uuid("cycle_id"), // References tontineCycles (defined later)
-    scheduleId: uuid("schedule_id"), // References tontineSchedules (defined later)
-
     // Pivot ledger
     mouvementId: uuid("mouvement_id").references(() => mouvementsFinanciers.id, { onDelete: "set null" }),
 
@@ -167,18 +233,13 @@ export const contributionsTontine = pgTable(
     reference: text("reference").notNull(),
     referenceExterne: text("reference_externe"),
     idempotencyKey: text("idempotency_key"),
-
-    // New: Mobile Money integration
     paymentIntentId: uuid("payment_intent_id").references(() => paymentIntents.id),
     provider: text("provider"), // MTN, AIRTEL
     phone: text("phone"), // MSISDN for MM payments
-
-    // Statut de la contribution : FULL = cotisation complète, PARTIAL = paiement partiel
-    statutContribution: text("statut_contribution").default("FULL"), // 'FULL' | 'PARTIAL'
+    statutContribution: text("statut_contribution").default("FULL"), // FULL | PARTIAL
 
     observations: text("observations"),
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
-    // New: who received the contribution (for cash)
     receivedBy: uuid("received_by").references(() => users.id, { onDelete: "set null" }),
     receivedAt: timestamp("received_at"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -200,46 +261,22 @@ export const insertContributionTontineSchema = (createInsertSchema(contributions
 export type InsertContributionTontine = z.infer<typeof insertContributionTontineSchema>;
 export type ContributionTontine = typeof contributionsTontine.$inferSelect;
 
-// Tontine Règles (added from previous session context)
-export const tontineRegles = pgTable("tontine_regles", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  tontineId: uuid("tontine_id").notNull().references(() => tontines.id),
-  typeRegle: text("type_regle").notNull(), // 'retard', 'absence', 'defaut'
-  montantPenalite: numeric("montant_penalite").notNull(),
-  description: text("description"),
-  actif: boolean("actif").default(true),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-export const insertTontineRegleSchema = (createInsertSchema(tontineRegles as any, {
-  montantPenalite: z.coerce.string(),
-}) as any).omit({ id: true, createdAt: true });
-export type InsertTontineRegle = z.infer<typeof insertTontineRegleSchema>;
-export type TontineRegle = typeof tontineRegles.$inferSelect;
-
 // Tontine Pénalités
 export const tontinePenalites = pgTable("tontine_penalites", {
   id: uuid("id").primaryKey().defaultRandom(),
   tontineId: uuid("tontine_id").notNull().references(() => tontines.id),
   membreId: uuid("membre_id").notNull().references(() => membresTontine.id),
-  regleId: uuid("regle_id").references(() => tontineRegles.id),
+  cycleId: uuid("cycle_id"),
+  scheduleId: uuid("schedule_id"),
 
-  // New: cycle and schedule references for production-ready module
-  cycleId: uuid("cycle_id"), // References tontineCycles (defined later)
-  scheduleId: uuid("schedule_id"), // References tontineSchedules (defined later)
-
-  // New: penalty type for better categorization
   penaltyType: text("penalty_type").default("LATE"), // LATE, ABSENCE, WITHDRAWAL_FEE, CUSTOM
 
   montant: numeric("montant").notNull(),
   dateFaute: timestamp("date_faute").defaultNow(),
-  statut: text("statut").default("PENDING"), // 'PENDING', 'PAID', 'CANCELLED', 'WAIVED'
+  statut: text("statut").default("PENDING"), // PENDING, PAID, CANCELLED, WAIVED
   datePaiement: timestamp("date_paiement"),
   motif: text("motif"),
-
-  // New: auto-application tracking
   autoApplied: boolean("auto_applied").default(false),
-
-  // New: waiver support
   waivedAt: timestamp("waived_at"),
   waivedBy: uuid("waived_by").references(() => users.id),
   waiveReason: text("waive_reason"),
@@ -254,44 +291,8 @@ export const insertTontinePenaliteSchema = (createInsertSchema(tontinePenalites 
 export type InsertTontinePenalite = z.infer<typeof insertTontinePenaliteSchema>;
 export type TontinePenalite = typeof tontinePenalites.$inferSelect;
 
-// Tontine Distributions
-export const tontineDistributions = pgTable("tontine_distributions", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  tontineId: uuid("tontine_id").notNull().references(() => tontines.id),
-  membreId: uuid("membre_id").notNull().references(() => membresTontine.id),
-  tourNumero: integer("tour_numero").notNull(),
-  montantTotal: numeric("montant_total").notNull(),
-  dateDistribution: timestamp("date_distribution").defaultNow(),
-  modePaiement: text("mode_paiement").default("CASH"),
-  referencePaiement: text("reference_paiement"),
-  notes: text("notes"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-  deletedAt: timestamp("deleted_at"), // Soft delete
-});
-export const insertTontineDistributionSchema = (createInsertSchema(tontineDistributions as any, {
-  montantTotal: z.coerce.string(),
-}) as any).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
-export type InsertTontineDistribution = z.infer<typeof insertTontineDistributionSchema>;
-export type TontineDistribution = typeof tontineDistributions.$inferSelect;
 
-// Tontine Alertes
-export const tontineAlertes = pgTable("tontine_alertes", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  tontineId: uuid("tontine_id").notNull().references(() => tontines.id),
-  membreId: uuid("membre_id").references(() => membresTontine.id),
-  typeAlerte: text("type_alerte").notNull(),
-  priorite: text("priorite").notNull().default("NORMAL"),
-  message: text("message").notNull(),
-  statut: text("statut").notNull().default("ACTIVE"),
-  resolvedAt: timestamp("resolved_at"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const insertTontineAlerteSchema = (createInsertSchema(tontineAlertes) as any).omit({ id: true, createdAt: true });
-export type InsertTontineAlerte = z.infer<typeof insertTontineAlerteSchema>;
-export type TontineAlerte = typeof tontineAlertes.$inferSelect;
-// Tontine Plans (Presets)
+// Tontine Plans (Templates/Modèles)
 export const tontinePlans = pgTable("tontine_plans", {
   id: uuid("id").primaryKey().defaultRandom(),
   nom: text("nom").notNull(),
@@ -299,24 +300,91 @@ export const tontinePlans = pgTable("tontine_plans", {
   montantCotisation: numeric("montant_cotisation").notNull(),
   nombreMembres: integer("nombre_membres").notNull(),
   frequence: text("frequence").notNull(),
-  typeDistribution: text("type_distribution").notNull(),
   tauxPlateforme: numeric("taux_plateforme").notNull().default("0"),
   intervalleCotisation: integer("intervalle_cotisation").default(1),
   agenceId: uuid("agence_id").references(() => agences.id),
   actif: boolean("actif").default(true),
+
+  // ─── Calendrier & 1ère cotisation ───
+  firstContributionRule: text("first_contribution_rule").notNull().default("ON_START_DATE"),
+  gracePeriodContribution: integer("grace_period_contribution").notNull().default(0),
+  collectionCalendarMode: text("collection_calendar_mode").notNull().default("ALL_DAYS"),
+  weekdaysMask: integer("weekdays_mask").notNull().default(127),
+  shiftNonWorkingDay: text("shift_non_working_day").notNull().default("NEXT"),
+  holidayCalendarId: uuid("holiday_calendar_id").references(() => holidayCalendars.id),
+  timezone: text("timezone").notNull().default("Africa/Brazzaville"),
+  preferredWeekday: integer("preferred_weekday"),
+
+  // ─── Distribution ───
+  distributionType: text("distribution_type").notNull().default("ROTATIVE_SUSU"),
+  payoutFrequency: text("payout_frequency").notNull().default("SAME_AS_CONTRIBUTION"),
+  payoutDayRule: text("payout_day_rule"),
+  payoutOrderMode: text("payout_order_mode").notNull().default("FIXED_BY_ADMIN"),
+  allowSwapPayoutOrder: boolean("allow_swap_payout_order").notNull().default(false),
+  swapRequiresApproval: boolean("swap_requires_approval").notNull().default(true),
+  payoutRequiresContribPaid: boolean("payout_requires_contrib_paid").notNull().default(true),
+  allowPartialDistribution: boolean("allow_partial_distribution").notNull().default(true),
+  distributionMinThresholdPct: numeric("distribution_min_threshold_pct", { precision: 5, scale: 2 }).notNull().default("50"),
+
+  // ─── Pénalités & retards ───
+  penaltyEnabled: boolean("penalty_enabled").notNull().default(false),
+  penaltyType: text("penalty_type").notNull().default("FIXED"),
+  penaltyValue: numeric("penalty_value", { precision: 15, scale: 2 }).notNull().default("0"),
+  penaltyApplication: text("penalty_application").notNull().default("PER_PERIOD"),
+  penaltyCap: numeric("penalty_cap", { precision: 15, scale: 2 }),
+  lateGracePeriodDays: integer("late_grace_period_days").notNull().default(0),
+  maxMissedContributions: integer("max_missed_contributions").notNull().default(0),
+  arrearsPolicy: text("arrears_policy").notNull().default("MUST_PAY_BEFORE_PAYOUT"),
+  suspensionPolicy: text("suspension_policy").notNull().default("SUSPEND_MEMBER"),
+  defaultPolicy: text("default_policy").notNull().default("EXCLUDE_MEMBER"),
+  maxLateBeforeSuspend: integer("max_late_before_suspend").notNull().default(3),
+  maxLateBeforeExclude: integer("max_late_before_exclude").notNull().default(5),
+  penaltyDeductedFromPayout: boolean("penalty_deducted_from_payout").notNull().default(true),
+  penaltyAsRevenue: boolean("penalty_as_revenue").notNull().default(false),
+  autoPenaltyPriority: boolean("auto_penalty_priority").notNull().default(true),
+
+  // ─── Entrée/Sortie ───
+  joinFeeEnabled: boolean("join_fee_enabled").notNull().default(false),
+  joinFeeAmount: numeric("join_fee_amount", { precision: 15, scale: 2 }).notNull().default("0"),
+  exitAllowed: boolean("exit_allowed").notNull().default(true),
+  exitFeePercent: numeric("exit_fee_percent", { precision: 5, scale: 2 }).notNull().default("0"),
+  exitNoticePeriods: integer("exit_notice_periods").notNull().default(0),
+  replacementAllowed: boolean("replacement_allowed").notNull().default(true),
+  transferMembershipAllowed: boolean("transfer_membership_allowed").notNull().default(false),
+  allowMidCycleJoin: boolean("allow_mid_cycle_join").notNull().default(false),
+
+  // ─── Paiement & Trésorerie ───
+  allowedPaymentMethods: jsonb("allowed_payment_methods").notNull().default(sql`'["CASH"]'::jsonb`),
+  defaultPaymentMethod: text("default_payment_method").notNull().default("CASH"),
+  cashMustGoToCaisse: boolean("cash_must_go_to_caisse").notNull().default(true),
+  feeCollectionMode: text("fee_collection_mode").notNull().default("ON_EACH_PAYOUT"),
+  maxAdvanceTours: integer("max_advance_tours").notNull().default(3),
+
+  // ─── Gouvernance ───
+  rolesEnabled: boolean("roles_enabled").notNull().default(true),
+  groupRoles: jsonb("group_roles").notNull().default(sql`'["PRESIDENT","TRESORIER","SECRETAIRE"]'::jsonb`),
+  approvalsRequiredFor: jsonb("approvals_required_for").notNull().default(sql`'["DISTRIBUTION","REORDER"]'::jsonb`),
+  minKycLevel: text("min_kyc_level").notNull().default("NONE"),
+  minSegmentRequired: text("min_segment_required"),
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const insertTontinePlanSchema = (createInsertSchema(tontinePlans as any, {
   montantCotisation: z.coerce.string(),
-  tauxPlateforme: z.coerce.string(),
+  tauxPlateforme: z.coerce.string().optional().default("0"),
+  penaltyValue: z.coerce.string().optional().default("0"),
+  penaltyCap: z.coerce.string().optional().nullable(),
+  joinFeeAmount: z.coerce.string().optional().default("0"),
+  exitFeePercent: z.coerce.string().optional().default("0"),
+  distributionMinThresholdPct: z.coerce.string().optional().default("50"),
 }) as any).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertTontinePlan = z.infer<typeof insertTontinePlanSchema>;
 export type TontinePlan = typeof tontinePlans.$inferSelect;
 
 // ============================================================================
-// NEW TABLES FOR PRODUCTION-READY TONTINE MODULE
+// TONTINE CYCLE, TURN & SCHEDULE TABLES
 // ============================================================================
 
 // Tontine Cycles - Formal rotation cycles
@@ -439,57 +507,6 @@ export const insertTontineScheduleSchema = createInsertSchema(tontineSchedules).
 });
 export type InsertTontineSchedule = z.infer<typeof insertTontineScheduleSchema>;
 export type TontineSchedule = typeof tontineSchedules.$inferSelect;
-
-// Tontine Rulesets - Structured rules (JSON)
-export const tontineRulesets = pgTable(
-  "tontine_rulesets",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    agenceId: uuid("agence_id").references(() => agences.id),
-
-    name: text("name").notNull(),
-    description: text("description"),
-    version: integer("version").notNull().default(1),
-    isActive: boolean("is_active").notNull().default(true),
-    isDefault: boolean("is_default").notNull().default(false),
-
-    // Structured rules as JSON
-    rules: jsonb("rules").notNull().default("{}"),
-
-    createdAt: timestamp("created_at").defaultNow(),
-    updatedAt: timestamp("updated_at").defaultNow(),
-    createdBy: uuid("created_by").references(() => users.id),
-  },
-  (t) => ({
-    idxActive: index("idx_tontine_rulesets_active").on(t.isActive),
-    idxAgence: index("idx_tontine_rulesets_agence").on(t.agenceId),
-  })
-);
-
-// TypeScript interface for ruleset JSON structure
-export interface TontineRulesConfig {
-  grace_days: number;                          // Days before penalty applies
-  late_fee_amount: number | null;              // Fixed late fee amount
-  late_fee_percent: number | null;             // OR percentage of contribution
-  max_late_count_before_suspend: number;       // Lates before suspension
-  max_late_count_before_exclude: number;       // Lates before exclusion
-  allow_partial_distribution: boolean;         // Allow partial payout
-  distribution_min_threshold_percent: number;  // Min % of pot to distribute
-  withdrawal_fee_amount: number;               // Fixed withdrawal fee
-  withdrawal_fee_percent: number;              // Withdrawal fee %
-  allow_reorder_turns_until: 'BEFORE_CYCLE_START' | 'BEFORE_TURN_DUE' | 'NEVER';
-  penalty_deducted_from_payout: boolean;       // Penalties deducted from gain
-  penalty_as_revenue: boolean;                 // Penalties = accounting revenue
-  auto_pay_penalty_priority: boolean;          // Penalties prioritized over contributions
-  min_members_to_start: number;                // Min members to start cycle
-  max_advance_tours: number;                   // Max tours payable in advance
-}
-
-export const insertTontineRulesetSchema = createInsertSchema(tontineRulesets).omit({
-  id: true, createdAt: true, updatedAt: true
-});
-export type InsertTontineRuleset = z.infer<typeof insertTontineRulesetSchema>;
-export type TontineRuleset = typeof tontineRulesets.$inferSelect;
 
 // Tontine Turn Audit - Audit trail for turn modifications
 export const tontineTurnAudit = pgTable(
@@ -675,3 +692,130 @@ export const TontineFrequency = {
   QUARTERLY: 'QUARTERLY',
 } as const;
 export type TontineFrequency = typeof TontineFrequency[keyof typeof TontineFrequency];
+
+// ============================================================================
+// NEW ENUMS FOR ENTERPRISE TONTINE ENGINE
+// ============================================================================
+
+export const FirstContributionRule = {
+  ON_START_DATE: 'ON_START_DATE',
+  AFTER_N_DAYS: 'AFTER_N_DAYS',
+  NEXT_WEEKDAY: 'NEXT_WEEKDAY',
+  END_OF_WEEK: 'END_OF_WEEK',
+  END_OF_MONTH: 'END_OF_MONTH',
+  CUSTOM_DATE_ALLOWED: 'CUSTOM_DATE_ALLOWED',
+} as const;
+export type FirstContributionRule = typeof FirstContributionRule[keyof typeof FirstContributionRule];
+
+export const CollectionCalendarMode = {
+  ALL_DAYS: 'ALL_DAYS',
+  BUSINESS_DAYS_ONLY: 'BUSINESS_DAYS_ONLY',
+  CUSTOM_WEEKDAYS: 'CUSTOM_WEEKDAYS',
+} as const;
+export type CollectionCalendarMode = typeof CollectionCalendarMode[keyof typeof CollectionCalendarMode];
+
+export const ShiftNonWorkingDay = {
+  NEXT: 'NEXT',
+  PREVIOUS: 'PREVIOUS',
+  NEAREST: 'NEAREST',
+} as const;
+export type ShiftNonWorkingDay = typeof ShiftNonWorkingDay[keyof typeof ShiftNonWorkingDay];
+
+export const DistributionType = {
+  ROTATIVE_SUSU: 'ROTATIVE_SUSU',
+  ACCUMULATIVE_END: 'ACCUMULATIVE_END',
+  MIXED: 'MIXED',
+  AUCTION_OPTIONAL: 'AUCTION_OPTIONAL',
+} as const;
+export type DistributionType = typeof DistributionType[keyof typeof DistributionType];
+
+export const PayoutFrequencyMode = {
+  SAME_AS_CONTRIBUTION: 'SAME_AS_CONTRIBUTION',
+  CUSTOM: 'CUSTOM',
+} as const;
+export type PayoutFrequencyMode = typeof PayoutFrequencyMode[keyof typeof PayoutFrequencyMode];
+
+export const PayoutOrderMode = {
+  FIXED_BY_ADMIN: 'FIXED_BY_ADMIN',
+  RANDOM_AT_START: 'RANDOM_AT_START',
+  PRIORITY_SCORE: 'PRIORITY_SCORE',
+} as const;
+export type PayoutOrderMode = typeof PayoutOrderMode[keyof typeof PayoutOrderMode];
+
+export const PenaltyTypeEnum = {
+  FIXED: 'FIXED',
+  PERCENT: 'PERCENT',
+} as const;
+export type PenaltyTypeEnum = typeof PenaltyTypeEnum[keyof typeof PenaltyTypeEnum];
+
+export const PenaltyApplication = {
+  PER_PERIOD: 'PER_PERIOD',
+  PER_DAY: 'PER_DAY',
+  ONE_TIME: 'ONE_TIME',
+} as const;
+export type PenaltyApplication = typeof PenaltyApplication[keyof typeof PenaltyApplication];
+
+export const ArrearsPolicy = {
+  MUST_PAY_BEFORE_PAYOUT: 'MUST_PAY_BEFORE_PAYOUT',
+  ALLOW_PAYOUT_WITH_ARREARS: 'ALLOW_PAYOUT_WITH_ARREARS',
+} as const;
+export type ArrearsPolicy = typeof ArrearsPolicy[keyof typeof ArrearsPolicy];
+
+export const SuspensionPolicy = {
+  SUSPEND_MEMBER: 'SUSPEND_MEMBER',
+  SUSPEND_PAYOUT_ONLY: 'SUSPEND_PAYOUT_ONLY',
+  SUSPEND_BOTH: 'SUSPEND_BOTH',
+} as const;
+export type SuspensionPolicy = typeof SuspensionPolicy[keyof typeof SuspensionPolicy];
+
+export const DefaultPolicy = {
+  EXCLUDE_MEMBER: 'EXCLUDE_MEMBER',
+  REPLACE_MEMBER: 'REPLACE_MEMBER',
+  KEEP_DEBT_RUNNING: 'KEEP_DEBT_RUNNING',
+} as const;
+export type DefaultPolicy = typeof DefaultPolicy[keyof typeof DefaultPolicy];
+
+export const FeeCollectionMode = {
+  ON_EACH_PAYOUT: 'ON_EACH_PAYOUT',
+  ON_EACH_CONTRIBUTION: 'ON_EACH_CONTRIBUTION',
+  END_OF_CYCLE: 'END_OF_CYCLE',
+} as const;
+export type FeeCollectionMode = typeof FeeCollectionMode[keyof typeof FeeCollectionMode];
+
+export const EndRule = {
+  AFTER_N_ROUNDS: 'AFTER_N_ROUNDS',
+  AFTER_N_PERIODS: 'AFTER_N_PERIODS',
+  WHEN_ALL_RECEIVED: 'WHEN_ALL_RECEIVED',
+} as const;
+export type EndRule = typeof EndRule[keyof typeof EndRule];
+
+export const TontineGroupRole = {
+  PRESIDENT: 'PRESIDENT',
+  TRESORIER: 'TRESORIER',
+  SECRETAIRE: 'SECRETAIRE',
+} as const;
+export type TontineGroupRole = typeof TontineGroupRole[keyof typeof TontineGroupRole];
+
+export const TontineStatus = {
+  DRAFT: 'DRAFT',
+  ACTIVE: 'ACTIVE',
+  PAUSED: 'PAUSED',
+  COMPLETED: 'COMPLETED',
+  CANCELLED: 'CANCELLED',
+} as const;
+export type TontineStatus = typeof TontineStatus[keyof typeof TontineStatus];
+
+export const KycLevel = {
+  NONE: 'NONE',
+  BASIC: 'BASIC',
+  FULL: 'FULL',
+} as const;
+export type KycLevel = typeof KycLevel[keyof typeof KycLevel];
+
+export const TontinePaymentMethod = {
+  CASH: 'CASH',
+  MOBILE_MONEY: 'MOBILE_MONEY',
+  BANK_TRANSFER: 'BANK_TRANSFER',
+  WALLET_INTERNAL: 'WALLET_INTERNAL',
+} as const;
+export type TontinePaymentMethod = typeof TontinePaymentMethod[keyof typeof TontinePaymentMethod];

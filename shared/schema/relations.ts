@@ -2,7 +2,7 @@ import { relations } from "drizzle-orm";
 import { users, loginAttempts } from "./auth";
 import { clients } from "./clients";
 import { credits, remboursements, comptes, transactionsCompte, plansEpargne, sessionsCaisse, operationsCaisse, mouvementsFinanciers, creditPlans, creditPlanFees, demandesCredit } from "./finance";
-import { tontines, membresTontine, contributionsTontine, tontineAlertes, tontinePenalites } from "./tontines";
+import { tontines, membresTontine, contributionsTontine, tontinePenalites, tontinePlans, tontineCycles, tontineTurns, tontineSchedules } from "./tontines";
 import { agentsTerrain, prospections, visitesTerrain, paiementsTerrain, factures, lignesFactures, remisesTerrain, comptageBillets } from "./operations";
 
 import { notifications, pushSubscriptions, creditPlanVersions, creditPenaltyStructures, holidayCalendars, holidayDates } from "./settings";
@@ -38,9 +38,62 @@ export const comptesRelations = relations(comptes, ({ one, many }) => ({
   transactions: many(transactionsCompte),
 }));
 
-export const tontinesRelations = relations(tontines, ({ many }) => ({
+export const tontinePlansRelations = relations(tontinePlans, ({ one, many }) => ({
+  holidayCalendar: one(holidayCalendars, {
+    fields: [tontinePlans.holidayCalendarId],
+    references: [holidayCalendars.id],
+  }),
+  tontines: many(tontines),
+}));
+
+export const tontinesRelations = relations(tontines, ({ one, many }) => ({
+  plan: one(tontinePlans, {
+    fields: [tontines.planId],
+    references: [tontinePlans.id],
+  }),
+  holidayCalendar: one(holidayCalendars, {
+    fields: [tontines.holidayCalendarId],
+    references: [holidayCalendars.id],
+  }),
   membres: many(membresTontine),
   contributions: many(contributionsTontine),
+  cycles: many(tontineCycles),
+  penalites: many(tontinePenalites),
+}));
+
+export const tontineCyclesRelations = relations(tontineCycles, ({ one, many }) => ({
+  tontine: one(tontines, {
+    fields: [tontineCycles.tontineId],
+    references: [tontines.id],
+  }),
+  turns: many(tontineTurns),
+  schedules: many(tontineSchedules),
+}));
+
+export const tontineTurnsRelations = relations(tontineTurns, ({ one }) => ({
+  tontine: one(tontines, {
+    fields: [tontineTurns.tontineId],
+    references: [tontines.id],
+  }),
+  cycle: one(tontineCycles, {
+    fields: [tontineTurns.cycleId],
+    references: [tontineCycles.id],
+  }),
+  beneficiary: one(membresTontine, {
+    fields: [tontineTurns.beneficiaryMemberId],
+    references: [membresTontine.id],
+  }),
+}));
+
+export const tontineSchedulesRelations = relations(tontineSchedules, ({ one }) => ({
+  tontine: one(tontines, {
+    fields: [tontineSchedules.tontineId],
+    references: [tontines.id],
+  }),
+  cycle: one(tontineCycles, {
+    fields: [tontineSchedules.cycleId],
+    references: [tontineCycles.id],
+  }),
 }));
 
 export const membresTontineRelations = relations(membresTontine, ({ one, many }) => ({
@@ -73,17 +126,6 @@ export const notificationsRelations = relations(notifications, ({ one }) => ({
   user: one(users, {
     fields: [notifications.userId],
     references: [users.id],
-  }),
-}));
-
-export const tontineAlertesRelations = relations(tontineAlertes, ({ one }) => ({
-  tontine: one(tontines, {
-    fields: [tontineAlertes.tontineId],
-    references: [tontines.id],
-  }),
-  membre: one(membresTontine, {
-    fields: [tontineAlertes.membreId],
-    references: [membresTontine.id],
   }),
 }));
 

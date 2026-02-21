@@ -1171,22 +1171,16 @@ export const TYPE_VISITE_TERRAIN_OPTIONS = Object.entries(TYPE_VISITE_TERRAIN_LA
 
 
 // ============================================
-// STATUT TONTINE (Groupe de cotisation)
+// STATUT TONTINE — Canonical enum: TontineStatus in shared/schema/tontines.ts
 // ============================================
 
-export const StatutTontine = {
-  ACTIVE: "ACTIVE",
-  COMPLETED: "COMPLETED",
-  SUSPENDED: "SUSPENDED",
-} as const;
-
-export type StatutTontineType = (typeof StatutTontine)[keyof typeof StatutTontine];
-
 /** Labels FR pour l'UI des statuts de tontine */
-export const STATUT_TONTINE_LABELS: Record<StatutTontineType, string> = {
-  [StatutTontine.ACTIVE]: "Active",
-  [StatutTontine.COMPLETED]: "Terminée",
-  [StatutTontine.SUSPENDED]: "Suspendue",
+export const STATUT_TONTINE_LABELS: Record<string, string> = {
+  DRAFT: "Brouillon",
+  ACTIVE: "Active",
+  PAUSED: "Suspendue",
+  COMPLETED: "Terminée",
+  CANCELLED: "Annulée",
 };
 
 /** Options de statut pour les selects de l'UI */
@@ -1253,24 +1247,15 @@ export const STATUT_CONTRIBUTION_TONTINE_OPTIONS = Object.entries(STATUT_CONTRIB
 
 
 // ============================================
-// TYPE DISTRIBUTION TONTINE (Méthode d'attribution du bénéfice)
+// TYPE DISTRIBUTION TONTINE — Canonical enum: DistributionType in shared/schema/tontines.ts
 // ============================================
 
-export const TypeDistributionTontine = {
-  ORDER: "ORDER",         // Attribution par ordre de position
-  RANDOM: "RANDOM",       // Attribution aléatoire
-  FIXED: "FIXED",         // Attribution fixe/prédéfinie
-  ROTATING: "ROTATING",   // Attribution rotative
-} as const;
-
-export type TypeDistributionTontineType = (typeof TypeDistributionTontine)[keyof typeof TypeDistributionTontine];
-
 /** Labels FR pour l'UI des types de distribution */
-export const TYPE_DISTRIBUTION_TONTINE_LABELS: Record<TypeDistributionTontineType, string> = {
-  [TypeDistributionTontine.ORDER]: "Par ordre",
-  [TypeDistributionTontine.RANDOM]: "Aléatoire",
-  [TypeDistributionTontine.FIXED]: "Fixe",
-  [TypeDistributionTontine.ROTATING]: "Rotatif",
+export const TYPE_DISTRIBUTION_TONTINE_LABELS: Record<string, string> = {
+  ROTATIVE_SUSU: "Rotative (Susu)",
+  ACCUMULATIVE_END: "Accumulation fin de cycle",
+  MIXED: "Mixte",
+  AUCTION_OPTIONAL: "Enchère optionnelle",
 };
 
 /** Options de type distribution pour les selects de l'UI */
@@ -1310,6 +1295,7 @@ export const StatutMembreTontine = {
   ACTIVE: "ACTIVE",
   INACTIVE: "INACTIVE",
   EXCLUDED: "EXCLUDED",
+  RETIRED: "RETIRÉ",
 } as const;
 
 export type StatutMembreTontineType = (typeof StatutMembreTontine)[keyof typeof StatutMembreTontine];
@@ -1319,6 +1305,7 @@ export const STATUT_MEMBRE_TONTINE_LABELS: Record<StatutMembreTontineType, strin
   [StatutMembreTontine.ACTIVE]: "Actif",
   [StatutMembreTontine.INACTIVE]: "Inactif",
   [StatutMembreTontine.EXCLUDED]: "Exclu",
+  [StatutMembreTontine.RETIRED]: "Retiré",
 };
 
 /** Options de statut membre pour les selects de l'UI */

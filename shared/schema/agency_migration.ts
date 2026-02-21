@@ -53,7 +53,6 @@ export const MIGRATION_ENTITY_TYPE = {
   TONTINE_CYCLE: "TONTINE_CYCLE",
   TONTINE_TURN: "TONTINE_TURN",
   TONTINE_SCHEDULE: "TONTINE_SCHEDULE",
-  TONTINE_RULESET: "TONTINE_RULESET",
   DOSSIER_CREDIT: "DOSSIER_CREDIT",
   TRANSFERT_COFFRE_CAISSE: "TRANSFERT_COFFRE_CAISSE",
   TREASURY_TRANSFER: "TREASURY_TRANSFER",
@@ -298,7 +297,6 @@ export interface MigrationVolumetry {
   tontineCycles: number;
   tontineTurns: number;
   tontineSchedules: number;
-  tontineRulesets: number;
   transfertsCoffreCaisse: number;
 }
 
