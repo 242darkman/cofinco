@@ -33,6 +33,7 @@ export const DEFAULT_FORM_DATA: TontineGroupFormData = {
   intervalleCotisation: "1",
   distributionType: "ROTATIVE_SUSU",
   agenceId: "",
+  gestionnaireId: "",
 
   dateDebut: new Date().toISOString().split("T")[0],
   dateFin: "",

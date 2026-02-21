@@ -1,12 +1,21 @@
+import { useState, useEffect } from "react";
 import type { StepComponentProps } from "../types";
 import { currencySymbol } from "@shared/config/currency";
 import {
   FREQUENCE_OPTIONS,
   DISTRIBUTION_TYPE_OPTIONS,
 } from "../../TontinePlanWizard/constants";
+import { userApi } from "../../../../lib/api-client";
 
 export default function StepGeneral({ formData, updateField }: StepComponentProps) {
   const sym = currencySymbol();
+  const [users, setUsers] = useState<any[]>([]);
+
+  useEffect(() => {
+    userApi.getAll()
+      .then((data) => setUsers(data || []))
+      .catch(() => setUsers([]));
+  }, []);
 
   return (
     <div className="space-y-5">
@@ -99,6 +108,21 @@ export default function StepGeneral({ formData, updateField }: StepComponentProp
             ))}
           </select>
         </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-content-primary mb-1">Gestionnaire</label>
+        <select
+          value={formData.gestionnaireId}
+          onChange={(e) => updateField("gestionnaireId", e.target.value)}
+          className="w-full px-3 py-2.5 bg-input border border-input-border rounded-lg text-sm focus:border-input-focus focus:outline-none"
+        >
+          <option value="">— Aucun gestionnaire —</option>
+          {users.map((u) => (
+            <option key={u.id} value={u.id}>{u.nom || u.name || u.username || u.email}</option>
+          ))}
+        </select>
+        <p className="text-[10px] text-content-muted mt-1">Utilisateur responsable de la gestion de cette tontine</p>
       </div>
     </div>
   );

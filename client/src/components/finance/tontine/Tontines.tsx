@@ -25,6 +25,7 @@ import TontineDashboard from './TontineDashboard';
 import TontineCalendar from './TontineCalendar';
 import TontineConfig from './TontineConfig';
 import TontinePenalties from './TontinePenalties';
+import TontineTurnManager from './TontineTurnManager';
 import { currencySymbol } from '@shared/config/currency';
 
 // Extends the DB schema type with computed fields returned by the API
@@ -50,7 +51,7 @@ export default function Tontines() {
   const [showForm, setShowForm] = useState(false);
   const [editingTontine, setEditingTontine] = useState<Tontine | null>(null);
   const [selectedTontine, setSelectedTontine] = useState<Tontine | null>(null);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'config' | 'membres' | 'contributions' | 'distributions' | 'penalites' | 'calendar'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'config' | 'membres' | 'contributions' | 'distributions' | 'tours' | 'penalites' | 'calendar'>('dashboard');
 
   useEffect(() => {
     fetchTontines();
@@ -336,6 +337,7 @@ export default function Tontines() {
               { key: 'membres', label: 'Membres' },
               { key: 'contributions', label: 'Contributions' },
               { key: 'distributions', label: 'Distributions' },
+              { key: 'tours', label: 'Tours' },
               { key: 'penalites', label: 'Penalites' },
               { key: 'calendar', label: 'Calendrier' },
             ]}
@@ -366,6 +368,9 @@ export default function Tontines() {
                   nombreMembres={selectedTontine.nombreMembres}
                   onUpdate={fetchTontines}
                 />
+              )}
+              {activeTab === 'tours' && (
+                <TontineTurnManager tontineId={selectedTontine.id} onUpdate={fetchTontines} />
               )}
               {activeTab === 'penalites' && (
                 <TontinePenalties tontineId={selectedTontine.id} onUpdate={fetchTontines} />

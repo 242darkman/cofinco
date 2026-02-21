@@ -16,6 +16,7 @@ function mapTontineToFormData(t: Tontine): TontineGroupFormData {
     intervalleCotisation: t.intervalleCotisation?.toString() || "1",
     distributionType: t.distributionType || "ROTATIVE_SUSU",
     agenceId: t.agenceId || "",
+    gestionnaireId: t.gestionnaireId || "",
 
     dateDebut: t.dateDebut?.split("T")[0] || new Date().toISOString().split("T")[0],
     dateFin: t.dateFin ? t.dateFin.split("T")[0] : "",

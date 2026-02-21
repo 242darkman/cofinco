@@ -21,6 +21,7 @@ export interface TontineGroupFormData {
   intervalleCotisation: string;
   distributionType: string;
   agenceId: string;
+  gestionnaireId: string;
 
   // ─── Step 3: Lifecycle ───
   dateDebut: string;

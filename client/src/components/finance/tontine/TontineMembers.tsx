@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Plus, UserPlus, Trash2, CheckCircle, X, Gift, User, Search, TrendingUp, AlertCircle, Clock, Settings, Wallet, Check, CheckCheck, AlertTriangle, Download } from 'lucide-react';
+import { Plus, UserPlus, Trash2, CheckCircle, X, Gift, User, Search, TrendingUp, AlertCircle, Clock, Settings, Wallet, Check, CheckCheck, AlertTriangle, Download, LogOut, UserMinus, RefreshCw } from 'lucide-react';
 import { Card, Button, IconButton } from '../../ui';
 import { TontineTimelineHorizontal } from './TontineTimeline';
 import ConfirmDialog from '../../ui/ConfirmDialog';
@@ -226,6 +226,80 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
       toast.error(handleApiError(error, "Erreur lors du changement de role"));
     }
   }, [tontineId, fetchMembres]);
+
+  // Exit request
+  const handleRequestExit = useCallback((membre: TontineMembre) => {
+    const memberName = formatClientName(membre.client?.nom, membre.client?.prenom);
+    openConfirm({
+      title: 'Demander la sortie',
+      message: `Soumettre une demande de sortie pour ${escapeHtml(memberName)} ?`,
+      variant: 'warning',
+      confirmText: 'Demander sortie',
+      onConfirm: async () => {
+        try {
+          await tontineApi.requestMemberExit(tontineId, membre.id);
+          toast.success('Demande de sortie soumise');
+          fetchMembres();
+          onUpdate();
+        } catch (error) {
+          toast.error(handleApiError(error, 'Erreur lors de la demande de sortie'));
+        }
+      },
+    });
+  }, [tontineId, openConfirm, fetchMembres, onUpdate]);
+
+  // Approve exit
+  const handleApproveExit = useCallback((membre: TontineMembre) => {
+    const memberName = formatClientName(membre.client?.nom, membre.client?.prenom);
+    openConfirm({
+      title: 'Approuver la sortie',
+      message: `Confirmer la sortie de ${escapeHtml(memberName)} de la tontine ? Cette action est irréversible.`,
+      variant: 'danger',
+      confirmText: 'Approuver sortie',
+      onConfirm: async () => {
+        try {
+          await tontineApi.approveMemberExit(tontineId, membre.id);
+          toast.success('Sortie approuvée');
+          fetchMembres();
+          onUpdate();
+        } catch (error) {
+          toast.error(handleApiError(error, "Erreur lors de l'approbation"));
+        }
+      },
+    });
+  }, [tontineId, openConfirm, fetchMembres, onUpdate]);
+
+  // Replace member
+  const [replacingMemberId, setReplacingMemberId] = useState<string | null>(null);
+  const [replacementClientId, setReplacementClientId] = useState('');
+  const [replacementSearch, setReplacementSearch] = useState('');
+
+  const replacementCandidates = useMemo(() => {
+    const query = sanitizeInput(replacementSearch).toLowerCase();
+    return clients.filter((client) => {
+      if (membres.some((m) => m.clientId === client.id)) return false;
+      if (!query) return true;
+      return (client.nom || '').toLowerCase().includes(query) || (client.telephone || '').toLowerCase().includes(query);
+    });
+  }, [clients, membres, replacementSearch]);
+
+  const handleReplaceMember = useCallback(async () => {
+    if (!replacingMemberId || !replacementClientId) return;
+    setSubmitting(true);
+    try {
+      await tontineApi.replaceMember(tontineId, replacingMemberId, replacementClientId);
+      toast.success('Membre remplacé avec succès');
+      setReplacingMemberId(null);
+      setReplacementClientId('');
+      setReplacementSearch('');
+      fetchMembres();
+      onUpdate();
+    } catch (error) {
+      toast.error(handleApiError(error, 'Erreur lors du remplacement'));
+    } finally {
+      setSubmitting(false);
+    }
+  }, [tontineId, replacingMemberId, replacementClientId, fetchMembres, onUpdate]);
 
   // Memoized filtered clients (excludes already added members)
   const filteredClients = useMemo(() => {
@@ -470,14 +544,49 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
                         </div>
                       </div>
 
-                      <button
-                        onClick={() => handleRemoveMembre(membre)}
-                        className="text-content-muted hover:text-status-danger transition-colors p-1 rounded-lg hover:bg-status-danger-bg"
-                        aria-label={`Retirer ${escapeHtml(membre.client?.nom || 'ce membre')}`}
-                        type="button"
-                      >
-                        <Trash2 size={14} aria-hidden="true" />
-                      </button>
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        {/* Exit request / approve */}
+                        {!membre.exitRequestedAt && (membre.status || membre.statut) === StatutMembreTontine.ACTIVE && (
+                          <button
+                            onClick={() => handleRequestExit(membre)}
+                            className="text-content-muted hover:text-status-warning transition-colors p-1 rounded-lg hover:bg-status-warning-bg"
+                            title="Demander sortie"
+                            type="button"
+                          >
+                            <LogOut size={14} />
+                          </button>
+                        )}
+                        {membre.exitRequestedAt && (
+                          <button
+                            onClick={() => handleApproveExit(membre)}
+                            className="text-content-muted hover:text-status-success transition-colors p-1 rounded-lg hover:bg-status-success-bg"
+                            title="Approuver sortie"
+                            type="button"
+                          >
+                            <CheckCircle size={14} />
+                          </button>
+                        )}
+                        {/* Replace member */}
+                        {(membre.status || membre.statut) === StatutMembreTontine.ACTIVE && (
+                          <button
+                            onClick={() => { setReplacingMemberId(membre.id); setReplacementClientId(''); setReplacementSearch(''); }}
+                            className="text-content-muted hover:text-accent transition-colors p-1 rounded-lg hover:bg-accent/10"
+                            title="Remplacer"
+                            type="button"
+                          >
+                            <RefreshCw size={14} />
+                          </button>
+                        )}
+                        {/* Remove */}
+                        <button
+                          onClick={() => handleRemoveMembre(membre)}
+                          className="text-content-muted hover:text-status-danger transition-colors p-1 rounded-lg hover:bg-status-danger-bg"
+                          aria-label={`Retirer ${escapeHtml(membre.client?.nom || 'ce membre')}`}
+                          type="button"
+                        >
+                          <Trash2 size={14} aria-hidden="true" />
+                        </button>
+                      </div>
                     </div>
 
                     <div className="flex items-center gap-2 mt-2">
@@ -693,6 +802,92 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
         variant={confirmState.variant}
         confirmText={confirmState.confirmText}
       />
+
+      {/* Replace Member Modal */}
+      {replacingMemberId && (
+        <div
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={(e) => e.target === e.currentTarget && setReplacingMemberId(null)}
+        >
+          <div className="bg-surface-base border border-edge rounded-xl w-full max-w-md shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="p-4 border-b border-edge flex items-center justify-between shrink-0">
+              <div>
+                <h2 className="text-lg font-bold text-content-primary">Remplacer le membre</h2>
+                <p className="text-xs text-content-muted mt-0.5">
+                  {(() => {
+                    const m = membres.find(m => m.id === replacingMemberId);
+                    return m ? formatClientName(m.client?.nom, m.client?.prenom) : '';
+                  })()}
+                </p>
+              </div>
+              <IconButton icon={X} onClick={() => setReplacingMemberId(null)} size="sm" aria-label="Fermer" />
+            </div>
+
+            <div className="p-4 flex-1 overflow-y-auto">
+              <label className="block text-xs font-semibold text-content-muted uppercase tracking-wider mb-2">
+                Nouveau membre
+              </label>
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" size={16} />
+                <input
+                  type="text"
+                  value={replacementSearch}
+                  onChange={(e) => setReplacementSearch(e.target.value)}
+                  className="w-full bg-surface-base text-content-primary pl-10 pr-4 py-2.5 rounded-lg border border-edge focus:outline-none focus:border-accent transition-colors text-sm"
+                  placeholder="Rechercher un client..."
+                  autoFocus
+                />
+              </div>
+              <div className="space-y-2 max-h-[300px] overflow-y-auto" role="listbox">
+                {replacementCandidates.length === 0 ? (
+                  <div className="text-center py-8 text-content-muted text-sm">Aucun client trouvé</div>
+                ) : (
+                  replacementCandidates.slice(0, 50).map((client) => (
+                    <button
+                      key={client.id}
+                      type="button"
+                      role="option"
+                      aria-selected={replacementClientId === client.id}
+                      onClick={() => setReplacementClientId(client.id)}
+                      className={`w-full text-left p-3 rounded-lg border transition-all flex items-center justify-between ${
+                        replacementClientId === client.id
+                          ? 'border-accent bg-accent/10'
+                          : 'border-edge hover:border-edge-strong bg-surface/30'
+                      }`}
+                    >
+                      <div>
+                        <div className={`font-semibold text-sm ${replacementClientId === client.id ? 'text-accent' : 'text-content-secondary'}`}>
+                          {formatClientName(client.nom, client.prenom)}
+                        </div>
+                        <div className="text-xs text-content-muted mt-0.5">{client.telephone || ''}</div>
+                      </div>
+                      {replacementClientId === client.id && <CheckCircle size={16} className="text-accent" />}
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-edge bg-surface-base/50 shrink-0 flex gap-3">
+              <Button variant="ghost" fullWidth onClick={() => setReplacingMemberId(null)} disabled={submitting}>
+                Annuler
+              </Button>
+              <Button
+                variant="primary"
+                fullWidth
+                onClick={handleReplaceMember}
+                disabled={!replacementClientId || submitting}
+                isLoading={submitting}
+                icon={RefreshCw}
+              >
+                Remplacer
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Configuration Modal */}
       {configMember && (

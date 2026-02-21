@@ -4,7 +4,7 @@ import {
   MethodePaiement,
   StatutMembreTontine
 } from '@shared/enum/status-constants';
-import { Check, DollarSign, User, X, AlertTriangle, Wallet, TrendingDown, Banknote, Smartphone, Clock, Play } from 'lucide-react';
+import { Check, DollarSign, User, X, AlertTriangle, Wallet, TrendingDown, Banknote, Smartphone, Clock, Play, CheckCircle, Ban } from 'lucide-react';
 import mtnLogo from '@/assets/logos/mtn-logo.png';
 import airtelLogo from '@/assets/logos/airtel-logo.png';
 
@@ -205,6 +205,36 @@ export default function TontineDistributions({ tontineId, montantContribution, t
     }
   }, [selectedMembreId, selectedTurnId, currentCycle, tontineId, payoutMethod, provider, notes, membres, soldeInsuffisant, fetchData, onUpdate]);
 
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  const handleApprove = useCallback(async (dist: DistributionRequest) => {
+    setActionLoading(dist.id);
+    try {
+      await tontineApi.approveDistribution(tontineId, dist.id);
+      toast.success('Distribution approuvée');
+      fetchData();
+      onUpdate();
+    } catch (error) {
+      toast.error(handleApiError(error, "Erreur lors de l'approbation"));
+    } finally {
+      setActionLoading(null);
+    }
+  }, [tontineId, fetchData, onUpdate]);
+
+  const handleCancel = useCallback(async (dist: DistributionRequest) => {
+    setActionLoading(dist.id);
+    try {
+      await tontineApi.cancelDistribution(tontineId, dist.id, 'Annulé manuellement');
+      toast.success('Distribution annulée');
+      fetchData();
+      onUpdate();
+    } catch (error) {
+      toast.error(handleApiError(error, "Erreur lors de l'annulation"));
+    } finally {
+      setActionLoading(null);
+    }
+  }, [tontineId, fetchData, onUpdate]);
+
   // Helper functions
   const getDistributionAmount = (dist: DistributionRequest) => {
     return Number(dist.netAmount || dist.amountPaid || dist.amountRequested || 0);
@@ -317,20 +347,53 @@ export default function TontineDistributions({ tontineId, montantContribution, t
       {/* Pending distributions */}
       {pendingDistributions.length > 0 && (
         <div className="space-y-2">
-          <div className="text-xs font-semibold text-status-warning uppercase tracking-wider">En attente</div>
+          <div className="text-xs font-semibold text-status-warning uppercase tracking-wider">
+            En attente ({pendingDistributions.length})
+          </div>
           {pendingDistributions.map(dist => {
             const memberId = dist.beneficiaryMemberId;
             const status = getDistributionStatus(dist);
             const statusCfg = statusConfig[status] || statusConfig.DRAFT;
+            const isActionLoading = actionLoading === dist.id;
 
             return (
-              <Card key={dist.id} className="bg-status-warning-bg border-status-warning/20 p-3">
-                <div className="flex justify-between items-center">
-                  <div>
+              <Card key={dist.id} className="bg-status-warning-bg/50 border-status-warning/20 p-3">
+                <div className="flex justify-between items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Badge variant={statusCfg.variant} className="text-[10px]" value={statusCfg.label} />
+                      {dist.createdAt && (
+                        <span className="text-[10px] text-content-muted">
+                          {new Date(dist.createdAt).toLocaleDateString('fr-FR')}
+                        </span>
+                      )}
+                    </div>
                     <div className="font-medium text-content-primary text-sm">{memberId ? getMemberName(memberId) : 'Inconnu'}</div>
-                    <div className="text-xs text-content-muted">{getDistributionAmount(dist).toLocaleString()} {sym}</div>
+                    <div className="text-xs text-content-muted mt-0.5">
+                      {getDistributionAmount(dist).toLocaleString()} {sym}
+                      {dist.payoutMethod && ` • ${payoutMethodLabels[dist.payoutMethod] || dist.payoutMethod}`}
+                    </div>
                   </div>
-                  <Badge variant={statusCfg.variant} className="text-[10px]" value={statusCfg.label} />
+                  <div className="flex items-center gap-1 shrink-0">
+                    {status === 'SUBMITTED' && (
+                      <button
+                        onClick={() => handleApprove(dist)}
+                        disabled={isActionLoading}
+                        className="p-1.5 rounded-lg text-status-success hover:bg-status-success-bg transition-colors disabled:opacity-50"
+                        title="Approuver"
+                      >
+                        <CheckCircle size={16} />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleCancel(dist)}
+                      disabled={isActionLoading}
+                      className="p-1.5 rounded-lg text-status-danger hover:bg-status-danger-bg transition-colors disabled:opacity-50"
+                      title="Annuler"
+                    >
+                      <Ban size={16} />
+                    </button>
+                  </div>
                 </div>
               </Card>
             );

@@ -8,3 +8,4 @@ export { default as TontineDistributions } from './TontineDistributions';
 export { default as TontineMembers } from './TontineMembers';
 export { default as TontinePenalties } from './TontinePenalties';
 export { default as TontineTimeline } from './TontineTimeline';
+export { default as TontineTurnManager } from './TontineTurnManager';
