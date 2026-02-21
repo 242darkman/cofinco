@@ -1,7 +1,8 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Card, Badge, Button } from '../ui';
-import { FileText, Download, Calendar } from 'lucide-react';
+import { Card } from '../ui';
+import { FileText, Download, Calendar, Eye, ChevronLeft, ChevronRight } from 'lucide-react';
+import { PayslipViewer } from '../hr/PayslipViewer';
 
 interface Bulletin {
   id: number;
@@ -35,6 +36,10 @@ const STATUT_STYLES: Record<string, { bg: string; text: string; label: string }>
 };
 
 export default function MesBulletinsTab() {
+  const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState(currentYear);
+  const [viewerBulletinId, setViewerBulletinId] = useState<number | null>(null);
+
   const { data: rawBulletins, isLoading } = useQuery<Bulletin[]>({
     queryKey: ['/api/hr/paie/my'],
     queryFn: () =>
@@ -44,20 +49,33 @@ export default function MesBulletinsTab() {
   });
   const bulletins = rawBulletins ?? [];
 
-  // Group bulletins by year, keyed by 'YYYY-MM'
-  const yearGroups = useMemo(() => {
-    const map = new Map<string, Map<number, Bulletin>>();
+  // Compute available years from bulletins
+  const availableYears = useMemo(() => {
+    const years = new Set<number>();
+    years.add(currentYear);
+    for (const b of bulletins) {
+      const y = parseInt(b.mois?.split('-')[0]);
+      if (!isNaN(y)) years.add(y);
+    }
+    return [...years].sort((a, b) => b - a);
+  }, [bulletins, currentYear]);
+
+  // Build month map for the selected year
+  const monthMap = useMemo(() => {
+    const map = new Map<number, Bulletin>();
     for (const b of bulletins) {
       const match = b.mois.match(/^(\d{4})-(\d{2})$/);
       if (!match) continue;
-      const year = match[1];
+      const year = parseInt(match[1], 10);
       const month = parseInt(match[2], 10);
-      if (!map.has(year)) map.set(year, new Map());
-      map.get(year)!.set(month, b);
+      if (year === selectedYear) {
+        map.set(month, b);
+      }
     }
-    // Sort years descending
-    return [...map.entries()].sort((a, b) => b[0].localeCompare(a[0]));
-  }, [bulletins]);
+    return map;
+  }, [bulletins, selectedYear]);
+
+  const bulletinCount = monthMap.size;
 
   if (isLoading) {
     return (
@@ -79,86 +97,141 @@ export default function MesBulletinsTab() {
     );
   }
 
+  const yearIdx = availableYears.indexOf(selectedYear);
+  const canPrev = yearIdx < availableYears.length - 1;
+  const canNext = yearIdx > 0;
+
   return (
-    <div className="space-y-4">
-      {yearGroups.map(([year, monthMap]) => (
-        <Card key={year} padding="sm">
-          {/* Year header */}
-          <div className="flex items-center gap-2 mb-3 pb-2 border-b border-edge-subtle">
-            <Calendar size={16} className="text-accent" />
-            <h3 className="text-sm font-bold text-content-primary">{year}</h3>
-            <span className="text-xs text-content-muted">
-              ({monthMap.size} bulletin{monthMap.size > 1 ? 's' : ''})
-            </span>
+    <div className="space-y-3">
+      {/* Year selector */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <div className="p-1.5 bg-accent/10 rounded-lg">
+            <Calendar size={15} className="text-accent" />
           </div>
+          <h3 className="text-xs font-bold text-content-secondary uppercase tracking-wider">
+            Bulletins de paie
+          </h3>
+        </div>
 
-          {/* 2-column x 6-row grid: Jan-Jun | Jul-Dec */}
-          <div className="grid grid-cols-2 gap-2">
-            {[...Array(12)].map((_, i) => {
-              const month = i + 1;
-              const bulletin = monthMap.get(month);
-              const style = bulletin ? STATUT_STYLES[bulletin.statut] : null;
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => canPrev && setSelectedYear(availableYears[yearIdx + 1])}
+            disabled={!canPrev}
+            className="p-1 rounded-md text-content-muted hover:text-accent hover:bg-accent/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <select
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(Number(e.target.value))}
+            className="bg-surface-base border border-edge rounded-lg text-sm font-semibold text-content-primary px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-colors cursor-pointer"
+          >
+            {availableYears.map((y) => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+          <button
+            onClick={() => canNext && setSelectedYear(availableYears[yearIdx - 1])}
+            disabled={!canNext}
+            className="p-1 rounded-md text-content-muted hover:text-accent hover:bg-accent/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
+      </div>
 
-              if (!bulletin) {
-                return (
-                  <div
-                    key={month}
-                    className="flex items-center gap-2.5 p-2.5 rounded-lg border border-dashed border-edge-subtle/50 opacity-40"
-                  >
-                    <div className="w-9 h-9 rounded-lg bg-surface-subtle flex items-center justify-center shrink-0">
-                      <span className="text-[10px] font-bold text-content-muted uppercase">
-                        {MOIS_SHORT[month]}
-                      </span>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-medium text-content-muted">{MOIS_LABELS[month]}</p>
-                      <p className="text-[10px] text-content-muted">—</p>
-                    </div>
-                  </div>
-                );
-              }
+      {/* Calendar grid */}
+      <Card padding="sm">
+        <div className="flex items-center gap-2 mb-3 pb-2 border-b border-edge-subtle">
+          <h3 className="text-sm font-bold text-content-primary">{selectedYear}</h3>
+          <span className="text-xs text-content-muted">
+            ({bulletinCount} bulletin{bulletinCount > 1 ? 's' : ''})
+          </span>
+        </div>
 
+        <div className="grid grid-cols-2 gap-2">
+          {[...Array(12)].map((_, i) => {
+            const month = i + 1;
+            const bulletin = monthMap.get(month);
+            const style = bulletin ? STATUT_STYLES[bulletin.statut] : null;
+
+            if (!bulletin) {
               return (
                 <div
                   key={month}
-                  className="group flex items-center gap-2.5 p-2.5 rounded-lg border border-edge-subtle bg-surface-subtle hover:bg-surface-elevated hover:border-accent/30 transition-all duration-150"
+                  className="flex items-center gap-2.5 p-2.5 rounded-lg border border-dashed border-edge-subtle/50 opacity-40"
                 >
-                  {/* Month badge */}
-                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${style?.bg || 'bg-accent/10'}`}>
-                    <span className={`text-[10px] font-bold uppercase ${style?.text || 'text-accent'}`}>
+                  <div className="w-9 h-9 rounded-lg bg-surface-subtle flex items-center justify-center shrink-0">
+                    <span className="text-[10px] font-bold text-content-muted uppercase">
                       {MOIS_SHORT[month]}
                     </span>
                   </div>
-
-                  {/* Info */}
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <p className="text-xs font-semibold text-content-primary truncate">{MOIS_LABELS[month]}</p>
-                      <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${style?.bg || 'bg-surface-muted'} ${style?.text || 'text-content-muted'}`}>
-                        {style?.label || bulletin.statut}
-                      </span>
-                    </div>
-                    <p className="text-[11px] font-medium text-content-secondary mt-0.5">
-                      {formatFCFA(bulletin.salaireNet)}
-                    </p>
+                    <p className="text-xs font-medium text-content-muted">{MOIS_LABELS[month]}</p>
+                    <p className="text-[10px] text-content-muted">—</p>
                   </div>
+                </div>
+              );
+            }
 
-                  {/* Download */}
+            return (
+              <div
+                key={month}
+                onClick={() => setViewerBulletinId(bulletin.id)}
+                className="group flex items-center gap-2.5 p-2.5 rounded-lg border border-edge-subtle bg-surface-subtle hover:bg-surface-elevated hover:border-accent/30 transition-all duration-150 cursor-pointer"
+              >
+                {/* Month badge */}
+                <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${style?.bg || 'bg-accent/10'}`}>
+                  <span className={`text-[10px] font-bold uppercase ${style?.text || 'text-accent'}`}>
+                    {MOIS_SHORT[month]}
+                  </span>
+                </div>
+
+                {/* Info */}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-xs font-semibold text-content-primary truncate">{MOIS_LABELS[month]}</p>
+                    <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${style?.bg || 'bg-surface-muted'} ${style?.text || 'text-content-muted'}`}>
+                      {style?.label || bulletin.statut}
+                    </span>
+                  </div>
+                  <p className="text-[11px] font-medium text-content-secondary mt-0.5">
+                    {formatFCFA(bulletin.salaireNet)}
+                  </p>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-0.5 shrink-0">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setViewerBulletinId(bulletin.id); }}
+                    className="p-1.5 rounded-md text-content-muted hover:text-accent hover:bg-accent/10 transition-colors"
+                    title="Voir le bulletin"
+                  >
+                    <Eye size={14} />
+                  </button>
                   {bulletin.pdfUrl && (
                     <button
-                      onClick={() => window.open(bulletin.pdfUrl, '_blank')}
-                      className="p-1.5 rounded-md text-content-muted opacity-0 group-hover:opacity-100 hover:text-accent hover:bg-accent/10 transition-all shrink-0"
+                      onClick={(e) => { e.stopPropagation(); window.open(bulletin.pdfUrl, '_blank'); }}
+                      className="p-1.5 rounded-md text-content-muted hover:text-accent hover:bg-accent/10 transition-colors"
                       title="Télécharger"
                     >
                       <Download size={14} />
                     </button>
                   )}
                 </div>
-              );
-            })}
-          </div>
-        </Card>
-      ))}
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+
+      {/* Bulletin preview modal */}
+      <PayslipViewer
+        isOpen={viewerBulletinId !== null}
+        onClose={() => setViewerBulletinId(null)}
+        bulletinId={viewerBulletinId}
+      />
     </div>
   );
 }
