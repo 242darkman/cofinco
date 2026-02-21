@@ -1,14 +1,14 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Users, Edit, Trash2, Plus, UserPlus, AlertTriangle, Play, Pause, CheckCircle, Ban, RotateCcw, Search, Filter } from 'lucide-react';
+import { Users, Edit, Trash2, Plus, UserPlus, AlertTriangle, Play, Pause, CheckCircle, Ban, RotateCcw, Search, Filter, LogOut, RefreshCw, ShieldOff, ShieldCheck } from 'lucide-react';
 import { Card, Button, Badge, Pagination, ResponsiveTable, TableColumn } from '../ui';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import { usePermissions } from '../auth/ProtectedFeature';
-import { tontineApi, clientApi } from '../../lib/api-client';
+import { tontineApi, clientApi, agenceApi, userApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import AdminTontinePlansGestion from './AdminTontinePlansGestion';
 import { TontineGroupWizard } from './TontineGroupWizard';
-import { StatutClient, STATUT_TONTINE_LABELS } from '@shared/enum/status-constants';
+import { StatutClient, STATUT_TONTINE_LABELS, StatutMembreTontine } from '@shared/enum/status-constants';
 import { TontineStatus } from '@shared/schema/tontines';
 import type { Tontine, TontinePlan } from '@shared/schema/tontines';
 
@@ -21,6 +21,7 @@ interface Membre {
   estTresorier?: boolean;
   statut: string;
   totalCotisations: number;
+  groupRole?: string;
   client?: {
     nom: string;
     prenom: string;
@@ -35,6 +36,17 @@ interface Client {
   numeroCompte: string;
   telephone: string;
 }
+
+interface RefItem { id: string; nom: string; [k: string]: any }
+
+const MEMBRE_STATUS_CONFIG: Record<string, { label: string; variant: 'success' | 'warning' | 'danger' | 'neutral' }> = {
+  [StatutMembreTontine.ACTIVE]: { label: 'Actif', variant: 'success' },
+  [StatutMembreTontine.SUSPENDED]: { label: 'Suspendu', variant: 'warning' },
+  EXITED: { label: 'Sorti', variant: 'neutral' },
+  REPLACED: { label: 'Remplace', variant: 'neutral' },
+  EXIT_PENDING: { label: 'Sortie en cours', variant: 'warning' },
+  'Retiré': { label: 'Retire', variant: 'danger' },
+};
 
 export default function AdminTontinesGestion() {
   // RBAC permissions
@@ -51,10 +63,14 @@ export default function AdminTontinesGestion() {
   const [selectedTontine, setSelectedTontine] = useState<Tontine | null>(null);
   const [membres, setMembres] = useState<Membre[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [allAgences, setAllAgences] = useState<RefItem[]>([]);
+  const [allUsers, setAllUsers] = useState<RefItem[]>([]);
   const [showWizard, setShowWizard] = useState(false);
   const [editTontine, setEditTontine] = useState<Tontine | null>(null);
   const [preSelectedPlanId, setPreSelectedPlanId] = useState<string | undefined>();
   const [showMembreForm, setShowMembreForm] = useState(false);
+  const [showReplaceForm, setShowReplaceForm] = useState<string | null>(null);
+  const [replaceClientId, setReplaceClientId] = useState('');
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [membresPage, setMembresPage] = useState(1);
@@ -62,7 +78,10 @@ export default function AdminTontinesGestion() {
   const [showPlanForm, setShowPlanForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
+  const [agenceFilter, setAgenceFilter] = useState<string>('');
+  const [gestionnaireFilter, setGestionnaireFilter] = useState<string>('');
   const [lifecycleLoading, setLifecycleLoading] = useState<string | null>(null);
+  const [memberActionLoading, setMemberActionLoading] = useState<string | null>(null);
   const itemsPerPage = 10;
 
   const [membreForm, setMembreForm] = useState({
@@ -71,6 +90,19 @@ export default function AdminTontinesGestion() {
     est_president: false,
     est_tresorier: false
   });
+
+  // Lookup maps for agence/gestionnaire names
+  const agenceMap = useMemo(() => {
+    const m = new Map<string, string>();
+    allAgences.forEach(a => m.set(a.id, a.nom));
+    return m;
+  }, [allAgences]);
+
+  const userMap = useMemo(() => {
+    const m = new Map<string, string>();
+    allUsers.forEach(u => m.set(u.id, u.nom || u.name || u.username || u.email || ''));
+    return m;
+  }, [allUsers]);
 
   const chargerTontines = useCallback(async () => {
     try {
@@ -103,6 +135,8 @@ export default function AdminTontinesGestion() {
   useEffect(() => {
     chargerTontines();
     chargerClients();
+    agenceApi.getAll().then(d => setAllAgences(d || [])).catch(() => {});
+    userApi.getAll().then(d => setAllUsers(d || [])).catch(() => {});
   }, [chargerTontines, chargerClients]);
 
   const handleSelectTontine = (tontine: Tontine) => {
@@ -110,6 +144,7 @@ export default function AdminTontinesGestion() {
     setMembresPage(1);
     chargerMembres(tontine.id);
     setShowMembreForm(false);
+    setShowReplaceForm(null);
   };
 
   const handleEditTontine = (tontine: Tontine) => {
@@ -210,6 +245,55 @@ export default function AdminTontinesGestion() {
     });
   }, [selectedTontine, openConfirm, chargerMembres, chargerTontines]);
 
+  // Member lifecycle actions (A7)
+  const handleMemberAction = useCallback(async (action: 'request-exit' | 'approve-exit' | 'suspend' | 'reinstate', membreId: string) => {
+    if (!selectedTontine) return;
+    setMemberActionLoading(membreId);
+    try {
+      switch (action) {
+        case 'request-exit':
+          await tontineApi.requestMemberExit(selectedTontine.id, membreId);
+          toast.success('Demande de sortie envoyée');
+          break;
+        case 'approve-exit':
+          await tontineApi.approveMemberExit(selectedTontine.id, membreId);
+          toast.success('Sortie approuvée');
+          break;
+        case 'suspend':
+          await tontineApi.suspendMember(selectedTontine.id, membreId, 'Suspendu par l\'administrateur');
+          toast.success('Membre suspendu');
+          break;
+        case 'reinstate':
+          await tontineApi.reinstateMember(selectedTontine.id, membreId);
+          toast.success('Membre réintégré');
+          break;
+      }
+      await chargerMembres(selectedTontine.id);
+      await chargerTontines();
+    } catch (error) {
+      toast.error(handleApiError(error, 'Erreur'));
+    } finally {
+      setMemberActionLoading(null);
+    }
+  }, [selectedTontine, chargerMembres, chargerTontines]);
+
+  const handleReplaceMember = useCallback(async (membreId: string) => {
+    if (!selectedTontine || !replaceClientId) return;
+    setMemberActionLoading(membreId);
+    try {
+      await tontineApi.replaceMember(selectedTontine.id, membreId, replaceClientId);
+      toast.success('Membre remplacé');
+      setShowReplaceForm(null);
+      setReplaceClientId('');
+      await chargerMembres(selectedTontine.id);
+      await chargerTontines();
+    } catch (error) {
+      toast.error(handleApiError(error, 'Erreur lors du remplacement'));
+    } finally {
+      setMemberActionLoading(null);
+    }
+  }, [selectedTontine, replaceClientId, chargerMembres, chargerTontines]);
+
   // Lifecycle actions
   const lifecycleActions: Record<string, { label: string; icon: React.ElementType; method: 'activate' | 'pause' | 'resume' | 'complete' | 'cancel'; variant: 'info' | 'warning' | 'danger'; allowedFrom: string[] }> = {
     activate: { label: 'Activer', icon: Play, method: 'activate', variant: 'info', allowedFrom: [TontineStatus.DRAFT] },
@@ -243,18 +327,31 @@ export default function AdminTontinesGestion() {
     });
   }, [openConfirm, chargerTontines]);
 
-  // Filtered tontines
+  // Filtered tontines (A3: agence + gestionnaire filters)
   const filteredTontines = useMemo(() => {
     let result = tontines;
     if (statusFilter) {
       result = result.filter((t) => t.statut === statusFilter);
+    }
+    if (agenceFilter) {
+      result = result.filter((t: any) => t.agenceId === agenceFilter);
+    }
+    if (gestionnaireFilter) {
+      result = result.filter((t: any) => t.gestionnaireId === gestionnaireFilter);
     }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
       result = result.filter((t) => t.nom?.toLowerCase().includes(q));
     }
     return result;
-  }, [tontines, statusFilter, searchQuery]);
+  }, [tontines, statusFilter, agenceFilter, gestionnaireFilter, searchQuery]);
+
+  // Unique gestionnaires in current data (for filter dropdown)
+  const gestionnaireOptions = useMemo(() => {
+    const ids = new Set<string>();
+    tontines.forEach((t: any) => { if (t.gestionnaireId) ids.add(t.gestionnaireId); });
+    return Array.from(ids).map(id => ({ id, nom: userMap.get(id) || id.substring(0, 8) }));
+  }, [tontines, userMap]);
 
   const handleLaunchFromPlan = (plan: TontinePlan) => {
     setActiveTab('groupes');
@@ -306,8 +403,8 @@ export default function AdminTontinesGestion() {
         <button
           onClick={() => setActiveTab('groupes')}
           className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
-            activeTab === 'groupes' 
-            ? 'text-accent border-accent' 
+            activeTab === 'groupes'
+            ? 'text-accent border-accent'
             : 'text-content-muted border-transparent hover:text-content-secondary'
           }`}
         >
@@ -316,8 +413,8 @@ export default function AdminTontinesGestion() {
         <button
           onClick={() => setActiveTab('plans')}
           className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
-            activeTab === 'plans' 
-            ? 'text-accent border-accent' 
+            activeTab === 'plans'
+            ? 'text-accent border-accent'
             : 'text-content-muted border-transparent hover:text-content-secondary'
           }`}
         >
@@ -326,14 +423,14 @@ export default function AdminTontinesGestion() {
       </div>
 
       {activeTab === 'plans' ? (
-        <AdminTontinePlansGestion 
-          showForm={showPlanForm} 
-          onHideForm={() => setShowPlanForm(false)} 
+        <AdminTontinePlansGestion
+          showForm={showPlanForm}
+          onHideForm={() => setShowPlanForm(false)}
           onLaunchTontine={handleLaunchFromPlan}
         />
       ) : (
         <>
-          {/* Search & Filters */}
+          {/* Search & Filters (A3: agence + gestionnaire filters) */}
           <div className="flex flex-col sm:flex-row gap-3 mb-4">
             <div className="relative flex-1">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" />
@@ -345,22 +442,44 @@ export default function AdminTontinesGestion() {
                 className="w-full pl-9 pr-3 py-2 bg-input border border-input-border rounded-lg text-sm text-content-primary placeholder:text-content-muted focus:border-input-focus focus:outline-none"
               />
             </div>
-            <div className="relative">
-              <Filter size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted pointer-events-none" />
+            <div className="flex gap-2 flex-wrap">
+              <div className="relative">
+                <Filter size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted pointer-events-none" />
+                <select
+                  value={statusFilter}
+                  onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
+                  className="pl-9 pr-8 py-2 bg-input border border-input-border rounded-lg text-sm text-content-primary focus:border-input-focus focus:outline-none appearance-none cursor-pointer"
+                >
+                  <option value="">Tous les statuts</option>
+                  {Object.entries(STATUT_TONTINE_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                </select>
+              </div>
               <select
-                value={statusFilter}
-                onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
-                className="pl-9 pr-8 py-2 bg-input border border-input-border rounded-lg text-sm text-content-primary focus:border-input-focus focus:outline-none appearance-none cursor-pointer"
+                value={agenceFilter}
+                onChange={(e) => { setAgenceFilter(e.target.value); setCurrentPage(1); }}
+                className="px-3 py-2 bg-input border border-input-border rounded-lg text-sm text-content-primary focus:border-input-focus focus:outline-none appearance-none cursor-pointer"
               >
-                <option value="">Tous les statuts</option>
-                {Object.entries(STATUT_TONTINE_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
+                <option value="">Toutes les agences</option>
+                {allAgences.map(a => (
+                  <option key={a.id} value={a.id}>{a.nom}</option>
+                ))}
+              </select>
+              <select
+                value={gestionnaireFilter}
+                onChange={(e) => { setGestionnaireFilter(e.target.value); setCurrentPage(1); }}
+                className="px-3 py-2 bg-input border border-input-border rounded-lg text-sm text-content-primary focus:border-input-focus focus:outline-none appearance-none cursor-pointer"
+              >
+                <option value="">Tous les gestionnaires</option>
+                {gestionnaireOptions.map(g => (
+                  <option key={g.id} value={g.id}>{g.nom}</option>
                 ))}
               </select>
             </div>
           </div>
 
-          {/* Tontines Table */}
+          {/* Tontines Table (A4: gestionnaire + agence columns) */}
           {(() => {
         const totalPages = Math.ceil(filteredTontines.length / itemsPerPage);
         const paginatedTontines = filteredTontines.slice(
@@ -369,9 +488,9 @@ export default function AdminTontinesGestion() {
         );
 
         const columns: TableColumn<Tontine>[] = [
-           { 
-            key: 'nom', 
-            label: 'Tontine', 
+           {
+            key: 'nom',
+            label: 'Tontine',
             primary: true,
             format: (val, item) => (
               <div>
@@ -380,20 +499,29 @@ export default function AdminTontinesGestion() {
               </div>
             )
           },
-          { 
+          {
             key: 'montantCotisation',
-            label: 'Cotisation (FCFA)', 
-            format: (val) => <span className="font-bold text-accent">{val?.toLocaleString()}</span> 
+            label: 'Cotisation (FCFA)',
+            format: (val) => <span className="font-bold text-accent">{val?.toLocaleString()}</span>
           },
-          { 
+          {
             key: 'membresActuels',
             label: 'Membres',
             format: (val, item) => <span className="text-content-secondary">{val || 0}/{item.nombreMembres || 0}</span>
           },
           {
-            key: 'tauxPlateforme',
-            label: 'Frais',
-            format: (val) => <span className="text-status-success font-medium">{val || 0}%</span>
+            key: 'agenceId' as any,
+            label: 'Agence',
+            format: (val) => val ? (
+              <span className="text-content-secondary text-xs">{agenceMap.get(val) || '—'}</span>
+            ) : <span className="text-content-muted">—</span>,
+          },
+          {
+            key: 'gestionnaireId' as any,
+            label: 'Gestionnaire',
+            format: (val) => val ? (
+              <span className="text-content-secondary text-xs">{userMap.get(val) || '—'}</span>
+            ) : <span className="text-content-muted">—</span>,
           },
           {
             key: 'dateDebut',
@@ -418,7 +546,7 @@ export default function AdminTontinesGestion() {
               data={paginatedTontines}
               columns={columns}
               density="compact"
-              emptyMessage={searchQuery || statusFilter ? "Aucune tontine ne correspond aux filtres." : "Aucune tontine trouvée. Créez-en une pour commencer."}
+              emptyMessage={searchQuery || statusFilter || agenceFilter || gestionnaireFilter ? "Aucune tontine ne correspond aux filtres." : "Aucune tontine trouvée. Créez-en une pour commencer."}
               onRowClick={(item) => handleSelectTontine(item)}
               actions={(tontine) => (
                  <div className="flex items-center gap-0.5">
@@ -477,7 +605,7 @@ export default function AdminTontinesGestion() {
         );
       })()}
 
-      {/* Selected Tontine Members */}
+      {/* Selected Tontine Members (A7: lifecycle buttons) */}
       {selectedTontine && (
         <Card className="bg-surface-base border-edge p-4 sm:p-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
@@ -567,44 +695,134 @@ export default function AdminTontinesGestion() {
               <>
                 {membres
                   .slice((membresPage - 1) * itemsPerPage, membresPage * itemsPerPage)
-                  .map((membre) => (
-                    <div
-                      key={membre.id}
-                      className="bg-surface rounded-lg p-3 sm:p-4 flex items-center justify-between gap-3"
-                    >
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <span className="w-8 h-8 sm:w-10 sm:h-10 bg-accent text-white rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0">
-                          {membre.position}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h4 className="font-semibold text-content-primary text-sm truncate">
-                              {membre.client?.nom} {membre.client?.prenom}
-                            </h4>
-                            {membre.estPresident && <Badge value="Président" variant="success" size="sm" />}
-                            {membre.estTresorier && <Badge value="Trésorier" variant="info" size="sm" />}
+                  .map((membre) => {
+                    const statusCfg = MEMBRE_STATUS_CONFIG[membre.statut] || { label: membre.statut, variant: 'neutral' as const };
+                    const isActive = membre.statut === StatutMembreTontine.ACTIVE;
+                    const isSuspended = membre.statut === StatutMembreTontine.SUSPENDED;
+                    const isExitPending = membre.statut === 'EXIT_PENDING';
+                    const isActionLoading = memberActionLoading === membre.id;
+
+                    return (
+                      <div key={membre.id}>
+                        <div className="bg-surface rounded-lg p-3 sm:p-4 flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <span className="w-8 h-8 sm:w-10 sm:h-10 bg-accent text-white rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0">
+                              {membre.position}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h4 className="font-semibold text-content-primary text-sm truncate">
+                                  {membre.client?.nom} {membre.client?.prenom}
+                                </h4>
+                                {membre.estPresident && <Badge value="Président" variant="success" size="sm" />}
+                                {membre.estTresorier && <Badge value="Trésorier" variant="info" size="sm" />}
+                                <Badge value={statusCfg.label} variant={statusCfg.variant} size="sm" />
+                              </div>
+                              <p className="text-xs text-content-muted truncate">{membre.client?.numeroCompte}</p>
+                            </div>
                           </div>
-                          <p className="text-xs text-content-muted truncate">{membre.client?.numeroCompte}</p>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <div className="text-right hidden sm:block">
+                              <p className="text-[10px] text-content-muted">Contribué</p>
+                              <p className="font-bold text-accent text-sm">{membre.totalCotisations?.toLocaleString() || 0} FCFA</p>
+                            </div>
+                            {/* Member lifecycle actions (A7) */}
+                            {canManageMembres && (
+                              <div className="flex items-center gap-0.5">
+                                {/* Request exit (for active members) */}
+                                {isActive && (
+                                  <button
+                                    onClick={() => handleMemberAction('request-exit', membre.id)}
+                                    disabled={isActionLoading}
+                                    className="p-1.5 rounded-lg text-content-muted hover:text-status-warning hover:bg-status-warning-bg transition-colors disabled:opacity-50"
+                                    title="Demander sortie"
+                                  >
+                                    <LogOut size={14} />
+                                  </button>
+                                )}
+                                {/* Approve exit (for pending exit members) */}
+                                {isExitPending && (
+                                  <button
+                                    onClick={() => handleMemberAction('approve-exit', membre.id)}
+                                    disabled={isActionLoading}
+                                    className="p-1.5 rounded-lg text-content-muted hover:text-status-success hover:bg-status-success-bg transition-colors disabled:opacity-50"
+                                    title="Approuver sortie"
+                                  >
+                                    <CheckCircle size={14} />
+                                  </button>
+                                )}
+                                {/* Suspend (active members) */}
+                                {isActive && (
+                                  <button
+                                    onClick={() => handleMemberAction('suspend', membre.id)}
+                                    disabled={isActionLoading}
+                                    className="p-1.5 rounded-lg text-content-muted hover:text-status-danger hover:bg-status-danger-bg transition-colors disabled:opacity-50"
+                                    title="Suspendre"
+                                  >
+                                    <ShieldOff size={14} />
+                                  </button>
+                                )}
+                                {/* Reinstate (suspended members) */}
+                                {isSuspended && (
+                                  <button
+                                    onClick={() => handleMemberAction('reinstate', membre.id)}
+                                    disabled={isActionLoading}
+                                    className="p-1.5 rounded-lg text-content-muted hover:text-status-success hover:bg-status-success-bg transition-colors disabled:opacity-50"
+                                    title="Réintégrer"
+                                  >
+                                    <ShieldCheck size={14} />
+                                  </button>
+                                )}
+                                {/* Replace (active or suspended members) */}
+                                {(isActive || isSuspended) && (
+                                  <button
+                                    onClick={() => setShowReplaceForm(showReplaceForm === membre.id ? null : membre.id)}
+                                    disabled={isActionLoading}
+                                    className="p-1.5 rounded-lg text-content-muted hover:text-status-info hover:bg-status-info-bg transition-colors disabled:opacity-50"
+                                    title="Remplacer"
+                                  >
+                                    <RefreshCw size={14} />
+                                  </button>
+                                )}
+                                {/* Delete (only DRAFT tontines) */}
+                                {selectedTontine.statut === TontineStatus.DRAFT && (
+                                  <button
+                                    onClick={() => handleDeleteMembre(membre.id)}
+                                    className="p-1.5 rounded-lg text-content-muted hover:text-status-danger hover:bg-status-danger-bg transition-colors"
+                                    title="Retirer"
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-3 flex-shrink-0">
-                        <div className="text-right hidden sm:block">
-                          <p className="text-[10px] text-content-muted">Contribué</p>
-                          <p className="font-bold text-accent text-sm">{membre.totalCotisations?.toLocaleString() || 0} FCFA</p>
-                        </div>
-                        {canManageMembres && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteMembre(membre.id)}
-                            className="p-2 text-status-danger hover:text-status-danger"
-                          >
-                            <Trash2 size={16} />
-                          </Button>
+
+                        {/* Inline replace form */}
+                        {showReplaceForm === membre.id && (
+                          <div className="ml-12 mt-1 mb-2 p-3 bg-surface-subtle rounded-lg border border-edge-subtle flex items-center gap-2">
+                            <select
+                              value={replaceClientId}
+                              onChange={(e) => setReplaceClientId(e.target.value)}
+                              className="flex-1 px-2 py-1.5 bg-input border border-input-border rounded-lg text-xs text-content-primary focus:border-input-focus focus:outline-none"
+                            >
+                              <option value="">-- Nouveau client --</option>
+                              {clients.map(c => (
+                                <option key={c.id} value={c.id}>{c.nom} {c.prenom}</option>
+                              ))}
+                            </select>
+                            <Button variant="primary" size="sm" onClick={() => handleReplaceMember(membre.id)} isLoading={isActionLoading} disabled={!replaceClientId}>
+                              Remplacer
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => { setShowReplaceForm(null); setReplaceClientId(''); }}>
+                              Annuler
+                            </Button>
+                          </div>
                         )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
 
                 {/* Pagination des membres */}
                 {membres.length > itemsPerPage && (

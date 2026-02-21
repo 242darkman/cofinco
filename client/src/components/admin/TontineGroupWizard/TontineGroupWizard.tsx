@@ -75,7 +75,7 @@ export default function TontineGroupWizard({ isOpen, onClose, onSave, editTontin
     setIsSubmitting(true);
 
     try {
-      const payload: TontineGroupPayload = {
+      const payload: TontineGroupPayload & { expectedVersion?: number } = {
         nom: formData.nom,
         description: formData.description || null,
         montantCotisation: formData.montantCotisation,
@@ -84,6 +84,7 @@ export default function TontineGroupWizard({ isOpen, onClose, onSave, editTontin
         intervalleCotisation: parseInt(formData.intervalleCotisation) || 1,
         distributionType: formData.distributionType,
         agenceId: formData.agenceId || null,
+        gestionnaireId: formData.gestionnaireId || null,
         planId: formData.planId || null,
 
         dateDebut: formData.dateDebut ? new Date(formData.dateDebut).toISOString() : null,
@@ -153,6 +154,11 @@ export default function TontineGroupWizard({ isOpen, onClose, onSave, editTontin
         members: formData.members,
         payoutOrder: formData.payoutOrder,
       };
+
+      // A5: Optimistic locking — send expectedVersion when editing
+      if (isEditMode && editTontine?.version != null) {
+        payload.expectedVersion = editTontine.version;
+      }
 
       await onSave(payload);
       clearDraft();

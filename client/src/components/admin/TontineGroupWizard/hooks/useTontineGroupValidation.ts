@@ -45,6 +45,8 @@ export function useTontineGroupValidation(formData: TontineGroupFormData) {
           }
           if (formData.joinFeeEnabled && parseFloat(formData.joinFeeAmount) <= 0) return false;
           if (formData.allowedPaymentMethods.length === 0) return false;
+          // A6: defaultPaymentMethod must be one of allowedPaymentMethods
+          if (formData.defaultPaymentMethod && !formData.allowedPaymentMethods.includes(formData.defaultPaymentMethod)) return false;
           return true;
         }
         case 5: // Members — optional at creation
