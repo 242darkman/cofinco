@@ -661,6 +661,29 @@ export function registerClientRoutes(app: Express) {
     }
   });
 
+  // GET Client Credits — Liste des crédits d'un client
+  app.get("/api/clients/:id/credits", requireAuth, requireAgenceIdAccess(), async (req, res) => {
+    try {
+      if (!z.string().uuid().safeParse(req.params.id).success) {
+        return res.status(404).json({ message: "Client not found (Invalid ID)" });
+      }
+
+      const client = await storage.getClient(req.params.id);
+      if (!client) return res.status(404).json({ message: "Client not found" });
+
+      const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
+      if (agenceFilter?.agenceId && client.agenceId !== agenceFilter.agenceId) {
+        return res.status(403).json({ message: "Accès refusé : client d'une autre agence" });
+      }
+
+      const credits = await getCreditsByClient(req.params.id);
+      res.json(credits);
+    } catch (error) {
+      logger.error({ err: error }, 'Error fetching client credits');
+      res.status(500).json({ message: "Erreur lors de la récupération des crédits" });
+    }
+  });
+
   // GET Client Enquêtes — Historique des enquêtes de crédit
   app.get("/api/clients/:id/enquetes", requireAuth, requireAgenceIdAccess(), async (req, res) => {
     try {
