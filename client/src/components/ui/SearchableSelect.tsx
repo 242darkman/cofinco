@@ -66,6 +66,7 @@ export interface SearchableSelectOption {
   emoji?: string;    // For flag emojis or other emoji icons
   disabled?: boolean;
   disabledReason?: string;
+  hideAvatar?: boolean; // Hide the avatar/initials circle for this option
 }
 
 interface SearchableSelectProps {
@@ -307,7 +308,7 @@ export default function SearchableSelect({
           >
               {/* Left Icon / Avatar */}
                <div className="shrink-0 mr-3 pl-1">
-                 {showAvatarInTrigger && selectedOption ? (
+                 {showAvatarInTrigger && selectedOption && !selectedOption.hideAvatar ? (
                     <OptionAvatar image={selectedOption.image} label={selectedOption.label} emoji={selectedOption.emoji} />
                  ) : (
                     <div className={`w-8 h-8 rounded-full border flex items-center justify-center ${isOpen ? 'bg-accent border-accent text-white' : 'bg-surface border-edge text-content-muted'}`}>
@@ -419,7 +420,7 @@ export default function SearchableSelect({
                              }
                            `}
                          >
-                           <OptionAvatar image={option.image} label={option.label} disabled={option.disabled} emoji={option.emoji} />
+                           {!option.hideAvatar && <OptionAvatar image={option.image} label={option.label} disabled={option.disabled} emoji={option.emoji} />}
                            <div className="flex-1 min-w-0">
                              <div className={`text-sm font-medium truncate flex items-center gap-2 ${option.disabled ? 'text-content-muted' : 'text-content-secondary'}`}>
                                  {option.label}

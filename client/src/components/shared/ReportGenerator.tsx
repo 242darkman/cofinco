@@ -87,6 +87,8 @@ export default function ReportGenerator({ onClose, filter }: ReportGeneratorProp
         onGenerate={handleGenerate}
         onPrint={handlePrint}
         loading={loading}
+        reportType={reportType}
+        context={filter}
       />
     </div>
   );

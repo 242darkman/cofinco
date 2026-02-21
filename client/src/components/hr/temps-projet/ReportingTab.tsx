@@ -161,11 +161,18 @@ function AllocationByEmployee() {
   const [dateTo, setDateTo] = useState<string>('');
 
   const { data: employees = [] } = useQuery<Employee[]>({
-    queryKey: ['/api/hr/employes'],
+    queryKey: ['/api/employes'],
     queryFn: async () => {
-      const res = await fetch('/api/hr/employes', { credentials: 'include' });
-      if (!res.ok) throw new Error('Erreur chargement employés');
-      return res.json();
+      const res = await fetch('/api/employes', { credentials: 'include' });
+      if (!res.ok) return [];
+      const data = await res.json();
+      if (!Array.isArray(data)) return [];
+      return data.map((e: any) => ({
+        id: e.id,
+        nom: e.user?.nom || '',
+        prenom: e.user?.prenom || '',
+        matricule: e.matricule || '',
+      }));
     },
   });
 

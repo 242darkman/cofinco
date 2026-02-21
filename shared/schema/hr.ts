@@ -541,6 +541,12 @@ export const payrollConfig = pgTable("payroll_config", {
   overtimeRate: numeric("overtime_rate", { precision: 3, scale: 2 }).default("1.50"),
   nightShiftRate: numeric("night_shift_rate", { precision: 3, scale: 2 }).default("1.25"),
   holidayRate: numeric("holiday_rate", { precision: 3, scale: 2 }).default("2.00"),
+  // Politique de présence
+  lateGraceMinutes: integer("late_grace_minutes").default(5),
+  allowOvertime: boolean("allow_overtime").default(true),
+  defaultHeureDebut: varchar("default_heure_debut", { length: 5 }).default("08:00"),
+  defaultHeureFin: varchar("default_heure_fin", { length: 5 }).default("17:00"),
+  defaultPauseMinutes: integer("default_pause_minutes").default(60),
   // Période de validité
   effectiveFrom: date("effective_from").notNull().defaultNow(),
   effectiveTo: date("effective_to"),
@@ -763,6 +769,11 @@ export const updatePayrollConfigSchema = z.object({
   overtimeRate: z.number().min(1).optional(),
   nightShiftRate: z.number().min(1).optional(),
   holidayRate: z.number().min(1).optional(),
+  lateGraceMinutes: z.number().int().min(0).max(30).optional(),
+  allowOvertime: z.boolean().optional(),
+  defaultHeureDebut: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  defaultHeureFin: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  defaultPauseMinutes: z.number().int().min(0).max(120).optional(),
 });
 
 // ============================================

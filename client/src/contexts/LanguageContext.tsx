@@ -359,6 +359,7 @@ const translations: Translations = {
   menuAdmin: { fr: 'Administration', en: 'Administration' },
   menuMessages: { fr: 'Messages', en: 'Messages' },
   menuValidations: { fr: 'Validations', en: 'Validations' },
+  menuMonEspace: { fr: 'Mon Espace', en: 'My Space' },
   menuProfil: { fr: 'Profil', en: 'Profile' },
   accueil: { fr: 'Accueil', en: 'Home' },
   securise: { fr: 'Sécurisé', en: 'Secured' },

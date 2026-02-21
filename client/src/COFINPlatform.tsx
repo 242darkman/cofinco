@@ -38,6 +38,9 @@ const AdminVirementsProgrammes = lazy(() => import('./components/admin/AdminVire
 // KPI module
 const KpiDashboard = lazy(() => import('./components/kpi/KpiDashboard'));
 
+// Mon Espace (employee portal)
+const MonEspace = lazy(() => import('./components/mon-espace/MonEspace'));
+
 // Shared modules
 const ReportGenerator = lazy(() => import('./components/shared/ReportGenerator'));
 const MessagesModule = lazy(() => import('./components/shared/MessagesModule'));
@@ -400,6 +403,12 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
         return (
           <Suspense fallback={<ModuleLoadingFallback moduleName="Administration" />}>
             <AdminModuleComplet activeView={currentSubModule} />
+          </Suspense>
+        );
+      case 'mon-espace':
+        return (
+          <Suspense fallback={<ModuleLoadingFallback moduleName="Mon Espace" />}>
+            <MonEspace />
           </Suspense>
         );
       case 'profil':

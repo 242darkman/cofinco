@@ -288,10 +288,12 @@ function PostesTab({
         return (
           <Card key={dept.id} padding="none">
             {/* Department header (clickable) */}
-            <button
-              type="button"
+            <div
+              role="button"
+              tabIndex={0}
               onClick={() => toggleDept(dept.id)}
-              className="w-full flex items-center justify-between p-4 sm:p-5 hover:bg-surface-subtle/50 transition-colors text-left"
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleDept(dept.id); } }}
+              className="w-full flex items-center justify-between p-4 sm:p-5 hover:bg-surface-subtle/50 transition-colors text-left cursor-pointer"
             >
               <div className="flex items-center gap-3 min-w-0">
                 <div className="p-2 rounded-lg bg-accent/10">
@@ -338,7 +340,7 @@ function PostesTab({
                   <ChevronRight size={18} className="text-content-muted" />
                 )}
               </div>
-            </button>
+            </div>
 
             {/* Expanded positions list */}
             {isExpanded && (

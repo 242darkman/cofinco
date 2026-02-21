@@ -313,6 +313,33 @@ export function useCreateTimesheet() {
   return { createTimesheet: create.mutateAsync, isCreating: create.isPending };
 }
 
+// ===================== PRESENCE WEEK =====================
+
+export interface PresenceDay {
+  id: number;
+  date: string;
+  statut: string;
+  heureArrivee: string | null;
+  heureDepart: string | null;
+  heuresTravaillees: number | null; // in minutes
+  heuresSupplementaires: number | null; // in minutes
+}
+
+export function usePresenceWeek(employeId: string | null, dateDebut: string | null, dateFin: string | null) {
+  const params = new URLSearchParams();
+  if (employeId) params.set('employeId', employeId);
+  if (dateDebut) params.set('dateDebut', dateDebut);
+  if (dateFin) params.set('dateFin', dateFin);
+  const qs = params.toString() ? `?${params.toString()}` : '';
+
+  const { data: presences = [], isLoading } = useQuery<PresenceDay[]>({
+    queryKey: ['/api/hr/presence/week', employeId, dateDebut, dateFin],
+    queryFn: () => fetchJson<PresenceDay[]>(`/api/hr/presence/week${qs}`),
+    enabled: !!employeId && !!dateDebut && !!dateFin,
+  });
+  return { presences, isLoading };
+}
+
 // ===================== REPORTING =====================
 
 export function useProjectCostSummary(projetId: string | null) {

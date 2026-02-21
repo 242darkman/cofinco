@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { CheckCircle, Clock, XCircle, UserCheck, MapPin, Loader2, BarChart3, Calendar } from 'lucide-react';
+import { CheckCircle, Clock, XCircle, UserCheck, MapPin, Loader2, BarChart3, Calendar, ClipboardEdit } from 'lucide-react';
 import { Employe } from '../../hooks/hr/useEmployes';
 import { Card, StatCard, Badge, Button, ResponsiveTable } from '../ui';
 import { useUserProfile } from '../../hooks/useUserProfile';
+import { usePermissions } from '../auth/ProtectedFeature';
 import { hrPresenceApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
 import { useGeolocation } from '../../hooks/useGeolocation';
@@ -43,12 +44,20 @@ interface PresenceTrackerProps {
 
 export default function PresenceTracker({ employes }: PresenceTrackerProps) {
   const { user } = useUserProfile();
+  const { hasPermission } = usePermissions();
+  const canManualEntry = hasPermission('rh', 'edit');
   const [stats, setStats] = useState<PresenceStats | null>(null);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [modalStatus, setModalStatus] = useState('');
   const [modalEmployees, setModalEmployees] = useState<PresenceRecord[]>([]);
   const [userPresence, setUserPresence] = useState<PresenceRecord | null>(null);
+
+  // Manual entry modal state
+  const [showManualModal, setShowManualModal] = useState(false);
+  const [manualTarget, setManualTarget] = useState<EmployePresenceData | null>(null);
+  const [manualForm, setManualForm] = useState({ heureArrivee: '', heureDepart: '', pauseDebut: '', pauseFin: '', commentaire: '' });
+  const [submittingManual, setSubmittingManual] = useState(false);
 
   // View mode: 'daily' or 'analytics'
   const [viewMode, setViewMode] = useState<'daily' | 'analytics'>('daily');
@@ -166,14 +175,44 @@ export default function PresenceTracker({ employes }: PresenceTrackerProps) {
     }
   }, []);
 
+  const openManualEntry = useCallback((emp: EmployePresenceData) => {
+    setManualTarget(emp);
+    setManualForm({ heureArrivee: '', heureDepart: '', pauseDebut: '', pauseFin: '', commentaire: '' });
+    setShowManualModal(true);
+  }, []);
+
+  const handleManualSubmit = useCallback(async () => {
+    if (!manualTarget || !manualForm.heureArrivee) return;
+    setSubmittingManual(true);
+    try {
+      await hrPresenceApi.manualEntry({
+        employeId: manualTarget.id,
+        heureArrivee: manualForm.heureArrivee,
+        ...(manualForm.heureDepart ? { heureDepart: manualForm.heureDepart } : {}),
+        ...(manualForm.pauseDebut ? { pauseDebut: manualForm.pauseDebut } : {}),
+        ...(manualForm.pauseFin ? { pauseFin: manualForm.pauseFin } : {}),
+        ...(manualForm.commentaire ? { commentaire: manualForm.commentaire } : {}),
+      });
+      toast.success(`Pointage manuel enregistré pour ${manualTarget.nom} ${manualTarget.prenom}`);
+      setShowManualModal(false);
+      fetchPresenceStats();
+    } catch (error) {
+      toast.error(handleApiError(error, 'Erreur lors du pointage manuel'));
+    } finally {
+      setSubmittingManual(false);
+    }
+  }, [manualTarget, manualForm, fetchPresenceStats]);
+
   if(!stats) return <div className="p-4 text-center text-content-muted">Chargement des présences...</div>;
+
+  const STATUS_LABELS: Record<string, string> = { PRESENT: 'Présent', LATE: 'Retard', ABSENT: 'Absent' };
 
   const getPresenceStatus = (empId: string): { status: string; color: 'success' | 'warning' | 'danger' | 'neutral'; time: string } => {
       const record = stats?.liste?.find((p: PresenceRecord) => p.employeId === empId);
       if (!record) return { status: 'Non pointé', color: 'neutral', time: '-' };
       return {
-          status: record.statut,
-          color: record.statut === 'Présent' ? 'success' : record.statut === 'Retard' ? 'warning' : 'danger',
+          status: STATUS_LABELS[record.statut] || record.statut,
+          color: record.statut === 'PRESENT' ? 'success' : record.statut === 'LATE' ? 'warning' : 'danger',
           time: record.heureArrivee ? new Date(record.heureArrivee).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'}) : '-'
       };
   };
@@ -358,6 +397,15 @@ export default function PresenceTracker({ employes }: PresenceTrackerProps) {
                 setSelectedEmployeeForAnalytics(emp);
                 setViewMode('analytics');
               }}
+              actions={canManualEntry ? (emp: EmployePresenceData) => (
+                <button
+                  onClick={(e) => { e.stopPropagation(); openManualEntry(emp); }}
+                  className="p-1.5 rounded-md text-content-muted hover:text-accent hover:bg-surface-elevated transition"
+                  title="Pointage manuel"
+                >
+                  <ClipboardEdit size={14} />
+                </button>
+              ) : undefined}
           />
         </div>
       </div>
@@ -434,6 +482,91 @@ export default function PresenceTracker({ employes }: PresenceTrackerProps) {
               ) : (
                 <div className="text-center py-8 text-content-muted">Aucun employé dans cette catégorie</div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Pointage Manuel */}
+      {showManualModal && manualTarget && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={() => setShowManualModal(false)}>
+          <div className="bg-surface-base rounded-xl border border-edge max-w-md w-full overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="p-4 border-b border-edge flex justify-between items-center">
+              <div>
+                <h3 className="text-content-primary font-bold text-sm">Pointage manuel</h3>
+                <p className="text-xs text-content-muted mt-0.5">{manualTarget.nom} {manualTarget.prenom} — {manualTarget.poste}</p>
+              </div>
+              <button onClick={() => setShowManualModal(false)} className="text-content-muted hover:text-content-primary">
+                ✕
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-content-secondary mb-1">Arrivée *</label>
+                  <input
+                    type="time"
+                    value={manualForm.heureArrivee}
+                    onChange={(e) => setManualForm(f => ({ ...f, heureArrivee: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-lg bg-input border border-input-border text-content-primary text-sm focus:border-input-focus focus:outline-none"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-content-secondary mb-1">Départ</label>
+                  <input
+                    type="time"
+                    value={manualForm.heureDepart}
+                    onChange={(e) => setManualForm(f => ({ ...f, heureDepart: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-lg bg-input border border-input-border text-content-primary text-sm focus:border-input-focus focus:outline-none"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-content-secondary mb-1">Début pause</label>
+                  <input
+                    type="time"
+                    value={manualForm.pauseDebut}
+                    onChange={(e) => setManualForm(f => ({ ...f, pauseDebut: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-lg bg-input border border-input-border text-content-primary text-sm focus:border-input-focus focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-content-secondary mb-1">Fin pause</label>
+                  <input
+                    type="time"
+                    value={manualForm.pauseFin}
+                    onChange={(e) => setManualForm(f => ({ ...f, pauseFin: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-lg bg-input border border-input-border text-content-primary text-sm focus:border-input-focus focus:outline-none"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-content-secondary mb-1">Commentaire</label>
+                <textarea
+                  value={manualForm.commentaire}
+                  onChange={(e) => setManualForm(f => ({ ...f, commentaire: e.target.value }))}
+                  placeholder="Motif du pointage manuel..."
+                  rows={2}
+                  className="w-full px-3 py-2 rounded-lg bg-input border border-input-border text-content-primary text-sm focus:border-input-focus focus:outline-none resize-none"
+                />
+              </div>
+            </div>
+            <div className="p-4 border-t border-edge flex justify-end gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setShowManualModal(false)} disabled={submittingManual}>
+                Annuler
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleManualSubmit}
+                disabled={!manualForm.heureArrivee || submittingManual}
+                icon={submittingManual ? Loader2 : undefined}
+                className={submittingManual ? '[&_svg]:animate-spin' : ''}
+              >
+                {submittingManual ? 'Enregistrement...' : 'Enregistrer'}
+              </Button>
             </div>
           </div>
         </div>

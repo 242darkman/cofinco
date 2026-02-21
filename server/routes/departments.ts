@@ -206,6 +206,56 @@ export function registerDepartmentsRoutes(app: Express) {
     }
   });
 
+  // GET - Statistiques effectifs/vacances par poste
+  // IMPORTANT: Must be registered BEFORE the /:id route to avoid "vacancy-stats" being parsed as a UUID
+  app.get("/api/job-positions/vacancy-stats", requireAuth, async (req, res) => {
+    try {
+      // Sous-requête: compter les employés actifs par poste
+      const employeCountSq = db
+        .select({
+          jobPositionId: employes.jobPositionId,
+          effectifActuel: count(employes.id).as('effectif_actuel'),
+        })
+        .from(employes)
+        .where(eq(employes.statut, 'ACTIVE'))
+        .groupBy(employes.jobPositionId)
+        .as('emp_count');
+
+      const result = await db
+        .select({
+          id: jobPositions.id,
+          code: jobPositions.code,
+          name: jobPositions.name,
+          departmentId: jobPositions.departmentId,
+          departmentName: departments.name,
+          departmentCode: departments.code,
+          effectifPrevu: jobPositions.effectifPrevu,
+          effectifActuel: sql<number>`COALESCE(${employeCountSq.effectifActuel}, 0)`.as('effectif_actuel'),
+          qualification: jobPositions.qualification,
+          salaireMin: jobPositions.salaireMin,
+          salaireMax: jobPositions.salaireMax,
+        })
+        .from(jobPositions)
+        .innerJoin(departments, eq(jobPositions.departmentId, departments.id))
+        .leftJoin(employeCountSq, eq(jobPositions.id, employeCountSq.jobPositionId))
+        .where(eq(jobPositions.isActive, true))
+        .orderBy(departments.name, jobPositions.name);
+
+      // Calculer les vacances
+      const stats = result.map(r => ({
+        ...r,
+        effectifPrevu: r.effectifPrevu ?? 1,
+        effectifActuel: Number(r.effectifActuel),
+        vacants: Math.max(0, (r.effectifPrevu ?? 1) - Number(r.effectifActuel)),
+      }));
+
+      res.json(stats);
+    } catch (error) {
+      logger.error({ err: error }, 'Error fetching vacancy stats');
+      res.status(500).json({ message: "Erreur lors du calcul des effectifs" });
+    }
+  });
+
   // GET - Poste par ID (UUID)
   app.get("/api/job-positions/:id", requireAuth, async (req, res) => {
     try {
@@ -320,52 +370,4 @@ export function registerDepartmentsRoutes(app: Express) {
     }
   });
 
-  // GET - Statistiques effectifs/vacances par poste
-  app.get("/api/job-positions/vacancy-stats", requireAuth, async (req, res) => {
-    try {
-      // Sous-requête: compter les employés actifs par poste
-      const employeCountSq = db
-        .select({
-          jobPositionId: employes.jobPositionId,
-          effectifActuel: count(employes.id).as('effectif_actuel'),
-        })
-        .from(employes)
-        .where(eq(employes.statut, 'ACTIVE'))
-        .groupBy(employes.jobPositionId)
-        .as('emp_count');
-
-      const result = await db
-        .select({
-          id: jobPositions.id,
-          code: jobPositions.code,
-          name: jobPositions.name,
-          departmentId: jobPositions.departmentId,
-          departmentName: departments.name,
-          departmentCode: departments.code,
-          effectifPrevu: jobPositions.effectifPrevu,
-          effectifActuel: sql<number>`COALESCE(${employeCountSq.effectifActuel}, 0)`.as('effectif_actuel'),
-          qualification: jobPositions.qualification,
-          salaireMin: jobPositions.salaireMin,
-          salaireMax: jobPositions.salaireMax,
-        })
-        .from(jobPositions)
-        .innerJoin(departments, eq(jobPositions.departmentId, departments.id))
-        .leftJoin(employeCountSq, eq(jobPositions.id, employeCountSq.jobPositionId))
-        .where(eq(jobPositions.isActive, true))
-        .orderBy(departments.name, jobPositions.name);
-
-      // Calculer les vacances
-      const stats = result.map(r => ({
-        ...r,
-        effectifPrevu: r.effectifPrevu ?? 1,
-        effectifActuel: Number(r.effectifActuel),
-        vacants: Math.max(0, (r.effectifPrevu ?? 1) - Number(r.effectifActuel)),
-      }));
-
-      res.json(stats);
-    } catch (error) {
-      logger.error({ err: error }, 'Error fetching vacancy stats');
-      res.status(500).json({ message: "Erreur lors du calcul des effectifs" });
-    }
-  });
 }

@@ -25,13 +25,14 @@ function formatFCFA(value: number | string): string {
 }
 
 export default function MesBulletinsTab() {
-  const { data: bulletins = [], isLoading } = useQuery<Bulletin[]>({
+  const { data: rawBulletins, isLoading } = useQuery<Bulletin[]>({
     queryKey: ['/api/hr/paie/my'],
     queryFn: () =>
       fetch('/api/hr/paie/bulletins?mine=true', { credentials: 'include' }).then((r) =>
         r.json()
       ),
   });
+  const bulletins = rawBulletins ?? [];
 
   if (isLoading) {
     return (

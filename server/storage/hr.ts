@@ -8,7 +8,7 @@ import {
   bulletinsPaie, InsertBulletinPaie,
   avantages, Avantage,
   avantagesEmployes, InsertAvantageEmploye, AvantageEmploye,
-  presences, Presence, users, horairesTravail, employes,
+  presences, Presence, users, horairesTravail, employes, payrollConfig,
   jobPositions, departments,
   evaluationTemplates, evaluationCriteria, evaluationCampaigns, evaluations, evaluationResponses,
   formationParticipants,
@@ -161,6 +161,82 @@ export interface GpsData {
     gpsSource?: string;
 }
 
+// ---------------------------------------------------------------------------
+// Schedule & attendance policy helpers
+// ---------------------------------------------------------------------------
+
+function parseHHMM(time: string): number {
+    const [h, m] = time.split(':').map(Number);
+    return h * 60 + (m || 0);
+}
+
+async function getEmployeeScheduleForDay(employeId: string, dayOfWeek: number): Promise<{
+    heureDebut: string;
+    heureFin: string;
+    pauseMinutes: number;
+    standardMinutes: number;
+} | null> {
+    const horaires = await db.select().from(horairesTravail)
+        .where(and(
+            eq(horairesTravail.employeId, employeId),
+            eq(horairesTravail.jourSemaine, dayOfWeek),
+            eq(horairesTravail.actif, true)
+        ));
+
+    if (horaires.length === 0) return null;
+
+    const h = horaires[0];
+    const pause = h.pauseMinutes || 60;
+    const startMin = parseHHMM(h.heureDebut);
+    const endMin = parseHHMM(h.heureFin);
+    const standardMinutes = Math.max(0, endMin - startMin - pause);
+
+    return { heureDebut: h.heureDebut, heureFin: h.heureFin, pauseMinutes: pause, standardMinutes };
+}
+
+async function loadAttendancePolicy(agenceId?: string | null): Promise<{
+    lateGraceMinutes: number;
+    allowOvertime: boolean;
+    defaultHeureDebut: string;
+    defaultHeureFin: string;
+    defaultPauseMinutes: number;
+    defaultStandardMinutes: number;
+}> {
+    let config = null;
+
+    if (agenceId) {
+        const [agencyConfig] = await db.select().from(payrollConfig)
+            .where(and(eq(payrollConfig.agenceId, agenceId), eq(payrollConfig.isActive, true)))
+            .orderBy(desc(payrollConfig.effectiveFrom)).limit(1);
+        config = agencyConfig || null;
+    }
+    if (!config) {
+        const [globalConfig] = await db.select().from(payrollConfig)
+            .where(and(sql`${payrollConfig.agenceId} IS NULL`, eq(payrollConfig.isActive, true)))
+            .orderBy(desc(payrollConfig.effectiveFrom)).limit(1);
+        config = globalConfig || null;
+    }
+
+    const defaultHeureDebut = config?.defaultHeureDebut || "08:00";
+    const defaultHeureFin = config?.defaultHeureFin || "17:00";
+    const defaultPauseMinutes = config?.defaultPauseMinutes ?? 60;
+
+    const defaultStandardMinutes = Math.max(0, parseHHMM(defaultHeureFin) - parseHHMM(defaultHeureDebut) - defaultPauseMinutes);
+
+    return {
+        lateGraceMinutes: config?.lateGraceMinutes ?? 5,
+        allowOvertime: config?.allowOvertime ?? true,
+        defaultHeureDebut,
+        defaultHeureFin,
+        defaultPauseMinutes,
+        defaultStandardMinutes,
+    };
+}
+
+// ---------------------------------------------------------------------------
+// Presence tracking
+// ---------------------------------------------------------------------------
+
 export async function checkIn(employeId: string, gps?: GpsData): Promise<Presence> {
     const today = new Date().toISOString().split('T')[0];
     const now = new Date();
@@ -170,10 +246,21 @@ export async function checkIn(employeId: string, gps?: GpsData): Promise<Presenc
 
     if (existing.length > 0) return existing[0]; // Already present
 
-    // Determine status based on time (e.g. after 9:00 is LATE)
-    const hour = now.getHours();
+    // Fetch employee's agency for policy lookup
+    const [emp] = await db.select({ agenceId: employes.agenceId }).from(employes).where(eq(employes.id, employeId));
+
+    // Determine status based on schedule + grace period
+    const schedule = await getEmployeeScheduleForDay(employeId, now.getDay());
+    const policy = await loadAttendancePolicy(emp?.agenceId);
+
+    const scheduledStart = schedule?.heureDebut || policy.defaultHeureDebut;
+    const arrivalMinutes = now.getHours() * 60 + now.getMinutes();
+    const scheduledMinutes = parseHHMM(scheduledStart);
+
     let statut: string = StatutPresence.PRESENT;
-    if (hour >= 9) statut = StatutPresence.LATE;
+    if (arrivalMinutes > scheduledMinutes + policy.lateGraceMinutes) {
+        statut = StatutPresence.LATE;
+    }
 
     const [presence] = await db.insert(presences).values({
         employeId,
@@ -202,36 +289,31 @@ export async function checkOut(employeId: string): Promise<Presence | null> {
     // Calculate total time from arrival to departure
     const diffMs = now.getTime() - new Date(heureArrivee).getTime();
     let totalMinutes = Math.floor(diffMs / 60000);
-    
-    // Fetch scheduled pause duration from horairesTravail
-    const dayOfWeek = now.getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
-    const horaires = await db.select().from(horairesTravail)
-        .where(and(
-            eq(horairesTravail.employeId, employeId),
-            eq(horairesTravail.jourSemaine, dayOfWeek),
-            eq(horairesTravail.actif, true)
-        ));
-    
-    let pauseMinutesFixe = 60; // Default scheduled pause: 60 min
-    if (horaires.length > 0) {
-        pauseMinutesFixe = horaires[0].pauseMinutes || 60;
-    }
-    
+
+    // Fetch employee schedule and attendance policy
+    const [emp] = await db.select({ agenceId: employes.agenceId }).from(employes).where(eq(employes.id, employeId));
+    const schedule = await getEmployeeScheduleForDay(employeId, now.getDay());
+    const policy = await loadAttendancePolicy(emp?.agenceId);
+
+    const pauseMinutesFixe = schedule?.pauseMinutes ?? policy.defaultPauseMinutes;
+
     // Calculate actual pause time if recorded
     let pauseMinutesReelle = 0;
     if (existing[0].pauseDebut && existing[0].pauseFin) {
         const pauseMs = new Date(existing[0].pauseFin).getTime() - new Date(existing[0].pauseDebut).getTime();
         pauseMinutesReelle = Math.floor(pauseMs / 60000);
     }
-    
-    // Use actual pause if recorded, otherwise use scheduled pause
+
+    // Use actual pause if recorded, otherwise use scheduled/default pause
     const pauseMinutes = pauseMinutesReelle > 0 ? pauseMinutesReelle : pauseMinutesFixe;
-    
+
     const minutesTravaillees = Math.max(0, totalMinutes - pauseMinutes);
-    
-    // Standard work day = 8 hours = 480 minutes
-    const standardMinutes = 480;
-    const heuresSupplementaires = Math.max(0, minutesTravaillees - standardMinutes);
+
+    // Use schedule-derived standard or policy default
+    const standardMinutes = schedule?.standardMinutes ?? policy.defaultStandardMinutes;
+    const heuresSupplementaires = policy.allowOvertime
+        ? Math.max(0, minutesTravaillees - standardMinutes)
+        : 0;
 
     const [updated] = await db.update(presences)
         .set({ 
@@ -273,6 +355,95 @@ export async function endBreak(employeId: string): Promise<Presence | null> {
         .returning();
         
     return updated;
+}
+
+export async function manualPresenceEntry(data: {
+    employeId: string;
+    date: string;
+    heureArrivee: string;
+    heureDepart?: string;
+    pauseDebut?: string;
+    pauseFin?: string;
+    commentaire?: string;
+}): Promise<Presence> {
+    // Build timestamps from date + HH:MM
+    const arriveeDt = new Date(`${data.date}T${data.heureArrivee}:00`);
+    const departDt = data.heureDepart ? new Date(`${data.date}T${data.heureDepart}:00`) : null;
+    const pauseDebutDt = data.pauseDebut ? new Date(`${data.date}T${data.pauseDebut}:00`) : null;
+    const pauseFinDt = data.pauseFin ? new Date(`${data.date}T${data.pauseFin}:00`) : null;
+
+    // Fetch employee schedule and attendance policy
+    const [emp] = await db.select({ agenceId: employes.agenceId }).from(employes).where(eq(employes.id, data.employeId));
+    const schedule = await getEmployeeScheduleForDay(data.employeId, arriveeDt.getDay());
+    const policy = await loadAttendancePolicy(emp?.agenceId);
+
+    // Determine late status from schedule + grace period
+    const scheduledStart = schedule?.heureDebut || policy.defaultHeureDebut;
+    const arrivalMinutes = arriveeDt.getHours() * 60 + arriveeDt.getMinutes();
+    const scheduledMinutes = parseHHMM(scheduledStart);
+
+    const statut = arrivalMinutes > scheduledMinutes + policy.lateGraceMinutes
+        ? StatutPresence.LATE
+        : StatutPresence.PRESENT;
+
+    // Calculate work hours if departure is provided
+    let heuresTravaillees = 0;
+    let heuresSupplementaires = 0;
+    if (departDt) {
+        const totalMinutes = Math.floor((departDt.getTime() - arriveeDt.getTime()) / 60000);
+
+        // Calculate pause minutes
+        let pauseMinutes: number;
+        if (pauseDebutDt && pauseFinDt) {
+            pauseMinutes = Math.floor((pauseFinDt.getTime() - pauseDebutDt.getTime()) / 60000);
+        } else {
+            pauseMinutes = schedule?.pauseMinutes ?? policy.defaultPauseMinutes;
+        }
+
+        heuresTravaillees = Math.max(0, totalMinutes - pauseMinutes);
+        const standardMinutes = schedule?.standardMinutes ?? policy.defaultStandardMinutes;
+        heuresSupplementaires = policy.allowOvertime
+            ? Math.max(0, heuresTravaillees - standardMinutes)
+            : 0;
+    }
+
+    // Check if record already exists for this employee+date
+    const existing = await db.select().from(presences)
+        .where(and(eq(presences.employeId, data.employeId), eq(presences.date, data.date)));
+
+    if (existing.length > 0) {
+        const [updated] = await db.update(presences)
+            .set({
+                statut,
+                heureArrivee: arriveeDt,
+                heureDepart: departDt,
+                pauseDebut: pauseDebutDt,
+                pauseFin: pauseFinDt,
+                heuresTravaillees,
+                heuresSupplementaires,
+                commentaire: data.commentaire || existing[0].commentaire,
+                gpsSource: "manual_admin",
+            })
+            .where(eq(presences.id, existing[0].id))
+            .returning();
+        return updated;
+    }
+
+    const [created] = await db.insert(presences).values({
+        employeId: data.employeId,
+        date: data.date,
+        statut,
+        heureArrivee: arriveeDt,
+        heureDepart: departDt,
+        pauseDebut: pauseDebutDt,
+        pauseFin: pauseFinDt,
+        heuresTravaillees,
+        heuresSupplementaires,
+        commentaire: data.commentaire || null,
+        gpsSource: "manual_admin",
+    }).returning();
+
+    return created;
 }
 
 // Paie Management
@@ -936,9 +1107,9 @@ export async function updateDocumentRequest(id: string, data: Partial<HrDocument
 export async function getJobOffers(filter?: { statut?: string; visibilite?: string }) {
   let query = db.select({
     offer: jobOffers,
-    positionName: jobPositions.nom,
+    positionName: jobPositions.name,
     positionCode: jobPositions.code,
-    departmentName: departments.nom,
+    departmentName: departments.name,
     departmentId: departments.id,
   })
     .from(jobOffers)
@@ -978,9 +1149,9 @@ export async function getJobOffers(filter?: { statut?: string; visibilite?: stri
 export async function getJobOfferById(id: number) {
   const [result] = await db.select({
     offer: jobOffers,
-    positionName: jobPositions.nom,
+    positionName: jobPositions.name,
     positionCode: jobPositions.code,
-    departmentName: departments.nom,
+    departmentName: departments.name,
     departmentId: departments.id,
   })
     .from(jobOffers)
@@ -1014,8 +1185,8 @@ export async function getJobOfferCandidatures(offerId: number) {
 export async function getInternalJobOffers() {
   return db.select({
     offer: jobOffers,
-    positionName: jobPositions.nom,
-    departmentName: departments.nom,
+    positionName: jobPositions.name,
+    departmentName: departments.name,
   })
     .from(jobOffers)
     .innerJoin(jobPositions, eq(jobOffers.jobPositionId, jobPositions.id))
@@ -1136,7 +1307,7 @@ export async function getProjectById(id: string) {
     employeId: projetMembres.employeId,
     role: projetMembres.role,
     dateAjout: projetMembres.dateAjout,
-    employeNom: sql<string>`(SELECT u."fullName" FROM users u JOIN employes e ON e."user_id" = u.id WHERE e.id = ${projetMembres.employeId})`,
+    employeNom: sql<string>`(SELECT CONCAT(u.prenom, ' ', u.nom) FROM users u JOIN employes e ON e."user_id" = u.id WHERE e.id = ${projetMembres.employeId})`,
     employeMatricule: sql<string>`(SELECT e.matricule FROM employes e WHERE e.id = ${projetMembres.employeId})`,
   }).from(projetMembres).where(eq(projetMembres.projetId, id));
 
@@ -1318,6 +1489,25 @@ export async function deleteTimeEntry(entryId: string) {
   await db.delete(tempsImputes).where(eq(tempsImputes.id, entryId));
 }
 
+// Get presence records for an employee over a date range (for timesheet linking)
+export async function getPresenceForWeek(employeId: string, dateDebut: string, dateFin: string) {
+  return await db.select({
+    id: presences.id,
+    date: presences.date,
+    statut: presences.statut,
+    heureArrivee: presences.heureArrivee,
+    heureDepart: presences.heureDepart,
+    heuresTravaillees: presences.heuresTravaillees,
+    heuresSupplementaires: presences.heuresSupplementaires,
+  }).from(presences)
+    .where(and(
+      eq(presences.employeId, employeId),
+      gte(presences.date, dateDebut),
+      lte(presences.date, dateFin),
+    ))
+    .orderBy(asc(presences.date));
+}
+
 // ================================================
 // REPORTING - Project cost & employee allocation
 // ================================================
@@ -1397,9 +1587,9 @@ export async function getMyDashboard(employeId: string) {
   const monthEnd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()).padStart(2, '0')}`;
   const presenceStats = await db.select({
     total: sql<number>`COUNT(*)::int`,
-    presents: sql<number>`COUNT(*) FILTER (WHERE ${presences.statut} = 'Présent')::int`,
-    retards: sql<number>`COUNT(*) FILTER (WHERE ${presences.statut} = 'Retard')::int`,
-    absents: sql<number>`COUNT(*) FILTER (WHERE ${presences.statut} = 'Absent')::int`,
+    presents: sql<number>`COUNT(*) FILTER (WHERE ${presences.statut} = 'PRESENT')::int`,
+    retards: sql<number>`COUNT(*) FILTER (WHERE ${presences.statut} = 'LATE')::int`,
+    absents: sql<number>`COUNT(*) FILTER (WHERE ${presences.statut} = 'ABSENT')::int`,
     heuresTravaillees: sql<number>`COALESCE(SUM(${presences.heuresTravaillees}), 0)`,
   }).from(presences)
     .where(and(
@@ -1450,13 +1640,13 @@ export async function getMyEvaluations(employeId: string) {
     id: evaluations.id,
     campaignId: evaluations.campaignId,
     employeId: evaluations.employeId,
-    evaluatorId: evaluations.evaluatorId,
-    status: evaluations.status,
-    overallScore: evaluations.overallScore,
-    overallComment: evaluations.overallComment,
+    evaluatorId: evaluations.managerId,
+    status: evaluations.statut,
+    overallScore: evaluations.finalScore,
+    overallComment: evaluations.managerCommentaire,
     createdAt: evaluations.createdAt,
-    completedAt: evaluations.completedAt,
-    evaluatorNom: sql<string>`(SELECT u."fullName" FROM users u JOIN employes e ON e."user_id" = u.id WHERE e.id = ${evaluations.evaluatorId})`,
+    completedAt: evaluations.finalizedAt,
+    evaluatorNom: evaluations.managerNom,
   }).from(evaluations)
     .where(eq(evaluations.employeId, employeId))
     .orderBy(desc(evaluations.createdAt));

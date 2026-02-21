@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, Button, Badge } from '../ui';
-import { Settings, Plus, Trash2, Save, RefreshCw, AlertTriangle, Percent, DollarSign, Clock } from 'lucide-react';
+import { Settings, Plus, Trash2, Save, RefreshCw, AlertTriangle, Percent, DollarSign, Clock, UserCheck } from 'lucide-react';
 import { toast } from '../../lib/toast';
 
 interface IprBracket {
@@ -24,6 +24,11 @@ interface PayrollConfig {
   effectiveFrom: string;
   isActive: boolean;
   updatedAt: string;
+  lateGraceMinutes: number;
+  allowOvertime: boolean;
+  defaultHeureDebut: string;
+  defaultHeureFin: string;
+  defaultPauseMinutes: number;
 }
 
 const formatCurrency = (val: number) => val.toLocaleString('fr-FR') + ' CDF';
@@ -55,6 +60,11 @@ export default function PayrollConfigPanel() {
   const [overtimeRate, setOvertimeRate] = useState('1.50');
   const [nightShiftRate, setNightShiftRate] = useState('1.25');
   const [holidayRate, setHolidayRate] = useState('2.00');
+  const [lateGraceMinutes, setLateGraceMinutes] = useState('5');
+  const [allowOvertime, setAllowOvertime] = useState(true);
+  const [defaultHeureDebut, setDefaultHeureDebut] = useState('08:00');
+  const [defaultHeureFin, setDefaultHeureFin] = useState('17:00');
+  const [defaultPauseMinutes, setDefaultPauseMinutes] = useState('60');
 
   // Populate form when config loads
   useEffect(() => {
@@ -67,6 +77,11 @@ export default function PayrollConfigPanel() {
       setOvertimeRate(config.overtimeRate || '1.50');
       setNightShiftRate(config.nightShiftRate || '1.25');
       setHolidayRate(config.holidayRate || '2.00');
+      setLateGraceMinutes(String(config.lateGraceMinutes ?? 5));
+      setAllowOvertime(config.allowOvertime ?? true);
+      setDefaultHeureDebut(config.defaultHeureDebut || '08:00');
+      setDefaultHeureFin(config.defaultHeureFin || '17:00');
+      setDefaultPauseMinutes(String(config.defaultPauseMinutes ?? 60));
     }
   }, [config]);
 
@@ -119,8 +134,13 @@ export default function PayrollConfigPanel() {
       overtimeRate: parseFloat(overtimeRate),
       nightShiftRate: parseFloat(nightShiftRate),
       holidayRate: parseFloat(holidayRate),
+      lateGraceMinutes: parseInt(lateGraceMinutes) || 5,
+      allowOvertime,
+      defaultHeureDebut,
+      defaultHeureFin,
+      defaultPauseMinutes: parseInt(defaultPauseMinutes) || 60,
     });
-  }, [cnssEmployee, cnssEmployer, brackets, transportAllowance, housingAllowance, overtimeRate, nightShiftRate, holidayRate, saveMutation]);
+  }, [cnssEmployee, cnssEmployer, brackets, transportAllowance, housingAllowance, overtimeRate, nightShiftRate, holidayRate, lateGraceMinutes, allowOvertime, defaultHeureDebut, defaultHeureFin, defaultPauseMinutes, saveMutation]);
 
   // Bracket helpers
   const addBracket = useCallback(() => {
@@ -254,6 +274,77 @@ export default function PayrollConfigPanel() {
                 className="w-full px-2 py-1.5 bg-surface-base border border-edge rounded text-sm text-content-primary font-mono focus:ring-1 focus:ring-status-success/50 outline-none"
               />
             </div>
+          </div>
+        </Card>
+
+        {/* Politique de Présence */}
+        <Card padding="sm" className="bg-surface/80 border-edge">
+          <h4 className="text-xs font-bold text-status-warning uppercase tracking-wide mb-3 flex items-center gap-1.5">
+            <UserCheck size={13} />
+            Politique de Présence
+          </h4>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] text-content-muted mb-1">Tolérance retard (min)</label>
+                <input
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={lateGraceMinutes}
+                  onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setLateGraceMinutes(v); }}
+                  className="w-full px-2 py-1.5 bg-surface-base border border-edge rounded text-sm text-content-primary font-mono focus:ring-1 focus:ring-status-warning/50 outline-none"
+                />
+              </div>
+              <div className="flex items-end pb-0.5">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <button
+                    type="button"
+                    onClick={() => setAllowOvertime(!allowOvertime)}
+                    className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+                      allowOvertime ? 'bg-status-success' : 'bg-edge'
+                    }`}
+                  >
+                    <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                      allowOvertime ? 'translate-x-4' : 'translate-x-0.5'
+                    }`} />
+                  </button>
+                  <span className="text-[10px] text-content-muted">Heures supp.</span>
+                </label>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <label className="block text-[10px] text-content-muted mb-1">Début par défaut</label>
+                <input
+                  type="time"
+                  value={defaultHeureDebut}
+                  onChange={(e) => setDefaultHeureDebut(e.target.value)}
+                  className="w-full px-2 py-1.5 bg-surface-base border border-edge rounded text-sm text-content-primary font-mono focus:ring-1 focus:ring-status-warning/50 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] text-content-muted mb-1">Fin par défaut</label>
+                <input
+                  type="time"
+                  value={defaultHeureFin}
+                  onChange={(e) => setDefaultHeureFin(e.target.value)}
+                  className="w-full px-2 py-1.5 bg-surface-base border border-edge rounded text-sm text-content-primary font-mono focus:ring-1 focus:ring-status-warning/50 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] text-content-muted mb-1">Pause (min)</label>
+                <input
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={defaultPauseMinutes}
+                  onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setDefaultPauseMinutes(v); }}
+                  className="w-full px-2 py-1.5 bg-surface-base border border-edge rounded text-sm text-content-primary font-mono focus:ring-1 focus:ring-status-warning/50 outline-none"
+                />
+              </div>
+            </div>
+            <p className="text-[10px] text-content-muted">
+              Horaires par défaut si l'employé n'a pas de planning individuel configuré
+            </p>
           </div>
         </Card>
 

@@ -313,7 +313,7 @@ function buildConfigs(): Record<string, ReportConfig> {
 export function useReportGenerator() {
   const { branding } = useBranding();
   const COMPANY_NAME = branding.appName;
-  const [reportType, setReportType] = useState('clients');
+  const [reportType, setReportType] = useState('');
   const [format, setFormat] = useState<'pdf' | 'excel' | 'csv'>('pdf');
   const [dateRange, setDateRange] = useState({
     start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -414,6 +414,7 @@ export function useReportGenerator() {
   // ═════════════════════════════════════════════════════════════════════════
 
   const generatePDF = async () => {
+    if (!reportType) return;
     setLoading(true);
     try {
       // P4.1: Lazy-load PDF libraries on demand
@@ -485,6 +486,7 @@ export function useReportGenerator() {
   // ═════════════════════════════════════════════════════════════════════════
 
   const generateExcel = async () => {
+    if (!reportType) return;
     setLoading(true);
     try {
       // P4.1: Lazy-load Excel library on demand
@@ -529,6 +531,7 @@ export function useReportGenerator() {
   // ═════════════════════════════════════════════════════════════════════════
 
   const generateCSV = async () => {
+    if (!reportType) return;
     setLoading(true);
     try {
       const data = await fetchReportData();
@@ -554,6 +557,7 @@ export function useReportGenerator() {
   // ═════════════════════════════════════════════════════════════════════════
 
   const printReport = async () => {
+    if (!reportType) return;
     setLoading(true);
     try {
       const data = await fetchReportData();

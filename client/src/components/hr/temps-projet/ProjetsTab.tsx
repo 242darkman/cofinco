@@ -12,8 +12,8 @@ const STATUS_LABELS: Record<string, string> = {
   DRAFT: 'Brouillon',
   ACTIVE: 'Actif',
   ON_HOLD: 'En pause',
-  COMPLETED: 'Termine',
-  CANCELLED: 'Annule',
+  COMPLETED: 'Terminé',
+  CANCELLED: 'Annulé',
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -35,8 +35,8 @@ const STATUS_OPTIONS = [
   { value: 'DRAFT', label: 'Brouillon' },
   { value: 'ACTIVE', label: 'Actif' },
   { value: 'ON_HOLD', label: 'En pause' },
-  { value: 'COMPLETED', label: 'Termine' },
-  { value: 'CANCELLED', label: 'Annule' },
+  { value: 'COMPLETED', label: 'Terminé' },
+  { value: 'CANCELLED', label: 'Annulé' },
 ];
 
 const ROLE_OPTIONS = [
@@ -89,8 +89,13 @@ export default function ProjetsTab() {
   const { project: projectDetail, isLoading: loadingDetail, addMember, removeMember } = useProject(selectedProjectId);
 
   const { data: employeesList = [] } = useQuery<any[]>({
-    queryKey: ['/api/hr/employes'],
-    queryFn: () => fetch('/api/hr/employes', { credentials: 'include' }).then(r => r.json()),
+    queryKey: ['/api/employes'],
+    queryFn: async () => {
+      const res = await fetch('/api/employes', { credentials: 'include' });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    },
   });
 
   // Filtered projects
@@ -190,7 +195,7 @@ export default function ProjetsTab() {
     () =>
       employeesList.map((e: any) => ({
         value: e.id,
-        label: `${e.prenom} ${e.nom} (${e.matricule})`,
+        label: `${e.user?.prenom || ''} ${e.user?.nom || ''} (${e.matricule || ''})`.trim(),
       })),
     [employeesList],
   );
@@ -203,7 +208,7 @@ export default function ProjetsTab() {
   // Members not yet added to the project
   const availableMembers = useMemo(() => {
     if (!projectDetail) return employeeOptions;
-    const existing = new Set(projectDetail.membres.map((m) => m.employeId));
+    const existing = new Set((projectDetail.membres || []).map((m) => m.employeId));
     return employeeOptions.filter((o: any) => !existing.has(o.value));
   }, [employeeOptions, projectDetail]);
 
@@ -213,7 +218,7 @@ export default function ProjetsTab() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard title="Total projets" value={stats.total} icon={FolderKanban} color="primary" />
         <StatCard title="Actifs" value={stats.active} icon={CheckCircle2} color="success" />
-        <StatCard title="Termines" value={stats.completed} icon={Clock} color="neutral" />
+        <StatCard title="Terminés" value={stats.completed} icon={Clock} color="neutral" />
         <StatCard title="Budget total" value={formatCurrency(stats.totalBudget)} icon={Banknote} color="warning" />
       </div>
 
@@ -251,8 +256,8 @@ export default function ProjetsTab() {
         <EmptyState
           icon={FolderKanban}
           title="Aucun projet"
-          description={search ? 'Aucun projet ne correspond a votre recherche.' : 'Commencez par creer votre premier projet.'}
-          action={!search ? { label: 'Creer un projet', onClick: openCreateModal } : undefined}
+          description={search ? 'Aucun projet ne correspond à votre recherche.' : 'Commencez par créer votre premier projet.'}
+          action={!search ? { label: 'Créer un projet', onClick: openCreateModal } : undefined}
         />
       )}
 
@@ -318,7 +323,7 @@ export default function ProjetsTab() {
               Annuler
             </Button>
             <Button variant="primary" onClick={handleSubmit} isLoading={isCreating}>
-              {editingProject ? 'Enregistrer' : 'Creer'}
+              {editingProject ? 'Enregistrer' : 'Créer'}
             </Button>
           </div>
         }
@@ -366,7 +371,7 @@ export default function ProjetsTab() {
               value={formData.responsableId}
               onChange={handleFormChange}
               options={employeeOptions}
-              placeholder="Selectionner..."
+              placeholder="Sélectionner..."
             />
           </div>
 
@@ -377,7 +382,7 @@ export default function ProjetsTab() {
               value={formData.agenceId}
               onChange={handleFormChange}
               options={agenceOptions}
-              placeholder="Selectionner..."
+              placeholder="Sélectionner..."
             />
             <SelectField
               label="Statut"
@@ -410,7 +415,7 @@ export default function ProjetsTab() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormField
-              label="Date de debut"
+              label="Date de début"
               name="dateDebut"
               type="date"
               value={formData.dateDebut}
@@ -431,7 +436,7 @@ export default function ProjetsTab() {
       <Modal
         isOpen={!!selectedProjectId}
         onClose={() => { setSelectedProjectId(null); setShowAddMember(false); }}
-        title={projectDetail?.nom || 'Detail du projet'}
+        title={projectDetail?.nom || 'Détail du projet'}
         subtitle={projectDetail?.code}
         size="lg"
         footer={
@@ -477,7 +482,7 @@ export default function ProjetsTab() {
                 <p className="text-content-primary text-sm font-medium">{projectDetail.client || '-'}</p>
               </div>
               <div>
-                <p className="text-content-muted text-xs mb-1">Periode</p>
+                <p className="text-content-muted text-xs mb-1">Période</p>
                 <p className="text-content-primary text-sm">
                   {formatDate(projectDetail.dateDebut)} - {formatDate(projectDetail.dateFin)}
                 </p>
@@ -504,7 +509,7 @@ export default function ProjetsTab() {
               <div className="flex items-center justify-between mb-3">
                 <h4 className="text-content-primary font-semibold text-sm flex items-center gap-2">
                   <Users size={16} className="text-accent" />
-                  Membres ({projectDetail.membres.length})
+                  Membres ({(projectDetail.membres || []).length})
                 </h4>
                 <Button variant="secondary" size="sm" icon={UserPlus} onClick={() => setShowAddMember(!showAddMember)}>
                   Ajouter membre
@@ -515,15 +520,15 @@ export default function ProjetsTab() {
               {showAddMember && (
                 <div className="bg-surface-subtle rounded-lg p-4 mb-4 border border-edge space-y-3">
                   <SelectField
-                    label="Employe"
+                    label="Employé"
                     name="newMemberEmployeId"
                     value={newMemberEmployeId}
                     onChange={(e) => setNewMemberEmployeId(e.target.value)}
                     options={availableMembers}
-                    placeholder="Selectionner un employe..."
+                    placeholder="Sélectionner un employé..."
                   />
                   <SelectField
-                    label="Role"
+                    label="Rôle"
                     name="newMemberRole"
                     value={newMemberRole}
                     onChange={(e) => setNewMemberRole(e.target.value)}
@@ -547,11 +552,11 @@ export default function ProjetsTab() {
               )}
 
               {/* Members list */}
-              {projectDetail.membres.length === 0 ? (
+              {(projectDetail.membres || []).length === 0 ? (
                 <p className="text-content-muted text-sm text-center py-4">Aucun membre dans ce projet.</p>
               ) : (
                 <div className="space-y-2">
-                  {projectDetail.membres.map((member) => (
+                  {(projectDetail.membres || []).map((member) => (
                     <div
                       key={member.id}
                       className="flex items-center justify-between p-3 bg-surface rounded-lg border border-edge"

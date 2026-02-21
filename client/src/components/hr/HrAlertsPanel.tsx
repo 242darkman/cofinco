@@ -14,11 +14,11 @@ import { Card, Badge, Button } from '../ui';
 import { useHrAlerts, type HrAlert } from '../../hooks/hr/useHrAlerts';
 
 const ALERT_TYPE_CONFIG: Record<string, { label: string; icon: React.ElementType }> = {
-  FIN_PERIODE_ESSAI: { label: "Fin p\u00e9riode d'essai", icon: Clock },
+  FIN_PERIODE_ESSAI: { label: "Fin période d'essai", icon: Clock },
   EXPIRATION_CDD: { label: 'Expiration CDD', icon: FileText },
   DOCUMENT_EXPIRANT: { label: 'Document expirant', icon: FileText },
   ANNIVERSAIRE_TRAVAIL: { label: 'Anniversaire', icon: Calendar },
-  VISITE_MEDICALE: { label: 'Visite m\u00e9dicale', icon: Stethoscope },
+  VISITE_MEDICALE: { label: 'Visite médicale', icon: Stethoscope },
 };
 
 const MAX_VISIBLE = 10;
@@ -84,7 +84,7 @@ export default function HrAlertsPanel() {
       <div className="flex items-center justify-between p-4 sm:p-6 pb-0 sm:pb-0">
         <div className="flex items-center gap-2">
           <Bell className="text-content-primary" size={20} />
-          <h3 className="font-bold text-content-primary text-lg">Alertes \u00e0 venir</h3>
+          <h3 className="font-bold text-content-primary text-lg">Alertes à venir</h3>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {stats.urgent > 0 && (
@@ -110,7 +110,7 @@ export default function HrAlertsPanel() {
         {visibleAlerts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-10 text-content-muted">
             <CheckCircle size={40} className="mb-3 opacity-50" />
-            <p className="text-sm">Aucune alerte \u00e0 venir</p>
+            <p className="text-sm">Aucune alerte à venir</p>
           </div>
         ) : (
           <ul className="space-y-2">
@@ -217,7 +217,7 @@ function AlertRow({ alert, onAcknowledge, onDismiss }: AlertRowProps) {
           icon={X}
           disabled={acting}
           onClick={handleDismiss}
-          title="\u00c9carter"
+          title="Écarter"
         />
       </div>
     </li>

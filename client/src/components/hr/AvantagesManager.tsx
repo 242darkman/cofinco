@@ -16,9 +16,9 @@ interface AvantagesManagerProps {
 }
 
 const TYPE_COLORS: Record<string, { bg: string; text: string }> = {
-  Prime: { bg: 'bg-status-success-bg border-status-success/30', text: 'text-status-success' },
-  Assurance: { bg: 'bg-status-info-bg border-status-info/30', text: 'text-status-info' },
-  'Avantage en nature': { bg: 'bg-status-warning-bg border-status-warning/30', text: 'text-status-warning' },
+  Prime: { bg: 'bg-status-success-bg border-status-success/30', text: 'text-status-success-text' },
+  Assurance: { bg: 'bg-status-info-bg border-status-info/30', text: 'text-status-info-text' },
+  'Avantage en nature': { bg: 'bg-status-warning-bg border-status-warning/30', text: 'text-status-warning-text' },
   Autre: { bg: 'bg-surface-subtle/30 border-edge-strong/30', text: 'text-content-muted' },
 };
 
@@ -213,7 +213,7 @@ export default function AvantagesManager({
                   onClick={() => setFilterType(type)}
                   className={`px-2 py-1 text-[10px] font-medium rounded-md transition ${
                     filterType === type
-                      ? 'bg-accent-secondary text-content-primary'
+                      ? 'bg-accent-secondary text-white'
                       : 'bg-surface text-content-muted hover:bg-surface-elevated'
                   }`}
                 >
@@ -226,7 +226,7 @@ export default function AvantagesManager({
           {canManage && onCreate && (
             <button
               onClick={() => { resetForm(); setShowCreateModal(true); }}
-              className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold bg-accent-secondary hover:bg-accent-secondary text-content-primary rounded-lg transition"
+              className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold bg-accent-secondary hover:bg-accent-secondary-hover text-white rounded-lg transition"
             >
               <Plus size={14} />
               <span className="hidden sm:inline">Nouveau</span>

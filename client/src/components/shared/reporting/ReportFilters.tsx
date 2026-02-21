@@ -13,11 +13,19 @@ interface ReportFiltersProps {
   onGenerate: () => void;
   onPrint: () => void;
   loading: boolean;
+  reportType?: string;
+  context?: string[];
 }
 
+const HR_REPORT_IDS = ['registre-personnel', 'bilan-social'];
+
 export default function ReportFilters({
-  format, setFormat, dateRange, setDateRange, filters, setFilters, onGenerate, onPrint, loading
+  format, setFormat, dateRange, setDateRange, filters, setFilters, onGenerate, onPrint, loading,
+  reportType, context
 }: ReportFiltersProps) {
+  const noSelection = !reportType;
+  const isHrContext = context?.every(id => HR_REPORT_IDS.includes(id));
+
   return (
     <Card variant="glass" padding="none" className="overflow-hidden">
       {/* Header with Title and Actions integrated */}
@@ -28,7 +36,7 @@ export default function ReportFilters({
           </div>
           <h3 className="text-sm font-semibold text-content-primary">Paramètres</h3>
         </div>
-        
+
         {/* Format Selector as Segmented Control in Header */}
         <div className="bg-surface-base/80 p-0.5 rounded-lg border border-edge flex">
           {(['pdf', 'excel', 'csv'] as const).map((fmt) => (
@@ -36,7 +44,7 @@ export default function ReportFilters({
               key={fmt}
               onClick={() => setFormat(fmt)}
               className={`px-3 py-1 text-[10px] font-bold uppercase rounded-md transition-all ${
-                format === fmt 
+                format === fmt
                   ? 'bg-accent text-white shadow-sm'
                   : 'text-content-muted hover:text-content-secondary hover:bg-surface/50'
               }`}
@@ -48,7 +56,7 @@ export default function ReportFilters({
       </div>
 
       <div className="p-4 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className={`grid grid-cols-1 ${isHrContext ? '' : 'md:grid-cols-2'} gap-4`}>
           {/* Date Range - Compact */}
           <div className="space-y-2">
             <label className="text-[10px] uppercase font-bold text-content-muted flex items-center gap-1.5">
@@ -75,51 +83,56 @@ export default function ReportFilters({
             </div>
           </div>
 
-          {/* Options - Grid instead of stacked */}
-          <div className="space-y-2">
-            <label className="text-[10px] uppercase font-bold text-content-muted">Options</label>
-            <div className="grid grid-cols-2 gap-2">
-              <div 
-                className={`flex items-center justify-between px-3 py-2 rounded-lg border transition-all ${
-                  filters.includeTransactions 
-                    ? 'bg-accent/5 border-accent/20' 
-                    : 'bg-surface-base border-edge'
-                }`}
-              >
-                <span className="text-xs text-content-secondary">Transactions</span>
-                <Switch 
-                  checked={filters.includeTransactions} 
-                  onChange={(c) => setFilters({ ...filters, includeTransactions: c })} 
-                  size="sm"
-                />
-              </div>
-              <div 
-                className={`flex items-center justify-between px-3 py-2 rounded-lg border transition-all ${
-                  filters.includeStats 
-                    ? 'bg-accent/5 border-accent/20' 
-                    : 'bg-surface-base border-edge'
-                }`}
-              >
-                <span className="text-xs text-content-secondary">Statistiques</span>
-                <Switch 
-                  checked={filters.includeStats} 
-                  onChange={(c) => setFilters({ ...filters, includeStats: c })} 
-                  size="sm"
-                />
+          {/* Options - Only show for non-HR contexts */}
+          {!isHrContext && (
+            <div className="space-y-2">
+              <label className="text-[10px] uppercase font-bold text-content-muted">Options</label>
+              <div className="grid grid-cols-2 gap-2">
+                <div
+                  className={`flex items-center justify-between px-3 py-2 rounded-lg border transition-all ${
+                    filters.includeTransactions
+                      ? 'bg-accent/5 border-accent/20'
+                      : 'bg-surface-base border-edge'
+                  }`}
+                >
+                  <span className="text-xs text-content-secondary">Transactions</span>
+                  <Switch
+                    checked={filters.includeTransactions}
+                    onChange={(c) => setFilters({ ...filters, includeTransactions: c })}
+                    size="sm"
+                  />
+                </div>
+                <div
+                  className={`flex items-center justify-between px-3 py-2 rounded-lg border transition-all ${
+                    filters.includeStats
+                      ? 'bg-accent/5 border-accent/20'
+                      : 'bg-surface-base border-edge'
+                  }`}
+                >
+                  <span className="text-xs text-content-secondary">Statistiques</span>
+                  <Switch
+                    checked={filters.includeStats}
+                    onChange={(c) => setFilters({ ...filters, includeStats: c })}
+                    size="sm"
+                  />
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 
       {/* Footer Actions */}
       <div className="px-4 py-3 bg-surface-base/30 border-t border-edge/50 flex items-center justify-end gap-3">
-        <Button 
-          variant="secondary" 
-          icon={Printer} 
+        {noSelection && (
+          <span className="text-xs text-content-muted mr-auto">Sélectionnez un type de rapport</span>
+        )}
+        <Button
+          variant="secondary"
+          icon={Printer}
           className="border-edge text-content-secondary hover:text-content-primary hover:bg-surface"
           onClick={onPrint}
-          disabled={loading}
+          disabled={loading || noSelection}
         >
           Imprimer
         </Button>
@@ -129,6 +142,7 @@ export default function ReportFilters({
           variant="primary"
           className="bg-gradient-to-r from-accent to-accent hover:from-accent hover:to-accent border-0 shadow-lg shadow-accent/20"
           icon={Download}
+          disabled={noSelection}
         >
           Générer ({format.toUpperCase()})
         </Button>

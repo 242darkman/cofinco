@@ -334,7 +334,7 @@ async function generatePdfsAndSendEmails(
       );
       if (pRows.length > 0) {
         htData = {
-          joursTravailles: pRows.filter(p => p.statut === 'Présent' || p.statut === 'Mission').length,
+          joursTravailles: pRows.filter(p => p.statut === 'PRESENT' || p.statut === 'LATE').length,
           heuresNormales: pRows.reduce((s, p) => s + (p.heuresTravaillees || 0), 0),
           heuresSupplementaires: pRows.reduce((s, p) => s + (p.heuresSupplementaires || 0), 0),
         };
@@ -2650,7 +2650,7 @@ hrRouter.get("/bulletins/:id", getAuthUser, async (req, res) => {
         )
       );
 
-      const joursTravailles = presenceRows.filter(p => p.statut === 'Présent' || p.statut === 'Mission').length;
+      const joursTravailles = presenceRows.filter(p => p.statut === 'PRESENT' || p.statut === 'LATE').length;
       const heuresNormales = presenceRows.reduce((sum, p) => sum + (p.heuresTravaillees || 0), 0);
       const heuresSupplementaires = presenceRows.reduce((sum, p) => sum + (p.heuresSupplementaires || 0), 0);
 
@@ -2842,6 +2842,11 @@ hrRouter.put("/paie/config", getAuthUser, attachAbility, requireAbility(Actions.
           ...(data.overtimeRate !== undefined && { overtimeRate: data.overtimeRate.toFixed(2) }),
           ...(data.nightShiftRate !== undefined && { nightShiftRate: data.nightShiftRate.toFixed(2) }),
           ...(data.holidayRate !== undefined && { holidayRate: data.holidayRate.toFixed(2) }),
+          ...(data.lateGraceMinutes !== undefined && { lateGraceMinutes: data.lateGraceMinutes }),
+          ...(data.allowOvertime !== undefined && { allowOvertime: data.allowOvertime }),
+          ...(data.defaultHeureDebut !== undefined && { defaultHeureDebut: data.defaultHeureDebut }),
+          ...(data.defaultHeureFin !== undefined && { defaultHeureFin: data.defaultHeureFin }),
+          ...(data.defaultPauseMinutes !== undefined && { defaultPauseMinutes: data.defaultPauseMinutes }),
           updatedAt: new Date(),
         })
         .where(eq(payrollConfig.id, existing.id))
@@ -2865,6 +2870,11 @@ hrRouter.put("/paie/config", getAuthUser, attachAbility, requireAbility(Actions.
           overtimeRate: (data.overtimeRate ?? 1.5).toFixed(2),
           nightShiftRate: (data.nightShiftRate ?? 1.25).toFixed(2),
           holidayRate: (data.holidayRate ?? 2.0).toFixed(2),
+          lateGraceMinutes: data.lateGraceMinutes ?? 5,
+          allowOvertime: data.allowOvertime ?? true,
+          defaultHeureDebut: data.defaultHeureDebut ?? "08:00",
+          defaultHeureFin: data.defaultHeureFin ?? "17:00",
+          defaultPauseMinutes: data.defaultPauseMinutes ?? 60,
           createdBy: user.id,
         })
         .returning();
@@ -3891,6 +3901,51 @@ hrRouter.post("/presence/end-break", getAuthUser, async (req, res) => {
         res.json(result);
     } catch (error) {
         logger.error({ err: error }, 'Erreur fin pause');
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// POST /api/hr/presence/manual - Pointage manuel par un ayant droit
+hrRouter.post("/presence/manual", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.RH), async (req, res) => {
+    try {
+        const { employeId, date, heureArrivee, heureDepart, pauseDebut, pauseFin, commentaire } = req.body;
+
+        if (!employeId || !heureArrivee) {
+            return res.status(400).json({ error: "employeId et heureArrivee sont requis" });
+        }
+
+        // Validate time format HH:MM
+        const timeRegex = /^\d{2}:\d{2}$/;
+        if (!timeRegex.test(heureArrivee)) {
+            return res.status(400).json({ error: "Format d'heure invalide (attendu HH:MM)" });
+        }
+        for (const field of [heureDepart, pauseDebut, pauseFin]) {
+            if (field && !timeRegex.test(field)) {
+                return res.status(400).json({ error: "Format d'heure invalide (attendu HH:MM)" });
+            }
+        }
+
+        const targetDate = date || new Date().toISOString().split('T')[0];
+
+        const result = await storage.manualPresenceEntry({
+            employeId,
+            date: targetDate,
+            heureArrivee,
+            heureDepart,
+            pauseDebut,
+            pauseFin,
+            commentaire,
+        });
+
+        // WebSocket: Notify presence update
+        const wsInstance = getWsInstance();
+        if (wsInstance) {
+            wsInstance.broadcast({ type: "PRESENCE_UPDATE", payload: { employeId } });
+        }
+
+        res.json(result);
+    } catch (error) {
+        logger.error({ err: error }, 'Erreur pointage manuel');
         res.status(500).json({ error: "Erreur serveur" });
     }
 });
@@ -6518,6 +6573,21 @@ hrRouter.patch("/timesheets/:id/reject", getAuthUser, attachAbility, async (req,
         res.json(sheet);
     } catch (error) {
         logger.error({ err: error }, "Erreur rejet feuille de temps");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// GET /api/hr/presence/week - Pointages d'un employé pour une semaine (lien feuille de temps)
+hrRouter.get("/presence/week", getAuthUser, async (req, res) => {
+    try {
+        const { employeId, dateDebut, dateFin } = req.query as { employeId?: string; dateDebut?: string; dateFin?: string };
+        if (!employeId || !dateDebut || !dateFin) {
+            return res.status(400).json({ error: "employeId, dateDebut et dateFin requis" });
+        }
+        const records = await hrStorage.getPresenceForWeek(employeId, dateDebut, dateFin);
+        res.json(records);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur récupération présences semaine");
         res.status(500).json({ error: "Erreur serveur" });
     }
 });

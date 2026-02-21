@@ -4,14 +4,16 @@ import {
   useTimesheet,
   useCreateTimesheet,
   useProjects,
+  usePresenceWeek,
   type Timesheet,
   type TimeEntry,
+  type PresenceDay,
 } from '../../../hooks/hr/useProjectTime';
 import { useEmployes } from '../../../hooks/hr/useEmployes';
 import { useUserProfile } from '../../../hooks/useUserProfile';
 import { usePermissions } from '../../auth/ProtectedFeature';
 import { isAdminRole } from '@shared/types/roles';
-import { Card, Button, Badge, SelectField, EmptyState } from '../../ui';
+import { Card, Button, Badge, SelectField, SearchableSelect, EmptyState } from '../../ui';
 import {
   ChevronLeft,
   ChevronRight,
@@ -23,6 +25,8 @@ import {
   Clock,
   CalendarDays,
   FileSpreadsheet,
+  Fingerprint,
+  AlertTriangle,
 } from 'lucide-react';
 import { toast } from '../../../lib/toast';
 
@@ -79,8 +83,8 @@ const STATUT_CONFIG: Record<
 > = {
   DRAFT: { label: 'Brouillon', variant: 'neutral' },
   SUBMITTED: { label: 'Soumise', variant: 'warning' },
-  APPROVED: { label: 'Approuv\u00e9e', variant: 'success' },
-  REJECTED: { label: 'Rejet\u00e9e', variant: 'danger' },
+  APPROVED: { label: 'Approuvée', variant: 'success' },
+  REJECTED: { label: 'Rejetée', variant: 'danger' },
 };
 
 function getStatutLabel(s: string) {
@@ -133,6 +137,12 @@ export default function FeuilleDeTempTab() {
   const { projects } = useProjects({ statut: 'ACTIVE' });
   const { employes } = useEmployes();
 
+  // Fetch presence data for the selected timesheet's employee + week
+  const presenceEmployeId = detail?.employeId || null;
+  const presenceDateDebut = detail?.dateDebut || null;
+  const presenceDateFin = detail?.dateFin || null;
+  const { presences: presenceData } = usePresenceWeek(presenceEmployeId, presenceDateDebut, presenceDateFin);
+
   // ---- Derived data for the grid ----
   const weekDates = useMemo(() => {
     if (!detail) return getWeekDates(selectedWeek);
@@ -149,6 +159,20 @@ export default function FeuilleDeTempTab() {
     }
     return map;
   }, [detail]);
+
+  // Map presence data by date
+  const presenceByDate = useMemo(() => {
+    const map = new Map<string, PresenceDay>();
+    for (const p of presenceData) map.set(p.date, p);
+    return map;
+  }, [presenceData]);
+
+  const getPresenceHours = (date: string): number => {
+    const p = presenceByDate.get(date);
+    return p?.heuresTravaillees ? p.heuresTravaillees / 60 : 0;
+  };
+
+  const totalPresenceHours = weekDates.reduce((sum, d) => sum + getPresenceHours(d), 0);
 
   // Projects shown in the grid: those with entries + any manually added
   const [extraProjectIds, setExtraProjectIds] = useState<string[]>([]);
@@ -179,7 +203,7 @@ export default function FeuilleDeTempTab() {
       });
       setEditingId(ts.id);
       setExtraProjectIds([]);
-      toast.success('Feuille de temps cr\u00e9\u00e9e');
+      toast.success('Feuille de temps créée');
     } catch {
       /* handled in hook */
     }
@@ -335,6 +359,35 @@ export default function FeuilleDeTempTab() {
               </tr>
             </thead>
             <tbody>
+              {/* Pointage reference row */}
+              {presenceData.length > 0 && (
+                <tr className="bg-status-info-bg/30 border-b border-edge">
+                  <td className="px-3 py-2 text-content-secondary font-medium">
+                    <div className="flex items-center gap-2">
+                      <Fingerprint size={14} className="text-status-info" />
+                      <span className="text-xs font-semibold">Pointage</span>
+                    </div>
+                  </td>
+                  {weekDates.map((d) => {
+                    const ph = getPresenceHours(d);
+                    const p = presenceByDate.get(d);
+                    return (
+                      <td key={d} className="px-1 py-1.5 text-center">
+                        <span className={`text-xs font-medium ${ph > 0 ? 'text-status-info' : 'text-content-muted'}`}>
+                          {ph > 0 ? ph.toFixed(1) : '-'}
+                        </span>
+                        {p?.statut && p.statut !== 'Présent' && (
+                          <div className="text-[9px] text-content-muted leading-tight">{p.statut}</div>
+                        )}
+                      </td>
+                    );
+                  })}
+                  <td className="px-3 py-1.5 text-center text-xs font-semibold text-status-info">
+                    {totalPresenceHours.toFixed(1)}
+                  </td>
+                </tr>
+              )}
+
               {gridProjectIds.length === 0 && (
                 <tr>
                   <td
@@ -419,6 +472,28 @@ export default function FeuilleDeTempTab() {
             )}
           </table>
         </Card>
+
+        {/* Presence vs imputation comparison */}
+        {presenceData.length > 0 && grandTotal > 0 && (
+          (() => {
+            const diff = Math.abs(grandTotal - totalPresenceHours);
+            if (diff < 0.1) return null;
+            const over = grandTotal > totalPresenceHours;
+            return (
+              <div className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg border ${
+                over
+                  ? 'bg-status-warning-bg border-status-warning/30 text-status-warning'
+                  : 'bg-status-info-bg border-status-info/30 text-status-info'
+              }`}>
+                <AlertTriangle size={14} />
+                <span>
+                  Imputation ({grandTotal.toFixed(1)}h) {over ? '>' : '<'} Pointage ({totalPresenceHours.toFixed(1)}h)
+                  {' '}&mdash; écart de {diff.toFixed(1)}h
+                </span>
+              </div>
+            );
+          })()
+        )}
 
         {/* Add project row */}
         {isEditable && availableProjects.length > 0 && (
@@ -535,7 +610,7 @@ export default function FeuilleDeTempTab() {
             size="sm"
             icon={ChevronLeft}
             onClick={() => setSelectedWeek((w) => shiftWeek(w, -1))}
-            aria-label="Semaine pr\u00e9c\u00e9dente"
+            aria-label="Semaine précédente"
           />
           <div>
             <label className="block text-xs font-semibold text-content-secondary mb-1">
@@ -567,8 +642,8 @@ export default function FeuilleDeTempTab() {
             { value: '', label: 'Tous' },
             { value: 'DRAFT', label: 'Brouillon' },
             { value: 'SUBMITTED', label: 'Soumise' },
-            { value: 'APPROVED', label: 'Approuv\u00e9e' },
-            { value: 'REJECTED', label: 'Rejet\u00e9e' },
+            { value: 'APPROVED', label: 'Approuvée' },
+            { value: 'REJECTED', label: 'Rejetée' },
           ]}
           placeholder=""
           containerClassName="w-40"
@@ -576,21 +651,23 @@ export default function FeuilleDeTempTab() {
 
         {/* Filter by employee (HR only) */}
         {isRH && employes.length > 0 && (
-          <SelectField
-            label="Employ\u00e9"
-            name="filterEmploye"
-            value={filterEmployeId}
-            onChange={(e) => setFilterEmployeId(e.target.value)}
-            options={[
-              { value: '', label: 'Tous' },
-              ...employes.map((emp: any) => ({
-                value: emp.id,
-                label: `${emp.prenom ?? ''} ${emp.nom ?? ''}`.trim() || emp.matricule || emp.id,
-              })),
-            ]}
-            placeholder=""
-            containerClassName="w-48"
-          />
+          <div className="w-56">
+            <SearchableSelect
+              label="Employé"
+              name="filterEmploye"
+              value={filterEmployeId}
+              onChange={(val) => setFilterEmployeId(String(val))}
+              options={[
+                { value: '', label: 'Tous les employés', hideAvatar: true },
+                ...employes.map((emp: any) => ({
+                  value: emp.id,
+                  label: `${emp.prenom ?? ''} ${emp.nom ?? ''}`.trim() || emp.matricule || emp.id,
+                  subLabel: emp.matricule || '',
+                })),
+              ]}
+              placeholder="Rechercher un employé..."
+            />
+          </div>
         )}
 
         {/* Spacer + create button */}
@@ -616,7 +693,7 @@ export default function FeuilleDeTempTab() {
         <EmptyState
           icon={FileSpreadsheet}
           title="Aucune feuille de temps"
-          description="Aucune feuille de temps trouv\u00e9e pour cette semaine. Cliquez sur \u00ab Nouvelle feuille \u00bb pour en cr\u00e9er une."
+          description="Aucune feuille de temps trouvée pour cette semaine. Cliquez sur « Nouvelle feuille » pour en créer une."
           action={{ label: 'Nouvelle feuille', onClick: handleCreateTimesheet }}
         />
       ) : (

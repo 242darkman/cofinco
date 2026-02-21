@@ -116,7 +116,7 @@ export default function ProspectionPrimeConfig() {
               onClick={() => setFilterTab(tab.key)}
               className={`flex items-center gap-1 px-2 py-1 rounded-md font-medium transition ${
                 filterTab === tab.key
-                  ? 'bg-accent-secondary text-content-primary'
+                  ? 'bg-accent-secondary text-white'
                   : 'text-content-muted hover:text-content-primary hover:bg-surface-elevated/50'
               }`}
             >
@@ -132,7 +132,7 @@ export default function ProspectionPrimeConfig() {
 
         <button
           onClick={() => setShowCreate(true)}
-          className="flex items-center gap-1 px-2.5 py-1.5 bg-accent-secondary hover:bg-accent-secondary text-content-primary rounded-lg text-xs font-medium transition"
+          className="flex items-center gap-1 px-2.5 py-1.5 bg-accent-secondary hover:bg-accent-secondary-hover text-white rounded-lg text-xs font-medium transition"
         >
           <Plus size={12} />
           Nouvelle config
@@ -228,7 +228,7 @@ export default function ProspectionPrimeConfig() {
             <button
               onClick={handleCreate}
               disabled={saving}
-              className="flex-1 py-1.5 bg-accent-secondary hover:bg-accent-secondary text-content-primary rounded text-xs font-medium flex items-center justify-center gap-1 transition disabled:opacity-50"
+              className="flex-1 py-1.5 bg-accent-secondary hover:bg-accent-secondary-hover text-white rounded text-xs font-medium flex items-center justify-center gap-1 transition disabled:opacity-50"
             >
               {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
               Créer

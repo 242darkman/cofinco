@@ -28,10 +28,10 @@ interface StatusConfig {
 }
 
 const STATUS_CONFIG: Record<EvalStatusKey, StatusConfig> = {
-  NOT_STARTED: { label: 'Non commenc\u00e9', variant: 'neutral' },
+  NOT_STARTED: { label: 'Non commencé', variant: 'neutral' },
   IN_PROGRESS: { label: 'En cours', variant: 'warning' },
-  COMPLETED: { label: 'Termin\u00e9', variant: 'success' },
-  FINALIZED: { label: 'Finalis\u00e9', variant: 'info' },
+  COMPLETED: { label: 'Terminé', variant: 'success' },
+  FINALIZED: { label: 'Finalisé', variant: 'info' },
 };
 
 function getStatusConfig(status: string): StatusConfig {
@@ -49,7 +49,7 @@ function formatPeriod(debut: string, fin: string): string {
       month: 'short',
       year: 'numeric',
     });
-  return `${fmt(debut)} \u2014 ${fmt(fin)}`;
+  return `${fmt(debut)} — ${fmt(fin)}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -104,7 +104,7 @@ function EvaluationCard({
         <div className="flex items-center gap-2 rounded-lg bg-surface-subtle p-3">
           <ClipboardCheck size={16} className="text-content-muted shrink-0" />
           <div className="min-w-0 flex-1">
-            <p className="text-xs text-content-muted">Auto-\u00e9valuation</p>
+            <p className="text-xs text-content-muted">Auto-évaluation</p>
             <Badge
               value={selfStatus.label}
               variant={selfStatus.variant}
@@ -119,7 +119,7 @@ function EvaluationCard({
         <div className="flex items-center gap-2 rounded-lg bg-surface-subtle p-3">
           <UserCheck size={16} className="text-content-muted shrink-0" />
           <div className="min-w-0 flex-1">
-            <p className="text-xs text-content-muted">\u00c9val. manager</p>
+            <p className="text-xs text-content-muted">Éval. manager</p>
             <Badge
               value={managerStatus.label}
               variant={managerStatus.variant}
@@ -154,7 +154,7 @@ function EvaluationCard({
               icon={ClipboardCheck}
               onClick={() => onAutoEval(evaluation.id)}
             >
-              Compl\u00e9ter mon auto-\u00e9valuation
+              Compléter mon auto-évaluation
             </Button>
           )}
           {showResultsBtn && (
@@ -164,7 +164,7 @@ function EvaluationCard({
               icon={Eye}
               onClick={() => onViewResults(evaluation.id)}
             >
-              Voir r\u00e9sultats
+              Voir résultats
             </Button>
           )}
         </div>
@@ -232,7 +232,7 @@ export default function MesEvaluationsTab() {
   // ---------- Loading ----------
 
   if (loading) {
-    return <LoadingSpinner text="Chargement de vos \u00e9valuations\u2026" />;
+    return <LoadingSpinner text="Chargement de vos évaluations…" />;
   }
 
   // ---------- Empty state ----------
@@ -241,8 +241,8 @@ export default function MesEvaluationsTab() {
     return (
       <EmptyState
         icon={ClipboardCheck}
-        title="Aucune \u00e9valuation"
-        description="Vous n'avez pas encore d'\u00e9valuation assign\u00e9e. Les \u00e9valuations appara\u00eetront ici lorsqu'une campagne sera lanc\u00e9e."
+        title="Aucune évaluation"
+        description="Vous n'avez pas encore d'évaluation assignée. Les évaluations apparaîtront ici lorsqu'une campagne sera lancée."
       />
     );
   }
@@ -255,7 +255,7 @@ export default function MesEvaluationsTab() {
         <div className="flex items-center gap-2 mb-2">
           <ClipboardCheck size={20} className="text-accent" />
           <h2 className="text-lg font-bold text-content-primary">
-            Mes \u00e9valuations
+            Mes évaluations
           </h2>
           <span className="text-xs text-content-muted">
             ({evaluations.length})

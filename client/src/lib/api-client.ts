@@ -2398,6 +2398,15 @@ export const hrPresenceApi = {
   checkOut: () => request<any>('/hr/presence/checkout', { method: 'POST' }),
   startBreak: () => request<any>('/hr/presence/start-break', { method: 'POST' }),
   endBreak: () => request<any>('/hr/presence/end-break', { method: 'POST' }),
+  manualEntry: (data: {
+    employeId: string; date?: string;
+    heureArrivee: string; heureDepart?: string;
+    pauseDebut?: string; pauseFin?: string;
+    commentaire?: string;
+  }) => request<any>('/hr/presence/manual', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
 };
 
 // HR Salary Advances API
