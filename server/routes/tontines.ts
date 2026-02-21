@@ -225,6 +225,9 @@ export function registerTontineRoutes(app: Express) {
       const data = normalizeKeysDeep(req.body);
       const tontine = await storage.getTontine(req.params.id);
       if (!tontine) return res.status(404).json({ message: "Tontine not found" });
+      if (['COMPLETED', 'CANCELLED'].includes(tontine.statut)) {
+          return res.status(400).json({ message: "Impossible d'ajouter un membre à une tontine terminée ou annulée." });
+      }
 
       const currentMembres = await storage.getMembresTontine(req.params.id);
       if (currentMembres.length >= tontine.nombreMembres) {
@@ -583,6 +586,13 @@ export function registerTontineRoutes(app: Express) {
       try {
         const data = normalizeKeysDeep(req.body);
         const parsed = insertContributionTontineSchema.parse(data);
+
+        // Validate tontine statut
+        const tontine = await storage.getTontine(parsed.tontineId);
+        if (!tontine) return res.status(404).json({ message: "Tontine introuvable" });
+        if (['COMPLETED', 'CANCELLED'].includes(tontine.statut)) {
+          return res.status(400).json({ message: "Impossible d'enregistrer une cotisation sur une tontine terminée ou annulée." });
+        }
 
         let sessionCaisseId = undefined;
 
@@ -979,14 +989,27 @@ export function registerTontineRoutes(app: Express) {
 
   // Tontine Plans
   app.get("/api/tontine-plans", requireAuth, async (req, res) => {
-    const plans = await storage.getAllTontinePlans();
-    res.json(plans);
+    try {
+      let plans = await storage.getAllTontinePlans();
+      if (req.query.actif === 'true') {
+        plans = plans.filter((p: any) => p.actif !== false);
+      } else if (req.query.actif === 'false') {
+        plans = plans.filter((p: any) => p.actif === false);
+      }
+      res.json(plans);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Erreur chargement des plans" });
+    }
   });
 
   app.get("/api/tontine-plans/:id", requireAuth, async (req, res) => {
-    const plan = await storage.getTontinePlan(req.params.id);
-    if (!plan) return res.status(404).json({ message: "Plan introuvable" });
-    res.json(plan);
+    try {
+      const plan = await storage.getTontinePlan(req.params.id);
+      if (!plan) return res.status(404).json({ message: "Plan introuvable" });
+      res.json(plan);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Erreur chargement du plan" });
+    }
   });
 
   app.post("/api/tontine-plans", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.TONTINE), async (req, res) => {
@@ -1007,14 +1030,22 @@ export function registerTontineRoutes(app: Express) {
   });
 
   app.patch("/api/tontine-plans/:id", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.TONTINE), async (req, res) => {
-    const data = normalizeKeysDeep(req.body);
-    const updated = await storage.updateTontinePlan(req.params.id, data as any);
-    res.json(updated);
+    try {
+      const data = normalizeKeysDeep(req.body);
+      const updated = await storage.updateTontinePlan(req.params.id, data as any);
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Erreur mise à jour du plan" });
+    }
   });
 
   app.delete("/api/tontine-plans/:id", requireAuth, attachAbility, requireAbility(Actions.DELETE, Subjects.TONTINE), async (req, res) => {
-    const success = await storage.deleteTontinePlan(req.params.id);
-    res.json({ success });
+    try {
+      const success = await storage.deleteTontinePlan(req.params.id);
+      res.json({ success });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message || "Erreur suppression du plan" });
+    }
   });
 
   // Create a tontine group pre-filled from a plan template

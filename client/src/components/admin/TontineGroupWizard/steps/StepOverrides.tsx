@@ -63,21 +63,32 @@ function hasCustomCalendar(f: StepComponentProps['formData']): boolean {
     || f.collectionCalendarMode !== PLAN_DEFAULTS.collectionCalendarMode
     || f.weekdaysMask !== PLAN_DEFAULTS.weekdaysMask
     || f.shiftNonWorkingDay !== PLAN_DEFAULTS.shiftNonWorkingDay
-    || f.timezone !== PLAN_DEFAULTS.timezone;
+    || f.timezone !== PLAN_DEFAULTS.timezone
+    || f.gracePeriodContribution !== PLAN_DEFAULTS.gracePeriodContribution
+    || f.preferredWeekday !== PLAN_DEFAULTS.preferredWeekday
+    || f.holidayCalendarId !== PLAN_DEFAULTS.holidayCalendarId;
 }
 function hasCustomDistribution(f: StepComponentProps['formData']): boolean {
   return f.payoutOrderMode !== PLAN_DEFAULTS.payoutOrderMode
+    || f.payoutFrequency !== PLAN_DEFAULTS.payoutFrequency
     || f.allowSwapPayoutOrder !== PLAN_DEFAULTS.allowSwapPayoutOrder
+    || f.swapRequiresApproval !== PLAN_DEFAULTS.swapRequiresApproval
     || f.payoutRequiresContribPaid !== PLAN_DEFAULTS.payoutRequiresContribPaid
-    || f.allowPartialDistribution !== PLAN_DEFAULTS.allowPartialDistribution;
+    || f.allowPartialDistribution !== PLAN_DEFAULTS.allowPartialDistribution
+    || f.distributionMinThresholdPct !== PLAN_DEFAULTS.distributionMinThresholdPct;
 }
 function hasCustomPenalties(f: StepComponentProps['formData']): boolean {
-  return f.penaltyEnabled !== PLAN_DEFAULTS.penaltyEnabled;
+  return f.penaltyEnabled !== PLAN_DEFAULTS.penaltyEnabled
+    || f.penaltyType !== PLAN_DEFAULTS.penaltyType
+    || f.penaltyValue !== PLAN_DEFAULTS.penaltyValue
+    || f.penaltyApplication !== PLAN_DEFAULTS.penaltyApplication
+    || f.arrearsPolicy !== PLAN_DEFAULTS.arrearsPolicy;
 }
 function hasCustomEntryExit(f: StepComponentProps['formData']): boolean {
   return f.joinFeeEnabled !== PLAN_DEFAULTS.joinFeeEnabled
     || f.exitAllowed !== PLAN_DEFAULTS.exitAllowed
     || f.replacementAllowed !== PLAN_DEFAULTS.replacementAllowed
+    || f.transferMembershipAllowed !== PLAN_DEFAULTS.transferMembershipAllowed
     || f.allowMidCycleJoin !== PLAN_DEFAULTS.allowMidCycleJoin;
 }
 function hasCustomPayment(f: StepComponentProps['formData']): boolean {

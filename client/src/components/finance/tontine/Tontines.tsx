@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Plus, Users, DollarSign, Calendar, TrendingUp, Edit2, Trash2, ArrowLeft, Eye, MoreHorizontal, Coins, Target, Clock, Activity, AlertTriangle, Download, Play, Pause, CheckCircle, Ban, LayoutTemplate } from 'lucide-react';
+import { Plus, Users, DollarSign, Calendar, TrendingUp, Edit2, Trash2, ArrowLeft, Eye, MoreHorizontal, Coins, Target, Clock, Activity, AlertTriangle, Download, Play, Pause, CheckCircle, Ban, LayoutTemplate, Filter } from 'lucide-react';
 import PageHeader from '../../ui/PageHeader';
 import { FeatureHeader, FEATURE_DESCRIPTIONS } from '../../ui/FeatureHeader';
 import Badge from '../../ui/Badge';
@@ -56,6 +56,7 @@ export default function Tontines() {
   const [plans, setPlans] = useState<any[]>([]);
   const [preSelectedPlanId, setPreSelectedPlanId] = useState<string | undefined>();
   const [showPlanPicker, setShowPlanPicker] = useState(false);
+  const [filterStatut, setFilterStatut] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'dashboard' | 'config' | 'membres' | 'contributions' | 'distributions' | 'tours' | 'penalites' | 'echeancier' | 'audit' | 'calendar'>('dashboard');
 
   useEffect(() => {
@@ -121,6 +122,11 @@ export default function Tontines() {
       tauxReussite,
     };
   }, [tontines]);
+
+  const filteredTontines = useMemo(() => {
+    if (!filterStatut) return tontines;
+    return tontines.filter(t => t.statut === filterStatut);
+  }, [tontines, filterStatut]);
 
   // Export tontine summary as PDF
   const handleExportSummary = useCallback(() => {
@@ -515,9 +521,29 @@ export default function Tontines() {
       </div>
 
       <div className="flex-1 min-h-0 bg-surface-base border border-edge rounded-lg flex flex-col">
+          <div className="flex items-center gap-2 px-3 py-2 border-b border-edge-subtle">
+            <Filter size={14} className="text-content-muted" />
+            <select
+              value={filterStatut}
+              onChange={(e) => setFilterStatut(e.target.value)}
+              className="text-xs bg-input border border-input-border rounded px-2 py-1 focus:border-input-focus focus:outline-none"
+            >
+              <option value="">Tous les statuts</option>
+              <option value="DRAFT">Brouillon</option>
+              <option value="ACTIVE">Active</option>
+              <option value="PAUSED">Suspendue</option>
+              <option value="COMPLETED">Terminée</option>
+              <option value="CANCELLED">Annulée</option>
+            </select>
+            {filterStatut && (
+              <span className="text-[10px] text-content-muted">
+                {filteredTontines.length}/{tontines.length}
+              </span>
+            )}
+          </div>
           <div className="flex-1 overflow-hidden">
               <ResponsiveTable
-                data={tontines}
+                data={filteredTontines}
                 columns={columns}
                 actions={actions}
                 loading={loading}

@@ -25,7 +25,7 @@ export const tontines = pgTable(
     dateFin: timestamp("date_fin"),
     nombreMembres: integer("nombre_membres").notNull(),
     membresActuels: integer("membres_actuels").default(0),
-    statut: text("statut").notNull().default("ACTIVE"),
+    statut: text("statut").notNull().default("DRAFT"),
     solde: numeric("solde").default("0"),
     prochainTour: timestamp("prochain_tour"),
     ordreDistribution: json("ordre_distribution"),

@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Layout, Edit, Trash2, Rocket } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Layout, Edit, Trash2, Rocket, Search } from 'lucide-react';
 import { Card, Button, Badge, EmptyState, LoadingSpinner } from '../ui';
 import { tontinePlanApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
@@ -26,6 +26,21 @@ export default function AdminTontinePlansGestion({ showForm: externalShowForm, o
   const [loading, setLoading] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
   const [editPlan, setEditPlan] = useState<TontinePlan | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterActif, setFilterActif] = useState<'' | 'true' | 'false'>('');
+
+  const filteredPlans = useMemo(() => {
+    let result = plans;
+    if (filterActif === 'true') result = result.filter(p => p.actif !== false);
+    else if (filterActif === 'false') result = result.filter(p => p.actif === false);
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(p =>
+        (p.nom || '').toLowerCase().includes(q) || (p.description || '').toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [plans, searchQuery, filterActif]);
 
   const loadPlans = useCallback(async () => {
     setLoading(true);
@@ -100,8 +115,33 @@ export default function AdminTontinePlansGestion({ showForm: externalShowForm, o
           description="Créez des modèles pour simplifier la création de vos tontines."
         />
       ) : (
+        <>
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="relative flex-1 min-w-[200px] max-w-xs">
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-content-muted" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Rechercher un modèle..."
+              className="w-full pl-8 pr-3 py-1.5 text-sm bg-input border border-input-border rounded-lg focus:border-input-focus focus:outline-none"
+            />
+          </div>
+          <select
+            value={filterActif}
+            onChange={(e) => setFilterActif(e.target.value as '' | 'true' | 'false')}
+            className="text-xs bg-input border border-input-border rounded-lg px-2.5 py-1.5 focus:border-input-focus focus:outline-none"
+          >
+            <option value="">Tous</option>
+            <option value="true">Actifs</option>
+            <option value="false">Inactifs</option>
+          </select>
+          {(searchQuery || filterActif) && (
+            <span className="text-[10px] text-content-muted">{filteredPlans.length}/{plans.length}</span>
+          )}
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {plans.map((plan) => (
+          {filteredPlans.map((plan) => (
             <Card key={plan.id} className="p-5 bg-surface-base border-edge hover:border-accent/50 transition-all duration-300 flex flex-col h-full group">
               <div className="flex justify-between items-start mb-4 gap-3 h-14">
                 <div className="flex-1 min-w-0">
@@ -173,6 +213,7 @@ export default function AdminTontinePlansGestion({ showForm: externalShowForm, o
             </Card>
           ))}
         </div>
+        </>
       )}
 
       <TontinePlanWizard

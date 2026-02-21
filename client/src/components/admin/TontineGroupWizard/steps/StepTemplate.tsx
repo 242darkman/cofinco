@@ -16,7 +16,7 @@ export default function StepTemplate({ formData, onApplyPlan }: StepTemplateProp
 
   useEffect(() => {
     tontinePlanApi.getAll()
-      .then((data) => setPlans((data || []).filter((p: TontinePlan) => p.actif)))
+      .then((data) => setPlans((data || []).filter((p: TontinePlan) => p.actif !== false)))
       .catch(() => setPlans([]))
       .finally(() => setLoading(false));
   }, []);
