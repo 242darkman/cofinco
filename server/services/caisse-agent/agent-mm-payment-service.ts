@@ -65,6 +65,7 @@ export interface InitiateAgentMmPaymentParams {
   latitude?: number;
   longitude?: number;
   observations?: string;
+  feeOption?: "CLIENT_PAYS" | "FEES_DEDUCTED";
 
   // Audit
   createdBy: string;
@@ -209,6 +210,7 @@ class AgentMmPaymentService {
         description: description || `Paiement agent ${reference} - ${client.nom} ${client.prenom || ""}`,
         idempotencyKey: `agent-mm-${payment.id}`, // Idempotency key dédiée pour le payment intent
         agenceId,
+        feeOption: params.feeOption,
         metadata: {
           agentPaymentId: payment.id,
           agentId,

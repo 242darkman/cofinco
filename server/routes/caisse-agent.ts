@@ -1305,6 +1305,7 @@ const initiateMmPaymentSchema = z.object({
   latitude: z.number().optional(),
   longitude: z.number().optional(),
   observations: z.string().optional(),
+  feeOption: z.enum(["CLIENT_PAYS", "FEES_DEDUCTED"]).optional(),
 });
 
 const listMmPaymentsSchema = z.object({

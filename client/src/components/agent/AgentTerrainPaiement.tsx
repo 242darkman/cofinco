@@ -304,6 +304,17 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
   const [mmPaymentIntent, setMmPaymentIntent] = useState<PaymentIntent | null>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Mobile Money fee estimation
+  const [feeOption, setFeeOption] = useState<'CLIENT_PAYS' | 'FEES_DEDUCTED' | ''>('');
+  const [feeEstimate, setFeeEstimate] = useState<{
+    feeAmount: number;
+    feeRate: number;
+    montantBrut: number;
+    montantNet: number;
+    feeOption: string;
+  } | null>(null);
+  const [loadingFeeEstimate, setLoadingFeeEstimate] = useState(false);
+
   const [formData, setFormData] = useState<{
     agent_id: string;
     client_id: string;
@@ -446,6 +457,45 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
       }
     };
   }, []);
+
+  // Debounced fee estimate when amount + feeOption change
+  useEffect(() => {
+    if (!isMobileMoneyPayment || !feeOption || !formData.montant) {
+      setFeeEstimate(null);
+      return;
+    }
+
+    const amount = parseFloat(formData.montant);
+    if (isNaN(amount) || amount <= 0) {
+      setFeeEstimate(null);
+      return;
+    }
+
+    const provider = formData.methode_paiement === 'MTN Mobile Money' ? 'MTN' : 'AIRTEL';
+
+    const timer = setTimeout(async () => {
+      setLoadingFeeEstimate(true);
+      try {
+        const params = new URLSearchParams({
+          amount: amount.toString(),
+          provider,
+          direction: 'COLLECTION',
+          feeOption,
+        });
+        const res = await fetch(`/api/payments/fee-estimate?${params}`, { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          setFeeEstimate(data);
+        }
+      } catch (err) {
+        console.error('Fee estimate error:', err);
+      } finally {
+        setLoadingFeeEstimate(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [formData.montant, formData.methode_paiement, feeOption, isMobileMoneyPayment]);
 
   const loadSecurityConfig = async () => {
     try {
@@ -783,6 +833,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
       description: paiementData.notes || (TYPE_OPERATION_TERRAIN_LABELS[paiementData.type_paiement as keyof typeof TYPE_OPERATION_TERRAIN_LABELS] || paiementData.type_paiement),
       observations: paiementData.notes,
       idempotencyKey: `agent-mm-${Date.now()}-${Array.from(crypto.getRandomValues(new Uint8Array(5)), b => b.toString(36)).join('').slice(0, 9)}`,
+      ...(feeOption && { feeOption }),
     };
 
     try {
@@ -1150,12 +1201,16 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                       <button
                         key={m.id}
                         type="button"
-                        onClick={() => setFormData({
-                          ...formData,
-                          methode_paiement: m.id,
-                          numero_telephone: selectedClient?.telephone || formData.numero_telephone || '',
-                          numero_transaction: ''
-                        })}
+                        onClick={() => {
+                          setFormData({
+                            ...formData,
+                            methode_paiement: m.id,
+                            numero_telephone: selectedClient?.telephone || formData.numero_telephone || '',
+                            numero_transaction: ''
+                          });
+                          setFeeOption('');
+                          setFeeEstimate(null);
+                        }}
                         className={`
                           relative py-3 px-2 rounded-xl border-2 flex flex-col items-center gap-1 transition-all
                           ${formData.methode_paiement === m.id
@@ -1219,6 +1274,71 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                     <p className="text-[10px] text-content-muted mt-1.5">
                       Le client recevra une demande de paiement sur ce numéro
                     </p>
+
+                    {/* Fee Option */}
+                    <div className="mt-3 pt-3 border-t border-edge-subtle/50">
+                      <label className="text-[10px] font-medium text-content-muted uppercase tracking-wider mb-2 block">
+                        Option frais Mobile Money
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setFeeOption(feeOption === 'CLIENT_PAYS' ? '' : 'CLIENT_PAYS')}
+                          className={`p-2.5 rounded-lg border text-left transition-all ${
+                            feeOption === 'CLIENT_PAYS'
+                              ? 'border-accent/50 bg-accent/10'
+                              : 'border-edge-subtle bg-surface-base/50 hover:border-edge'
+                          }`}
+                        >
+                          <p className={`text-[11px] font-bold ${feeOption === 'CLIENT_PAYS' ? 'text-accent' : 'text-content-primary'}`}>
+                            Client paie en plus
+                          </p>
+                          <p className="text-[9px] text-content-muted mt-0.5">Frais ajoutés au montant</p>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFeeOption(feeOption === 'FEES_DEDUCTED' ? '' : 'FEES_DEDUCTED')}
+                          className={`p-2.5 rounded-lg border text-left transition-all ${
+                            feeOption === 'FEES_DEDUCTED'
+                              ? 'border-accent/50 bg-accent/10'
+                              : 'border-edge-subtle bg-surface-base/50 hover:border-edge'
+                          }`}
+                        >
+                          <p className={`text-[11px] font-bold ${feeOption === 'FEES_DEDUCTED' ? 'text-accent' : 'text-content-primary'}`}>
+                            Frais déduits
+                          </p>
+                          <p className="text-[9px] text-content-muted mt-0.5">Frais déduits du montant</p>
+                        </button>
+                      </div>
+
+                      {/* Fee Preview */}
+                      {feeOption && feeEstimate && (
+                        <div className="mt-2 bg-accent/5 border border-accent/20 rounded-lg p-2.5 space-y-1">
+                          <div className="flex justify-between text-[11px]">
+                            <span className="text-content-muted">Montant opération</span>
+                            <span className="text-content-primary font-medium">{feeEstimate.montantBrut.toLocaleString()} F</span>
+                          </div>
+                          <div className="flex justify-between text-[11px]">
+                            <span className="text-content-muted">Frais MM ({feeEstimate.feeRate}%)</span>
+                            <span className="text-content-primary font-medium">{feeEstimate.feeAmount.toLocaleString()} F</span>
+                          </div>
+                          <div className="flex justify-between text-[11px] pt-1 border-t border-accent/20">
+                            <span className="text-content-muted font-semibold">
+                              {feeOption === 'CLIENT_PAYS' ? 'Total débité du téléphone' : 'Crédité au compte'}
+                            </span>
+                            <span className="text-content-primary font-bold">
+                              {(feeOption === 'CLIENT_PAYS' ? feeEstimate.montantBrut : feeEstimate.montantNet).toLocaleString()} F
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      {feeOption && loadingFeeEstimate && (
+                        <div className="mt-2 flex items-center gap-2 text-[10px] text-content-muted">
+                          <Loader2 size={10} className="animate-spin" />
+                          Calcul des frais...
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -1253,8 +1373,12 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
               {/* Total Preview */}
               {montantNum > 0 && (
                 <div className="mb-3 flex items-center justify-between px-3 py-2 rounded-lg bg-status-success-bg border border-status-success/20">
-                  <span className="text-xs text-status-success">Total</span>
-                  <span className="text-lg font-bold text-status-success">{montantNum.toLocaleString()} <span className="text-xs">F</span></span>
+                  <span className="text-xs text-status-success">
+                    {feeEstimate && feeOption === 'CLIENT_PAYS' ? 'Total débité' : 'Total'}
+                  </span>
+                  <span className="text-lg font-bold text-status-success">
+                    {(feeEstimate && feeOption === 'CLIENT_PAYS' ? feeEstimate.montantBrut : montantNum).toLocaleString()} <span className="text-xs">F</span>
+                  </span>
                 </div>
               )}
 
