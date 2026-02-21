@@ -14,6 +14,8 @@ export interface Employe {
   adresse: string | null;
   ville: string | null;
   lieuNaissance: string | null;
+  lieuNaissanceLocalityId?: string | null;
+  lieuNaissanceLocalityType?: string | null;
   nationaliteId: string | null;
   paysNaissanceId: string | null;
   nationaliteNom?: string | null;
@@ -27,9 +29,9 @@ export interface Employe {
   numeroCnss: string | null;
   createdAt: string;
   photoProfile?: string | null;
-  managerId?: string | null; // ID du supérieur hiérarchique
-  managerNom?: string | null; // Nom complet du manager (pour affichage)
-  agenceId?: string | null; // UUID de l'agence
+  managerId?: string | null;
+  managerNom?: string | null;
+  agenceId?: string | null;
   agence?: {
     id: string;
     nom: string;
@@ -38,7 +40,15 @@ export interface Employe {
   } | null;
   modeCalculPaie?: 'MONTHLY' | 'HOURLY' | 'DAILY';
   jobPositionId?: string | null;
-  // Situation familiale & fiscale (paie Congo-Brazza)
+  // Pièce d'identité
+  typePiece?: string | null;
+  numeroPiece?: string | null;
+  dateExpirationPiece?: string | null;
+  paysEmissionId?: string | null;
+  // Paiement
+  paymentMethod?: string | null;
+  paymentDetails?: string | null;
+  // Situation familiale & fiscale
   situationFamiliale?: 'CELIBATAIRE' | 'MARIE' | 'VEUF' | 'DIVORCE' | null;
   nombreEnfantsCharge?: number | null;
   niu?: string | null;
@@ -77,6 +87,10 @@ export interface EmployeFormData {
   dateNaissance: string;
   sexe: 'M' | 'F';
   lieuNaissance: string;
+  lieuNaissanceLocalityId?: string | null;
+  lieuNaissanceLocalityType?: string | null;
+  nationaliteId?: string | null;
+  paysNaissanceId?: string | null;
   adresse: string;
   ville: string;
   dateEmbauche: string;
@@ -92,7 +106,15 @@ export interface EmployeFormData {
   agenceId?: string | null;
   modeCalculPaie?: 'MONTHLY' | 'HOURLY' | 'DAILY';
   jobPositionId?: string | null;
-  // Situation familiale & fiscale (paie Congo-Brazza)
+  // Pièce d'identité
+  typePiece?: string | null;
+  numeroPiece?: string | null;
+  dateExpirationPiece?: string | null;
+  paysEmissionId?: string | null;
+  // Paiement
+  paymentMethod?: string | null;
+  paymentDetails?: string | null;
+  // Situation familiale & fiscale
   situationFamiliale?: 'CELIBATAIRE' | 'MARIE' | 'VEUF' | 'DIVORCE';
   nombreEnfantsCharge?: string;
   niu?: string;
@@ -156,6 +178,8 @@ export function useEmployes() {
         adresse: item.user?.adresse || null,
         ville: item.user?.ville || null,
         lieuNaissance: item.user?.lieuNaissance || null,
+        lieuNaissanceLocalityId: item.user?.lieuNaissanceLocalityId || null,
+        lieuNaissanceLocalityType: item.user?.lieuNaissanceLocalityType || null,
         nationaliteId: item.user?.nationaliteId || null,
         paysNaissanceId: item.user?.paysNaissanceId || null,
         nationaliteNom: item.nationaliteNom || null,
@@ -163,6 +187,31 @@ export function useEmployes() {
         statut: item.user?.statut || StatutUser.ACTIVE,
         photoProfile: item.user?.photoProfile || null,
         typeCompte: item.user?.typeCompte || 'employe',
+        // Pièce d'identité
+        typePiece: item.typePiece || null,
+        numeroPiece: item.numeroPiece || null,
+        dateExpirationPiece: item.dateExpirationPiece || null,
+        paysEmissionId: item.paysEmissionId || null,
+        // Paiement
+        paymentMethod: item.paymentMethod || null,
+        paymentDetails: item.paymentDetails || null,
+        // Coordonnées bancaires
+        bankName: item.bankName || null,
+        bankCode: item.bankCode || null,
+        branchCode: item.branchCode || null,
+        bankAccountNumber: item.bankAccountNumber || null,
+        accountKey: item.accountKey || null,
+        // Situation familiale & fiscale
+        situationFamiliale: item.situationFamiliale || null,
+        nombreEnfantsCharge: item.nombreEnfantsCharge ?? null,
+        niu: item.niu || null,
+        // Dates contrat
+        dateFinContrat: item.dateFinContrat || null,
+        dateFinEssai: item.dateFinEssai || null,
+        prochaineMedicale: item.prochaineMedicale || null,
+        // Sortie
+        dateSortie: item.dateSortie || null,
+        motifSortie: item.motifSortie || null,
       }));
 
       // Dédupliquer par ID d'employé (un employé peut avoir plusieurs rôles mais ne doit apparaître qu'une fois)
