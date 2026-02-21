@@ -4,7 +4,7 @@ import {
   MoreVertical, CheckCircle, Ban, Calendar, MessageCircle,
   Loader2, FileText, KeyRound, LogOut, Archive, History, Shield,
   ChevronLeft, Upload, Download, Trash2, Clock, AlertTriangle,
-  Eye, File, Building2
+  Eye, File, Building2, Wallet, Users
 } from 'lucide-react';
 import { Employe } from '../../hooks/hr/useEmployes';
 import TransferAgenceModal from './TransferAgenceModal';
@@ -74,6 +74,36 @@ const DOC_STATUS_STYLES: Record<string, { label: string; cls: string }> = {
   VERIFIED: { label: 'Vérifié', cls: 'bg-status-success-bg text-status-success border-status-success/30' },
   REJECTED: { label: 'Rejeté', cls: 'bg-status-danger-bg text-status-danger border-status-danger/30' },
   EXPIRED: { label: 'Expiré', cls: 'bg-surface-subtle/30 text-content-muted border-edge-strong/30' },
+};
+
+const PIECE_TYPE_LABELS: Record<string, string> = {
+  CNI: 'Carte Nationale d\'Identité',
+  PASSPORT: 'Passeport',
+  PERMIS_CONDUIRE: 'Permis de conduire',
+  CARTE_RESIDENT: 'Carte de résident',
+};
+
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  CASH: 'Espèces',
+  TRANSFER: 'Virement bancaire',
+  MOBILE_MONEY: 'Mobile Money',
+  CHECK: 'Chèque',
+  INTERNAL_WALLET: 'Portefeuille interne',
+};
+
+const SITUATION_LABELS: Record<string, string> = {
+  CELIBATAIRE: 'Célibataire',
+  MARIE: 'Marié(e)',
+  VEUF: 'Veuf/Veuve',
+  DIVORCE: 'Divorcé(e)',
+};
+
+const MOTIF_SORTIE_LABELS: Record<string, string> = {
+  DEMISSION: 'Démission',
+  LICENCIEMENT: 'Licenciement',
+  FIN_CDD: 'Fin de CDD',
+  RETRAITE: 'Retraite',
+  DECES: 'Décès',
 };
 
 interface EmployeeProfileDrawerProps {
@@ -644,14 +674,24 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
               {/* Block 1: Info Pro */}
               <Section title="Informations Professionnelles" icon={Briefcase}>
                 <GridItem label="Matricule" value={employee.matricule} mono />
+                <GridItem label="Poste" value={employee.poste || 'Non défini'} />
                 <GridItem label="Département" value={employee.departement || 'N/A'} />
+                <GridItem label="Type Contrat" value={employee.typeContrat} badge />
                 <GridItem label="Date d'embauche" value={formatDate(employee.dateEmbauche)} icon={Calendar} />
+                <GridItem label="Manager" value={employee.managerNom || 'Aucun'} />
                 <GridItem
                   label="Statut"
                   value={<StatusBadge status={getStatusLabel(employee.statut)} />}
                 />
-                <GridItem label="Type Contrat" value={employee.typeContrat} badge />
-                <GridItem label="Manager" value={employee.managerNom || 'Aucun'} />
+                {employee.dateFinEssai && (
+                  <GridItem label="Fin période d'essai" value={formatDate(employee.dateFinEssai)} icon={Calendar} />
+                )}
+                {employee.typeContrat !== 'CDI' && employee.dateFinContrat && (
+                  <GridItem label="Fin de contrat" value={formatDate(employee.dateFinContrat)} icon={Calendar} />
+                )}
+                {employee.prochaineMedicale && (
+                  <GridItem label="Visite médicale" value={formatDate(employee.prochaineMedicale)} icon={Calendar} />
+                )}
               </Section>
 
               {/* Block 2: Info Perso */}
@@ -677,8 +717,30 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
                 />
               </Section>
 
-              {/* Block 3: Financier */}
-              <Section title="Données Financières" icon={CreditCard}>
+              {/* Block 3: Pièce d'identité */}
+              {employee.typePiece && (
+                <Section title="Pièce d'Identité" icon={Shield}>
+                  <GridItem label="Type" value={PIECE_TYPE_LABELS[employee.typePiece] || employee.typePiece} />
+                  <GridItem label="Numéro" value={employee.numeroPiece || 'Non renseigné'} mono />
+                  {employee.dateExpirationPiece && (
+                    <GridItem
+                      label="Expiration"
+                      value={
+                        <span className={new Date(employee.dateExpirationPiece) < new Date() ? 'text-status-danger font-semibold' : ''}>
+                          {formatDate(employee.dateExpirationPiece)}
+                          {new Date(employee.dateExpirationPiece) < new Date() && (
+                            <span className="ml-2 text-[10px] bg-status-danger-bg text-status-danger px-1.5 py-0.5 rounded font-bold">EXPIRÉ</span>
+                          )}
+                        </span>
+                      }
+                      icon={Calendar}
+                    />
+                  )}
+                </Section>
+              )}
+
+              {/* Block 4: Rémunération */}
+              <Section title="Rémunération" icon={CreditCard}>
                 <div className="col-span-2 p-4 bg-surface-base rounded-xl border border-edge flex justify-between items-center">
                    <div>
                       <div className="text-xs text-content-muted uppercase font-bold mb-1">Salaire de Base</div>
@@ -700,9 +762,47 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
                 </div>
               </Section>
 
-              {/* Block 4: Agence */}
+              {/* Block 5: Mode de Paiement */}
+              <Section title="Mode de Paiement" icon={Wallet}>
+                <GridItem
+                  label="Méthode"
+                  value={PAYMENT_METHOD_LABELS[employee.paymentMethod || 'CASH'] || employee.paymentMethod || 'Espèces'}
+                  badge
+                />
+                {employee.paymentMethod === 'TRANSFER' && (employee.bankName || employee.bankAccountNumber) && (
+                  <>
+                    {employee.bankName && <GridItem label="Banque" value={employee.bankName} />}
+                    <GridItem
+                      label="RIB"
+                      value={[employee.bankCode, employee.branchCode, employee.bankAccountNumber, employee.accountKey].filter(Boolean).join(' ') || 'Non renseigné'}
+                      mono
+                      fullWidth
+                    />
+                  </>
+                )}
+                {employee.paymentMethod === 'MOBILE_MONEY' && employee.paymentDetails && (
+                  <GridItem label="N° Mobile Money" value={employee.paymentDetails} icon={Phone} />
+                )}
+              </Section>
+
+              {/* Block 6: Situation Familiale & Fiscale */}
+              <Section title="Situation Familiale & Fiscale" icon={Users}>
+                <GridItem
+                  label="Situation familiale"
+                  value={SITUATION_LABELS[employee.situationFamiliale || ''] || 'Non renseignée'}
+                />
+                <GridItem
+                  label="Enfants à charge"
+                  value={employee.nombreEnfantsCharge != null ? String(employee.nombreEnfantsCharge) : '0'}
+                />
+                {employee.niu && (
+                  <GridItem label="NIU (fiscal)" value={employee.niu} mono />
+                )}
+              </Section>
+
+              {/* Block 7: Agence */}
               {(employee.agenceId || employee.agence) && (
-                <Section title="Affectation" icon={MapPin}>
+                <Section title="Affectation" icon={Building2}>
                   <div className="col-span-2">
                     <div className="text-xs text-content-muted font-medium mb-2">Agence</div>
                     <div className="flex items-center gap-2">
@@ -719,6 +819,18 @@ export default function EmployeeProfileDrawer({ employee, onClose, onEdit, onRef
                       </div>
                     )}
                   </div>
+                </Section>
+              )}
+
+              {/* Block 8: Sortie */}
+              {(employee.dateSortie || employee.motifSortie) && (
+                <Section title="Sortie" icon={LogOut}>
+                  {employee.dateSortie && (
+                    <GridItem label="Date de sortie" value={formatDate(employee.dateSortie)} icon={Calendar} />
+                  )}
+                  {employee.motifSortie && (
+                    <GridItem label="Motif" value={MOTIF_SORTIE_LABELS[employee.motifSortie] || employee.motifSortie} badge />
+                  )}
                 </Section>
               )}
             </>
