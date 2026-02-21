@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useMyDashboard } from '../../hooks/hr/useMonEspace';
 import { Card, Badge, StatCard } from '../ui';
-import { Calendar, CheckCircle, Clock, FileText, Star, Briefcase, Download } from 'lucide-react';
+import { Calendar, CheckCircle, Clock, FileText, Star, Briefcase, Download, Eye } from 'lucide-react';
+import { PayslipViewer } from '../hr/PayslipViewer';
 
 function formatFCFA(value: number | string): string {
   const num = typeof value === 'string' ? parseFloat(value) : value;
@@ -51,6 +52,7 @@ function parseMoisStr(mois: string | number): { label: string; annee: string } {
 
 export default function MonEspaceDashboard() {
   const { dashboard, isLoading } = useMyDashboard();
+  const [viewerBulletinId, setViewerBulletinId] = useState<number | null>(null);
 
   if (isLoading) {
     return (
@@ -138,7 +140,8 @@ export default function MonEspaceDashboard() {
                 return (
                   <div
                     key={index}
-                    className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-surface-subtle border border-edge-subtle"
+                    onClick={() => bulletin.id && setViewerBulletinId(bulletin.id)}
+                    className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-surface-subtle border border-edge-subtle hover:bg-surface-elevated hover:border-accent/30 transition-all cursor-pointer"
                   >
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-content-primary">
@@ -148,12 +151,19 @@ export default function MonEspaceDashboard() {
                         Net : {formatFCFA(bulletin.salaireNet)}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       <Badge value={bulletin.statut} size="sm" />
+                      <button
+                        onClick={(e) => { e.stopPropagation(); bulletin.id && setViewerBulletinId(bulletin.id); }}
+                        className="p-1.5 rounded-md text-content-muted hover:text-accent hover:bg-accent/10 transition-colors"
+                        title="Voir le bulletin"
+                      >
+                        <Eye size={14} />
+                      </button>
                       {bulletin.pdfUrl && (
                         <button
-                          onClick={() => window.open(bulletin.pdfUrl, '_blank')}
-                          className="p-1.5 rounded-md text-content-muted hover:text-accent hover:bg-accent/10 transition"
+                          onClick={(e) => { e.stopPropagation(); window.open(bulletin.pdfUrl, '_blank'); }}
+                          className="p-1.5 rounded-md text-content-muted hover:text-accent hover:bg-accent/10 transition-colors"
                           title="Télécharger le bulletin"
                         >
                           <Download size={14} />
@@ -232,6 +242,13 @@ export default function MonEspaceDashboard() {
           </div>
         )}
       </Card>
+
+      {/* Bulletin preview modal */}
+      <PayslipViewer
+        isOpen={viewerBulletinId !== null}
+        onClose={() => setViewerBulletinId(null)}
+        bulletinId={viewerBulletinId}
+      />
     </div>
   );
 }
