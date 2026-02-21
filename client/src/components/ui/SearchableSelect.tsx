@@ -70,7 +70,7 @@ export interface SearchableSelectOption {
 }
 
 interface SearchableSelectProps {
-  label: string;
+  label?: string;
   name: string;
   options: SearchableSelectOption[];
   value: string | number;

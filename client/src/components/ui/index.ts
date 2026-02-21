@@ -41,6 +41,8 @@ export type { TextareaFieldProps } from './TextareaField';
 export { default as SearchInput } from './SearchInput';
 export type { SearchInputProps } from './SearchInput';
 
+export { default as FilterBar } from './FilterBar';
+
 export { default as SearchableSelect } from './SearchableSelect';
 export type { SearchableSelectOption } from './SearchableSelect';
 

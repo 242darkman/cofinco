@@ -4,7 +4,7 @@ import {
   Eye, UserPlus, UserMinus, Pencil, CheckCircle2, PauseCircle, XCircle,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { Card, Button, Modal, FormField, SelectField, TextareaField, Badge, StatCard, SearchInput, EmptyState } from '../../ui';
+import { Card, Button, Modal, FormField, SelectField, TextareaField, Badge, StatCard, SearchInput, EmptyState, FilterBar } from '../../ui';
 import { useProjects, useProject, type Project, type ProjectDetail } from '../../../hooks/hr/useProjectTime';
 import { useAgence } from '../../../contexts/AgenceContext';
 
@@ -223,13 +223,13 @@ export default function ProjetsTab() {
       </div>
 
       {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+      <FilterBar>
         <SearchInput
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           onClear={() => setSearch('')}
           placeholder="Rechercher un projet..."
-          containerClassName="flex-1"
+          containerClassName="flex-1 min-w-[200px]"
         />
         <SelectField
           name="statusFilter"
@@ -237,12 +237,12 @@ export default function ProjetsTab() {
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
           placeholder=""
-          containerClassName="sm:w-48"
+          containerClassName="lg:w-48"
         />
         <Button variant="primary" icon={Plus} onClick={openCreateModal}>
           Nouveau projet
         </Button>
-      </div>
+      </FilterBar>
 
       {/* Loading */}
       {isLoading && (

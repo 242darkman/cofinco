@@ -48,8 +48,9 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
     return (
       <div className={`relative ${containerClassName}`}>
         <Search
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted pointer-events-none"
+          className="absolute left-[14px] top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
           size={18}
+          strokeWidth={1.5}
         />
 
         <input
@@ -60,12 +61,13 @@ const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(
           placeholder={placeholder}
           disabled={disabled}
           className={`
-            w-full h-10 sm:h-11 pl-10 pr-${hasValue && showClearButton ? '12' : '4'}
-            bg-input-bg border border-input-border rounded-lg
-            text-input-text text-sm sm:text-base
-            placeholder:text-input-placeholder
+            w-full h-[40px] pl-[38px] pr-${hasValue && showClearButton ? '12' : '[14px]'}
+            bg-white border border-[#E5E7EB] rounded-lg
+            text-[#111827] text-[13px]
+            placeholder:text-[#9CA3AF] placeholder:font-normal
             transition-colors duration-200
-            focus:outline-none focus:ring-2 focus:border-input-focus focus:ring-input-focus/30
+            hover:border-gray-400
+            focus:outline-none focus:ring-[3px] focus:border-[#059669] focus:ring-[#059669]/30
             disabled:opacity-50 disabled:cursor-not-allowed
             ${className}
           `}

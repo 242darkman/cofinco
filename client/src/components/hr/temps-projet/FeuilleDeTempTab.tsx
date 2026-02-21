@@ -13,7 +13,7 @@ import { useEmployes } from '../../../hooks/hr/useEmployes';
 import { useUserProfile } from '../../../hooks/useUserProfile';
 import { usePermissions } from '../../auth/ProtectedFeature';
 import { isAdminRole } from '@shared/types/roles';
-import { Card, Button, Badge, SelectField, SearchableSelect, EmptyState } from '../../ui';
+import { Card, Button, Badge, SelectField, SearchableSelect, EmptyState, FilterBar } from '../../ui';
 import {
   ChevronLeft,
   ChevronRight,
@@ -602,9 +602,9 @@ export default function FeuilleDeTempTab() {
   return (
     <div className="space-y-4">
       {/* Header toolbar */}
-      <div className="flex flex-col sm:flex-row sm:items-end gap-3 flex-wrap">
+      <FilterBar>
         {/* Week selector */}
-        <div className="flex items-end gap-1">
+        <div className="flex items-center gap-1">
           <Button
             variant="ghost"
             size="sm"
@@ -620,7 +620,7 @@ export default function FeuilleDeTempTab() {
               type="week"
               value={selectedWeek}
               onChange={(e) => setSelectedWeek(e.target.value)}
-              className="h-10 px-3 rounded-lg border border-edge bg-input-bg text-input-text text-sm focus:outline-none focus:border-input-focus focus:ring-1 focus:ring-input-focus/30"
+              className="h-[40px] px-3 rounded-lg border border-[#E5E7EB] bg-white text-[#111827] text-[13px] focus:outline-none focus:ring-[3px] focus:border-[#059669] focus:ring-[#059669]/30 hover:border-gray-400 transition-colors"
             />
           </div>
           <Button
@@ -634,7 +634,6 @@ export default function FeuilleDeTempTab() {
 
         {/* Filter by status */}
         <SelectField
-          label="Statut"
           name="filterStatut"
           value={filterStatut}
           onChange={(e) => setFilterStatut(e.target.value)}
@@ -646,14 +645,13 @@ export default function FeuilleDeTempTab() {
             { value: 'REJECTED', label: 'Rejetée' },
           ]}
           placeholder=""
-          containerClassName="w-40"
+          containerClassName="lg:w-40"
         />
 
         {/* Filter by employee (HR only) */}
         {isRH && employes.length > 0 && (
-          <div className="w-56">
+          <div className="lg:w-56">
             <SearchableSelect
-              label="Employé"
               name="filterEmploye"
               value={filterEmployeId}
               onChange={(val) => setFilterEmployeId(String(val))}
@@ -671,7 +669,7 @@ export default function FeuilleDeTempTab() {
         )}
 
         {/* Spacer + create button */}
-        <div className="sm:ml-auto">
+        <div className="lg:ml-auto">
           <Button
             variant="primary"
             size="sm"
@@ -682,7 +680,7 @@ export default function FeuilleDeTempTab() {
             Nouvelle feuille
           </Button>
         </div>
-      </div>
+      </FilterBar>
 
       {/* List */}
       {loadingList ? (

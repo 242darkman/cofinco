@@ -57,7 +57,7 @@ const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(
     );
 
     return (
-      <div className={`${containerClassName} mb-4`}>
+      <div className={`${containerClassName} ${label ? 'mb-4' : ''}`}>
         {label && (
           <label
             htmlFor={name}
@@ -88,7 +88,7 @@ const SelectField = forwardRef<HTMLSelectElement, SelectFieldProps>(
               w-full h-auto px-[14px] py-[10px] pr-[38px]
               ${Icon ? 'pl-[38px]' : ''}
               bg-white border rounded-lg
-              text-[#111827] text-[13px]
+              text-[#111827] text-[13px] text-ellipsis
               appearance-none cursor-pointer
               transition-colors duration-200
               focus:outline-none focus:ring-[3px]
