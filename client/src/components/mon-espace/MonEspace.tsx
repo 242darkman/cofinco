@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { LayoutDashboard, User, Clock, Calendar, FileText, FolderOpen, Star } from 'lucide-react';
+import { LayoutDashboard, CreditCard, Clock, Calendar, FileText, FolderOpen, Star, User } from 'lucide-react';
 import { TabGroup, FeatureHeader } from '../ui';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 import MonEspaceDashboard from './MonEspaceDashboard';
@@ -12,7 +12,7 @@ import MesEvaluationsTab from './MesEvaluationsTab';
 
 const TABS = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { key: 'profil', label: 'Mon Profil', icon: User },
+  { key: 'coordonnees', label: 'Coordonnées', icon: CreditCard },
   { key: 'presence', label: 'Présence', icon: Clock },
   { key: 'conges', label: 'Congés', icon: Calendar },
   { key: 'bulletins', label: 'Bulletins', icon: FileText },
@@ -47,7 +47,7 @@ export default function MonEspace() {
     switch (activeTab) {
       case 'dashboard':
         return <MonEspaceDashboard />;
-      case 'profil':
+      case 'coordonnees':
         return <MonProfilEditor />;
       case 'presence':
         return <MaPresenceTab />;
@@ -84,7 +84,7 @@ export default function MonEspace() {
         />
       </div>
 
-      <div className="flex-1 p-2 sm:p-4">
+      <div className="flex-1 p-2 sm:p-3">
         {renderContent()}
       </div>
     </div>

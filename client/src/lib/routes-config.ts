@@ -380,7 +380,7 @@ export const ROUTES: RouteConfig[] = [
     group: 'Système',
     subRoutes: [
       { path: '/mon-espace/dashboard', subModule: 'dashboard', label: 'Dashboard' },
-      { path: '/mon-espace/profil', subModule: 'profil', label: 'Mon Profil' },
+      { path: '/mon-espace/coordonnees', subModule: 'coordonnees', label: 'Coordonnées' },
       { path: '/mon-espace/presence', subModule: 'presence', label: 'Présence' },
       { path: '/mon-espace/conges', subModule: 'conges', label: 'Congés' },
       { path: '/mon-espace/bulletins', subModule: 'bulletins', label: 'Bulletins' },

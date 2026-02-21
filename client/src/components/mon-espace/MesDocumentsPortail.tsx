@@ -97,10 +97,10 @@ export default function MesDocumentsPortail() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4">
-        <h3 className="text-lg font-bold text-content-primary">Mes demandes de documents</h3>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-sm font-bold text-content-primary">Mes demandes de documents</h3>
         <Button variant="primary" size="sm" icon={Plus} onClick={() => setShowModal(true)}>
           Nouvelle demande
         </Button>
@@ -109,8 +109,8 @@ export default function MesDocumentsPortail() {
       {/* List */}
       {docs.length === 0 ? (
         <Card>
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <FileText className="h-12 w-12 text-content-muted mb-4" />
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <FileText className="h-10 w-10 text-content-muted mb-3" />
             <p className="text-content-secondary font-medium">Aucune demande</p>
             <p className="text-sm text-content-muted mt-1">
               Demandez vos attestations et certificats ici
@@ -118,7 +118,7 @@ export default function MesDocumentsPortail() {
           </div>
         </Card>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {docs.map((doc) => (
             <Card key={doc.id} padding="sm">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -183,7 +183,7 @@ export default function MesDocumentsPortail() {
           </>
         }
       >
-        <div className="space-y-4">
+        <div className="space-y-3">
           <SelectField
             label="Type de document"
             name="typeDocument"

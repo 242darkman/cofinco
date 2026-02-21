@@ -120,9 +120,9 @@ export default function MesCongesTab() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {/* Balance cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
         <StatCard
           title="En attente"
           value={enAttente}
@@ -144,8 +144,8 @@ export default function MesCongesTab() {
       </div>
 
       {/* Header with new request button */}
-      <div className="flex items-center justify-between gap-4">
-        <h3 className="text-lg font-bold text-content-primary">Historique des conges</h3>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-sm font-bold text-content-primary">Historique des congés</h3>
         <Button variant="primary" size="sm" icon={Plus} onClick={() => setShowModal(true)}>
           Nouvelle demande
         </Button>
@@ -154,16 +154,16 @@ export default function MesCongesTab() {
       {/* History */}
       {conges.length === 0 ? (
         <Card>
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <Calendar className="h-12 w-12 text-content-muted mb-4" />
-            <p className="text-content-secondary font-medium">Aucun conge</p>
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <Calendar className="h-10 w-10 text-content-muted mb-3" />
+            <p className="text-content-secondary font-medium">Aucun congé</p>
             <p className="text-sm text-content-muted mt-1">
-              Vous n'avez pas encore de demandes de conges
+              Vous n'avez pas encore de demandes de congés
             </p>
           </div>
         </Card>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {conges.map((conge) => {
             const duree = conge.dureeJours || computeDays(conge.dateDebut, conge.dateFin);
             return (
@@ -234,7 +234,7 @@ export default function MesCongesTab() {
           </>
         }
       >
-        <div className="space-y-4">
+        <div className="space-y-3">
           <SelectField
             label="Type de conge"
             name="typeConge"

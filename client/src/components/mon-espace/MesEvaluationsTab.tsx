@@ -60,7 +60,7 @@ export default function MesEvaluationsTab() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {evaluations.map((evaluation) => (
         <EvaluationCard
           key={evaluation.id}
@@ -100,7 +100,7 @@ function EvaluationCard({
       {/* Header - clickable */}
       <button
         onClick={onToggle}
-        className="w-full p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-left hover:bg-surface-elevated/30 transition-colors"
+        className="w-full p-3 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-left hover:bg-surface-elevated/30 transition-colors"
       >
         <div className="flex items-center gap-3 min-w-0">
           <div className="shrink-0 flex items-center justify-center w-10 h-10 rounded-lg bg-accent/10">
@@ -137,7 +137,7 @@ function EvaluationCard({
 
       {/* Expanded content */}
       {expanded && (
-        <div className="border-t border-edge px-4 sm:px-5 py-4 space-y-4">
+        <div className="border-t border-edge px-3 sm:px-4 py-3 space-y-3">
           {/* Overall comment */}
           {evaluation.overallComment && (
             <div className="flex gap-3 p-3 rounded-lg bg-surface-subtle border border-edge-subtle">

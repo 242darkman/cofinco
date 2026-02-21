@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useUpdateMyProfile } from '../../hooks/hr/useMonEspace';
 import { Card, Button, FormField, SelectField } from '../ui';
-import { User, Building2, CreditCard, Save, Info } from 'lucide-react';
+import { Users, CreditCard, Save } from 'lucide-react';
 
 const SITUATION_FAMILIALE_OPTIONS = [
   { value: 'CELIBATAIRE', label: 'Celibataire' },
@@ -18,30 +18,8 @@ const PAYMENT_METHOD_OPTIONS = [
   { value: 'CHECK', label: 'Cheque' },
 ];
 
-function formatDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return '-';
-  return new Date(dateStr).toLocaleDateString('fr-FR', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-  });
-}
-
-function formatFCFA(value: number | string | null | undefined): string {
-  if (value == null) return '-';
-  const num = typeof value === 'string' ? parseFloat(value) : value;
-  if (isNaN(num)) return '-';
-  return num.toLocaleString('fr-FR') + ' FCFA';
-}
-
 export default function MonProfilEditor() {
   const { updateProfile, isUpdating } = useUpdateMyProfile();
-
-  const { data: profile } = useQuery<any>({
-    queryKey: ['/api/user/profile'],
-    queryFn: () =>
-      fetch('/api/user/profile', { credentials: 'include' }).then((r) => r.json()),
-  });
 
   const { data: empData } = useQuery<any>({
     queryKey: ['/api/hr/my/profile-data'],
@@ -51,10 +29,7 @@ export default function MonProfilEditor() {
         .catch(() => null),
   });
 
-  // Editable fields
-  const [telephone, setTelephone] = useState('');
-  const [emailPerso, setEmailPerso] = useState('');
-  const [adresse, setAdresse] = useState('');
+  // Family info
   const [situationFamiliale, setSituationFamiliale] = useState('');
   const [nombreEnfants, setNombreEnfants] = useState(0);
 
@@ -66,15 +41,6 @@ export default function MonProfilEditor() {
   const [bankAccountNumber, setBankAccountNumber] = useState('');
   const [accountKey, setAccountKey] = useState('');
   const [paymentDetails, setPaymentDetails] = useState('');
-
-  // Initialize form from profile + empData
-  useEffect(() => {
-    if (profile) {
-      setTelephone(profile.telephone || '');
-      setEmailPerso(profile.email || '');
-      setAdresse(profile.adresse || '');
-    }
-  }, [profile]);
 
   useEffect(() => {
     if (empData) {
@@ -92,9 +58,6 @@ export default function MonProfilEditor() {
 
   const handleSave = async () => {
     await updateProfile({
-      telephone: telephone || undefined,
-      email: emailPerso || undefined,
-      adresse: adresse || undefined,
       situationFamiliale: situationFamiliale || undefined,
       nombreEnfantsCharge: nombreEnfants,
       paymentMethod: paymentMethod || undefined,
@@ -107,78 +70,18 @@ export default function MonProfilEditor() {
     });
   };
 
-  // Derive read-only info
-  const fullName = profile?.fullName || empData?.nom || '-';
-  const matricule = empData?.matricule || '-';
-  const poste = empData?.poste || empData?.positionTitle || '-';
-  const departement = empData?.departement || empData?.departmentName || '-';
-  const typeContrat = empData?.typeContrat || '-';
-  const dateEmbauche = empData?.dateEmbauche;
-  const salaireBase = empData?.salaireBase;
-
   return (
-    <div className="space-y-6">
-      {/* Read-only section */}
-      <Card className="bg-surface-subtle">
-        <div className="flex items-center gap-2 mb-4">
-          <div className="p-2 rounded-lg bg-accent/10">
-            <User className="h-5 w-5 text-accent" />
-          </div>
-          <div>
-            <h3 className="text-lg font-bold text-content-primary">Informations professionnelles</h3>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <Info className="h-3.5 w-3.5 text-content-muted" />
-              <p className="text-xs text-content-muted">
-                Ces informations sont gerees par les RH
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <ReadOnlyField label="Nom complet" value={fullName} />
-          <ReadOnlyField label="Matricule" value={matricule} />
-          <ReadOnlyField label="Poste" value={poste} />
-          <ReadOnlyField label="Departement" value={departement} />
-          <ReadOnlyField label="Type de contrat" value={typeContrat} />
-          <ReadOnlyField label="Date d'embauche" value={formatDate(dateEmbauche)} />
-          <ReadOnlyField label="Salaire de base" value={formatFCFA(salaireBase)} />
-        </div>
-      </Card>
-
-      {/* Editable section */}
+    <div className="space-y-4">
+      {/* Situation familiale */}
       <Card>
-        <div className="flex items-center gap-2 mb-4">
-          <div className="p-2 rounded-lg bg-accent/10">
-            <Building2 className="h-5 w-5 text-accent" />
+        <div className="flex items-center gap-2 mb-3">
+          <div className="p-1.5 rounded-lg bg-accent/10">
+            <Users className="h-4 w-4 text-accent" />
           </div>
-          <h3 className="text-lg font-bold text-content-primary">Informations personnelles</h3>
+          <h3 className="text-base font-bold text-content-primary">Situation familiale</h3>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <FormField
-            label="Telephone"
-            name="telephone"
-            value={telephone}
-            onChange={(e) => setTelephone(e.target.value)}
-            placeholder="+243 ..."
-          />
-          <FormField
-            label="Email personnel"
-            name="emailPerso"
-            type="email"
-            value={emailPerso}
-            onChange={(e) => setEmailPerso(e.target.value)}
-            placeholder="votre@email.com"
-          />
-          <FormField
-            label="Adresse"
-            name="adresse"
-            value={adresse}
-            onChange={(e) => setAdresse(e.target.value)}
-            placeholder="Votre adresse"
-            containerClassName="sm:col-span-2"
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <SelectField
             label="Situation familiale"
             name="situationFamiliale"
@@ -198,16 +101,16 @@ export default function MonProfilEditor() {
         </div>
       </Card>
 
-      {/* Bank info */}
+      {/* Coordonnees bancaires */}
       <Card>
-        <div className="flex items-center gap-2 mb-4">
-          <div className="p-2 rounded-lg bg-accent/10">
-            <CreditCard className="h-5 w-5 text-accent" />
+        <div className="flex items-center gap-2 mb-3">
+          <div className="p-1.5 rounded-lg bg-accent/10">
+            <CreditCard className="h-4 w-4 text-accent" />
           </div>
-          <h3 className="text-lg font-bold text-content-primary">Coordonnees bancaires</h3>
+          <h3 className="text-base font-bold text-content-primary">Coordonnees bancaires</h3>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           <SelectField
             label="Mode de paiement"
             name="paymentMethod"
@@ -253,17 +156,16 @@ export default function MonProfilEditor() {
           />
         </div>
 
-        {/* Payment details textarea */}
-        <div className="mt-4">
-          <label className="block text-xs sm:text-sm font-semibold text-content-secondary mb-2">
+        <div className="mt-3">
+          <label className="block text-xs sm:text-sm font-semibold text-content-secondary mb-1.5">
             Details de paiement
           </label>
           <textarea
             value={paymentDetails}
             onChange={(e) => setPaymentDetails(e.target.value)}
             placeholder="Numero Mobile Money, informations complementaires..."
-            rows={3}
-            className="w-full px-4 py-2 bg-input-bg border border-input-border rounded-lg text-input-text text-sm placeholder:text-input-placeholder focus:outline-none focus:ring-2 focus:border-input-focus focus:ring-input-focus/30 transition-colors duration-200"
+            rows={2}
+            className="w-full px-3 py-2 bg-input-bg border border-input-border rounded-lg text-input-text text-sm placeholder:text-input-placeholder focus:outline-none focus:ring-2 focus:border-input-focus focus:ring-input-focus/30 transition-colors duration-200"
           />
         </div>
       </Card>
@@ -275,21 +177,11 @@ export default function MonProfilEditor() {
           icon={Save}
           onClick={handleSave}
           isLoading={isUpdating}
+          size="sm"
         >
-          Enregistrer les modifications
+          Enregistrer
         </Button>
       </div>
-    </div>
-  );
-}
-
-function ReadOnlyField({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className="text-xs font-semibold text-content-muted uppercase tracking-wide mb-1">
-        {label}
-      </p>
-      <p className="text-sm font-medium text-content-primary">{value}</p>
     </div>
   );
 }

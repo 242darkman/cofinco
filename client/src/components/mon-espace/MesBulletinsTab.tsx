@@ -44,8 +44,8 @@ export default function MesBulletinsTab() {
 
   if (bulletins.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <FileText className="h-12 w-12 text-content-muted mb-4" />
+      <div className="flex flex-col items-center justify-center py-10 text-center">
+        <FileText className="h-10 w-10 text-content-muted mb-3" />
         <p className="text-content-secondary font-medium">Aucun bulletin de paie</p>
         <p className="text-sm text-content-muted mt-1">
           Vos bulletins de paie apparaitront ici une fois generes
@@ -55,7 +55,7 @@ export default function MesBulletinsTab() {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {bulletins.map((bulletin) => (
         <Card key={bulletin.id} padding="sm">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
