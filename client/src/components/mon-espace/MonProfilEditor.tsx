@@ -43,7 +43,7 @@ export default function MonProfilEditor() {
   const [nombreEnfants, setNombreEnfants] = useState(0);
 
   // Bank info
-  const [paymentMethod, setPaymentMethod] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('CASH');
   const [bankName, setBankName] = useState('');
   const [bankCode, setBankCode] = useState('');
   const [branchCode, setBranchCode] = useState('');
@@ -55,7 +55,7 @@ export default function MonProfilEditor() {
     if (empData) {
       setSituationFamiliale(empData.situationFamiliale || '');
       setNombreEnfants(empData.nombreEnfantsCharge || 0);
-      setPaymentMethod(empData.paymentMethod || '');
+      setPaymentMethod(empData.paymentMethod || 'CASH');
       setBankName(empData.bankName || '');
       setBankCode(empData.bankCode || '');
       setBranchCode(empData.branchCode || '');
@@ -69,7 +69,7 @@ export default function MonProfilEditor() {
     await updateProfile({
       situationFamiliale: situationFamiliale || undefined,
       nombreEnfantsCharge: nombreEnfants,
-      paymentMethod: paymentMethod || undefined,
+      paymentMethod: paymentMethod || 'CASH',
       bankName: paymentMethod === 'TRANSFER' ? bankName || undefined : undefined,
       bankCode: paymentMethod === 'TRANSFER' ? bankCode || undefined : undefined,
       branchCode: paymentMethod === 'TRANSFER' ? branchCode || undefined : undefined,
@@ -112,16 +112,19 @@ export default function MonProfilEditor() {
         </div>
       </div>
 
-      {/* Mode de paiement */}
+      {/* Versement du salaire */}
       <div className="bg-surface-base border border-edge rounded-xl p-4">
-        <div className="flex items-center gap-2 pb-2.5 border-b border-edge mb-3">
+        <div className="flex items-center gap-2 pb-2.5 border-b border-edge mb-1.5">
           <div className="p-1.5 bg-status-info/10 rounded-lg">
             <Wallet size={15} className="text-status-info" />
           </div>
           <h3 className="text-xs font-bold text-content-secondary uppercase tracking-wider">
-            Mode de paiement
+            Versement du salaire
           </h3>
         </div>
+        <p className="text-[11px] text-content-muted mb-3">
+          Choisissez comment vous souhaitez recevoir votre salaire. Ce choix sera applique lors de chaque paiement.
+        </p>
 
         {/* Payment method selector as visual cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
@@ -156,15 +159,6 @@ export default function MonProfilEditor() {
         </div>
 
         {/* Dynamic content based on payment method */}
-        {!paymentMethod && (
-          <div className="flex items-center gap-2.5 p-3 rounded-lg bg-surface-subtle border border-edge-subtle">
-            <Info size={16} className="text-content-muted shrink-0" />
-            <p className="text-xs text-content-muted">
-              Selectionnez un mode de paiement pour configurer vos informations de versement.
-            </p>
-          </div>
-        )}
-
         {paymentMethod === 'CASH' && (
           <div className="flex items-start gap-2.5 p-3 rounded-lg bg-status-warning-bg/50 border border-status-warning/20">
             <Banknote size={16} className="text-status-warning shrink-0 mt-0.5" />
