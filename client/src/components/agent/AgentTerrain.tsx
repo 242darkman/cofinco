@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Users, Wallet, ArrowRightLeft, UserPlus, RefreshCw,
   Wifi, Search, MapPin, ChevronDown, Clock, CheckCircle,
@@ -117,6 +117,15 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
   const [enqueteFormData, setEnqueteFormData] = useState<any>(null);
   const [showCloseSessionModal, setShowCloseSessionModal] = useState(false);
 
+  // Body scroll lock — prevent background scroll when any modal/overlay is open
+  useEffect(() => {
+    const anyOpen = showPaiementForm || showSettlementModal || showProspectionForm
+      || showFullPlanning || showEnquetesPanel || !!enqueteFormData || showCloseSessionModal;
+    document.body.classList.toggle('modal-open', anyOpen);
+    return () => { document.body.classList.remove('modal-open'); };
+  }, [showPaiementForm, showSettlementModal, showProspectionForm,
+      showFullPlanning, showEnquetesPanel, enqueteFormData, showCloseSessionModal]);
+
   // Agent dropdown search
   const [agentDropdownOpen, setAgentDropdownOpen] = useState(false);
   const [agentSearchQuery, setAgentSearchQuery] = useState('');
@@ -128,6 +137,25 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
   // Recent transactions pagination
   const [txPage, setTxPage] = useState(0);
   const TX_PAGE_SIZE = 5;
+
+  // Scroll affordance — fade indicators top/bottom
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [scrollFade, setScrollFade] = useState({ top: false, bottom: true });
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const update = () => {
+      const { scrollTop, scrollHeight, clientHeight } = el;
+      setScrollFade({
+        top: scrollTop > 10,
+        bottom: scrollTop + clientHeight < scrollHeight - 10,
+      });
+    };
+    update();
+    el.addEventListener('scroll', update, { passive: true });
+    return () => el.removeEventListener('scroll', update);
+  }, []);
 
   useEffect(() => {
     const update = () => {
@@ -569,7 +597,12 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
       </header>
 
       {/* ═══ 2. SCROLLABLE CONTENT ═══ */}
-      <div className="flex-1 overflow-y-auto overscroll-contain">
+      <div
+        ref={scrollRef}
+        className={`flex-1 overflow-y-auto overscroll-contain pro-scrollbar scroll-fade-container ${
+          scrollFade.top ? 'has-scroll-top' : ''
+        } ${scrollFade.bottom ? 'has-scroll-bottom' : ''}`}
+      >
 
         {/* --- AGENT CARD --- */}
         <div className="px-3 pt-3 pb-2">
@@ -723,7 +756,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
         {/* --- KPI STRIP (Horizontally Scrollable) --- */}
         {!agentDisabled && (
           <div className="px-3 pb-2">
-            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none snap-x-mandatory">
               <KPIChip
                 icon={Target}
                 value={`${kpis.objectifPct}%`}
@@ -762,13 +795,14 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
 
         {/* --- ACTION GRID --- */}
         <div className={`px-3 pb-2 ${agentDisabled ? 'opacity-40 pointer-events-none grayscale' : ''}`}>
-           <div className={`grid gap-2 ${hasGlSession ? 'grid-cols-3' : 'grid-cols-2'}`}>
+           <div className="grid grid-cols-2 gap-3 p-1">
               <ActionTile
                  title="COLLECTE"
                  subtitle="Tontine"
                  icon={Wallet}
                  color="emerald"
-                 className={hasGlSession ? 'col-span-3' : 'col-span-2'}
+                 className="col-span-2"
+                 primary
                  onClick={() => setShowPaiementForm(true)}
               />
               <ActionTile
@@ -791,6 +825,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                   subtitle="Fin de journée"
                   icon={ShieldCheck}
                   color="amber"
+                  className="col-span-2"
                   onClick={() => setShowCloseSessionModal(true)}
                 />
               )}
@@ -800,7 +835,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
         {/* --- AGENDA DU JOUR (planning + enquêtes intégrées) --- */}
         {!agentDisabled && (
           <div className="px-3 pb-2">
-            <div className="bg-surface-base border border-edge rounded-xl overflow-hidden">
+            <div className="bg-surface-base border border-edge rounded-xl overflow-hidden min-h-[120px]">
               <div className="px-3 py-2 border-b border-edge flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-[10px] font-bold text-content-muted uppercase tracking-wider">
                   <Calendar size={11} /> Mon agenda
@@ -844,7 +879,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                       return (
                         <div
                           key={`enq-${enq.id}`}
-                          className={`flex items-center gap-2.5 px-3 py-2.5 ${isOverdue ? 'bg-status-danger-bg' : ''}`}
+                          className={`flex items-center gap-2.5 px-3 py-3 ${isOverdue ? 'bg-status-danger-bg' : ''}`}
                         >
                           <div className={`w-1 self-stretch rounded-full shrink-0 ${borderColor} ${enq.priority === 'URGENT' ? 'animate-pulse' : ''}`} />
                           <div className="w-7 h-7 rounded-full bg-accent/10 flex items-center justify-center text-accent font-bold text-[10px] shrink-0">
@@ -908,7 +943,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                     } else {
                       const p = item.data;
                       return (
-                        <div key={p.id} className="flex items-center gap-2.5 px-3 py-2">
+                        <div key={p.id} className="flex items-center gap-2.5 px-3 py-3">
                           <div className="text-[10px] font-mono font-bold text-content-muted w-10 shrink-0">
                             {p.heureDebut}
                           </div>
@@ -962,7 +997,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                   <button
                     onClick={() => setAgendaPage(p => Math.max(0, p - 1))}
                     disabled={safeAgendaPage === 0}
-                    className="p-1.5 rounded-lg disabled:opacity-20 text-content-muted hover:text-content-primary hover:bg-surface active:bg-surface-elevated transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center"
+                    className="p-1.5 rounded-lg disabled:opacity-20 text-content-muted hover:text-content-primary hover:bg-surface active:bg-surface-elevated transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
                   >
                     <ChevronLeft size={14} />
                   </button>
@@ -972,7 +1007,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                   <button
                     onClick={() => setAgendaPage(p => Math.min(totalAgendaPages - 1, p + 1))}
                     disabled={safeAgendaPage >= totalAgendaPages - 1}
-                    className="p-1.5 rounded-lg disabled:opacity-20 text-content-muted hover:text-content-primary hover:bg-surface active:bg-surface-elevated transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center"
+                    className="p-1.5 rounded-lg disabled:opacity-20 text-content-muted hover:text-content-primary hover:bg-surface active:bg-surface-elevated transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
                   >
                     <ChevronRight size={14} />
                   </button>
@@ -990,7 +1025,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
 
            return (
              <div className="px-3 pb-3">
-                <div className="bg-surface-base border border-edge rounded-xl overflow-hidden">
+                <div className="bg-surface-base border border-edge rounded-xl overflow-hidden min-h-[100px]">
                   <div className="px-3 py-2 border-b border-edge flex items-center justify-between">
                     <div className="flex items-center gap-1.5 text-[10px] font-bold text-content-muted uppercase tracking-wider">
                       <Clock size={11} /> Opérations récentes
@@ -1012,7 +1047,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                        const amountPrefix = op.isWithdrawal || op.type === 'SETTLEMENT_CASH' ? '-' : '+';
 
                        return (
-                         <div key={op.id} className="flex items-center gap-2 px-3 py-2">
+                         <div key={op.id} className="flex items-center gap-2 px-3 py-3">
                            <div className={`w-1 h-8 rounded-full shrink-0 ${indicatorColor}`} />
                            <DirectionIcon size={14} className={`shrink-0 ${amountColor}`} />
                            <div className="min-w-0 flex-1">
@@ -1048,7 +1083,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                       <button
                         onClick={() => setTxPage(p => Math.max(0, p - 1))}
                         disabled={safeTxPage === 0}
-                        className="p-1.5 rounded-lg disabled:opacity-20 text-content-muted hover:text-content-primary hover:bg-surface active:bg-surface-elevated transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center"
+                        className="p-1.5 rounded-lg disabled:opacity-20 text-content-muted hover:text-content-primary hover:bg-surface active:bg-surface-elevated transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
                       >
                         <ChevronLeft size={14} />
                       </button>
@@ -1058,7 +1093,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
                       <button
                         onClick={() => setTxPage(p => Math.min(totalTxPages - 1, p + 1))}
                         disabled={safeTxPage >= totalTxPages - 1}
-                        className="p-1.5 rounded-lg disabled:opacity-20 text-content-muted hover:text-content-primary hover:bg-surface active:bg-surface-elevated transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center"
+                        className="p-1.5 rounded-lg disabled:opacity-20 text-content-muted hover:text-content-primary hover:bg-surface active:bg-surface-elevated transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
                       >
                         <ChevronRight size={14} />
                       </button>
@@ -1368,7 +1403,7 @@ function KPIChip({ icon: Icon, value, label, color, pulse }: KPIChipProps) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ACTION TILE - Large touch-friendly button
+// ACTION TILE - Compact touch-friendly Bento Grid button (POS-optimized)
 // ═══════════════════════════════════════════════════════════════════════════
 
 interface ActionTileProps {
@@ -1377,10 +1412,11 @@ interface ActionTileProps {
   icon: React.ElementType;
   color: 'emerald' | 'blue' | 'purple' | 'amber';
   className?: string;
+  primary?: boolean;
   onClick: () => void;
 }
 
-function ActionTile({ title, subtitle, icon: Icon, color, className = '', onClick }: ActionTileProps) {
+function ActionTile({ title, subtitle, icon: Icon, color, className = '', primary, onClick }: ActionTileProps) {
   const colors = {
     emerald: 'bg-status-success hover:bg-status-success border-status-success shadow-status-success/20',
     blue: 'bg-status-info hover:bg-status-info border-status-info shadow-status-info/20',
@@ -1388,27 +1424,23 @@ function ActionTile({ title, subtitle, icon: Icon, color, className = '', onClic
     amber: 'bg-status-warning hover:bg-status-warning border-status-warning shadow-status-warning/20',
   };
 
-  const isWide = className.includes('col-span-2');
-
   return (
     <button
       onClick={onClick}
       className={`
-        ${className} relative group overflow-hidden rounded-2xl border-t border-l border-white/20 shadow-xl
+        ${className} relative overflow-hidden rounded-xl border-t border-l border-white/20 shadow-lg
         transition-all active:scale-[0.97] text-white
         ${colors[color]}
-        ${isWide ? 'py-4' : 'py-3'}
-        flex flex-col items-center justify-center gap-0.5
+        ${primary ? 'h-16' : 'h-14'}
+        px-4 flex items-center gap-3
       `}
     >
-       <Icon size={isWide ? 60 : 48} className="absolute -bottom-2 -right-2 opacity-15 rotate-12 pointer-events-none" />
-
-       <div className="relative z-10 p-2 bg-black/20 rounded-full group-hover:bg-black/10 transition-colors">
-          <Icon size={isWide ? 24 : 20} />
+       <div className="p-1.5 bg-black/20 rounded-lg shrink-0">
+          <Icon size={20} />
        </div>
-       <div className="relative z-10 text-center">
-          <div className={`font-black tracking-tight ${isWide ? 'text-lg' : 'text-sm'}`}>{title}</div>
-          <div className="text-[8px] font-medium opacity-70 uppercase tracking-wider">{subtitle}</div>
+       <div className="text-left min-w-0">
+          <div className={`font-black tracking-tight leading-tight ${primary ? 'text-base' : 'text-sm'}`}>{title}</div>
+          <div className="text-[9px] font-medium opacity-70 uppercase tracking-wider">{subtitle}</div>
        </div>
     </button>
   );

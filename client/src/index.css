@@ -718,6 +718,15 @@ body {
   background: color-mix(in srgb, var(--accent-primary) 80%, transparent);
 }
 
+/* POS/Touch: Horizontal snap scrolling for carousels */
+.snap-x-mandatory {
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline-start: 12px;
+}
+.snap-x-mandatory > * {
+  scroll-snap-align: start;
+}
+
 /* Scroll container with fade indicators - uses CSS var for bg-base */
 .scroll-fade-container {
   position: relative;

@@ -529,7 +529,7 @@ export default function UserProfile({ onUserUpdate }: UserProfileProps) {
   };
 
   return (
-    <div className="text-content-primary p-2 md:p-3 max-w-5xl mx-auto">
+    <div className="text-content-primary p-3 md:p-4 lg:p-6 max-w-4xl mx-auto space-y-4">
       <input
         ref={fileInputRef}
         type="file"
@@ -538,91 +538,127 @@ export default function UserProfile({ onUserUpdate }: UserProfileProps) {
         onChange={handlePhotoChange}
       />
 
-      {/* HEADER COMPACT */}
-      <div className="flex items-center gap-3 mb-4 bg-surface-base/50 p-2 rounded-xl border border-edge/50">
-        <div className="relative group shrink-0">
-          {/* Photo Preview Mode */}
-          {photoPreview ? (
-            <div className="relative">
-              <img
-                src={photoPreview.url}
-                alt="Aperçu"
-                className="w-10 h-10 rounded-full border-2 border-accent object-cover ring-2 ring-accent/30"
-              />
-              <div className="absolute -bottom-2 -right-2 flex gap-0.5">
-                <button
-                  onClick={handleConfirmPhoto}
-                  disabled={uploadingPhoto}
-                  className="bg-status-success hover:bg-status-success p-1 rounded-full transition-colors disabled:opacity-50"
-                  title="Confirmer"
-                >
-                  {uploadingPhoto ? (
-                    <LoadingSpinner size="sm" />
+      {/* ==================== HERO HEADER CARD ==================== */}
+      <div className="relative overflow-hidden bg-surface-base border border-edge rounded-2xl">
+        {/* Decorative gradient band */}
+        <div className="h-24 sm:h-28 bg-gradient-to-br from-accent/10 via-surface-base to-accent/5 relative">
+          <div className="absolute top-0 right-0 w-40 h-40 bg-accent/5 rounded-full blur-3xl -mr-12 -mt-12 pointer-events-none" />
+        </div>
+
+        {/* Profile content overlapping the gradient */}
+        <div className="px-4 sm:px-6 pb-4 sm:pb-5 -mt-10 sm:-mt-12 relative z-10">
+          <div className="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-4">
+            {/* Avatar */}
+            <div className="relative group shrink-0">
+              {photoPreview ? (
+                <div className="relative">
+                  <img
+                    src={photoPreview.url}
+                    alt="Aperçu"
+                    className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-2 border-accent object-cover ring-4 ring-surface-base"
+                  />
+                  <div className="absolute -bottom-1 -right-1 flex gap-0.5">
+                    <button
+                      onClick={handleConfirmPhoto}
+                      disabled={uploadingPhoto}
+                      className="bg-status-success hover:bg-status-success p-1 rounded-full transition-colors disabled:opacity-50"
+                      title="Confirmer"
+                    >
+                      {uploadingPhoto ? (
+                        <LoadingSpinner size="sm" />
+                      ) : (
+                        <Check size={12} className="text-white" strokeWidth={3} />
+                      )}
+                    </button>
+                    <button
+                      onClick={handleCancelPreview}
+                      disabled={uploadingPhoto}
+                      className="bg-surface-elevated hover:bg-surface-subtle p-1 rounded-full border border-edge transition-colors disabled:opacity-50"
+                      title="Annuler"
+                    >
+                      <X size={12} className="text-content-secondary" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {user.photoProfile ? (
+                    <img
+                      src={resolveStorageUrl(user.photoProfile)}
+                      alt={getFullName()}
+                      className="w-16 h-16 sm:w-20 sm:h-20 rounded-full border-2 border-accent/30 object-cover ring-4 ring-surface-base"
+                    />
                   ) : (
-                    <Check size={10} className="text-white" strokeWidth={3} />
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-accent to-status-info flex items-center justify-center text-white text-lg sm:text-xl font-bold ring-4 ring-surface-base">
+                      {getInitials()}
+                    </div>
                   )}
-                </button>
-                <button
-                  onClick={handleCancelPreview}
-                  disabled={uploadingPhoto}
-                  className="bg-surface-elevated hover:bg-surface-subtle p-1 rounded-full border border-edge-strong transition-colors disabled:opacity-50"
-                  title="Annuler"
-                >
-                  <X size={10} className="text-content-secondary" />
-                </button>
+                  <button
+                    onClick={handlePhotoClick}
+                    disabled={uploadingPhoto}
+                    className="absolute -bottom-0.5 -right-0.5 bg-surface-base p-1.5 rounded-full border border-edge hover:bg-surface-elevated transition-colors disabled:opacity-50"
+                  >
+                    <Camera size={12} className="text-content-secondary" />
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* Name + Role + Agency */}
+            <div className="flex-1 min-w-0 pb-0.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-lg sm:text-xl font-bold text-content-primary leading-tight">
+                  {getFullName()}
+                </h1>
+                {photoPreview && (
+                  <span className="text-[9px] px-1.5 py-0.5 bg-accent/10 text-accent rounded border border-accent/30">
+                    Aperçu photo
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-xs font-semibold text-accent uppercase tracking-wide">
+                  {getRoleLabel(user.role)}
+                </span>
+                {user.agence && (
+                  <>
+                    <span className="text-content-muted">|</span>
+                    <span className="text-xs text-content-muted">{user.agence}</span>
+                  </>
+                )}
               </div>
             </div>
-          ) : (
-            <>
-              {user.photoProfile ? (
-                <img
-                  src={resolveStorageUrl(user.photoProfile)}
-                  alt={getFullName()}
-                  className="w-10 h-10 rounded-full border border-accent object-cover"
-                />
-              ) : (
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-accent to-status-info flex items-center justify-center text-white text-sm font-bold border border-accent">
-                  {getInitials()}
-                </div>
-              )}
-              <button
-                onClick={handlePhotoClick}
-                disabled={uploadingPhoto}
-                className="absolute -bottom-1 -right-1 bg-surface p-1 rounded-full border border-edge-strong hover:bg-surface-elevated transition-colors disabled:opacity-50"
-              >
-                <Camera size={8} className="text-content-secondary" />
-              </button>
-            </>
-          )}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <h1 className="text-base font-bold leading-tight">{getFullName()}</h1>
-            {photoPreview && (
-              <span className="text-[9px] px-1.5 py-0.5 bg-accent/10 text-accent rounded border border-accent/30">
-                Aperçu photo
-              </span>
-            )}
+
+            {/* Username badge (desktop) */}
+            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 bg-surface-subtle rounded-lg border border-edge shrink-0">
+              <UserCircle size={14} className="text-content-muted" />
+              <span className="text-xs text-content-muted font-medium">@{user.username}</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2 text-xs text-content-muted mt-0.5">
-             <span className="text-accent font-medium text-[10px] uppercase">
-               {getRoleLabel(user.role)}
-             </span>
-             {user.agence && <span className="opacity-50">• {user.agence}</span>}
+
+          {/* Username (mobile) */}
+          <div className="sm:hidden flex items-center gap-1.5 mt-2">
+            <UserCircle size={12} className="text-content-muted" />
+            <span className="text-[10px] text-content-muted">@{user.username}</span>
           </div>
         </div>
       </div>
 
-      {/* BENTO GRID - DENSE */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-2">
-        {/* 1. CARTE IDENTITÉ */}
-        <div className="bg-surface-base border border-edge rounded-lg p-3 space-y-2 flex flex-col">
-          <h3 className="text-xs font-semibold flex items-center gap-2 pb-2 border-b border-edge text-content-secondary">
-            <User size={14} className="text-accent" />
-            Identité
-          </h3>
+      {/* ==================== BODY: 2-COLUMN ASYMMETRIC ==================== */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 lg:gap-4">
+        {/* LEFT COLUMN (3/5) */}
+        <div className="lg:col-span-3 space-y-3">
+          {/* Card: Coordonnees */}
+          <div className="bg-surface-base border border-edge rounded-xl p-4 space-y-1">
+            <div className="flex items-center gap-2 pb-2.5 border-b border-edge mb-1">
+              <div className="p-1.5 bg-accent/10 rounded-lg">
+                <User size={15} className="text-accent" />
+              </div>
+              <h3 className="text-xs font-bold text-content-secondary uppercase tracking-wider">
+                Coordonnées
+              </h3>
+            </div>
 
-          <div className="flex-1 space-y-0.5">
             <EditableField
               label="Téléphone"
               value={user.telephone}
@@ -650,88 +686,102 @@ export default function UserProfile({ onUserUpdate }: UserProfileProps) {
             />
           </div>
 
+          {/* Card: Informations Personnelles (conditional) */}
           {(user.sexe || user.dateNaissance || user.lieuNaissance) && (
-            <div className="pt-2 border-t border-edge grid grid-cols-2 gap-2">
-              {user.sexe && (
-                <ReadOnlyField label="Sexe" value={user.sexe === 'M' ? 'Masculin' : 'Féminin'} />
-              )}
-              {user.dateNaissance && (
-                <ReadOnlyField label="Date de naissance" value={formatDate(user.dateNaissance)} />
-              )}
-              {user.lieuNaissance && (
-                <ReadOnlyField label="Lieu de naissance" value={user.lieuNaissance} />
-              )}
-            </div>
-          )}
-
-          <div className="flex items-center gap-1.5 pt-2 border-t border-edge">
-            <UserCircle size={12} className="text-content-muted" />
-            <span className="text-[10px] text-content-muted">@{user.username}</span>
-          </div>
-        </div>
-
-        {/* 2. CARTE RH */}
-        <div className="bg-surface-base border border-edge rounded-lg p-3 space-y-3">
-          <div className="flex justify-between items-center pb-2 border-b border-edge">
-            <h3 className="text-xs font-semibold flex items-center gap-2 text-content-secondary">
-              <Building2 size={14} className="text-status-success" />
-              RH & Contrat
-            </h3>
-            <div className={user.matricule ? "text-status-success" : "text-status-warning"}>
-                 <div className="w-1.5 h-1.5 rounded-full bg-current" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <ReadOnlyField label="Matricule" value={user.matricule} />
-            <ReadOnlyField label="Poste" value={user.poste} />
-            <ReadOnlyField label="Département" value={user.departement} />
-            <ReadOnlyField label="Contrat" value={user.typeContrat} />
-            <div className="col-span-2">
-               <ReadOnlyField label="Date d'embauche" value={formatDate(user.dateEmbauche)} />
-            </div>
-          </div>
-
-          {canViewSalary() && user.salaireBase !== undefined && (
-            <div className="pt-2 border-t border-edge">
-              <div className="flex justify-between items-end">
-                   <span className="text-[9px] text-content-muted uppercase tracking-wider">Salaire Base</span>
-                   <span className="text-sm font-mono font-bold text-status-success">{formatMoney(user.salaireBase)}</span>
+            <div className="bg-surface-base border border-edge rounded-xl p-4">
+              <div className="flex items-center gap-2 pb-2.5 border-b border-edge mb-3">
+                <div className="p-1.5 bg-status-info/10 rounded-lg">
+                  <Info size={15} className="text-status-info" />
+                </div>
+                <h3 className="text-xs font-bold text-content-secondary uppercase tracking-wider">
+                  Informations personnelles
+                </h3>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {user.sexe && (
+                  <ReadOnlyField label="Sexe" value={user.sexe === 'M' ? 'Masculin' : 'Féminin'} />
+                )}
+                {user.dateNaissance && (
+                  <ReadOnlyField label="Date de naissance" value={formatDate(user.dateNaissance)} />
+                )}
+                {user.lieuNaissance && (
+                  <ReadOnlyField label="Lieu de naissance" value={user.lieuNaissance} />
+                )}
               </div>
             </div>
           )}
         </div>
 
-        {/* 3. CARTE SÉCURITÉ */}
-        <div className="bg-surface-base border border-edge rounded-lg p-3 space-y-3">
-          <h3 className="text-xs font-semibold flex items-center gap-2 pb-2 border-b border-edge text-content-secondary">
-            <Shield size={14} className="text-status-danger" />
-            Sécurité
-          </h3>
-
-          <div className="space-y-3">
-            {/* Mot de passe */}
-            <div className="flex justify-between items-center p-2 bg-surface-base rounded-lg border border-edge">
-                <div className="flex items-center gap-2">
-                <Key size={14} className="text-content-muted" />
-                <div className="flex flex-col">
-                    <span className="text-[10px] font-medium text-content-secondary">Mot de passe</span>
+        {/* RIGHT COLUMN (2/5) */}
+        <div className="lg:col-span-2 space-y-3">
+          {/* Card: RH & Contrat */}
+          <div className="bg-surface-base border border-edge rounded-xl p-4 space-y-3">
+            <div className="flex items-center justify-between pb-2.5 border-b border-edge">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-status-success/10 rounded-lg">
+                  <Building2 size={15} className="text-status-success" />
                 </div>
-                </div>
-                <button
-                onClick={() => setShowPasswordModal(true)}
-                className="text-[10px] text-accent hover:text-accent font-medium px-2 py-1 border border-edge rounded hover:bg-surface transition-colors"
-                >
-                Modifier
-                </button>
+                <h3 className="text-xs font-bold text-content-secondary uppercase tracking-wider">
+                  RH & Contrat
+                </h3>
+              </div>
+              <div className={user.matricule ? "text-status-success" : "text-status-warning"}>
+                <div className="w-1.5 h-1.5 rounded-full bg-current" />
+              </div>
             </div>
 
-            {/* PIN Caisse */}
-            <CaissePinManager
+            <div className="grid grid-cols-2 gap-3">
+              <ReadOnlyField label="Matricule" value={user.matricule} />
+              <ReadOnlyField label="Poste" value={user.poste} />
+              <ReadOnlyField label="Département" value={user.departement} />
+              <ReadOnlyField label="Contrat" value={user.typeContrat} />
+            </div>
+
+            <ReadOnlyField label="Date d'embauche" value={formatDate(user.dateEmbauche)} />
+
+            {canViewSalary() && user.salaireBase !== undefined && (
+              <div className="pt-2.5 border-t border-edge">
+                <div className="flex justify-between items-end">
+                  <span className="text-[9px] text-content-muted uppercase tracking-wider">Salaire Base</span>
+                  <span className="text-sm font-mono font-bold text-status-success">{formatMoney(user.salaireBase)}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Card: Securite */}
+          <div className="bg-surface-base border border-edge rounded-xl p-4 space-y-3">
+            <div className="flex items-center gap-2 pb-2.5 border-b border-edge">
+              <div className="p-1.5 bg-status-danger/10 rounded-lg">
+                <Shield size={15} className="text-status-danger" />
+              </div>
+              <h3 className="text-xs font-bold text-content-secondary uppercase tracking-wider">
+                Sécurité
+              </h3>
+            </div>
+
+            <div className="space-y-2.5">
+              {/* Mot de passe */}
+              <div className="flex justify-between items-center p-2.5 bg-surface-subtle rounded-lg border border-edge">
+                <div className="flex items-center gap-2.5">
+                  <Key size={14} className="text-content-muted" />
+                  <span className="text-xs font-medium text-content-secondary">Mot de passe</span>
+                </div>
+                <button
+                  onClick={() => setShowPasswordModal(true)}
+                  className="text-[10px] text-accent hover:text-accent font-medium px-2.5 py-1 border border-edge rounded-md hover:bg-surface transition-colors"
+                >
+                  Modifier
+                </button>
+              </div>
+
+              {/* PIN Caisse */}
+              <CaissePinManager
                 hasPin={user.hasCaissePin}
                 onPinConfigured={reloadProfile}
                 canAccessCaisse={canConfigureCaissePin}
-            />
+              />
+            </div>
           </div>
         </div>
       </div>
