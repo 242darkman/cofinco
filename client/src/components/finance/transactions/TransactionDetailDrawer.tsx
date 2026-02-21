@@ -15,7 +15,9 @@ import {
   Hash,
   CreditCard,
   Building,
-  ArrowRight
+  ArrowRight,
+  RotateCcw,
+  Loader2
 } from 'lucide-react';
 import { toast } from '../../../lib/toast';
 import { currencySymbol } from '@shared/config/currency';
@@ -23,6 +25,7 @@ import { formatMoney, formatDate } from '../../../lib/format';
 import { ReceiptData } from '../../ui/printable/ReceiptTemplate';
 import { ReceiptActions } from '../shared/ReceiptActions';
 import { getStatusLabel, ALL_STATUS_LABELS } from '../../../lib/status-labels';
+import { caisseOperationApi } from '../../../lib/api-client';
 
 // --- Types ---
 
@@ -106,10 +109,10 @@ const isEntree = (type: string): boolean => {
 
 const normalizeStatus = (status: string): 'Succès' | 'Échec' | 'En attente' | 'Annulé' => {
   const s = status.toLowerCase();
-  if (s === 'completed' || s === 'succès' || s === 'success') return 'Succès';
+  if (s === 'completed' || s === 'succès' || s === 'success' || s === 'posted') return 'Succès';
   if (s === 'failed' || s === 'échec' || s === 'error') return 'Échec';
   if (s === 'pending' || s === 'en attente' || s === 'en cours') return 'En attente';
-  if (s === 'annulé' || s === 'cancelled' || s === 'canceled') return 'Annulé';
+  if (s === 'annulé' || s === 'cancelled' || s === 'canceled' || s === 'reversed') return 'Annulé';
   return 'Succès';
 };
 
@@ -170,6 +173,15 @@ interface DrawerContentProps {
   onClose: () => void;
   onCopyReference: () => void;
   onReportProblem: () => void;
+  // Cancellation
+  canReverse: boolean;
+  showCancelConfirm: boolean;
+  cancelReason: string;
+  isCancelling: boolean;
+  onCancelReasonChange: (reason: string) => void;
+  onCancelConfirmOpen: () => void;
+  onCancelConfirmClose: () => void;
+  onCancelSubmit: () => void;
 }
 
 const DrawerContent = React.memo(function DrawerContent({
@@ -183,7 +195,15 @@ const DrawerContent = React.memo(function DrawerContent({
   copied,
   onClose,
   onCopyReference,
-  onReportProblem
+  onReportProblem,
+  canReverse,
+  showCancelConfirm,
+  cancelReason,
+  isCancelling,
+  onCancelReasonChange,
+  onCancelConfirmOpen,
+  onCancelConfirmClose,
+  onCancelSubmit
 }: DrawerContentProps) {
   const StatusIcon = statusConfig.icon;
 
@@ -376,6 +396,59 @@ const DrawerContent = React.memo(function DrawerContent({
             />
           </section>
 
+          {/* Cancel/Reverse Operation */}
+          {canReverse && !showCancelConfirm && (
+            <section>
+              <button
+                onClick={onCancelConfirmOpen}
+                className="w-full py-3 px-4 text-sm font-medium text-status-danger border border-status-danger/30 rounded-xl hover:bg-status-danger-bg transition-colors flex items-center justify-center gap-2"
+              >
+                <RotateCcw size={16} />
+                Annuler cette opération
+              </button>
+            </section>
+          )}
+
+          {showCancelConfirm && (
+            <section className="border border-status-warning/30 bg-status-warning-bg rounded-xl p-4 animate-in fade-in slide-in-from-bottom-2 duration-200">
+              <div className="flex items-center gap-2 mb-3 text-status-warning">
+                <AlertTriangle size={18} />
+                <span className="font-semibold text-sm">Confirmer l'annulation</span>
+              </div>
+              <textarea
+                value={cancelReason}
+                onChange={(e) => onCancelReasonChange(e.target.value)}
+                placeholder="Motif d'annulation (obligatoire, min. 3 caractères)..."
+                className="w-full p-3 text-sm border border-status-warning/50 rounded-lg bg-surface text-content-primary placeholder-content-muted focus:ring-2 focus:ring-status-warning focus:border-transparent resize-none"
+                rows={2}
+                autoFocus
+              />
+              <div className="flex gap-2 mt-3">
+                <button
+                  className="flex-1 h-10 rounded-lg text-sm font-medium border border-edge text-content-secondary hover:bg-surface-subtle transition-colors"
+                  onClick={onCancelConfirmClose}
+                  disabled={isCancelling}
+                >
+                  Retour
+                </button>
+                <button
+                  className="flex-1 h-10 rounded-lg text-sm font-medium bg-status-danger hover:bg-status-danger/90 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  onClick={onCancelSubmit}
+                  disabled={isCancelling || cancelReason.trim().length < 3}
+                >
+                  {isCancelling ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      Annulation...
+                    </>
+                  ) : (
+                    "Confirmer l'annulation"
+                  )}
+                </button>
+              </div>
+            </section>
+          )}
+
           {/* Tertiary Action (Report Problem) */}
           {showError && (
             <button
@@ -402,6 +475,50 @@ export default function TransactionDetailDrawer({
 }: TransactionDetailDrawerProps) {
   const isDesktop = useMediaQuery('(min-width: 768px)');
   const [copied, setCopied] = useState(false);
+
+  // --- Cancel/Reverse Operation ---
+  const [canReverse, setCanReverse] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [isCancelling, setIsCancelling] = useState(false);
+
+  useEffect(() => {
+    if (!transaction?.id || !isOpen) {
+      setCanReverse(false);
+      setShowCancelConfirm(false);
+      setCancelReason('');
+      return;
+    }
+    let cancelled = false;
+    caisseOperationApi.canReverse(transaction.id)
+      .then((result) => {
+        if (!cancelled) setCanReverse(result.reversible);
+      })
+      .catch(() => {
+        if (!cancelled) setCanReverse(false);
+      });
+    return () => { cancelled = true; };
+  }, [transaction?.id, isOpen]);
+
+  const handleCancelSubmit = useCallback(async () => {
+    if (!transaction?.id || cancelReason.trim().length < 3) return;
+    setIsCancelling(true);
+    try {
+      const result = await caisseOperationApi.cancel(transaction.id, {
+        reason: cancelReason.trim(),
+      });
+      toast.success(result.message || 'Opération annulée avec succès');
+      setShowCancelConfirm(false);
+      setCancelReason('');
+      setCanReverse(false);
+      onClose();
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Erreur lors de l'annulation";
+      toast.error(message);
+    } finally {
+      setIsCancelling(false);
+    }
+  }, [transaction?.id, cancelReason, onClose]);
 
   // Prepare Receipt Data for ReceiptActions
   const receiptData: ReceiptData | null = useMemo(() => {
@@ -496,6 +613,14 @@ export default function TransactionDetailDrawer({
             onClose={onClose}
             onCopyReference={handleCopyReference}
             onReportProblem={handleReportProblem}
+            canReverse={canReverse}
+            showCancelConfirm={showCancelConfirm}
+            cancelReason={cancelReason}
+            isCancelling={isCancelling}
+            onCancelReasonChange={setCancelReason}
+            onCancelConfirmOpen={() => setShowCancelConfirm(true)}
+            onCancelConfirmClose={() => { setShowCancelConfirm(false); setCancelReason(''); }}
+            onCancelSubmit={handleCancelSubmit}
           />
         </div>
       </div>
@@ -526,6 +651,14 @@ export default function TransactionDetailDrawer({
               onClose={onClose}
               onCopyReference={handleCopyReference}
               onReportProblem={handleReportProblem}
+              canReverse={canReverse}
+              showCancelConfirm={showCancelConfirm}
+              cancelReason={cancelReason}
+              isCancelling={isCancelling}
+              onCancelReasonChange={setCancelReason}
+              onCancelConfirmOpen={() => setShowCancelConfirm(true)}
+              onCancelConfirmClose={() => { setShowCancelConfirm(false); setCancelReason(''); }}
+              onCancelSubmit={handleCancelSubmit}
             />
           </div>
         </Drawer.Content>
