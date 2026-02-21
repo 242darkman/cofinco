@@ -424,6 +424,27 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
     }
   };
 
+  // Export Transferts CSV
+  const handleExportTransferts = useCallback(() => {
+    if (transferts.length === 0) return;
+    const headers = ['Date', 'Type', 'Caisse', 'Montant', 'Statut', 'Initié par'];
+    const rows = transferts.map((t: any) => [
+      format(new Date(t.createdAt), 'dd/MM/yyyy HH:mm', { locale: fr }),
+      t.typeTransfert === 'COFFRE_VERS_CAISSE' ? 'Sortie' : 'Entrée',
+      t.typeTransfert === 'COFFRE_VERS_CAISSE' ? t.caisseDestinationNom : t.caisseSourceNom,
+      `${t.typeTransfert === 'COFFRE_VERS_CAISSE' ? '-' : '+'}${Number(t.montant).toLocaleString('fr-FR')}`,
+      t.statut,
+      `${t.requestedByNom || ''} ${t.requestedByPrenom || ''}`.trim(),
+    ]);
+    const bom = '\uFEFF';
+    const csvContent = [headers.join(';'), ...rows.map((r: string[]) => r.join(';'))].join('\n');
+    const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `transferts_coffre_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    link.click();
+  }, [transferts]);
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -660,27 +681,6 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
 
     return null;
   };
-
-  // Export Transferts CSV
-  const handleExportTransferts = useCallback(() => {
-    if (transferts.length === 0) return;
-    const headers = ['Date', 'Type', 'Caisse', 'Montant', 'Statut', 'Initié par'];
-    const rows = transferts.map((t: any) => [
-      format(new Date(t.createdAt), 'dd/MM/yyyy HH:mm', { locale: fr }),
-      t.typeTransfert === 'COFFRE_VERS_CAISSE' ? 'Sortie' : 'Entrée',
-      t.typeTransfert === 'COFFRE_VERS_CAISSE' ? t.caisseDestinationNom : t.caisseSourceNom,
-      `${t.typeTransfert === 'COFFRE_VERS_CAISSE' ? '-' : '+'}${Number(t.montant).toLocaleString('fr-FR')}`,
-      t.statut,
-      `${t.requestedByNom || ''} ${t.requestedByPrenom || ''}`.trim(),
-    ]);
-    const bom = '\uFEFF';
-    const csvContent = [headers.join(';'), ...rows.map((r: string[]) => r.join(';'))].join('\n');
-    const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `transferts_coffre_${format(new Date(), 'yyyy-MM-dd')}.csv`;
-    link.click();
-  }, [transferts]);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">

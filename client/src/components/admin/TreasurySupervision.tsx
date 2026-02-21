@@ -12,6 +12,7 @@ import {
 import { Card, Button, Badge, FeatureHeader, FEATURE_DESCRIPTIONS } from '../ui';
 import { api } from '../../lib/api-client';
 import { cn } from '@/lib/utils';
+import { formatMoney, currencySymbol } from '@shared/config/currency';
 
 // --- Constants & Helpers ---
 const AGENCY_COLORS = [
@@ -35,7 +36,7 @@ const getAgencyColor = (agencyId: string) => {
 };
 
 const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat('fr-FR').format(val);
+    return formatMoney(val, { showCurrency: false });
 };
 
 // --- Sub-components ---
@@ -164,7 +165,7 @@ export function TreasurySupervision() {
 
     if (format === 'csv' || format === 'excel') {
       // Generate CSV content
-      const headers = ['Agence', 'Ville', 'Solde (FCFA)', 'Statut'];
+      const headers = ['Agence', 'Ville', `Solde (${currencySymbol()})`, 'Statut'];
       const rows = globalStats.breakdown.map(a => [
         a.agenceNom,
         a.ville || '-',
@@ -201,7 +202,7 @@ export function TreasurySupervision() {
           <tr>
             <td style="padding: 8px; border: 1px solid #ddd;">${a.agenceNom}</td>
             <td style="padding: 8px; border: 1px solid #ddd;">${a.ville || '-'}</td>
-            <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${a.solde.toLocaleString('fr-FR')} FCFA</td>
+            <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${formatMoney(a.solde)}</td>
             <td style="padding: 8px; border: 1px solid #ddd;">${a.solde > 0 ? '✓ Actif' : '○ Vide'}</td>
           </tr>
         `).join('');
@@ -243,7 +244,7 @@ export function TreasurySupervision() {
 
             <div class="summary">
               <p><strong>Résumé</strong></p>
-              <p class="total">${globalStats.globalBalance.toLocaleString('fr-FR')} FCFA</p>
+              <p class="total">${formatMoney(globalStats.globalBalance)}</p>
               <p>Trésorerie globale sur ${globalStats.breakdown.length} agences</p>
             </div>
 
@@ -382,7 +383,7 @@ export function TreasurySupervision() {
                 <span className="text-xl font-black font-mono text-foreground">
                   {formatCurrency(globalStats?.globalBalance || 0)}
                 </span>
-                <span className="text-[9px] text-content-muted">FCFA</span>
+                <span className="text-[9px] text-content-muted">{currencySymbol()}</span>
               </div>
               <div className={`flex items-center text-[10px] font-bold ${isPositive ? 'text-status-success' : 'text-status-danger'}`}>
                 {isPositive ? <TrendingUp size={10} className="mr-0.5" /> : <TrendingDown size={10} className="mr-0.5" />}
@@ -395,8 +396,8 @@ export function TreasurySupervision() {
             <div className="min-w-0">
               <p className="text-[9px] font-bold text-content-muted uppercase truncate">Moyenne/Agence</p>
               <span className="text-base font-bold text-foreground">
-                {globalStats?.breakdown.length ? Math.round((globalStats.globalBalance / globalStats.breakdown.length)).toLocaleString() : 0}
-                <span className="text-[9px] text-content-muted ml-1">F</span>
+                {globalStats?.breakdown.length ? formatCurrency(Math.round(globalStats.globalBalance / globalStats.breakdown.length)) : 0}
+                <span className="text-[9px] text-content-muted ml-1">{currencySymbol()}</span>
               </span>
             </div>
           </Card>
@@ -552,8 +553,8 @@ export function TreasurySupervision() {
                 <div className="flex items-end justify-between">
                   <span className="text-[9px] text-content-muted truncate max-w-[40%]">{agency.ville || '—'}</span>
                   <div className="text-xs font-bold font-mono text-content-primary">
-                    {agency.solde.toLocaleString()}
-                    <span className="text-[8px] font-sans text-content-muted ml-0.5">F</span>
+                    {formatCurrency(agency.solde)}
+                    <span className="text-[8px] font-sans text-content-muted ml-0.5">{currencySymbol()}</span>
                   </div>
                 </div>
               </Card>
