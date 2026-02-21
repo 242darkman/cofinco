@@ -14,7 +14,7 @@ import {
     EnqueteCredit, InsertEnqueteCredit, Remboursement, InsertRemboursement, Compte, InsertCompte,
     TransactionCompte, InsertTransactionCompte, PlanEpargne, InsertPlanEpargne, ObjectifEpargne, InsertObjectifEpargne,
     Tontine, InsertTontine, MembreTontine, InsertMembreTontine, ContributionTontine, InsertContributionTontine,
-    TontineRegle, InsertTontineRegle, TontinePenalite, InsertTontinePenalite,
+    TontinePenalite, InsertTontinePenalite,
     TontinePlan, InsertTontinePlan,
     UserCreditPlan, InsertCreditPlan, CreditPlanFee, InsertCreditPlanFee,
     SessionCaisse, InsertSessionCaisse, OperationCaisse, InsertOperationCaisse, AgentTerrain, InsertAgentTerrain,
@@ -223,12 +223,8 @@ export interface IStorage {
       userId?: string
     ): Promise<ContributionTontine>;
 
-    getTontineRegles(tontineId: string): Promise<TontineRegle[]>;
-    createTontineRegle(regle: InsertTontineRegle): Promise<TontineRegle>;
-    updateTontineRegle(id: string, regle: Partial<InsertTontineRegle>): Promise<TontineRegle | undefined>;
-    deleteTontineRegle(id: string): Promise<boolean>;
-
     getTontinePenalites(tontineId: string): Promise<any[]>;
+    createTontinePenalite(data: InsertTontinePenalite): Promise<TontinePenalite>;
     updateTontinePenalite(id: string, penalite: Partial<InsertTontinePenalite>): Promise<TontinePenalite | undefined>;
 
     // Prochain bénéficiaire
@@ -236,24 +232,38 @@ export interface IStorage {
     tirerProchainBeneficiaire(tontineId: string): Promise<any | null>;
     getMembresEligiblesBenefice(tontineId: string): Promise<any[]>;
 
-    // Distributions Tontine
-    getDistributionsByTontine(tontineId: string): Promise<any[]>;
-    getDistribution(id: string): Promise<any | undefined>;
-    getDistributionStats(tontineId: string): Promise<{
-      totalDistribue: number;
-      nombreDistributions: number;
-      membresAyantRecu: number;
-      membresEnAttente: number;
-      prochainTour: number;
-      soldeDisponible: number;
-    }>;
-
     // Tontine Plans
     getTontinePlan(id: string): Promise<TontinePlan | undefined>;
     getAllTontinePlans(filter?: { agenceId?: string; actif?: boolean }): Promise<TontinePlan[]>;
     createTontinePlan(plan: InsertTontinePlan): Promise<TontinePlan>;
     updateTontinePlan(id: string, plan: Partial<InsertTontinePlan>): Promise<TontinePlan | undefined>;
     deleteTontinePlan(id: string): Promise<boolean>;
+
+    // Cycles
+    getCyclesByTontine(tontineId: string): Promise<any[]>;
+    getCycle(tontineId: string, cycleId: string): Promise<any | undefined>;
+    getCycleById(cycleId: string): Promise<any | undefined>;
+    getActiveCycle(tontineId: string): Promise<any | undefined>;
+    closeCycle(tontineId: string, cycleId: string, userId: string): Promise<any>;
+
+    // Turns
+    getTurnsByCycle(tontineId: string, cycleId: string): Promise<any[]>;
+    getNextScheduledTurn(cycleId: string): Promise<any | undefined>;
+
+    // Schedules
+    getSchedulesByCycle(tontineId: string, cycleId: string): Promise<any[]>;
+
+    // Turn Audit
+    getTurnAuditByCycle(tontineId: string, cycleId: string): Promise<any[]>;
+
+    // Distribution Requests
+    getDistributionRequests(tontineId: string, filters?: { cycleId?: string; status?: string }): Promise<any[]>;
+    getDistributionRequest(requestId: string): Promise<any | undefined>;
+    cancelDistributionRequest(requestId: string, reason?: string): Promise<any>;
+    getPendingDistributionCount(tontineId: string): Promise<number>;
+
+    // Member by ID
+    getMembreTontineById(membreId: string): Promise<MembreTontine | undefined>;
 
     // Sessions Caisse
     getSessionCaisse(id: string): Promise<SessionCaisse | undefined>;

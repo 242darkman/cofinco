@@ -1,11 +1,12 @@
-import { tontines, membresTontine, contributionsTontine, clients, users, userAgences, agences, tontineRegles, tontinePenalites, tontineDistributions, tontinePlans, tontineAlertes } from "@shared/schema";
+import { tontines, membresTontine, contributionsTontine, clients, users, userAgences, agences, tontinePenalites, tontinePlans } from "@shared/schema";
 import { type Tontine, type InsertTontine, type MembreTontine, type InsertMembreTontine, type ContributionTontine, type InsertContributionTontine,
-    type TontineRegle, type InsertTontineRegle, type TontinePenalite, type InsertTontinePenalite,
+    type TontinePenalite, type InsertTontinePenalite,
     type TontinePlan, type InsertTontinePlan,
-    operationsCaisse
+    operationsCaisse,
+    tontineCycles, tontineTurns, tontineSchedules, tontineDistributionRequests, tontineTurnAudit,
  } from "@shared/schema";
 import { db } from "../db";
-import { eq, desc, and, sql, getTableColumns, or } from "drizzle-orm";
+import { eq, desc, asc, and, sql, getTableColumns, or, isNull } from "drizzle-orm";
 
 import { executeWithLedger, updateTontineSolde, updateSessionSolde, validateUserId } from "../services/ledger";
 import { createFactureForContributionTontine } from "./finance";
@@ -15,8 +16,8 @@ import {
   StatutTransaction,
   MethodePaiement,
   METHODE_PAIEMENT_LABELS,
-  TypeDistributionTontine,
 } from "@shared/enum/status-constants";
+import { DistributionType } from "@shared/schema/tontines";
 
 
 // Tontine Plans
@@ -52,6 +53,83 @@ export async function deleteTontinePlan(id: string): Promise<boolean> {
   const result = await db.update(tontinePlans).set({ actif: false, updatedAt: new Date() }).where(eq(tontinePlans.id, id)).returning();
   return result.length > 0;
 }
+
+/** Copy all config columns from a plan to use as tontine defaults */
+export function copyPlanToTontineValues(plan: TontinePlan): Partial<InsertTontine> {
+  return {
+    nom: plan.nom,
+    description: plan.description,
+    montantCotisation: plan.montantCotisation,
+    nombreMembres: plan.nombreMembres,
+    frequence: plan.frequence,
+    intervalleCotisation: plan.intervalleCotisation,
+    distributionType: plan.distributionType,
+    tauxPlateforme: plan.tauxPlateforme,
+    planId: plan.id,
+
+    // Calendar
+    firstContributionRule: plan.firstContributionRule,
+    gracePeriodContribution: plan.gracePeriodContribution,
+    collectionCalendarMode: plan.collectionCalendarMode,
+    weekdaysMask: plan.weekdaysMask,
+    shiftNonWorkingDay: plan.shiftNonWorkingDay,
+    holidayCalendarId: plan.holidayCalendarId,
+    timezone: plan.timezone,
+    preferredWeekday: plan.preferredWeekday,
+
+    // Distribution
+    payoutFrequency: plan.payoutFrequency,
+    payoutDayRule: plan.payoutDayRule,
+    payoutOrderMode: plan.payoutOrderMode,
+    allowSwapPayoutOrder: plan.allowSwapPayoutOrder,
+    swapRequiresApproval: plan.swapRequiresApproval,
+    payoutRequiresContribPaid: plan.payoutRequiresContribPaid,
+    allowPartialDistribution: plan.allowPartialDistribution,
+    distributionMinThresholdPct: plan.distributionMinThresholdPct,
+
+    // Penalties
+    penaltyEnabled: plan.penaltyEnabled,
+    penaltyType: plan.penaltyType,
+    penaltyValue: plan.penaltyValue,
+    penaltyApplication: plan.penaltyApplication,
+    penaltyCap: plan.penaltyCap,
+    lateGracePeriodDays: plan.lateGracePeriodDays,
+    maxMissedContributions: plan.maxMissedContributions,
+    arrearsPolicy: plan.arrearsPolicy,
+    suspensionPolicy: plan.suspensionPolicy,
+    defaultPolicy: plan.defaultPolicy,
+    maxLateBeforeSuspend: plan.maxLateBeforeSuspend,
+    maxLateBeforeExclude: plan.maxLateBeforeExclude,
+    penaltyDeductedFromPayout: plan.penaltyDeductedFromPayout,
+    penaltyAsRevenue: plan.penaltyAsRevenue,
+    autoPenaltyPriority: plan.autoPenaltyPriority,
+
+    // Entry/Exit
+    joinFeeEnabled: plan.joinFeeEnabled,
+    joinFeeAmount: plan.joinFeeAmount,
+    exitAllowed: plan.exitAllowed,
+    exitFeePercent: plan.exitFeePercent,
+    exitNoticePeriods: plan.exitNoticePeriods,
+    replacementAllowed: plan.replacementAllowed,
+    transferMembershipAllowed: plan.transferMembershipAllowed,
+    allowMidCycleJoin: plan.allowMidCycleJoin,
+
+    // Payment
+    allowedPaymentMethods: plan.allowedPaymentMethods,
+    defaultPaymentMethod: plan.defaultPaymentMethod,
+    cashMustGoToCaisse: plan.cashMustGoToCaisse,
+    feeCollectionMode: plan.feeCollectionMode,
+    maxAdvanceTours: plan.maxAdvanceTours,
+
+    // Governance
+    rolesEnabled: plan.rolesEnabled,
+    groupRoles: plan.groupRoles,
+    approvalsRequiredFor: plan.approvalsRequiredFor,
+    minKycLevel: plan.minKycLevel,
+    minSegmentRequired: plan.minSegmentRequired,
+  };
+}
+
 export async function getTontine(id: string): Promise<any | undefined> {
   const [result] = await db
     .select({
@@ -59,7 +137,7 @@ export async function getTontine(id: string): Promise<any | undefined> {
       nombreMembresActuel: sql<number>`count(DISTINCT ${membresTontine.id})`.mapWith(Number),
       // Tour actuel = nombre de distributions complétées + 1 (tour en cours)
       // Si aucune distribution, on est au tour 1
-      tourActuel: sql<number>`COALESCE(MAX(${tontineDistributions.tourNumero}), 0) + 1`.mapWith(Number),
+      tourActuel: sql<number>`COALESCE(${tontines.currentRound}, 0) + 1`.mapWith(Number),
       // Somme réelle des contributions validées - utilise la colonne tontines.id pour la corrélation
       totalCollecte: sql<number>`COALESCE((
         SELECT SUM(CAST(ct.montant AS NUMERIC))
@@ -73,8 +151,7 @@ export async function getTontine(id: string): Promise<any | undefined> {
       eq(tontines.id, membresTontine.tontineId),
       eq(membresTontine.statut, StatutMembreTontine.ACTIVE)
     ))
-    .leftJoin(tontineDistributions, eq(tontines.id, tontineDistributions.tontineId))
-    .where(eq(tontines.id, id))
+    .where(and(eq(tontines.id, id), isNull(tontines.deletedAt)))
     .groupBy(tontines.id);
 
   return result || undefined;
@@ -86,7 +163,7 @@ export async function getAllTontines(filter: { agenceId?: string; agence?: strin
         ...getTableColumns(tontines),
         nombreMembresActuel: sql<number>`count(DISTINCT ${membresTontine.id})`.mapWith(Number),
         // Tour actuel = dernier tour distribué + 1 (ou 1 si aucune distribution)
-        tourActuel: sql<number>`COALESCE(MAX(${tontineDistributions.tourNumero}), 0) + 1`.mapWith(Number),
+        tourActuel: sql<number>`COALESCE(${tontines.currentRound}, 0) + 1`.mapWith(Number),
         // Somme réelle des contributions validées - référence directe à la colonne
         totalCollecte: sql<number>`COALESCE((
           SELECT SUM(CAST(ct.montant AS NUMERIC))
@@ -100,8 +177,7 @@ export async function getAllTontines(filter: { agenceId?: string; agence?: strin
           eq(tontines.id, membresTontine.tontineId),
           eq(membresTontine.statut, StatutMembreTontine.ACTIVE)
       ))
-      .leftJoin(tontineDistributions, eq(tontines.id, tontineDistributions.tontineId))
-      .groupBy(tontines.id)
+        .groupBy(tontines.id)
       .orderBy(desc(tontines.createdAt));
 
     // Déterminer l'agenceId à utiliser
@@ -124,7 +200,7 @@ export async function getAllTontines(filter: { agenceId?: string; agence?: strin
         .select({
             ...getTableColumns(tontines),
             nombreMembresActuel: sql<number>`count(DISTINCT ${membresTontine.id})`.mapWith(Number),
-            tourActuel: sql<number>`COALESCE(MAX(${tontineDistributions.tourNumero}), 0) + 1`.mapWith(Number),
+            tourActuel: sql<number>`COALESCE(${tontines.currentRound}, 0) + 1`.mapWith(Number),
             totalCollecte: sql<number>`COALESCE((
               SELECT SUM(CAST(ct.montant AS NUMERIC))
               FROM contributions_tontine ct
@@ -137,21 +213,20 @@ export async function getAllTontines(filter: { agenceId?: string; agence?: strin
             eq(tontines.id, membresTontine.tontineId),
             eq(membresTontine.statut, StatutMembreTontine.ACTIVE)
         ))
-        .leftJoin(tontineDistributions, eq(tontines.id, tontineDistributions.tontineId))
-        .leftJoin(users, eq(tontines.gestionnaireId, users.id))
+            .leftJoin(users, eq(tontines.gestionnaireId, users.id))
         .leftJoin(userAgences, and(
           eq(userAgences.userId, users.id),
           eq(userAgences.isPrimary, true),
           eq(userAgences.actif, true)
         ))
-        .where(eq(userAgences.agenceId, agenceIdToFilter))
+        .where(and(eq(userAgences.agenceId, agenceIdToFilter), isNull(tontines.deletedAt)))
         .groupBy(tontines.id)
         .orderBy(desc(tontines.createdAt));
 
       return results;
     }
-    
-  const results = await baseQuery;
+
+  const results = await baseQuery.where(isNull(tontines.deletedAt));
   return results;
 }
 
@@ -171,7 +246,6 @@ export async function updateTontine(id: string, updateData: Partial<InsertTontin
 
 export async function deleteTontine(id: string): Promise<boolean> {
   // Soft-archive all dependencies (preserve financial history)
-  await db.update(tontineRegles).set({ actif: false }).where(eq(tontineRegles.tontineId, id));
   await db.update(membresTontine).set({ statut: "REMOVED" }).where(eq(membresTontine.tontineId, id));
 
   // Soft delete the tontine itself (has deletedAt column)
@@ -186,9 +260,7 @@ export async function getMembresTontine(tontineId: string): Promise<any[]> {
     .select({
       montantCotisation: tontines.montantCotisation,
       nombreMembres: tontines.nombreMembres,
-      tourActuel: sql<number>`COALESCE((
-        SELECT MAX(tour_numero) FROM tontine_distributions WHERE tontine_id = ${tontineId}
-      ), 0) + 1`.mapWith(Number)
+      tourActuel: sql<number>`COALESCE(${tontines.currentRound}, 0) + 1`.mapWith(Number)
     })
     .from(tontines)
     .where(eq(tontines.id, tontineId));
@@ -220,7 +292,7 @@ export async function getMembresTontine(tontineId: string): Promise<any[]> {
     })
     .from(membresTontine)
     .innerJoin(clients, eq(membresTontine.clientId, clients.id))
-    .where(eq(membresTontine.tontineId, tontineId));
+    .where(and(eq(membresTontine.tontineId, tontineId), isNull(membresTontine.deletedAt)));
 
   return rows.map(({ membre, client, nombreContributions, totalCotiseCalcule }) => {
     // Utiliser le total calculé depuis les contributions (pas le champ totalCotisations qui peut être désynchronisé)
@@ -267,7 +339,8 @@ export async function getTontinesByClient(clientId: string): Promise<Array<Membr
     .innerJoin(tontines, eq(membresTontine.tontineId, tontines.id))
     .where(and(
       eq(membresTontine.clientId, clientId),
-      eq(membresTontine.statut, StatutMembreTontine.ACTIVE)
+      eq(membresTontine.statut, StatutMembreTontine.ACTIVE),
+      isNull(membresTontine.deletedAt)
     ));
   return result as Array<MembreTontine & { tontine: Tontine }>;
 }
@@ -276,7 +349,8 @@ export async function getMembreTontineByClientAndTontine(clientId: string, tonti
   const [membre] = await db.select().from(membresTontine)
     .where(and(
       eq(membresTontine.clientId, clientId),
-      eq(membresTontine.tontineId, tontineId)
+      eq(membresTontine.tontineId, tontineId),
+      isNull(membresTontine.deletedAt)
     ));
   return membre || undefined;
 }
@@ -323,10 +397,7 @@ export async function getContributionsByTontine(tontineId: string): Promise<any[
 }
 
 export async function getContributionsByMembre(membreId: string): Promise<ContributionTontine[]> {
-  // Actually, wait, if it's getContributionsByMembre, it should filter by a member ref.
-  // But our contributions_tontine table has clientId and tontineId, not membreId directly.
-  // So we filter by clientId if we want contributions for a specific client in tontines.
-  return db.select().from(contributionsTontine).where(eq(contributionsTontine.clientId, membreId)).orderBy(desc(contributionsTontine.createdAt));
+  return db.select().from(contributionsTontine).where(eq(contributionsTontine.membreId, membreId)).orderBy(desc(contributionsTontine.createdAt));
 }
 
 
@@ -445,26 +516,6 @@ export async function createContributionTontineWithLedger(
   }).then(({ contribution }) => contribution); // Keep original return type for compatibility
 }
 
-// Règles
-export async function getTontineRegles(tontineId: string): Promise<TontineRegle[]> {
-  return db.select().from(tontineRegles).where(eq(tontineRegles.tontineId, tontineId));
-}
-
-export async function createTontineRegle(regle: InsertTontineRegle): Promise<TontineRegle> {
-  const [newRegle] = await db.insert(tontineRegles).values(regle).returning();
-  return newRegle;
-}
-
-export async function updateTontineRegle(id: string, updates: Partial<InsertTontineRegle>): Promise<TontineRegle | undefined> {
-  const [updated] = await db.update(tontineRegles).set(updates).where(eq(tontineRegles.id, id)).returning();
-  return updated || undefined;
-}
-
-export async function deleteTontineRegle(id: string): Promise<boolean> {
-  const result = await db.update(tontineRegles).set({ actif: false }).where(eq(tontineRegles.id, id)).returning();
-  return result.length > 0;
-}
-
 // Pénalités
 export async function getTontinePenalites(tontineId: string): Promise<any[]> {
     // Join with membres_tontine and clients to get names
@@ -489,6 +540,11 @@ export async function getTontinePenalites(tontineId: string): Promise<any[]> {
     }));
 }
 
+export async function createTontinePenalite(data: InsertTontinePenalite): Promise<TontinePenalite> {
+  const [penalite] = await db.insert(tontinePenalites).values(data).returning();
+  return penalite;
+}
+
 export async function updateTontinePenalite(id: string, updates: Partial<InsertTontinePenalite>): Promise<TontinePenalite | undefined> {
   const [updated] = await db.update(tontinePenalites).set(updates).where(eq(tontinePenalites.id, id)).returning();
   return updated || undefined;
@@ -505,7 +561,7 @@ export async function updateTontinePenalite(id: string, updates: Partial<InsertT
 export async function getProchainBeneficiaire(tontineId: string): Promise<any | null> {
   // Get tontine type
   const [tontine] = await db
-    .select({ typeDistribution: tontines.typeDistribution })
+    .select({ distributionType: tontines.distributionType })
     .from(tontines)
     .where(eq(tontines.id, tontineId));
 
@@ -529,7 +585,7 @@ export async function getProchainBeneficiaire(tontineId: string): Promise<any | 
   if (eligibles.length === 0) return null;
 
   let selected;
-  if (tontine.typeDistribution === TypeDistributionTontine.ORDER || tontine.typeDistribution === TypeDistributionTontine.FIXED) {
+  if (tontine.distributionType === DistributionType.ROTATIVE_SUSU || tontine.distributionType === DistributionType.ACCUMULATIVE_END) {
     // Premier membre selon la position
     selected = eligibles[0];
   } else {
@@ -578,7 +634,7 @@ export async function tirerProchainBeneficiaire(tontineId: string): Promise<any 
   const [tontineInfo] = await db
     .select({
       ordreDistribution: tontines.ordreDistribution,
-      tourActuel: sql<number>`COALESCE((SELECT MAX(tour_numero) FROM tontine_distributions WHERE tontine_id = ${tontineId}), 0) + 1`.mapWith(Number)
+      tourActuel: sql<number>`COALESCE(${tontines.currentRound}, 0) + 1`.mapWith(Number)
     })
     .from(tontines)
     .where(eq(tontines.id, tontineId));
@@ -636,101 +692,164 @@ export async function getMembresEligiblesBenefice(tontineId: string): Promise<an
   }));
 }
 
-// ============ DISTRIBUTIONS ============
+// Distributions are now managed via tontineTurns + tontineDistributionRequests
+// See tontine-production-service.ts for distribution workflows
 
-/**
- * Récupère toutes les distributions d'une tontine
- */
-export async function getDistributionsByTontine(tontineId: string): Promise<any[]> {
-  const rows = await db
-    .select({
-      distribution: tontineDistributions,
-      membre: membresTontine,
-      client: clients
-    })
-    .from(tontineDistributions)
-    .innerJoin(membresTontine, eq(tontineDistributions.membreId, membresTontine.id))
-    .innerJoin(clients, eq(membresTontine.clientId, clients.id))
-    .where(eq(tontineDistributions.tontineId, tontineId))
-    .orderBy(desc(tontineDistributions.tourNumero));
+// ============================================================================
+// CYCLES
+// ============================================================================
 
-  return rows.map(({ distribution, membre, client }) => ({
-    ...distribution,
-    membre: {
-      ...membre,
-      client
-    }
-  }));
+export async function getCyclesByTontine(tontineId: string): Promise<any[]> {
+  return db
+    .select()
+    .from(tontineCycles)
+    .where(eq(tontineCycles.tontineId, tontineId))
+    .orderBy(desc(tontineCycles.cycleNumber));
 }
 
-/**
- * Récupère une distribution par ID
- */
-export async function getDistribution(id: string): Promise<any | undefined> {
-  const [row] = await db
-    .select({
-      distribution: tontineDistributions,
-      membre: membresTontine,
-      client: clients
-    })
-    .from(tontineDistributions)
-    .innerJoin(membresTontine, eq(tontineDistributions.membreId, membresTontine.id))
-    .innerJoin(clients, eq(membresTontine.clientId, clients.id))
-    .where(eq(tontineDistributions.id, id));
-
-  if (!row) return undefined;
-
-  return {
-    ...row.distribution,
-    membre: {
-      ...row.membre,
-      client: row.client
-    }
-  };
+export async function getCycle(tontineId: string, cycleId: string): Promise<any | undefined> {
+  const [cycle] = await db
+    .select()
+    .from(tontineCycles)
+    .where(and(eq(tontineCycles.tontineId, tontineId), eq(tontineCycles.id, cycleId)))
+    .limit(1);
+  return cycle || undefined;
 }
 
-/**
- * Récupère les statistiques de distribution d'une tontine
- */
-export async function getDistributionStats(tontineId: string): Promise<{
-  totalDistribue: number;
-  nombreDistributions: number;
-  membresAyantRecu: number;
-  membresEnAttente: number;
-  prochainTour: number;
-  soldeDisponible: number;
-}> {
-  // Stats des distributions
-  const [distStats] = await db
-    .select({
-      totalDistribue: sql<number>`COALESCE(SUM(CAST(${tontineDistributions.montantTotal} AS NUMERIC)), 0)`.mapWith(Number),
-      nombreDistributions: sql<number>`COUNT(*)`.mapWith(Number),
-      dernierTour: sql<number>`COALESCE(MAX(${tontineDistributions.tourNumero}), 0)`.mapWith(Number)
+export async function getCycleById(cycleId: string): Promise<any | undefined> {
+  const [cycle] = await db
+    .select()
+    .from(tontineCycles)
+    .where(eq(tontineCycles.id, cycleId))
+    .limit(1);
+  return cycle || undefined;
+}
+
+export async function getActiveCycle(tontineId: string): Promise<any | undefined> {
+  const [cycle] = await db
+    .select()
+    .from(tontineCycles)
+    .where(and(eq(tontineCycles.tontineId, tontineId), eq(tontineCycles.status, "OPEN")))
+    .orderBy(desc(tontineCycles.cycleNumber))
+    .limit(1);
+  return cycle || undefined;
+}
+
+export async function closeCycle(tontineId: string, cycleId: string, userId: string): Promise<any> {
+  const [updated] = await db
+    .update(tontineCycles)
+    .set({
+      status: "CLOSED",
+      closedAt: new Date(),
+      closedBy: userId,
+      updatedAt: new Date(),
     })
-    .from(tontineDistributions)
-    .where(eq(tontineDistributions.tontineId, tontineId));
+    .where(and(eq(tontineCycles.tontineId, tontineId), eq(tontineCycles.id, cycleId)))
+    .returning();
+  return updated;
+}
 
-  // Stats des membres
-  const [membreStats] = await db
-    .select({
-      membresAyantRecu: sql<number>`COUNT(*) FILTER (WHERE ${membresTontine.aRecuBenefice} = true)`.mapWith(Number),
-      membresEnAttente: sql<number>`COUNT(*) FILTER (WHERE ${membresTontine.aRecuBenefice} = false AND (${membresTontine.statut} = 'ACTIVE' OR ${membresTontine.statut} = 'ACTIVE'))`.mapWith(Number)
+// ============================================================================
+// TURNS
+// ============================================================================
+
+export async function getTurnsByCycle(tontineId: string, cycleId: string): Promise<any[]> {
+  return db
+    .select()
+    .from(tontineTurns)
+    .where(and(eq(tontineTurns.tontineId, tontineId), eq(tontineTurns.cycleId, cycleId)))
+    .orderBy(asc(tontineTurns.turnNumber));
+}
+
+export async function getNextScheduledTurn(cycleId: string): Promise<any | undefined> {
+  const [turn] = await db
+    .select()
+    .from(tontineTurns)
+    .where(and(eq(tontineTurns.cycleId, cycleId), eq(tontineTurns.status, "SCHEDULED")))
+    .orderBy(asc(tontineTurns.turnNumber))
+    .limit(1);
+  return turn || undefined;
+}
+
+// ============================================================================
+// SCHEDULES
+// ============================================================================
+
+export async function getSchedulesByCycle(tontineId: string, cycleId: string): Promise<any[]> {
+  return db
+    .select()
+    .from(tontineSchedules)
+    .where(and(eq(tontineSchedules.tontineId, tontineId), eq(tontineSchedules.cycleId, cycleId)))
+    .orderBy(asc(tontineSchedules.periodNumber));
+}
+
+// ============================================================================
+// TURN AUDIT
+// ============================================================================
+
+export async function getTurnAuditByCycle(tontineId: string, cycleId: string): Promise<any[]> {
+  return db
+    .select()
+    .from(tontineTurnAudit)
+    .where(and(eq(tontineTurnAudit.tontineId, tontineId), eq(tontineTurnAudit.cycleId, cycleId)))
+    .orderBy(desc(tontineTurnAudit.changedAt));
+}
+
+// ============================================================================
+// DISTRIBUTION REQUESTS
+// ============================================================================
+
+export async function getDistributionRequests(tontineId: string, filters?: { cycleId?: string; status?: string }): Promise<any[]> {
+  const requests = await db
+    .select()
+    .from(tontineDistributionRequests)
+    .where(eq(tontineDistributionRequests.tontineId, tontineId))
+    .orderBy(desc(tontineDistributionRequests.createdAt));
+
+  let filtered = requests;
+  if (filters?.cycleId) filtered = filtered.filter((r: any) => r.cycleId === filters.cycleId);
+  if (filters?.status) filtered = filtered.filter((r: any) => r.status === filters.status);
+  return filtered;
+}
+
+export async function getDistributionRequest(requestId: string): Promise<any | undefined> {
+  const [req] = await db
+    .select()
+    .from(tontineDistributionRequests)
+    .where(eq(tontineDistributionRequests.id, requestId))
+    .limit(1);
+  return req || undefined;
+}
+
+export async function cancelDistributionRequest(requestId: string, reason?: string): Promise<any> {
+  const [updated] = await db
+    .update(tontineDistributionRequests)
+    .set({
+      status: "CANCELLED",
+      rejectionReason: reason || "Annulé",
+      updatedAt: new Date(),
     })
-    .from(membresTontine)
-    .where(eq(membresTontine.tontineId, tontineId));
+    .where(eq(tontineDistributionRequests.id, requestId))
+    .returning();
+  return updated;
+}
 
-  // Solde de la tontine
-  const [tontine] = await db
-    .select({ solde: tontines.solde })
-    .from(tontines)
-    .where(eq(tontines.id, tontineId));
+export async function getPendingDistributionCount(tontineId: string): Promise<number> {
+  const pending = await db
+    .select()
+    .from(tontineDistributionRequests)
+    .where(and(
+      eq(tontineDistributionRequests.tontineId, tontineId),
+      eq(tontineDistributionRequests.status, "SUBMITTED"),
+    ));
+  return pending.length;
+}
 
-  return {
-    totalDistribue: distStats?.totalDistribue || 0,
-    nombreDistributions: distStats?.nombreDistributions || 0,
-    membresAyantRecu: membreStats?.membresAyantRecu || 0,
-    membresEnAttente: membreStats?.membresEnAttente || 0,
-    prochainTour: (distStats?.dernierTour || 0) + 1,
-    soldeDisponible: Number(tontine?.solde || 0)
-  };
+// ============================================================================
+// MEMBER LOOKUP BY ID
+// ============================================================================
+
+export async function getMembreTontineById(membreId: string): Promise<MembreTontine | undefined> {
+  const [membre] = await db.select().from(membresTontine).where(eq(membresTontine.id, membreId)).limit(1);
+  return membre || undefined;
 }

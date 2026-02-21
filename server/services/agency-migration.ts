@@ -25,7 +25,6 @@ import {
   tontineCycles,
   tontineTurns,
   tontineSchedules,
-  tontineRulesets,
   userAgences,
   agences,
   coffresForts,
@@ -862,7 +861,7 @@ export class AgencyMigrationService {
     const [
       clientsN, comptesN, creditsN, demandesN, tontinesN, employesN,
       sessionsN, mouvementsN, virementsN, dossiersN,
-      membresTontineN, contributionsN, cyclesN, turnsN, schedulesN, rulesetsN,
+      membresTontineN, contributionsN, cyclesN, turnsN, schedulesN,
       transfertsCCN,
     ] = await Promise.all([
       countQuery(clients, clients.agenceId, isNull(clients.deletedAt)),
@@ -885,7 +884,6 @@ export class AgencyMigrationService {
       countQuery(tontineCycles, tontineCycles.agenceId),
       countQuery(tontineTurns, tontineTurns.agenceId),
       countQuery(tontineSchedules, tontineSchedules.agenceId),
-      countQuery(tontineRulesets, tontineRulesets.agenceId),
       countQuery(transfertsCoffreCaisse, transfertsCoffreCaisse.agenceId),
     ]);
 
@@ -916,7 +914,6 @@ export class AgencyMigrationService {
       tontineCycles: cyclesN,
       tontineTurns: turnsN,
       tontineSchedules: schedulesN,
-      tontineRulesets: rulesetsN,
       transfertsCoffreCaisse: transfertsCCN,
     };
   }
@@ -1022,7 +1019,6 @@ export class AgencyMigrationService {
       tontineCycles: 0,
       tontineTurns: 0,
       tontineSchedules: 0,
-      tontineRulesets: 0,
       transfertsCoffreCaisse: 0,
     };
     let financials: MigrationFinancials = {
@@ -1266,7 +1262,6 @@ export class AgencyMigrationService {
             { table: tontineCycles, col: tontineCycles.agenceId, type: MIGRATION_ENTITY_TYPE.TONTINE_CYCLE, volKey: "tontineCycles" as const },
             { table: tontineTurns, col: tontineTurns.agenceId, type: MIGRATION_ENTITY_TYPE.TONTINE_TURN, volKey: "tontineTurns" as const },
             { table: tontineSchedules, col: tontineSchedules.agenceId, type: MIGRATION_ENTITY_TYPE.TONTINE_SCHEDULE, volKey: "tontineSchedules" as const },
-            { table: tontineRulesets, col: tontineRulesets.agenceId, type: MIGRATION_ENTITY_TYPE.TONTINE_RULESET, volKey: "tontineRulesets" as const },
           ];
 
           for (const sub of tontineSubTables) {
@@ -1764,7 +1759,6 @@ export class AgencyMigrationService {
       [MIGRATION_ENTITY_TYPE.TONTINE_CYCLE]: tontineCycles,
       [MIGRATION_ENTITY_TYPE.TONTINE_TURN]: tontineTurns,
       [MIGRATION_ENTITY_TYPE.TONTINE_SCHEDULE]: tontineSchedules,
-      [MIGRATION_ENTITY_TYPE.TONTINE_RULESET]: tontineRulesets,
       [MIGRATION_ENTITY_TYPE.MOUVEMENT_FINANCIER]: mouvementsFinanciers,
       [MIGRATION_ENTITY_TYPE.SESSION_CAISSE]: sessionsCaisse,
       [MIGRATION_ENTITY_TYPE.TRANSFERT_COFFRE_CAISSE]: transfertsCoffreCaisse,
@@ -1924,7 +1918,6 @@ export class AgencyMigrationService {
           MIGRATION_ENTITY_TYPE.TRANSFERT_COFFRE_CAISSE,
           MIGRATION_ENTITY_TYPE.SESSION_CAISSE,
           MIGRATION_ENTITY_TYPE.MOUVEMENT_FINANCIER,
-          MIGRATION_ENTITY_TYPE.TONTINE_RULESET,
           MIGRATION_ENTITY_TYPE.TONTINE_SCHEDULE,
           MIGRATION_ENTITY_TYPE.TONTINE_TURN,
           MIGRATION_ENTITY_TYPE.TONTINE_CYCLE,

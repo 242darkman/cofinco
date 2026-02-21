@@ -40,6 +40,8 @@ export type DomainEventType =
   | "TONTINE_DISTRIBUTION_APPROVED"
   | "TONTINE_DISTRIBUTION_PAID"
   | "TONTINE_CYCLE_STARTED"
+  | "TONTINE_STATUS_CHANGED"
+  | "TONTINE_MEMBER_EXIT"
   // Accounts / Savings
   | "ACCOUNT_CREATED"
   | "ACCOUNT_ACTIVATED"
@@ -232,6 +234,24 @@ export interface TontineCycleStartedData {
   startDate: string;
   endDate?: string;
   membersCount: number;
+  agenceId?: string;
+}
+
+export interface TontineStatusChangedData {
+  tontineId: string;
+  tontineName: string;
+  previousStatus: string;
+  newStatus: string;
+  reason?: string;
+  agenceId?: string;
+}
+
+export interface TontineMemberExitData {
+  tontineId: string;
+  tontineName: string;
+  memberId: string;
+  clientId: string;
+  exitFeePercent: number;
   agenceId?: string;
 }
 

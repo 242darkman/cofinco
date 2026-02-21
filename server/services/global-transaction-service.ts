@@ -4,7 +4,6 @@ import {
   operationsCaisse,
   tontines,
   tontineTurns,
-  tontineDistributions,
   comptes,
   credits,
   remboursements,
@@ -222,12 +221,10 @@ export class GlobalTransactionService {
                if (!turn) throw new Error("Aucun tour programmé pour ce membre dans le cycle actif");
                tourNumero = turn.turnNumber;
              } else {
-               // Système legacy : tour actuel = MAX(tour distribué) + 1
+               // Tour actuel depuis la colonne typée
                const [result] = await db
                  .select({
-                   tourActuel: sql<number>`COALESCE((
-                     SELECT MAX(tour_numero) FROM tontine_distributions WHERE tontine_id = ${payload.tontineId}
-                   ), 0) + 1`.mapWith(Number)
+                   tourActuel: sql<number>`COALESCE(${tontines.currentRound}, 0) + 1`.mapWith(Number)
                  })
                  .from(tontines)
                  .where(eq(tontines.id, payload.tontineId));

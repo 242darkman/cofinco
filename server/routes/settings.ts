@@ -361,9 +361,7 @@ export function registerSettingsRoutes(app: Express) {
           (SELECT COUNT(*) FROM contributions_tontine WHERE membre_id IN (SELECT id FROM membres_tontine WHERE tontine_id IN (SELECT id FROM tontines WHERE agence_id = ${agenceId}))) +
           (SELECT COUNT(*) FROM tontine_cycles WHERE agence_id = ${agenceId}) +
           (SELECT COUNT(*) FROM tontine_turns WHERE cycle_id IN (SELECT id FROM tontine_cycles WHERE agence_id = ${agenceId})) +
-          (SELECT COUNT(*) FROM tontine_schedules WHERE agence_id = ${agenceId}) +
-          (SELECT COUNT(*) FROM tontine_distributions WHERE agence_id = ${agenceId}) +
-          (SELECT COUNT(*) FROM tontine_rulesets WHERE agence_id = ${agenceId})
+          (SELECT COUNT(*) FROM tontine_schedules WHERE agence_id = ${agenceId})
           AS count`),
 
         // Caisse & Sessions
@@ -686,25 +684,18 @@ export function registerSettingsRoutes(app: Express) {
             )
           )
         `);
-        await tx.execute(sql`DELETE FROM tontine_distributions WHERE agence_id = ${agenceId}`);
         await tx.execute(sql`DELETE FROM tontine_schedules WHERE agence_id = ${agenceId}`);
         await tx.execute(sql`DELETE FROM tontine_turns WHERE cycle_id IN (
           SELECT id FROM tontine_cycles WHERE agence_id = ${agenceId}
         )`);
         await tx.execute(sql`DELETE FROM tontine_cycles WHERE agence_id = ${agenceId}`);
-        await tx.execute(sql`DELETE FROM tontine_rulesets WHERE agence_id = ${agenceId}`);
         await tx.execute(sql`DELETE FROM tontine_penalites WHERE tontine_id IN (
           SELECT id FROM tontines WHERE agence_id = ${agenceId}
         )`);
         await tx.execute(sql`DELETE FROM tontine_alertes WHERE tontine_id IN (
           SELECT id FROM tontines WHERE agence_id = ${agenceId}
         )`);
-        await tx.execute(sql`DELETE FROM tontine_plans WHERE tontine_id IN (
-          SELECT id FROM tontines WHERE agence_id = ${agenceId}
-        )`);
-        await tx.execute(sql`DELETE FROM tontine_regles WHERE tontine_id IN (
-          SELECT id FROM tontines WHERE agence_id = ${agenceId}
-        )`);
+        await tx.execute(sql`DELETE FROM tontine_plans WHERE agence_id = ${agenceId}`);
         await tx.execute(sql`
           DELETE FROM contributions_tontine WHERE membre_id IN (
             SELECT id FROM membres_tontine WHERE tontine_id IN (

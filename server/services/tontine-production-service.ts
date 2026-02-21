@@ -20,13 +20,11 @@ import {
   tontineCycles,
   tontineTurns,
   tontineSchedules,
-  tontineRulesets,
   tontineTurnAudit,
   tontineDistributionRequests,
   membresTontine,
   contributionsTontine,
   tontinePenalites,
-  TontineRulesConfig,
   TontineCycleStatus,
   TontineTurnStatus,
   TontineScheduleStatus,
@@ -109,54 +107,90 @@ export interface TurnReorderResult {
 }
 
 // ============================================================================
-// DEFAULT RULES
+// TYPES — Tontine Rules (read from typed columns)
 // ============================================================================
 
-const DEFAULT_RULES: TontineRulesConfig = {
-  grace_days: 2,
-  late_fee_amount: 500,
-  late_fee_percent: null,
-  max_late_count_before_suspend: 3,
-  max_late_count_before_exclude: 5,
-  allow_partial_distribution: true,
-  distribution_min_threshold_percent: 50,
-  withdrawal_fee_amount: 0,
-  withdrawal_fee_percent: 0,
-  allow_reorder_turns_until: 'BEFORE_TURN_DUE',
-  penalty_deducted_from_payout: true,
-  penalty_as_revenue: false,
-  auto_pay_penalty_priority: true,
-  min_members_to_start: 3,
-  max_advance_tours: 3,
-};
+interface TontineRules {
+  penaltyEnabled: boolean;
+  penaltyType: string;
+  penaltyValue: number;
+  penaltyApplication: string;
+  penaltyCap: number | null;
+  lateGracePeriodDays: number;
+  maxLateBeforeSuspend: number;
+  maxLateBeforeExclude: number;
+  allowPartialDistribution: boolean;
+  distributionMinThresholdPct: number;
+  exitFeePercent: number;
+  tauxPlateforme: number;
+  penaltyDeductedFromPayout: boolean;
+  penaltyAsRevenue: boolean;
+  autoPenaltyPriority: boolean;
+  minMembersToStart: number;
+  maxAdvanceTours: number;
+  payoutOrderMode: string;
+  allowSwapPayoutOrder: boolean;
+}
 
 // ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
 
 /**
- * Get tontine rules (from ruleset or default)
+ * Get tontine rules from typed columns on the tontines table.
  */
-async function getTontineRules(tontineId: string): Promise<TontineRulesConfig> {
+async function getTontineRules(tontineId: string): Promise<TontineRules> {
   const [tontine] = await db
-    .select({ rulesetId: tontines.rulesetId })
+    .select({
+      penaltyEnabled: tontines.penaltyEnabled,
+      penaltyType: tontines.penaltyType,
+      penaltyValue: tontines.penaltyValue,
+      penaltyApplication: tontines.penaltyApplication,
+      penaltyCap: tontines.penaltyCap,
+      lateGracePeriodDays: tontines.lateGracePeriodDays,
+      maxLateBeforeSuspend: tontines.maxLateBeforeSuspend,
+      maxLateBeforeExclude: tontines.maxLateBeforeExclude,
+      allowPartialDistribution: tontines.allowPartialDistribution,
+      distributionMinThresholdPct: tontines.distributionMinThresholdPct,
+      exitFeePercent: tontines.exitFeePercent,
+      tauxPlateforme: tontines.tauxPlateforme,
+      penaltyDeductedFromPayout: tontines.penaltyDeductedFromPayout,
+      penaltyAsRevenue: tontines.penaltyAsRevenue,
+      autoPenaltyPriority: tontines.autoPenaltyPriority,
+      minMembersToStart: tontines.minMembersToStart,
+      maxAdvanceTours: tontines.maxAdvanceTours,
+      payoutOrderMode: tontines.payoutOrderMode,
+      allowSwapPayoutOrder: tontines.allowSwapPayoutOrder,
+    })
     .from(tontines)
     .where(eq(tontines.id, tontineId))
     .limit(1);
 
-  if (tontine?.rulesetId) {
-    const [ruleset] = await db
-      .select({ rules: tontineRulesets.rules })
-      .from(tontineRulesets)
-      .where(eq(tontineRulesets.id, tontine.rulesetId))
-      .limit(1);
-
-    if (ruleset?.rules) {
-      return { ...DEFAULT_RULES, ...(ruleset.rules as Partial<TontineRulesConfig>) };
-    }
+  if (!tontine) {
+    throw new Error("Tontine non trouvée");
   }
 
-  return DEFAULT_RULES;
+  return {
+    penaltyEnabled: tontine.penaltyEnabled ?? false,
+    penaltyType: tontine.penaltyType ?? 'FIXED',
+    penaltyValue: parseFloat(tontine.penaltyValue?.toString() ?? '0'),
+    penaltyApplication: tontine.penaltyApplication ?? 'PER_PERIOD',
+    penaltyCap: tontine.penaltyCap ? parseFloat(tontine.penaltyCap.toString()) : null,
+    lateGracePeriodDays: tontine.lateGracePeriodDays ?? 0,
+    maxLateBeforeSuspend: tontine.maxLateBeforeSuspend ?? 3,
+    maxLateBeforeExclude: tontine.maxLateBeforeExclude ?? 5,
+    allowPartialDistribution: tontine.allowPartialDistribution ?? true,
+    distributionMinThresholdPct: parseFloat(tontine.distributionMinThresholdPct?.toString() ?? '50'),
+    exitFeePercent: parseFloat(tontine.exitFeePercent?.toString() ?? '0'),
+    tauxPlateforme: parseFloat(tontine.tauxPlateforme?.toString() ?? '0'),
+    penaltyDeductedFromPayout: tontine.penaltyDeductedFromPayout ?? true,
+    penaltyAsRevenue: tontine.penaltyAsRevenue ?? false,
+    autoPenaltyPriority: tontine.autoPenaltyPriority ?? true,
+    minMembersToStart: tontine.minMembersToStart ?? 3,
+    maxAdvanceTours: tontine.maxAdvanceTours ?? 3,
+    payoutOrderMode: tontine.payoutOrderMode ?? 'FIXED_BY_ADMIN',
+    allowSwapPayoutOrder: tontine.allowSwapPayoutOrder ?? false,
+  };
 }
 
 /**
@@ -289,8 +323,8 @@ export async function generateCycle(params: {
     }
 
     const rules = await getTontineRules(tontineId);
-    if (members.length < rules.min_members_to_start) {
-      throw new Error(`Minimum ${rules.min_members_to_start} membres requis pour démarrer un cycle`);
+    if (members.length < rules.minMembersToStart) {
+      throw new Error(`Minimum ${rules.minMembersToStart} membres requis pour démarrer un cycle`);
     }
 
     // Check for existing open cycle
@@ -335,12 +369,10 @@ export async function generateCycle(params: {
     let orderedMembers = members;
     const seed = randomSeed ?? (Date.now() + parseInt(tontineId.replace(/-/g, '').slice(0, 8), 16));
 
-    if (tontine.typeDistribution === 'RANDOM') {
+    if (rules.payoutOrderMode === 'RANDOM_AT_START') {
       orderedMembers = shuffleWithSeed(members, seed);
-    } else if (tontine.typeDistribution === 'ORDER') {
-      // Already ordered by position/dateAdhesion
     }
-    // FIXED and ROTATING use position field
+    // FIXED_BY_ADMIN and PRIORITY_SCORE use position field (already ordered)
 
     // Generate schedules and turns
     let currentDate = new Date(cycleStartDate);
@@ -408,7 +440,7 @@ export async function generateCycle(params: {
         changedBy: userId,
         metadata: {
           seed,
-          distributionType: tontine.typeDistribution,
+          payoutOrderMode: rules.payoutOrderMode,
           membersCount: members.length,
           frequency: tontine.frequence,
         },
@@ -487,16 +519,9 @@ export async function reorderTurns(params: {
       }
     }
 
-    // Check rule: allow_reorder_turns_until
-    if (rules.allow_reorder_turns_until === 'NEVER') {
+    // Check rule: swap reorder allowed
+    if (!rules.allowSwapPayoutOrder) {
       throw new Error("La réorganisation des tours n'est pas autorisée selon les règles");
-    }
-
-    if (rules.allow_reorder_turns_until === 'BEFORE_CYCLE_START') {
-      const cycleStart = new Date(cycle[0].startDate);
-      if (today >= cycleStart) {
-        throw new Error("La réorganisation n'est plus autorisée après le début du cycle");
-      }
     }
 
     // Prepare old order for audit
@@ -512,12 +537,10 @@ export async function reorderTurns(params: {
       if (!currentTurn) continue;
 
       if (currentTurn.beneficiaryMemberId !== newTurnOrder.memberId) {
-        // Check if turn due date has passed (for BEFORE_TURN_DUE rule)
-        if (rules.allow_reorder_turns_until === 'BEFORE_TURN_DUE') {
-          const turnDueDate = new Date(currentTurn.dueDate);
-          if (today >= turnDueDate) {
-            throw new Error(`Le tour ${currentTurn.turnNumber} a déjà atteint sa date d'échéance`);
-          }
+        // Check if turn due date has passed
+        const turnDueDate = new Date(currentTurn.dueDate);
+        if (today >= turnDueDate) {
+          throw new Error(`Le tour ${currentTurn.turnNumber} a déjà atteint sa date d'échéance`);
         }
 
         await tx
@@ -659,10 +682,10 @@ export async function calculateRetirable(
   if (montantRetirable < 0) montantRetirable = 0;
 
   // Check minimum threshold
-  if (rules.allow_partial_distribution) {
-    const minThreshold = (droitsMembre * rules.distribution_min_threshold_percent) / 100;
+  if (rules.allowPartialDistribution) {
+    const minThreshold = (droitsMembre * rules.distributionMinThresholdPct) / 100;
     if (potDisponible < minThreshold) {
-      raison = `Pot insuffisant (minimum ${rules.distribution_min_threshold_percent}% requis)`;
+      raison = `Pot insuffisant (minimum ${rules.distributionMinThresholdPct}% requis)`;
       // Still allow partial if pot > 0
       if (potDisponible <= 0) {
         peutRetirer = false;
@@ -747,17 +770,14 @@ export async function createDistributionRequest(params: {
     // Get rules
     const rules = await getTontineRules(tontineId);
 
-    // Calculate fees
+    // Calculate platform fees on distribution
     let feesDeducted = 0;
-    if (rules.withdrawal_fee_amount > 0) {
-      feesDeducted += rules.withdrawal_fee_amount;
-    }
-    if (rules.withdrawal_fee_percent > 0) {
-      feesDeducted += (retirable.montantRetirable * rules.withdrawal_fee_percent) / 100;
+    if (rules.tauxPlateforme > 0) {
+      feesDeducted += (retirable.montantRetirable * rules.tauxPlateforme) / 100;
     }
 
     // Calculate net amount
-    const penaltiesDeducted = rules.penalty_deducted_from_payout ? retirable.penalitesADeduire : 0;
+    const penaltiesDeducted = rules.penaltyDeductedFromPayout ? retirable.penalitesADeduire : 0;
     const netAmount = retirable.montantRetirable - penaltiesDeducted - feesDeducted;
 
     if (netAmount <= 0) {
@@ -888,7 +908,7 @@ export async function approveDistribution(params: {
     if (retirable.montantRetirable < requestedAmount) {
       // Partial distribution
       const rules = await getTontineRules(request.tontineId);
-      if (!rules.allow_partial_distribution) {
+      if (!rules.allowPartialDistribution) {
         throw new Error("Distribution partielle non autorisée et pot insuffisant");
       }
       approvedAmount = retirable.montantRetirable;
@@ -1216,21 +1236,27 @@ export async function applyLatePenalties(agenceId: string): Promise<{ applied: n
 
   for (const { schedule, tontine } of schedules) {
     const rules = await getTontineRules(tontine.id);
+
+    // Skip if penalties are disabled for this tontine
+    if (!rules.penaltyEnabled) {
+      continue;
+    }
+
     const dueDate = new Date(schedule.dueDate);
     const graceEndDate = new Date(dueDate);
-    graceEndDate.setDate(graceEndDate.getDate() + rules.grace_days);
+    graceEndDate.setDate(graceEndDate.getDate() + rules.lateGracePeriodDays);
 
     if (today <= graceEndDate) {
       continue; // Still in grace period
     }
 
-    // Get members who haven't paid for this schedule
+    // Get members who haven't paid for this period
     const paidMembers = await db
       .select({ membreId: contributionsTontine.membreId })
       .from(contributionsTontine)
       .where(and(
         eq(contributionsTontine.tontineId, tontine.id),
-        eq(contributionsTontine.scheduleId, schedule.id),
+        eq(contributionsTontine.tourNumero, schedule.periodNumber),
         eq(contributionsTontine.statutTransaction, "POSTED")
       ));
 
@@ -1269,10 +1295,10 @@ export async function applyLatePenalties(agenceId: string): Promise<{ applied: n
 
       // Calculate penalty amount
       let penaltyAmount = 0;
-      if (rules.late_fee_amount) {
-        penaltyAmount = rules.late_fee_amount;
-      } else if (rules.late_fee_percent) {
-        penaltyAmount = (parseFloat(tontine.montantCotisation || "0") * rules.late_fee_percent) / 100;
+      if (rules.penaltyType === 'FIXED') {
+        penaltyAmount = rules.penaltyValue;
+      } else if (rules.penaltyType === 'PERCENTAGE') {
+        penaltyAmount = (parseFloat(tontine.montantCotisation || "0") * rules.penaltyValue) / 100;
       }
 
       if (penaltyAmount <= 0) {
@@ -1283,7 +1309,6 @@ export async function applyLatePenalties(agenceId: string): Promise<{ applied: n
       await db.insert(tontinePenalites).values({
         tontineId: tontine.id,
         membreId: member.id,
-        regleId: null, // Could link to specific rule
         cycleId: schedule.cycleId,
         scheduleId: schedule.id,
         montant: penaltyAmount.toString(),
@@ -1360,11 +1385,11 @@ export async function applyLatePenalties(agenceId: string): Promise<{ applied: n
 
       // Check if member should be suspended
       const newLateCount = (member.lateCount || 0) + 1;
-      if (newLateCount >= rules.max_late_count_before_suspend) {
+      if (newLateCount >= rules.maxLateBeforeSuspend) {
         await db
           .update(membresTontine)
           .set({
-            statut: newLateCount >= rules.max_late_count_before_exclude ? "EXCLUDED" : "INACTIVE",
+            statut: newLateCount >= rules.maxLateBeforeExclude ? "EXCLUDED" : "INACTIVE",
             updatedAt: new Date(),
           })
           .where(eq(membresTontine.id, member.id));

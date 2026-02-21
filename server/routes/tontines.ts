@@ -3,14 +3,15 @@ import { z } from "zod";
 import { createLogger } from "../lib/logger";
 
 const logger = createLogger('Routes:Tontines');
-import { insertTontineSchema, insertMembreTontineSchema, insertContributionTontineSchema, insertTontineAlerteSchema,
-    insertTontineRegleSchema, insertTontinePenaliteSchema, insertTontineDistributionSchema,
+import { insertTontineSchema, insertMembreTontineSchema, insertContributionTontineSchema,
+    insertTontinePenaliteSchema,
     insertTontinePlanSchema,
-    tontineCycles, tontineTurns, tontineSchedules, tontineDistributionRequests, tontineTurnAudit,
+    tontineCycles, tontineTurns, tontineSchedules, tontineDistributionRequests,
     membresTontine, tontinePenalites, tontines, contributionsTontine, TontinePayoutMethod,
-    clients
+    clients, holidayDates, holidayCalendars
 } from "@shared/schema";
 import { users } from "@shared/schema/auth";
+import { employes } from "@shared/schema/employes";
 import { storage } from "../storage";
 import { requireAuth } from "../auth";
 import { attachAbility, requireAbility } from "../authorization";
@@ -19,11 +20,15 @@ import { requireAgenceAccess } from "../middleware";
 import { normalizeKeysDeep } from "./utils";
 import { getWsInstance } from "../ws-server";
 import tontineProductionService from "../services/tontine-production-service";
+import tontineLifecycleService from "../services/tontine-lifecycle-service";
+import { generateTontineSchedulePreview, type TontineCalendarConfig } from "../services/tontine-schedule-engine";
+import { copyPlanToTontineValues } from "../storage/tontines";
+import { formatDateKey } from "../services/credit-plan/calendar-utils";
 import { dispatchDomainEvent } from "../services/notifications/domain-events/event-registry";
 import { generateTontineReminderSchedule } from "../services/notifications/tontine-reminder-service";
-import { executeWithLedger, updateTontineSolde, updateSessionSolde, generateReference } from "../services/ledger";
+import { executeWithLedger, updateTontineSolde, updateSessionSolde } from "../services/ledger";
 import { db } from "../db";
-import { eq, and, desc, asc, sql } from "drizzle-orm";
+import { eq, and, asc, sql } from "drizzle-orm";
 
 export function registerTontineRoutes(app: Express) {
   app.get("/api/tontines", requireAuth, requireAgenceAccess("agenceId"), async (req, res) => {
@@ -42,17 +47,24 @@ export function registerTontineRoutes(app: Express) {
       const data = normalizeKeysDeep(req.body);
       const parsed = insertTontineSchema.parse(data);
 
+      // Auto-inject agenceId from user session if not provided
+      if (!parsed.agenceId && req.user?.agenceId) {
+        (parsed as any).agenceId = req.user.agenceId;
+      }
+
       // Le gestionnaire doit être de la même agence (sauf admin)
       const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
 
       if (agenceFilter && parsed.gestionnaireId) {
-        // Architecture V3: User n'a plus de champ agence
-        // La vérification d'agence doit se faire via employes.agenceId
-        const gestionnaire = await storage.getUser(parsed.gestionnaireId);
-        if (!gestionnaire) {
-          return res.status(403).json({ message: "Gestionnaire introuvable" });
+        const [employe] = await db.select({ agenceId: employes.agenceId })
+          .from(employes)
+          .where(eq(employes.userId, parsed.gestionnaireId));
+        if (!employe) {
+          return res.status(403).json({ message: "Gestionnaire introuvable dans la table employes" });
         }
-        // TODO: Vérifier l'agence via la table employes si nécessaire
+        if (agenceFilter.agenceId && employe.agenceId !== agenceFilter.agenceId) {
+          return res.status(403).json({ message: "Le gestionnaire n'appartient pas a cette agence" });
+        }
       }
 
       const tontine = await storage.createTontine(parsed);
@@ -73,11 +85,12 @@ export function registerTontineRoutes(app: Express) {
       // Vérifier accès via gestionnaire
       const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
       if (agenceFilter && tontine.gestionnaireId) {
-        const gestionnaire = await storage.getUser(tontine.gestionnaireId);
-        if (!gestionnaire) {
-          return res.status(403).json({ message: "Accès refusé : gestionnaire introuvable" });
+        const [employe] = await db.select({ agenceId: employes.agenceId })
+          .from(employes)
+          .where(eq(employes.userId, tontine.gestionnaireId));
+        if (employe && agenceFilter.agenceId && employe.agenceId !== agenceFilter.agenceId) {
+          return res.status(403).json({ message: "Acces refuse : gestionnaire d'une autre agence" });
         }
-        // TODO: Vérifier l'agence via la table employes si nécessaire
       }
 
       res.json(tontine);
@@ -140,6 +153,11 @@ export function registerTontineRoutes(app: Express) {
       const parsed = insertMembreTontineSchema.parse(Object.assign({}, data, { tontineId: req.params.id }));
       const membre = await storage.createMembreTontine(parsed);
 
+      // Increment member count
+      await storage.updateTontine(req.params.id, {
+        membresActuels: sql`COALESCE(${tontines.membresActuels}, 0) + 1`,
+      } as any);
+
       // Notify
       const wsInstance = getWsInstance();
       if (wsInstance) {
@@ -168,8 +186,13 @@ export function registerTontineRoutes(app: Express) {
 
   // Remove membre from tontine
   app.delete("/api/tontines/:id/membres/:membreId", requireAuth, attachAbility, requireAbility(Actions.DELETE, Subjects.TONTINE_MEMBRE), async (req, res) => {
-      // In a real app, we might want to check if the membre belongs to the tontine
-      const success = await storage.updateMembreTontine(req.params.membreId, { statut: 'Retiré' } as any);
+      const success = await storage.updateMembreTontine(req.params.membreId, { statut: 'Retiré', deletedAt: new Date() } as any);
+
+      // Decrement member count
+      await storage.updateTontine(req.params.id, {
+        membresActuels: sql`GREATEST(0, COALESCE(${tontines.membresActuels}, 0) - 1)`,
+      } as any);
+
       res.json({ success: !!success });
   });
 
@@ -182,6 +205,130 @@ export function registerTontineRoutes(app: Express) {
 
       const updated = await storage.updateMembreTontine(req.params.membreId, data as any);
       res.json(updated);
+  });
+
+  // ============================================================================
+  // LIFECYCLE STATE MACHINE
+  // ============================================================================
+
+  app.post("/api/tontines/:id/activate", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.TONTINE), async (req, res) => {
+    try {
+      const result = await tontineLifecycleService.transitionStatus(
+        req.params.id, "ACTIVE", req.session.user!.id, req.body.reason
+      );
+      const wsInstance = getWsInstance();
+      if (wsInstance) wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: "status_changed", id: req.params.id } });
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/tontines/:id/pause", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.TONTINE), async (req, res) => {
+    try {
+      const result = await tontineLifecycleService.transitionStatus(
+        req.params.id, "PAUSED", req.session.user!.id, req.body.reason
+      );
+      const wsInstance = getWsInstance();
+      if (wsInstance) wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: "status_changed", id: req.params.id } });
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/tontines/:id/resume", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.TONTINE), async (req, res) => {
+    try {
+      const result = await tontineLifecycleService.transitionStatus(
+        req.params.id, "ACTIVE", req.session.user!.id, req.body.reason
+      );
+      const wsInstance = getWsInstance();
+      if (wsInstance) wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: "status_changed", id: req.params.id } });
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/tontines/:id/complete", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.TONTINE), async (req, res) => {
+    try {
+      const result = await tontineLifecycleService.transitionStatus(
+        req.params.id, "COMPLETED", req.session.user!.id, req.body.reason
+      );
+      const wsInstance = getWsInstance();
+      if (wsInstance) wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: "status_changed", id: req.params.id } });
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/tontines/:id/cancel", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.TONTINE), async (req, res) => {
+    try {
+      const result = await tontineLifecycleService.transitionStatus(
+        req.params.id, "CANCELLED", req.session.user!.id, req.body.reason
+      );
+      const wsInstance = getWsInstance();
+      if (wsInstance) wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: "status_changed", id: req.params.id } });
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // ============================================================================
+  // MEMBER EXIT/REPLACEMENT WORKFLOW
+  // ============================================================================
+
+  app.post("/api/tontines/:id/membres/:membreId/request-exit", requireAuth, async (req, res) => {
+    try {
+      const result = await tontineLifecycleService.requestMemberExit(
+        req.params.id, req.params.membreId, req.session.user!.id
+      );
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/tontines/:id/membres/:membreId/approve-exit", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.TONTINE_MEMBRE), async (req, res) => {
+    try {
+      const result = await tontineLifecycleService.approveMemberExit(
+        req.params.id, req.params.membreId, req.session.user!.id
+      );
+      const wsInstance = getWsInstance();
+      if (wsInstance) wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: "member_exit", tontineId: req.params.id } });
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/tontines/:id/membres/:membreId/replace", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.TONTINE_MEMBRE), async (req, res) => {
+    try {
+      const { newClientId } = req.body;
+      if (!newClientId) return res.status(400).json({ message: "newClientId requis" });
+
+      const result = await tontineLifecycleService.replaceMember(
+        req.params.id, req.params.membreId, newClientId, req.session.user!.id
+      );
+      const wsInstance = getWsInstance();
+      if (wsInstance) wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: "member_replaced", tontineId: req.params.id } });
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  // ROLE MANAGEMENT
+  app.patch("/api/tontines/:id/membres/:membreId/role", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.TONTINE_MEMBRE), async (req, res) => {
+    try {
+      const { role } = req.body;
+      await tontineLifecycleService.assignMemberRole(req.params.id, req.params.membreId, role || null);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
   });
 
   app.get("/api/tontines/:id/contributions", requireAuth, async (req, res) => {
@@ -268,44 +415,6 @@ export function registerTontineRoutes(app: Express) {
     res.json(tontines);
   });
 
-  // Tontine Rules
-  app.get("/api/tontines/:id/regles", requireAuth, async (req, res) => {
-    const regles = await storage.getTontineRegles(req.params.id);
-    res.json(regles);
-  });
-
-  app.post("/api/tontine-regles", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.TONTINE), async (req, res) => {
-    const data = normalizeKeysDeep(req.body);
-    const parsed = insertTontineRegleSchema.parse(data);
-    const regle = await storage.createTontineRegle(parsed);
-
-    // Notify
-    const wsInstance = getWsInstance();
-    if (wsInstance) {
-        wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: 'regle_new', tontineId: parsed.tontineId } });
-    }
-
-    res.json(regle);
-  });
-
-  app.patch("/api/tontine-regles/:id", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.TONTINE), async (req, res) => {
-    const data = normalizeKeysDeep(req.body);
-    const updated = await storage.updateTontineRegle(req.params.id, data as any);
-
-    // Notify
-    const wsInstance = getWsInstance();
-    if (wsInstance) {
-        wsInstance.broadcast({ type: "TONTINE_UPDATE", payload: { type: 'regle_updated', id: req.params.id } });
-    }
-
-    res.json(updated);
-  });
-
-  app.delete("/api/tontine-regles/:id", requireAuth, attachAbility, requireAbility(Actions.DELETE, Subjects.TONTINE), async (req, res) => {
-    const success = await storage.deleteTontineRegle(req.params.id);
-    res.json({ success });
-  });
-
   // Tontine Penalites
   app.get("/api/tontines/:id/penalites", requireAuth, async (req, res) => {
     const penalites = await storage.getTontinePenalites(req.params.id);
@@ -365,10 +474,7 @@ export function registerTontineRoutes(app: Express) {
       }
 
       // 3. Load member for clientId
-      const [membre] = await db
-        .select()
-        .from(membresTontine)
-        .where(eq(membresTontine.id, penalite.membreId));
+      const membre = await storage.getMembreTontineById(penalite.membreId);
 
       if (!membre) {
         return res.status(404).json({ message: "Membre introuvable" });
@@ -592,6 +698,12 @@ export function registerTontineRoutes(app: Express) {
     res.json(plans);
   });
 
+  app.get("/api/tontine-plans/:id", requireAuth, async (req, res) => {
+    const plan = await storage.getTontinePlan(req.params.id);
+    if (!plan) return res.status(404).json({ message: "Plan introuvable" });
+    res.json(plan);
+  });
+
   app.post("/api/tontine-plans", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.TONTINE), async (req, res) => {
     try {
       const data = normalizeKeysDeep(req.body);
@@ -620,6 +732,28 @@ export function registerTontineRoutes(app: Express) {
     res.json({ success });
   });
 
+  // Create a tontine group pre-filled from a plan template
+  app.post("/api/tontines/from-plan/:planId", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.TONTINE), async (req: Request, res: Response) => {
+    try {
+      const plan = await storage.getTontinePlan(req.params.planId);
+      if (!plan) return res.status(404).json({ message: "Modele introuvable" });
+
+      const planValues = copyPlanToTontineValues(plan);
+      const overrides = normalizeKeysDeep(req.body);
+      const merged = { ...planValues, ...overrides };
+
+      const parsed = insertTontineSchema.parse(merged);
+      const tontine = await storage.createTontine(parsed);
+      res.json(tontine);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Erreur de validation", errors: error.errors });
+      }
+      logger.error({ err: error }, 'Erreur creation tontine depuis plan');
+      res.status(500).json({ message: error.message || "Erreur interne" });
+    }
+  });
+
   // ============================================================================
   // PRODUCTION-READY TONTINE ENDPOINTS
   // ============================================================================
@@ -629,11 +763,7 @@ export function registerTontineRoutes(app: Express) {
   // List cycles for a tontine
   app.get("/api/tontines/:id/cycles", requireAuth, async (req: Request, res: Response) => {
     try {
-      const cycles = await db
-        .select()
-        .from(tontineCycles)
-        .where(eq(tontineCycles.tontineId, req.params.id))
-        .orderBy(desc(tontineCycles.cycleNumber));
+      const cycles = await storage.getCyclesByTontine(req.params.id);
 
       res.json(cycles);
     } catch (error: any) {
@@ -717,14 +847,7 @@ export function registerTontineRoutes(app: Express) {
   // Get cycle details
   app.get("/api/tontines/:id/cycles/:cycleId", requireAuth, async (req: Request, res: Response) => {
     try {
-      const [cycle] = await db
-        .select()
-        .from(tontineCycles)
-        .where(and(
-          eq(tontineCycles.tontineId, req.params.id),
-          eq(tontineCycles.id, req.params.cycleId)
-        ))
-        .limit(1);
+      const cycle = await storage.getCycle(req.params.id, req.params.cycleId);
 
       if (!cycle) {
         return res.status(404).json({ message: "Cycle non trouvé" });
@@ -742,19 +865,7 @@ export function registerTontineRoutes(app: Express) {
     try {
       const userId = req.session.user?.id;
 
-      const [updated] = await db
-        .update(tontineCycles)
-        .set({
-          status: 'CLOSED',
-          closedAt: new Date(),
-          closedBy: userId,
-          updatedAt: new Date(),
-        })
-        .where(and(
-          eq(tontineCycles.tontineId, req.params.id),
-          eq(tontineCycles.id, req.params.cycleId)
-        ))
-        .returning();
+      const updated = await storage.closeCycle(req.params.id, req.params.cycleId, userId!);
 
       // Notify
       const wsInstance = getWsInstance();
@@ -777,14 +888,7 @@ export function registerTontineRoutes(app: Express) {
   // List turns for a cycle
   app.get("/api/tontines/:id/cycles/:cycleId/turns", requireAuth, async (req: Request, res: Response) => {
     try {
-      const turns = await db
-        .select()
-        .from(tontineTurns)
-        .where(and(
-          eq(tontineTurns.tontineId, req.params.id),
-          eq(tontineTurns.cycleId, req.params.cycleId)
-        ))
-        .orderBy(asc(tontineTurns.turnNumber));
+      const turns = await storage.getTurnsByCycle(req.params.id, req.params.cycleId);
 
       res.json(turns);
     } catch (error: any) {
@@ -846,14 +950,7 @@ export function registerTontineRoutes(app: Express) {
   // Get turn audit history
   app.get("/api/tontines/:id/cycles/:cycleId/audit", requireAuth, async (req: Request, res: Response) => {
     try {
-      const audits = await db
-        .select()
-        .from(tontineTurnAudit)
-        .where(and(
-          eq(tontineTurnAudit.tontineId, req.params.id),
-          eq(tontineTurnAudit.cycleId, req.params.cycleId)
-        ))
-        .orderBy(desc(tontineTurnAudit.changedAt));
+      const audits = await storage.getTurnAuditByCycle(req.params.id, req.params.cycleId);
 
       res.json(audits);
     } catch (error: any) {
@@ -867,14 +964,7 @@ export function registerTontineRoutes(app: Express) {
   // List schedules for a cycle
   app.get("/api/tontines/:id/cycles/:cycleId/schedules", requireAuth, async (req: Request, res: Response) => {
     try {
-      const schedules = await db
-        .select()
-        .from(tontineSchedules)
-        .where(and(
-          eq(tontineSchedules.tontineId, req.params.id),
-          eq(tontineSchedules.cycleId, req.params.cycleId)
-        ))
-        .orderBy(asc(tontineSchedules.periodNumber));
+      const schedules = await storage.getSchedulesByCycle(req.params.id, req.params.cycleId);
 
       res.json(schedules);
     } catch (error: any) {
@@ -891,12 +981,7 @@ export function registerTontineRoutes(app: Express) {
       const tontineId = req.params.id;
 
       // Find the active cycle
-      const [cycle] = await db
-        .select()
-        .from(tontineCycles)
-        .where(and(eq(tontineCycles.tontineId, tontineId), eq(tontineCycles.status, "OPEN")))
-        .orderBy(desc(tontineCycles.cycleNumber))
-        .limit(1);
+      const cycle = await storage.getActiveCycle(tontineId);
 
       if (!cycle) {
         return res.json([]);
@@ -986,21 +1071,10 @@ export function registerTontineRoutes(app: Express) {
     try {
       const { cycleId, status } = req.query;
 
-      let query = db
-        .select()
-        .from(tontineDistributionRequests)
-        .where(eq(tontineDistributionRequests.tontineId, req.params.id));
-
-      const requests = await query.orderBy(desc(tontineDistributionRequests.createdAt));
-
-      // Filter in memory if needed (Drizzle chaining limitations)
-      let filtered = requests;
-      if (cycleId) {
-        filtered = filtered.filter(r => r.cycleId === cycleId);
-      }
-      if (status) {
-        filtered = filtered.filter(r => r.status === status);
-      }
+      const filtered = await storage.getDistributionRequests(req.params.id, {
+        cycleId: cycleId as string | undefined,
+        status: status as string | undefined,
+      });
 
       res.json(filtered);
     } catch (error: any) {
@@ -1115,15 +1189,11 @@ export function registerTontineRoutes(app: Express) {
       // Domain event: distribution paid — look up beneficiary info
       if (result.status === 'SUCCESS' || result.status === 'PARTIAL') {
         try {
-          const [distReq] = await db
-            .select()
-            .from(tontineDistributionRequests)
-            .where(eq(tontineDistributionRequests.id, result.requestId))
-            .limit(1);
+          const distReq = await storage.getDistributionRequest(result.requestId);
           if (distReq) {
             const tontineForDist = await storage.getTontine(req.params.id);
-            const benefMember = await db.select().from(membresTontine).where(eq(membresTontine.id, distReq.beneficiaryMemberId)).limit(1);
-            const clientId = benefMember[0]?.clientId;
+            const benefMember = await storage.getMembreTontineById(distReq.beneficiaryMemberId);
+            const clientId = benefMember?.clientId;
             if (clientId && tontineForDist) {
               dispatchDomainEvent({
                 type: "TONTINE_DISTRIBUTION_PAID",
@@ -1155,15 +1225,7 @@ export function registerTontineRoutes(app: Express) {
     try {
       const { reason } = req.body;
 
-      const [updated] = await db
-        .update(tontineDistributionRequests)
-        .set({
-          status: 'CANCELLED',
-          rejectionReason: reason || 'Annulé',
-          updatedAt: new Date(),
-        })
-        .where(eq(tontineDistributionRequests.id, req.params.requestId))
-        .returning();
+      const updated = await storage.cancelDistributionRequest(req.params.requestId, reason);
 
       // Notify
       const wsInstance = getWsInstance();
@@ -1199,43 +1261,23 @@ export function registerTontineRoutes(app: Express) {
       // Get current cycle
       let currentCycle = null;
       if (tontine.currentCycleId) {
-        const [cycle] = await db
-          .select()
-          .from(tontineCycles)
-          .where(eq(tontineCycles.id, tontine.currentCycleId))
-          .limit(1);
-        currentCycle = cycle;
+        currentCycle = await storage.getCycleById(tontine.currentCycleId) || null;
       }
 
       // Get next turn
       let nextTurn = null;
       if (currentCycle) {
-        const [turn] = await db
-          .select()
-          .from(tontineTurns)
-          .where(and(
-            eq(tontineTurns.cycleId, currentCycle.id),
-            eq(tontineTurns.status, 'SCHEDULED')
-          ))
-          .orderBy(asc(tontineTurns.turnNumber))
-          .limit(1);
-        nextTurn = turn;
+        nextTurn = await storage.getNextScheduledTurn(currentCycle.id) || null;
       }
 
       // Get pending distribution requests
-      const pendingRequests = await db
-        .select()
-        .from(tontineDistributionRequests)
-        .where(and(
-          eq(tontineDistributionRequests.tontineId, req.params.id),
-          eq(tontineDistributionRequests.status, 'SUBMITTED')
-        ));
+      const pendingCount = await storage.getPendingDistributionCount(req.params.id);
 
       res.json({
         tontine,
         currentCycle,
         nextTurn,
-        pendingDistributions: pendingRequests.length,
+        pendingDistributions: pendingCount,
         stats: {
           potCollecte: currentCycle?.potCollected || tontine.solde || "0",
           potDistribue: currentCycle?.potDistributed || "0",
@@ -1245,6 +1287,85 @@ export function registerTontineRoutes(app: Express) {
     } catch (error: any) {
       logger.error({ err: error }, 'Erreur dashboard tontine');
       res.status(500).json({ message: error.message || "Erreur dashboard" });
+    }
+  });
+
+  // ============================================================================
+  // HOLIDAY CALENDARS (read-only list for selectors)
+  // ============================================================================
+
+  app.get("/api/holiday-calendars", requireAuth, async (_req: Request, res: Response) => {
+    try {
+      const calendars = await db.select({
+        id: holidayCalendars.id,
+        nom: holidayCalendars.nom,
+        description: holidayCalendars.description,
+      })
+        .from(holidayCalendars)
+        .where(eq(holidayCalendars.isActive, true))
+        .orderBy(asc(holidayCalendars.nom));
+      res.json(calendars);
+    } catch (error: any) {
+      logger.error({ err: error }, "Erreur chargement holiday calendars");
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ============================================================================
+  // SCHEDULE PREVIEW (read-only, no persistence)
+  // ============================================================================
+
+  const schedulePreviewSchema = z.object({
+    startDate: z.string(),
+    config: z.object({
+      firstContributionRule: z.string().default("ON_START_DATE"),
+      gracePeriodContribution: z.coerce.number().default(0),
+      collectionCalendarMode: z.string().default("ALL_DAYS"),
+      weekdaysMask: z.coerce.number().default(127),
+      shiftNonWorkingDay: z.string().default("NEXT"),
+      timezone: z.string().default("Africa/Brazzaville"),
+      frequence: z.string(),
+      intervalleCotisation: z.coerce.number().default(1),
+      preferredWeekday: z.coerce.number().nullable().optional(),
+      distributionType: z.string().default("ROTATIVE_SUSU"),
+      payoutFrequency: z.string().default("SAME_AS_CONTRIBUTION"),
+      payoutDayRule: z.string().nullable().optional(),
+      nombreMembres: z.coerce.number().min(1),
+    }),
+    holidayCalendarId: z.string().uuid().optional(),
+    customFirstDate: z.string().optional(),
+  });
+
+  app.post("/api/tontine-schedule/preview", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const parsed = schedulePreviewSchema.parse(req.body);
+
+      // Load holidays if a calendar is specified
+      let holidays: Set<string> | undefined;
+      if (parsed.holidayCalendarId) {
+        const dates = await db.select({ date: holidayDates.date })
+          .from(holidayDates)
+          .where(eq(holidayDates.calendarId, parsed.holidayCalendarId));
+        holidays = new Set(dates.map(d => typeof d.date === "string" ? d.date : formatDateKey(new Date(d.date))));
+      }
+
+      const startDate = new Date(parsed.startDate);
+      const customFirst = parsed.customFirstDate ? new Date(parsed.customFirstDate) : undefined;
+
+      const preview = generateTontineSchedulePreview(
+        startDate,
+        parsed.config as TontineCalendarConfig,
+        holidays,
+        customFirst,
+      );
+
+      res.json(preview);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Données invalides", errors: error.errors });
+      }
+      logger.error({ err: error }, 'Erreur preview schedule tontine');
+      res.status(500).json({ message: error.message || "Erreur génération preview" });
     }
   });
 }

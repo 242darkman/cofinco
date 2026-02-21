@@ -1,10 +1,11 @@
 import { db } from "../db";
-import { tontines, membresTontine, contributionsTontine, tontineDistributions, comptes, transactionsCompte } from "@shared/schema";
+import { tontines, membresTontine, contributionsTontine, comptes, transactionsCompte } from "@shared/schema";
 import { eq, and, sql, desc } from "drizzle-orm";
 import { createContributionTontineWithLedger } from "../storage/tontines";
 import { updateTontineSolde, executeWithLedger, updateCompteSolde, generateReference } from "./ledger";
 import { isTourFullyPaid } from "./tontine-logic";
-import { StatutTontine, StatutMembreTontine, TypeCompte, StatutTransaction, TypeOperationCaisse, MethodePaiement } from "@shared/enum/status-constants";
+import { StatutMembreTontine, TypeCompte, StatutTransaction, TypeOperationCaisse, MethodePaiement } from "@shared/enum/status-constants";
+import { TontineStatus } from "@shared/schema/tontines";
 import { createLogger } from "../lib/logger";
 
 const logger = createLogger('AutoTontine');
@@ -13,7 +14,7 @@ export async function processAutomaticTontineContributions() {
   const now = new Date();
 
   // 1. Get all active tontines
-  const activeTontines = await db.select().from(tontines).where(eq(tontines.statut, StatutTontine.ACTIVE));
+  const activeTontines = await db.select().from(tontines).where(eq(tontines.statut, TontineStatus.ACTIVE));
 
   const results = {
     processed: 0,
@@ -24,14 +25,8 @@ export async function processAutomaticTontineContributions() {
 
   for (const tontine of activeTontines) {
     try {
-      // Determine Current Tour
-      // Logic: Max distribution tour + 1. 
-      // If 0 distributions, tour 1.
-      const lastDist = await db.query.tontineDistributions.findFirst({
-        where: eq(tontineDistributions.tontineId, tontine.id),
-        orderBy: desc(tontineDistributions.tourNumero)
-      });
-      const currentTour = (lastDist?.tourNumero || 0) + 1;
+      // Determine Current Tour from typed column
+      const currentTour = (tontine.currentRound || 0) + 1;
 
       // 2. Find members with auto-contribution
       const eligibleMembers = await db.select().from(membresTontine).where(and(
@@ -107,53 +102,7 @@ async function processPayment(tontine: any, membre: any, tourNumero: number, com
         throw new Error("Insufficient funds");
     }
 
-    // Logic: 
-    // We need to Debit Account -> this increases Ledger/Bank/System funds ? 
-    // No, Tontine is internal money movement usually, but `createContributionTontineWithLedger` expects money to come IN to Tontine.
-    // If it comes from an Account, we must DEBIT the account.
-    
-    // `createContributionTontineWithLedger` does NOT handle the valid debit of a specific source account automatically unless we hack/extend it.
-    // It creates a "Mouvement" with inputs.
-    // If we look at `server/storage/tontines.ts`:
-    /*
-      return await executeWithLedger("TONTINE", { ... }, async (tx, mouvement) => {
-         // It updates Tontine Solde (+ amount)
-         // It updates Session Solde (if Cash)
-      })
-    */
-    // It does NOT debit a source account. It assumes money appears (Cash) or is just recorded (Check/Transfer check).
-    
-    // So for Automatic Account Transfer, we need to handle the Debit explicitly.
-    // We can do this by wrapping `createContributionTontineWithLedger` OR by custom logic here utilizing `executeWithLedger`.
-    
-    // Better to use `executeWithLedger` directly here to ensure atomicity of Debit + Credit.
-    
-    await db.transaction(async (tx) => {
-       // 1. Debit Account
-       await updateCompteSolde(tx, compte.id, -amount);
-       
-       // 2. We can call createContributionTontineWithLedger INSIDE this transaction?
-       // `createContributionTontineWithLedger` uses `executeWithLedger` which starts a NEW transaction usually (`db.transaction`).
-       // Nesting transactions in Drizzle/Postgres is supported (savepoints).
-       
-       // However, `createContributionTontineWithLedger` is not exported as taking a TX. It takes `userId`. import { db } from "../db".
-       
-       // I should probably duplicate the logic or refactor `createContributionTontineWithLedger`.
-       // Refactoring `server/storage/tontines.ts` to accept an optional TX is best practice but might be invasive.
-       
-       // Alternative: Do the "Contribution" part manually here.
-       // It matches what `createContributionTontineWithLedger` does but adds the Account Debit.
-       
-       const reference = generateReference("TONTINE");
-       
-       // Use finance service to Create Mouvement
-       // We need `createMouvementFinancier` ... wait `executeWithLedger` handles everything.
-       // We can just use `executeWithLedger` but we need to pass Tontine module.
-    });
-
-    // Let's rewrite `executeWithLedger` call here specifically for Auto-Contribution
-    // It is: Account -> Tontine.
-    
+    // Debit account + credit tontine atomically via executeWithLedger
     await executeWithLedger(
         "TONTINE",
         {
@@ -186,6 +135,7 @@ async function processPayment(tontine: any, membre: any, tourNumero: number, com
             await tx.insert(contributionsTontine).values({
                 tontineId: tontine.id,
                 clientId: membre.clientId,
+                membreId: membre.id,
                 typeOperation: TypeOperationCaisse.TONTINE_CONTRIBUTION,
                 montant: amount.toString(),
                 tourNumero,

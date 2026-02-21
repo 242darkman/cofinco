@@ -4,6 +4,7 @@ import { eq, inArray, and, isNull } from "drizzle-orm";
 import { emitNotificationEvent } from "../notification-service";
 import { logNotificationEvent } from "../audit/notification-audit";
 import { createLogger } from "../../../lib/logger";
+import { StatutMembreTontine } from "@shared/enum/status-constants";
 
 const logger = createLogger('EventHandlers');
 import type {
@@ -24,6 +25,8 @@ import type {
   TontineDistributionApprovedData,
   TontineDistributionPaidData,
   TontineCycleStartedData,
+  TontineStatusChangedData,
+  TontineMemberExitData,
   TransferRequestedData,
   TransferValidatedData,
   TransferRejectedData,
@@ -733,7 +736,7 @@ export async function handleTontineCycleStarted(data: TontineCycleStartedData) {
       .where(
         and(
           eq(membresTontine.tontineId, data.tontineId),
-          eq(membresTontine.statut, "ACTIVE"),
+          eq(membresTontine.statut, StatutMembreTontine.ACTIVE),
           isNull(membresTontine.deletedAt)
         )
       );
@@ -766,6 +769,81 @@ export async function handleTontineCycleStarted(data: TontineCycleStartedData) {
 
   logNotificationEvent("info", "Domain event: TONTINE_CYCLE_STARTED", {
     correlationId: `tontine-cycle-${data.tontineId}-${data.cycleNumber}`,
+    status: "DISPATCHED",
+  });
+}
+
+export async function handleTontineStatusChanged(data: TontineStatusChangedData) {
+  // Notify all active members of the status change
+  try {
+    const members = await db
+      .select({ clientId: membresTontine.clientId })
+      .from(membresTontine)
+      .where(
+        and(
+          eq(membresTontine.tontineId, data.tontineId),
+          eq(membresTontine.statut, StatutMembreTontine.ACTIVE),
+          isNull(membresTontine.deletedAt)
+        )
+      );
+
+    for (const member of members) {
+      if (!member.clientId) continue;
+      const client = await getClientContact(member.clientId);
+      if (!client) continue;
+
+      const STATUS_LABELS: Record<string, string> = {
+        DRAFT: "Brouillon", ACTIVE: "Active", PAUSED: "Suspendue",
+        COMPLETED: "Terminée", CANCELLED: "Annulée",
+      };
+
+      const payload = {
+        clientName: client.name,
+        tontineName: data.tontineName,
+        newStatus: STATUS_LABELS[data.newStatus] || data.newStatus,
+        reason: data.reason || "",
+      };
+
+      await emitNotificationEvent("TONTINE_STATUS_CHANGED", data, {
+        smsRecipients: client.phone
+          ? [{ phone: client.phone, templateCode: "TONTINE_STATUS_CHANGED", payload, agenceId: data.agenceId }]
+          : [],
+        emailRecipients: client.email
+          ? [{ email: client.email, templateCode: "TONTINE_STATUS_CHANGED", payload, agenceId: data.agenceId }]
+          : [],
+      });
+    }
+  } catch (error: unknown) {
+    logger.error({ err: error }, 'Error notifying members for tontine status change');
+  }
+
+  logNotificationEvent("info", "Domain event: TONTINE_STATUS_CHANGED", {
+    correlationId: `tontine-status-${data.tontineId}-${data.newStatus}`,
+    status: "DISPATCHED",
+  });
+}
+
+export async function handleTontineMemberExit(data: TontineMemberExitData) {
+  const client = await getClientContact(data.clientId);
+  if (!client) return;
+
+  const payload = {
+    clientName: client.name,
+    tontineName: data.tontineName,
+    exitFeePercent: String(data.exitFeePercent),
+  };
+
+  await emitNotificationEvent("TONTINE_MEMBER_EXIT", data, {
+    smsRecipients: client.phone
+      ? [{ phone: client.phone, templateCode: "TONTINE_MEMBER_EXIT", payload, agenceId: data.agenceId }]
+      : [],
+    emailRecipients: client.email
+      ? [{ email: client.email, templateCode: "TONTINE_MEMBER_EXIT", payload, agenceId: data.agenceId }]
+      : [],
+  });
+
+  logNotificationEvent("info", "Domain event: TONTINE_MEMBER_EXIT", {
+    correlationId: `tontine-exit-${data.tontineId}-${data.memberId}`,
     status: "DISPATCHED",
   });
 }

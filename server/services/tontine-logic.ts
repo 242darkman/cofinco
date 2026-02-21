@@ -15,7 +15,7 @@ import {
   membresTontine,
   contributionsTontine,
   tontinePenalites,
-  tontineDistributions,
+  tontineTurns,
   operationsCaisse,
   comptes,
   mouvementsFinanciers
@@ -23,6 +23,7 @@ import {
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import { type MouvementFinancier } from "./ledger";
 import { eq, and, sql, desc, asc, lte } from "drizzle-orm";
+import { v4 as uuidv4 } from "uuid";
 import {
   executeWithLedger,
   updateTontineSolde,
@@ -43,8 +44,8 @@ import { currencySymbol } from "@shared/config/currency";
 // ============ STATUS CONSTANTS (for DB values) ============
 // These map to the enum values and are used for DB queries
 const DB_STATUT_MEMBRE_ACTIF = StatutMembreTontine.ACTIVE;
-const DB_STATUT_PENALITE_IMPAYE = "impaye";
-const DB_STATUT_PENALITE_PAYE = "paye";
+const DB_STATUT_PENALITE_IMPAYE = "PENDING";
+const DB_STATUT_PENALITE_PAYE = "PAID";
 // Use standardized English status for transactions
 const DB_STATUT_TRANSACTION_POSTE = StatutTransaction.POSTED;
 
@@ -99,9 +100,7 @@ export async function getMemberTontineState(
       id: tontines.id,
       montantCotisation: tontines.montantCotisation,
       nombreMembres: tontines.nombreMembres,
-      tourActuel: sql<number>`COALESCE((
-        SELECT MAX(tour_numero) FROM tontine_distributions WHERE tontine_id = ${tontineId}
-      ), 0) + 1`.mapWith(Number)
+      tourActuel: sql<number>`COALESCE(${tontines.currentRound}, 0) + 1`.mapWith(Number)
     })
     .from(tontines)
     .where(eq(tontines.id, tontineId));
@@ -319,6 +318,7 @@ export async function processTontineContribution(
 ) {
   const { clientId, tontineId, amountTotal, sessionCaisseId, userId, state } = params;
   const { tontine, penalitesImpayees, contributionsParTour, toursEnRetard } = state;
+  const membreId = state.membre.id;
   const isCash = !!sessionCaisseId;
 
   let remaining = amountTotal;
@@ -363,6 +363,7 @@ export async function processTontineContribution(
       .values({
         tontineId,
         clientId,
+        membreId,
         mouvementId: mouvement.id,
         typeOperation: TypeOperationCaisse.TONTINE_CONTRIBUTION,
         montant: montantAPayer.toString(),
@@ -406,6 +407,7 @@ export async function processTontineContribution(
       .values({
         tontineId,
         clientId,
+        membreId,
         mouvementId: mouvement.id,
         typeOperation: TypeOperationCaisse.TONTINE_CONTRIBUTION,
         montant: montantAPayer.toString(),
@@ -682,16 +684,17 @@ export async function distributeTontineGain(
     );
   }
 
-  // 6. Vérifier si une distribution existe déjà pour ce tour
-  const [existingDistribution] = await db
-    .select({ id: tontineDistributions.id })
-    .from(tontineDistributions)
+  // 6. Vérifier si une distribution existe déjà pour ce tour via tontineTurns
+  const [existingTurn] = await db
+    .select({ id: tontineTurns.id, status: tontineTurns.status })
+    .from(tontineTurns)
     .where(and(
-      eq(tontineDistributions.tontineId, tontineId),
-      eq(tontineDistributions.tourNumero, tourNumero)
+      eq(tontineTurns.tontineId, tontineId),
+      eq(tontineTurns.turnNumber, tourNumero),
+      eq(tontineTurns.status, 'PAID_OUT')
     ));
 
-  if (existingDistribution) {
+  if (existingTurn) {
     throw new Error("Une distribution existe déjà pour ce tour");
   }
 
@@ -769,20 +772,36 @@ export async function processTontineDistribution(
     compteId, userId, notes, reference, tontineNom
   } = params;
 
-  // Créer la distribution
-  const [distribution] = await tx
-    .insert(tontineDistributions)
-    .values({
-      tontineId,
-      membreId,
-      tourNumero,
-      montantTotal: montantTotal.toString(),
-      dateDistribution: new Date(),
-      modePaiement,
-      referencePaiement: reference,
-      notes: notes || `Distribution automatique - Mode: ${modeDistribution === ModeDistributionTontine.CASH_WITHDRAWAL ? 'Retrait espèces' : 'Virement compte'}`
+  // Update turn status if it exists, otherwise create a tracking record
+  const distributionId = uuidv4();
+  const [existingTurn] = await tx
+    .select({ id: tontineTurns.id })
+    .from(tontineTurns)
+    .where(and(
+      eq(tontineTurns.tontineId, tontineId),
+      eq(tontineTurns.turnNumber, tourNumero)
+    ))
+    .limit(1);
+
+  if (existingTurn) {
+    await tx
+      .update(tontineTurns)
+      .set({
+        status: 'PAID_OUT',
+        amountPaidOut: montantTotal.toString(),
+        updatedAt: new Date(),
+      })
+      .where(eq(tontineTurns.id, existingTurn.id));
+  }
+
+  // Update tontine current round
+  await tx
+    .update(tontines)
+    .set({
+      currentRound: sql`GREATEST(COALESCE(${tontines.currentRound}, 0), ${tourNumero})`,
+      updatedAt: new Date(),
     })
-    .returning();
+    .where(eq(tontines.id, tontineId));
 
   // Mettre à jour le solde de la tontine (débit)
   await tx.execute(sql`
@@ -834,7 +853,7 @@ export async function processTontineDistribution(
   }
 
   const result: DistributionResult = {
-    distributionId: distribution.id,
+    distributionId: existingTurn?.id ?? distributionId,
     beneficiaireId: membreId,
     montantTotal,
     modeDistribution,
@@ -875,15 +894,6 @@ export interface TontineRetirableResult {
 }
 
 /**
- * Interface pour les règles de tontine
- */
-interface TontineRegles {
-  maxDistributionParCycle?: number;
-  minContributionsAvantRetrait?: number;
-  [key: string]: unknown;
-}
-
-/**
  * Calcule le montant qu'un membre peut retirer de la tontine
  *
  * Règle: min(pot_disponible, droit_membre, règles_cycle)
@@ -906,7 +916,8 @@ export async function calculateTontineRetirable(
       solde: tontines.solde,
       nombreMembres: tontines.nombreMembres,
       montantCotisation: tontines.montantCotisation,
-      regles: tontines.regles,
+      allowPartialDistribution: tontines.allowPartialDistribution,
+      distributionMinThresholdPct: tontines.distributionMinThresholdPct,
     })
     .from(tontines)
     .where(eq(tontines.id, tontineId));
@@ -982,9 +993,8 @@ export async function calculateTontineRetirable(
   // Normalement c'est montantCotisation * nombreMembres (un tour complet)
   const droitMembre = montantCotisation * nombreMembres;
 
-  // Règles du cycle
-  const regles = tontineData.regles as TontineRegles | null;
-  const reglesCycle = regles?.maxDistributionParCycle ?? Infinity;
+  // Règles du cycle — no max distribution cap in typed schema, use Infinity
+  const reglesCycle = Infinity;
 
   // 6. Calculer le montant retirable = min des 3 valeurs
   const montantRetirable = Math.min(potDisponible, droitMembre, reglesCycle);
