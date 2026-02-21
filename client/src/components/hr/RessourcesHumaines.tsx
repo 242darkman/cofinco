@@ -404,6 +404,10 @@ export default function RessourcesHumaines() {
           phone: editingEmploye.phone || '',
           dateNaissance: editingEmploye.dateNaissance || '',
           lieuNaissance: editingEmploye.lieuNaissance || '',
+          lieuNaissanceLocalityId: editingEmploye.lieuNaissanceLocalityId || null,
+          lieuNaissanceLocalityType: editingEmploye.lieuNaissanceLocalityType || null,
+          nationaliteId: editingEmploye.nationaliteId || null,
+          paysNaissanceId: editingEmploye.paysNaissanceId || null,
           dateEmbauche: editingEmploye.dateEmbauche,
           adresse: editingEmploye.adresse || '',
           ville: editingEmploye.ville || '',
@@ -417,14 +421,31 @@ export default function RessourcesHumaines() {
           agenceId: editingEmploye.agenceId || null,
           jobPositionId: editingEmploye.jobPositionId || null,
           modeCalculPaie: editingEmploye.modeCalculPaie || 'MONTHLY',
+          // Documents
+          typePiece: editingEmploye.typePiece || null,
+          numeroPiece: editingEmploye.numeroPiece || null,
+          dateExpirationPiece: editingEmploye.dateExpirationPiece || null,
+          paysEmissionId: editingEmploye.paysEmissionId || null,
+          // Paiement
+          paymentMethod: editingEmploye.paymentMethod || null,
+          paymentDetails: editingEmploye.paymentDetails || null,
+          // Coordonnées bancaires
           bankName: editingEmploye.bankName || '',
           bankCode: editingEmploye.bankCode || '',
           branchCode: editingEmploye.branchCode || '',
           bankAccountNumber: editingEmploye.bankAccountNumber || '',
           accountKey: editingEmploye.accountKey || '',
+          // Dates contrat
           dateFinContrat: editingEmploye.dateFinContrat || null,
           dateFinEssai: editingEmploye.dateFinEssai || null,
           prochaineMedicale: editingEmploye.prochaineMedicale || null,
+          // Situation familiale
+          situationFamiliale: editingEmploye.situationFamiliale || undefined,
+          nombreEnfantsCharge: String(editingEmploye.nombreEnfantsCharge ?? 0),
+          niu: editingEmploye.niu || '',
+          // Sortie
+          dateSortie: editingEmploye.dateSortie || null,
+          motifSortie: editingEmploye.motifSortie || null,
         } : {
           matricule: '',
           nom: '',

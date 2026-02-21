@@ -1,27 +1,38 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { X, Save, AlertTriangle, Upload, User, Users, Link, Building2, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { Save, ChevronLeft, ChevronRight, User, FileText, Briefcase, Banknote, Check } from 'lucide-react';
 import { Employe, EmployeFormData } from '../../hooks/hr/useEmployes';
-import { Modal, FormField, SelectField, Button, ConfirmDialog } from '../ui';
+import { Modal, Button, ConfirmDialog } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { toast } from '../../lib/toast';
 import { useEntityUpload } from '../../hooks/useEntityUpload';
 import { StatutUser } from '@shared/enum/status-constants';
-import { agenceApi } from '../../lib/api-client';
-import { resolveStorageUrl } from '@/lib/format';
+import { agenceApi, paysApi, localityApi } from '../../lib/api-client';
+import StepIdentite from './employee-wizard/StepIdentite';
+import StepDocuments from './employee-wizard/StepDocuments';
+import StepContrat from './employee-wizard/StepContrat';
+import StepRemuneration from './employee-wizard/StepRemuneration';
 
 // Patterns de validation
 const VALIDATION_PATTERNS = {
   email: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
-  phone: /^\+?[0-9]{8,15}$/, // Format international ou local (8-15 chiffres, + optionnel)
-  cnss: /^[A-Z0-9-]{6,20}$/i, // Format alphanumérique avec tirets (6-20 caractères)
+  phone: /^\+?[0-9]{8,15}$/,
+  cnss: /^[A-Z0-9-]{6,20}$/i,
 };
 
-// Âge minimum légal pour embauche (18 ans)
 const MIN_AGE_EMBAUCHE = 18;
-// Âge maximum réaliste (70 ans)
 const MAX_AGE_EMBAUCHE = 70;
 
-// Interface pour les users non liés à un employé
+// Wizard steps config
+const STEPS = [
+  { key: 'identite', label: 'Identité', icon: User },
+  { key: 'documents', label: 'Documents', icon: FileText },
+  { key: 'contrat', label: 'Contrat', icon: Briefcase },
+  { key: 'remuneration', label: 'Rémunération', icon: Banknote },
+] as const;
+
+type StepKey = typeof STEPS[number]['key'];
+
+// Interfaces
 interface UnlinkedUser {
   id: string;
   nom: string;
@@ -30,20 +41,17 @@ interface UnlinkedUser {
   telephone: string | null;
   sexe: string | null;
   photoProfile: string | null;
-  // Agence affectée (récupérée depuis user_agences)
   agenceId: string | null;
   agenceNom: string | null;
   agenceCode: string | null;
 }
 
-// Interface pour les agences
 interface Agence {
   id: string;
   nom: string;
   code: string;
 }
 
-// Interface pour les départements et postes
 interface Department {
   id: string;
   code: string;
@@ -57,28 +65,32 @@ interface JobPosition {
   code: string;
   name: string;
   isActive?: boolean;
-  department: {
-    id: string;
-    code: string;
-    name: string;
-  };
+  salaireMin?: number | null;
+  salaireMax?: number | null;
+  department: { id: string; code: string; name: string };
 }
 
-// Modes de calcul de paie
-const MODE_CALCUL_PAIE_OPTIONS = [
-  { value: 'MONTHLY', label: 'Mensuel' },
-  { value: 'HOURLY', label: 'Horaire' },
-  { value: 'DAILY', label: 'Journalier' },
-];
+interface PaysOption {
+  id: string;
+  nomFr: string;
+  nomEn: string;
+  iso2: string | null;
+}
 
-// Génération du matricule automatique
+interface LocalityOption {
+  id: string;
+  type: 'CITY' | 'DISTRICT';
+  name: string;
+  regionName?: string | null;
+}
+
 interface EmployeeFormProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (data: EmployeFormData) => Promise<{ success: boolean; error?: string }>;
   editingEmploye: Employe | null;
   initialData: EmployeFormData;
-  allEmployes?: Employe[]; // Liste des employés pour sélection du manager
+  allEmployes?: Employe[];
 }
 
 export default function EmployeeForm({
@@ -87,244 +99,238 @@ export default function EmployeeForm({
   onSave,
   editingEmploye,
   initialData,
-  allEmployes = []
+  allEmployes = [],
 }: EmployeeFormProps) {
-  // RBAC permissions
+  // RBAC
   const { hasPermission } = usePermissions();
   const canSaveEmployees = editingEmploye
     ? (hasPermission('rh', 'edit') || hasPermission('employes', 'edit'))
     : (hasPermission('rh', 'create') || hasPermission('employes', 'create'));
 
+  // Form data
   const [formData, setFormData] = useState<EmployeFormData>(initialData);
   const [saving, setSaving] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(initialData.photoProfile || null);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [showUnsavedConfirm, setShowUnsavedConfirm] = useState(false);
 
-  // Nouveaux états pour la liaison User et génération matricule
+  // Wizard step
+  const [currentStep, setCurrentStep] = useState(0);
+
+  // User linking (creation mode)
   const [unlinkedUsers, setUnlinkedUsers] = useState<UnlinkedUser[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<UnlinkedUser | null>(null);
-  const [agences, setAgences] = useState<Agence[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
-  const [modeCalculPaie, setModeCalculPaie] = useState<'MONTHLY' | 'HOURLY' | 'DAILY'>('MONTHLY');
-  const [agenceId, setAgenceId] = useState<string>('');
 
-  // États pour départements et postes
+  // Org data
+  const [agences, setAgences] = useState<Agence[]>([]);
+  const [agenceId, setAgenceId] = useState<string>('');
+  const [modeCalculPaie, setModeCalculPaie] = useState<'MONTHLY' | 'HOURLY' | 'DAILY'>('MONTHLY');
+
+  // Departments & positions
   const [departments, setDepartments] = useState<Department[]>([]);
   const [jobPositions, setJobPositions] = useState<JobPosition[]>([]);
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<string | null>(null);
   const [selectedJobPositionId, setSelectedJobPositionId] = useState<string | null>(null);
 
-  // CNSS uniqueness check
+  // CNSS check
   const [checkingCnss, setCheckingCnss] = useState(false);
   const [cnssAvailable, setCnssAvailable] = useState<boolean | null>(null);
   const [cnssError, setCnssError] = useState<string | null>(null);
   const cnssDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Tabs state
-  const [activeTab, setActiveTab] = useState<'identity' | 'contract'>('identity');
+  // Geography data
+  const [paysList, setPaysList] = useState<PaysOption[]>([]);
+  const [localitiesList, setLocalitiesList] = useState<LocalityOption[]>([]);
+  const [localitiesLoading, setLocalitiesLoading] = useState(false);
+  const localitiesCacheRef = useRef<Record<string, LocalityOption[]>>({});
 
-  // Référence pour détecter les modifications non sauvegardées
+  // Document uploads
+  const [uploadedDocs, setUploadedDocs] = useState<Record<string, any>>({});
+
+  // Unsaved changes tracking
   const initialDataRef = useRef<string>(JSON.stringify(initialData));
-
-  // Détection des modifications non sauvegardées
   const hasUnsavedChanges = useMemo(() => {
     return JSON.stringify(formData) !== initialDataRef.current;
   }, [formData]);
 
-  // Détection des références circulaires dans la hiérarchie
-  // Vérifie si sélectionner `potentialManagerId` créerait une boucle
-  const wouldCreateCircularReference = useCallback((potentialManagerId: string): boolean => {
-    if (!editingEmploye?.id) return false; // Nouvel employé, pas de risque
+  // Temp entity ID for uploads
+  const tempEmployeIdRef = useRef(crypto.randomUUID());
+  const { uploadFile, isUploading } = useEntityUpload({
+    fileType: 'profile',
+    entityType: 'employe',
+    entityId: editingEmploye?.id || tempEmployeIdRef.current,
+    onError: (err) => toast.error(`Erreur upload: ${err.message}`),
+  });
 
-    // Parcourir la chaîne hiérarchique du manager potentiel
+  // --- Circular reference detection ---
+  const wouldCreateCircularReference = useCallback((potentialManagerId: string): boolean => {
+    if (!editingEmploye?.id) return false;
     let currentId: string | null | undefined = potentialManagerId;
     const visited = new Set<string>();
-
     while (currentId) {
-      if (currentId === editingEmploye.id) {
-        // Cercle détecté: le manager potentiel a l'employé actuel dans sa hiérarchie
-        return true;
-      }
-      if (visited.has(currentId)) {
-        // Boucle infinie détectée (données corrompues)
-        break;
-      }
+      if (currentId === editingEmploye.id) return true;
+      if (visited.has(currentId)) break;
       visited.add(currentId);
-
-      // Trouver le manager du manager actuel
       const currentEmp = allEmployes.find(e => e.id === currentId);
       currentId = currentEmp?.managerId;
     }
-
     return false;
   }, [allEmployes, editingEmploye?.id]);
 
-  // Liste des managers disponibles (exclure soi-même, les inactifs et ceux qui créeraient une boucle)
   const availableManagers = useMemo(() => {
-    return allEmployes.filter(emp =>
-      emp.id !== editingEmploye?.id && // Ne peut pas être son propre manager
-      emp.statut === StatutUser.ACTIVE && // Seulement les employés actifs
-      !wouldCreateCircularReference(emp.id) // Pas de référence circulaire
-    ).map(emp => ({
-      value: emp.id,
-      label: `${emp.nom} ${emp.prenom} - ${emp.poste}`
-    }));
+    return allEmployes
+      .filter(emp =>
+        emp.id !== editingEmploye?.id &&
+        emp.statut === StatutUser.ACTIVE &&
+        !wouldCreateCircularReference(emp.id)
+      )
+      .map(emp => ({
+        value: emp.id,
+        label: `${emp.nom} ${emp.prenom} - ${emp.poste}`,
+      }));
   }, [allEmployes, editingEmploye?.id, wouldCreateCircularReference]);
 
-  // Fonction de validation - retourne l'objet errors pour usage immédiat
-  const validateForm = useCallback((scope: 'all' | 'identity' | 'contract' = 'all'): Record<string, string> => {
+  // --- Update field ---
+  const updateField = useCallback((field: string, value: string | null) => {
+    setFormData(prev => ({ ...prev, [field]: value ?? '' }));
+  }, []);
+
+  // --- Fetch localities ---
+  const fetchLocalitiesByPays = useCallback(async (paysId: string) => {
+    if (localitiesCacheRef.current[paysId]) {
+      setLocalitiesList(localitiesCacheRef.current[paysId]);
+      return;
+    }
+    setLocalitiesLoading(true);
+    try {
+      const data = await localityApi.getAll({ paysId, limit: 500 });
+      localitiesCacheRef.current[paysId] = data;
+      setLocalitiesList(data);
+    } catch {
+      setLocalitiesList([]);
+    } finally {
+      setLocalitiesLoading(false);
+    }
+  }, []);
+
+  // --- Validation ---
+  const validateStep = useCallback((stepIndex: number): Record<string, string> => {
     const errors: Record<string, string> = {};
 
-    // --- VALIDATION IDENTITÉ (Tab 1) ---
-    if (scope === 'all' || scope === 'identity') {
-      // En mode création, vérifier qu'un user est sélectionné
+    if (stepIndex === 0) {
+      // Step 1: Identité
       if (!editingEmploye && !selectedUserId) {
         errors.userId = 'Veuillez sélectionner un compte utilisateur à lier';
       }
-
-      // Validation agence
-      if (!editingEmploye) {
-        if (selectedUser && !selectedUser.agenceId) {
-          errors.agenceId = "L'utilisateur sélectionné n'a pas d'agence affectée.";
-        }
-      } else {
-        if (!agenceId) {
-          errors.agenceId = "L'agence est requise";
-        }
+      if (!editingEmploye && selectedUser && !selectedUser.agenceId) {
+        errors.agenceId = "L'utilisateur sélectionné n'a pas d'agence affectée.";
       }
-
-      // Validation email
+      if (editingEmploye && !agenceId) {
+        errors.agenceId = "L'agence est requise";
+      }
+      if (!formData.nom) errors.nom = 'Requis';
       if (formData.email && !VALIDATION_PATTERNS.email.test(formData.email)) {
         errors.email = 'Format email invalide';
       }
-
-      // Validation téléphone
       if (formData.phone) {
         const cleanPhone = formData.phone.replace(/[\s.-]/g, '');
         if (!VALIDATION_PATTERNS.phone.test(cleanPhone)) {
           errors.phone = 'Format téléphone invalide';
         }
       }
-      
-      // Validationchamps requis Identité (Nom/Prénom/Sexe auto-gérés ou requis par HTML, mais ajoutons la sécu)
-      if (!formData.nom) errors.nom = 'Requis';
     }
 
-    // --- VALIDATION CONTRAT (Tab 2) ---
-    if (scope === 'all' || scope === 'contract') {
-      // Validation poste
-      if (!selectedJobPositionId) {
-        errors.jobPositionId = 'Le poste est requis';
-      }
+    if (stepIndex === 2) {
+      // Step 3: Contrat
+      if (!selectedJobPositionId) errors.jobPositionId = 'Le poste est requis';
+      if (!formData.dateEmbauche) errors.dateEmbauche = "Date d'embauche requise";
 
-      // Validation salaire
+      if (formData.dateNaissance && formData.dateEmbauche) {
+        const birthDate = new Date(formData.dateNaissance);
+        const hireDate = new Date(formData.dateEmbauche);
+        const today = new Date();
+        const ageAtHire = Math.floor((hireDate.getTime() - birthDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+
+        if (birthDate >= today) errors.dateNaissance = 'La date de naissance doit être dans le passé';
+        const maxFutureHire = new Date();
+        maxFutureHire.setMonth(maxFutureHire.getMonth() + 1);
+        if (hireDate > maxFutureHire) errors.dateEmbauche = "La date d'embauche ne peut pas être trop éloignée";
+        if (ageAtHire < MIN_AGE_EMBAUCHE) errors.dateNaissance = `Age min: ${MIN_AGE_EMBAUCHE} ans (actuellement: ${ageAtHire})`;
+        if (ageAtHire > MAX_AGE_EMBAUCHE) errors.dateNaissance = `Age invalide (${ageAtHire} ans)`;
+        if (hireDate <= birthDate) errors.dateEmbauche = "Embauche avant naissance impossible";
+      }
+    }
+
+    if (stepIndex === 3) {
+      // Step 4: Rémunération
       const salary = parseFloat(formData.salaireBase);
       if (isNaN(salary) || salary < 0) {
         errors.salaireBase = 'Salaire invalide';
+      } else if (selectedJobPositionId) {
+        const pos = jobPositions.find(p => p.id === selectedJobPositionId);
+        if (pos) {
+          if (pos.salaireMin != null && salary < pos.salaireMin) {
+            errors.salaireBase = `En dessous du minimum du poste (${pos.salaireMin.toLocaleString('fr-FR')} FCFA)`;
+          }
+          if (pos.salaireMax != null && salary > pos.salaireMax) {
+            errors.salaireBase = `Au dessus du maximum du poste (${pos.salaireMax.toLocaleString('fr-FR')} FCFA)`;
+          }
+        }
       }
-
-      // Validation CNSS
       if (formData.numeroCnss && !VALIDATION_PATTERNS.cnss.test(formData.numeroCnss)) {
         errors.numeroCnss = 'Format CNSS invalide (6-20 caractères alphanumériques)';
       } else if (cnssAvailable === false) {
         errors.numeroCnss = cnssError || 'Ce numéro CNSS est déjà utilisé';
       }
-      
-      // Validation Date Embauche
-      if (!formData.dateEmbauche) {
-        errors.dateEmbauche = "Date d'embauche requise";
-      }
-
-      // Validation cohérence des dates
-      if (formData.dateNaissance && formData.dateEmbauche) {
-        const birthDate = new Date(formData.dateNaissance);
-        const hireDate = new Date(formData.dateEmbauche);
-        const today = new Date();
-
-        // Calcul de l'âge à l'embauche
-        const ageAtHire = Math.floor((hireDate.getTime() - birthDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
-
-        // Vérifier que la date de naissance est dans le passé
-        if (birthDate >= today) {
-          errors.dateNaissance = 'La date de naissance doit être dans le passé';
-        }
-
-        // Vérifier que la date d'embauche n'est pas dans le futur lointain
-        const maxFutureHire = new Date();
-        maxFutureHire.setMonth(maxFutureHire.getMonth() + 1);
-        if (hireDate > maxFutureHire) {
-          errors.dateEmbauche = "La date d'embauche ne peut pas être trop éloignée";
-        }
-
-        // Vérifier l'âge minimum légal
-        if (ageAtHire < MIN_AGE_EMBAUCHE) {
-          errors.dateNaissance = `Age min: ${MIN_AGE_EMBAUCHE} ans (actuellement: ${ageAtHire})`;
-        }
-
-        // Vérifier l'âge maximum réaliste
-        if (ageAtHire > MAX_AGE_EMBAUCHE) {
-          errors.dateNaissance = `Age invalide (${ageAtHire} ans)`;
-        }
-
-        // Vérifier que l'embauche est après la naissance
-        if (hireDate <= birthDate) {
-          errors.dateEmbauche = "Embauche avant naissance impossible";
-        }
-      }
     }
 
-    // Mise à jour des erreurs: SI on valide 'all', on remplace tout. Si on valide partiel, on merge.
-    if (scope === 'all') {
-      setValidationErrors(errors);
-    } else {
-      setValidationErrors(prev => ({ ...prev, ...errors }));
-    }
-
-    // Retourne l'objet errors pour usage immédiat (car setState est async)
     return errors;
-  }, [formData, editingEmploye, selectedUserId, selectedUser, agenceId, selectedJobPositionId]);
+  }, [formData, editingEmploye, selectedUserId, selectedUser, agenceId, selectedJobPositionId, jobPositions, cnssAvailable, cnssError]);
 
-  const handleNextTab = () => {
-    // Passer directement à l'onglet suivant sans bloquer
-    setActiveTab('contract');
-    // Scroll top
-    const modalBody = document.querySelector('.overflow-y-auto');
-    if (modalBody) modalBody.scrollTop = 0;
-  };
-
-  // Vérifier si le formulaire est complet pour activer le bouton de soumission
-  const isFormComplete = useMemo(() => {
-    // Vérifications Tab 1 - Identité
-    if (!editingEmploye && !selectedUserId) return false;
-    if (!editingEmploye && selectedUser && !selectedUser.agenceId) return false;
-    if (editingEmploye && !agenceId) return false;
-    if (!formData.nom) return false;
-    if (formData.email && !VALIDATION_PATTERNS.email.test(formData.email)) return false;
-    if (formData.phone) {
-      const cleanPhone = formData.phone.replace(/[\s.-]/g, '');
-      if (!VALIDATION_PATTERNS.phone.test(cleanPhone)) return false;
+  const validateAllSteps = useCallback((): Record<string, string> => {
+    let allErrors: Record<string, string> = {};
+    for (let i = 0; i < STEPS.length; i++) {
+      allErrors = { ...allErrors, ...validateStep(i) };
     }
+    setValidationErrors(allErrors);
+    return allErrors;
+  }, [validateStep]);
 
-    // Vérifications Tab 2 - Contrat
-    if (!selectedJobPositionId) return false;
-    if (!formData.dateEmbauche) return false;
-    const salary = parseFloat(formData.salaireBase);
-    if (isNaN(salary) || salary < 0) return false;
-    if (formData.numeroCnss && !VALIDATION_PATTERNS.cnss.test(formData.numeroCnss)) return false;
-    if (formData.numeroCnss && cnssAvailable === false) return false;
-    if (formData.numeroCnss && checkingCnss) return false;
+  // --- Navigation ---
+  const handleNext = useCallback(() => {
+    // Non-blocking - just proceed (validation at submit time)
+    if (currentStep < STEPS.length - 1) {
+      setCurrentStep(prev => prev + 1);
+      // Scroll modal content to top
+      const modalBody = document.querySelector('.overflow-y-auto');
+      if (modalBody) modalBody.scrollTop = 0;
+    }
+  }, [currentStep]);
 
-    return true;
-  }, [formData, editingEmploye, selectedUserId, selectedUser, agenceId, selectedJobPositionId, cnssAvailable, checkingCnss]);
+  const handlePrev = useCallback(() => {
+    if (currentStep > 0) {
+      setCurrentStep(prev => prev - 1);
+      const modalBody = document.querySelector('.overflow-y-auto');
+      if (modalBody) modalBody.scrollTop = 0;
+    }
+  }, [currentStep]);
 
+  // --- Submit ---
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validation avant soumission
-    const errors = validateForm('all');
+    const errors = validateAllSteps();
     if (Object.keys(errors).length > 0) {
+      // Find the first step with errors and navigate there
+      for (let i = 0; i < STEPS.length; i++) {
+        const stepErrors = validateStep(i);
+        if (Object.keys(stepErrors).length > 0) {
+          setCurrentStep(i);
+          break;
+        }
+      }
       const errorMessages = Object.entries(errors)
         .map(([field, msg]) => `${field}: ${msg}`)
         .join(', ');
@@ -334,14 +340,12 @@ export default function EmployeeForm({
 
     setSaving(true);
 
-    // Enrichir formData avec les nouveaux champs
     const enrichedData = {
       ...formData,
-      userId: selectedUserId, // Lier au user sélectionné
-      agenceId: agenceId,
-      modeCalculPaie: modeCalculPaie,
-      jobPositionId: selectedJobPositionId, // Poste lié au département
-      // Send temp entity ID so the server can relocate uploaded files
+      userId: selectedUserId,
+      agenceId,
+      modeCalculPaie,
+      jobPositionId: selectedJobPositionId,
       ...(editingEmploye ? {} : { tempEntityId: tempEmployeIdRef.current }),
     };
 
@@ -354,27 +358,54 @@ export default function EmployeeForm({
     } else {
       toast.error(result.error || 'Erreur lors de la sauvegarde');
     }
-  }, [formData, onSave, onClose, validateForm, selectedUserId, agenceId, modeCalculPaie, selectedJobPositionId]);
+  }, [formData, onSave, onClose, validateAllSteps, validateStep, selectedUserId, agenceId, modeCalculPaie, selectedJobPositionId, editingEmploye]);
 
-  const updateField = (field: keyof EmployeFormData, value: string | null) => {
-    // Convertir null en string vide pour éviter les warnings React controlled/uncontrolled
-    setFormData(prev => ({ ...prev, [field]: value ?? '' }));
-  };
+  // --- Photo upload ---
+  const handlePhotoUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        toast.error('La photo ne doit pas dépasser 2 Mo');
+        return;
+      }
+      const url = await uploadFile(file);
+      if (url) {
+        setPhotoPreview(url);
+        updateField('photoProfile', url);
+      }
+    }
+  }, [uploadFile, updateField]);
 
-  // Mise à jour de la référence et reset du formulaire quand le modal s'ouvre ou l'employé change
-  // On utilise editingEmploye?.id pour éviter de se déclencher à chaque render
-  // On compare le JSON stringifié de initialData pour détecter les vrais changements
+  // --- Document change ---
+  const handleDocumentChange = useCallback((type: string, doc: any) => {
+    setUploadedDocs(prev => ({ ...prev, [type]: doc }));
+  }, []);
+
+  // --- Close handling ---
+  const handleClose = useCallback(() => {
+    if (hasUnsavedChanges) {
+      setShowUnsavedConfirm(true);
+    } else {
+      onClose();
+    }
+  }, [hasUnsavedChanges, onClose]);
+
+  const confirmClose = useCallback(() => {
+    setShowUnsavedConfirm(false);
+    onClose();
+  }, [onClose]);
+
+  // --- Effects ---
+
+  // Reset on open/close/editingEmploye change
   const initialDataJson = JSON.stringify(initialData);
   const prevInitialDataJsonRef = useRef<string | null>(null);
 
   useEffect(() => {
-    // Réinitialiser la ref quand le modal se ferme
     if (!isOpen) {
       prevInitialDataJsonRef.current = null;
       return;
     }
-
-    // Ne réinitialiser que si initialData a vraiment changé
     if (prevInitialDataJsonRef.current === initialDataJson) return;
     prevInitialDataJsonRef.current = initialDataJson;
 
@@ -385,8 +416,9 @@ export default function EmployeeForm({
     setCnssAvailable(null);
     setCnssError(null);
     setCheckingCnss(false);
+    setCurrentStep(0);
+    setUploadedDocs({});
 
-    // Reset user selection for new employee
     if (!editingEmploye) {
       setSelectedUserId(null);
       setSelectedUser(null);
@@ -395,19 +427,14 @@ export default function EmployeeForm({
       setSelectedDepartmentId(null);
       setSelectedJobPositionId(null);
     } else {
-      // En mode édition, charger les valeurs existantes depuis initialData
-      // IMPORTANT: Réinitialiser les états de création pour éviter la contamination de données
       setSelectedUserId(null);
       setSelectedUser(null);
-      setUnlinkedUsers([]); // Vider la liste des users non liés
-
+      setUnlinkedUsers([]);
       setAgenceId(initialData.agenceId || '');
       setModeCalculPaie(initialData.modeCalculPaie || 'MONTHLY');
-      // Charger le département et le poste existants
       const jobPosId = initialData.jobPositionId;
       if (jobPosId) {
         setSelectedJobPositionId(jobPosId);
-        // Le département sera défini quand les jobPositions seront chargés
       } else {
         setSelectedJobPositionId(null);
         setSelectedDepartmentId(null);
@@ -416,7 +443,7 @@ export default function EmployeeForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, editingEmploye?.id, initialDataJson]);
 
-  // Charger les agences
+  // Load agences
   useEffect(() => {
     const loadAgences = async () => {
       try {
@@ -433,18 +460,28 @@ export default function EmployeeForm({
     loadAgences();
   }, []);
 
-  // Charger les départements et postes
+  // Load pays
+  useEffect(() => {
+    const loadPays = async () => {
+      try {
+        const data = await paysApi.getAll({ actif: true });
+        setPaysList(data);
+      } catch (error) {
+        console.error('Erreur chargement pays:', error);
+      }
+    };
+    loadPays();
+  }, []);
+
+  // Load departments & positions
   useEffect(() => {
     const loadDepartmentsAndPositions = async () => {
       try {
-        // Charger les départements
         const deptRes = await fetch('/api/departments', { credentials: 'include' });
         if (deptRes.ok) {
           const depts = await deptRes.json();
           setDepartments(depts.filter((d: Department) => d.isActive !== false));
         }
-
-        // Charger les postes
         const posRes = await fetch('/api/job-positions', { credentials: 'include' });
         if (posRes.ok) {
           const positions = await posRes.json();
@@ -457,10 +494,7 @@ export default function EmployeeForm({
     loadDepartmentsAndPositions();
   }, []);
 
-  // Définir le département quand le poste est sélectionné (utile en mode édition pour charger le département initial)
-  // Cet effet ne doit s'exécuter que lorsque:
-  // 1. Un poste est sélectionné ET
-  // 2. Le département correspondant n'est pas déjà sélectionné (pour éviter boucle infinie)
+  // Set department from job position (edit mode init)
   useEffect(() => {
     if (selectedJobPositionId && jobPositions.length > 0) {
       const position = jobPositions.find(p => p.id === selectedJobPositionId);
@@ -471,31 +505,30 @@ export default function EmployeeForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedJobPositionId, jobPositions]);
 
-  // Charger les users non liés à un employé (uniquement en mode création)
+  // Load localities for editing employee's paysNaissanceId
   useEffect(() => {
-    if (editingEmploye) return; // Ne pas charger en mode édition
+    if (isOpen && editingEmploye && initialData.paysNaissanceId) {
+      fetchLocalitiesByPays(initialData.paysNaissanceId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, editingEmploye?.id]);
+
+  // Load unlinked users (creation mode only)
+  useEffect(() => {
+    if (editingEmploye) return;
 
     const loadUnlinkedUsers = async () => {
       setLoadingUsers(true);
       try {
-        // Récupérer tous les users
         const usersRes = await fetch('/api/users', { credentials: 'include' });
         const allUsers: any[] = await usersRes.json();
-
-        // Récupérer tous les employés pour filtrer
         const employesRes = await fetch('/api/employes', { credentials: 'include' });
         const allEmployesData: any[] = await employesRes.json();
-
-        // Récupérer toutes les agences pour la correspondance
         const agencesRes = await fetch('/api/agences', { credentials: 'include' });
         const allAgences: any[] = await agencesRes.json();
         const agenceMap = new Map(allAgences.map((a: any) => [a.id, a]));
-
-        // IDs des users déjà liés à un employé
         const linkedUserIds = new Set(allEmployesData.map((e: any) => e.userId));
 
-        // Filtrer pour ne garder que les users sans employé et avec typeCompte = 'employe'
-        // Et récupérer leur agence affectée
         const unlinkedPromises = allUsers
           .filter((u: any) =>
             !linkedUserIds.has(u.id) &&
@@ -503,22 +536,17 @@ export default function EmployeeForm({
             u.statut === StatutUser.ACTIVE
           )
           .map(async (u: any) => {
-            // Récupérer l'agence affectée de l'utilisateur
             let userAgence = null;
             try {
               const userAgencesRes = await fetch(`/api/users/${u.id}/agences`, { credentials: 'include' });
               if (userAgencesRes.ok) {
                 const userAgences: any[] = await userAgencesRes.json();
-                // Prendre la première agence affectée (ou agence principale)
                 if (userAgences.length > 0) {
-                  const agenceId = userAgences[0].agenceId || userAgences[0].id;
-                  userAgence = agenceMap.get(agenceId);
+                  const agId = userAgences[0].agenceId || userAgences[0].id;
+                  userAgence = agenceMap.get(agId);
                 }
               }
-            } catch {
-              // Ignorer les erreurs de récupération d'agence
-            }
-
+            } catch { /* ignore */ }
             return {
               id: u.id,
               nom: u.nom,
@@ -527,7 +555,6 @@ export default function EmployeeForm({
               telephone: u.telephone,
               sexe: u.sexe,
               photoProfile: u.photoProfile,
-              // Agence affectée
               agenceId: userAgence?.id || null,
               agenceNom: userAgence?.nom || null,
               agenceCode: userAgence?.code || userAgence?.nom?.substring(0, 3).toUpperCase() || null,
@@ -548,20 +575,13 @@ export default function EmployeeForm({
     }
   }, [isOpen, editingEmploye]);
 
-  // Quand un user est sélectionné, mettre à jour les champs d'identité ET l'agence
-  // IMPORTANT: Ce useEffect ne doit s'exécuter qu'en mode CRÉATION pour éviter d'écraser
-  // les données de l'employé en mode édition
+  // When user is selected, populate identity fields & agency
   useEffect(() => {
-    // Ignorer en mode édition - les données de l'employé doivent rester intactes
-    if (editingEmploye) {
-      return;
-    }
-
+    if (editingEmploye) return;
     if (selectedUserId) {
       const user = unlinkedUsers.find(u => u.id === selectedUserId);
       if (user) {
         setSelectedUser(user);
-        // Mettre à jour les champs du formulaire avec les données du user
         setFormData(prev => ({
           ...prev,
           nom: user.nom,
@@ -571,26 +591,16 @@ export default function EmployeeForm({
           sexe: (user.sexe as 'M' | 'F') || 'M',
           photoProfile: user.photoProfile || '',
         }));
-        if (user.photoProfile) {
-          setPhotoPreview(user.photoProfile);
-        }
-
-        // Auto-peupler l'agence depuis l'affectation de l'utilisateur
-        if (user.agenceId) {
-          setAgenceId(user.agenceId);
-        } else {
-          // L'utilisateur n'a pas d'agence affectée - afficher un warning
-          setAgenceId('');
-        }
+        if (user.photoProfile) setPhotoPreview(user.photoProfile);
+        setAgenceId(user.agenceId || '');
       }
     } else {
       setSelectedUser(null);
-      // Reset agence quand aucun user n'est sélectionné
       setAgenceId('');
     }
   }, [selectedUserId, unlinkedUsers, editingEmploye]);
 
-  // Vérification CNSS en temps réel (debounced)
+  // CNSS debounced check
   useEffect(() => {
     const cnss = formData.numeroCnss?.trim();
     if (!cnss || !VALIDATION_PATTERNS.cnss.test(cnss)) {
@@ -599,7 +609,6 @@ export default function EmployeeForm({
       setCheckingCnss(false);
       return;
     }
-
     if (cnssDebounceRef.current) clearTimeout(cnssDebounceRef.current);
     setCheckingCnss(true);
     setCnssAvailable(null);
@@ -626,584 +635,200 @@ export default function EmployeeForm({
     };
   }, [formData.numeroCnss, editingEmploye?.id]);
 
-  // Libellé dynamique pour le taux de paiement
-  const tauxPaiementLabel = useMemo(() => {
-    switch (modeCalculPaie) {
-      case 'HOURLY': return 'Taux Horaire (FCFA/h)';
-      case 'DAILY': return 'Taux Journalier (FCFA/jour)';
-      default: return 'Salaire de Base (FCFA/mois)';
+  // --- Selected position salary range ---
+  const selectedPositionSalaryRange = useMemo(() => {
+    if (!selectedJobPositionId) return null;
+    const pos = jobPositions.find(p => p.id === selectedJobPositionId);
+    if (!pos) return null;
+    if (pos.salaireMin == null && pos.salaireMax == null) return null;
+    return { min: pos.salaireMin ?? null, max: pos.salaireMax ?? null };
+  }, [selectedJobPositionId, jobPositions]);
+
+  // --- Is employee also a client? ---
+  const isEmployeClient = useMemo(() => {
+    if (editingEmploye?.typeCompte === 'both') return true;
+    if (selectedUser) {
+      // Check from user data if available
+      const user = unlinkedUsers.find(u => u.id === selectedUserId);
+      // We can't know typeCompte from unlinked users list, default false
+      return false;
     }
-  }, [modeCalculPaie]);
+    return false;
+  }, [editingEmploye, selectedUser, selectedUserId, unlinkedUsers]);
 
-  // Gestion de la fermeture avec confirmation si modifications non sauvegardées
-  const handleClose = useCallback(() => {
-    if (hasUnsavedChanges) {
-      setShowUnsavedConfirm(true);
-    } else {
-      onClose();
+  // --- Render step content ---
+  const renderStepContent = () => {
+    switch (currentStep) {
+      case 0:
+        return (
+          <StepIdentite
+            formData={formData}
+            updateField={updateField}
+            editingEmploye={editingEmploye}
+            unlinkedUsers={unlinkedUsers}
+            selectedUserId={selectedUserId}
+            setSelectedUserId={setSelectedUserId}
+            selectedUser={selectedUser}
+            loadingUsers={loadingUsers}
+            agenceId={agenceId}
+            setAgenceId={setAgenceId}
+            agences={agences}
+            photoPreview={photoPreview}
+            handlePhotoUpload={handlePhotoUpload}
+            isUploading={isUploading}
+            paysList={paysList}
+            localitiesList={localitiesList}
+            localitiesLoading={localitiesLoading}
+            fetchLocalitiesByPays={fetchLocalitiesByPays}
+            validationErrors={validationErrors}
+          />
+        );
+      case 1:
+        return (
+          <StepDocuments
+            formData={formData}
+            updateField={updateField}
+            editingEmploye={editingEmploye}
+            paysList={paysList}
+            uploadedDocs={uploadedDocs}
+            handleDocumentChange={handleDocumentChange}
+            entityId={editingEmploye?.id || tempEmployeIdRef.current}
+          />
+        );
+      case 2:
+        return (
+          <StepContrat
+            formData={formData}
+            updateField={updateField}
+            editingEmploye={editingEmploye}
+            departments={departments}
+            jobPositions={jobPositions}
+            selectedDepartmentId={selectedDepartmentId}
+            setSelectedDepartmentId={setSelectedDepartmentId}
+            selectedJobPositionId={selectedJobPositionId}
+            setSelectedJobPositionId={setSelectedJobPositionId}
+            availableManagers={availableManagers}
+            validationErrors={validationErrors}
+          />
+        );
+      case 3:
+        return (
+          <StepRemuneration
+            formData={formData}
+            updateField={updateField}
+            editingEmploye={editingEmploye}
+            modeCalculPaie={modeCalculPaie}
+            setModeCalculPaie={setModeCalculPaie}
+            validationErrors={validationErrors}
+            checkingCnss={checkingCnss}
+            cnssAvailable={cnssAvailable}
+            cnssError={cnssError}
+            isEmployeClient={isEmployeClient}
+            salaryRange={selectedPositionSalaryRange}
+          />
+        );
+      default:
+        return null;
     }
-  }, [hasUnsavedChanges, onClose]);
-
-  const confirmClose = useCallback(() => {
-    setShowUnsavedConfirm(false);
-    onClose();
-  }, [onClose]);
-
-  const tempEmployeIdRef = useRef(crypto.randomUUID());
-  const { uploadFile, isUploading } = useEntityUpload({
-    fileType: 'profile',
-    entityType: 'employe',
-    entityId: editingEmploye?.id || tempEmployeIdRef.current,
-    onError: (err) => toast.error(`Erreur upload: ${err.message}`)
-  });
-
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        toast.error('La photo ne doit pas dépasser 2 Mo');
-        return;
-      }
-      
-      const url = await uploadFile(file);
-      if (url) {
-        setPhotoPreview(url);
-        updateField('photoProfile', url);
-      }
-    }
-  };
-
-  const removePhoto = () => {
-    setPhotoPreview(null);
-    updateField('photoProfile', '');
   };
 
   return (
     <>
-    <Modal
-      isOpen={isOpen}
-      onClose={handleClose}
-      title={editingEmploye ? 'Modifier Employé' : 'Nouvel Employé'}
-      size="lg"
-    >
-      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-        {/* TAB NAVIGATION */}
-        <div className="flex p-1 bg-surface rounded-lg mb-4">
-          <button
-            type="button"
-            onClick={() => setActiveTab('identity')}
-            className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
-              activeTab === 'identity' 
-                ? 'bg-accent text-white shadow-lg' 
-                : 'text-content-muted hover:text-content-primary hover:bg-surface-elevated/50'
-            }`}
-          >
-            1. Informations Personnelles
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('contract')}
-            className={`flex-1 py-2 text-sm font-medium rounded-md transition-all ${
-              activeTab === 'contract' 
-                ? 'bg-accent text-white shadow-lg' 
-                : 'text-content-muted hover:text-content-primary hover:bg-surface-elevated/50'
-            }`}
-          >
-            2. Contrat & Poste
-          </button>
-        </div>
+      <Modal
+        isOpen={isOpen}
+        onClose={handleClose}
+        title={editingEmploye ? 'Modifier Employé' : 'Nouvel Employé'}
+        size="lg"
+      >
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+          {/* Step indicator */}
+          <div className="flex items-center gap-1 px-2">
+            {STEPS.map((step, index) => {
+              const Icon = step.icon;
+              const isActive = index === currentStep;
+              const isCompleted = index < currentStep;
 
-        {/* --- TAB 1: IDENTITÉ --- */}
-        {activeTab === 'identity' && (
-          <div className="space-y-4 animate-in fade-in slide-in-from-left-4 duration-300">
-            {/* Section 1: Liaison avec un compte utilisateur (mode création uniquement) */}
-            {!editingEmploye && (
-              <div className="p-3 bg-accent/10 border border-accent/30 rounded-lg space-y-3">
-                <div className="flex items-center gap-2">
-                  <Link size={16} className="text-accent" />
-                  <h4 className="text-sm font-semibold text-content-primary">Lier à un compte utilisateur</h4>
-                </div>
-  
-                <SelectField
-                  label=""
-                  name="userId"
-                  value={selectedUserId || ''}
-                  onChange={(e) => setSelectedUserId(e.target.value || null)}
-                  options={[
-                    { value: '', label: loadingUsers ? 'Chargement...' : '-- Sélectionner un utilisateur --' },
-                    ...unlinkedUsers.map(u => ({
-                      value: u.id,
-                      label: `${u.prenom || ''} ${u.nom} ${u.email ? `(${u.email})` : ''}`.trim()
-                    }))
-                  ]}
-                  error={validationErrors.userId}
-                />
-  
-                {selectedUser && (
-                  <div className="flex items-center gap-3 p-2 bg-surface/50 rounded-lg border border-edge">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-status-info to-status-success flex items-center justify-center overflow-hidden">
-                      {selectedUser.photoProfile ? (
-                        <img src={resolveStorageUrl(selectedUser.photoProfile)} alt="" className="w-full h-full object-cover" />
+              return (
+                <React.Fragment key={step.key}>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentStep(index)}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all text-sm font-medium ${
+                      isActive
+                        ? 'bg-accent text-white shadow-lg'
+                        : isCompleted
+                          ? 'bg-status-success/10 text-status-success hover:bg-status-success/20'
+                          : 'bg-surface text-content-muted hover:bg-surface-elevated hover:text-content-secondary'
+                    }`}
+                  >
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                      isActive
+                        ? 'bg-white/20'
+                        : isCompleted
+                          ? 'bg-status-success/20'
+                          : 'bg-surface-subtle'
+                    }`}>
+                      {isCompleted ? (
+                        <Check size={14} />
                       ) : (
-                        <User size={20} className="text-content-primary" />
+                        <Icon size={14} />
                       )}
                     </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold text-content-primary">{selectedUser.prenom} {selectedUser.nom}</p>
-                      <p className="text-[10px] text-content-muted">{selectedUser.email || 'Pas d\'email'} • {selectedUser.telephone || 'Pas de téléphone'}</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-  
-            {/* Section 2: Agence et Matricule */}
-            <div className="p-6 bg-surface/30 border border-edge rounded-xl">
-              <div className="flex items-center gap-2 mb-6 text-content-primary font-bold text-base">
-                <Building2 size={20} className="text-accent" />
-                Affectation
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* En mode création: afficher l'agence de l'utilisateur (lecture seule) */}
-                {!editingEmploye ? (
-                  <div>
-                    <label className="block text-xs sm:text-sm font-semibold text-content-secondary mb-2">
-                      Agence <span className="text-status-danger ml-1">*</span>
-                    </label>
-                    {selectedUser ? (
-                      selectedUser.agenceId ? (
-                        <div className="flex items-center gap-2 px-4 h-12 bg-surface-elevated/50 rounded-lg border border-edge-strong">
-                          <Building2 size={14} className="text-accent" />
-                          <span className="text-content-primary text-sm font-medium">{selectedUser.agenceNom}</span>
-                          <span className="text-xs text-content-muted">({selectedUser.agenceCode})</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2 px-4 h-12 bg-status-warning-bg rounded-lg border border-status-warning/30">
-                          <AlertTriangle size={14} className="text-status-warning" />
-                          <span className="text-status-warning text-xs">Aucune agence affectée</span>
-                        </div>
-                      )
-                    ) : (
-                      <div className="flex items-center px-4 h-12 bg-surface/50 rounded-lg border border-edge text-content-muted text-xs">
-                        Sélectionnez d'abord un utilisateur
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <SelectField
-                    label="Agence d'affectation"
-                    name="agenceId"
-                    value={agenceId}
-                    onChange={(e) => setAgenceId(e.target.value)}
-                    options={[
-                      { value: '', label: '-- Sélectionner --' },
-                      ...agences.map(a => ({ value: a.id, label: a.nom }))
-                    ]}
-                    error={validationErrors.agenceId}
-                    required
-                    className="!h-12"
-                  />
-                )}
-
-                {/* Matricule */}
-                <div>
-                  <label className="block text-xs sm:text-sm font-semibold text-content-secondary mb-2">Matricule</label>
-                  <div className="flex items-center gap-2 px-4 h-12 bg-surface/50 rounded-lg border border-edge text-content-secondary text-sm font-mono">
-                    {editingEmploye && formData.matricule ? formData.matricule : 'Généré automatiquement'}
-                  </div>
-                </div>
-              </div>
-            </div>
-  
-            {/* Section 3: Identité */}
-            <div className="p-3 bg-surface/30 border border-edge rounded-lg space-y-3">
-              <div className="flex items-center gap-2">
-                <User size={16} className="text-content-muted" />
-                <h4 className="text-sm font-semibold text-content-primary">Identité</h4>
-              </div>
-  
-              {/* Photo Compact */}
-              <div className="flex items-center gap-4">
-                 <div className="relative shrink-0">
-                    {photoPreview ? (
-                      <img src={resolveStorageUrl(photoPreview)} className="w-16 h-16 rounded-full object-cover border-2 border-edge-strong" />
-                    ) : (
-                      <div className="w-16 h-16 rounded-full bg-surface-elevated flex items-center justify-center border-2 border-edge-strong">
-                        <User size={24} className="text-content-muted" />
-                      </div>
-                    )}
-                    {!selectedUser && (
-                       <label className="absolute -bottom-1 -right-1 w-6 h-6 bg-status-info rounded-full flex items-center justify-center cursor-pointer hover:bg-status-info transition-colors">
-                          <Upload size={12} className="text-content-primary" />
-                          <input type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" />
-                       </label>
-                    )}
-                 </div>
-                 <div className="flex-1 grid grid-cols-2 gap-3">
-                   <FormField label="Nom" name="nom" value={formData.nom || ''} onChange={(e) => updateField('nom', e.target.value)} required readOnly={!!selectedUser && !editingEmploye} className="py-1" />
-                   <FormField label="Prénom" name="prenom" value={formData.prenom || ''} onChange={(e) => updateField('prenom', e.target.value)} required readOnly={!!selectedUser && !editingEmploye} className="py-1" />
-                 </div>
-              </div>
-  
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <SelectField label="Sexe" name="sexe" value={formData.sexe || 'M'} onChange={(e) => updateField('sexe', e.target.value as 'M' | 'F')} options={[{ value: 'M', label: 'Masculin' }, { value: 'F', label: 'Féminin' }]} required />
-                <FormField label="Email" name="email" type="email" value={formData.email || ''} onChange={(e) => updateField('email', e.target.value)} readOnly={!!selectedUser && !editingEmploye} error={validationErrors.email} className="py-1" />
-                <FormField label="Téléphone" name="phone" type="tel" value={formData.phone || ''} onChange={(e) => updateField('phone', e.target.value)} readOnly={!!selectedUser && !editingEmploye} error={validationErrors.phone} className="py-1" />
-              </div>
-
-               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <FormField label="Date de Naissance" name="dateNaissance" type="date" value={formData.dateNaissance || ''} onChange={(e) => updateField('dateNaissance', e.target.value)} error={validationErrors.dateNaissance} className="py-1" />
-                  <FormField label="Lieu de Naissance" name="lieuNaissance" value={formData.lieuNaissance || ''} onChange={(e) => updateField('lieuNaissance', e.target.value)} className="py-1" />
-               </div>
-               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <FormField label="Adresse" name="adresse" value={formData.adresse || ''} onChange={(e) => updateField('adresse', e.target.value)} className="py-1" />
-                  <FormField label="Ville" name="ville" value={formData.ville || ''} onChange={(e) => updateField('ville', e.target.value)} className="py-1" />
-               </div>
-            </div>
-          </div>
-        )}
-
-        {/* --- TAB 2: CONTRAT & POSTE --- */}
-        {activeTab === 'contract' && (
-          <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
-            {/* Section 4: Contrat RH */}
-            <div className="p-3 bg-status-success-bg border border-status-success/30 rounded-lg space-y-3">
-              <div className="flex items-center gap-2">
-                <Building2 size={16} className="text-status-success" />
-                <h4 className="text-sm font-semibold text-content-primary">Contrat & Rémunération</h4>
-              </div>
-  
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <FormField
-                  label="Date d'Embauche"
-                  name="dateEmbauche"
-                  type="date"
-                  value={formData.dateEmbauche || ''}
-                  onChange={(e) => updateField('dateEmbauche', e.target.value)}
-                  required
-                  error={validationErrors.dateEmbauche}
-                  className="py-1"
-                />
-  
-                <SelectField
-                  label="Type de Contrat"
-                  name="typeContrat"
-                  value={formData.typeContrat || 'CDI'}
-                  onChange={(e) => updateField('typeContrat', e.target.value)}
-                  options={[
-                    { value: 'CDI', label: 'CDI' },
-                    { value: 'CDD', label: 'CDD' },
-                    { value: 'Stage', label: 'Stage' },
-                  ]}
-                  required
-                />
-  
-                <SelectField
-                  label="Département"
-                  name="departmentId"
-                  value={selectedDepartmentId || ''}
-                  onChange={(e) => {
-                    const deptId = e.target.value || null;
-                    setSelectedDepartmentId(deptId);
-                    setSelectedJobPositionId(null);
-                  }}
-                  options={[
-                    { value: '', label: '...' },
-                    ...departments.map(d => ({ value: d.id, label: d.name }))
-                  ]}
-                />
-  
-                <SelectField
-                  label="Poste"
-                  name="jobPositionId"
-                  value={selectedJobPositionId || ''}
-                  onChange={(e) => setSelectedJobPositionId(e.target.value || null)}
-                  options={[
-                    { value: '', label: '...' },
-                    ...jobPositions
-                      .filter(p => !selectedDepartmentId || p.departmentId === selectedDepartmentId)
-                      .map(p => ({ value: p.id, label: p.name }))
-                  ]}
-                  required
-                  disabled={!selectedDepartmentId}
-                  error={validationErrors.jobPositionId}
-                />
-  
-                <SelectField
-                  label="Mode Calcul"
-                  name="modeCalculPaie"
-                  value={modeCalculPaie}
-                  onChange={(e) => setModeCalculPaie(e.target.value as 'MONTHLY' | 'HOURLY' | 'DAILY')}
-                  options={MODE_CALCUL_PAIE_OPTIONS}
-                  required
-                />
-  
-                <FormField
-                  label={tauxPaiementLabel}
-                  name="salaireBase"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  value={formData.salaireBase || ''}
-                  onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); updateField('salaireBase', v); }}
-                  error={validationErrors.salaireBase}
-                  className="py-1"
-                />
-  
-                <div className="md:col-span-2">
-                  <FormField
-                    label="Numéro CNSS"
-                    name="numeroCnss"
-                    type="text"
-                    value={formData.numeroCnss || ''}
-                    onChange={(e) => updateField('numeroCnss', e.target.value.toUpperCase())}
-                    error={validationErrors.numeroCnss || (cnssAvailable === false ? (cnssError || 'Déjà utilisé') : undefined)}
-                    placeholder="Ex: CNSS-CG-12345"
-                    className="py-1"
-                  />
-                  {formData.numeroCnss && VALIDATION_PATTERNS.cnss.test(formData.numeroCnss) && (
-                    <div className="mt-1 text-xs">
-                      {checkingCnss && <span className="text-content-muted">Vérification...</span>}
-                      {!checkingCnss && cnssAvailable === true && <span className="text-status-success">Numéro CNSS disponible</span>}
-                      {!checkingCnss && cnssAvailable === false && <span className="text-status-danger">{cnssError || 'Déjà utilisé par un autre employé'}</span>}
-                    </div>
+                    <span className="hidden sm:inline">{step.label}</span>
+                  </button>
+                  {index < STEPS.length - 1 && (
+                    <div className={`flex-1 h-0.5 rounded-full ${
+                      index < currentStep ? 'bg-status-success/40' : 'bg-edge'
+                    }`} />
                   )}
-                </div>
-              </div>
-            </div>
-  
-            {/* Section Coordonnées Bancaires */}
-            <div className="p-3 bg-accent/5 border border-accent/20 rounded-lg space-y-3">
-              <div className="flex items-center gap-2">
-                <Building2 size={16} className="text-accent" />
-                <h4 className="text-sm font-semibold text-content-primary">Coordonnées Bancaires</h4>
-                <span className="text-[10px] text-content-muted">(virement)</span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <FormField
-                  label="Nom de la Banque"
-                  name="bankName"
-                  value={formData.bankName || ''}
-                  onChange={(e) => updateField('bankName', e.target.value)}
-                  placeholder="Ex: BGFI Bank Congo"
-                  className="py-1"
-                />
-                <FormField
-                  label="Code Banque"
-                  name="bankCode"
-                  value={formData.bankCode || ''}
-                  onChange={(e) => updateField('bankCode', e.target.value)}
-                  placeholder="Ex: 30011"
-                  className="py-1"
-                />
-                <FormField
-                  label="Code Guichet"
-                  name="branchCode"
-                  value={formData.branchCode || ''}
-                  onChange={(e) => updateField('branchCode', e.target.value)}
-                  placeholder="Ex: 00100"
-                  className="py-1"
-                />
-                <FormField
-                  label="Numéro de Compte"
-                  name="bankAccountNumber"
-                  value={formData.bankAccountNumber || ''}
-                  onChange={(e) => updateField('bankAccountNumber', e.target.value)}
-                  placeholder="Ex: 0000123456"
-                  className="py-1"
-                />
-                <FormField
-                  label="Clé RIB"
-                  name="accountKey"
-                  value={formData.accountKey || ''}
-                  onChange={(e) => updateField('accountKey', e.target.value)}
-                  placeholder="Ex: 97"
-                  className="py-1"
-                />
-              </div>
-            </div>
-
-            {/* Section Dates Contrat */}
-            <div className="p-3 bg-status-warning-bg border border-status-warning/20 rounded-lg space-y-3">
-              <div className="flex items-center gap-2">
-                <Calendar size={16} className="text-status-warning" />
-                <h4 className="text-sm font-semibold text-content-primary">Dates clés du contrat</h4>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <FormField
-                  label="Fin Période d'Essai"
-                  name="dateFinEssai"
-                  type="date"
-                  value={formData.dateFinEssai || ''}
-                  onChange={(e) => updateField('dateFinEssai', e.target.value)}
-                  className="py-1"
-                />
-                <FormField
-                  label="Fin de Contrat (CDD)"
-                  name="dateFinContrat"
-                  type="date"
-                  value={formData.dateFinContrat || ''}
-                  onChange={(e) => updateField('dateFinContrat', e.target.value)}
-                  className="py-1"
-                />
-                <FormField
-                  label="Prochaine Visite Médicale"
-                  name="prochaineMedicale"
-                  type="date"
-                  value={formData.prochaineMedicale || ''}
-                  onChange={(e) => updateField('prochaineMedicale', e.target.value)}
-                  className="py-1"
-                />
-              </div>
-            </div>
-
-            {/* Section Situation Familiale & Fiscale */}
-            <div className="p-6 bg-status-info-bg border border-status-info/30 rounded-xl">
-              <div className="flex items-center gap-2 mb-6 text-content-primary font-bold text-base">
-                <Users size={20} className="text-status-info" />
-                Situation Familiale & Fiscale
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <SelectField
-                  label="Situation Familiale"
-                  name="situationFamiliale"
-                  value={formData.situationFamiliale || 'CELIBATAIRE'}
-                  onChange={(e) => updateField('situationFamiliale', e.target.value)}
-                  options={[
-                    { value: 'CELIBATAIRE', label: 'Célibataire' },
-                    { value: 'MARIE', label: 'Marié(e)' },
-                    { value: 'VEUF', label: 'Veuf/Veuve' },
-                    { value: 'DIVORCE', label: 'Divorcé(e)' },
-                  ]}
-                  className="!h-12"
-                />
-
-                <FormField
-                  label="Enfants à charge"
-                  name="nombreEnfantsCharge"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  value={String(formData.nombreEnfantsCharge ?? 0)}
-                  onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); updateField('nombreEnfantsCharge', v); }}
-                  className="!h-12"
-                />
-
-                <FormField
-                  label="NIU (Identifiant Unique)"
-                  name="niu"
-                  type="text"
-                  value={formData.niu || ''}
-                  onChange={(e) => updateField('niu', e.target.value)}
-                  placeholder="Ex: NIU-CG-00123"
-                  className="!h-12"
-                />
-              </div>
-
-              <p className="mt-4 text-[10px] text-status-info/60 italic">
-                La situation familiale et le nombre d'enfants déterminent le quotient familial pour le calcul de l'IRPP.
-              </p>
-            </div>
-
-            {/* Section Sortie (visible uniquement en édition) */}
-            {editingEmploye && (
-              <div className="p-3 bg-status-danger/5 border border-status-danger/20 rounded-lg space-y-3">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle size={16} className="text-status-danger" />
-                  <h4 className="text-sm font-semibold text-content-primary">Sortie</h4>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <FormField
-                    label="Date de Sortie"
-                    name="dateSortie"
-                    type="date"
-                    value={formData.dateSortie || ''}
-                    onChange={(e) => updateField('dateSortie', e.target.value || null)}
-                    className="py-1"
-                  />
-
-                  <SelectField
-                    label="Motif de Sortie"
-                    name="motifSortie"
-                    value={formData.motifSortie || ''}
-                    onChange={(e) => updateField('motifSortie', e.target.value || null)}
-                    options={[
-                      { value: '', label: '— Aucun —' },
-                      { value: 'DEMISSION', label: 'Démission' },
-                      { value: 'LICENCIEMENT', label: 'Licenciement' },
-                      { value: 'FIN_CDD', label: 'Fin de CDD' },
-                      { value: 'RETRAITE', label: 'Retraite' },
-                      { value: 'DECES', label: 'Décès' },
-                    ]}
-                  />
-                </div>
-
-                <p className="text-[10px] text-status-danger/60">
-                  Si renseignée, la date de sortie permet le calcul du prorata sur le dernier mois de paie.
-                </p>
-              </div>
-            )}
-
-            {/* Section Hiérarchie */}
-            <div className="pt-2 border-t border-edge">
-               <div className="grid grid-cols-1 gap-4">
-                <SelectField
-                  label="Supérieur Hiérarchique (Manager)"
-                  name="managerId"
-                  value={formData.managerId || ''}
-                  onChange={(e) => updateField('managerId', e.target.value || null)}
-                  options={[
-                    { value: '', label: '— Aucun —' },
-                    ...availableManagers
-                  ]}
-                />
-               </div>
-            </div>
+                </React.Fragment>
+              );
+            })}
           </div>
-        )}
 
-        {/* FOOTER ACTIONS */}
-        <div className="flex justify-between gap-3 pt-4 border-t border-edge mt-auto">
-          <Button type="button" variant="secondary" onClick={handleClose} disabled={saving}>
-             Annuler
-          </Button>
-          
-          <div className="flex gap-2">
-             {activeTab === 'contract' && (
-                <Button type="button" variant="secondary" onClick={() => setActiveTab('identity')}>
+          {/* Step content */}
+          <div className="animate-in fade-in duration-200">
+            {renderStepContent()}
+          </div>
+
+          {/* Footer actions */}
+          <div className="flex justify-between gap-3 pt-4 border-t border-edge mt-auto">
+            <Button type="button" variant="secondary" onClick={handleClose} disabled={saving}>
+              Annuler
+            </Button>
+
+            <div className="flex gap-2">
+              {currentStep > 0 && (
+                <Button type="button" variant="secondary" onClick={handlePrev}>
                   <ChevronLeft size={16} /> Précédent
                 </Button>
-             )}
-             
-             {activeTab === 'identity' ? (
-                <Button type="button" variant="primary" onClick={handleNextTab}>
+              )}
+
+              {currentStep < STEPS.length - 1 ? (
+                <Button type="button" variant="primary" onClick={handleNext}>
                   Suivant <ChevronRight size={16} />
                 </Button>
-             ) : (
-                <Button type="submit" variant="primary" disabled={saving || !isFormComplete}>
+              ) : (
+                <Button type="submit" variant="primary" disabled={saving || !canSaveEmployees}>
                   <Save size={18} className="mr-2" />
                   {saving ? '...' : 'Sauvegarder'}
                 </Button>
-             )}
+              )}
+            </div>
           </div>
-        </div>
-      </form>
-    </Modal>
+        </form>
+      </Modal>
 
-    {/* Confirmation pour modifications non sauvegardées */}
-    <ConfirmDialog
-      isOpen={showUnsavedConfirm}
-      onClose={() => setShowUnsavedConfirm(false)}
-      onConfirm={confirmClose}
-      title="Modifications non sauvegardées"
-      message="Vous avez des modifications non sauvegardées. Êtes-vous sûr de vouloir quitter sans sauvegarder ?"
-      variant="warning"
-      confirmText="Quitter sans sauvegarder"
-      cancelText="Continuer l'édition"
-    />
+      <ConfirmDialog
+        isOpen={showUnsavedConfirm}
+        onClose={() => setShowUnsavedConfirm(false)}
+        onConfirm={confirmClose}
+        title="Modifications non sauvegardées"
+        message="Vous avez des modifications non sauvegardées. Êtes-vous sûr de vouloir quitter sans sauvegarder ?"
+        variant="warning"
+        confirmText="Quitter sans sauvegarder"
+        cancelText="Continuer l'édition"
+      />
     </>
   );
 }
