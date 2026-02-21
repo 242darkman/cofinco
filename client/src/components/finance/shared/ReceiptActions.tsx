@@ -244,7 +244,7 @@ export const ReceiptActions: React.FC<ReceiptActionsProps> = ({
         <button
           onClick={handlePrint}
           className={`
-            w-full py-4 rounded-xl font-bold text-content-primary
+            w-full py-4 rounded-xl font-bold text-white
             flex items-center justify-center gap-3
             active:scale-[0.98] transition-all
             ${activeTab === 'ticket'

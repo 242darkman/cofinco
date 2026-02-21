@@ -537,7 +537,7 @@ export default function TransactionDetailsSheet({
                         {/* Print Button */}
                         <Button
                             variant="primary"
-                            className={`flex-1 h-12 rounded-xl text-content-primary shadow-lg shadow-${themeColor}-500/20
+                            className={`flex-1 h-12 rounded-xl text-white shadow-lg shadow-${themeColor}-500/20
                                 ${isCredit
                                     ? 'bg-status-success hover:bg-status-success'
                                     : isDebit

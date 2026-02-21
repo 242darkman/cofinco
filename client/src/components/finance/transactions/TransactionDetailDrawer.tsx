@@ -99,12 +99,15 @@ const TYPES_ENTREES = [
   'SAVINGS_DEPOSIT', 'TRANSFER_IN', 'BANK_FEE'
 ];
 
-const isEntree = (type: string): boolean => {
+const isEntree = (type: string, description?: string): boolean => {
   if (!type) return false;
   const typeLower = type.toLowerCase();
-  return TYPES_ENTREES.some(t =>
+  const incoming = TYPES_ENTREES.some(t =>
     typeLower.includes(t.toLowerCase()) || t.toLowerCase().includes(typeLower)
   );
+  // Reversal operations have the same typeOperation but opposite cash direction
+  if (description?.startsWith('[ANNULATION]')) return !incoming;
+  return incoming;
 };
 
 const normalizeStatus = (status: string): 'Succès' | 'Échec' | 'En attente' | 'Annulé' => {
@@ -584,7 +587,7 @@ export default function TransactionDetailDrawer({
   // Don't render if no transaction and closed
   if (!transaction || !isOpen || !receiptData) return null;
 
-  const isCredit = isEntree(transaction.typeOperation || transaction.type || '');
+  const isCredit = isEntree(transaction.typeOperation || transaction.type || '', transaction.description);
   const statusConfig = getStatusConfig(transaction.status || 'Succès');
   const isTransfer = !!(transaction.source && transaction.destination);
   const showError = normalizeStatus(transaction.status || '') === 'Échec';

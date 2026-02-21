@@ -112,6 +112,14 @@ export async function reverseOperation(req: ReversalRequest): Promise<ReversalRe
     );
   }
 
+  // A reversal operation itself cannot be reversed
+  if (original.reversalOfId) {
+    throw new ReversalError(
+      "Une operation de contrepassation ne peut pas etre annulee",
+      "IS_REVERSAL"
+    );
+  }
+
   // Check if already reversed (via reversalOfId link)
   const [existingReversal] = await db
     .select({ id: operationsCaisse.id })
@@ -177,11 +185,11 @@ export async function reverseOperation(req: ReversalRequest): Promise<ReversalRe
   const montantNum = parseFloat(montant);
 
   // Delta for balances: reverse the original effect
-  // Original DEBIT on account = withdrawal = negative effect -> reversal adds back
-  // Original CREDIT on account = deposit = positive effect -> reversal subtracts
+  // CREDIT (reversing a withdrawal) = cash comes back in = +montant
+  // DEBIT (reversing a deposit) = cash goes back out = -montant
+  // Session and account always move in the same direction for caisse operations
   const compteDelta = inverseSens === "CREDIT" ? montantNum : -montantNum;
-  // Session delta is the opposite: DEBIT = cash out -> reversal = cash in
-  const sessionDelta = inverseSens === "CREDIT" ? -montantNum : montantNum;
+  const sessionDelta = compteDelta;
 
   const result = await db.transaction(async (tx) => {
     // 4a. Create inverse mouvement
@@ -393,6 +401,11 @@ export async function canReverseOperation(operationId: string): Promise<{
 
   if (op.statut !== "POSTED") {
     return { reversible: false, reason: `Statut actuel: ${op.statut}` };
+  }
+
+  // A reversal operation itself cannot be reversed
+  if (op.reversalOfId) {
+    return { reversible: false, reason: "Operation de contrepassation" };
   }
 
   if (!op.mouvementId) {

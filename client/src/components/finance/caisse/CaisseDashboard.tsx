@@ -580,8 +580,17 @@ export default function CaisseDashboard({
   };
 
   // Calcul des entrées/sorties en utilisant les helpers centralisés
-  const entreesOps = transactions.filter(t => isIncomingOperation(t.typeOperation));
-  const sortiesOps = transactions.filter(t => isOutgoingOperation(t.typeOperation));
+  // Exclure les opérations REVERSED (annulées) et classifier les annulations dans le sens inverse
+  const activeTransactions = transactions.filter(t => t.statut !== 'REVERSED');
+  const entreesOps = activeTransactions.filter(t => {
+    const isReversal = t.description?.startsWith('[ANNULATION]');
+    // Reversal of incoming = outgoing, Reversal of outgoing = incoming
+    return isReversal ? isOutgoingOperation(t.typeOperation) : isIncomingOperation(t.typeOperation);
+  });
+  const sortiesOps = activeTransactions.filter(t => {
+    const isReversal = t.description?.startsWith('[ANNULATION]');
+    return isReversal ? isIncomingOperation(t.typeOperation) : isOutgoingOperation(t.typeOperation);
+  });
 
   const totalEntrees = entreesOps.reduce((sum, t) => sum + toNumber(t.montant), 0);
   const totalSorties = sortiesOps.reduce((sum, t) => sum + toNumber(t.montant), 0);
@@ -730,7 +739,7 @@ export default function CaisseDashboard({
                     amount: toNumber(tx.montant),
                     type: tx.typeOperation,
                     typeOperation: tx.typeOperation,
-                    status: tx.statut || tx.status || 'POSTED',
+                    status: tx.description?.startsWith('[ANNULATION]') ? 'REVERSED' : (tx.statut || tx.status || 'POSTED'),
                     date: tx.createdAt,
                     description: tx.description,
                     client: tx.clientNom ? {
@@ -1069,7 +1078,7 @@ export default function CaisseDashboard({
           amount: toNumber(tx.montant),
           type: tx.typeOperation,
           typeOperation: tx.typeOperation,
-          status: tx.statut || tx.status || 'POSTED',
+          status: tx.description?.startsWith('[ANNULATION]') ? 'REVERSED' : (tx.statut || tx.status || 'POSTED'),
           date: tx.createdAt,
           description: tx.description,
           client: tx.clientNom ? {

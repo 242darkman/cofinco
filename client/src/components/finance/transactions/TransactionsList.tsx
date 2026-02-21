@@ -57,7 +57,12 @@ export interface TransactionsListProps {
 // --- Helper Functions ---
 
 /** Détermine si une opération est une entrée (crédit pour la caisse) */
-const isEntree = (type: string): boolean => isIncomingOperation(type);
+const isEntree = (type: string, description?: string): boolean => {
+  const incoming = isIncomingOperation(type);
+  // Reversal operations have the same typeOperation but opposite cash direction
+  if (description?.startsWith('[ANNULATION]')) return !incoming;
+  return incoming;
+};
 
 /** Normalize DB status to canonical display values */
 const normalizeStatus = (status: string): OperationStatus => {
@@ -143,7 +148,7 @@ function MobileTransactionRow({
   const tx = transactions[index];
   if (!tx) return null;
 
-  const isCredit = isEntree(tx.typeOperation || tx.type);
+  const isCredit = isEntree(tx.typeOperation || tx.type, tx.description);
   const statusConfig = getStatusConfig(tx.status);
   const StatusIcon = statusConfig.icon;
   const dateObj = new Date(tx.createdAt || tx.date);
@@ -317,7 +322,7 @@ export default function TransactionsList({
         ) : (
           <div className="divide-y divide-edge">
             {displayedTransactions.map((tx) => {
-              const isCredit = isEntree(tx.typeOperation || tx.type);
+              const isCredit = isEntree(tx.typeOperation || tx.type, tx.description);
               const statusConfig = getStatusConfig(tx.status);
               const StatusIcon = statusConfig.icon;
               const dateObj = new Date(tx.createdAt || tx.date);
@@ -390,7 +395,7 @@ export default function TransactionsList({
           </thead>
           <tbody className="divide-y divide-edge">
             {displayedTransactions.map((tx) => {
-              const isCredit = isEntree(tx.typeOperation || tx.type);
+              const isCredit = isEntree(tx.typeOperation || tx.type, tx.description);
               const statusConfig = getStatusConfig(tx.status);
               const dateObj = new Date(tx.createdAt || tx.date);
 
