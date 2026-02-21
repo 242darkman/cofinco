@@ -142,6 +142,19 @@ export async function reverseOperation(req: ReversalRequest): Promise<ReversalRe
     );
   }
 
+  // Check that the original operation's session is not closed (end-of-day clôture)
+  const [originalSession] = await db
+    .select({ id: sessionsCaisse.id, statut: sessionsCaisse.statut })
+    .from(sessionsCaisse)
+    .where(eq(sessionsCaisse.id, original.sessionId));
+
+  if (originalSession?.statut === "CLOSED") {
+    throw new ReversalError(
+      "La session de caisse a ete cloturee. Les annulations ne sont plus possibles apres la cloture de la journee.",
+      "SESSION_CLOSED"
+    );
+  }
+
   // Determine the session to use for the reversal
   const reversalSessionId = sessionCaisseId || original.sessionId;
 
@@ -297,6 +310,11 @@ export async function reverseOperation(req: ReversalRequest): Promise<ReversalRe
           reversalOf: originalMouvement!.id,
           reversalReason: reason,
         });
+        // postGlForMouvement does NOT update glPostingStatus — we must do it
+        await tx
+          .update(mouvementsFinanciers)
+          .set({ glPostingStatus: "POSTED", glPostingError: null })
+          .where(eq(mouvementsFinanciers.id, reversalMvt.id));
         logger.info({ mouvementId: reversalMvt.id }, "GL posting successful for reversal");
       } catch (error) {
         if (error instanceof AccountingRuleNotFoundError) {
@@ -313,6 +331,12 @@ export async function reverseOperation(req: ReversalRequest): Promise<ReversalRe
           throw error;
         }
       }
+    } else {
+      // No agenceId → cannot post to GL, mark as SKIPPED
+      await tx
+        .update(mouvementsFinanciers)
+        .set({ glPostingStatus: "SKIPPED", glPostingError: "No agenceId available" })
+        .where(eq(mouvementsFinanciers.id, reversalMvt.id));
     }
 
     // Reload the original to return updated version
@@ -383,6 +407,16 @@ export async function canReverseOperation(operationId: string): Promise<{
 
   if (existing) {
     return { reversible: false, reason: "Deja annulee" };
+  }
+
+  // Check that the original session is not closed (end-of-day clôture)
+  const [session] = await db
+    .select({ statut: sessionsCaisse.statut })
+    .from(sessionsCaisse)
+    .where(eq(sessionsCaisse.id, op.sessionId));
+
+  if (session?.statut === "CLOSED") {
+    return { reversible: false, reason: "Session cloturee" };
   }
 
   return { reversible: true };
