@@ -360,6 +360,7 @@ export const ROUTES: RouteConfig[] = [
       { path: '/administration/devise', subModule: 'currency', label: 'Devise' },
       { path: '/administration/branding', subModule: 'branding', label: 'Branding' },
       { path: '/administration/reset-agence', subModule: 'reset-agence', label: 'Reset Agence' },
+      { path: '/administration/scoring', subModule: 'scoring', label: 'Scoring' },
     ],
   },
   {
