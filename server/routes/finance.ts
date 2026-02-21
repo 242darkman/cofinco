@@ -3889,8 +3889,13 @@ export function registerFinanceRoutes(app: Express) {
                  if (targetType) {
                      foundAccount = clientAccounts.find(c => c.typeCompte === targetType && c.statut === StatutCompte.ACTIVE);
                  } else {
-                     // Default fallback (usually Epargne)
-                     foundAccount = clientAccounts.find(c => c.typeCompte === TypeCompte.SAVINGS && c.statut === StatutCompte.ACTIVE) || clientAccounts[0];
+                     // Default fallback: prefer active SAVINGS, then CURRENT, then any active account
+                     const typePriority = [TypeCompte.SAVINGS, TypeCompte.CURRENT, TypeCompte.BLOCKED];
+                     const activeAccounts = clientAccounts.filter(c => c.statut === StatutCompte.ACTIVE);
+                     foundAccount = typePriority.reduce<typeof activeAccounts[0] | undefined>(
+                       (found, type) => found || activeAccounts.find(c => c.typeCompte === type),
+                       undefined
+                     ) || activeAccounts[0];
                  }
 
                  if (foundAccount) {
@@ -4034,6 +4039,11 @@ export function registerFinanceRoutes(app: Express) {
         if (!updated) {
              return res.status(404).json({ message: "Opération introuvable" });
         }
+
+        await logAudit(req, "UPDATE_OPERATION_CAISSE", "operation_caisse", id, {
+          fields: Object.keys(parsed),
+          reference: updated.reference,
+        }, "success", "low");
 
         // Notify updates
              if (updated.clientId) {

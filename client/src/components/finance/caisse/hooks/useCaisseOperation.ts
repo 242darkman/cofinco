@@ -185,9 +185,13 @@ export function useCaisseOperation({
       }
     }
 
-    if (operationType === 'RETRAIT' && securityLimits?.daily && parsedAmount > 0) {
-      if (parsedAmount > securityLimits.daily.remaining) {
+    if (operationType === 'RETRAIT' && securityLimits && parsedAmount > 0) {
+      if (securityLimits.daily && parsedAmount > securityLimits.daily.remaining) {
         errors.limit = `Limite journalière dépassée (reste: ${new Intl.NumberFormat('fr-FR').format(securityLimits.daily.remaining)} FCFA)`;
+      } else if (securityLimits.weekly && parsedAmount > securityLimits.weekly.remaining) {
+        errors.limit = `Limite hebdomadaire dépassée (reste: ${new Intl.NumberFormat('fr-FR').format(securityLimits.weekly.remaining)} FCFA)`;
+      } else if (securityLimits.monthly && parsedAmount > securityLimits.monthly.remaining) {
+        errors.limit = `Limite mensuelle dépassée (reste: ${new Intl.NumberFormat('fr-FR').format(securityLimits.monthly.remaining)} FCFA)`;
       }
     }
 
@@ -203,8 +207,14 @@ export function useCaisseOperation({
       if (!mobileMoneyProvider) {
         errors.provider = 'Sélectionnez un opérateur';
       }
-      if (!mobileMoneyPhone || mobileMoneyPhone.length < 9) {
+      if (!mobileMoneyPhone) {
         errors.phone = 'Numéro de téléphone requis';
+      } else {
+        const cleaned = mobileMoneyPhone.replace(/[\s\-().]/g, '');
+        const phoneRegex = /^(?:\+?242)?0?[456]\d{7,8}$/;
+        if (cleaned.length < 9 || !phoneRegex.test(cleaned)) {
+          errors.phone = 'Format invalide (ex: 06XXXXXXX ou +242 06XXXXXXX)';
+        }
       }
     }
 

@@ -65,7 +65,74 @@ interface PaymentIntent {
   confirmedAt?: string;
 }
 
+// Lightweight types for API responses (may use snake_case or camelCase keys)
+interface CreditInfo {
+  id: string;
+  numeroCredit: string;
+  montant?: string | number;
+  solde_restant?: string | number;
+  soldeRestant?: string | number;
+  statut?: string;
+  [key: string]: unknown;
+}
+
+interface TontineInfo {
+  id: string;
+  nom?: string;
+  montantCotisation?: string | number;
+  [key: string]: unknown;
+}
+
+interface CompteInfo {
+  id: string;
+  typeCompte?: string;
+  soldeCourant?: string | number;
+  numeroCompte?: string;
+  statut?: string;
+  [key: string]: unknown;
+}
+
+interface EcheanceInfo {
+  id: string;
+  montantTotal: number;
+  montantPaye?: number;
+  dateEcheance?: string;
+  status?: string;
+  [key: string]: unknown;
+}
+
+interface CaisseOperationPayload {
+  session_id: string;
+  client_id: string;
+  compte_id?: string;
+  type_operation: string;
+  montant: number;
+  methode_paiement: string;
+  reference: string;
+  description: string;
+  metadata: Record<string, unknown>;
+  physical_confirmation?: PhysicalConfirmationData;
+}
+
+interface LastOperationInfo {
+  reference: string;
+  typeOperation: TypeOperation | null;
+  typeDetaille: TypeDepot | TypeRetrait | null;
+  montant: number;
+  client: Client | null;
+  date: Date;
+  modePaiement: string;
+}
+
 // ─── Helpers ────────────────────────────────────────────
+
+/** Validate Congo phone number: +242 or 242 prefix + 9 digits, or local 9 digits starting with 0[456] */
+const PHONE_REGEX = /^(?:\+?242)?0?[456]\d{7,8}$/;
+const isValidPhone = (phone: string): boolean => {
+  const cleaned = phone.replace(/[\s\-().]/g, '');
+  return cleaned.length >= 9 && PHONE_REGEX.test(cleaned);
+};
+
 const mapToOperationEnum = (typeOp: string | null, typeDetaille: string | null): string => {
   if (!typeDetaille) return TypeOperationCaisse.MISC_COLLECTION;
   const detail = typeDetaille.toLowerCase();
@@ -147,12 +214,13 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
   const [showBilletage, setShowBilletage] = useState(false);
   const [billetage, setBilletage] = useState<Record<number, number>>({});
   const [showPhysicalConfirmation, setShowPhysicalConfirmation] = useState(false);
-  const [pendingOperationData, setPendingOperationData] = useState<any>(null);
+  const [pendingOperationData, setPendingOperationData] = useState<CaisseOperationPayload | null>(null);
   const [confirmationData, setConfirmationData] = useState<PhysicalConfirmationData | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   // ── Mobile Money-specific ──
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [phoneError, setPhoneError] = useState<string | null>(null);
   const [paymentIntent, setPaymentIntent] = useState<PaymentIntent | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('CREATED');
   const [showPaymentStatusModal, setShowPaymentStatusModal] = useState(false);
@@ -183,15 +251,15 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
   const [loadingFeeEstimate, setLoadingFeeEstimate] = useState(false);
 
   // ── Credit / Tontine / Comptes Data ──
-  const [creditsActifs, setCreditsActifs] = useState<any[]>([]);
-  const [creditSelectionne, setCreditSelectionne] = useState<any>(null);
-  const [prochaineEcheance, setProchaineEcheance] = useState<any>(null);
-  const [tontinesActives, setTontinesActives] = useState<any[]>([]);
-  const [tontineSelectionnee, setTontineSelectionnee] = useState<any>(null);
-  const [comptesClient, setComptesClient] = useState<any[]>([]);
+  const [creditsActifs, setCreditsActifs] = useState<CreditInfo[]>([]);
+  const [creditSelectionne, setCreditSelectionne] = useState<CreditInfo | null>(null);
+  const [prochaineEcheance, setProchaineEcheance] = useState<EcheanceInfo | null>(null);
+  const [tontinesActives, setTontinesActives] = useState<TontineInfo[]>([]);
+  const [tontineSelectionnee, setTontineSelectionnee] = useState<TontineInfo | null>(null);
+  const [comptesClient, setComptesClient] = useState<CompteInfo[]>([]);
 
   // ── Receipt & Success ──
-  const [lastOperationData, setLastOperationData] = useState<any>(null);
+  const [lastOperationData, setLastOperationData] = useState<LastOperationInfo | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [receiptData, setReceiptData] = useState<ReceiptData | undefined>(undefined);
 
@@ -207,12 +275,14 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
   });
 
   // ── Auto-fill amount from suggestion ──
+  // Depend on typeDepot/typeRetrait too so re-selecting the same sub-type still applies
+  const currentSubTypeKey = typeOperation === 'Dépôt' ? typeDepot : typeRetrait;
   useEffect(() => {
     if (suggestedAmount) {
       setMontant(suggestedAmount);
       setMontantError(null);
     }
-  }, [suggestedAmount]);
+  }, [suggestedAmount, currentSubTypeKey]);
 
   // ── Auto-fill phone from client ──
   useEffect(() => {
@@ -375,7 +445,21 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
   }, [lastOperationData]);
 
   // ─── Billetage ────────────────────────────────────────
-  const toggleBilletage = useCallback(() => setShowBilletage(prev => !prev), []);
+  const totalBilletage = useMemo(() =>
+    Object.entries(billetage).reduce((acc, [val, qty]) => acc + (parseInt(val) * qty), 0),
+    [billetage]
+  );
+
+  const toggleBilletage = useCallback(() => {
+    setShowBilletage(prev => {
+      const willHide = prev;
+      // Warn if toggling off with a discrepancy
+      if (willHide && totalBilletage > 0 && montant && parseInt(montant) !== totalBilletage) {
+        setMontantError(`Attention : le montant (${formatMoney(parseInt(montant))}) diffère du billetage (${formatMoney(totalBilletage)})`);
+      }
+      return !prev;
+    });
+  }, [totalBilletage, montant]);
 
   const updateBilletage = useCallback((value: number, count: number) => {
     const sanitizedCount = Math.max(0, Math.floor(count));
@@ -452,7 +536,7 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
     else if (typeOp === 'Compte Bloqué') targetType = TypeCompte.BLOCKED;
 
     if (targetType) {
-      const compte = comptesClient.find((c: any) => c.typeCompte === targetType);
+      const compte = comptesClient.find((c) => c.typeCompte === targetType);
       return compte?.id;
     }
     return undefined;
@@ -555,7 +639,7 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
     }
   }, [typeOperation, typeDepot, typeRetrait, sessionId, selectedClient, montant, billetage, getCompteIdForOperation, requiresPhysicalConfirmation]);
 
-  const executeCashOperation = useCallback(async (operationData: any, loadingId?: string | number) => {
+  const executeCashOperation = useCallback(async (operationData: CaisseOperationPayload, loadingId?: string | number) => {
     try {
       await operationCaisseApi.create(operationData);
 
@@ -606,7 +690,7 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
     }
   }, [typeOperation, typeDepot, montant, sessionId, prochaineEcheance, creditSelectionne, tontineSelectionnee, selectedClient, typeRetrait, onTransactionComplete]);
 
-  const validerOperationDirect = useCallback(async (operationData: any) => {
+  const validerOperationDirect = useCallback(async (operationData: CaisseOperationPayload) => {
     const loadingId = toast.loading("Traitement de l'opération en cours...");
     setLoading(true);
     try {
@@ -695,6 +779,11 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
       toast.warning('Veuillez remplir tous les champs requis');
       return;
     }
+    if (!isValidPhone(phoneNumber)) {
+      toast.warning('Numéro de téléphone invalide');
+      setPhoneError('Format invalide (ex: 06XXXXXXX ou +242 06XXXXXXX)');
+      return;
+    }
     const subType = typeOperation === 'Dépôt' ? typeDepot : typeRetrait;
     if (!subType) {
       toast.warning(`Sélectionnez le type de ${typeOperation.toLowerCase()}`);
@@ -709,7 +798,7 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
       const paymentType = getPaymentIntentType(typeOperation, subType);
       const idempotencyKey = crypto.randomUUID();
 
-      const payload: any = {
+      const payload: Record<string, unknown> = {
         provider,
         amount: parseFloat(montant),
         phone: phoneNumber,
@@ -822,6 +911,7 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
     setShowPhysicalConfirmation(false);
     setShowPresenceModal(false);
     setPhoneNumber('');
+    setPhoneError(null);
     setPaymentIntent(null);
     setPaymentStatus('CREATED');
     setFeeOption('');
@@ -1215,12 +1305,23 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
                           <input
                             type="tel"
                             value={phoneNumber}
-                            onChange={(e) => setPhoneNumber(e.target.value)}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setPhoneNumber(val);
+                              if (val && !isValidPhone(val)) {
+                                setPhoneError('Format invalide (ex: 06XXXXXXX ou +242 06XXXXXXX)');
+                              } else {
+                                setPhoneError(null);
+                              }
+                            }}
                             className={`w-full bg-surface-base border rounded-lg py-2 pl-8 pr-3 text-sm text-content-primary focus:ring-1 focus:ring-accent/50 outline-none font-mono ${
-                              phoneValidation?.warning ? 'border-status-warning/50' : 'border-edge'
+                              phoneError ? 'border-status-danger/50' : phoneValidation?.warning ? 'border-status-warning/50' : 'border-edge'
                             }`}
-                            placeholder="+242..."
+                            placeholder="+242 06..."
                           />
+                          {phoneError && (
+                            <p className="text-[9px] text-status-danger mt-0.5">{phoneError}</p>
+                          )}
                         </div>
                         {phoneValidation?.warning && (
                           <div className="mt-1 p-1.5 rounded bg-status-warning-bg border border-status-warning/20 text-[9px] text-status-warning">
@@ -1363,6 +1464,12 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
                             </div>
                           ))}
                         </div>
+                        {totalBilletage > 0 && (
+                          <div className="mt-2 pt-2 border-t border-edge flex justify-between items-center">
+                            <span className="text-[10px] text-content-muted">Total billetage</span>
+                            <span className="text-xs font-bold font-mono text-content-primary">{formatMoney(totalBilletage)}</span>
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -1407,7 +1514,7 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
                   </p>
                   <Button
                     onClick={handleSubmit}
-                    disabled={loading || (moyenPaiement !== 'CASH' && !phoneNumber)}
+                    disabled={loading || (moyenPaiement !== 'CASH' && (!phoneNumber || !!phoneError))}
                     className={`w-full py-3 text-sm font-bold tracking-wide shadow-xl transition-all ${
                       typeOperation === 'Retrait'
                         ? 'bg-status-danger hover:bg-status-danger shadow-status-danger/20'
