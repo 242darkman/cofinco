@@ -612,17 +612,12 @@ export default function FeuilleDeTempTab() {
             onClick={() => setSelectedWeek((w) => shiftWeek(w, -1))}
             aria-label="Semaine précédente"
           />
-          <div>
-            <label className="block text-xs font-semibold text-content-secondary mb-1">
-              Semaine
-            </label>
-            <input
-              type="week"
-              value={selectedWeek}
-              onChange={(e) => setSelectedWeek(e.target.value)}
-              className="h-[40px] px-3 rounded-lg border border-[#E5E7EB] bg-white text-[#111827] text-[13px] focus:outline-none focus:ring-[3px] focus:border-[#059669] focus:ring-[#059669]/30 hover:border-gray-400 transition-colors"
-            />
-          </div>
+          <input
+            type="week"
+            value={selectedWeek}
+            onChange={(e) => setSelectedWeek(e.target.value)}
+            className="h-[40px] px-3 rounded-lg border border-[#E5E7EB] bg-white text-[#111827] text-[13px] focus:outline-none focus:ring-[3px] focus:border-[#059669] focus:ring-[#059669]/30 hover:border-gray-400 transition-colors"
+          />
           <Button
             variant="ghost"
             size="sm"

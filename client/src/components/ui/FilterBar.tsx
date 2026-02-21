@@ -44,7 +44,7 @@ export default function FilterBar({ children, className = '', maxVisible = 4 }: 
         className={`
           flex flex-col gap-3
           sm:grid sm:grid-cols-2 sm:gap-3
-          lg:flex lg:flex-row lg:flex-wrap lg:items-end lg:gap-3
+          lg:flex lg:flex-row lg:flex-wrap lg:items-center lg:gap-3
           [&>*]:min-w-0
         `}
       >
@@ -88,7 +88,7 @@ export default function FilterBar({ children, className = '', maxVisible = 4 }: 
             ${showAdvanced ? 'flex' : 'hidden'} lg:flex
             flex-col gap-3
             sm:grid sm:grid-cols-2 sm:gap-3
-            lg:flex-row lg:flex-wrap lg:items-end lg:gap-3
+            lg:flex-row lg:flex-wrap lg:items-center lg:gap-3
             [&>*]:min-w-0
           `}
         >

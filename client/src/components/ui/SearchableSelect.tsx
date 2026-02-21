@@ -274,7 +274,7 @@ export default function SearchableSelect({
   };
 
   return (
-    <div className={`relative ${className} mb-4`} ref={containerRef}>
+    <div className={`relative ${className} ${label ? 'mb-4' : ''}`} ref={containerRef}>
       {label && (
         <label htmlFor={name} className="block font-inter font-medium text-[13px] text-[#374151] mb-[6px]">
           {label}
