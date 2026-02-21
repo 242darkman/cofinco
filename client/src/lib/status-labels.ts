@@ -731,7 +731,12 @@ export const PRESENCE_STATUS_COLORS: Record<string, string> = {
 export const BULLETIN_STATUS_COLORS: Record<string, string> = {
   DRAFT: "bg-surface-subtle/40 text-content-muted border-edge-subtle",
   VALIDATED: "bg-status-success-bg text-status-success border-status-success/30",
+  SCHEDULED: "bg-status-info-bg text-status-info border-status-info/30",
+  PENDING_CAISSE: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  PAYOUT_PENDING: "bg-status-warning-bg text-status-warning border-status-warning/30",
+  PAYOUT_PROCESSING: "bg-status-info-bg text-status-info border-status-info/30",
   PAID: "bg-status-success-bg text-status-success border-status-success/30",
+  PAYMENT_FAILED: "bg-status-danger-bg text-status-danger border-status-danger/30",
   CANCELLED: "bg-status-danger-bg text-status-danger border-status-danger/30",
 };
 

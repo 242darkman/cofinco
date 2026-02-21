@@ -1,11 +1,12 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { useUserProfile } from '../../hooks/useUserProfile';
-import { usePaie, type PayrollRun, type BulletinPaie, type PayrollRunIssue } from '../../hooks/hr/usePaie';
+import { usePaie, type PayrollRun, type BulletinPaie, type PayrollRunIssue, type SalaryPaymentJob } from '../../hooks/hr/usePaie';
 import { Card, Button, ResponsiveTable, Badge, TabGroup } from '../ui';
 import {
   FileText, Play, Download, Calculator, AlertCircle, Banknote, Settings, Eye,
   ShieldCheck, CreditCard, ArrowLeft, RefreshCw, AlertTriangle, Clock, RotateCcw,
-  CheckCircle, Loader2, ChevronLeft, ChevronRight, Calendar
+  CheckCircle, Loader2, XCircle, RotateCw,
+  Smartphone, CalendarClock
 } from 'lucide-react';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { toast } from '../../lib/toast';
@@ -17,6 +18,7 @@ import TransferFileModal from './TransferFileModal';
 import PaymentBatchManager from './PaymentBatchManager';
 import BankReconciliationPanel from './BankReconciliationPanel';
 import { formatMoney } from '../../lib/format';
+import { useHrRealtime } from '../../hooks/hr/useHrRealtime';
 
 // Status badge config
 const RUN_STATUS_CONFIG: Record<string, { variant: 'warning' | 'info' | 'success' | 'danger'; label: string }> = {
@@ -25,6 +27,35 @@ const RUN_STATUS_CONFIG: Record<string, { variant: 'warning' | 'info' | 'success
   PAID: { variant: 'success', label: 'Payé' },
   CLOSED: { variant: 'success', label: 'Clôturé' },
   CANCELLED: { variant: 'danger', label: 'Annulé' },
+};
+
+const BULLETIN_STATUS_CONFIG: Record<string, { variant: 'warning' | 'info' | 'success' | 'danger'; label: string }> = {
+  DRAFT: { variant: 'warning', label: 'Brouillon' },
+  VALIDATED: { variant: 'info', label: 'Validé' },
+  SCHEDULED: { variant: 'info', label: 'Programmé' },
+  PENDING_CAISSE: { variant: 'warning', label: 'Attente caisse' },
+  PAYOUT_PENDING: { variant: 'warning', label: 'Paiement en attente' },
+  PAYOUT_PROCESSING: { variant: 'info', label: 'Paiement en cours' },
+  PAID: { variant: 'success', label: 'Payé' },
+  PAYMENT_FAILED: { variant: 'danger', label: 'Échec paiement' },
+  CANCELLED: { variant: 'danger', label: 'Annulé' },
+};
+
+const JOB_STATUS_CONFIG: Record<string, { variant: 'warning' | 'info' | 'success' | 'danger'; label: string }> = {
+  CREATED: { variant: 'warning', label: 'Créé' },
+  SCHEDULED: { variant: 'info', label: 'Programmé' },
+  QUEUED: { variant: 'warning', label: 'En file' },
+  PROCESSING: { variant: 'info', label: 'En cours' },
+  SUCCEEDED: { variant: 'success', label: 'Réussi' },
+  FAILED: { variant: 'danger', label: 'Échoué' },
+  CANCELLED: { variant: 'danger', label: 'Annulé' },
+};
+
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  CASH: 'Espèces',
+  MOBILE_MONEY: 'Mobile Money',
+  TRANSFER: 'Virement',
+  CHECK: 'Chèque',
 };
 
 export default function PaieManager() {
@@ -43,6 +74,11 @@ export default function PaieManager() {
     validateRun, isValidating,
     payRun, isPaying,
     rerun, isRerunning,
+    confirmPayment, isConfirming,
+    retryPayment, isRetrying,
+    cancelPayment, isCancelling,
+    schedulePay, isScheduling,
+    usePaymentJobs,
   } = usePaie();
 
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
@@ -63,6 +99,23 @@ export default function PaieManager() {
   const [rerunDialogOpen, setRerunDialogOpen] = useState(false);
   const [rerunTargetId, setRerunTargetId] = useState<number | null>(null);
   const [rerunReason, setRerunReason] = useState('');
+
+  // Schedule dialog
+  const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
+  const [scheduleTargetId, setScheduleTargetId] = useState<number | null>(null);
+  const [scheduleDate, setScheduleDate] = useState('');
+
+  // Payment jobs
+  const { data: paymentJobs = [], isLoading: loadingJobs } = usePaymentJobs(selectedRunId);
+  const [showPaymentJobs, setShowPaymentJobs] = useState(false);
+
+  // Confirm payment dialog (for TRANSFER/CHECK reference)
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [confirmJobIds, setConfirmJobIds] = useState<string[]>([]);
+  const [confirmReference, setConfirmReference] = useState('');
+
+  // Real-time WebSocket subscription
+  useHrRealtime({ entities: ['salary_payment'], showToasts: true });
 
   // My bulletins: year filter + pagination
   const currentYear = new Date().getFullYear();
@@ -140,6 +193,48 @@ export default function PaieManager() {
     } catch (e) { /* handled */ }
   };
 
+  const handleScheduleOpen = (runId: number) => {
+    setScheduleTargetId(runId);
+    setScheduleDate('');
+    setScheduleDialogOpen(true);
+  };
+
+  const handleScheduleSubmit = async () => {
+    if (!scheduleTargetId || !scheduleDate) {
+      toast.warning('Veuillez sélectionner une date');
+      return;
+    }
+    try {
+      await schedulePay({ runId: scheduleTargetId, scheduledAt: new Date(scheduleDate).toISOString() });
+      setScheduleDialogOpen(false);
+    } catch (e) { /* handled */ }
+  };
+
+  const handleConfirmOpen = (jobIds: string[]) => {
+    setConfirmJobIds(jobIds);
+    setConfirmReference('');
+    setConfirmDialogOpen(true);
+  };
+
+  const handleConfirmSubmit = async () => {
+    try {
+      await confirmPayment({ jobIds: confirmJobIds, reference: confirmReference.trim() || undefined });
+      setConfirmDialogOpen(false);
+    } catch (e) { /* handled */ }
+  };
+
+  const handleRetryJobs = async (jobIds: string[]) => {
+    try {
+      await retryPayment({ jobIds });
+    } catch (e) { /* handled */ }
+  };
+
+  const handleCancelJobs = async (jobIds: string[]) => {
+    try {
+      await cancelPayment({ jobIds });
+    } catch (e) { /* handled */ }
+  };
+
   // Export CSV for a run's bulletins
   const handleExportRun = useCallback((bulletins: BulletinPaie[]) => {
     if (!bulletins || bulletins.length === 0) {
@@ -175,8 +270,8 @@ export default function PaieManager() {
     { key: 'mois', label: 'Mois', primary: true, format: (val: string) => <span className="font-medium">{formatMoisLabel(val)}</span> },
     { key: 'salaireNet', label: 'Net à Payer', format: (val: string) => <span className="font-bold text-status-success">{formatMoney(val)}</span> },
     { key: 'statut', label: 'Statut', format: (val: string) => {
-      const cfg = RUN_STATUS_CONFIG[val] || { variant: 'warning' as const, label: val };
-      return <Badge variant={cfg.variant} value={cfg.label} />;
+      const cfg = BULLETIN_STATUS_CONFIG[val] || RUN_STATUS_CONFIG[val] || { variant: 'warning' as const, label: val };
+      return <Badge variant={cfg.variant} value={cfg.label} size="xs" />;
     }},
     { key: 'actions', label: '', format: (_val: any, item: BulletinPaie) => (
       <Button variant="ghost" size="sm" icon={Eye} onClick={(e: React.MouseEvent) => { e.stopPropagation(); setViewerBulletinId(item.id); }}>
@@ -255,10 +350,16 @@ export default function PaieManager() {
               </Button>
             )}
             {run.status === 'VALIDATED' && canPay && (
-              <Button size="sm" variant="outline" icon={CreditCard} onClick={() => handlePayRun(run.id)} isLoading={isPaying}
-                className="h-7 text-[11px] border-status-success/50 text-status-success hover:bg-status-success-bg">
-                Payer le Run
-              </Button>
+              <>
+                <Button size="sm" variant="outline" icon={CreditCard} onClick={() => handlePayRun(run.id)} isLoading={isPaying}
+                  className="h-7 text-[11px] border-status-success/50 text-status-success hover:bg-status-success-bg">
+                  Payer
+                </Button>
+                <Button size="sm" variant="outline" icon={CalendarClock} onClick={() => handleScheduleOpen(run.id)} isLoading={isScheduling}
+                  className="h-7 text-[11px] border-status-info/50 text-status-info hover:bg-status-info-bg">
+                  Programmer
+                </Button>
+              </>
             )}
             {['DRAFT', 'VALIDATED', 'PAID'].includes(run.status) && canGeneratePaie && (
               <Button size="sm" variant="outline" icon={RotateCcw} onClick={() => handleRerunOpen(run.id)} isLoading={isRerunning}
@@ -353,11 +454,19 @@ export default function PaieManager() {
 
         {/* Bulletins table */}
         <Card padding="none" className="bg-surface-base/50 border-edge">
-          <div className="p-3 border-b border-edge">
+          <div className="p-3 border-b border-edge flex items-center justify-between">
             <h4 className="text-sm font-bold text-content-primary flex items-center gap-2">
               <FileText size={16} className="text-status-info" />
               Bulletins ({bulletins.length})
             </h4>
+            {(paymentJobs as SalaryPaymentJob[]).length > 0 && (
+              <button
+                onClick={() => setShowPaymentJobs(!showPaymentJobs)}
+                className="text-[10px] text-accent hover:underline"
+              >
+                {showPaymentJobs ? 'Masquer paiements' : `Suivi paiements (${(paymentJobs as SalaryPaymentJob[]).length})`}
+              </button>
+            )}
           </div>
           {bulletins.length > 0 ? (
             <ResponsiveTable
@@ -367,6 +476,14 @@ export default function PaieManager() {
                 { key: 'salaireBaseSnapshot', label: 'Base', hideOnMobile: true, format: (val: number) => <span className="font-mono text-content-secondary">{formatMoney(val)}</span> },
                 { key: 'salaireBrut', label: 'Brut', hideOnMobile: true, format: (val: string) => <span className="font-mono text-content-secondary">{formatMoney(val)}</span> },
                 { key: 'salaireNet', label: 'Net', format: (val: string) => <span className="font-bold text-status-success">{formatMoney(val)}</span> },
+                { key: 'statut', label: 'Statut', format: (val: string) => {
+                  const cfg = BULLETIN_STATUS_CONFIG[val] || { variant: 'warning' as const, label: val };
+                  return (
+                    <span className={val === 'PAYOUT_PROCESSING' ? 'animate-pulse' : ''}>
+                      <Badge variant={cfg.variant} value={cfg.label} size="xs" />
+                    </span>
+                  );
+                }},
                 { key: 'actions', label: '', format: (_val: any, item: BulletinPaie) => (
                   <Button variant="ghost" size="sm" icon={Eye} onClick={(e: React.MouseEvent) => { e.stopPropagation(); setViewerBulletinId(item.id); }} />
                 )},
@@ -384,6 +501,129 @@ export default function PaieManager() {
             </div>
           )}
         </Card>
+
+        {/* Failed Payments Panel */}
+        {(() => {
+          const failedJobs = (paymentJobs as SalaryPaymentJob[]).filter(j => j.status === 'FAILED');
+          if (failedJobs.length === 0) return null;
+          return (
+            <Card padding="none" className="bg-status-danger-bg border-status-danger/30">
+              <div className="p-3 border-b border-status-danger/20 flex items-center justify-between">
+                <h4 className="text-sm font-bold text-status-danger flex items-center gap-2">
+                  <AlertCircle size={16} />
+                  Paiements en échec ({failedJobs.length})
+                </h4>
+                {canPay && (
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" variant="outline" icon={RotateCw}
+                      onClick={() => handleRetryJobs(failedJobs.map(j => j.id))} isLoading={isRetrying}
+                      className="h-6 text-[10px] border-status-warning/50 text-status-warning hover:bg-status-warning-bg">
+                      Relancer tout
+                    </Button>
+                    <Button size="sm" variant="outline" icon={XCircle}
+                      onClick={() => handleCancelJobs(failedJobs.map(j => j.id))} isLoading={isCancelling}
+                      className="h-6 text-[10px] border-status-danger/50 text-status-danger hover:bg-status-danger-bg">
+                      Annuler tout
+                    </Button>
+                  </div>
+                )}
+              </div>
+              <div className="divide-y divide-status-danger/10 max-h-48 overflow-y-auto">
+                {failedJobs.map((job) => (
+                  <div key={job.id} className="px-3 py-2 flex items-center gap-3 text-xs">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-content-primary truncate">{job.employeNom || job.employeId}</div>
+                      <div className="text-status-danger text-[10px] mt-0.5 truncate" title={job.failureReason || ''}>
+                        {job.failureReason || 'Erreur inconnue'}
+                        {job.failureCode && <span className="ml-1 opacity-60">({job.failureCode})</span>}
+                      </div>
+                      <div className="text-content-muted text-[10px]">
+                        {PAYMENT_METHOD_LABELS[job.paymentMethod] || job.paymentMethod}
+                        {job.operator && ` • ${job.operator}`}
+                        {` • Tentative ${job.retryCount}/${job.maxRetries}`}
+                      </div>
+                    </div>
+                    <div className="font-mono font-bold text-content-primary whitespace-nowrap">
+                      {formatMoney(job.amount)}
+                    </div>
+                    {canPay && (
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button variant="ghost" size="sm" icon={RotateCw}
+                          onClick={() => handleRetryJobs([job.id])} isLoading={isRetrying}
+                          className="h-6 text-[10px] text-status-warning" title="Relancer">
+                        </Button>
+                        <Button variant="ghost" size="sm" icon={XCircle}
+                          onClick={() => handleCancelJobs([job.id])} isLoading={isCancelling}
+                          className="h-6 text-[10px] text-status-danger" title="Annuler">
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </Card>
+          );
+        })()}
+
+        {/* Payment Jobs Panel */}
+        {showPaymentJobs && (paymentJobs as SalaryPaymentJob[]).length > 0 && (
+          <Card padding="none" className="bg-surface-base/50 border-edge">
+            <div className="p-3 border-b border-edge">
+              <h4 className="text-sm font-bold text-content-primary flex items-center gap-2">
+                <Smartphone size={16} className="text-accent" />
+                Suivi des paiements
+              </h4>
+            </div>
+            <div className="divide-y divide-edge-subtle max-h-80 overflow-y-auto">
+              {(paymentJobs as SalaryPaymentJob[]).map((job) => {
+                const statusCfg = JOB_STATUS_CONFIG[job.status] || { variant: 'warning' as const, label: job.status };
+                return (
+                  <div key={job.id} className="px-3 py-2 flex items-center gap-3 text-xs">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-content-primary truncate">{job.employeNom || job.employeId}</div>
+                      <div className="text-content-muted">
+                        {PAYMENT_METHOD_LABELS[job.paymentMethod] || job.paymentMethod}
+                        {job.operator && ` • ${job.operator}`}
+                        {job.scheduledAt && ` • ${new Date(job.scheduledAt).toLocaleDateString('fr-FR')}`}
+                      </div>
+                      {job.failureReason && (
+                        <div className="text-status-danger text-[10px] mt-0.5 truncate" title={job.failureReason}>
+                          {job.failureReason}
+                        </div>
+                      )}
+                    </div>
+                    <div className="font-mono font-bold text-content-primary whitespace-nowrap">
+                      {formatMoney(job.amount)}
+                    </div>
+                    <span className={job.status === 'PROCESSING' ? 'animate-pulse' : ''}>
+                      <Badge variant={statusCfg.variant} value={statusCfg.label} size="xs" />
+                    </span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {job.status === 'PROCESSING' && ['TRANSFER', 'CHECK'].includes(job.paymentMethod) && canPay && (
+                        <Button variant="ghost" size="sm" icon={CheckCircle}
+                          onClick={() => handleConfirmOpen([job.id])}
+                          className="h-6 text-[10px] text-status-success" title="Confirmer">
+                        </Button>
+                      )}
+                      {job.status === 'FAILED' && canPay && (
+                        <Button variant="ghost" size="sm" icon={RotateCw}
+                          onClick={() => handleRetryJobs([job.id])} isLoading={isRetrying}
+                          className="h-6 text-[10px] text-status-warning" title="Relancer">
+                        </Button>
+                      )}
+                      {['CREATED', 'SCHEDULED', 'QUEUED'].includes(job.status) && canPay && (
+                        <Button variant="ghost" size="sm" icon={XCircle}
+                          onClick={() => handleCancelJobs([job.id])} isLoading={isCancelling}
+                          className="h-6 text-[10px] text-status-danger" title="Annuler">
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        )}
       </div>
     );
   };
@@ -658,6 +898,79 @@ export default function PaieManager() {
                 className="bg-status-warning hover:bg-status-warning"
               >
                 Confirmer le Re-run
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Schedule Dialog */}
+      {scheduleDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-surface border border-edge rounded-lg p-5 w-full max-w-md mx-4 shadow-xl">
+            <h3 className="text-sm font-bold text-content-primary flex items-center gap-2 mb-3">
+              <CalendarClock size={16} className="text-status-info" />
+              Programmer le paiement
+            </h3>
+            <p className="text-xs text-content-muted mb-3">
+              Les paiements seront déclenchés automatiquement à la date choisie.
+            </p>
+            <label className="block text-xs text-content-secondary mb-1 font-medium">Date et heure *</label>
+            <input
+              type="datetime-local"
+              className="w-full px-3 py-2 bg-surface-base border border-edge-strong rounded text-sm text-content-primary focus:ring-1 focus:ring-status-info/50 outline-none"
+              value={scheduleDate}
+              onChange={(e) => setScheduleDate(e.target.value)}
+              min={new Date().toISOString().slice(0, 16)}
+            />
+            <div className="flex gap-2 mt-4 justify-end">
+              <Button size="sm" variant="secondary" onClick={() => setScheduleDialogOpen(false)}>Annuler</Button>
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={handleScheduleSubmit}
+                isLoading={isScheduling}
+                disabled={!scheduleDate || isScheduling}
+                className="bg-status-info hover:bg-status-info"
+              >
+                Programmer
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Payment Dialog (TRANSFER/CHECK reference) */}
+      {confirmDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-surface border border-edge rounded-lg p-5 w-full max-w-md mx-4 shadow-xl">
+            <h3 className="text-sm font-bold text-content-primary flex items-center gap-2 mb-3">
+              <CheckCircle size={16} className="text-status-success" />
+              Confirmer le paiement
+            </h3>
+            <p className="text-xs text-content-muted mb-3">
+              Confirmez que le virement ou chèque a été effectué pour {confirmJobIds.length} paiement(s).
+            </p>
+            <label className="block text-xs text-content-secondary mb-1 font-medium">
+              Référence bancaire <span className="text-content-muted font-normal">(optionnel)</span>
+            </label>
+            <input
+              type="text"
+              className="w-full px-3 py-2 bg-surface-base border border-edge-strong rounded text-sm text-content-primary placeholder-content-muted focus:ring-1 focus:ring-status-success/50 outline-none"
+              placeholder="Ex: VIR-2026-02-001, CHQ-4521..."
+              value={confirmReference}
+              onChange={(e) => setConfirmReference(e.target.value)}
+            />
+            <div className="flex gap-2 mt-4 justify-end">
+              <Button size="sm" variant="secondary" onClick={() => setConfirmDialogOpen(false)}>Annuler</Button>
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={handleConfirmSubmit}
+                isLoading={isConfirming}
+                className="bg-status-success hover:bg-status-success"
+              >
+                Confirmer le paiement
               </Button>
             </div>
           </div>

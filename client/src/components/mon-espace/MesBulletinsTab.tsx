@@ -33,6 +33,11 @@ function formatFCFA(value: number | string): string {
 const STATUT_STYLES: Record<string, { bg: string; text: string; label: string }> = {
   PAID: { bg: 'bg-status-success-bg', text: 'text-status-success', label: 'Payé' },
   VALIDATED: { bg: 'bg-status-info-bg', text: 'text-status-info', label: 'Validé' },
+  SCHEDULED: { bg: 'bg-status-info-bg', text: 'text-status-info', label: 'Programmé' },
+  PENDING_CAISSE: { bg: 'bg-status-warning-bg', text: 'text-status-warning', label: 'En attente caisse' },
+  PAYOUT_PENDING: { bg: 'bg-status-warning-bg', text: 'text-status-warning', label: 'Paiement en attente' },
+  PAYOUT_PROCESSING: { bg: 'bg-status-info-bg', text: 'text-status-info', label: 'Paiement en cours' },
+  PAYMENT_FAILED: { bg: 'bg-status-danger-bg', text: 'text-status-danger', label: 'Échec paiement' },
 };
 
 export default function MesBulletinsTab() {

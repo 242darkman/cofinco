@@ -60,6 +60,28 @@ export interface PayrollRunIssue {
   resolved: boolean;
 }
 
+export interface SalaryPaymentJob {
+  id: string;
+  bulletinId: number;
+  payrollRunId: number;
+  employeId: string;
+  paymentMethod: string;
+  executionMode: string;
+  scheduledAt: string | null;
+  amount: string;
+  status: string;
+  failureReason: string | null;
+  failureCode: string | null;
+  retryCount: number;
+  maxRetries: number;
+  operator: string | null;
+  correspondent: string | null;
+  createdAt: string;
+  completedAt: string | null;
+  employeNom?: string;
+  bulletinStatut?: string;
+}
+
 // ============================================================================
 // HOOK
 // ============================================================================
@@ -72,6 +94,7 @@ export function usePaie() {
     queryClient.invalidateQueries({ queryKey: ['my-bulletins'] });
     queryClient.invalidateQueries({ queryKey: ['payroll-runs'] });
     queryClient.invalidateQueries({ queryKey: ['payroll-run'] });
+    queryClient.invalidateQueries({ queryKey: ['payment-jobs'] });
     queryClient.invalidateQueries({ queryKey: ['gl-payroll-661'] });
     queryClient.invalidateQueries({ queryKey: ['gl-payroll-421'] });
   };
@@ -185,8 +208,9 @@ export function usePaie() {
       return res.json();
     },
     onSuccess: (data) => {
-      const count = data?.data?.paid || 0;
-      toast.success(`${count} bulletin(s) marqué(s) comme payé(s)`);
+      const d = data?.data || {};
+      const total = d.totalJobs || d.paid || 0;
+      toast.success(`${total} paiement(s) lancé(s)`);
       invalidateAll();
     },
     onError: (error: Error) => {
@@ -218,6 +242,117 @@ export function usePaie() {
     },
   });
 
+  // ---- Schedule Payment ----
+  const schedulePayMutation = useMutation({
+    mutationFn: async ({ runId, scheduledAt, bulletinIds }: { runId: number; scheduledAt: string; bulletinIds?: number[] }) => {
+      const res = await fetch('/api/hr/paie/schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ runId, scheduledAt, bulletinIds }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || err.message || 'Erreur lors de la programmation');
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      const count = data?.data?.scheduled || 0;
+      toast.success(`${count} paiement(s) programmé(s)`);
+      invalidateAll();
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Erreur lors de la programmation');
+    },
+  });
+
+  // ---- Confirm Manual Payment (TRANSFER/CHECK) ----
+  const confirmPaymentMutation = useMutation({
+    mutationFn: async ({ jobIds, reference }: { jobIds: string[]; reference?: string }) => {
+      const res = await fetch('/api/hr/paie/confirm-payment', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobIds, reference }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || err.message || 'Erreur confirmation');
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      const count = data?.data?.succeeded || 0;
+      toast.success(`${count} paiement(s) confirmé(s)`);
+      invalidateAll();
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Erreur lors de la confirmation');
+    },
+  });
+
+  // ---- Retry Failed Payments ----
+  const retryPaymentMutation = useMutation({
+    mutationFn: async ({ jobIds }: { jobIds: string[] }) => {
+      const res = await fetch('/api/hr/paie/retry-payment', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobIds }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || err.message || 'Erreur relance');
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      const count = data?.data?.retried || 0;
+      toast.success(`${count} paiement(s) relancé(s)`);
+      invalidateAll();
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Erreur lors de la relance');
+    },
+  });
+
+  // ---- Cancel Payments ----
+  const cancelPaymentMutation = useMutation({
+    mutationFn: async ({ jobIds }: { jobIds: string[] }) => {
+      const res = await fetch('/api/hr/paie/cancel-payment', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobIds }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || err.message || 'Erreur annulation');
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      const count = data?.data?.cancelled || 0;
+      toast.success(`${count} paiement(s) annulé(s)`);
+      invalidateAll();
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Erreur lors de l\'annulation');
+    },
+  });
+
+  // ---- Payment Jobs for a run ----
+  function usePaymentJobs(runId: number | null) {
+    return useQuery<SalaryPaymentJob[]>({
+      queryKey: ['payment-jobs', runId],
+      queryFn: async () => {
+        if (!runId) return [];
+        const res = await fetch(`/api/hr/paie/payment-jobs/${runId}`);
+        if (!res.ok) throw new Error('Failed to fetch payment jobs');
+        const json = await res.json();
+        return json.data?.jobs || json.data || json;
+      },
+      enabled: !!runId,
+    });
+  }
+
   return {
     // Bulletins
     myBulletins,
@@ -239,6 +374,17 @@ export function usePaie() {
     isPaying: payRunMutation.isPending,
     rerun: rerunMutation.mutateAsync,
     isRerunning: rerunMutation.isPending,
+
+    // Payment jobs
+    schedulePay: schedulePayMutation.mutateAsync,
+    isScheduling: schedulePayMutation.isPending,
+    confirmPayment: confirmPaymentMutation.mutateAsync,
+    isConfirming: confirmPaymentMutation.isPending,
+    retryPayment: retryPaymentMutation.mutateAsync,
+    isRetrying: retryPaymentMutation.isPending,
+    cancelPayment: cancelPaymentMutation.mutateAsync,
+    isCancelling: cancelPaymentMutation.isPending,
+    usePaymentJobs,
 
     // Legacy compat (deprecated — use run-based operations)
     validateBulletins: async (bulletinIds: number[]) => {

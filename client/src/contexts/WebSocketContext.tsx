@@ -611,6 +611,13 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
              case 'organigramme':
                debounceInvalidate(["/api/hr/organigramme"]);
                break;
+             case 'salary_payment':
+               debounceInvalidate(["payment-jobs"]);
+               debounceInvalidate(["payroll-run"]);
+               debounceInvalidate(["all-bulletins"]);
+               debounceInvalidate(["my-bulletins"]);
+               debounceInvalidate(["payroll-runs"]);
+               break;
            }
          }
          break;

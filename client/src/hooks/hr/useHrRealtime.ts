@@ -24,6 +24,7 @@ export type HrEntity =
   | 'presence'
   | 'paie'
   | 'bulletin'
+  | 'salary_payment'
   | 'formation'
   | 'sanction'
   | 'avantage'
@@ -40,7 +41,9 @@ export type HrAction =
   | 'deleted'
   | 'assigned'
   | 'generated'
-  | 'validated';
+  | 'validated'
+  | 'SUCCEEDED'
+  | 'FAILED';
 
 // HR Update Event payload
 export interface HrUpdateEvent {
@@ -81,6 +84,7 @@ const QUERY_KEY_MAPPINGS: Record<HrEntity, string[][]> = {
   avantage: [['/api/hr/avantages'], ['/api/hr/stats']],
   candidature: [['/api/hr/candidatures'], ['/api/hr/stats']],
   organigramme: [['/api/hr/organigramme']],
+  salary_payment: [['payment-jobs'], ['payroll-run'], ['all-bulletins'], ['my-bulletins'], ['payroll-runs']],
 };
 
 // Default toast messages
@@ -105,6 +109,10 @@ const DEFAULT_TOAST_MESSAGES: Partial<Record<HrEntity, Partial<Record<HrAction, 
   candidature: {
     created: 'Nouvelle candidature reçue',
     updated: 'Statut candidature mis à jour',
+  },
+  salary_payment: {
+    SUCCEEDED: 'Paiement salaire réussi',
+    FAILED: 'Échec paiement salaire',
   },
 };
 
