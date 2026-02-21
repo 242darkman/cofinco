@@ -67,7 +67,6 @@ export default function PaieManager() {
 
   const { user } = useUserProfile();
   const {
-    myBulletins, loadingMyBulletins,
     runs, loadingRuns,
     useRunDetail,
     generatePaie, isGenerating,
@@ -83,7 +82,7 @@ export default function PaieManager() {
 
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
   const isRH = isAdminRole(user?.role) || canViewAllPaie || canGeneratePaie;
-  const [activeTab, setActiveTab] = useState('my');
+  const [activeTab, setActiveTab] = useState('generate');
 
   // Run detail
   const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
@@ -116,36 +115,6 @@ export default function PaieManager() {
 
   // Real-time WebSocket subscription
   useHrRealtime({ entities: ['salary_payment'], showToasts: true });
-
-  // My bulletins: year filter + pagination
-  const currentYear = new Date().getFullYear();
-  const [selectedYear, setSelectedYear] = useState(currentYear);
-  const [myPage, setMyPage] = useState(0);
-  const MY_PAGE_SIZE = 12;
-
-  // Available years from bulletins
-  const availableYears = useMemo(() => {
-    const years = new Set<number>();
-    years.add(currentYear);
-    for (const b of (myBulletins || []) as BulletinPaie[]) {
-      const y = parseInt(b.mois?.split('-')[0]);
-      if (!isNaN(y)) years.add(y);
-    }
-    return [...years].sort((a, b) => b - a);
-  }, [myBulletins, currentYear]);
-
-  // Filtered + sorted bulletins
-  const filteredBulletins = useMemo(() => {
-    return ((myBulletins || []) as BulletinPaie[])
-      .filter(b => b.mois?.startsWith(String(selectedYear)))
-      .sort((a, b) => b.mois.localeCompare(a.mois));
-  }, [myBulletins, selectedYear]);
-
-  const myTotalPages = Math.max(1, Math.ceil(filteredBulletins.length / MY_PAGE_SIZE));
-  const paginatedBulletins = useMemo(
-    () => filteredBulletins.slice(myPage * MY_PAGE_SIZE, (myPage + 1) * MY_PAGE_SIZE),
-    [filteredBulletins, myPage]
-  );
 
   // Filter runs by selected month, sorted by version desc
   const runsDuMois = useMemo(
@@ -258,28 +227,6 @@ export default function PaieManager() {
     toast.success('Export CSV téléchargé');
   }, [selectedMonth]);
 
-  // My bulletins columns
-  const formatMoisLabel = (mois: string) => {
-    const [year, month] = mois.split('-');
-    const d = new Date(Number(year), Number(month) - 1);
-    const label = d.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
-    return label.charAt(0).toUpperCase() + label.slice(1);
-  };
-
-  const myColumns = [
-    { key: 'mois', label: 'Mois', primary: true, format: (val: string) => <span className="font-medium">{formatMoisLabel(val)}</span> },
-    { key: 'salaireNet', label: 'Net à Payer', format: (val: string) => <span className="font-bold text-status-success">{formatMoney(val)}</span> },
-    { key: 'statut', label: 'Statut', format: (val: string) => {
-      const cfg = BULLETIN_STATUS_CONFIG[val] || RUN_STATUS_CONFIG[val] || { variant: 'warning' as const, label: val };
-      return <Badge variant={cfg.variant} value={cfg.label} size="xs" />;
-    }},
-    { key: 'actions', label: '', format: (_val: any, item: BulletinPaie) => (
-      <Button variant="ghost" size="sm" icon={Eye} onClick={(e: React.MouseEvent) => { e.stopPropagation(); setViewerBulletinId(item.id); }}>
-        Voir
-      </Button>
-    )},
-  ];
-
   // Runs list columns
   const runColumns = [
     { key: 'period', label: 'Période', primary: true, format: (val: string) => <span className="font-mono font-medium">{val}</span> },
@@ -299,13 +246,10 @@ export default function PaieManager() {
   const [virementsRunId, setVirementsRunId] = useState<number | null>(null);
 
   const tabs = [
-    { key: 'my', label: 'Mes Bulletins', icon: FileText },
-    ...(isRH ? [
-      { key: 'generate', label: 'Gestion Paie', icon: Calculator },
-      { key: 'virements', label: 'Virements', icon: CreditCard },
-      { key: 'avances', label: 'Avances', icon: Banknote },
-      { key: 'config', label: 'Configuration', icon: Settings },
-    ] : [])
+    { key: 'generate', label: 'Gestion Paie', icon: Calculator },
+    { key: 'virements', label: 'Virements', icon: CreditCard },
+    { key: 'avances', label: 'Avances', icon: Banknote },
+    { key: 'config', label: 'Configuration', icon: Settings },
   ];
 
   // ---- Run Detail View ----
@@ -805,68 +749,7 @@ export default function PaieManager() {
             </div>
           )}
         </div>
-      ) : (
-        /* Mes Bulletins tab */
-        <div className="flex-1 min-h-0 bg-surface-base border border-edge rounded-lg flex flex-col">
-          <div className="shrink-0 p-2 border-b border-edge flex justify-between items-center bg-surface-base/50">
-            <h3 className="font-bold text-content-primary flex items-center gap-2 text-xs">
-              <FileText size={14} className="text-accent" />
-              Mes Bulletins
-            </h3>
-            <div className="flex items-center gap-1.5">
-              <Calendar size={13} className="text-content-muted" />
-              <select
-                value={selectedYear}
-                onChange={(e) => { setSelectedYear(Number(e.target.value)); setMyPage(0); }}
-                className="bg-surface border border-edge rounded text-xs text-content-primary px-2 py-1 outline-none focus:ring-1 focus:ring-accent/50"
-              >
-                {availableYears.map(y => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div className="flex-1 overflow-hidden">
-            <ResponsiveTable
-              data={paginatedBulletins}
-              columns={myColumns}
-              emptyMessage={`Aucun bulletin pour ${selectedYear}.`}
-              loading={loadingMyBulletins}
-              maxHeight="100%"
-              density="compact"
-              className="border-0 rounded-none h-full"
-              headerClassName="bg-surface-base sticky top-0"
-              onRowClick={(item: BulletinPaie) => setViewerBulletinId(item.id)}
-            />
-          </div>
-          {filteredBulletins.length > MY_PAGE_SIZE && (
-            <div className="shrink-0 px-3 py-1.5 border-t border-edge flex items-center justify-between bg-surface-base/50">
-              <span className="text-[10px] text-content-muted">
-                {filteredBulletins.length} bulletin{filteredBulletins.length > 1 ? 's' : ''} en {selectedYear}
-              </span>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setMyPage(p => Math.max(0, p - 1))}
-                  disabled={myPage === 0}
-                  className="p-0.5 rounded hover:bg-surface disabled:opacity-30 disabled:cursor-not-allowed text-content-muted"
-                >
-                  <ChevronLeft size={16} />
-                </button>
-                <span className="text-[10px] text-content-muted font-mono px-1">
-                  {myPage + 1}/{myTotalPages}
-                </span>
-                <button
-                  onClick={() => setMyPage(p => Math.min(myTotalPages - 1, p + 1))}
-                  disabled={myPage >= myTotalPages - 1}
-                  className="p-0.5 rounded hover:bg-surface disabled:opacity-30 disabled:cursor-not-allowed text-content-muted"
-                >
-                  <ChevronRight size={16} />
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      ) : null}
 
       {/* Re-run Dialog */}
       {rerunDialogOpen && (
