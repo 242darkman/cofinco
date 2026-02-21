@@ -16,6 +16,7 @@ import { Card, Button, Badge, IconButton } from '../../ui';
 import { tontineMembreApi, tontineApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { formatClientName } from '../../../lib/format';
+import { currencySymbol } from '@shared/config/currency';
 
 interface DistributionRequest {
   id: string;
@@ -44,7 +45,6 @@ interface Membre {
   totalCotisations?: string;
   toursPayes?: number;
   estAJour?: boolean;
-  msisdn?: string;
   preferredPayoutMethod?: string;
 }
 
@@ -74,6 +74,7 @@ const statusConfig: Record<string, { label: string; variant: 'success' | 'warnin
 };
 
 export default function TontineDistributions({ tontineId, montantContribution, tourActuel, nombreMembres, onUpdate }: TontineDistributionsProps) {
+  const sym = currencySymbol();
   const [distributions, setDistributions] = useState<DistributionRequest[]>([]);
   const [membres, setMembres] = useState<Membre[]>([]);
   const [loading, setLoading] = useState(false);
@@ -265,8 +266,8 @@ export default function TontineDistributions({ tontineId, montantContribution, t
             <div>
               <div className="font-semibold text-status-warning text-sm">Solde insuffisant</div>
               <div className="text-xs text-content-muted mt-1">
-                Solde: <span className="text-content-primary">{soldeDisponible.toLocaleString()} FCFA</span> •
-                Requis: <span className="text-content-primary">{montantEstime.toLocaleString()} FCFA</span>
+                Solde: <span className="text-content-primary">{soldeDisponible.toLocaleString()} {sym}</span> •
+                Requis: <span className="text-content-primary">{montantEstime.toLocaleString()} {sym}</span>
               </div>
             </div>
           </div>
@@ -281,7 +282,7 @@ export default function TontineDistributions({ tontineId, montantContribution, t
             <span className="text-xs font-medium uppercase tracking-wider">Solde Disponible</span>
           </div>
           <div className={`font-bold text-lg ${soldeInsuffisant ? 'text-status-warning' : 'text-status-success'}`}>
-            {soldeDisponible.toLocaleString()} FCFA
+            {soldeDisponible.toLocaleString()} {sym}
           </div>
         </div>
       </Card>
@@ -306,7 +307,7 @@ export default function TontineDistributions({ tontineId, montantContribution, t
             <div className="text-right">
               <div className="text-xs text-content-muted mb-0.5">Montant estimé</div>
               <div className={`text-xl font-bold ${soldeInsuffisant ? 'text-status-warning' : 'text-status-success'}`}>
-                {montantEstime.toLocaleString()} FCFA
+                {montantEstime.toLocaleString()} {sym}
               </div>
             </div>
           </div>
@@ -327,7 +328,7 @@ export default function TontineDistributions({ tontineId, montantContribution, t
                 <div className="flex justify-between items-center">
                   <div>
                     <div className="font-medium text-content-primary text-sm">{memberId ? getMemberName(memberId) : 'Inconnu'}</div>
-                    <div className="text-xs text-content-muted">{getDistributionAmount(dist).toLocaleString()} FCFA</div>
+                    <div className="text-xs text-content-muted">{getDistributionAmount(dist).toLocaleString()} {sym}</div>
                   </div>
                   <Badge variant={statusCfg.variant} className="text-[10px]" value={statusCfg.label} />
                 </div>
@@ -372,7 +373,7 @@ export default function TontineDistributions({ tontineId, montantContribution, t
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="font-bold text-status-success">{getDistributionAmount(dist).toLocaleString()} FCFA</div>
+                    <div className="font-bold text-status-success">{getDistributionAmount(dist).toLocaleString()} {sym}</div>
                   </div>
                 </div>
               </Card>
@@ -398,7 +399,7 @@ export default function TontineDistributions({ tontineId, montantContribution, t
                     Solde insuffisant
                   </div>
                   <div className="text-xs text-content-secondary mt-1">
-                    Manquant: <span className="font-bold text-status-warning">{(montantEstime - soldeDisponible).toLocaleString()} FCFA</span>
+                    Manquant: <span className="font-bold text-status-warning">{(montantEstime - soldeDisponible).toLocaleString()} {sym}</span>
                   </div>
                 </div>
               )}
@@ -426,7 +427,7 @@ export default function TontineDistributions({ tontineId, montantContribution, t
                     ? 'bg-status-warning-bg border border-status-warning/30 text-status-warning'
                     : 'bg-status-success-bg border border-status-success/30 text-status-success'
                 }`}>
-                  {montantEstime.toLocaleString()} FCFA
+                  {montantEstime.toLocaleString()} {sym}
                 </div>
               </div>
 

@@ -1530,6 +1530,40 @@ export const tontineApi = {
 
   // Dashboard
   getDashboard: (tontineId: string) => request<any>(`/tontines/${tontineId}/dashboard`),
+
+  // Lifecycle
+  activate: (tontineId: string, reason?: string) =>
+    request<any>(`/tontines/${tontineId}/activate`, { method: 'POST', body: JSON.stringify({ reason }) }),
+  pause: (tontineId: string, reason?: string) =>
+    request<any>(`/tontines/${tontineId}/pause`, { method: 'POST', body: JSON.stringify({ reason }) }),
+  resume: (tontineId: string, reason?: string) =>
+    request<any>(`/tontines/${tontineId}/resume`, { method: 'POST', body: JSON.stringify({ reason }) }),
+  complete: (tontineId: string, reason?: string) =>
+    request<any>(`/tontines/${tontineId}/complete`, { method: 'POST', body: JSON.stringify({ reason }) }),
+  cancel: (tontineId: string, reason?: string) =>
+    request<any>(`/tontines/${tontineId}/cancel`, { method: 'POST', body: JSON.stringify({ reason }) }),
+
+  // Member workflow
+  requestMemberExit: (tontineId: string, membreId: string) =>
+    request<any>(`/tontines/${tontineId}/membres/${membreId}/request-exit`, { method: 'POST' }),
+  approveMemberExit: (tontineId: string, membreId: string) =>
+    request<any>(`/tontines/${tontineId}/membres/${membreId}/approve-exit`, { method: 'POST' }),
+  replaceMember: (tontineId: string, membreId: string, newClientId: string) =>
+    request<any>(`/tontines/${tontineId}/membres/${membreId}/replace`, {
+      method: 'POST', body: JSON.stringify({ newClientId }),
+    }),
+  assignMemberRole: (tontineId: string, membreId: string, role: string | null) =>
+    request<any>(`/tontines/${tontineId}/membres/${membreId}/role`, {
+      method: 'PATCH', body: JSON.stringify({ role }),
+    }),
+
+  // Penalties
+  getPenalties: (tontineId: string) => request<any[]>(`/tontines/${tontineId}/penalites`),
+  payPenalty: (tontineId: string, penaliteId: string) =>
+    request<any>(`/tontines/${tontineId}/penalites/${penaliteId}/pay`, { method: 'POST' }),
+
+  // Reconciliation
+  getReconciliation: (tontineId: string) => request<any>(`/tontines/${tontineId}/reconciliation`),
 };
 
 // Tontine Plans API
@@ -2073,80 +2107,12 @@ export const contributionTontineApi = {
   }),
 };
 
-// Alertes Tontine API
-export const alerteTontineApi = {
-  getByTontine: (tontineId: string, params?: { statut?: string }) => {
-    const queryParams = new URLSearchParams();
-    if (params?.statut && params.statut !== 'all') queryParams.append('status', params.statut);
-    const query = queryParams.toString();
-    return request<any[]>(`/tontines/${tontineId}/alertes${query ? `?${query}` : ''}`);
-  },
-  markAsRead: (id: string) => request<any>(`/alertes-tontine/${id}/read`, {
-    method: 'PATCH',
-  }),
-  update: (id: string, data: { statut?: string }) => request<any>(`/tontine-alertes/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify(data),
-  }),
-  resolve: (id: string) => request<any>(`/tontine-alertes/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ statut: 'RESOLVED' }),
-  }),
-  ignore: (id: string) => request<any>(`/tontine-alertes/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ statut: 'IGNORED' }),
-  }),
-};
-
-// Règles Tontine API
-export const regleTontineApi = {
-  getByTontine: (tontineId: string) => request<any[]>(`/tontines/${tontineId}/regles`),
-  create: (tontineId: string, data: any) => request<any>(`/tontines/${tontineId}/regles`, {
+// Tontine Schedule API
+export const tontineScheduleApi = {
+  preview: (data: any) => request<any>('/tontine-schedule/preview', {
     method: 'POST',
     body: JSON.stringify(data),
   }),
-  update: (id: string, data: any) => request<any>(`/regles-tontine/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify(data),
-  }),
-  delete: (id: string) => request<void>(`/regles-tontine/${id}`, {
-    method: 'DELETE',
-  }),
-};
-
-// Pénalités Tontine API
-export const penaliteTontineApi = {
-  getByTontine: (tontineId: string) => request<any[]>(`/tontines/${tontineId}/penalites`),
-  create: (data: any) => request<any>('/penalites-tontine', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }),
-  update: (id: string, data: any) => request<any>(`/tontine-penalites/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify(data),
-  }),
-};
-
-// Aliases for backward compatibility
-export const tontineRegleApi = {
-  getByTontine: (tontineId: string) => regleTontineApi.getByTontine(tontineId),
-  create: (data: any) => request<any>('/tontine-regles', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }),
-  update: (id: string, data: any) => request<any>(`/tontine-regles/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify(data),
-  }),
-  delete: (id: string) => request<void>(`/tontine-regles/${id}`, {
-    method: 'DELETE',
-  }),
-};
-
-export const tontinePenaliteApi = {
-  getByTontine: (tontineId: string) => penaliteTontineApi.getByTontine(tontineId),
-  create: (data: any) => penaliteTontineApi.create(data),
-  update: (id: string, data: any) => penaliteTontineApi.update(id, data),
 };
 
 // Échéances Crédit API
@@ -2490,6 +2456,9 @@ export const settingsExtendedApi = {
   }) => request<any>('/settings/maintenance-schedules', { method: 'POST', body: JSON.stringify(data) }),
   updateMaintenanceSchedule: (id: string, data: any) =>
     request<any>(`/settings/maintenance-schedules/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+
+  // Holiday Calendars (for tontine selectors)
+  getHolidayCalendars: () => request<{ id: string; nom: string; description: string | null }[]>('/holiday-calendars'),
 
   // Holiday Exceptions
   getHolidays: (agenceId?: string) => {
@@ -3014,16 +2983,6 @@ export const importLogApi = {
     method: 'POST',
     body: JSON.stringify(data),
   }),
-};
-
-// Membres Tontine API (admin)
-export const membreTontineApi = {
-  getByTontine: (tontineId: string) => request<any[]>(`/tontine-membres?tontine_id=${tontineId}`),
-  create: (data: any) => request<any>('/tontine-membres', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }),
-  delete: (id: string) => request<any>(`/tontine-membres/${id}`, { method: 'DELETE' }),
 };
 
 // ============================================

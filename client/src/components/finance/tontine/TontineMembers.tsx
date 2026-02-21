@@ -19,6 +19,7 @@ import {
   STATUT_MEMBRE_TONTINE_LABELS,
   TypeCompte
 } from '@shared/enum/status-constants';
+import { currencySymbol } from '@shared/config/currency';
 
 interface Client {
   id: string;
@@ -56,6 +57,8 @@ interface TontineMembre {
   montantCotisation?: number;
   cotisationAutomatique?: boolean;
   cotisationCompteId?: string;
+  groupRole?: string | null;
+  exitRequestedAt?: string | null;
 }
 
 interface TontineMembersProps {
@@ -98,6 +101,7 @@ const MemberStatusBadge = ({ membre, tourActuel }: { membre: TontineMembre; tour
 };
 
 export default function TontineMembers({ tontineId, maxMembres, onUpdate }: TontineMembersProps) {
+  const sym = currencySymbol();
   const [membres, setMembres] = useState<TontineMembre[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
@@ -170,9 +174,6 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
         position_ordre: nextOrdre,
       });
 
-      // Update tontine member count
-      await tontineApi.update(tontineId, { nombre_membres: nextOrdre });
-
       // Récupérer le nom du client pour le feedback
       const addedClient = clients.find(c => c.id === selectedClientId);
       const clientNom = addedClient?.nom || 'Nouveau membre';
@@ -203,7 +204,6 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
         onConfirm: async () => {
           try {
             await tontineMembreApi.remove(tontineId, membre.id);
-            await tontineApi.update(tontineId, { nombre_membres: membres.length - 1 });
 
             fetchMembres();
             onUpdate();
@@ -216,6 +216,16 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
     },
     [tontineId, membres.length, fetchMembres, onUpdate, openConfirm]
   );
+
+  const handleRoleChange = useCallback(async (membre: TontineMembre, newRole: string | null) => {
+    try {
+      await tontineApi.assignMemberRole(tontineId, membre.id, newRole);
+      fetchMembres();
+      toast.success(newRole ? `Role ${newRole} attribue` : 'Role retire');
+    } catch (error) {
+      toast.error(handleApiError(error, "Erreur lors du changement de role"));
+    }
+  }, [tontineId, fetchMembres]);
 
   // Memoized filtered clients (excludes already added members)
   const filteredClients = useMemo(() => {
@@ -264,10 +274,10 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
       'Position': m.positionOrdre,
       'Nom': formatClientName(m.client?.nom, m.client?.prenom),
       'Statut': getStatutLabel(m.status || m.statut || StatutMembreTontine.ACTIVE),
-      'Total cotisé (FCFA)': Number(m.totalCotisations || m.montantTotalContribue || 0),
+      [`Total cotisé (${sym})`]: Number(m.totalCotisations || m.montantTotalContribue || 0),
       'Tours payés': m.toursPayes ?? '-',
       'Tours restants': m.toursRestants ?? '-',
-      'Restant (FCFA)': m.montantRestant ?? 0,
+      [`Restant (${sym})`]: m.montantRestant ?? 0,
       'Bénéfice reçu': m.aRecuBenefice ? 'Oui' : 'Non',
       "Date d'adhésion": new Date(m.dateAdhesion || '').toLocaleDateString('fr-FR'),
     }));
@@ -447,6 +457,16 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
                           </span>
                           {/* Status Badge Mobile-First */}
                           <MemberStatusBadge membre={membre} tourActuel={membre.tourActuel || 1} />
+                          {membre.groupRole && (
+                            <span className="px-1.5 py-0.5 rounded bg-accent/10 text-accent text-[10px] font-bold">
+                              {membre.groupRole}
+                            </span>
+                          )}
+                          {membre.exitRequestedAt && !membre.dateBenefice && (
+                            <span className="px-1.5 py-0.5 rounded bg-status-warning-bg text-status-warning text-[10px] font-bold">
+                              Sortie demandee
+                            </span>
+                          )}
                         </div>
                       </div>
 
@@ -457,12 +477,11 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
                         type="button"
                       >
                         <Trash2 size={14} aria-hidden="true" />
-                        <Trash2 size={14} aria-hidden="true" />
                       </button>
                     </div>
 
                     <div className="flex items-center gap-2 mt-2">
-                        <button 
+                        <button
                             onClick={() => handleOpenConfig(membre)}
                             className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] uppercase font-bold tracking-wider border transition-colors ${
                                 membre.cotisationAutomatique
@@ -473,6 +492,17 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
                             <Settings size={10} />
                             {membre.cotisationAutomatique ? 'Auto ON' : 'Auto OFF'}
                         </button>
+                        <select
+                          value={membre.groupRole || ''}
+                          onChange={(e) => handleRoleChange(membre, e.target.value || null)}
+                          className="px-1.5 py-1 text-[10px] bg-input border border-input-border rounded-md text-content-secondary focus:border-input-focus focus:outline-none"
+                          title="Role du membre"
+                        >
+                          <option value="">Membre</option>
+                          <option value="PRESIDENT">President</option>
+                          <option value="TRESORIER">Tresorier</option>
+                          <option value="SECRETAIRE">Secretaire</option>
+                        </select>
                     </div>
 
                     {/* Stats de cotisations */}
@@ -480,13 +510,13 @@ export default function TontineMembers({ tontineId, maxMembres, onUpdate }: Tont
                       <div className="flex flex-col">
                         <span className="text-content-muted">Total cotisé</span>
                         <span className="font-bold text-status-success">
-                          {Number(membre.totalCotisations || membre.montantTotalContribue || 0).toLocaleString('fr-FR')} FCFA
+                          {Number(membre.totalCotisations || membre.montantTotalContribue || 0).toLocaleString('fr-FR')} {sym}
                         </span>
                       </div>
                       <div className="flex flex-col text-right">
                         <span className="text-content-muted">Restant</span>
                         <span className={`font-bold ${(membre.montantRestant || 0) > 0 ? 'text-status-warning' : 'text-status-success'}`}>
-                          {(membre.montantRestant || 0).toLocaleString('fr-FR')} FCFA
+                          {(membre.montantRestant || 0).toLocaleString('fr-FR')} {sym}
                         </span>
                       </div>
                     </div>
