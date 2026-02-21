@@ -308,7 +308,7 @@ export default function SearchableSelect({
           >
               {/* Left Icon / Avatar */}
                {showAvatarInTrigger && selectedOption && !selectedOption.hideAvatar ? (
-                 <div className="shrink-0 mr-3">
+                 <div className="shrink-0 mr-2">
                    <OptionAvatar image={selectedOption.image} label={selectedOption.label} emoji={selectedOption.emoji} />
                  </div>
                ) : (
@@ -318,7 +318,7 @@ export default function SearchableSelect({
                )}
 
                {/* Content Area: Either Display Value or Search Input */}
-               <div className="flex-1 min-w-0">
+               <div className="flex-1 min-w-0 overflow-hidden">
                   {isOpen ? (
                      <input
                         ref={searchInputRef}
@@ -337,9 +337,9 @@ export default function SearchableSelect({
                         }}
                      />
                   ) : selectedOption ? (
-                    <div>
-                      <div className="text-[13px] text-[#111827] truncate leading-tight">{selectedOption.label}</div>
-                      {selectedOption.subLabel && <div className="text-xs text-gray-400 truncate">{selectedOption.subLabel}</div>}
+                    <div className="flex items-center gap-1.5 truncate">
+                      <span className="text-[13px] text-[#111827] truncate leading-tight">{selectedOption.label}</span>
+                      {selectedOption.subLabel && <span className="text-[11px] text-gray-400 truncate shrink-0">{selectedOption.subLabel}</span>}
                     </div>
                   ) : (
                      <span className="text-[#9CA3AF] text-[13px] block">{placeholder}</span>
