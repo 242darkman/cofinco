@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { TrendingUp, Users, DollarSign, CheckCircle, AlertTriangle, Calendar, Activity, ArrowRight, Play, Gift, RefreshCw, ChevronDown, ChevronUp, Lock, Clock } from 'lucide-react';
+import { TrendingUp, Users, DollarSign, CheckCircle, AlertTriangle, Calendar, Activity, ArrowRight, Play, Gift, RefreshCw, ChevronDown, ChevronUp, Lock, Clock, Square } from 'lucide-react';
 import { Card, ProgressBar, Button, Badge } from '../../ui';
 import { toast } from '../../../lib/toast';
 import { tontineApi } from '../../../lib/api-client';
@@ -38,6 +38,7 @@ export default function TontineDashboard({
 
   const [loading, setLoading] = useState(false);
   const [generatingCycle, setGeneratingCycle] = useState(false);
+  const [closingCycle, setClosingCycle] = useState(false);
   const [showAllTurns, setShowAllTurns] = useState(false);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
 
@@ -102,6 +103,20 @@ export default function TontineDashboard({
       setGeneratingCycle(false);
     }
   }, [tontineId]);
+
+  const handleCloseCycle = useCallback(async () => {
+    if (!tontineId || !currentCycle?.id) return;
+    setClosingCycle(true);
+    try {
+      await tontineApi.closeCycle(tontineId, currentCycle.id);
+      toast.success('Cycle cloture avec succes');
+      fetchDashboard();
+    } catch (error: any) {
+      toast.error(error.message || 'Erreur lors de la cloture du cycle');
+    } finally {
+      setClosingCycle(false);
+    }
+  }, [tontineId, dashboard]);
 
   // Compute stats
   const stats = dashboard?.stats || {};
@@ -179,9 +194,27 @@ export default function TontineDashboard({
             <Calendar className="text-status-info" size={16} />
           </div>
           {currentCycle ? (
-            <div className="flex items-center gap-2">
-              <span className="text-xl font-bold text-content-primary">#{currentCycle.cycleNumber}</span>
-              <Badge variant="success" className="text-[10px]" value="Actif" />
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xl font-bold text-content-primary">#{currentCycle.cycleNumber}</span>
+                <Badge
+                  variant={currentCycle.status === 'OPEN' ? 'success' : currentCycle.status === 'PAUSED' ? 'warning' : 'neutral'}
+                  className="text-[10px]"
+                  value={currentCycle.status === 'OPEN' ? 'Ouvert' : currentCycle.status === 'PAUSED' ? 'Pause' : currentCycle.status === 'CLOSED' ? 'Cloture' : currentCycle.status}
+                />
+              </div>
+              {currentCycle.status === 'OPEN' && progressPercent === 100 && (
+                <Button
+                  size="xs"
+                  variant="outline"
+                  onClick={handleCloseCycle}
+                  disabled={closingCycle}
+                  className="w-full text-[10px] mt-2"
+                  icon={closingCycle ? RefreshCw : Square}
+                >
+                  {closingCycle ? 'Cloture...' : 'Cloturer le cycle'}
+                </Button>
+              )}
             </div>
           ) : (
             <Button
@@ -192,7 +225,7 @@ export default function TontineDashboard({
               className="w-full text-xs"
               icon={generatingCycle ? RefreshCw : Play}
             >
-              {generatingCycle ? 'Génération...' : 'Démarrer'}
+              {generatingCycle ? 'Generation...' : 'Demarrer'}
             </Button>
           )}
         </Card>

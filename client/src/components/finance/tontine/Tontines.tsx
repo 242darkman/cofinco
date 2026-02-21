@@ -23,6 +23,8 @@ import TontineDistributions from './TontineDistributions';
 import { TontineStatus, type Tontine as SchemaTontine } from '@shared/schema/tontines';
 import TontineDashboard from './TontineDashboard';
 import TontineCalendar from './TontineCalendar';
+import TontineConfig from './TontineConfig';
+import TontinePenalties from './TontinePenalties';
 import { currencySymbol } from '@shared/config/currency';
 
 // Extends the DB schema type with computed fields returned by the API
@@ -48,7 +50,7 @@ export default function Tontines() {
   const [showForm, setShowForm] = useState(false);
   const [editingTontine, setEditingTontine] = useState<Tontine | null>(null);
   const [selectedTontine, setSelectedTontine] = useState<Tontine | null>(null);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'details' | 'membres' | 'contributions' | 'distributions' | 'calendar'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'config' | 'membres' | 'contributions' | 'distributions' | 'penalites' | 'calendar'>('dashboard');
 
   useEffect(() => {
     fetchTontines();
@@ -330,10 +332,11 @@ export default function Tontines() {
             onTabChange={(key) => setActiveTab(key as any)}
             tabs={[
               { key: 'dashboard', label: 'Dashboard' },
-              { key: 'details', label: 'Détails' },
+              { key: 'config', label: 'Configuration' },
               { key: 'membres', label: 'Membres' },
               { key: 'contributions', label: 'Contributions' },
               { key: 'distributions', label: 'Distributions' },
+              { key: 'penalites', label: 'Penalites' },
               { key: 'calendar', label: 'Calendrier' },
             ]}
             variant="underline"
@@ -350,41 +353,8 @@ export default function Tontines() {
                   tourActuel={selectedTontine.tourActuel}
                 />
               )}
-              {activeTab === 'details' && (
-                 <Card>
-                    <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                       <div className="p-3 bg-surface/40 rounded-lg border border-edge-subtle">
-                          <div className="flex items-center gap-1.5 text-content-muted mb-1">
-                             <Clock size={14} />
-                             <span className="text-[10px] uppercase tracking-wider font-bold">Fréquence</span>
-                          </div>
-                          <div className="text-content-primary font-medium text-sm pl-0.5">{selectedTontine.frequence}</div>
-                       </div>
-                       <div className="p-3 bg-surface/40 rounded-lg border border-edge-subtle">
-                          <div className="flex items-center gap-1.5 text-content-muted mb-1">
-                             <Calendar size={14} />
-                             <span className="text-[10px] uppercase tracking-wider font-bold">Date Début</span>
-                          </div>
-                          <div className="text-content-primary font-medium text-sm pl-0.5">{new Date(selectedTontine.dateDebut).toLocaleDateString()}</div>
-                       </div>
-                       <div className="p-3 bg-surface/40 rounded-lg border border-edge-subtle">
-                          <div className="flex items-center gap-1.5 text-content-muted mb-1">
-                             <Calendar size={14} />
-                             <span className="text-[10px] uppercase tracking-wider font-bold">Créé le</span>
-                          </div>
-                          <div className="text-content-primary font-medium text-sm pl-0.5">{new Date(selectedTontine.createdAt).toLocaleDateString()}</div>
-                       </div>
-                       <div className="p-3 bg-surface/40 rounded-lg border border-edge-subtle">
-                          <div className="flex items-center gap-1.5 text-content-muted mb-1">
-                             <Activity size={14} />
-                             <span className="text-[10px] uppercase tracking-wider font-bold">Statut</span>
-                          </div>
-                          <div className="pl-0.5">
-                             <Badge value={selectedTontine.statut} />
-                          </div>
-                       </div>
-                    </div>
-                 </Card>
+              {activeTab === 'config' && (
+                <TontineConfig tontineId={selectedTontine.id} />
               )}
               {activeTab === 'membres' && <TontineMembers tontineId={selectedTontine.id} maxMembres={selectedTontine.nombreMembres} onUpdate={fetchTontines} />}
               {activeTab === 'contributions' && <TontineContributions tontineId={selectedTontine.id} />}
@@ -396,6 +366,9 @@ export default function Tontines() {
                   nombreMembres={selectedTontine.nombreMembres}
                   onUpdate={fetchTontines}
                 />
+              )}
+              {activeTab === 'penalites' && (
+                <TontinePenalties tontineId={selectedTontine.id} onUpdate={fetchTontines} />
               )}
               {activeTab === 'calendar' && (
                 <TontineCalendar

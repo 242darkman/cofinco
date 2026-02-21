@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Users, Edit, Trash2, Plus, UserPlus, AlertTriangle } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Users, Edit, Trash2, Plus, UserPlus, AlertTriangle, Play, Pause, CheckCircle, Ban, RotateCcw, Search, Filter } from 'lucide-react';
 import { Card, Button, Badge, Pagination, ResponsiveTable, TableColumn } from '../ui';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import { usePermissions } from '../auth/ProtectedFeature';
@@ -8,7 +8,8 @@ import { toast, handleApiError } from '../../lib/toast';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import AdminTontinePlansGestion from './AdminTontinePlansGestion';
 import { TontineGroupWizard } from './TontineGroupWizard';
-import { StatutClient } from '@shared/enum/status-constants';
+import { StatutClient, STATUT_TONTINE_LABELS } from '@shared/enum/status-constants';
+import { TontineStatus } from '@shared/schema/tontines';
 import type { Tontine, TontinePlan } from '@shared/schema/tontines';
 
 interface Membre {
@@ -59,6 +60,9 @@ export default function AdminTontinesGestion() {
   const [membresPage, setMembresPage] = useState(1);
   const [activeTab, setActiveTab] = useState<'groupes' | 'plans'>('groupes');
   const [showPlanForm, setShowPlanForm] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [lifecycleLoading, setLifecycleLoading] = useState<string | null>(null);
   const itemsPerPage = 10;
 
   const [membreForm, setMembreForm] = useState({
@@ -206,6 +210,52 @@ export default function AdminTontinesGestion() {
     });
   }, [selectedTontine, openConfirm, chargerMembres, chargerTontines]);
 
+  // Lifecycle actions
+  const lifecycleActions: Record<string, { label: string; icon: React.ElementType; method: 'activate' | 'pause' | 'resume' | 'complete' | 'cancel'; variant: 'info' | 'warning' | 'danger'; allowedFrom: string[] }> = {
+    activate: { label: 'Activer', icon: Play, method: 'activate', variant: 'info', allowedFrom: [TontineStatus.DRAFT] },
+    pause: { label: 'Suspendre', icon: Pause, method: 'pause', variant: 'warning', allowedFrom: [TontineStatus.ACTIVE] },
+    resume: { label: 'Reprendre', icon: RotateCcw, method: 'resume', variant: 'info', allowedFrom: [TontineStatus.PAUSED] },
+    complete: { label: 'Terminer', icon: CheckCircle, method: 'complete', variant: 'warning', allowedFrom: [TontineStatus.ACTIVE, TontineStatus.PAUSED] },
+    cancel: { label: 'Annuler', icon: Ban, method: 'cancel', variant: 'danger', allowedFrom: [TontineStatus.DRAFT, TontineStatus.ACTIVE, TontineStatus.PAUSED] },
+  };
+
+  const handleLifecycleAction = useCallback((tontine: Tontine, actionKey: string) => {
+    const action = lifecycleActions[actionKey];
+    if (!action) return;
+
+    openConfirm({
+      title: `${action.label} la tontine ?`,
+      message: `Êtes-vous sûr de vouloir ${action.label.toLowerCase()} la tontine "${tontine.nom}" ?`,
+      variant: action.variant,
+      confirmText: action.label,
+      onConfirm: async () => {
+        setLifecycleLoading(tontine.id);
+        try {
+          await tontineApi[action.method](tontine.id);
+          toast.success(`Tontine ${action.label.toLowerCase()}e avec succès`);
+          await chargerTontines();
+        } catch (error) {
+          toast.error(handleApiError(error, `Erreur lors de l'action "${action.label}"`));
+        } finally {
+          setLifecycleLoading(null);
+        }
+      },
+    });
+  }, [openConfirm, chargerTontines]);
+
+  // Filtered tontines
+  const filteredTontines = useMemo(() => {
+    let result = tontines;
+    if (statusFilter) {
+      result = result.filter((t) => t.statut === statusFilter);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      result = result.filter((t) => t.nom?.toLowerCase().includes(q));
+    }
+    return result;
+  }, [tontines, statusFilter, searchQuery]);
+
   const handleLaunchFromPlan = (plan: TontinePlan) => {
     setActiveTab('groupes');
     setEditTontine(null);
@@ -283,10 +333,37 @@ export default function AdminTontinesGestion() {
         />
       ) : (
         <>
+          {/* Search & Filters */}
+          <div className="flex flex-col sm:flex-row gap-3 mb-4">
+            <div className="relative flex-1">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" />
+              <input
+                type="text"
+                placeholder="Rechercher par nom..."
+                value={searchQuery}
+                onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                className="w-full pl-9 pr-3 py-2 bg-input border border-input-border rounded-lg text-sm text-content-primary placeholder:text-content-muted focus:border-input-focus focus:outline-none"
+              />
+            </div>
+            <div className="relative">
+              <Filter size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted pointer-events-none" />
+              <select
+                value={statusFilter}
+                onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
+                className="pl-9 pr-8 py-2 bg-input border border-input-border rounded-lg text-sm text-content-primary focus:border-input-focus focus:outline-none appearance-none cursor-pointer"
+              >
+                <option value="">Tous les statuts</option>
+                {Object.entries(STATUT_TONTINE_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
           {/* Tontines Table */}
           {(() => {
-        const totalPages = Math.ceil(tontines.length / itemsPerPage);
-        const paginatedTontines = tontines.slice(
+        const totalPages = Math.ceil(filteredTontines.length / itemsPerPage);
+        const paginatedTontines = filteredTontines.slice(
           (currentPage - 1) * itemsPerPage,
           currentPage * itemsPerPage
         );
@@ -318,10 +395,20 @@ export default function AdminTontinesGestion() {
             label: 'Frais',
             format: (val) => <span className="text-status-success font-medium">{val || 0}%</span>
           },
-           { 
-            key: 'statut', 
-            label: 'Statut', 
-            badge: true
+          {
+            key: 'dateDebut',
+            label: 'Début',
+            format: (val) => val ? new Date(val).toLocaleDateString('fr-FR') : <span className="text-content-muted">—</span>,
+          },
+           {
+            key: 'statut',
+            label: 'Statut',
+            format: (val) => {
+              const variantMap: Record<string, 'neutral' | 'success' | 'warning' | 'danger' | 'info'> = {
+                DRAFT: 'neutral', ACTIVE: 'success', PAUSED: 'warning', COMPLETED: 'info', CANCELLED: 'danger',
+              };
+              return <Badge value={STATUT_TONTINE_LABELS[val] || val} variant={variantMap[val] || 'neutral'} size="sm" />;
+            },
           },
         ];
 
@@ -331,12 +418,36 @@ export default function AdminTontinesGestion() {
               data={paginatedTontines}
               columns={columns}
               density="compact"
-              emptyMessage="Aucune tontine trouvée. Créez-en une pour commencer."
+              emptyMessage={searchQuery || statusFilter ? "Aucune tontine ne correspond aux filtres." : "Aucune tontine trouvée. Créez-en une pour commencer."}
               onRowClick={(item) => handleSelectTontine(item)}
               actions={(tontine) => (
-                 <div className="flex items-center gap-1">
+                 <div className="flex items-center gap-0.5">
+                  {/* Lifecycle buttons */}
+                  {canEditTontines && Object.entries(lifecycleActions).map(([key, action]) => {
+                    if (!action.allowedFrom.includes(tontine.statut)) return null;
+                    const Icon = action.icon;
+                    const isLoading = lifecycleLoading === tontine.id;
+                    return (
+                      <button
+                        key={key}
+                        onClick={(e) => { e.stopPropagation(); handleLifecycleAction(tontine, key); }}
+                        disabled={isLoading}
+                        className={`p-1.5 rounded-lg text-content-muted transition-colors ${
+                          action.variant === 'danger'
+                            ? 'hover:text-status-danger hover:bg-status-danger-bg'
+                            : action.variant === 'warning'
+                            ? 'hover:text-status-warning hover:bg-status-warning-bg'
+                            : 'hover:text-status-info hover:bg-status-info-bg'
+                        } disabled:opacity-50`}
+                        title={action.label}
+                      >
+                        <Icon size={15} />
+                      </button>
+                    );
+                  })}
+                  {/* Edit */}
                   {canEditTontines && (
-                    <button 
+                    <button
                       onClick={(e) => { e.stopPropagation(); handleEditTontine(tontine); }}
                       className="p-1.5 rounded-lg text-content-muted hover:text-content-primary hover:bg-surface-elevated transition-colors"
                       title="Modifier"
@@ -344,8 +455,9 @@ export default function AdminTontinesGestion() {
                       <Edit size={16} />
                     </button>
                   )}
-                  {canDeleteTontines && (
-                    <button 
+                  {/* Delete (only DRAFT) */}
+                  {canDeleteTontines && tontine.statut === TontineStatus.DRAFT && (
+                    <button
                       onClick={(e) => { e.stopPropagation(); handleDeleteTontine(tontine.id); }}
                       className="p-1.5 rounded-lg text-content-muted hover:text-status-danger hover:bg-status-danger-bg transition-colors"
                       title="Supprimer"
