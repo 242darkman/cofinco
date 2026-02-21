@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -16,6 +16,7 @@ import {
   AlertTriangle,
   AlertCircle,
   Settings,
+  Download,
   MoreHorizontal,
   Play,
   Ban,
@@ -660,7 +661,26 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
     return null;
   };
 
-
+  // Export Transferts CSV
+  const handleExportTransferts = useCallback(() => {
+    if (transferts.length === 0) return;
+    const headers = ['Date', 'Type', 'Caisse', 'Montant', 'Statut', 'Initié par'];
+    const rows = transferts.map((t: any) => [
+      format(new Date(t.createdAt), 'dd/MM/yyyy HH:mm', { locale: fr }),
+      t.typeTransfert === 'COFFRE_VERS_CAISSE' ? 'Sortie' : 'Entrée',
+      t.typeTransfert === 'COFFRE_VERS_CAISSE' ? t.caisseDestinationNom : t.caisseSourceNom,
+      `${t.typeTransfert === 'COFFRE_VERS_CAISSE' ? '-' : '+'}${Number(t.montant).toLocaleString('fr-FR')}`,
+      t.statut,
+      `${t.requestedByNom || ''} ${t.requestedByPrenom || ''}`.trim(),
+    ]);
+    const bom = '\uFEFF';
+    const csvContent = [headers.join(';'), ...rows.map((r: string[]) => r.join(';'))].join('\n');
+    const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `transferts_coffre_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    link.click();
+  }, [transferts]);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -998,20 +1018,33 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
                         <span className="text-[9px] text-content-muted font-medium">{transferts.length}</span>
                       )}
                    </div>
-                   <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => refetch()}
-                      disabled={isRefetchingTransferts}
-                      className="h-7 px-2 text-[10px] text-content-muted hover:text-content-primary"
-                   >
-                      <Loader2
-                          size={12}
-                          className={`mr-1 ${isRefetchingTransferts ? 'animate-spin text-status-info' : 'text-content-muted'}`}
-                      />
-                      <span className="hidden xs:inline">Actualiser</span>
-                      <span className="xs:hidden">Act.</span>
-                   </Button>
+                   <div className="flex items-center gap-1">
+                     <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleExportTransferts}
+                        disabled={transferts.length === 0}
+                        className="h-7 px-2 text-[10px] text-content-muted hover:text-content-primary"
+                        title="Exporter en CSV"
+                     >
+                        <Download size={12} className="mr-1" />
+                        <span className="hidden xs:inline">CSV</span>
+                     </Button>
+                     <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => refetch()}
+                        disabled={isRefetchingTransferts}
+                        className="h-7 px-2 text-[10px] text-content-muted hover:text-content-primary"
+                     >
+                        <Loader2
+                            size={12}
+                            className={`mr-1 ${isRefetchingTransferts ? 'animate-spin text-status-info' : 'text-content-muted'}`}
+                        />
+                        <span className="hidden xs:inline">Actualiser</span>
+                        <span className="xs:hidden">Act.</span>
+                     </Button>
+                   </div>
               </div>
 
               <ResponsiveTable
@@ -1162,12 +1195,39 @@ function CoffreFortHistorique({ agenceId }: { agenceId: string }) {
     const { currency } = useCurrency();
     const [selectedMouvement, setSelectedMouvement] = useState<any>(null);
 
+    // Date range filter — defaults to last 30 days
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const thirtyDaysAgo = format(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd');
+    const [dateFrom, setDateFrom] = useState(thirtyDaysAgo);
+    const [dateTo, setDateTo] = useState(today);
+
     const { data, isLoading, refetch, isRefetching } = useQuery({
-        queryKey: coffreKeys.mouvements(agenceId),
-        queryFn: () => coffreApi.getMouvements({ agenceId, limit: 100 }),
+        queryKey: [...coffreKeys.mouvements(agenceId), dateFrom, dateTo],
+        queryFn: () => coffreApi.getMouvements({ agenceId, limit: 500, dateFrom, dateTo }),
     });
 
     const mouvements = data?.data || [];
+
+    // Export CSV
+    const handleExportCSV = () => {
+      if (mouvements.length === 0) return;
+      const headers = ['Date', 'Type', 'Sens', 'Description', 'Montant', 'Effectué par'];
+      const rows = mouvements.map((m: any) => [
+        format(new Date(m.dateOperation), 'dd/MM/yyyy HH:mm', { locale: fr }),
+        getMouvementCoffreLabel(m.typePaiement || m.metadata?.type || m.sourceModule),
+        m.sens === 'CREDIT' ? 'Entrée' : 'Sortie',
+        (m.metadata?.description || m.metadata?.motif || m.reference || '').replace(/,/g, ' '),
+        `${m.sens === 'CREDIT' ? '+' : '-'}${Number(m.montant).toLocaleString('fr-FR')}`,
+        m.initiator ? `${m.initiator.prenom || ''} ${m.initiator.nom || ''}`.trim() : '',
+      ]);
+      const bom = '\uFEFF';
+      const csvContent = [headers.join(';'), ...rows.map((r: string[]) => r.join(';'))].join('\n');
+      const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `historique_coffre_${dateFrom}_${dateTo}.csv`;
+      link.click();
+    };
 
     const columns = [
         {
@@ -1241,24 +1301,64 @@ function CoffreFortHistorique({ agenceId }: { agenceId: string }) {
     return (
         <>
             <Card className="overflow-hidden bg-surface-base/50 backdrop-blur border-edge">
-                <div className="p-2 border-b border-edge flex justify-between items-center bg-surface-base/40">
-                    <div className="flex items-center gap-2">
-                        <Clock className="text-content-muted" size={14} />
-                        <h3 className="font-bold text-content-primary text-xs">Historique</h3>
+                <div className="p-2 border-b border-edge space-y-2 bg-surface-base/40">
+                    <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                            <Clock className="text-content-muted" size={14} />
+                            <h3 className="font-bold text-content-primary text-xs">Historique</h3>
+                            {mouvements.length > 0 && (
+                              <span className="text-[9px] text-content-muted">{mouvements.length}</span>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={handleExportCSV}
+                                disabled={mouvements.length === 0}
+                                className="h-6 px-2 text-[10px] text-content-muted hover:text-content-primary hover:bg-surface"
+                                title="Exporter en CSV"
+                            >
+                                <Download size={10} className="mr-1" />
+                                CSV
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => refetch()}
+                                disabled={isRefetching}
+                                className="h-6 px-2 text-[10px] text-content-muted hover:text-content-primary hover:bg-surface"
+                            >
+                                <Loader2
+                                    size={10}
+                                    className={`mr-1 ${isRefetching ? 'animate-spin text-status-info' : 'text-content-muted'}`}
+                                />
+                                Act.
+                            </Button>
+                        </div>
                     </div>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => refetch()}
-                        disabled={isRefetching}
-                        className="h-6 px-2 text-[10px] text-content-muted hover:text-content-primary hover:bg-surface"
-                    >
-                        <Loader2
-                            size={10}
-                            className={`mr-1 ${isRefetching ? 'animate-spin text-status-info' : 'text-content-muted'}`}
-                        />
-                        Act.
-                    </Button>
+                    {/* Date Range Filters */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <div className="flex items-center gap-1">
+                            <label className="text-[10px] text-content-muted shrink-0">Du</label>
+                            <input
+                                type="date"
+                                value={dateFrom}
+                                onChange={(e) => setDateFrom(e.target.value)}
+                                className="px-1.5 py-1 text-[11px] rounded border border-edge bg-surface-base/50 text-content-primary w-[110px]"
+                            />
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <label className="text-[10px] text-content-muted shrink-0">Au</label>
+                            <input
+                                type="date"
+                                value={dateTo}
+                                onChange={(e) => setDateTo(e.target.value)}
+                                max={today}
+                                className="px-1.5 py-1 text-[11px] rounded border border-edge bg-surface-base/50 text-content-primary w-[110px]"
+                            />
+                        </div>
+                    </div>
                 </div>
 
                 <div className="max-h-[400px] overflow-y-auto custom-scrollbar">

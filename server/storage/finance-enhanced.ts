@@ -3,24 +3,28 @@
  */
 
 import { db } from "../db";
-import { 
-  credits, 
-  remboursements, 
+import {
+  credits,
+  remboursements,
   mouvementsFinanciers,
+  echeancesCredits,
   type Remboursement,
-  type MouvementFinancier
+  type MouvementFinancier,
+  type InsertEcheanceCredit
 } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { eq, and, inArray, asc } from "drizzle-orm";
 import { executeWithLedger, updateCreditSolde, updateSessionSolde, validateUserId } from "../services/ledger";
-import { 
-  allocateRepaymentToSchedule, 
+import {
+  allocateRepaymentToSchedule,
   type AllocationResult,
-  type RepaymentAllocationOptions 
+  type RepaymentAllocationOptions
 } from "../services/repayment-allocation-service";
-import { createFactureForRemboursement } from "./finance";
+import { createFactureForRemboursement, getCreditPlan } from "./finance";
 import { getWsInstance } from "../ws-server";
 import { createLogger } from "../lib/logger";
-import { StatutCredit } from "@shared/enum/status-constants";
+import { StatutCredit, StatutEcheanceCredit } from "@shared/enum/status-constants";
+import { D, roundMoney } from "../lib/money";
+import type { PgTransaction } from "drizzle-orm/pg-core";
 
 const logger = createLogger('FinanceEnhanced');
 
@@ -128,6 +132,11 @@ export async function createRemboursementWithAllocation(
         })
         .where(eq(credits.id, data.creditId))
         .returning();
+
+      // 5b. Recalculer les échéances futures si le crédit n'est pas soldé
+      if (nouveauStatutCredit !== StatutCredit.PAID) {
+        await recalculateRemainingSchedule(tx, data.creditId);
+      }
 
       // 6. Mettre à jour la session de caisse si applicable
       let nouveauSoldeSession: string | undefined;
@@ -244,6 +253,130 @@ export async function createRemboursementWithAllocation(
   }, 'Repayment created with allocations');
 
   return result;
+}
+
+/**
+ * Recalcule les échéances UPCOMING d'un crédit après un remboursement.
+ * Stratégie : même nombre d'échéances restantes, montant ajusté.
+ * - Garde les échéances PAID/PARTIALLY_PAID/LATE intactes
+ * - Supprime les UPCOMING et les recrée avec le capital/intérêt restant réparti
+ * - Met à jour montantEcheance et prochaineEcheance sur le crédit
+ */
+export async function recalculateRemainingSchedule(
+  tx: PgTransaction<any, any, any>,
+  creditId: string
+): Promise<void> {
+  // 1. Charger toutes les échéances du crédit
+  const allEcheances = await tx.select()
+    .from(echeancesCredits)
+    .where(eq(echeancesCredits.creditId, creditId))
+    .orderBy(asc(echeancesCredits.dateEcheance), asc(echeancesCredits.sequence));
+
+  if (allEcheances.length === 0) return;
+
+  // 2. Séparer les échéances par statut
+  const upcoming = allEcheances.filter(e => e.statut === StatutEcheanceCredit.UPCOMING);
+  const partiallyPaid = allEcheances.filter(e => e.statut === StatutEcheanceCredit.PARTIALLY_PAID);
+  const paid = allEcheances.filter(e =>
+    e.statut === StatutEcheanceCredit.PAID || e.statut === StatutEcheanceCredit.SETTLED
+  );
+  const late = allEcheances.filter(e => e.statut === StatutEcheanceCredit.LATE);
+
+  // Rien à recalculer si aucune échéance UPCOMING
+  if (upcoming.length === 0) {
+    // Mettre à jour prochaineEcheance avec la première échéance non payée (PARTIALLY_PAID ou LATE)
+    const firstUnpaid = [...partiallyPaid, ...late]
+      .sort((a, b) => new Date(a.dateEcheance).getTime() - new Date(b.dateEcheance).getTime())[0];
+
+    if (firstUnpaid) {
+      await tx.update(credits).set({
+        prochaineEcheance: firstUnpaid.dateEcheance,
+        updatedAt: new Date(),
+      }).where(eq(credits.id, creditId));
+    }
+    return;
+  }
+
+  // 3. Calculer le capital et l'intérêt restant dans les échéances UPCOMING
+  const capitalRestantUpcoming = upcoming.reduce((sum, e) => sum.plus(D(e.montantCapital)), D(0));
+  const interetRestantUpcoming = upcoming.reduce((sum, e) => sum.plus(D(e.montantInteret)), D(0));
+
+  const nbUpcoming = upcoming.length;
+
+  // 4. Calculer les montants par échéance (répartition uniforme)
+  const capitalParEcheance = capitalRestantUpcoming.div(nbUpcoming);
+  const interetParEcheance = interetRestantUpcoming.div(nbUpcoming);
+
+  // Arrondi : dernière échéance absorbe le reliquat
+  const capitalArrondi = D(roundMoney(capitalParEcheance));
+  const interetArrondi = D(roundMoney(interetParEcheance));
+  const capitalDerniereEcheance = capitalRestantUpcoming.minus(capitalArrondi.times(nbUpcoming - 1));
+  const interetDerniereEcheance = interetRestantUpcoming.minus(interetArrondi.times(nbUpcoming - 1));
+
+  // 5. Supprimer les échéances UPCOMING existantes
+  const upcomingIds = upcoming.map(e => e.id);
+  await tx.delete(echeancesCredits).where(
+    and(
+      eq(echeancesCredits.creditId, creditId),
+      inArray(echeancesCredits.id, upcomingIds)
+    )
+  );
+
+  // 6. Déterminer la numérotation et les dates (conserver celles des anciennes UPCOMING)
+  const newEcheances: InsertEcheanceCredit[] = upcoming.map((old, idx) => {
+    const isLast = idx === nbUpcoming - 1;
+    const capital = isLast ? roundMoney(capitalDerniereEcheance) : roundMoney(capitalArrondi);
+    const interet = isLast ? roundMoney(interetDerniereEcheance) : roundMoney(interetArrondi);
+    const total = roundMoney(D(capital).plus(D(interet)));
+
+    return {
+      creditId,
+      numeroEcheance: old.numeroEcheance,
+      dateEcheance: old.dateEcheance,
+      montantCapital: capital,
+      montantInteret: interet,
+      montantTotal: total,
+      statut: StatutEcheanceCredit.UPCOMING as any,
+      sequence: old.sequence ?? old.numeroEcheance,
+    };
+  });
+
+  if (newEcheances.length > 0) {
+    await tx.insert(echeancesCredits).values(newEcheances);
+  }
+
+  // 7. Déterminer la première échéance non payée (pour prochaineEcheance)
+  const allNonPaid = [...partiallyPaid, ...late, ...newEcheances.map(e => ({
+    dateEcheance: e.dateEcheance,
+    montantTotal: e.montantTotal,
+  }))]
+    .sort((a, b) => new Date(a.dateEcheance).getTime() - new Date(b.dateEcheance).getTime());
+
+  const prochaineEcheance = allNonPaid.length > 0 ? allNonPaid[0].dateEcheance : null;
+  const nouveauMontantEcheance = newEcheances.length > 0 ? newEcheances[0].montantTotal : null;
+
+  // 8. Recalculer soldeRestant = PARTIALLY_PAID restant + LATE restant + UPCOMING total
+  const soldePartial = partiallyPaid.reduce((sum, e) =>
+    sum.plus(D(e.montantTotal).minus(D(e.montantPaye || 0))), D(0));
+  const soldeLate = late.reduce((sum, e) =>
+    sum.plus(D(e.montantTotal).minus(D(e.montantPaye || 0))), D(0));
+  const soldeUpcoming = newEcheances.reduce((sum, e) => sum.plus(D(e.montantTotal)), D(0));
+  const nouveauSoldeRestant = roundMoney(soldePartial.plus(soldeLate).plus(soldeUpcoming));
+
+  // 9. Mettre à jour le crédit
+  await tx.update(credits).set({
+    montantEcheance: nouveauMontantEcheance,
+    prochaineEcheance,
+    soldeRestant: nouveauSoldeRestant,
+    updatedAt: new Date(),
+  }).where(eq(credits.id, creditId));
+
+  logger.info({
+    creditId,
+    nbUpcomingRecalculated: nbUpcoming,
+    nouveauMontantEcheance,
+    nouveauSoldeRestant,
+  }, 'Schedule recalculated after repayment');
 }
 
 /**

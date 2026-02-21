@@ -114,9 +114,9 @@ export default function CaisseAccessControl({ onAccessGranted, onClose, userRole
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-4">
       <Card variant="elevated" className="w-full max-w-sm bg-surface-base border-edge max-h-[95vh] flex flex-col" padding="none">
         {/* Header - Compact */}
-        <div className={`px-3 py-3 sm:px-4 sm:py-4 flex items-center gap-3 border-b border-edge ${isOutsideHours ? 'bg-danger/10' : 'bg-primary/10'}`}>
-          <div className={`p-2 sm:p-2.5 rounded-xl ${isOutsideHours ? 'bg-danger/20' : 'bg-primary/20'}`}>
-            {isOutsideHours ? <Lock className="w-5 h-5 text-danger" /> : <Key className="w-5 h-5 text-primary" />}
+        <div className={`px-3 py-3 sm:px-4 sm:py-4 flex items-center gap-3 border-b border-edge ${isOutsideHours ? 'bg-danger/10' : 'bg-accent/10'}`}>
+          <div className={`p-2 sm:p-2.5 rounded-xl ${isOutsideHours ? 'bg-danger/20' : 'bg-accent/20'}`}>
+            {isOutsideHours ? <Lock className="w-5 h-5 text-danger" /> : <Key className="w-5 h-5 text-accent" />}
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="text-base sm:text-lg font-bold text-content-primary truncate">
@@ -145,7 +145,7 @@ export default function CaisseAccessControl({ onAccessGranted, onClose, userRole
                   </p>
                 )}
                 {accessStatus?.nextOpening && (
-                  <p className="text-[10px] sm:text-xs text-primary pl-6">
+                  <p className="text-[10px] sm:text-xs text-accent pl-6">
                     Prochaine ouverture: {accessStatus.nextOpening.day} à {accessStatus.nextOpening.time}
                   </p>
                 )}
@@ -180,7 +180,7 @@ export default function CaisseAccessControl({ onAccessGranted, onClose, userRole
                 onChange={handleCodeInput}
                 onKeyDown={(e) => e.key === 'Enter' && validateCode()}
                 placeholder="XXXXXX"
-                className="w-full px-3 py-3 sm:py-3.5 bg-surface-muted border border-edge rounded-xl text-content-primary text-center text-lg sm:text-xl tracking-[0.3em] font-mono placeholder:tracking-normal placeholder:text-base focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
+                className="w-full px-3 py-3 sm:py-3.5 bg-surface-muted border border-edge rounded-xl text-content-primary text-center text-lg sm:text-xl tracking-[0.3em] font-mono placeholder:tracking-normal placeholder:text-base focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-all"
                 maxLength={6}
                 autoFocus
                 data-testid="input-security-code"

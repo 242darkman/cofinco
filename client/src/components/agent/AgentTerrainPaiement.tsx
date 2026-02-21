@@ -11,7 +11,7 @@ import { ReceiptData } from '../ui/printable/ReceiptTemplate';
 import { securityConfigApi, SecurityConfigResponse, caisseAgentApi, creditApi, compteEpargneApi, clientApi, agentTerrainApi } from '../../lib/api-client';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { StatutUser, StatutClient, StatutCredit, StatutOperationTerrain, TypeOperationTerrain, TYPE_OPERATION_TERRAIN_LABELS, TYPE_COMPTE_LABELS, TypeCompteType } from '@shared/enum/status-constants';
-import { currencySymbol } from '@shared/config/currency';
+import { currencySymbol, formatMoney } from '@shared/config/currency';
 
 // MM Payment status types
 type MMPaymentStatus = 'idle' | 'pending' | 'success' | 'failed' | 'expired';
@@ -110,6 +110,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
   const [selectedTontine, setSelectedTontine] = useState<ClientTontine | null>(null);
   const [loadingTontines, setLoadingTontines] = useState(false);
   const [clientCredits, setClientCredits] = useState<any[]>([]);
+  const [selectedCredit, setSelectedCredit] = useState<any>(null);
   const [clientComptes, setClientComptes] = useState<any[]>([]);
   const [loadingCredits, setLoadingCredits] = useState(false);
   const [loadingComptes, setLoadingComptes] = useState(false);
@@ -405,6 +406,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
 
   const loadClientCredits = async (clientId: string) => {
     setLoadingCredits(true);
+    setSelectedCredit(null);
     try {
       const credits = await creditApi.getByClient(clientId);
       setClientCredits((credits || []).filter((c: any) => c.statut === StatutCredit.ACTIVE || c.statut === StatutCredit.LATE));
@@ -920,7 +922,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                               <div>
                                 <p className="text-[13px] font-medium text-content-primary">{ct.tontine.nom}</p>
                                 <p className="text-[12px] text-content-muted">
-                                  {parseFloat(ct.tontine.montantCotisation).toLocaleString()} F • {ct.tontine.frequence}
+                                  {formatMoney(ct.tontine.montantCotisation)} • {ct.tontine.frequence}
                                 </p>
                               </div>
                               {selectedTontine?.id === ct.id && <CheckCircle2 size={18} className="text-status-success" />}
@@ -934,19 +936,58 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
 
                   {/* Credit Selection */}
                   {isCreditPayment && (
-                    <SelectField
-                      label="Crédit"
-                      name="credit_id"
-                      value={formData.credit_id}
-                      onChange={(e) => setFormData({ ...formData, credit_id: e.target.value })}
-                      options={clientCredits.map((c: any) => ({
-                        value: c.id,
-                        label: `#${(c.numero || c.id).slice(0, 8)} - ${Number(c.soldeRestant || 0).toLocaleString()} F`
-                      }))}
-                      placeholder={loadingCredits ? 'Chargement...' : 'Sélectionner crédit'}
-                      error={errors.credit_id}
-                      disabled={loadingCredits || clientCredits.length === 0}
-                    />
+                    <div className="space-y-2">
+                      <SelectField
+                        label="Crédit"
+                        name="credit_id"
+                        value={formData.credit_id}
+                        onChange={(e) => {
+                          const creditId = e.target.value;
+                          const credit = clientCredits.find((c: any) => c.id === creditId) || null;
+                          setSelectedCredit(credit);
+                          const echeance = credit?.montantEcheance ? String(Math.round(Number(credit.montantEcheance))) : '';
+                          setFormData(prev => ({
+                            ...prev,
+                            credit_id: creditId,
+                            montant: echeance,
+                            notes: credit ? `Remboursement ${credit.numeroCredit || ''}`.trim() : '',
+                          }));
+                        }}
+                        options={clientCredits.map((c: any) => ({
+                          value: c.id,
+                          label: `${c.numeroCredit || c.id.slice(0, 8)} — Solde: ${formatMoney(c.soldeRestant)}`
+                        }))}
+                        placeholder={loadingCredits ? 'Chargement...' : 'Sélectionner crédit'}
+                        error={errors.credit_id}
+                        disabled={loadingCredits || clientCredits.length === 0}
+                      />
+                      {selectedCredit && (
+                        <div className="bg-surface-subtle rounded-lg px-3 py-2 text-[11px] space-y-1 border border-edge-subtle">
+                          <div className="flex justify-between">
+                            <span className="text-content-muted">Solde restant</span>
+                            <span className="font-semibold text-content-primary">{formatMoney(selectedCredit.soldeRestant)}</span>
+                          </div>
+                          {selectedCredit.montantEcheance && (
+                            <div className="flex justify-between">
+                              <span className="text-content-muted">Échéance ({selectedCredit.echeance?.toLowerCase() || 'périodique'})</span>
+                              <span className="font-semibold text-accent">{formatMoney(selectedCredit.montantEcheance)}</span>
+                            </div>
+                          )}
+                          {selectedCredit.prochaineEcheance && (
+                            <div className="flex justify-between">
+                              <span className="text-content-muted">Prochaine échéance</span>
+                              <span className="text-content-secondary">{new Date(selectedCredit.prochaineEcheance).toLocaleDateString('fr-FR')}</span>
+                            </div>
+                          )}
+                          {selectedCredit.statut === 'LATE' && (
+                            <div className="text-status-danger font-medium mt-1 flex items-center gap-1">
+                              <AlertTriangle size={11} />
+                              Crédit en retard de paiement
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   )}
 
                   {/* Compte Selection */}
@@ -1138,18 +1179,18 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                         <div className="mt-3 bg-accent/5 border border-accent/20 rounded-xl p-3 space-y-1.5">
                           <div className="flex justify-between text-[13px]">
                             <span className="text-content-muted">Montant opération</span>
-                            <span className="text-content-primary font-medium">{feeEstimate.montantBrut.toLocaleString()} F</span>
+                            <span className="text-content-primary font-medium">{formatMoney(feeEstimate.montantBrut)}</span>
                           </div>
                           <div className="flex justify-between text-[13px]">
                             <span className="text-content-muted">Frais MM ({feeEstimate.feeRate}%)</span>
-                            <span className="text-content-primary font-medium">{feeEstimate.feeAmount.toLocaleString()} F</span>
+                            <span className="text-content-primary font-medium">{formatMoney(feeEstimate.feeAmount)}</span>
                           </div>
                           <div className="flex justify-between text-[13px] pt-1.5 border-t border-accent/20">
                             <span className="text-content-muted font-semibold">
                               {feeOption === 'CLIENT_PAYS' ? 'Total débité du téléphone' : 'Crédité au compte'}
                             </span>
                             <span className="text-content-primary font-bold">
-                              {(feeOption === 'CLIENT_PAYS' ? feeEstimate.montantBrut : feeEstimate.montantNet).toLocaleString()} F
+                              {formatMoney(feeOption === 'CLIENT_PAYS' ? feeEstimate.montantBrut : feeEstimate.montantNet)}
                             </span>
                           </div>
                         </div>
@@ -1199,7 +1240,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                     {feeEstimate && feeOption === 'CLIENT_PAYS' ? 'Total débité' : 'Total'}
                   </span>
                   <span className="text-xl font-bold text-status-success">
-                    {(feeEstimate && feeOption === 'CLIENT_PAYS' ? feeEstimate.montantBrut : montantNum).toLocaleString()} <span className="text-[13px]">F</span>
+                    {(feeEstimate && feeOption === 'CLIENT_PAYS' ? feeEstimate.montantBrut : montantNum).toLocaleString('fr-FR')} <span className="text-[13px]">{currencySymbol()}</span>
                   </span>
                 </div>
               )}
@@ -1301,7 +1342,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
               <p className={`text-2xl font-bold ${
                 mmPaymentIntent.provider === 'MTN' ? 'text-status-warning' : 'text-status-danger'
               }`}>
-                {Number(mmPaymentIntent.amount).toLocaleString()} <span className="text-sm">FCFA</span>
+                {formatMoney(mmPaymentIntent.amount)}
               </p>
             </div>
 

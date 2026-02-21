@@ -311,7 +311,7 @@ export function TreasurySupervision() {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="text-center space-y-4">
-          <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto"></div>
+          <div className="animate-spin w-8 h-8 border-4 border-accent border-t-transparent rounded-full mx-auto"></div>
           <p className="text-muted-foreground">Synchronisation de la supervision...</p>
         </div>
       </div>
@@ -335,7 +335,7 @@ export function TreasurySupervision() {
       {/* 1. Header - Ultra Compact */}
       <div className="shrink-0 flex items-center justify-between gap-4 px-1">
         <div className="flex items-center gap-3">
-          <TrendingUp className="w-5 h-5 text-primary" />
+          <TrendingUp className="w-5 h-5 text-accent" />
           <div>
             <h2 className="text-sm font-bold text-content-primary">Supervision Trésorerie</h2>
             <p className="text-[10px] text-content-muted">{globalStats?.breakdown.length || 0} agences</p>
@@ -431,7 +431,7 @@ export function TreasurySupervision() {
                   onClick={() => setPeriod(opt.value)}
                   className={cn(
                     "px-1.5 py-0.5 rounded text-[9px] font-medium transition-all",
-                    period === opt.value ? "bg-primary text-content-primary" : "text-content-muted hover:text-content-secondary"
+                    period === opt.value ? "bg-accent text-white" : "text-content-muted hover:text-content-secondary"
                   )}
                 >
                   {opt.label}
@@ -518,7 +518,7 @@ export function TreasurySupervision() {
             <input
               type="text"
               placeholder="Filtrer..."
-              className="w-full pl-6 pr-2 py-1 text-[10px] bg-surface-base border border-edge rounded focus:outline-none focus:border-primary/50 text-content-secondary"
+              className="w-full pl-6 pr-2 py-1 text-[10px] bg-surface-base border border-edge rounded focus:outline-none focus:border-accent/50 text-content-secondary"
               value={searchTerm}
               onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
             />
@@ -533,7 +533,7 @@ export function TreasurySupervision() {
                 key={agency.agenceId}
                 className={cn(
                   "cursor-pointer transition-all duration-150 hover:bg-surface/50 relative overflow-hidden border-edge p-2",
-                  isSelected ? "ring-1 ring-primary border-primary bg-primary/[0.05]" : "hover:border-edge"
+                  isSelected ? "ring-1 ring-accent border-accent bg-accent/[0.05]" : "hover:border-edge"
                 )}
                 onClick={() => toggleAgency(agency.agenceId)}
               >

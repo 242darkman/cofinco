@@ -2276,11 +2276,13 @@ export const coffreApi = {
     method: 'POST',
     body: JSON.stringify(data),
   }),
-  getMouvements: (params: { agenceId: string; page?: number; limit?: number }) => {
+  getMouvements: (params: { agenceId: string; page?: number; limit?: number; dateFrom?: string; dateTo?: string }) => {
     const queryParams = new URLSearchParams();
     queryParams.append('agenceId', params.agenceId);
     if (params.page) queryParams.append('page', String(params.page));
     if (params.limit) queryParams.append('limit', String(params.limit));
+    if (params.dateFrom) queryParams.append('dateFrom', params.dateFrom);
+    if (params.dateTo) queryParams.append('dateTo', params.dateTo);
     return request<any>(`/coffre/mouvements?${queryParams.toString()}`);
   },
   // ========== WORKFLOW SECURISE D'OUVERTURE (Coffre → Caisse) ==========

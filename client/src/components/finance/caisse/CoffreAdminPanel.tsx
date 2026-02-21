@@ -49,7 +49,7 @@ const ScopeBadge = ({ type }: { type: 'global' | 'guichet' | 'audit' }) => {
 // Section Header
 const SectionHeader = ({ icon: Icon, title, desc }: { icon: any; title: string; desc: string }) => (
   <div className="flex items-center gap-2 pb-2 border-b border-edge-subtle mb-2.5">
-    <Icon className="h-3.5 w-3.5 text-primary" />
+    <Icon className="h-3.5 w-3.5 text-accent" />
     <span className="text-xs font-bold text-content-primary uppercase tracking-wide">{title}</span>
     <span className="text-[11px] text-content-muted">— {desc}</span>
   </div>
@@ -80,7 +80,7 @@ const MiniInput = ({ label, value, onChange, placeholder }: {
       value={value}
       onChange={(e) => { e.target.value = e.target.value.replace(/[^0-9]/g, ''); onChange(e); }}
       placeholder={placeholder}
-      className="w-full px-2 py-1.5 text-[11px] rounded border border-edge bg-surface-base/50 text-content-primary placeholder:text-content-muted focus:border-primary/50 focus:outline-none"
+      className="w-full px-2 py-1.5 text-[11px] rounded border border-edge bg-surface-base/50 text-content-primary placeholder:text-content-muted focus:border-accent/50 focus:outline-none"
     />
   </div>
 );
@@ -159,7 +159,7 @@ export function CoffreAdminPanel({ agenceId }: CoffreAdminPanelProps) {
     }));
   };
 
-  if (loading) return <div className="flex justify-center p-6"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>;
+  if (loading) return <div className="flex justify-center p-6"><Loader2 className="h-5 w-5 animate-spin text-accent" /></div>;
 
   return (
     <div className="flex flex-col h-full p-2 space-y-2">
@@ -202,7 +202,7 @@ export function CoffreAdminPanel({ agenceId }: CoffreAdminPanelProps) {
             {DAYS.map((day, i) => (
               <button key={day} onClick={() => toggleDay(DAYS_FULL[i])}
                 className={cn("flex-1 py-1 rounded text-[10px] font-medium transition-all",
-                  config.joursOuvrables.includes(DAYS_FULL[i]) ? "bg-primary text-content-primary" : "bg-surface text-content-muted hover:bg-surface-elevated"
+                  config.joursOuvrables.includes(DAYS_FULL[i]) ? "bg-accent text-white" : "bg-surface text-content-muted hover:bg-surface-elevated"
                 )}>
                 {day}
               </button>
@@ -278,7 +278,7 @@ export function CoffreAdminPanel({ agenceId }: CoffreAdminPanelProps) {
       {/* Save Button - Bottom right corner */}
       <div className="absolute bottom-3 right-3">
         <Button onClick={handleSave} disabled={saving || loading} isLoading={saving}
-          className="shadow-lg rounded-full px-4 py-2 h-auto text-[11px] font-semibold bg-primary hover:bg-primary/90">
+          className="shadow-lg rounded-full px-4 py-2 h-auto text-[11px] font-semibold bg-accent hover:bg-accent/90">
           <Save className="mr-1.5 h-3.5 w-3.5" /> Enregistrer
         </Button>
       </div>

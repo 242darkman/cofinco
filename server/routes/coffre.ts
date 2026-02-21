@@ -656,6 +656,8 @@ coffreRouter.get("/mouvements", async (req, res) => {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
     const offset = (page - 1) * limit;
+    const dateFrom = req.query.dateFrom as string | undefined;
+    const dateTo = req.query.dateTo as string | undefined;
 
     // 1. Récupérer le coffre-fort de l'agence (nouveau système unifié)
     const [coffre] = await db.select()
@@ -666,17 +668,18 @@ coffreRouter.get("/mouvements", async (req, res) => {
       return res.json({ data: [], pagination: { page, limit, total: 0, totalPages: 0 } });
     }
 
-    // 2. Query Mouvements
-    // Criteria:
-    // - Agence ID matches
-    // - AND (
-    //    metadata->caisseId == coffre.id (Transfers)
-    //    OR typePaiement == 'Approvisionnement coffre' (External Provisioning)
-    //    OR typePaiement == 'Versement coffre' (Manual Deposits specific to safe?)
-    // )
+    // 2. Build date conditions
+    const dateConditions = [];
+    if (dateFrom) {
+      dateConditions.push(sql`${schema.mouvementsFinanciers.dateOperation} >= ${dateFrom}`);
+    }
+    if (dateTo) {
+      dateConditions.push(sql`${schema.mouvementsFinanciers.dateOperation} <= ${dateTo + 'T23:59:59'}`);
+    }
 
     const conditions = and(
         eq(schema.mouvementsFinanciers.agenceId, agenceId),
+        ...(dateConditions.length > 0 ? dateConditions : []),
         sql`(${schema.mouvementsFinanciers.metadata}->>'coffreId' = ${coffre.id}
             OR ${schema.mouvementsFinanciers.metadata}->>'caisseId' = ${coffre.id}
             OR ${schema.mouvementsFinanciers.sourceId} = ${coffre.id}
