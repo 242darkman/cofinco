@@ -13,13 +13,15 @@
  */
 
 import { db } from "../db";
-import { eq, and, inArray, isNull, sql, lte } from "drizzle-orm";
+import { eq, and, or, inArray, isNull, sql, lte, desc } from "drizzle-orm";
 import {
   salaryPaymentJobs,
   bulletinsPaie,
   payrollRuns,
   employes,
   users,
+  paymentIntents,
+  payrollConfig,
   BulletinStatus,
   SalaryPaymentJobStatus,
   PaymentExecutionMode,
@@ -276,6 +278,26 @@ async function processMobileMoneyJob(job: SalaryPaymentJob): Promise<void> {
 
   const metadata = job.metadata as Record<string, unknown> | null;
 
+  // Lire la config frais MM (agence-specific d'abord, fallback global)
+  const [feeConfig] = await db.select({ mmSalaryFeeOption: payrollConfig.mmSalaryFeeOption })
+    .from(payrollConfig)
+    .where(and(
+      eq(payrollConfig.isActive, true),
+      or(
+        job.agenceId ? eq(payrollConfig.agenceId, job.agenceId) : isNull(payrollConfig.agenceId),
+        isNull(payrollConfig.agenceId),
+      ),
+    ))
+    .orderBy(desc(payrollConfig.agenceId)) // agence-specific en premier
+    .limit(1);
+
+  const mmFeeOption = feeConfig?.mmSalaryFeeOption || "COMPANY_ABSORBS";
+  const feeOption = mmFeeOption === "EMPLOYEE_PAYS" ? "FEES_DEDUCTED" as const : undefined;
+
+  // Stocker le feeOption sur le job
+  await db.update(salaryPaymentJobs).set({ feeOption: mmFeeOption })
+    .where(eq(salaryPaymentJobs.id, job.id));
+
   try {
     const intent = await paymentService.initiatePayout({
       provider: operator,
@@ -285,6 +307,7 @@ async function processMobileMoneyJob(job: SalaryPaymentJob): Promise<void> {
       agenceId: job.agenceId || undefined,
       description: `Salaire ${metadata?.employeNom || ""} ${metadata?.employePrenom || ""}`.trim(),
       idempotencyKey: `salary-momo-${job.id}`,
+      feeOption,
       metadata: {
         useCase: "SALARY_PAYOUT",
         jobId: job.id,
@@ -356,11 +379,27 @@ export async function handlePayoutSuccess(jobId: string, mouvementId: string): P
     return;
   }
 
+  // Récupérer les frais depuis le payment_intent (rempli par le webhook pawaPay)
+  let intentFeeAmount: string | null = null;
+  let intentMontantNet: string | null = null;
+  if (job.paymentIntentId) {
+    const [intent] = await db.select({
+      feeAmount: paymentIntents.feeAmount,
+      montantNet: paymentIntents.montantNet,
+    }).from(paymentIntents).where(eq(paymentIntents.id, job.paymentIntentId));
+    if (intent) {
+      intentFeeAmount = intent.feeAmount;
+      intentMontantNet = intent.montantNet;
+    }
+  }
+
   await db.transaction(async (tx) => {
-    // 1. Marquer le job SUCCEEDED
+    // 1. Marquer le job SUCCEEDED + stocker les frais
     await tx.update(salaryPaymentJobs).set({
       status: SalaryPaymentJobStatus.SUCCEEDED,
       mouvementId,
+      feeAmount: intentFeeAmount,
+      montantNet: intentMontantNet || job.amount,
       completedAt: new Date(),
       updatedAt: new Date(),
     }).where(eq(salaryPaymentJobs.id, jobId));
@@ -874,6 +913,9 @@ export async function getJobsByRunId(runId: number) {
       maxRetries: salaryPaymentJobs.maxRetries,
       operator: salaryPaymentJobs.operator,
       correspondent: salaryPaymentJobs.correspondent,
+      feeOption: salaryPaymentJobs.feeOption,
+      feeAmount: salaryPaymentJobs.feeAmount,
+      montantNet: salaryPaymentJobs.montantNet,
       createdAt: salaryPaymentJobs.createdAt,
       completedAt: salaryPaymentJobs.completedAt,
       employeNom: sql<string>`COALESCE(${users.nom}, '') || ' ' || COALESCE(${users.prenom}, '')`.as("employe_nom"),

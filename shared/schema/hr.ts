@@ -548,6 +548,8 @@ export const payrollConfig = pgTable("payroll_config", {
   defaultHeureDebut: varchar("default_heure_debut", { length: 5 }).default("08:00"),
   defaultHeureFin: varchar("default_heure_fin", { length: 5 }).default("17:00"),
   defaultPauseMinutes: integer("default_pause_minutes").default(60),
+  // Frais Mobile Money pour paiements salaires
+  mmSalaryFeeOption: varchar("mm_salary_fee_option", { length: 20 }).default("COMPANY_ABSORBS"),
   // Période de validité
   effectiveFrom: date("effective_from").notNull().defaultNow(),
   effectiveTo: date("effective_to"),
@@ -779,6 +781,7 @@ export const updatePayrollConfigSchema = z.object({
   defaultHeureDebut: z.string().regex(/^\d{2}:\d{2}$/).optional(),
   defaultHeureFin: z.string().regex(/^\d{2}:\d{2}$/).optional(),
   defaultPauseMinutes: z.number().int().min(0).max(120).optional(),
+  mmSalaryFeeOption: z.enum(["COMPANY_ABSORBS", "EMPLOYEE_PAYS"]).optional(),
 });
 
 // ============================================
@@ -1746,6 +1749,11 @@ export const salaryPaymentJobs = pgTable("salary_payment_jobs", {
   scheduledAt: timestamp("scheduled_at"),                              // Date programmée (requis si SCHEDULED)
   amount: numeric("amount", { precision: 14, scale: 0 }).notNull(),
   currency: varchar("currency", { length: 3 }).notNull().default("XAF"),
+
+  // Frais Mobile Money (rempli après webhook)
+  feeOption: varchar("fee_option", { length: 20 }),                          // COMPANY_ABSORBS | EMPLOYEE_PAYS
+  feeAmount: numeric("fee_amount", { precision: 14, scale: 0 }),             // Frais opérateur (depuis webhook)
+  montantNet: numeric("montant_net", { precision: 14, scale: 0 }),           // Montant effectivement reçu par l'employé
 
   // Status & lifecycle
   status: varchar("status", { length: 20 }).notNull().default("CREATED"),

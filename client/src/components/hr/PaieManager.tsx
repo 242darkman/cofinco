@@ -535,6 +535,14 @@ export default function PaieManager() {
                           {job.failureReason}
                         </div>
                       )}
+                      {job.feeAmount && Number(job.feeAmount) > 0 && (
+                        <div className="text-content-muted text-[10px] mt-0.5">
+                          Frais: {formatMoney(job.feeAmount)} • Net reçu: {formatMoney(job.montantNet || job.amount)}
+                          {job.feeOption === 'EMPLOYEE_PAYS' && (
+                            <span className="text-status-warning ml-1">(déduit du net)</span>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div className="font-mono font-bold text-content-primary whitespace-nowrap">
                       {formatMoney(job.amount)}

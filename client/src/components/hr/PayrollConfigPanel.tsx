@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, Button, Badge } from '../ui';
-import { Settings, Plus, Trash2, Save, RefreshCw, AlertTriangle, Percent, DollarSign, Clock, UserCheck } from 'lucide-react';
+import { Settings, Plus, Trash2, Save, RefreshCw, AlertTriangle, Percent, DollarSign, Clock, UserCheck, Smartphone } from 'lucide-react';
 import { toast } from '../../lib/toast';
 
 interface IprBracket {
@@ -29,6 +29,7 @@ interface PayrollConfig {
   defaultHeureDebut: string;
   defaultHeureFin: string;
   defaultPauseMinutes: number;
+  mmSalaryFeeOption: string;
 }
 
 const formatCurrency = (val: number) => val.toLocaleString('fr-FR') + ' CDF';
@@ -65,6 +66,7 @@ export default function PayrollConfigPanel() {
   const [defaultHeureDebut, setDefaultHeureDebut] = useState('08:00');
   const [defaultHeureFin, setDefaultHeureFin] = useState('17:00');
   const [defaultPauseMinutes, setDefaultPauseMinutes] = useState('60');
+  const [mmSalaryFeeOption, setMmSalaryFeeOption] = useState<'COMPANY_ABSORBS' | 'EMPLOYEE_PAYS'>('COMPANY_ABSORBS');
 
   // Populate form when config loads
   useEffect(() => {
@@ -82,6 +84,7 @@ export default function PayrollConfigPanel() {
       setDefaultHeureDebut(config.defaultHeureDebut || '08:00');
       setDefaultHeureFin(config.defaultHeureFin || '17:00');
       setDefaultPauseMinutes(String(config.defaultPauseMinutes ?? 60));
+      setMmSalaryFeeOption((config.mmSalaryFeeOption as 'COMPANY_ABSORBS' | 'EMPLOYEE_PAYS') || 'COMPANY_ABSORBS');
     }
   }, [config]);
 
@@ -139,8 +142,9 @@ export default function PayrollConfigPanel() {
       defaultHeureDebut,
       defaultHeureFin,
       defaultPauseMinutes: parseInt(defaultPauseMinutes) || 60,
+      mmSalaryFeeOption,
     });
-  }, [cnssEmployee, cnssEmployer, brackets, transportAllowance, housingAllowance, overtimeRate, nightShiftRate, holidayRate, lateGraceMinutes, allowOvertime, defaultHeureDebut, defaultHeureFin, defaultPauseMinutes, saveMutation]);
+  }, [cnssEmployee, cnssEmployer, brackets, transportAllowance, housingAllowance, overtimeRate, nightShiftRate, holidayRate, lateGraceMinutes, allowOvertime, defaultHeureDebut, defaultHeureFin, defaultPauseMinutes, mmSalaryFeeOption, saveMutation]);
 
   // Bracket helpers
   const addBracket = useCallback(() => {
@@ -344,6 +348,52 @@ export default function PayrollConfigPanel() {
             </div>
             <p className="text-[10px] text-content-muted">
               Horaires par défaut si l'employé n'a pas de planning individuel configuré
+            </p>
+          </div>
+        </Card>
+
+        {/* Frais Mobile Money */}
+        <Card padding="sm" className="bg-surface/80 border-edge">
+          <h4 className="text-xs font-bold text-accent uppercase tracking-wide mb-3 flex items-center gap-1.5">
+            <Smartphone size={13} />
+            Frais Mobile Money — Paiements salaires
+          </h4>
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 cursor-pointer group">
+              <input
+                type="radio"
+                name="mmSalaryFeeOption"
+                value="COMPANY_ABSORBS"
+                checked={mmSalaryFeeOption === 'COMPANY_ABSORBS'}
+                onChange={() => setMmSalaryFeeOption('COMPANY_ABSORBS')}
+                className="accent-accent"
+              />
+              <span className="text-xs text-content-primary group-hover:text-accent transition-colors">
+                Absorbés par l'entreprise
+              </span>
+              <span className="text-[10px] text-content-muted">(GL : D 6272 / C 578x)</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer group">
+              <input
+                type="radio"
+                name="mmSalaryFeeOption"
+                value="EMPLOYEE_PAYS"
+                checked={mmSalaryFeeOption === 'EMPLOYEE_PAYS'}
+                onChange={() => setMmSalaryFeeOption('EMPLOYEE_PAYS')}
+                className="accent-accent"
+              />
+              <span className="text-xs text-content-primary group-hover:text-accent transition-colors">
+                Déduits du net de l'employé
+              </span>
+            </label>
+            {mmSalaryFeeOption === 'EMPLOYEE_PAYS' && (
+              <div className="bg-status-warning-bg text-status-warning text-[10px] p-2 rounded border border-status-warning/20">
+                Les frais seront calculés via le barème Mobile Money et déduits du salaire net.
+                Le montant sera explicité sur la fiche de paie et dans le suivi des paiements.
+              </div>
+            )}
+            <p className="text-[10px] text-content-muted">
+              Les frais opérateur (pawaPay) sont automatiquement postés en comptabilité lors du webhook.
             </p>
           </div>
         </Card>

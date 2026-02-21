@@ -76,6 +76,9 @@ export interface SalaryPaymentJob {
   maxRetries: number;
   operator: string | null;
   correspondent: string | null;
+  feeOption: string | null;
+  feeAmount: string | null;
+  montantNet: string | null;
   createdAt: string;
   completedAt: string | null;
   employeNom?: string;

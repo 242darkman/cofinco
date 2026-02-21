@@ -75,6 +75,11 @@ export interface PayslipData {
     heuresNormales: number;
     heuresSupplementaires: number;
   } | null;
+  paymentFee: {
+    feeOption: string | null;
+    feeAmount: string | null;
+    montantNet: string | null;
+  } | null;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────
@@ -140,7 +145,7 @@ interface PayslipTemplateProps {
 export const PayslipTemplate = React.forwardRef<HTMLDivElement, PayslipTemplateProps>(
   ({ data }, ref) => {
     const { branding } = useBranding();
-    const { bulletin, lines, employe, company, agence, leaves, heuresTravaillees } = data;
+    const { bulletin, lines, employe, company, agence, leaves, heuresTravaillees, paymentFee } = data;
     const companyName = company?.appName || branding.appName;
     const employeeName = employe ? `${employe.nom} ${employe.prenom || ''}`.trim() : 'N/A';
 
@@ -392,6 +397,28 @@ export const PayslipTemplate = React.forwardRef<HTMLDivElement, PayslipTemplateP
             </div>
           </div>
         </div>
+
+        {/* ── FRAIS MOBILE MONEY (si applicable) ─────────── */}
+        {paymentFee && employe?.paymentMethod === 'MOBILE_MONEY' && (
+          <div className="border border-edge rounded-sm p-2 mb-3 text-[9px]">
+            {paymentFee.feeOption === 'EMPLOYEE_PAYS' ? (
+              <div className="space-y-0.5">
+                <div className="flex justify-between">
+                  <span className="font-bold">Frais Mobile Money</span>
+                  <span className="font-mono text-status-danger">-{fmt(paymentFee.feeAmount)} {currencySymbol()}</span>
+                </div>
+                <div className="flex justify-between font-bold">
+                  <span>Net versé (après frais)</span>
+                  <span className="font-mono">{fmt(paymentFee.montantNet)} {currencySymbol()}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="text-content-muted italic">
+                Paiement via Mobile Money — Frais de transfert pris en charge par l'employeur ({fmt(paymentFee.feeAmount)} {currencySymbol()})
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── MENTIONS LÉGALES & SIGNATURE ─────────────────── */}
         <div className="flex justify-between items-end text-[9px] mt-4 pt-4 border-t border-edge">

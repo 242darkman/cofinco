@@ -62,6 +62,7 @@ import {
   payrollBatchItems,
   bankReconciliationSessions,
   bankReconciliationLines,
+  salaryPaymentJobs,
 } from "@shared/schema";
 import { agentsTerrain, agentPlannings } from "@shared/schema";
 import { systemSettings } from "@shared/schema/settings";
@@ -2659,9 +2660,26 @@ hrRouter.get("/bulletins/:id", getAuthUser, async (req, res) => {
       }
     }
 
+    // Fetch payment fee info from salary_payment_jobs (if paid via MM)
+    let paymentFee: { feeOption: string | null; feeAmount: string | null; montantNet: string | null } | null = null;
+    const [paymentJob] = await db.select({
+      feeOption: salaryPaymentJobs.feeOption,
+      feeAmount: salaryPaymentJobs.feeAmount,
+      montantNet: salaryPaymentJobs.montantNet,
+    }).from(salaryPaymentJobs)
+      .where(and(
+        eq(salaryPaymentJobs.bulletinId, bulletinId),
+        eq(salaryPaymentJobs.status, 'SUCCEEDED'),
+      ))
+      .limit(1);
+    if (paymentJob && paymentJob.feeAmount && Number(paymentJob.feeAmount) > 0) {
+      paymentFee = paymentJob;
+    }
+
     res.json({
       bulletin,
       lines,
+      paymentFee,
       employe: employeData ? {
         id: employeData.employe.id,
         matricule: employeData.employe.matricule,
@@ -2847,6 +2865,7 @@ hrRouter.put("/paie/config", getAuthUser, attachAbility, requireAbility(Actions.
           ...(data.defaultHeureDebut !== undefined && { defaultHeureDebut: data.defaultHeureDebut }),
           ...(data.defaultHeureFin !== undefined && { defaultHeureFin: data.defaultHeureFin }),
           ...(data.defaultPauseMinutes !== undefined && { defaultPauseMinutes: data.defaultPauseMinutes }),
+          ...(data.mmSalaryFeeOption !== undefined && { mmSalaryFeeOption: data.mmSalaryFeeOption }),
           updatedAt: new Date(),
         })
         .where(eq(payrollConfig.id, existing.id))
@@ -2875,6 +2894,7 @@ hrRouter.put("/paie/config", getAuthUser, attachAbility, requireAbility(Actions.
           defaultHeureDebut: data.defaultHeureDebut ?? "08:00",
           defaultHeureFin: data.defaultHeureFin ?? "17:00",
           defaultPauseMinutes: data.defaultPauseMinutes ?? 60,
+          mmSalaryFeeOption: data.mmSalaryFeeOption ?? "COMPANY_ABSORBS",
           createdBy: user.id,
         })
         .returning();
