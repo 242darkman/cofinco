@@ -306,10 +306,18 @@ export default function SearchableSelect({
               ${error ? '!border-[#EF4444] !ring-[3px] !ring-[#EF4444]/30' : ''}
             `}
           >
-              {/* Left Icon / Avatar */}
+              {/* Left Icon / Avatar — small (20px) to match SelectField height */}
                {showAvatarInTrigger && selectedOption && !selectedOption.hideAvatar ? (
-                 <div className="shrink-0 mr-2">
-                   <OptionAvatar image={selectedOption.image} label={selectedOption.label} emoji={selectedOption.emoji} />
+                 <div className="shrink-0 mr-2 flex items-center">
+                   {selectedOption.image && !selectedOption.emoji ? (
+                     <img src={resolveStorageUrl(selectedOption.image)} alt="" className="w-5 h-5 rounded-full object-cover border border-edge-strong" />
+                   ) : selectedOption.emoji ? (
+                     <span className="w-5 h-5 flex items-center justify-center text-sm leading-none">{selectedOption.emoji}</span>
+                   ) : (
+                     <div className="w-5 h-5 rounded-full bg-gradient-to-br from-surface-subtle to-surface-elevated flex items-center justify-center text-[9px] font-bold text-content-primary border border-edge-strong">
+                       {getInitials(selectedOption.label)}
+                     </div>
+                   )}
                  </div>
                ) : (
                  <div className="shrink-0 mr-2 text-gray-400">
@@ -337,10 +345,7 @@ export default function SearchableSelect({
                         }}
                      />
                   ) : selectedOption ? (
-                    <div className="flex items-center gap-1.5 truncate">
-                      <span className="text-[13px] text-[#111827] truncate leading-tight">{selectedOption.label}</span>
-                      {selectedOption.subLabel && <span className="text-[11px] text-gray-400 truncate shrink-0">{selectedOption.subLabel}</span>}
-                    </div>
+                    <span className="text-[13px] text-[#111827] truncate leading-tight block">{selectedOption.label}</span>
                   ) : (
                      <span className="text-[#9CA3AF] text-[13px] block">{placeholder}</span>
                   )}
