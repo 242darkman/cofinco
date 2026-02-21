@@ -1,27 +1,15 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Users, Edit, Trash2, Plus, Save, Calendar, UserPlus, AlertTriangle } from 'lucide-react';
-import { Card, Button, Badge, FormField, SelectField, Modal, EmptyState, LoadingSpinner, Pagination, ResponsiveTable, TableColumn } from '../ui';
+import { useState, useEffect, useCallback } from 'react';
+import { Users, Edit, Trash2, Plus, UserPlus, AlertTriangle } from 'lucide-react';
+import { Card, Button, Badge, Pagination, ResponsiveTable, TableColumn } from '../ui';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import { usePermissions } from '../auth/ProtectedFeature';
-import { tontineApi, membreTontineApi, clientApi, tontinePlanApi } from '../../lib/api-client';
+import { tontineApi, clientApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import AdminTontinePlansGestion from './AdminTontinePlansGestion';
+import { TontineGroupWizard } from './TontineGroupWizard';
 import { StatutClient } from '@shared/enum/status-constants';
-
-interface Tontine {
-  id: string;
-  nom: string;
-  description: string;
-  typeDistribution: string;
-  montantCotisation: number;
-  frequence: string;
-  dateDebut: string;
-  nombreMembres: number;
-  membresActuels: number;
-  statut: string;
-  regles: any;
-}
+import type { Tontine, TontinePlan } from '@shared/schema/tontines';
 
 interface Membre {
   id: string;
@@ -62,28 +50,16 @@ export default function AdminTontinesGestion() {
   const [selectedTontine, setSelectedTontine] = useState<Tontine | null>(null);
   const [membres, setMembres] = useState<Membre[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
-  const [showTontineForm, setShowTontineForm] = useState(false);
+  const [showWizard, setShowWizard] = useState(false);
+  const [editTontine, setEditTontine] = useState<Tontine | null>(null);
+  const [preSelectedPlanId, setPreSelectedPlanId] = useState<string | undefined>();
   const [showMembreForm, setShowMembreForm] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [editMode, setEditMode] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [membresPage, setMembresPage] = useState(1);
   const [activeTab, setActiveTab] = useState<'groupes' | 'plans'>('groupes');
-  const [tontinePlans, setTontinePlans] = useState<any[]>([]);
   const [showPlanForm, setShowPlanForm] = useState(false);
-  const itemsPerPage = 10; // Table view can show more items
-
-  const [formData, setFormData] = useState({
-    nom: '',
-    description: '',
-    type_distribution: 'Rotative',
-    montant_cotisation: '',
-    frequence: 'Hebdomadaire',
-    date_debut: new Date().toISOString().split('T')[0],
-    nombre_membres: '10',
-    frais_pourcentage: '2',
-    montant_par_tour: ''
-  });
+  const itemsPerPage = 10;
 
   const [membreForm, setMembreForm] = useState({
     client_id: '',
@@ -120,93 +96,37 @@ export default function AdminTontinesGestion() {
     }
   }, []);
 
-  const chargerTontinePlans = useCallback(async () => {
-    try {
-      const data = await tontinePlanApi.getAll();
-      setTontinePlans(data?.filter((p: any) => p.actif) || []);
-    } catch (error) {
-      // Silently fail or use toast
-    }
-  }, []);
-
   useEffect(() => {
     chargerTontines();
     chargerClients();
-    chargerTontinePlans();
-  }, [chargerTontines, chargerClients, chargerTontinePlans]);
+  }, [chargerTontines, chargerClients]);
 
   const handleSelectTontine = (tontine: Tontine) => {
     setSelectedTontine(tontine);
-    setMembresPage(1); // Reset page on selection
+    setMembresPage(1);
     chargerMembres(tontine.id);
-    setShowTontineForm(false);
     setShowMembreForm(false);
   };
 
   const handleEditTontine = (tontine: Tontine) => {
-    // Format date for <input type="date"> (YYYY-MM-DD)
-    const formattedDate = tontine.dateDebut
-      ? new Date(tontine.dateDebut).toISOString().split('T')[0]
-      : new Date().toISOString().split('T')[0];
-
-    setFormData({
-      nom: tontine.nom || '',
-      description: tontine.description || '',
-      type_distribution: tontine.typeDistribution || 'Rotative',
-      montant_cotisation: tontine.montantCotisation?.toString() || '',
-      frequence: tontine.frequence || 'Hebdomadaire',
-      date_debut: formattedDate,
-      nombre_membres: tontine.nombreMembres?.toString() || '10',
-      frais_pourcentage: tontine.regles?.frais_sortie_pourcentage?.toString() || '2',
-      montant_par_tour: tontine.regles?.montant_par_tour?.toString() || ''
-    });
-    setSelectedTontine(tontine);
-    setEditMode(true);
-    setShowTontineForm(true);
+    setEditTontine(tontine);
+    setShowWizard(true);
   };
 
-  const handleSaveTontine = useCallback(async () => {
-    setLoading(true);
-    try {
-      const montantCotisation = parseFloat(formData.montant_cotisation);
-      const nombreMembres = parseInt(formData.nombre_membres);
-      const montantParTour = montantCotisation * nombreMembres;
-
-      const tontineData = {
-        nom: formData.nom,
-        description: formData.description,
-        type_distribution: formData.type_distribution,
-        montant_cotisation: montantCotisation,
-        frequence: formData.frequence,
-        date_debut: formData.date_debut,
-        nombre_membres: nombreMembres,
-        membres_actuels: editMode ? selectedTontine?.membresActuels : 0,
-        statut: 'ACTIVE',
-        regles: {
-          frais_sortie_pourcentage: parseFloat(formData.frais_pourcentage),
-          montant_par_tour: montantParTour,
-          description_frais: `Frais de ${formData.frais_pourcentage}% sur chaque distribution`
-        }
-      };
-
-      if (editMode && selectedTontine) {
-        await tontineApi.update(selectedTontine.id, tontineData);
-        toast.success('Tontine modifiée');
-      } else {
-        await tontineApi.create(tontineData);
-        toast.success('Tontine créée');
-      }
-
-      await chargerTontines();
-      setShowTontineForm(false);
-      setEditMode(false);
-      resetForm();
-    } catch (error) {
-      toast.error(handleApiError(error, 'Erreur lors de la sauvegarde'));
-    } finally {
-      setLoading(false);
+  const handleWizardSave = async (data: Partial<Tontine> & { members?: Array<{ clientId: string; groupRole: string }>; payoutOrder?: string[] }) => {
+    if (editTontine) {
+      await tontineApi.update(editTontine.id, data);
+    } else {
+      await tontineApi.create(data);
     }
-  }, [formData, editMode, selectedTontine, chargerTontines]);
+    await chargerTontines();
+  };
+
+  const handleWizardClose = () => {
+    setShowWizard(false);
+    setEditTontine(null);
+    setPreSelectedPlanId(null);
+  };
 
   const handleDeleteTontine = useCallback((tontineId: string) => {
     openConfirm({
@@ -286,47 +206,11 @@ export default function AdminTontinesGestion() {
     });
   }, [selectedTontine, openConfirm, chargerMembres, chargerTontines]);
 
-  const resetForm = () => {
-    setFormData({
-      nom: '',
-      description: '',
-      type_distribution: 'Rotative',
-      montant_cotisation: '',
-      frequence: 'Hebdomadaire',
-      date_debut: new Date().toISOString().split('T')[0],
-      nombre_membres: '10',
-      frais_pourcentage: '2',
-      montant_par_tour: ''
-    });
-  };
-
-  const applyPlan = (planId: string) => {
-    const plan = tontinePlans.find(p => p.id === planId);
-    if (!plan) return;
-
-    setFormData({
-      ...formData,
-      nom: formData.nom || plan.nom,
-      description: formData.description || plan.description || '',
-      montant_cotisation: plan.montantCotisation.toString(),
-      frequence: plan.frequence,
-      nombre_membres: plan.nombreMembres.toString(),
-      frais_pourcentage: plan.tauxPlateforme.toString()
-    });
-    toast.info(`Modèle "${plan.nom}" appliqué`);
-  };
-
-  const handleLaunchFromPlan = (plan: any) => {
+  const handleLaunchFromPlan = (plan: TontinePlan) => {
     setActiveTab('groupes');
-    resetForm();
-    setEditMode(false);
-    
-    // Defer form opening to ensure tab switch is processed if needed, 
-    // but React handles it fine usually.
-    setTimeout(() => {
-      applyPlan(plan);
-      setShowTontineForm(true);
-    }, 100);
+    setEditTontine(null);
+    setPreSelectedPlanId(plan.id);
+    setShowWizard(true);
   };
 
   return (
@@ -349,10 +233,8 @@ export default function AdminTontinesGestion() {
             size="sm"
             onClick={() => {
               if (activeTab === 'groupes') {
-                setShowTontineForm(true);
-                setEditMode(false);
-                resetForm();
-                setSelectedTontine(null);
+                setEditTontine(null);
+                setShowWizard(true);
               } else {
                 setShowPlanForm(true);
               }
@@ -431,10 +313,10 @@ export default function AdminTontinesGestion() {
             label: 'Membres',
             format: (val, item) => <span className="text-content-secondary">{val || 0}/{item.nombreMembres || 0}</span>
           },
-          { 
-            key: 'regles.frais_sortie_pourcentage', 
-            label: 'Frais', 
-            format: (val, item) => <span className="text-status-success font-medium">{item.regles?.frais_sortie_pourcentage || 0}%</span>
+          {
+            key: 'tauxPlateforme',
+            label: 'Frais',
+            format: (val) => <span className="text-status-success font-medium">{val || 0}%</span>
           },
            { 
             key: 'statut', 
@@ -507,26 +389,30 @@ export default function AdminTontinesGestion() {
             <Card className="bg-surface border-edge p-4 mb-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="sm:col-span-2">
-                  <SelectField
-                    label="Sélectionner un client"
-                    name="client_id"
+                  <label className="block text-xs font-semibold text-content-secondary mb-1">Sélectionner un client</label>
+                  <select
                     value={membreForm.client_id}
                     onChange={(e) => setMembreForm({ ...membreForm, client_id: e.target.value })}
-                    options={[
-                      { value: '', label: '-- Choisir un client --' },
-                      ...clients.map(c => ({ value: c.id, label: `${c.nom} ${c.prenom} - ${c.numeroCompte}` }))
-                    ]}
+                    className="w-full px-3 py-2 bg-input border border-input-border rounded-lg text-sm text-content-primary focus:border-input-focus focus:outline-none"
+                  >
+                    <option value="">-- Choisir un client --</option>
+                    {clients.map(c => (
+                      <option key={c.id} value={c.id}>{c.nom} {c.prenom} - {c.numeroCompte}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-content-secondary mb-1">Position dans l'ordre</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={membreForm.position}
+                    onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setMembreForm({ ...membreForm, position: v }); }}
+                    placeholder="1"
+                    className="w-full px-3 py-2 bg-input border border-input-border rounded-lg text-sm text-content-primary focus:border-input-focus focus:outline-none"
                   />
                 </div>
-                <FormField
-                  label="Position dans l'ordre"
-                  name="position"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  value={membreForm.position}
-                  onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setMembreForm({ ...membreForm, position: v }); }}
-                  placeholder="1"
-                />
                 <div className="flex items-center gap-4 pt-6">
                   <label className="flex items-center gap-2 text-content-secondary cursor-pointer">
                     <input
@@ -629,114 +515,14 @@ export default function AdminTontinesGestion() {
       </>
     )}
 
-      {/* Tontine Form Modal */}
-      <Modal
-        isOpen={showTontineForm}
-        onClose={() => {
-          setShowTontineForm(false);
-          setEditMode(false);
-          resetForm();
-        }}
-        title={editMode ? 'Modifier la tontine' : 'Créer une nouvelle tontine'}
-        size="lg"
-      >
-        <div className="space-y-4">
-          {!editMode && tontinePlans.length > 0 && (
-            <div className="bg-accent/10 p-4 rounded-xl border border-accent/20 mb-4">
-              <SelectField
-                label="Utiliser un modèle (Optionnel)"
-                name="plan_selection"
-                value=""
-                onChange={(e) => applyPlan(e.target.value)}
-                options={[
-                  { value: '', label: '-- Sélectionner un modèle pour pré-remplir --' },
-                  ...tontinePlans.map(p => ({ value: p.id, label: `${p.nom} (${p.montantCotisation} FCFA)` }))
-                ]}
-              />
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-            <FormField
-              label="Nom du groupe"
-              name="nom"
-              value={formData.nom}
-              onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
-              placeholder="Ex: Groupe Solidarité"
-            />
-            <SelectField
-              label="Fréquence"
-              name="frequence"
-              value={formData.frequence}
-              onChange={(e) => setFormData({ ...formData, frequence: e.target.value })}
-              options={[
-                { value: 'Journalier', label: 'Journalier' },
-                { value: 'Hebdomadaire', label: 'Hebdomadaire' },
-                { value: 'Bimensuel', label: 'Bimensuel' },
-                { value: 'Mensuel', label: 'Mensuel' },
-                { value: 'Trimestriel', label: 'Trimestriel' }
-              ]}
-            />
-            <FormField
-              label="Montant cotisation (FCFA)"
-              name="montant_cotisation"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              value={formData.montant_cotisation}
-              onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormData({ ...formData, montant_cotisation: v }); }}
-              placeholder="10000"
-            />
-            <FormField
-              label="Nombre max de membres"
-              name="nombre_membres"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              value={formData.nombre_membres}
-              onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormData({ ...formData, nombre_membres: v }); }}
-              placeholder="10"
-            />
-            <FormField
-              label="Frais de sortie (%)"
-              name="frais_pourcentage"
-              inputMode="decimal"
-              value={formData.frais_pourcentage}
-              onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); setFormData({ ...formData, frais_pourcentage: v }); }}
-              placeholder="2"
-              helperText={<span className="text-[10px]">Pourcentage retenu par la plateforme sur chaque bénéficiaire.</span>}
-            />
-            <FormField
-              label="Date de début"
-              name="date_debut"
-              type="date"
-              value={formData.date_debut}
-              onChange={(e) => setFormData({ ...formData, date_debut: e.target.value })}
-              icon={Calendar}
-            />
-          </div>
-
-          <div className="flex gap-3 pt-4">
-            <Button
-              variant="primary"
-              icon={Save}
-              onClick={handleSaveTontine}
-              isLoading={loading}
-              fullWidth
-            >
-              Sauvegarder
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setShowTontineForm(false);
-                setEditMode(false);
-                resetForm();
-              }}
-            >
-              Annuler
-            </Button>
-          </div>
-        </div>
-      </Modal>
+      {/* Tontine Group Wizard */}
+      <TontineGroupWizard
+        isOpen={showWizard}
+        onClose={handleWizardClose}
+        onSave={handleWizardSave}
+        editTontine={editTontine ?? undefined}
+        preSelectedPlanId={preSelectedPlanId ?? undefined}
+      />
 
       <ConfirmDialog
         isOpen={confirmState.isOpen}
