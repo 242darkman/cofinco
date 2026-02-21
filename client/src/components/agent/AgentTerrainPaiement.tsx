@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { DollarSign, Phone, FileText, CheckCircle, Users, CheckCircle2, AlertCircle, AlertTriangle, X, ChevronDown, Banknote, Smartphone, Loader2 } from 'lucide-react';
+import { SelectField, SearchableSelect } from '../ui';
 import { toast } from 'sonner';
 import AccountHolderPresenceModal, { PresenceConfirmationData } from '../auth/AccountHolderPresenceModal';
 import { usePermissions } from '../auth/ProtectedFeature';
@@ -89,189 +90,7 @@ interface AgentTerrainPaiementProps {
   visiteId?: string;
 }
 
-// Compact Select Component
-const CompactSelect = ({
-  value,
-  onChange,
-  options,
-  placeholder,
-  error,
-  disabled,
-  icon: Icon
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  options: { value: string; label: string }[];
-  placeholder: string;
-  error?: string;
-  disabled?: boolean;
-  icon?: React.ElementType;
-}) => (
-  <div className="relative">
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      disabled={disabled}
-      className={`
-        w-full h-11 px-3 ${Icon ? 'pl-9' : ''} pr-8 rounded-lg appearance-none
-        bg-surface/80 border text-sm
-        ${error ? 'border-status-danger/50' : 'border-edge-subtle focus:border-accent/50'}
-        text-content-primary disabled:opacity-50 disabled:cursor-not-allowed
-        focus:outline-none focus:ring-2 focus:ring-accent/20
-        transition-all cursor-pointer
-      `}
-    >
-      <option value="" className="bg-surface-base">{placeholder}</option>
-      {options.map(opt => (
-        <option key={opt.value} value={opt.value} className="bg-surface-base">{opt.label}</option>
-      ))}
-    </select>
-    {Icon && <Icon size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" />}
-    <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-content-muted pointer-events-none" />
-    {error && <p className="text-[10px] text-status-danger mt-0.5 pl-1">{error}</p>}
-  </div>
-);
 
-// Searchable Select Component
-const SearchableSelect = ({
-  value,
-  onChange,
-  options,
-  placeholder,
-  error,
-  disabled,
-  loading: isLoading
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  options: { value: string; label: string; sublabel?: string }[];
-  placeholder: string;
-  error?: string;
-  disabled?: boolean;
-  loading?: boolean;
-}) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [search, setSearch] = useState('');
-  const containerRef = React.useRef<HTMLDivElement>(null);
-
-  const filteredOptions = useMemo(() => {
-    if (!search.trim()) return options;
-    const s = search.toLowerCase();
-    return options.filter(o =>
-      o.label.toLowerCase().includes(s) ||
-      (o.sublabel?.toLowerCase().includes(s))
-    );
-  }, [options, search]);
-
-  const selectedOption = options.find(o => o.value === value);
-
-  // Close on outside click
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  return (
-    <div ref={containerRef} className="relative">
-      {/* Trigger */}
-      <button
-        type="button"
-        onClick={() => !disabled && setIsOpen(!isOpen)}
-        disabled={disabled}
-        className={`
-          w-full h-11 px-3 rounded-lg text-left flex items-center justify-between
-          bg-surface/80 border text-sm
-          ${error ? 'border-status-danger/50' : 'border-edge-subtle'}
-          ${isOpen ? 'border-accent/50 ring-2 ring-accent/20' : ''}
-          text-content-primary disabled:opacity-50 disabled:cursor-not-allowed
-          transition-all
-        `}
-      >
-        {selectedOption ? (
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <span className="text-content-primary font-medium truncate">{selectedOption.label}</span>
-            {selectedOption.sublabel && (
-              <span className="text-content-muted text-xs flex-shrink-0">• {selectedOption.sublabel}</span>
-            )}
-          </div>
-        ) : (
-          <span className="text-content-muted">{placeholder}</span>
-        )}
-        <ChevronDown size={14} className={`text-content-muted transition-transform flex-shrink-0 ml-2 ${isOpen ? 'rotate-180' : ''}`} />
-      </button>
-
-      {/* Dropdown */}
-      {isOpen && (
-        <div className="absolute z-50 mt-1 w-full bg-surface-base border border-edge-subtle rounded-xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
-          {/* Search Input */}
-          <div className="p-2 border-b border-edge">
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Rechercher..."
-              autoFocus
-              className="w-full h-9 px-3 rounded-lg text-sm bg-surface border border-edge-subtle text-content-primary placeholder-content-muted focus:outline-none focus:border-accent/50"
-            />
-          </div>
-
-          {/* Options List */}
-          <div className="max-h-48 overflow-y-auto overscroll-contain">
-            {isLoading ? (
-              <div className="p-4 flex items-center justify-center">
-                <div className="w-5 h-5 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
-              </div>
-            ) : filteredOptions.length === 0 ? (
-              <div className="p-4 text-center text-sm text-content-muted">
-                {search ? 'Aucun résultat' : 'Aucune option'}
-              </div>
-            ) : (
-              filteredOptions.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => {
-                    onChange(opt.value);
-                    setIsOpen(false);
-                    setSearch('');
-                  }}
-                  className={`
-                    w-full px-3 py-2.5 text-left flex items-center gap-3
-                    hover:bg-surface transition-colors
-                    ${value === opt.value ? 'bg-accent/10' : ''}
-                  `}
-                >
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent/20 to-status-info/20 flex items-center justify-center flex-shrink-0">
-                    <Users size={14} className={value === opt.value ? 'text-accent' : 'text-content-muted'} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-xs font-medium truncate ${value === opt.value ? 'text-accent' : 'text-content-primary'}`}>
-                      {opt.label}
-                    </p>
-                    {opt.sublabel && (
-                      <p className="text-[11px] text-content-muted flex items-center gap-1">
-                        <Phone size={10} />
-                        {opt.sublabel}
-                      </p>
-                    )}
-                  </div>
-                  {value === opt.value && <CheckCircle2 size={16} className="text-accent flex-shrink-0" />}
-                </button>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-
-      {error && <p className="text-[10px] text-status-danger mt-0.5 pl-1">{error}</p>}
-    </div>
-  );
-};
 
 export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clientId, visiteId }: AgentTerrainPaiementProps) {
   const { hasPermission } = usePermissions();
@@ -980,79 +799,82 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
           {/* Backdrop */}
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
-          {/* Modal Content */}
-          <div className="relative w-full max-w-md max-h-[92vh] bg-gradient-to-b from-surface-base to-surface-base rounded-t-2xl sm:rounded-2xl border border-edge/50 shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom-4 duration-200">
+          {/* Modal Content — flex column, full-width on mobile, max-w-lg on desktop */}
+          <div className="relative w-full sm:max-w-lg max-h-[92vh] bg-gradient-to-b from-surface-base to-surface-base rounded-t-2xl sm:rounded-2xl border border-edge/50 shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom-4 duration-200">
 
-            {/* Header - Fixed */}
-            <div className="flex-shrink-0 px-4 py-3 border-b border-edge/50 flex items-center justify-between bg-surface-base/80 backdrop-blur-sm">
+            {/* ── HEADER ── */}
+            <div className="shrink-0 px-5 py-4 border-b border-edge/50 flex items-center justify-between bg-surface-base/80 backdrop-blur-sm">
               <div>
-                <h2 className="text-base font-bold text-content-primary">Nouvelle Collecte</h2>
-                <p className="text-[10px] text-content-muted mt-0.5">Enregistrer un paiement client</p>
+                <h2 className="text-lg font-bold text-content-primary">Nouvelle Collecte</h2>
+                <p className="text-[13px] text-content-muted mt-0.5">Enregistrer un paiement client</p>
               </div>
               <button
                 onClick={onClose}
-                className="p-2 rounded-lg hover:bg-surface text-content-muted hover:text-content-primary transition-colors"
+                className="p-2.5 rounded-xl hover:bg-surface text-content-muted hover:text-content-primary transition-colors"
               >
-                <X size={18} />
+                <X size={20} />
               </button>
             </div>
 
-            {/* Scrollable Content */}
+            {/* ── SCROLLABLE FORM CONTENT ── */}
             <div className="flex-1 overflow-y-auto overscroll-contain">
-              <form onSubmit={handleSubmit} className="p-4 space-y-3">
+              <form onSubmit={handleSubmit} className="p-5 space-y-4">
 
                 {errors.submit && (
-                  <div className="bg-status-danger-bg border border-status-danger/30 text-status-danger px-3 py-2 rounded-lg text-xs flex items-center gap-2">
-                    <AlertCircle size={14} />
+                  <div className="bg-status-danger-bg border border-status-danger/30 text-status-danger px-4 py-3 rounded-xl text-[13px] flex items-center gap-2">
+                    <AlertCircle size={16} />
                     {errors.submit}
                   </div>
                 )}
 
-                {/* Agent & Client Row */}
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[10px] font-medium text-content-muted uppercase tracking-wider mb-1 block">Agent</label>
-                    <CompactSelect
-                      value={formData.agent_id}
-                      onChange={(v) => setFormData({ ...formData, agent_id: v })}
-                      options={agents.map(a => ({ value: a.id, label: `${a.nom} ${a.prenom}` }))}
-                      placeholder="Agent..."
-                      error={errors.agent_id}
-                      disabled={!!agentId}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-medium text-content-muted uppercase tracking-wider mb-1 block">
-                      Client {clients.length > 0 && <span className="text-content-muted">({clients.length})</span>}
-                    </label>
-                    <SearchableSelect
-                      value={formData.client_id}
-                      onChange={(v) => setFormData({ ...formData, client_id: v, credit_id: '', compte_id: '' })}
-                      options={clients.map(c => {
-                        // Build full name from nom + prenom
-                        const fullName = [c.nom, c.prenom].filter(Boolean).join(' ') || 'Sans nom';
-                        const phone = c.telephone;
-                        return {
-                          value: c.id,
-                          label: fullName,
-                          sublabel: phone || c.email || undefined
-                        };
-                      })}
-                      placeholder="Rechercher client..."
-                      error={errors.client_id}
-                      disabled={!!clientId}
-                      loading={loadingClients}
-                    />
+                {/* ── SECTION 1 : QUI ── */}
+                <div className="space-y-3">
+                  <p className="text-[13px] font-semibold text-content-secondary">Identification</p>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="flex-1">
+                      <SelectField
+                        label="Agent"
+                        name="agent_id"
+                        value={formData.agent_id}
+                        onChange={(e) => setFormData({ ...formData, agent_id: e.target.value })}
+                        options={agents.map((a: any) => ({ value: a.id, label: `${a.nom} ${a.prenom}` }))}
+                        placeholder="Sélectionner un agent"
+                        error={errors.agent_id}
+                        disabled={!!agentId}
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <SearchableSelect
+                        label="Client"
+                        name="client_id"
+                        value={formData.client_id}
+                        onChange={(val) => setFormData({ ...formData, client_id: String(val), credit_id: '', compte_id: '' })}
+                        options={clients.map((c: any) => {
+                          const fullName = [c.nom, c.prenom].filter(Boolean).join(' ') || 'Sans nom';
+                          return {
+                            value: c.id,
+                            label: fullName,
+                            subLabel: c.telephone || c.email || undefined
+                          };
+                        })}
+                        placeholder="Rechercher client..."
+                        error={errors.client_id}
+                        disabled={!!clientId}
+                        isLoading={loadingClients}
+                      />
+                    </div>
                   </div>
                 </div>
 
-                {/* Payment Type */}
-                <div>
-                  <label className="text-[10px] font-medium text-content-muted uppercase tracking-wider mb-1 block">Type</label>
-                  <CompactSelect
+                {/* ── SECTION 2 : QUOI ── */}
+                <div className="space-y-3">
+                  <p className="text-[13px] font-semibold text-content-secondary">Opération</p>
+                  <SelectField
+                    label="Type d'opération"
+                    name="type_paiement"
                     value={formData.type_paiement}
-                    onChange={(v) => {
-                      setFormData({ ...formData, type_paiement: v, credit_id: '', compte_id: '' });
+                    onChange={(e) => {
+                      setFormData({ ...formData, type_paiement: e.target.value, credit_id: '', compte_id: '' });
                       setSelectedTontine(null);
                     }}
                     options={[
@@ -1061,90 +883,94 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                       { value: TypeOperationTerrain.SAVINGS_DEPOSIT, label: 'Dépôt Épargne' },
                       { value: TypeOperationTerrain.MISC_COLLECTION, label: 'Autre Collecte' }
                     ]}
-                    placeholder="Type..."
+                    placeholder="Type d'opération..."
                   />
+
+                  {/* Tontine Selection */}
+                  {isTontinePayment && formData.client_id && (
+                    <div className="bg-accent/5 border border-accent/20 rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Users size={16} className="text-accent" />
+                        <span className="text-[13px] font-semibold text-accent">Tontine</span>
+                      </div>
+                      {loadingTontines ? (
+                        <div className="py-4 flex items-center justify-center">
+                          <div className="w-5 h-5 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
+                        </div>
+                      ) : clientTontines.length === 0 ? (
+                        <p className="text-[13px] text-status-warning flex items-center gap-2">
+                          <AlertCircle size={14} />
+                          Aucune tontine active
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {clientTontines.map((ct) => (
+                            <button
+                              key={ct.id}
+                              type="button"
+                              onClick={() => selectTontine(ct)}
+                              className={`
+                                w-full px-4 py-3 rounded-xl border text-left flex items-center justify-between transition-all
+                                ${selectedTontine?.id === ct.id
+                                  ? 'border-status-success/50 bg-status-success-bg'
+                                  : 'border-edge-subtle bg-surface/30 hover:border-accent/30'
+                                }
+                              `}
+                            >
+                              <div>
+                                <p className="text-[13px] font-medium text-content-primary">{ct.tontine.nom}</p>
+                                <p className="text-[12px] text-content-muted">
+                                  {parseFloat(ct.tontine.montantCotisation).toLocaleString()} F • {ct.tontine.frequence}
+                                </p>
+                              </div>
+                              {selectedTontine?.id === ct.id && <CheckCircle2 size={18} className="text-status-success" />}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {errors.tontine && <p className="text-[12px] text-status-danger mt-2">{errors.tontine}</p>}
+                    </div>
+                  )}
+
+                  {/* Credit Selection */}
+                  {isCreditPayment && (
+                    <SelectField
+                      label="Crédit"
+                      name="credit_id"
+                      value={formData.credit_id}
+                      onChange={(e) => setFormData({ ...formData, credit_id: e.target.value })}
+                      options={clientCredits.map((c: any) => ({
+                        value: c.id,
+                        label: `#${(c.numero || c.id).slice(0, 8)} - ${Number(c.soldeRestant || 0).toLocaleString()} F`
+                      }))}
+                      placeholder={loadingCredits ? 'Chargement...' : 'Sélectionner crédit'}
+                      error={errors.credit_id}
+                      disabled={loadingCredits || clientCredits.length === 0}
+                    />
+                  )}
+
+                  {/* Compte Selection */}
+                  {isComptePayment && (
+                    <SelectField
+                      label="Compte"
+                      name="compte_id"
+                      value={formData.compte_id}
+                      onChange={(e) => setFormData({ ...formData, compte_id: e.target.value })}
+                      options={clientComptes.map((c: any) => ({
+                        value: c.id,
+                        label: `${TYPE_COMPTE_LABELS[c.typeCompte as TypeCompteType] || c.typeCompte || 'Compte'} - ${(c.numeroCompte || c.id).slice(-8)}`
+                      }))}
+                      placeholder={loadingComptes ? 'Chargement...' : 'Sélectionner compte'}
+                      error={errors.compte_id}
+                      disabled={loadingComptes || clientComptes.length === 0}
+                    />
+                  )}
                 </div>
 
-                {/* Tontine Selection */}
-                {isTontinePayment && formData.client_id && (
-                  <div className="bg-accent/5 border border-accent/20 rounded-xl p-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Users size={14} className="text-accent" />
-                      <span className="text-xs font-semibold text-accent">Tontine</span>
-                    </div>
-                    {loadingTontines ? (
-                      <div className="h-10 flex items-center justify-center">
-                        <div className="w-4 h-4 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
-                      </div>
-                    ) : clientTontines.length === 0 ? (
-                      <p className="text-xs text-status-warning flex items-center gap-1.5">
-                        <AlertCircle size={12} />
-                        Aucune tontine active
-                      </p>
-                    ) : (
-                      <div className="space-y-1.5">
-                        {clientTontines.map((ct) => (
-                          <button
-                            key={ct.id}
-                            type="button"
-                            onClick={() => selectTontine(ct)}
-                            className={`
-                              w-full px-3 py-2 rounded-lg border text-left flex items-center justify-between transition-all
-                              ${selectedTontine?.id === ct.id
-                                ? 'border-status-success/50 bg-status-success-bg'
-                                : 'border-edge-subtle bg-surface/30 hover:border-accent/30'
-                              }
-                            `}
-                          >
-                            <div>
-                              <p className="text-xs font-medium text-content-primary">{ct.tontine.nom}</p>
-                              <p className="text-[10px] text-content-muted">
-                                {parseFloat(ct.tontine.montantCotisation).toLocaleString()} F • {ct.tontine.frequence}
-                              </p>
-                            </div>
-                            {selectedTontine?.id === ct.id && <CheckCircle2 size={16} className="text-status-success" />}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    {errors.tontine && <p className="text-[10px] text-status-danger mt-1">{errors.tontine}</p>}
-                  </div>
-                )}
-
-                {/* Credit Selection */}
-                {isCreditPayment && (
-                  <CompactSelect
-                    value={formData.credit_id}
-                    onChange={(v) => setFormData({ ...formData, credit_id: v })}
-                    options={clientCredits.map((c: any) => ({
-                      value: c.id,
-                      label: `#${(c.numero || c.id).slice(0, 8)} - ${Number(c.soldeRestant || 0).toLocaleString()} F`
-                    }))}
-                    placeholder={loadingCredits ? 'Chargement...' : 'Sélectionner crédit'}
-                    error={errors.credit_id}
-                    disabled={loadingCredits || clientCredits.length === 0}
-                  />
-                )}
-
-                {/* Compte Selection */}
-                {isComptePayment && (
-                  <CompactSelect
-                    value={formData.compte_id}
-                    onChange={(v) => setFormData({ ...formData, compte_id: v })}
-                    options={clientComptes.map((c: any) => ({
-                      value: c.id,
-                      label: `${TYPE_COMPTE_LABELS[c.typeCompte as TypeCompteType] || c.typeCompte || 'Compte'} - ${(c.numeroCompte || c.id).slice(-8)}`
-                    }))}
-                    placeholder={loadingComptes ? 'Chargement...' : 'Sélectionner compte'}
-                    error={errors.compte_id}
-                    disabled={loadingComptes || clientComptes.length === 0}
-                  />
-                )}
-
-                {/* Amount Section */}
-                <div className="bg-surface/30 rounded-xl p-3 border border-edge-subtle">
-                  <label className="text-[10px] font-medium text-content-muted uppercase tracking-wider mb-2 block">
-                    Montant (FCFA)
+                {/* ── SECTION 3 : COMBIEN ── */}
+                <div className="bg-surface/30 rounded-xl p-4 border border-edge-subtle space-y-3">
+                  <label className="text-[13px] font-semibold text-content-secondary block">
+                    Montant ({currencySymbol()})
                   </label>
                   <div className="relative">
                     <input
@@ -1154,7 +980,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                       onChange={(e) => { const v = e.target.value.replace(/[^0-9]/g, ''); setFormData({ ...formData, montant: v }); }}
                       placeholder="0"
                       className={`
-                        w-full h-14 px-4 rounded-xl text-2xl font-bold text-center
+                        w-full py-4 px-5 rounded-xl text-3xl font-bold text-center
                         bg-surface-base/80 border-2
                         ${errors.montant ? 'border-status-danger/50' : 'border-edge-subtle focus:border-accent/50'}
                         text-content-primary placeholder-content-muted
@@ -1163,16 +989,16 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                       `}
                     />
                   </div>
-                  {errors.montant && <p className="text-[10px] text-status-danger mt-1 text-center">{errors.montant}</p>}
+                  {errors.montant && <p className="text-[12px] text-status-danger text-center">{errors.montant}</p>}
 
-                  {/* Quick Amount Chips */}
-                  <div className="flex gap-1.5 mt-2 flex-wrap justify-center">
+                  {/* Quick Amount Chips — flex-wrap, no fixed sizes */}
+                  <div className="flex gap-2 flex-wrap justify-center">
                     {[1000, 2000, 5000, 10000].map((amt) => (
                       <button
                         key={amt}
                         type="button"
                         onClick={() => setFormData({ ...formData, montant: (montantNum + amt).toString() })}
-                        className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-accent/10 border border-accent/30 text-accent hover:bg-accent/20 active:scale-95 transition-all"
+                        className="px-4 py-2.5 rounded-full text-[13px] font-semibold bg-accent/10 border border-accent/30 text-accent hover:bg-accent/20 active:scale-95 transition-all"
                       >
                         +{(amt / 1000)}k
                       </button>
@@ -1180,23 +1006,21 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                     <button
                       type="button"
                       onClick={() => setFormData({ ...formData, montant: '' })}
-                      className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-surface-elevated/50 text-content-muted hover:bg-surface-elevated active:scale-95 transition-all"
+                      className="px-4 py-2.5 rounded-full text-[13px] font-semibold bg-surface-elevated/50 text-content-muted hover:bg-surface-elevated active:scale-95 transition-all"
                     >
                       C
                     </button>
                   </div>
                 </div>
 
-                {/* Payment Method */}
-                <div>
-                  <label className="text-[10px] font-medium text-content-muted uppercase tracking-wider mb-2 block">
-                    Mode de paiement
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
+                {/* ── SECTION 4 : COMMENT ── */}
+                <div className="space-y-3">
+                  <p className="text-[13px] font-semibold text-content-secondary">Mode de paiement</p>
+                  <div className="flex gap-3">
                     {[
                       { id: 'Espèces', label: 'Espèces', icon: Banknote, color: 'emerald' },
-                      { id: 'Airtel Money', label: 'Airtel', icon: () => <AirtelLogo className="h-5 w-5" />, color: 'red' },
-                      { id: 'MTN Mobile Money', label: 'MTN', icon: () => <MTNLogo className="h-5 w-5" />, color: 'yellow' }
+                      { id: 'Airtel Money', label: 'Airtel', icon: () => <AirtelLogo className="h-6 w-6" />, color: 'red' },
+                      { id: 'MTN Mobile Money', label: 'MTN', icon: () => <MTNLogo className="h-6 w-6" />, color: 'yellow' }
                     ].map((m) => (
                       <button
                         key={m.id}
@@ -1212,7 +1036,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                           setFeeEstimate(null);
                         }}
                         className={`
-                          relative py-3 px-2 rounded-xl border-2 flex flex-col items-center gap-1 transition-all
+                          flex-1 py-4 px-3 rounded-xl border-2 flex flex-col items-center gap-2 transition-all
                           ${formData.methode_paiement === m.id
                             ? m.id === 'Espèces'
                               ? 'border-status-success/60 bg-status-success-bg'
@@ -1223,13 +1047,13 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                           }
                         `}
                       >
-                        <m.icon size={18} className={
+                        <m.icon size={22} className={
                           formData.methode_paiement === m.id
                             ? m.id === 'Espèces' ? 'text-status-success'
                               : m.id === 'Airtel Money' ? 'text-status-danger' : 'text-status-warning'
                             : 'text-content-muted'
                         } />
-                        <span className={`text-[10px] font-semibold ${
+                        <span className={`text-[13px] font-semibold ${
                           formData.methode_paiement === m.id
                             ? m.id === 'Espèces' ? 'text-status-success'
                               : m.id === 'Airtel Money' ? 'text-status-danger' : 'text-status-warning'
@@ -1244,85 +1068,83 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
 
                 {/* Mobile Money Fields */}
                 {isMobileMoneyPayment && (
-                  <div className={`p-3 rounded-xl border ${
+                  <div className={`p-4 rounded-xl border ${
                     formData.methode_paiement === 'Airtel Money'
                       ? 'bg-status-danger/5 border-status-danger/20'
                       : 'bg-status-warning/5 border-status-warning/20'
                   }`}>
-                    <div className="flex items-center gap-2 mb-2">
-                      <Phone size={14} className={formData.methode_paiement === 'Airtel Money' ? 'text-status-danger' : 'text-status-warning'} />
-                      <span className={`text-xs font-semibold ${formData.methode_paiement === 'Airtel Money' ? 'text-status-danger' : 'text-status-warning'}`}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Phone size={16} className={formData.methode_paiement === 'Airtel Money' ? 'text-status-danger' : 'text-status-warning'} />
+                      <span className={`text-[13px] font-semibold ${formData.methode_paiement === 'Airtel Money' ? 'text-status-danger' : 'text-status-warning'}`}>
                         Numéro {formData.methode_paiement === 'Airtel Money' ? 'Airtel' : 'MTN'}
                       </span>
                     </div>
-                    <div className="relative">
-                      <input
-                        type="tel"
-                        value={formData.numero_telephone}
-                        onChange={(e) => setFormData({ ...formData, numero_telephone: e.target.value })}
-                        placeholder="06XXXXXXXX ou 05XXXXXXXX"
-                        className={`w-full h-12 px-4 rounded-lg text-base font-medium bg-surface-base/80 border text-content-primary placeholder-content-muted focus:outline-none ${
-                          errors.numero_telephone
-                            ? 'border-status-danger/50'
-                            : formData.methode_paiement === 'Airtel Money'
-                              ? 'border-status-danger/30 focus:border-status-danger/60'
-                              : 'border-status-warning/30 focus:border-status-warning/60'
-                        }`}
-                      />
-                    </div>
-                    {errors.numero_telephone && <p className="text-[10px] text-status-danger mt-1">{errors.numero_telephone}</p>}
-                    <p className="text-[10px] text-content-muted mt-1.5">
+                    <input
+                      type="tel"
+                      value={formData.numero_telephone}
+                      onChange={(e) => setFormData({ ...formData, numero_telephone: e.target.value })}
+                      placeholder="06XXXXXXXX ou 05XXXXXXXX"
+                      className={`w-full py-3 px-4 rounded-lg text-[15px] font-medium bg-surface-base/80 border text-content-primary placeholder-content-muted focus:outline-none ${
+                        errors.numero_telephone
+                          ? 'border-status-danger/50'
+                          : formData.methode_paiement === 'Airtel Money'
+                            ? 'border-status-danger/30 focus:border-status-danger/60'
+                            : 'border-status-warning/30 focus:border-status-warning/60'
+                      }`}
+                    />
+                    {errors.numero_telephone && <p className="text-[12px] text-status-danger mt-1">{errors.numero_telephone}</p>}
+                    <p className="text-[12px] text-content-muted mt-2">
                       Le client recevra une demande de paiement sur ce numéro
                     </p>
 
                     {/* Fee Option */}
-                    <div className="mt-3 pt-3 border-t border-edge-subtle/50">
-                      <label className="text-[10px] font-medium text-content-muted uppercase tracking-wider mb-2 block">
+                    <div className="mt-4 pt-4 border-t border-edge-subtle/50">
+                      <label className="text-[12px] font-medium text-content-muted uppercase tracking-wider mb-2 block">
                         Option frais Mobile Money
                       </label>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="flex gap-2">
                         <button
                           type="button"
                           onClick={() => setFeeOption(feeOption === 'CLIENT_PAYS' ? '' : 'CLIENT_PAYS')}
-                          className={`p-2.5 rounded-lg border text-left transition-all ${
+                          className={`flex-1 p-3 rounded-xl border text-left transition-all ${
                             feeOption === 'CLIENT_PAYS'
                               ? 'border-accent/50 bg-accent/10'
                               : 'border-edge-subtle bg-surface-base/50 hover:border-edge'
                           }`}
                         >
-                          <p className={`text-[11px] font-bold ${feeOption === 'CLIENT_PAYS' ? 'text-accent' : 'text-content-primary'}`}>
+                          <p className={`text-[13px] font-bold ${feeOption === 'CLIENT_PAYS' ? 'text-accent' : 'text-content-primary'}`}>
                             Client paie en plus
                           </p>
-                          <p className="text-[9px] text-content-muted mt-0.5">Frais ajoutés au montant</p>
+                          <p className="text-[11px] text-content-muted mt-0.5">Frais ajoutés au montant</p>
                         </button>
                         <button
                           type="button"
                           onClick={() => setFeeOption(feeOption === 'FEES_DEDUCTED' ? '' : 'FEES_DEDUCTED')}
-                          className={`p-2.5 rounded-lg border text-left transition-all ${
+                          className={`flex-1 p-3 rounded-xl border text-left transition-all ${
                             feeOption === 'FEES_DEDUCTED'
                               ? 'border-accent/50 bg-accent/10'
                               : 'border-edge-subtle bg-surface-base/50 hover:border-edge'
                           }`}
                         >
-                          <p className={`text-[11px] font-bold ${feeOption === 'FEES_DEDUCTED' ? 'text-accent' : 'text-content-primary'}`}>
+                          <p className={`text-[13px] font-bold ${feeOption === 'FEES_DEDUCTED' ? 'text-accent' : 'text-content-primary'}`}>
                             Frais déduits
                           </p>
-                          <p className="text-[9px] text-content-muted mt-0.5">Frais déduits du montant</p>
+                          <p className="text-[11px] text-content-muted mt-0.5">Frais déduits du montant</p>
                         </button>
                       </div>
 
                       {/* Fee Preview */}
                       {feeOption && feeEstimate && (
-                        <div className="mt-2 bg-accent/5 border border-accent/20 rounded-lg p-2.5 space-y-1">
-                          <div className="flex justify-between text-[11px]">
+                        <div className="mt-3 bg-accent/5 border border-accent/20 rounded-xl p-3 space-y-1.5">
+                          <div className="flex justify-between text-[13px]">
                             <span className="text-content-muted">Montant opération</span>
                             <span className="text-content-primary font-medium">{feeEstimate.montantBrut.toLocaleString()} F</span>
                           </div>
-                          <div className="flex justify-between text-[11px]">
+                          <div className="flex justify-between text-[13px]">
                             <span className="text-content-muted">Frais MM ({feeEstimate.feeRate}%)</span>
                             <span className="text-content-primary font-medium">{feeEstimate.feeAmount.toLocaleString()} F</span>
                           </div>
-                          <div className="flex justify-between text-[11px] pt-1 border-t border-accent/20">
+                          <div className="flex justify-between text-[13px] pt-1.5 border-t border-accent/20">
                             <span className="text-content-muted font-semibold">
                               {feeOption === 'CLIENT_PAYS' ? 'Total débité du téléphone' : 'Crédité au compte'}
                             </span>
@@ -1333,8 +1155,8 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                         </div>
                       )}
                       {feeOption && loadingFeeEstimate && (
-                        <div className="mt-2 flex items-center gap-2 text-[10px] text-content-muted">
-                          <Loader2 size={10} className="animate-spin" />
+                        <div className="mt-2 flex items-center gap-2 text-[12px] text-content-muted">
+                          <Loader2 size={12} className="animate-spin" />
                           Calcul des frais...
                         </div>
                       )}
@@ -1344,76 +1166,75 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
 
                 {/* Notes - Collapsible */}
                 <details className="group">
-                  <summary className="text-[10px] font-medium text-content-muted uppercase tracking-wider cursor-pointer flex items-center gap-1 select-none">
-                    <ChevronDown size={12} className="group-open:rotate-180 transition-transform" />
+                  <summary className="text-[13px] font-medium text-content-muted cursor-pointer flex items-center gap-1.5 select-none py-1">
+                    <ChevronDown size={14} className="group-open:rotate-180 transition-transform" />
                     Options avancées
                   </summary>
-                  <div className="mt-2 space-y-2">
+                  <div className="mt-3 space-y-3">
                     <input
                       type="text"
                       value={formData.reference}
                       onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
                       placeholder="Référence (optionnel)"
-                      className="w-full h-10 px-3 rounded-lg text-sm bg-surface/50 border border-edge-subtle text-content-primary placeholder-content-muted focus:outline-none focus:border-accent/50"
+                      className="w-full py-3 px-4 rounded-xl text-[13px] bg-surface/50 border border-edge-subtle text-content-primary placeholder-content-muted focus:outline-none focus:border-accent/50"
                     />
                     <textarea
                       value={formData.notes}
                       onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                       placeholder="Notes..."
                       rows={2}
-                      className="w-full px-3 py-2 rounded-lg text-sm bg-surface/50 border border-edge-subtle text-content-primary placeholder-content-muted focus:outline-none focus:border-accent/50 resize-none"
+                      className="w-full py-3 px-4 rounded-xl text-[13px] bg-surface/50 border border-edge-subtle text-content-primary placeholder-content-muted focus:outline-none focus:border-accent/50 resize-none"
                     />
                   </div>
                 </details>
               </form>
             </div>
 
-            {/* Footer - Fixed */}
-            <div className="flex-shrink-0 p-4 border-t border-edge/50 bg-surface-base/80 backdrop-blur-sm">
+            {/* ── FOOTER ── */}
+            <div className="shrink-0 p-5 border-t border-edge/50 bg-surface-base/80 backdrop-blur-sm space-y-3">
               {/* Total Preview */}
               {montantNum > 0 && (
-                <div className="mb-3 flex items-center justify-between px-3 py-2 rounded-lg bg-status-success-bg border border-status-success/20">
-                  <span className="text-xs text-status-success">
+                <div className="flex items-center justify-between px-4 py-3 rounded-xl bg-status-success-bg border border-status-success/20">
+                  <span className="text-[13px] text-status-success font-medium">
                     {feeEstimate && feeOption === 'CLIENT_PAYS' ? 'Total débité' : 'Total'}
                   </span>
-                  <span className="text-lg font-bold text-status-success">
-                    {(feeEstimate && feeOption === 'CLIENT_PAYS' ? feeEstimate.montantBrut : montantNum).toLocaleString()} <span className="text-xs">F</span>
+                  <span className="text-xl font-bold text-status-success">
+                    {(feeEstimate && feeOption === 'CLIENT_PAYS' ? feeEstimate.montantBrut : montantNum).toLocaleString()} <span className="text-[13px]">F</span>
                   </span>
                 </div>
               )}
 
-              <div className="flex gap-2">
+              {/* Action Buttons — Valider full-width, Annuler as text link */}
+              {canCreatePayments ? (
                 <button
                   type="button"
-                  onClick={onClose}
-                  disabled={loading}
-                  className="flex-1 h-12 rounded-xl font-semibold text-content-muted bg-surface/50 hover:bg-surface border border-edge-subtle transition-all disabled:opacity-50"
+                  onClick={handleSubmit}
+                  disabled={loading || montantNum <= 0}
+                  className="w-full py-4 rounded-xl font-semibold text-white bg-gradient-to-r from-status-success to-accent hover:from-status-success/90 hover:to-accent/90 shadow-lg shadow-status-success/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
                 >
-                  Annuler
+                  {loading ? (
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <CheckCircle size={20} />
+                      <span className="text-[15px]">Valider la collecte</span>
+                    </>
+                  )}
                 </button>
-                {canCreatePayments ? (
-                  <button
-                    type="button"
-                    onClick={handleSubmit}
-                    disabled={loading || montantNum <= 0}
-                    className="flex-[2] h-12 rounded-xl font-semibold text-white bg-gradient-to-r from-status-success to-accent hover:from-status-success/90 hover:to-accent/90 shadow-lg shadow-status-success/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
-                  >
-                    {loading ? (
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    ) : (
-                      <>
-                        <CheckCircle size={18} />
-                        Valider
-                      </>
-                    )}
-                  </button>
-                ) : (
-                  <div className="flex-[2] h-12 rounded-xl font-semibold text-status-warning bg-status-warning-bg border border-status-warning/30 flex items-center justify-center gap-2">
-                    <AlertTriangle size={16} />
-                    Permission requise
-                  </div>
-                )}
-              </div>
+              ) : (
+                <div className="w-full py-4 rounded-xl font-semibold text-status-warning bg-status-warning-bg border border-status-warning/30 flex items-center justify-center gap-2">
+                  <AlertTriangle size={18} />
+                  <span className="text-[13px]">Permission requise</span>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={loading}
+                className="w-full py-2 text-[13px] font-medium text-content-muted hover:text-content-primary transition-colors disabled:opacity-50"
+              >
+                Annuler
+              </button>
             </div>
           </div>
         </div>
