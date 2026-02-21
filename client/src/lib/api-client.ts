@@ -1495,6 +1495,22 @@ export const tontineApi = {
       method: 'POST',
       body: JSON.stringify({ lock, reason }),
     }),
+  skipTurn: (tontineId: string, cycleId: string, turnId: string, reason: string) =>
+    request<any>(`/tontines/${tontineId}/cycles/${cycleId}/turns/${turnId}/skip`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+  requestSwap: (tontineId: string, cycleId: string, turnIdA: string, turnIdB: string, reason: string) =>
+    request<any>(`/tontines/${tontineId}/cycles/${cycleId}/turns/swap`, {
+      method: 'POST',
+      body: JSON.stringify({ turnIdA, turnIdB, reason }),
+    }),
+  approveSwap: (tontineId: string, auditId: string) =>
+    request<any>(`/tontines/${tontineId}/swap/${auditId}/approve`, { method: 'POST' }),
+
+  // Cycle report
+  getCycleReport: (tontineId: string, cycleId: string) =>
+    request<any>(`/tontines/${tontineId}/cycles/${cycleId}/report`),
 
   // Join fee
   payJoinFee: (tontineId: string, membreId: string, data?: { sessionCaisseId?: string; methodePaiement?: string }) =>

@@ -1228,6 +1228,422 @@ export async function approveDistribution(params: {
 }
 
 // ============================================================================
+// TURN SKIP (B7)
+// ============================================================================
+
+/**
+ * Skip a turn — marks it as SKIPPED and creates an audit trail.
+ * Typically used when a beneficiary cannot receive or is absent.
+ */
+export async function skipTurn(params: {
+  tontineId: string;
+  cycleId: string;
+  turnId: string;
+  agenceId: string;
+  userId: string;
+  reason: string;
+}): Promise<{ turnId: string; skipped: boolean; auditId: string }> {
+  const { tontineId, cycleId, turnId, agenceId, userId, reason } = params;
+
+  return await db.transaction(async (tx) => {
+    const [turn] = await tx
+      .select()
+      .from(tontineTurns)
+      .where(and(eq(tontineTurns.id, turnId), eq(tontineTurns.tontineId, tontineId)))
+      .limit(1);
+
+    if (!turn) throw new Error("Tour non trouvé");
+    if (turn.cycleId !== cycleId) throw new Error("Le tour n'appartient pas à ce cycle");
+
+    if (turn.status === TontineTurnStatus.PAID_OUT) {
+      throw new Error("Impossible de sauter un tour déjà payé");
+    }
+    if (turn.status === TontineTurnStatus.SKIPPED) {
+      throw new Error("Ce tour est déjà marqué comme sauté");
+    }
+    if (turn.isLocked) {
+      throw new Error("Impossible de sauter un tour verrouillé");
+    }
+
+    await tx
+      .update(tontineTurns)
+      .set({
+        status: TontineTurnStatus.SKIPPED,
+        updatedAt: new Date(),
+      })
+      .where(eq(tontineTurns.id, turnId));
+
+    const [audit] = await tx
+      .insert(tontineTurnAudit)
+      .values({
+        agenceId,
+        tontineId,
+        cycleId,
+        actionType: TontineTurnAuditActionType.SKIP,
+        reason,
+        changedBy: userId,
+        affectedTurnIds: [turnId],
+        affectedMemberIds: turn.beneficiaryMemberId ? [turn.beneficiaryMemberId] : [],
+        metadata: { turnNumber: turn.turnNumber, beneficiaryMemberId: turn.beneficiaryMemberId },
+      })
+      .returning();
+
+    return { turnId, skipped: true, auditId: audit.id };
+  });
+}
+
+// ============================================================================
+// TURN SWAP WITH APPROVAL (B9)
+// ============================================================================
+
+/**
+ * Request a swap between two turns. If swapRequiresApproval is false,
+ * executes immediately. Otherwise, returns a pending swap request.
+ */
+export async function requestTurnSwap(params: {
+  tontineId: string;
+  cycleId: string;
+  turnIdA: string;
+  turnIdB: string;
+  agenceId: string;
+  userId: string;
+  reason: string;
+}): Promise<{ swapped: boolean; needsApproval: boolean; auditId?: string }> {
+  const { tontineId, cycleId, turnIdA, turnIdB, agenceId, userId, reason } = params;
+
+  const rules = await getTontineRules(tontineId);
+
+  if (!rules.allowSwapPayoutOrder) {
+    throw new Error("L'échange de tours n'est pas autorisé selon les règles de cette tontine");
+  }
+
+  // Validate both turns
+  const [turnA] = await db
+    .select()
+    .from(tontineTurns)
+    .where(and(eq(tontineTurns.id, turnIdA), eq(tontineTurns.tontineId, tontineId)))
+    .limit(1);
+
+  const [turnB] = await db
+    .select()
+    .from(tontineTurns)
+    .where(and(eq(tontineTurns.id, turnIdB), eq(tontineTurns.tontineId, tontineId)))
+    .limit(1);
+
+  if (!turnA || !turnB) throw new Error("Un ou les deux tours sont introuvables");
+  if (turnA.cycleId !== cycleId || turnB.cycleId !== cycleId) throw new Error("Les tours doivent appartenir au même cycle");
+  if (turnA.isLocked || turnB.isLocked) throw new Error("Impossible d'échanger des tours verrouillés");
+  if (turnA.status === TontineTurnStatus.PAID_OUT || turnB.status === TontineTurnStatus.PAID_OUT) {
+    throw new Error("Impossible d'échanger un tour déjà payé");
+  }
+
+  // Read swapRequiresApproval from tontine
+  const [tontine] = await db
+    .select({ swapRequiresApproval: tontines.swapRequiresApproval })
+    .from(tontines)
+    .where(eq(tontines.id, tontineId))
+    .limit(1);
+
+  if (tontine?.swapRequiresApproval) {
+    // Store as pending swap in audit with PENDING metadata
+    const [audit] = await db
+      .insert(tontineTurnAudit)
+      .values({
+        agenceId,
+        tontineId,
+        cycleId,
+        actionType: TontineTurnAuditActionType.SWAP,
+        oldOrder: [
+          { turnNumber: turnA.turnNumber, memberId: turnA.beneficiaryMemberId },
+          { turnNumber: turnB.turnNumber, memberId: turnB.beneficiaryMemberId },
+        ],
+        newOrder: [
+          { turnNumber: turnA.turnNumber, memberId: turnB.beneficiaryMemberId },
+          { turnNumber: turnB.turnNumber, memberId: turnA.beneficiaryMemberId },
+        ],
+        reason,
+        changedBy: userId,
+        affectedTurnIds: [turnIdA, turnIdB],
+        affectedMemberIds: [turnA.beneficiaryMemberId, turnB.beneficiaryMemberId].filter(Boolean) as string[],
+        metadata: { status: 'PENDING_APPROVAL', requestedBy: userId },
+      })
+      .returning();
+
+    return { swapped: false, needsApproval: true, auditId: audit.id };
+  }
+
+  // Execute immediately
+  return executeSwap({ tontineId, cycleId, turnA, turnB, agenceId, userId, reason });
+}
+
+/**
+ * Approve a pending swap request (identified by auditId).
+ */
+export async function approveSwap(params: {
+  tontineId: string;
+  auditId: string;
+  agenceId: string;
+  userId: string;
+}): Promise<{ swapped: boolean; auditId: string }> {
+  const { tontineId, auditId, agenceId, userId } = params;
+
+  const [auditEntry] = await db
+    .select()
+    .from(tontineTurnAudit)
+    .where(and(
+      eq(tontineTurnAudit.id, auditId),
+      eq(tontineTurnAudit.tontineId, tontineId),
+    ))
+    .limit(1);
+
+  if (!auditEntry) throw new Error("Entrée d'audit introuvable");
+  if (auditEntry.actionType !== TontineTurnAuditActionType.SWAP) throw new Error("Cette entrée n'est pas un échange");
+
+  const metadata = auditEntry.metadata as any;
+  if (metadata?.status !== 'PENDING_APPROVAL') throw new Error("Cet échange n'est pas en attente d'approbation");
+
+  const affectedTurnIds = auditEntry.affectedTurnIds || [];
+  if (affectedTurnIds.length !== 2) throw new Error("Données d'échange invalides");
+
+  const [turnA] = await db.select().from(tontineTurns).where(eq(tontineTurns.id, affectedTurnIds[0])).limit(1);
+  const [turnB] = await db.select().from(tontineTurns).where(eq(tontineTurns.id, affectedTurnIds[1])).limit(1);
+
+  if (!turnA || !turnB) throw new Error("Tours introuvables");
+  if (turnA.isLocked || turnB.isLocked) throw new Error("Un des tours est maintenant verrouillé");
+  if (turnA.status === TontineTurnStatus.PAID_OUT || turnB.status === TontineTurnStatus.PAID_OUT) {
+    throw new Error("Un des tours a déjà été payé");
+  }
+
+  const result = await executeSwap({
+    tontineId,
+    cycleId: auditEntry.cycleId,
+    turnA,
+    turnB,
+    agenceId,
+    userId,
+    reason: `Approbation de l'échange demandé (audit: ${auditId})`,
+  });
+
+  // Mark original audit as approved
+  await db
+    .update(tontineTurnAudit)
+    .set({ metadata: { ...metadata, status: 'APPROVED', approvedBy: userId, approvedAt: new Date().toISOString() } })
+    .where(eq(tontineTurnAudit.id, auditId));
+
+  return { swapped: true, auditId: result.auditId! };
+}
+
+/**
+ * Internal: execute the actual swap of beneficiaries between two turns.
+ */
+async function executeSwap(params: {
+  tontineId: string;
+  cycleId: string;
+  turnA: any;
+  turnB: any;
+  agenceId: string;
+  userId: string;
+  reason: string;
+}): Promise<{ swapped: boolean; needsApproval: boolean; auditId: string }> {
+  const { tontineId, cycleId, turnA, turnB, agenceId, userId, reason } = params;
+
+  return await db.transaction(async (tx) => {
+    // Swap beneficiaries
+    await tx
+      .update(tontineTurns)
+      .set({ beneficiaryMemberId: turnB.beneficiaryMemberId, updatedAt: new Date() })
+      .where(eq(tontineTurns.id, turnA.id));
+
+    await tx
+      .update(tontineTurns)
+      .set({ beneficiaryMemberId: turnA.beneficiaryMemberId, updatedAt: new Date() })
+      .where(eq(tontineTurns.id, turnB.id));
+
+    const [audit] = await tx
+      .insert(tontineTurnAudit)
+      .values({
+        agenceId,
+        tontineId,
+        cycleId,
+        actionType: TontineTurnAuditActionType.SWAP,
+        oldOrder: [
+          { turnNumber: turnA.turnNumber, memberId: turnA.beneficiaryMemberId },
+          { turnNumber: turnB.turnNumber, memberId: turnB.beneficiaryMemberId },
+        ],
+        newOrder: [
+          { turnNumber: turnA.turnNumber, memberId: turnB.beneficiaryMemberId },
+          { turnNumber: turnB.turnNumber, memberId: turnA.beneficiaryMemberId },
+        ],
+        reason,
+        changedBy: userId,
+        affectedTurnIds: [turnA.id, turnB.id],
+        affectedMemberIds: [turnA.beneficiaryMemberId, turnB.beneficiaryMemberId].filter(Boolean),
+        metadata: { status: 'EXECUTED' },
+      })
+      .returning();
+
+    return { swapped: true, needsApproval: false, auditId: audit.id };
+  });
+}
+
+// ============================================================================
+// CYCLE END REPORT (B12)
+// ============================================================================
+
+export interface CycleEndReport {
+  cycleId: string;
+  cycleNumber: number;
+  tontineId: string;
+  tontineName: string;
+  startDate: string;
+  closedAt: string;
+  membersCount: number;
+  totalContributions: number;
+  totalDistributions: number;
+  totalPenalties: number;
+  totalPenaltiesPaid: number;
+  potRemaining: number;
+  turnsCompleted: number;
+  turnsSkipped: number;
+  turnsRemaining: number;
+  memberSummary: Array<{
+    memberId: string;
+    clientId: string;
+    totalPaid: number;
+    totalReceived: number;
+    penaltiesCount: number;
+    lateCount: number;
+    status: string;
+  }>;
+}
+
+/**
+ * Generate a comprehensive end-of-cycle report.
+ */
+export async function generateCycleEndReport(
+  tontineId: string,
+  cycleId: string,
+): Promise<CycleEndReport> {
+  // Get tontine and cycle
+  const [tontine] = await db
+    .select({ id: tontines.id, nom: tontines.nom, solde: tontines.solde })
+    .from(tontines)
+    .where(eq(tontines.id, tontineId));
+
+  if (!tontine) throw new Error("Tontine introuvable");
+
+  const [cycle] = await db
+    .select()
+    .from(tontineCycles)
+    .where(and(eq(tontineCycles.id, cycleId), eq(tontineCycles.tontineId, tontineId)));
+
+  if (!cycle) throw new Error("Cycle introuvable");
+
+  // Total contributions for this cycle
+  const [contribResult] = await db
+    .select({ total: sql<string>`COALESCE(SUM(${contributionsTontine.montant}::numeric), 0)` })
+    .from(contributionsTontine)
+    .where(and(
+      eq(contributionsTontine.tontineId, tontineId),
+      eq(contributionsTontine.statutTransaction, "POSTED"),
+    ));
+
+  // Total distributions for this cycle
+  const [distribResult] = await db
+    .select({ total: sql<string>`COALESCE(SUM(${tontineDistributionRequests.amountPaid}::numeric), 0)` })
+    .from(tontineDistributionRequests)
+    .where(and(
+      eq(tontineDistributionRequests.tontineId, tontineId),
+      eq(tontineDistributionRequests.cycleId, cycleId),
+      sql`${tontineDistributionRequests.status} IN ('SUCCESS', 'PARTIAL')`,
+    ));
+
+  // Total penalties for this cycle
+  const [penaltyAll] = await db
+    .select({ total: sql<string>`COALESCE(SUM(${tontinePenalites.montant}::numeric), 0)` })
+    .from(tontinePenalites)
+    .where(and(eq(tontinePenalites.tontineId, tontineId), eq(tontinePenalites.cycleId, cycleId)));
+
+  const [penaltyPaid] = await db
+    .select({ total: sql<string>`COALESCE(SUM(${tontinePenalites.montant}::numeric), 0)` })
+    .from(tontinePenalites)
+    .where(and(
+      eq(tontinePenalites.tontineId, tontineId),
+      eq(tontinePenalites.cycleId, cycleId),
+      eq(tontinePenalites.statut, "PAID"),
+    ));
+
+  // Turn stats
+  const turnStats = await db
+    .select({
+      status: tontineTurns.status,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(tontineTurns)
+    .where(and(eq(tontineTurns.tontineId, tontineId), eq(tontineTurns.cycleId, cycleId)))
+    .groupBy(tontineTurns.status);
+
+  const turnMap = new Map(turnStats.map(t => [t.status, t.count]));
+  const turnsCompleted = (turnMap.get(TontineTurnStatus.PAID_OUT) || 0) + (turnMap.get(TontineTurnStatus.PARTIAL_PAID) || 0);
+  const turnsSkipped = turnMap.get(TontineTurnStatus.SKIPPED) || 0;
+  const totalTurns = turnStats.reduce((s, t) => s + t.count, 0);
+
+  // Per-member summary
+  const members = await db
+    .select({
+      memberId: membresTontine.id,
+      clientId: membresTontine.clientId,
+      totalPaid: membresTontine.totalCotisations,
+      totalReceived: membresTontine.totalRecus,
+      lateCount: membresTontine.lateCount,
+      status: membresTontine.statut,
+    })
+    .from(membresTontine)
+    .where(eq(membresTontine.tontineId, tontineId));
+
+  // Count penalties per member
+  const memberPenalties = await db
+    .select({
+      membreId: tontinePenalites.membreId,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(tontinePenalites)
+    .where(and(eq(tontinePenalites.tontineId, tontineId), eq(tontinePenalites.cycleId, cycleId)))
+    .groupBy(tontinePenalites.membreId);
+
+  const penaltyMap = new Map(memberPenalties.map(p => [p.membreId, p.count]));
+
+  const memberSummary = members.map(m => ({
+    memberId: m.memberId,
+    clientId: m.clientId,
+    totalPaid: parseFloat(m.totalPaid?.toString() || "0"),
+    totalReceived: parseFloat(m.totalReceived?.toString() || "0"),
+    penaltiesCount: penaltyMap.get(m.memberId) || 0,
+    lateCount: m.lateCount || 0,
+    status: m.status,
+  }));
+
+  return {
+    cycleId,
+    cycleNumber: cycle.cycleNumber,
+    tontineId,
+    tontineName: tontine.nom,
+    startDate: cycle.startDate?.toString() || "",
+    closedAt: cycle.closedAt?.toISOString() || new Date().toISOString(),
+    membersCount: cycle.membersCount || members.length,
+    totalContributions: Number(contribResult.total),
+    totalDistributions: Number(distribResult.total),
+    totalPenalties: Number(penaltyAll.total),
+    totalPenaltiesPaid: Number(penaltyPaid.total),
+    potRemaining: parseFloat(tontine.solde?.toString() || "0"),
+    turnsCompleted,
+    turnsSkipped,
+    turnsRemaining: totalTurns - turnsCompleted - turnsSkipped,
+    memberSummary,
+  };
+}
+
+// ============================================================================
 // PENALTY MANAGEMENT
 // ============================================================================
 
@@ -1433,4 +1849,8 @@ export default {
   approveDistribution,
   applyLatePenalties,
   getTontineRules,
+  skipTurn,
+  requestTurnSwap,
+  approveSwap,
+  generateCycleEndReport,
 };

@@ -31,6 +31,65 @@ import { executeWithLedger, updateTontineSolde, updateSessionSolde } from "../se
 import { db } from "../db";
 import { eq, and, asc, sql } from "drizzle-orm";
 
+// ============================================================================
+// KYC / SEGMENT VALIDATION (B11)
+// ============================================================================
+
+const KYC_LEVEL_ORDER: Record<string, number> = { NONE: 0, BASIC: 1, FULL: 2 };
+
+async function validateMemberKycAndSegment(tontineId: string, clientId: string): Promise<void> {
+  const [tontine] = await db
+    .select({ minKycLevel: tontines.minKycLevel, minSegmentRequired: tontines.minSegmentRequired })
+    .from(tontines)
+    .where(eq(tontines.id, tontineId));
+
+  if (!tontine) return; // tontine validation happens elsewhere
+
+  // Check KYC level
+  if (tontine.minKycLevel && tontine.minKycLevel !== 'NONE') {
+    const [client] = await db
+      .select({ kycStatus: clients.kycStatus })
+      .from(clients)
+      .where(eq(clients.id, clientId));
+
+    if (!client) throw new Error("Client introuvable");
+
+    // Map kycStatus to a level: VERIFIED = FULL, PARTIAL = BASIC, else NONE
+    const statusToLevel: Record<string, string> = {
+      VERIFIED: 'FULL',
+      PARTIAL: 'BASIC',
+      PENDING: 'NONE',
+      REJECTED: 'NONE',
+      EXPIRED: 'NONE',
+    };
+    const clientLevel = statusToLevel[client.kycStatus] || 'NONE';
+    const requiredLevel = KYC_LEVEL_ORDER[tontine.minKycLevel] ?? 0;
+    const actualLevel = KYC_LEVEL_ORDER[clientLevel] ?? 0;
+
+    if (actualLevel < requiredLevel) {
+      throw new Error(
+        `Niveau KYC insuffisant. Requis: ${tontine.minKycLevel}, actuel: ${clientLevel} (statut: ${client.kycStatus})`
+      );
+    }
+  }
+
+  // Check segment
+  if (tontine.minSegmentRequired) {
+    const [client] = await db
+      .select({ segment: clients.segment })
+      .from(clients)
+      .where(eq(clients.id, clientId));
+
+    if (!client) throw new Error("Client introuvable");
+
+    if (client.segment !== tontine.minSegmentRequired) {
+      throw new Error(
+        `Segment requis: "${tontine.minSegmentRequired}", segment du client: "${client.segment}"`
+      );
+    }
+  }
+}
+
 export function registerTontineRoutes(app: Express) {
   app.get("/api/tontines", requireAuth, requireAgenceAccess("agenceId"), async (req, res) => {
       // req.agenceFilter est injecté par requireAgenceAccess avec l'agenceId
@@ -152,6 +211,12 @@ export function registerTontineRoutes(app: Express) {
       }
 
       const parsed = insertMembreTontineSchema.parse(Object.assign({}, data, { tontineId: req.params.id }));
+
+      // B11: Validate KYC level and segment before adding member
+      if (parsed.clientId) {
+        await validateMemberKycAndSegment(req.params.id, parsed.clientId);
+      }
+
       // Set joinFeePaid based on tontine config
       if (tontine.joinFeeEnabled) {
         (parsed as any).joinFeePaid = false;
@@ -389,6 +454,9 @@ export function registerTontineRoutes(app: Express) {
       const { newClientId } = req.body;
       if (!newClientId) return res.status(400).json({ message: "newClientId requis" });
 
+      // B11: Validate KYC level and segment for replacement member
+      await validateMemberKycAndSegment(req.params.id, newClientId);
+
       const result = await tontineLifecycleService.replaceMember(
         req.params.id, req.params.membreId, newClientId, req.session.user!.id
       );
@@ -405,6 +473,9 @@ export function registerTontineRoutes(app: Express) {
     try {
       const { clientId } = req.body;
       if (!clientId) return res.status(400).json({ message: "clientId requis" });
+
+      // B11: Validate KYC level and segment before mid-cycle join
+      await validateMemberKycAndSegment(req.params.id, clientId);
 
       const result = await tontineLifecycleService.midCycleJoin(
         req.params.id, clientId, req.session.user!.id
@@ -1131,6 +1202,128 @@ export function registerTontineRoutes(app: Express) {
     } catch (error: any) {
       logger.error({ err: error }, "Erreur lock/unlock tour");
       res.status(400).json({ message: error.message || "Erreur lock/unlock" });
+    }
+  });
+
+  // --- SKIP TURN (B7) ---
+
+  app.post("/api/tontines/:id/cycles/:cycleId/turns/:turnId/skip", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.TONTINE), async (req: Request, res: Response) => {
+    try {
+      const agenceId = req.user?.agenceId || (req.session.user as any)?.agenceId;
+      const userId = req.session.user?.id;
+
+      if (!agenceId) return res.status(400).json({ message: "Agence non définie" });
+
+      const { reason } = req.body;
+      if (!reason || reason.trim().length === 0) {
+        return res.status(400).json({ message: "Motif requis pour sauter un tour" });
+      }
+
+      const result = await tontineProductionService.skipTurn({
+        tontineId: req.params.id,
+        cycleId: req.params.cycleId,
+        turnId: req.params.turnId,
+        agenceId,
+        userId: userId!,
+        reason,
+      });
+
+      const wsInstance = getWsInstance();
+      if (wsInstance) {
+        wsInstance.broadcast({
+          type: "TONTINE_UPDATE",
+          payload: { type: "turn_skipped", tontineId: req.params.id, turnId: req.params.turnId },
+        });
+      }
+
+      res.json(result);
+    } catch (error: any) {
+      logger.error({ err: error }, "Erreur skip tour");
+      res.status(400).json({ message: error.message || "Erreur skip tour" });
+    }
+  });
+
+  // --- TURN SWAP (B9) ---
+
+  // Request a swap between two turns
+  app.post("/api/tontines/:id/cycles/:cycleId/turns/swap", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.TONTINE), async (req: Request, res: Response) => {
+    try {
+      const agenceId = req.user?.agenceId || (req.session.user as any)?.agenceId;
+      const userId = req.session.user?.id;
+
+      if (!agenceId) return res.status(400).json({ message: "Agence non définie" });
+
+      const { turnIdA, turnIdB, reason } = req.body;
+      if (!turnIdA || !turnIdB) return res.status(400).json({ message: "turnIdA et turnIdB requis" });
+      if (!reason || reason.trim().length === 0) return res.status(400).json({ message: "Motif requis" });
+
+      const result = await tontineProductionService.requestTurnSwap({
+        tontineId: req.params.id,
+        cycleId: req.params.cycleId,
+        turnIdA,
+        turnIdB,
+        agenceId,
+        userId: userId!,
+        reason,
+      });
+
+      const wsInstance = getWsInstance();
+      if (wsInstance) {
+        wsInstance.broadcast({
+          type: "TONTINE_UPDATE",
+          payload: { type: result.swapped ? "turns_swapped" : "swap_requested", tontineId: req.params.id },
+        });
+      }
+
+      res.json(result);
+    } catch (error: any) {
+      logger.error({ err: error }, "Erreur swap tours");
+      res.status(400).json({ message: error.message || "Erreur swap tours" });
+    }
+  });
+
+  // Approve a pending swap
+  app.post("/api/tontines/:id/swap/:auditId/approve", requireAuth, attachAbility, requireAbility(Actions.APPROVE, Subjects.TONTINE), async (req: Request, res: Response) => {
+    try {
+      const agenceId = req.user?.agenceId || (req.session.user as any)?.agenceId;
+      const userId = req.session.user?.id;
+
+      if (!agenceId) return res.status(400).json({ message: "Agence non définie" });
+
+      const result = await tontineProductionService.approveSwap({
+        tontineId: req.params.id,
+        auditId: req.params.auditId,
+        agenceId,
+        userId: userId!,
+      });
+
+      const wsInstance = getWsInstance();
+      if (wsInstance) {
+        wsInstance.broadcast({
+          type: "TONTINE_UPDATE",
+          payload: { type: "swap_approved", tontineId: req.params.id },
+        });
+      }
+
+      res.json(result);
+    } catch (error: any) {
+      logger.error({ err: error }, "Erreur approbation swap");
+      res.status(400).json({ message: error.message || "Erreur approbation swap" });
+    }
+  });
+
+  // --- CYCLE END REPORT (B12) ---
+
+  app.get("/api/tontines/:id/cycles/:cycleId/report", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const report = await tontineProductionService.generateCycleEndReport(
+        req.params.id,
+        req.params.cycleId,
+      );
+      res.json(report);
+    } catch (error: any) {
+      logger.error({ err: error }, "Erreur rapport cycle");
+      res.status(500).json({ message: error.message || "Erreur rapport cycle" });
     }
   });
 
