@@ -3471,29 +3471,29 @@ async function seedHRBootstrap(context: SeedContext, dryRun: boolean): Promise<S
   }
   results.push({ table: 'departments', action: 'created', count: DEPARTMENTS_DATA.length });
 
-  // Job Positions
+  // Job Positions (enrichi avec fiche de poste)
   const positions = [
-    { departmentId: deptMap['DIR'], code: 'DG', name: 'Directeur Général' },
-    { departmentId: deptMap['DIR'], code: 'DGA', name: 'Directeur Général Adjoint' },
-    { departmentId: deptMap['DIR'], code: 'SEC', name: 'Secrétaire de Direction' },
-    { departmentId: deptMap['FIN'], code: 'DAF', name: 'Directeur Administratif et Financier' },
-    { departmentId: deptMap['FIN'], code: 'COMPT', name: 'Comptable' },
-    { departmentId: deptMap['FIN'], code: 'TRESO', name: 'Trésorier' },
-    { departmentId: deptMap['FIN'], code: 'AUDIT', name: 'Auditeur Interne' },
-    { departmentId: deptMap['RH'], code: 'DRH', name: 'Directeur des Ressources Humaines' },
-    { departmentId: deptMap['RH'], code: 'GPERSO', name: 'Gestionnaire du Personnel' },
-    { departmentId: deptMap['OPS'], code: 'DOPS', name: 'Directeur des Opérations' },
-    { departmentId: deptMap['OPS'], code: 'CAGENCE', name: 'Chef d\'Agence' },
-    { departmentId: deptMap['OPS'], code: 'CAISS', name: 'Caissier' },
-    { departmentId: deptMap['OPS'], code: 'AGTER', name: 'Agent Terrain' },
-    { departmentId: deptMap['OPS'], code: 'SUPV', name: 'Superviseur' },
-    { departmentId: deptMap['COM'], code: 'DCOM', name: 'Directeur Commercial' },
-    { departmentId: deptMap['COM'], code: 'CCONS', name: 'Chargé de Clientèle' },
-    { departmentId: deptMap['COM'], code: 'ACRED', name: 'Analyste Crédit' },
-    { departmentId: deptMap['IT'], code: 'DSI', name: 'Directeur des Systèmes d\'Information' },
-    { departmentId: deptMap['IT'], code: 'DEV', name: 'Développeur' },
-    { departmentId: deptMap['RISK'], code: 'DRISK', name: 'Directeur des Risques' },
-    { departmentId: deptMap['RISK'], code: 'CONF', name: 'Responsable Conformité' },
+    { departmentId: deptMap['DIR'], code: 'DG', name: 'Directeur Général', qualification: 'CADRE_SUPERIEUR', salaireMin: 800000, salaireMax: 1500000, effectifPrevu: 1, competencesRequises: ['leadership', 'stratégie', 'gestion financière'] },
+    { departmentId: deptMap['DIR'], code: 'DGA', name: 'Directeur Général Adjoint', qualification: 'CADRE_SUPERIEUR', salaireMin: 600000, salaireMax: 1200000, effectifPrevu: 1, competencesRequises: ['leadership', 'coordination', 'gestion'] },
+    { departmentId: deptMap['DIR'], code: 'SEC', name: 'Secrétaire de Direction', qualification: 'EMPLOYE', salaireMin: 200000, salaireMax: 400000, effectifPrevu: 2, competencesRequises: ['bureautique', 'organisation', 'communication'] },
+    { departmentId: deptMap['FIN'], code: 'DAF', name: 'Directeur Administratif et Financier', qualification: 'CADRE_SUPERIEUR', salaireMin: 600000, salaireMax: 1200000, effectifPrevu: 1, competencesRequises: ['comptabilité', 'finance', 'fiscalité', 'audit'] },
+    { departmentId: deptMap['FIN'], code: 'COMPT', name: 'Comptable', qualification: 'CADRE', salaireMin: 250000, salaireMax: 500000, effectifPrevu: 3, competencesRequises: ['comptabilité OHADA', 'Excel', 'fiscalité'] },
+    { departmentId: deptMap['FIN'], code: 'TRESO', name: 'Trésorier', qualification: 'CADRE', salaireMin: 300000, salaireMax: 550000, effectifPrevu: 1, competencesRequises: ['trésorerie', 'gestion de caisse', 'rapprochement bancaire'] },
+    { departmentId: deptMap['FIN'], code: 'AUDIT', name: 'Auditeur Interne', qualification: 'CADRE', salaireMin: 350000, salaireMax: 600000, effectifPrevu: 1, competencesRequises: ['audit interne', 'conformité', 'analyse des risques'] },
+    { departmentId: deptMap['RH'], code: 'DRH', name: 'Directeur des Ressources Humaines', qualification: 'CADRE_SUPERIEUR', salaireMin: 500000, salaireMax: 1000000, effectifPrevu: 1, competencesRequises: ['droit du travail', 'gestion RH', 'paie', 'formation'] },
+    { departmentId: deptMap['RH'], code: 'GPERSO', name: 'Gestionnaire du Personnel', qualification: 'AGENT_MAITRISE', salaireMin: 200000, salaireMax: 400000, effectifPrevu: 2, competencesRequises: ['administration RH', 'paie', 'gestion congés'] },
+    { departmentId: deptMap['OPS'], code: 'DOPS', name: 'Directeur des Opérations', qualification: 'CADRE_SUPERIEUR', salaireMin: 500000, salaireMax: 1000000, effectifPrevu: 1, competencesRequises: ['gestion opérationnelle', 'supervision', 'microfinance'] },
+    { departmentId: deptMap['OPS'], code: 'CAGENCE', name: 'Chef d\'Agence', qualification: 'CADRE', salaireMin: 350000, salaireMax: 700000, effectifPrevu: 5, competencesRequises: ['management', 'crédit', 'gestion commerciale'] },
+    { departmentId: deptMap['OPS'], code: 'CAISS', name: 'Caissier', qualification: 'EMPLOYE', salaireMin: 150000, salaireMax: 300000, effectifPrevu: 10, competencesRequises: ['comptage espèces', 'service client', 'rigueur'] },
+    { departmentId: deptMap['OPS'], code: 'AGTER', name: 'Agent Terrain', qualification: 'EMPLOYE', salaireMin: 120000, salaireMax: 250000, effectifPrevu: 15, competencesRequises: ['prospection', 'collecte', 'relation client'] },
+    { departmentId: deptMap['OPS'], code: 'SUPV', name: 'Superviseur', qualification: 'AGENT_MAITRISE', salaireMin: 250000, salaireMax: 500000, effectifPrevu: 3, competencesRequises: ['supervision terrain', 'reporting', 'contrôle'] },
+    { departmentId: deptMap['COM'], code: 'DCOM', name: 'Directeur Commercial', qualification: 'CADRE_SUPERIEUR', salaireMin: 500000, salaireMax: 1000000, effectifPrevu: 1, competencesRequises: ['stratégie commerciale', 'marketing', 'développement'] },
+    { departmentId: deptMap['COM'], code: 'CCONS', name: 'Chargé de Clientèle', qualification: 'AGENT_MAITRISE', salaireMin: 200000, salaireMax: 400000, effectifPrevu: 5, competencesRequises: ['relation client', 'vente', 'produits financiers'] },
+    { departmentId: deptMap['COM'], code: 'ACRED', name: 'Analyste Crédit', qualification: 'CADRE', salaireMin: 300000, salaireMax: 550000, effectifPrevu: 3, competencesRequises: ['analyse financière', 'risque crédit', 'scoring'] },
+    { departmentId: deptMap['IT'], code: 'DSI', name: 'Directeur des Systèmes d\'Information', qualification: 'CADRE_SUPERIEUR', salaireMin: 500000, salaireMax: 1000000, effectifPrevu: 1, competencesRequises: ['architecture SI', 'sécurité', 'gestion de projet'] },
+    { departmentId: deptMap['IT'], code: 'DEV', name: 'Développeur', qualification: 'CADRE', salaireMin: 300000, salaireMax: 600000, effectifPrevu: 3, competencesRequises: ['développement web', 'TypeScript', 'PostgreSQL', 'React'] },
+    { departmentId: deptMap['RISK'], code: 'DRISK', name: 'Directeur des Risques', qualification: 'CADRE_SUPERIEUR', salaireMin: 500000, salaireMax: 1000000, effectifPrevu: 1, competencesRequises: ['gestion des risques', 'réglementation COBAC', 'audit'] },
+    { departmentId: deptMap['RISK'], code: 'CONF', name: 'Responsable Conformité', qualification: 'CADRE', salaireMin: 350000, salaireMax: 650000, effectifPrevu: 1, competencesRequises: ['conformité', 'LCB-FT', 'réglementation bancaire'] },
   ];
 
   for (const pos of positions) {

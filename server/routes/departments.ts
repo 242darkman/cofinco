@@ -1,9 +1,9 @@
 import type { Express } from "express";
 import { createLogger } from "../lib/logger";
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { eq, sql, and, count } from "drizzle-orm";
 import { db } from "../db";
-import { departments, jobPositions } from "@shared/schema";
+import { departments, jobPositions, employes } from "@shared/schema";
 import { requireAuth } from "../auth";
 import { attachAbility, requireAbility } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
@@ -31,6 +31,12 @@ const createJobPositionSchema = z.object({
   name: z.string().min(1).max(120),
   description: z.string().optional().nullable(),
   isActive: z.boolean().optional().default(true),
+  salaireMin: z.number().int().min(0).optional().nullable(),
+  salaireMax: z.number().int().min(0).optional().nullable(),
+  qualification: z.string().max(50).optional().nullable(),
+  responsabilites: z.string().optional().nullable(),
+  competencesRequises: z.array(z.string()).optional().nullable(),
+  effectifPrevu: z.number().int().min(0).optional().default(1),
 });
 
 const updateJobPositionSchema = z.object({
@@ -39,6 +45,12 @@ const updateJobPositionSchema = z.object({
   name: z.string().min(1).max(120).optional(),
   description: z.string().optional().nullable(),
   isActive: z.boolean().optional(),
+  salaireMin: z.number().int().min(0).optional().nullable(),
+  salaireMax: z.number().int().min(0).optional().nullable(),
+  qualification: z.string().max(50).optional().nullable(),
+  responsabilites: z.string().optional().nullable(),
+  competencesRequises: z.array(z.string()).optional().nullable(),
+  effectifPrevu: z.number().int().min(0).optional(),
 });
 
 export function registerDepartmentsRoutes(app: Express) {
@@ -165,6 +177,12 @@ export function registerDepartmentsRoutes(app: Express) {
         name: jobPositions.name,
         description: jobPositions.description,
         isActive: jobPositions.isActive,
+        salaireMin: jobPositions.salaireMin,
+        salaireMax: jobPositions.salaireMax,
+        qualification: jobPositions.qualification,
+        responsabilites: jobPositions.responsabilites,
+        competencesRequises: jobPositions.competencesRequises,
+        effectifPrevu: jobPositions.effectifPrevu,
         createdAt: jobPositions.createdAt,
         updatedAt: jobPositions.updatedAt,
         department: {
@@ -299,6 +317,55 @@ export function registerDepartmentsRoutes(app: Express) {
     } catch (error) {
       logger.error({ err: error }, 'Error deleting job position');
       res.status(500).json({ message: "Erreur lors de la suppression du poste" });
+    }
+  });
+
+  // GET - Statistiques effectifs/vacances par poste
+  app.get("/api/job-positions/vacancy-stats", requireAuth, async (req, res) => {
+    try {
+      // Sous-requête: compter les employés actifs par poste
+      const employeCountSq = db
+        .select({
+          jobPositionId: employes.jobPositionId,
+          effectifActuel: count(employes.id).as('effectif_actuel'),
+        })
+        .from(employes)
+        .where(eq(employes.statut, 'ACTIVE'))
+        .groupBy(employes.jobPositionId)
+        .as('emp_count');
+
+      const result = await db
+        .select({
+          id: jobPositions.id,
+          code: jobPositions.code,
+          name: jobPositions.name,
+          departmentId: jobPositions.departmentId,
+          departmentName: departments.name,
+          departmentCode: departments.code,
+          effectifPrevu: jobPositions.effectifPrevu,
+          effectifActuel: sql<number>`COALESCE(${employeCountSq.effectifActuel}, 0)`.as('effectif_actuel'),
+          qualification: jobPositions.qualification,
+          salaireMin: jobPositions.salaireMin,
+          salaireMax: jobPositions.salaireMax,
+        })
+        .from(jobPositions)
+        .innerJoin(departments, eq(jobPositions.departmentId, departments.id))
+        .leftJoin(employeCountSq, eq(jobPositions.id, employeCountSq.jobPositionId))
+        .where(eq(jobPositions.isActive, true))
+        .orderBy(departments.name, jobPositions.name);
+
+      // Calculer les vacances
+      const stats = result.map(r => ({
+        ...r,
+        effectifPrevu: r.effectifPrevu ?? 1,
+        effectifActuel: Number(r.effectifActuel),
+        vacants: Math.max(0, (r.effectifPrevu ?? 1) - Number(r.effectifActuel)),
+      }));
+
+      res.json(stats);
+    } catch (error) {
+      logger.error({ err: error }, 'Error fetching vacancy stats');
+      res.status(500).json({ message: "Erreur lors du calcul des effectifs" });
     }
   });
 }

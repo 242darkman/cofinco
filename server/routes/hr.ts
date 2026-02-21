@@ -53,6 +53,9 @@ import {
   hrAlertConfig,
   hrAlerts,
   payrollTransferFiles,
+  hrDocumentRequests,
+  insertHrDocumentRequestSchema,
+  HrDocumentRequestStatus,
 } from "@shared/schema";
 import { agentsTerrain, agentPlannings } from "@shared/schema";
 import { systemSettings } from "@shared/schema/settings";
@@ -5477,6 +5480,160 @@ hrRouter.get("/paie/runs/:runId/transfer-files", getAuthUser, attachAbility, asy
         res.json(files);
     } catch (error) {
         logger.error({ err: error }, "Erreur récupération fichiers virement");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// =============================================================================
+// HR REPORTS
+// =============================================================================
+
+// GET /api/hr/reports/registre-personnel
+hrRouter.get("/reports/registre-personnel", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const filters: { statut?: string; departmentId?: string; agenceId?: string } = {};
+        if (req.query.statut) filters.statut = req.query.statut as string;
+        if (req.query.departmentId) filters.departmentId = req.query.departmentId as string;
+        if (req.query.agenceId) filters.agenceId = req.query.agenceId as string;
+        const data = await hrStorage.getRegistrePersonnel(Object.keys(filters).length > 0 ? filters : undefined);
+        res.json(data);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur récupération registre du personnel");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// GET /api/hr/reports/bilan-social
+hrRouter.get("/reports/bilan-social", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        const year = req.query.year ? parseInt(req.query.year as string) : new Date().getFullYear();
+        const data = await hrStorage.getBilanSocial(year);
+        res.json(data);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur récupération bilan social");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// =============================================================================
+// DOCUMENT REQUESTS (Portail Employe)
+// =============================================================================
+
+// GET /api/hr/document-requests
+hrRouter.get("/document-requests", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        const user = (req as any).user;
+        const mine = req.query.mine === 'true';
+
+        if (mine) {
+            // Employé: voir ses propres demandes
+            const [emp] = await db.select().from(employes).where(eq(employes.userId, user.id));
+            if (!emp) return res.json([]);
+            const requests = await hrStorage.getDocumentRequests({ employeId: emp.id });
+            return res.json(requests);
+        }
+
+        // Admin RH: voir toutes les demandes
+        if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) {
+            return res.status(403).json({ error: "Non autorisé" });
+        }
+
+        const filters: { statut?: string } = {};
+        if (req.query.statut) filters.statut = req.query.statut as string;
+        const requests = await hrStorage.getDocumentRequests(filters);
+        res.json(requests);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur récupération demandes de documents");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// POST /api/hr/document-requests
+hrRouter.post("/document-requests", getAuthUser, async (req, res) => {
+    try {
+        const user = (req as any).user;
+        const [emp] = await db.select().from(employes).where(eq(employes.userId, user.id));
+        if (!emp) {
+            return res.status(400).json({ error: "Aucun profil employé associé à votre compte" });
+        }
+
+        const { type, motif, details, urgence } = req.body;
+        if (!type) {
+            return res.status(400).json({ error: "Le type de document est requis" });
+        }
+
+        const data = {
+            employeId: emp.id,
+            employeNom: `${user.nom}${user.prenom ? ' ' + user.prenom : ''}`,
+            type,
+            motif: motif || null,
+            details: details || null,
+            urgence: urgence || false,
+            statut: HrDocumentRequestStatus.PENDING,
+        };
+
+        const result = await hrStorage.createDocumentRequest(data);
+
+        broadcastHrEvent({ entity: 'employe' as any, action: 'created', id: result.id });
+
+        res.status(201).json(result);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur création demande de document");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// PATCH /api/hr/document-requests/:id/process
+hrRouter.patch("/document-requests/:id/process", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) {
+            return res.status(403).json({ error: "Non autorisé" });
+        }
+
+        const user = (req as any).user;
+        const { statut, commentaireRh, motifRejet } = req.body;
+
+        if (!statut) {
+            return res.status(400).json({ error: "Le statut est requis" });
+        }
+
+        const updateData: any = {
+            statut,
+            traitePar: user.id,
+            traiteAt: new Date(),
+        };
+        if (commentaireRh !== undefined) updateData.commentaireRh = commentaireRh;
+        if (motifRejet !== undefined) updateData.motifRejet = motifRejet;
+
+        const result = await hrStorage.updateDocumentRequest(req.params.id, updateData);
+        if (!result) {
+            return res.status(404).json({ error: "Demande introuvable" });
+        }
+
+        broadcastHrEvent({ entity: 'employe' as any, action: 'updated', id: result.id });
+
+        res.json(result);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur traitement demande de document");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// GET /api/hr/document-requests/:id/download
+hrRouter.get("/document-requests/:id/download", getAuthUser, async (req, res) => {
+    try {
+        const [request] = await db.select().from(hrDocumentRequests).where(eq(hrDocumentRequests.id, req.params.id));
+        if (!request) {
+            return res.status(404).json({ error: "Demande introuvable" });
+        }
+        if (request.statut !== HrDocumentRequestStatus.COMPLETED || !request.documentUrl) {
+            return res.status(400).json({ error: "Le document n'est pas encore disponible" });
+        }
+        res.redirect(request.documentUrl);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur téléchargement document");
         res.status(500).json({ error: "Erreur serveur" });
     }
 });

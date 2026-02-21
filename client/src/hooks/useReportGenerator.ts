@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
-import { Users, Wallet, PiggyBank, UsersRound, LucideIcon } from 'lucide-react';
+import { Users, Wallet, PiggyBank, UsersRound, ClipboardList, BarChart3, LucideIcon } from 'lucide-react';
 import { useBranding } from '../contexts/BrandingContext';
-import { requestListAll } from '../lib/api-client';
+import { requestListAll, api } from '../lib/api-client';
 import { addPdfLogoHeader, addPdfLogoFooter } from '../lib/pdf-logo';
 // P4.1: Lazy-load heavy export libraries (saves ~650KB on initial bundle)
 import { loadPDFLibraries, loadExcelLibrary } from '../lib/lazy-export';
@@ -28,6 +28,8 @@ interface ReportConfig {
   getSummary: (data: any[]) => { label: string; value: string }[];
   /** Field used for client-side date-range filtering */
   dateField: string;
+  /** Optional transform for APIs that return an object instead of an array */
+  transformResponse?: (data: any) => any[];
 }
 
 // ============================================================================
@@ -39,6 +41,8 @@ export const reportTypes: ReportType[] = [
   { id: 'credits', label: 'Rapport Crédits', icon: Wallet, description: 'État des crédits et remboursements' },
   { id: 'epargnes', label: 'Rapport Épargnes', icon: PiggyBank, description: 'Soldes et mouvements d\'épargne' },
   { id: 'tontines', label: 'Rapport Tontines', icon: UsersRound, description: 'Activité des groupes de tontine' },
+  { id: 'registre-personnel', label: 'Registre du Personnel', icon: ClipboardList, description: 'Registre légal des employés' },
+  { id: 'bilan-social', label: 'Bilan Social', icon: BarChart3, description: 'Bilan social annuel' },
 ];
 
 // Constant for HTML print template
@@ -199,6 +203,106 @@ function buildConfigs(): Record<string, ReportConfig> {
         ];
       },
     },
+
+    'registre-personnel': {
+      title: 'Registre du Personnel',
+      columns: ['Matricule', 'Nom', 'Prénom', 'Sexe', 'Date Naissance', 'Date Embauche', 'Poste', 'Département', 'Contrat', 'CNSS'],
+      dateField: 'dateEmbauche',
+      getRowValues: (i) => [
+        i.matricule || '-',
+        i.nom || '-',
+        i.prenom || '-',
+        i.sexe || '-',
+        fmtDate(i.dateNaissance),
+        fmtDate(i.dateEmbauche),
+        i.poste || '-',
+        i.departement || '-',
+        i.typeContrat || '-',
+        i.numeroCnss || '-',
+      ],
+      getRawValues(i) { return this.getRowValues(i); },
+      getSummary: (data) => {
+        const hommes = data.filter(d => d.sexe === 'M').length;
+        const femmes = data.filter(d => d.sexe === 'F').length;
+        const cdi = data.filter(d => d.typeContrat === 'CDI').length;
+        return [
+          { label: 'Total employés', value: String(data.length) },
+          { label: 'Hommes', value: String(hommes) },
+          { label: 'Femmes', value: String(femmes) },
+          { label: 'CDI', value: String(cdi) },
+        ];
+      },
+    },
+
+    'bilan-social': {
+      title: 'Bilan Social',
+      columns: ['Catégorie', 'Indicateur', 'Valeur'],
+      dateField: '',
+      getRowValues: (i) => [
+        i.categorie || '-',
+        i.indicateur || '-',
+        String(i.valeur ?? '-'),
+      ],
+      getRawValues(i) { return this.getRowValues(i); },
+      getSummary: (data) => {
+        const effectifsRow = data.find(d => d.indicateur === 'Total employés');
+        const masseRow = data.find(d => d.indicateur === 'Masse salariale');
+        return [
+          { label: 'Total indicateurs', value: String(data.length) },
+          { label: 'Effectif total', value: effectifsRow ? String(effectifsRow.valeur) : '-' },
+          { label: 'Masse salariale', value: masseRow ? fmtMoney(masseRow.valeur) : '-' },
+        ];
+      },
+      transformResponse: (data: any) => {
+        const rows: any[] = [];
+        // Effectifs
+        if (data.effectifs) {
+          rows.push({ categorie: 'Effectifs', indicateur: 'Total employés', valeur: data.effectifs.total });
+          rows.push({ categorie: 'Effectifs', indicateur: 'Embauches', valeur: data.effectifs.embauches });
+          rows.push({ categorie: 'Effectifs', indicateur: 'Départs', valeur: data.effectifs.departs });
+          rows.push({ categorie: 'Effectifs', indicateur: 'Taux de rotation (%)', valeur: data.effectifs.tauxRotation });
+          if (data.effectifs.parSexe) {
+            for (const s of data.effectifs.parSexe) {
+              rows.push({ categorie: 'Effectifs', indicateur: `Sexe: ${s.sexe === 'M' ? 'Hommes' : s.sexe === 'F' ? 'Femmes' : 'Non renseigné'}`, valeur: s.count });
+            }
+          }
+          if (data.effectifs.parTypeContrat) {
+            for (const c of data.effectifs.parTypeContrat) {
+              rows.push({ categorie: 'Effectifs', indicateur: `Contrat: ${c.typeContrat || 'Non renseigné'}`, valeur: c.count });
+            }
+          }
+          if (data.effectifs.parDepartement) {
+            for (const d of data.effectifs.parDepartement) {
+              rows.push({ categorie: 'Effectifs', indicateur: `Département: ${d.departement || 'Non assigné'}`, valeur: d.count });
+            }
+          }
+        }
+        // Rémunération
+        if (data.remuneration) {
+          rows.push({ categorie: 'Rémunération', indicateur: 'Masse salariale', valeur: data.remuneration.masseSalariale });
+          rows.push({ categorie: 'Rémunération', indicateur: 'Salaire moyen', valeur: data.remuneration.salaireMoyen });
+        }
+        // Congés
+        if (data.conges) {
+          rows.push({ categorie: 'Congés', indicateur: 'Jours approuvés', valeur: data.conges.totalJoursApprouves });
+        }
+        // Formations
+        if (data.formations) {
+          rows.push({ categorie: 'Formations', indicateur: 'Nombre de formations', valeur: data.formations.nombreFormations });
+          rows.push({ categorie: 'Formations', indicateur: 'Nombre de participants', valeur: data.formations.nombreParticipants });
+        }
+        // Sanctions
+        if (data.sanctions) {
+          rows.push({ categorie: 'Sanctions', indicateur: 'Total sanctions', valeur: data.sanctions.total });
+          if (data.sanctions.parGravite) {
+            for (const g of data.sanctions.parGravite) {
+              rows.push({ categorie: 'Sanctions', indicateur: `Gravité: ${g.gravite}`, valeur: g.count });
+            }
+          }
+        }
+        return rows;
+      },
+    },
   };
 }
 
@@ -231,6 +335,8 @@ export function useReportGenerator() {
     credits: '/api/credits',
     epargnes: '/api/comptes',       // ← fixed: was /api/epargne (404)
     tontines: '/api/tontines',
+    'registre-personnel': '/api/hr/reports/registre-personnel',
+    'bilan-social': '/api/hr/reports/bilan-social',
   };
 
   const normalizeApiPath = (ep: string) => ep.startsWith('/api/') ? ep.slice(4) : ep;
@@ -264,11 +370,20 @@ export function useReportGenerator() {
     const endpoint = endpoints[t];
     if (!endpoint) return [];
     try {
-      const params: Record<string, string> = {};
-      if (t === 'epargnes') params.limit = '5000';
-      const data = await requestListAll<any>(normalizeApiPath(endpoint), params);
       const cfg = buildConfigs()[t];
-      let filtered = filterByDateRange(data, cfg.dateField);
+      let data: any[];
+
+      if (cfg.transformResponse) {
+        // API returns an object, not an array — use api.get then transform
+        const raw = await api.get<any>(normalizeApiPath(endpoint));
+        data = cfg.transformResponse(raw);
+      } else {
+        const params: Record<string, string> = {};
+        if (t === 'epargnes') params.limit = '5000';
+        data = await requestListAll<any>(normalizeApiPath(endpoint), params);
+      }
+
+      let filtered = cfg.dateField ? filterByDateRange(data, cfg.dateField) : data;
       if (t === 'clients') filtered = applyClientFilters(filtered);
       return filtered;
     } catch (err) {

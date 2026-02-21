@@ -5,12 +5,15 @@ import { Card } from '../../ui';
 interface ReportTypeSelectorProps {
   selectedType: string;
   onSelect: (typeId: string) => void;
+  filter?: string[];
 }
 
-export default function ReportTypeSelector({ selectedType, onSelect }: ReportTypeSelectorProps) {
+export default function ReportTypeSelector({ selectedType, onSelect, filter }: ReportTypeSelectorProps) {
+  const filteredTypes = filter ? reportTypes.filter(t => filter.includes(t.id)) : reportTypes;
+
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-      {reportTypes.map((type) => {
+      {filteredTypes.map((type) => {
         const IconComponent = type.icon;
         const isSelected = selectedType === type.id;
         

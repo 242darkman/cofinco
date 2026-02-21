@@ -9,9 +9,10 @@ import { toast } from '../../lib/toast';
 
 interface ReportGeneratorProps {
   onClose?: () => void;
+  filter?: string[];
 }
 
-export default function ReportGenerator({ onClose }: ReportGeneratorProps) {
+export default function ReportGenerator({ onClose, filter }: ReportGeneratorProps) {
   const {
     reportType, dateRange, setDateRange, format, setFormat,
     filters, setFilters, loading, previewData, loadingPreview,
@@ -67,7 +68,7 @@ export default function ReportGenerator({ onClose }: ReportGeneratorProps) {
         )}
       </div>
 
-      <ReportTypeSelector selectedType={reportType} onSelect={loadPreview} />
+      <ReportTypeSelector selectedType={reportType} onSelect={loadPreview} filter={filter} />
 
       <ReportPreview
         data={previewData}

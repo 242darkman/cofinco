@@ -1568,6 +1568,16 @@ export const tontineApi = {
     request<any>(`/tontines/${tontineId}/membres/${membreId}/role`, {
       method: 'PATCH', body: JSON.stringify({ role }),
     }),
+  midCycleJoin: (tontineId: string, clientId: string) =>
+    request<any>(`/tontines/${tontineId}/mid-cycle-join`, {
+      method: 'POST', body: JSON.stringify({ clientId }),
+    }),
+  suspendMember: (tontineId: string, membreId: string, reason?: string) =>
+    request<any>(`/tontines/${tontineId}/membres/${membreId}/suspend`, {
+      method: 'POST', body: JSON.stringify({ reason }),
+    }),
+  reinstateMember: (tontineId: string, membreId: string) =>
+    request<any>(`/tontines/${tontineId}/membres/${membreId}/reinstate`, { method: 'POST' }),
 
   // Penalties
   getPenalties: (tontineId: string) => request<any[]>(`/tontines/${tontineId}/penalites`),

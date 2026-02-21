@@ -1,6 +1,16 @@
-import { pgTable, text, varchar, boolean, timestamp, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, boolean, timestamp, uuid, integer, json } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+// Niveaux de qualification
+export const QualificationLevel = {
+  OUVRIER: 'OUVRIER',
+  EMPLOYE: 'EMPLOYE',
+  AGENT_MAITRISE: 'AGENT_MAITRISE',
+  CADRE: 'CADRE',
+  CADRE_SUPERIEUR: 'CADRE_SUPERIEUR',
+} as const;
+export type QualificationLevelType = typeof QualificationLevel[keyof typeof QualificationLevel];
 
 /**
  * Table des départements
@@ -33,6 +43,14 @@ export const jobPositions = pgTable("job_positions", {
   name: varchar("name", { length: 120 }).notNull(),
   description: text("description"),
   isActive: boolean("is_active").notNull().default(true),
+
+  // Fiche de poste enrichie
+  salaireMin: integer("salaire_min"),
+  salaireMax: integer("salaire_max"),
+  qualification: varchar("qualification", { length: 50 }), // QualificationLevel
+  responsabilites: text("responsabilites"),
+  competencesRequises: json("competences_requises").$type<string[]>(),
+  effectifPrevu: integer("effectif_prevu").default(1),
 
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

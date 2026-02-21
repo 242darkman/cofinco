@@ -1342,3 +1342,51 @@ export const payrollTransferFiles = pgTable("payroll_transfer_files", {
 export const insertPayrollTransferFileSchema = createInsertSchema(payrollTransferFiles).omit({ id: true, createdAt: true });
 export type PayrollTransferFile = typeof payrollTransferFiles.$inferSelect;
 export type InsertPayrollTransferFile = z.infer<typeof insertPayrollTransferFileSchema>;
+
+// =============================================================================
+// DEMANDES DE DOCUMENTS RH
+// =============================================================================
+
+export const HrDocumentRequestType = {
+  ATTESTATION_TRAVAIL: 'ATTESTATION_TRAVAIL',
+  ATTESTATION_SALAIRE: 'ATTESTATION_SALAIRE',
+  CERTIFICAT_TRAVAIL: 'CERTIFICAT_TRAVAIL',
+  ATTESTATION_CONGE: 'ATTESTATION_CONGE',
+  AUTRE: 'AUTRE',
+} as const;
+
+export const HrDocumentRequestStatus = {
+  PENDING: 'PENDING',
+  IN_PROGRESS: 'IN_PROGRESS',
+  COMPLETED: 'COMPLETED',
+  REJECTED: 'REJECTED',
+} as const;
+
+export const hrDocumentRequests = pgTable("hr_document_requests", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  employeId: uuid("employe_id").notNull().references(() => employes.id, { onDelete: "cascade" }),
+  employeNom: varchar("employe_nom", { length: 255 }).notNull(),
+  type: varchar("type", { length: 50 }).notNull(),
+  motif: text("motif"),
+  details: text("details"),
+  urgence: boolean("urgence").default(false),
+  statut: varchar("statut", { length: 20 }).notNull().default("PENDING"),
+  traitePar: uuid("traite_par").references(() => users.id, { onDelete: "set null" }),
+  traiteAt: timestamp("traite_at"),
+  commentaireRh: text("commentaire_rh"),
+  motifRejet: text("motif_rejet"),
+  documentUrl: text("document_url"),
+  documentFileName: text("document_file_name"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => ({
+  idxEmployeId: index("idx_hr_doc_requests_employe").on(t.employeId),
+  idxStatut: index("idx_hr_doc_requests_statut").on(t.statut),
+}));
+
+export const insertHrDocumentRequestSchema = createInsertSchema(hrDocumentRequests).omit({
+  id: true, createdAt: true, updatedAt: true, traitePar: true, traiteAt: true,
+  motifRejet: true, documentUrl: true, documentFileName: true,
+});
+export type InsertHrDocumentRequest = z.infer<typeof insertHrDocumentRequestSchema>;
+export type HrDocumentRequest = typeof hrDocumentRequests.$inferSelect;
