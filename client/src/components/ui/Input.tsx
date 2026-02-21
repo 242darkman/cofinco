@@ -16,16 +16,16 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         ref={ref}
         disabled={disabled}
         className={`
-          w-full px-4 py-2 sm:py-2.5
-          bg-input-bg border rounded-lg
-          text-input-text text-sm sm:text-base
-          placeholder:text-input-placeholder
+          w-full px-[14px] py-[10px]
+          bg-white border rounded-lg
+          text-[#111827] text-[13px] sm:text-[13px]
+          placeholder:text-[#9CA3AF] placeholder:font-normal
           transition-colors duration-200
-          focus:outline-none focus:ring-2
+          focus:outline-none focus:ring-[3px]
           disabled:opacity-50 disabled:cursor-not-allowed
           ${error
-            ? 'border-status-danger/50 focus:border-status-danger focus:ring-status-danger/30'
-            : 'border-input-border focus:border-input-focus focus:ring-input-focus/30'
+            ? 'border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]/30'
+            : 'border-[#E5E7EB] hover:border-gray-400 focus:border-[#059669] focus:ring-[#059669]/30'
           }
           ${className}
         `}

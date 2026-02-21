@@ -1,5 +1,5 @@
 import React, { forwardRef } from 'react';
-import { LucideIcon } from 'lucide-react';
+import { LucideIcon, AlertCircle } from 'lucide-react';
 
 /**
  * FormField Component - COFIN Platform
@@ -48,20 +48,21 @@ const FormField = forwardRef<HTMLInputElement, FormFieldProps>(
     ref
   ) => {
     return (
-      <div className={containerClassName}>
+      <div className={`${containerClassName} mb-4`}>
         <label
           htmlFor={name}
-          className="block text-xs sm:text-sm font-semibold text-content-secondary mb-2"
+          className="block font-inter font-medium text-[13px] text-[#374151] mb-[6px]"
         >
           {label}
-          {required && <span className="text-status-danger ml-1">*</span>}
+          {required && <span className="text-[#EF4444] ml-1">*</span>}
         </label>
 
         <div className="relative">
           {Icon && (
             <Icon
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted pointer-events-none"
+              className="absolute left-[14px] top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none"
               size={18}
+              strokeWidth={1.5}
             />
           )}
 
@@ -73,18 +74,18 @@ const FormField = forwardRef<HTMLInputElement, FormFieldProps>(
             aria-invalid={error ? 'true' : 'false'}
             aria-describedby={error ? `${name}-error` : helperText ? `${name}-helper` : undefined}
             className={`
-              w-full px-4 py-2 sm:py-2.5
-              ${Icon ? 'pl-10' : ''}
-              ${RightIcon ? 'pr-10' : ''}
-              bg-input-bg border rounded-lg
-              text-input-text text-sm sm:text-base
-              placeholder:text-input-placeholder
+              w-full px-[14px] py-[10px]
+              ${Icon ? 'pl-[38px]' : ''}
+              ${RightIcon ? 'pr-[38px]' : ''}
+              bg-white border rounded-lg
+              text-[#111827] text-[13px]
+              placeholder:text-[#9CA3AF] placeholder:font-normal
               transition-colors duration-200
-              focus:outline-none focus:ring-2
+              focus:outline-none focus:ring-[3px]
               disabled:opacity-50 disabled:cursor-not-allowed
               ${error
-                ? 'border-status-danger/50 focus:border-status-danger focus:ring-status-danger/30'
-                : 'border-input-border focus:border-input-focus focus:ring-input-focus/30'
+                ? 'border-[#EF4444] focus:border-[#EF4444] focus:ring-[#EF4444]/30'
+                : 'border-[#E5E7EB] hover:border-gray-400 focus:border-[#059669] focus:ring-[#059669]/30'
               }
               ${className}
             `}
@@ -95,36 +96,29 @@ const FormField = forwardRef<HTMLInputElement, FormFieldProps>(
             <button
               type="button"
               onClick={onRightIconClick}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-content-muted hover:text-content-secondary transition-colors"
+              className="absolute right-[12px] top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors"
               tabIndex={-1}
             >
-              <RightIcon size={18} />
+              <RightIcon size={18} strokeWidth={1.5} />
             </button>
           )}
+          {error && (
+            <p
+              id={`${name}-error`}
+              className="absolute -bottom-5 left-0 text-[11px] text-[#EF4444] flex items-center gap-1 mt-1"
+              role="alert"
+            >
+              <AlertCircle size={12} strokeWidth={2} className="shrink-0" />
+              {error}
+            </p>
+          )}
+
+          {helperText && !error && (
+            <p id={`${name}-helper`} className="absolute -bottom-5 left-0 text-[11px] text-gray-500 mt-1">
+              {helperText}
+            </p>
+          )}
         </div>
-
-        {error && (
-          <p
-            id={`${name}-error`}
-            className="mt-1.5 text-xs sm:text-sm text-status-danger flex items-center gap-1"
-            role="alert"
-          >
-            <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-              <path
-                fillRule="evenodd"
-                d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
-                clipRule="evenodd"
-              />
-            </svg>
-            {error}
-          </p>
-        )}
-
-        {helperText && !error && (
-          <p id={`${name}-helper`} className="mt-1.5 text-xs sm:text-sm text-content-muted">
-            {helperText}
-          </p>
-        )}
       </div>
     );
   }

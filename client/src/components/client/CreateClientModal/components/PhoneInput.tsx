@@ -1,4 +1,5 @@
 import React from 'react';
+import { AlertCircle } from 'lucide-react';
 
 interface PhoneInputProps {
   value: string;
@@ -24,24 +25,24 @@ export default function PhoneInput({ value, onChange, error, onBlur, disabled }:
   };
 
   return (
-    <div>
-      <label className="block text-xs sm:text-sm font-semibold text-content-secondary mb-2">
-        Téléphone <span className="text-status-danger ml-1">*</span>
+    <div className="mb-4 relative">
+      <label className="block font-inter font-medium text-[13px] text-[#374151] mb-[6px]">
+        Téléphone <span className="text-[#EF4444] ml-1">*</span>
       </label>
       <div
         className={`
           phone-input-group flex items-center
-          bg-input border rounded-xl
-          transition-all duration-200
-          focus-within:border-input-focus focus-within:ring-2 focus-within:ring-input-focus/20
-          ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
+          bg-white border rounded-lg
+          transition-all duration-200 overflow-hidden
+          focus-within:border-[#059669] focus-within:ring-[3px] focus-within:ring-[#059669]/30
+          ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-gray-400'}
           ${error
-            ? 'border-status-danger/50 focus-within:border-status-danger focus-within:ring-status-danger/20'
-            : 'border-input-border'
+            ? 'border-[#EF4444] focus-within:border-[#EF4444] focus-within:ring-[#EF4444]/30'
+            : 'border-[#E5E7EB]'
           }
         `}
       >
-        <span className="phone-prefix shrink-0 pl-4 pr-3 text-sm text-content-muted/60 font-mono select-none flex items-center self-stretch border-r border-edge-subtle/60 bg-surface-subtle/30">
+        <span className="phone-prefix shrink-0 pl-[14px] pr-3 py-[10px] text-[13px] text-gray-500 font-mono select-none flex items-center self-stretch border-r border-[#E5E7EB] bg-[#F9FAFB]">
           +242
         </span>
         <input
@@ -51,11 +52,14 @@ export default function PhoneInput({ value, onChange, error, onBlur, disabled }:
           onBlur={onBlur}
           disabled={disabled}
           placeholder="06 XXX XX XX"
-          className="flex-1 bg-transparent border-none px-3 text-sm text-content-primary placeholder:text-content-muted focus:outline-none focus:ring-0 disabled:cursor-not-allowed min-w-0"
+          className="flex-1 bg-transparent border-none px-3 py-[10px] text-[13px] text-[#111827] placeholder:text-[#9CA3AF] placeholder:font-normal focus:outline-none focus:ring-0 disabled:cursor-not-allowed min-w-0"
         />
       </div>
       {error && (
-        <p className="mt-1.5 text-[10px] text-status-danger" role="alert">{error}</p>
+        <p className="absolute -bottom-5 left-0 text-[11px] text-[#EF4444] flex items-center gap-1 mt-1" role="alert">
+          <AlertCircle size={12} strokeWidth={2} className="shrink-0" />
+          {error}
+        </p>
       )}
     </div>
   );

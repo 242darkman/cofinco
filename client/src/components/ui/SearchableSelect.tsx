@@ -274,11 +274,11 @@ export default function SearchableSelect({
   };
 
   return (
-    <div className={`relative ${className}`} ref={containerRef}>
+    <div className={`relative ${className} mb-4`} ref={containerRef}>
       {label && (
-        <label htmlFor={name} className="block text-xs sm:text-sm font-semibold text-content-secondary mb-2">
+        <label htmlFor={name} className="block font-inter font-medium text-[13px] text-[#374151] mb-[6px]">
           {label}
-          {required && <span className="text-status-danger ml-1">*</span>}
+          {required && <span className="text-[#EF4444] ml-1">*</span>}
         </label>
       )}
 
@@ -293,32 +293,32 @@ export default function SearchableSelect({
             }}
             className={`
               relative flex items-center
-              w-full h-full min-h-[3rem]
-              border rounded-xl px-2
-              text-sm sm:text-base
+              w-full py-[10px] pl-[14px] pr-8
+              border rounded-lg
+              text-[13px]
               transition-all duration-200
               ${variant === 'dark'
                 ? 'bg-surface-base border-edge text-content-primary'
-                : 'bg-input-bg border-input-border text-input-text'
+                : 'bg-white text-[#111827]'
               }
-              ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-content-muted'}
-              ${isOpen ? 'ring-2 ring-accent/30 border-accent' : ''}
-              ${error ? 'border-status-danger/50 ring-1 ring-status-danger/30' : ''}
+              ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:border-gray-400'}
+              ${isOpen ? 'border-[#059669] ring-[3px] ring-[#059669]/30' : (variant === 'dark' ? '' : 'border-[#E5E7EB]')}
+              ${error ? '!border-[#EF4444] !ring-[3px] !ring-[#EF4444]/30' : ''}
             `}
           >
               {/* Left Icon / Avatar */}
-               <div className="shrink-0 mr-3 pl-1">
-                 {showAvatarInTrigger && selectedOption && !selectedOption.hideAvatar ? (
-                    <OptionAvatar image={selectedOption.image} label={selectedOption.label} emoji={selectedOption.emoji} />
-                 ) : (
-                    <div className={`w-8 h-8 rounded-full border flex items-center justify-center ${isOpen ? 'bg-accent border-accent text-white' : 'bg-surface border-edge text-content-muted'}`}>
-                       {Icon ? <Icon size={14} /> : <Search size={14} />}
-                    </div>
-                 )}
-               </div>
+               {showAvatarInTrigger && selectedOption && !selectedOption.hideAvatar ? (
+                 <div className="shrink-0 mr-3">
+                   <OptionAvatar image={selectedOption.image} label={selectedOption.label} emoji={selectedOption.emoji} />
+                 </div>
+               ) : (
+                 <div className="shrink-0 mr-2 text-gray-400">
+                   {Icon ? <Icon size={18} strokeWidth={1.5} /> : <Search size={18} strokeWidth={1.5} />}
+                 </div>
+               )}
 
                {/* Content Area: Either Display Value or Search Input */}
-               <div className="flex-1 min-w-0 py-2">
+               <div className="flex-1 min-w-0">
                   {isOpen ? (
                      <input
                         ref={searchInputRef}
@@ -329,7 +329,7 @@ export default function SearchableSelect({
                            if (onSearchChange) onSearchChange(e.target.value);
                         }}
                         placeholder="Tapez pour rechercher..."
-                        className="w-full bg-transparent border-none p-0 text-content-primary placeholder:text-content-muted focus:ring-0 focus:outline-none text-sm font-medium"
+                        className="w-full bg-transparent border-none p-0 text-[#111827] placeholder:text-[#9CA3AF] placeholder:font-normal focus:ring-0 focus:outline-none text-[13px]"
                         onClick={(e) => e.stopPropagation()}
                         onKeyDown={(e) => {
                            e.stopPropagation();
@@ -338,16 +338,16 @@ export default function SearchableSelect({
                      />
                   ) : selectedOption ? (
                     <div>
-                      <div className="font-medium truncate leading-tight">{selectedOption.label}</div>
-                      {selectedOption.subLabel && <div className="text-xs text-content-muted truncate">{selectedOption.subLabel}</div>}
+                      <div className="text-[13px] text-[#111827] truncate leading-tight">{selectedOption.label}</div>
+                      {selectedOption.subLabel && <div className="text-xs text-gray-400 truncate">{selectedOption.subLabel}</div>}
                     </div>
                   ) : (
-                     <span className="text-content-muted block py-1">{placeholder}</span>
+                     <span className="text-[#9CA3AF] text-[13px] block">{placeholder}</span>
                   )}
                </div>
 
                {/* Right Actions */}
-               <div className="flex items-center gap-2 pl-2 pr-1">
+               <div className="absolute right-[12px] flex items-center gap-2">
                   {(selectedOption || (isOpen && searchQuery)) && (
                      <div
                        onClick={(e) => {
@@ -372,9 +372,9 @@ export default function SearchableSelect({
                         setIsOpen(!isOpen);
                       }
                     }}
-                    className="p-1 cursor-pointer hover:bg-surface rounded-full transition-colors"
+                    className="cursor-pointer transition-colors"
                   >
-                    <ChevronDown size={18} className={`text-content-muted transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+                    <ChevronDown size={16} strokeWidth={1.5} className={`text-gray-500 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
                   </div>
                </div>
           </div>
@@ -482,8 +482,8 @@ export default function SearchableSelect({
 
       {/* Errors */}
       {error && (
-        <p className="mt-1.5 text-xs text-status-danger flex items-center gap-1 animate-in slide-in-from-top-1">
-          <AlertCircle size={12} />
+        <p className="absolute -bottom-5 left-0 text-[11px] text-[#EF4444] flex items-center gap-1 mt-1">
+          <AlertCircle size={12} strokeWidth={2} className="shrink-0" />
           {error}
         </p>
       )}
