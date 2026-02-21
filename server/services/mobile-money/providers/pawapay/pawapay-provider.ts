@@ -26,7 +26,7 @@ import type {
   ProviderBalanceResponse,
 } from "../../types";
 import { ProviderApiError, MobileMoneyError } from "../../types";
-import { loadPawaPayConfig, correspondentToOperator, type PawaPayProviderConfig } from "./pawapay-config";
+import { loadPawaPayConfig, correspondentToOperator, resolveOperatorFromPhone, type PawaPayProviderConfig } from "./pawapay-config";
 import { verifyPawaPaySignature } from "./pawapay-signature";
 import { CircuitBreaker } from "../../circuit-breaker";
 import { createLogger } from "../../../../lib/logger";
@@ -741,6 +741,74 @@ export class PawaPayProvider implements IMobileMoneyProvider {
 
   private sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // ============================================
+  // PREDICT CORRESPONDENT (Toolkit API)
+  // ============================================
+
+  /**
+   * Prédit le correspondant à partir du numéro de téléphone.
+   * Utilise l'API pawaPay Predict Correspondent en priorité, avec fallback
+   * sur la résolution locale par préfixe si l'API est indisponible.
+   *
+   * @returns Le code correspondant (ex: MTN_MOMO_COG, AIRTEL_COG) ou null
+   */
+  async predictCorrespondent(msisdn: string): Promise<string | null> {
+    const normalizedPhone = this.normalizePhone(msisdn);
+
+    // 1. Essayer l'API pawaPay toolkit
+    try {
+      const response = await this.makeRequest(
+        "GET",
+        `/v1/toolkit/predict-correspondent?msisdn=${encodeURIComponent(normalizedPhone)}`
+      );
+
+      if (response.ok) {
+        const data = await response.json() as {
+          correspondent?: string;
+          correspondents?: Array<{
+            correspondent: string;
+            operationTypes: Array<{ operationType: string; status: string }>;
+          }>;
+        };
+
+        // L'API peut retourner un seul correspondent ou une liste
+        if (data.correspondent) {
+          logger.info({ msisdn: normalizedPhone, correspondent: data.correspondent }, "Predict correspondent: API match");
+          return data.correspondent;
+        }
+
+        // Format alternatif: tableau de correspondents
+        if (data.correspondents && data.correspondents.length > 0) {
+          // Préférer un correspondant qui supporte PAYOUT
+          const payoutCapable = data.correspondents.find(c =>
+            c.operationTypes?.some(o => o.operationType === "PAYOUT" && o.status === "ACTIVE")
+          );
+          const chosen = payoutCapable || data.correspondents[0];
+          logger.info({ msisdn: normalizedPhone, correspondent: chosen.correspondent }, "Predict correspondent: API match (from list)");
+          return chosen.correspondent;
+        }
+
+        logger.warn({ msisdn: normalizedPhone }, "Predict correspondent: API returned no match");
+        return null;
+      }
+
+      logger.warn({ msisdn: normalizedPhone, status: response.status }, "Predict correspondent: API error");
+    } catch (error) {
+      logger.warn({ msisdn: normalizedPhone, err: error }, "Predict correspondent: API indisponible");
+    }
+
+    // 2. Fallback sur résolution locale
+    const operator = resolveOperatorFromPhone(normalizedPhone);
+    if (operator) {
+      const { operatorToCorrespondent } = await import("./pawapay-config");
+      const fallbackCorrespondent = operatorToCorrespondent(operator);
+      logger.info({ msisdn: normalizedPhone, operator, correspondent: fallbackCorrespondent }, "Predict correspondent: fallback local");
+      return fallbackCorrespondent;
+    }
+
+    return null;
   }
 
   /**
