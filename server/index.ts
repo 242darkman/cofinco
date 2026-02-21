@@ -29,6 +29,7 @@ import { startSessionCleanupCron } from "./cron/session-cleanup";
 import { startAutomaticTransfersCron } from "./cron/automatic-transfers";
 import { startScheduledAccountTransfersCron } from "./cron/scheduled-account-transfers";
 import { startScheduledDisbursementsCron } from "./cron/scheduled-disbursements";
+import { startSalaryPaymentSchedulerCron } from "./cron/salary-payment-scheduler";
 import { startAutomaticRepaymentsCron } from "./cron/automatic-repayments";
 import { startCreditStatusUpdateCron } from "./cron/update-credit-status";
 import { startScheduledMigrationsCron } from "./cron/scheduled-migrations";
@@ -350,6 +351,10 @@ app.get("/api/health", async (_req, res) => {
 
     // Start the scheduled disbursements cron job (daily at 9 AM)
     startScheduledDisbursementsCron();
+
+    // Start salary payment scheduler (every minute — processes scheduled/queued/retryable salary payments)
+    startSalaryPaymentSchedulerCron();
+    logger.info('Salary payment scheduler cron started (every minute)');
     startAutomaticRepaymentsCron();
     startCreditStatusUpdateCron();
     startScheduledMigrationsCron();
