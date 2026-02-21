@@ -1383,6 +1383,8 @@ export async function getCompteTransactions(
       solde_apres: transactionsCompte.soldeApres,
       mouvementId: transactionsCompte.mouvementId,
       factureId: transactionsCompte.factureId,
+      statut: transactionsCompte.statut,
+      reversalOfId: transactionsCompte.reversalOfId,
       // Métadonnées pour enrichir les libellés (numéro compte dest, etc.)
       metadata: mouvementsFinanciers.metadata,
     })

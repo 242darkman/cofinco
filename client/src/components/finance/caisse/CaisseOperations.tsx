@@ -21,6 +21,7 @@ import { PaymentStatusModal, PaymentStatus } from '../payments';
 import { ReceiptData } from '../../ui/printable/ReceiptTemplate';
 import { authService } from '../../../lib/auth';
 import { StatutCredit, TypeCompte, TypeOperationCaisse } from '@shared/enum/status-constants';
+import { isIncomingOperation } from '@shared/config/caisse-operations';
 import { useOperationInfo } from './hooks/useOperationInfo';
 import { currencySymbol } from '@shared/config/currency';
 import airtelLogo from '@/assets/logos/airtel-logo.png';
@@ -119,10 +120,12 @@ const PROVIDERS = [
 // ─── Component ──────────────────────────────────────────
 interface CaisseOperationsProps {
   sessionId: string;
+  soldeSession?: number;
+  recentTransactions?: any[];
   onTransactionComplete?: () => void;
 }
 
-export default function CaisseOperations({ sessionId, onTransactionComplete }: CaisseOperationsProps) {
+export default function CaisseOperations({ sessionId, soldeSession, recentTransactions, onTransactionComplete }: CaisseOperationsProps) {
   const user = authService.getCurrentUser();
 
   // ── Client Search ──
@@ -152,6 +155,7 @@ export default function CaisseOperations({ sessionId, onTransactionComplete }: C
   const [paymentIntent, setPaymentIntent] = useState<PaymentIntent | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('CREATED');
   const [showPaymentStatusModal, setShowPaymentStatusModal] = useState(false);
+  const [paymentTimeLeft, setPaymentTimeLeft] = useState<number | null>(null);
   const [securityConfig, setSecurityConfig] = useState<SecurityConfigResponse | null>(null);
   const [showPresenceModal, setShowPresenceModal] = useState(false);
   const [sandboxInfo, setSandboxInfo] = useState<{
@@ -244,7 +248,31 @@ export default function CaisseOperations({ sessionId, onTransactionComplete }: C
     loadSandboxInfo();
   }, []);
 
-  // ── Payment status polling ──
+  // ── Payment status polling with client-side timeout ──
+  const CLIENT_PAYMENT_TIMEOUT = 5 * 60; // 5 minutes
+
+  // Start countdown when payment modal opens
+  useEffect(() => {
+    if (!showPaymentStatusModal || !paymentIntent) {
+      setPaymentTimeLeft(null);
+      return;
+    }
+    if (['SUCCESS', 'FAILED', 'EXPIRED', 'REVERSED'].includes(paymentStatus)) return;
+
+    setPaymentTimeLeft(CLIENT_PAYMENT_TIMEOUT);
+    const timer = setInterval(() => {
+      setPaymentTimeLeft(prev => {
+        if (prev === null || prev <= 0) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [showPaymentStatusModal, paymentIntent?.id]);
+
+  // Polling effect
   useEffect(() => {
     if (!paymentIntent || !showPaymentStatusModal) return;
     if (['SUCCESS', 'FAILED', 'EXPIRED', 'REVERSED'].includes(paymentStatus)) return;
@@ -768,6 +796,19 @@ export default function CaisseOperations({ sessionId, onTransactionComplete }: C
     setFeeEstimate(null);
   }, []);
 
+  // ─── Keyboard Shortcuts ─────────────────────────────
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Escape: reset form if client is selected and no modal is open
+      if (e.key === 'Escape' && selectedClient && !showSuccessModal && !showPaymentStatusModal && !confirmationData) {
+        e.preventDefault();
+        reinitialiserFormulaire();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [selectedClient, showSuccessModal, showPaymentStatusModal, confirmationData, reinitialiserFormulaire]);
+
   // ─── Submit Dispatch ──────────────────────────────────
   const handleSubmit = useCallback(() => {
     if (moyenPaiement === 'CASH') {
@@ -929,6 +970,46 @@ export default function CaisseOperations({ sessionId, onTransactionComplete }: C
               </div>
             </div>
           )}
+
+          {/* Mini-historique: last session operations */}
+          {recentTransactions && recentTransactions.length > 0 && (
+            <Card className="bg-surface/50 border border-edge-subtle p-2 shrink-0">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] font-bold text-content-muted uppercase tracking-wider">Dernières opérations</span>
+                <span className="text-[9px] text-content-muted">{recentTransactions.length}</span>
+              </div>
+              <div className="divide-y divide-edge-subtle">
+                {recentTransactions.map((tx: any) => {
+                  const isReversalTx = tx.description?.startsWith('[ANNULATION]');
+                  const isReversed = tx.statut === 'REVERSED';
+                  const incoming = isIncomingOperation(tx.typeOperation);
+                  const isEntree = isReversalTx ? !incoming : incoming;
+                  const isCancelled = isReversed || isReversalTx;
+                  return (
+                    <div key={tx.id} className={`py-1 flex items-center justify-between ${isCancelled ? 'opacity-40' : ''}`}>
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
+                          isCancelled ? 'bg-surface-subtle text-content-muted' :
+                          isEntree ? 'bg-status-success-bg text-status-success' : 'bg-status-danger-bg text-status-danger'
+                        }`}>
+                          {isEntree ? <ArrowDownLeft size={10}/> : <ArrowUpRight size={10}/>}
+                        </div>
+                        <span className={`text-[10px] truncate ${isCancelled ? 'text-content-muted line-through' : 'text-content-secondary'}`}>
+                          {tx.clientNom || tx.typeOperation}
+                        </span>
+                      </div>
+                      <span className={`text-[10px] font-mono font-bold shrink-0 ${
+                        isCancelled ? 'text-content-muted line-through' :
+                        isEntree ? 'text-status-success' : 'text-status-danger'
+                      }`}>
+                        {isEntree ? '+' : '-'}{Number(tx.montant).toLocaleString()}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
         </div>
 
         {/* ── RIGHT PANEL: Operation Form ── */}
@@ -939,10 +1020,19 @@ export default function CaisseOperations({ sessionId, onTransactionComplete }: C
               {/* Step 1: Direction */}
               <div className="p-3 border-b border-edge bg-surface-base/30 shrink-0 space-y-3">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-bold text-content-primary flex items-center gap-2">
-                    <Coins className="text-accent" size={16} />
-                    Opération
-                  </h2>
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-sm font-bold text-content-primary flex items-center gap-2">
+                      <Coins className="text-accent" size={16} />
+                      Opération
+                    </h2>
+                    {soldeSession != null && (
+                      <div className="flex items-center gap-1.5 px-2 py-0.5 bg-surface/50 rounded border border-edge-subtle">
+                        <Wallet size={11} className="text-accent" />
+                        <span className="text-[10px] text-content-muted">Solde</span>
+                        <span className="text-[10px] font-mono font-bold text-content-primary">{soldeSession.toLocaleString('fr-FR')} F</span>
+                      </div>
+                    )}
+                  </div>
                   <div className="flex bg-surface-base p-0.5 rounded-lg border border-edge">
                     {(['Dépôt', 'Retrait'] as TypeOperation[]).map(type => (
                       <button
@@ -1377,6 +1467,7 @@ export default function CaisseOperations({ sessionId, onTransactionComplete }: C
         reference={paymentIntent?.externalRef}
         providerTxnId={paymentIntent?.providerTxnId}
         errorMessage={paymentIntent?.errorMessage}
+        timeLeft={paymentTimeLeft ?? undefined}
         onRetry={() => {
           setShowPaymentStatusModal(false);
           setPaymentIntent(null);

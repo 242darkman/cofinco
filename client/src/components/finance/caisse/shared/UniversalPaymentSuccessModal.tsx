@@ -66,6 +66,19 @@ export const UniversalPaymentSuccessModal: React.FC<UniversalPaymentSuccessModal
   const [copied, setCopied] = useState(false);
   const [animationComplete, setAnimationComplete] = useState(false);
 
+  // Keyboard shortcut: Escape or Enter closes the modal for quick workflow
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' || e.key === 'Enter') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isOpen, onClose]);
+
   // Extract values with defaults for type safety
   const reference = data?.reference || '';
   const total = data?.total || 0;
@@ -342,10 +355,13 @@ export const UniversalPaymentSuccessModal: React.FC<UniversalPaymentSuccessModal
         <div className="p-4 border-t border-edge bg-surface-base/95 backdrop-blur-sm">
           <button
             onClick={onClose}
-            className="w-full py-4 flex items-center justify-center gap-2 text-content-muted hover:text-content-primary text-sm font-medium transition-colors rounded-xl hover:bg-surface/50 active:scale-[0.98]"
+            className="w-full py-3 flex flex-col items-center gap-1 text-content-muted hover:text-content-primary text-sm font-medium transition-colors rounded-xl hover:bg-surface/50 active:scale-[0.98]"
           >
-            <span>Fermer et Nouvelle Opération</span>
-            <ArrowRight size={16} />
+            <span className="flex items-center gap-2">
+              Fermer et Nouvelle Opération
+              <ArrowRight size={16} />
+            </span>
+            <span className="text-[10px] text-content-muted font-normal">Appuyez Échap ou Entrée</span>
           </button>
         </div>
       </div>

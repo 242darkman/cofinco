@@ -19,7 +19,6 @@ import { useReceiptActions } from '../../../hooks/finance/useReceiptActions';
 import { getAccountBalance, getAccountUiConfig, getMonthlyInterestEstimate, getRealBalance, getPendingDepositAmount } from '../../../lib/account-config';
 import { getStatusLabel, ALL_STATUS_LABELS } from '../../../lib/status-labels';
 import { computeSessionStatus } from '../../../lib/format';
-import { isDepositType, isWithdrawalType } from '@shared/enum/status-constants';
 import StatementExportModal from './StatementExportModal';
 import { formatClientName } from '../../../lib/format';
 import { useLocation } from 'wouter';
@@ -94,6 +93,8 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRe
     return raw.map((t: any) => {
       const rawType = t.typePaiement || 'Autre';
       const translatedLabel = getStatusLabel(rawType, ALL_STATUS_LABELS);
+      const isReversal = !!t.reversalOfId;
+      const isReversed = t.statut === 'REVERSED';
       return {
         ...t,
         montant: Number(t.montant) || 0,
@@ -101,18 +102,21 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRe
         typeTransaction: translatedLabel !== rawType ? translatedLabel : rawType.replace(/ (Épargne|Courant|Bloqué)$/, ''),
         dateTransaction: t.createdAt || new Date().toISOString(),
         description: t.observations || t.typePaiement,
-        reference: t.billingReference || t.id?.substring(0, 8)
+        reference: t.billingReference || t.id?.substring(0, 8),
+        isReversal,
+        isReversed,
       };
     });
   }, [transactionsQuery.data]);
 
   const stats = useMemo(() => {
-    return transactions.reduce((acc: { totalDepots: number; totalRetraits: number; nombreTransactions: number }, t: any) => {
+    // Exclude REVERSED and contrepassation entries from stats
+    const activeTransactions = transactions.filter((t: any) => !t.isReversed && !t.isReversal);
+    return activeTransactions.reduce((acc: { totalDepots: number; totalRetraits: number; nombreTransactions: number }, t: any) => {
       const m = Number(t.montant) || 0;
-      const rawType = t.typePaiement || t.typeTransaction || '';
-      if (isDepositType(rawType) || (m > 0 && !isWithdrawalType(rawType))) {
+      if (t.sens === 'CREDIT') {
         acc.totalDepots += Math.abs(m);
-      } else if (isWithdrawalType(rawType) || m < 0) {
+      } else {
         acc.totalRetraits += Math.abs(m);
       }
       acc.nombreTransactions++;
@@ -386,39 +390,50 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRe
 
                    <div className="mt-3 sm:mt-4">
                       {activeTab === 'transactions' && (
-                         <div className="space-y-2 sm:space-y-3">
-                            <div className="flex justify-between items-center pb-1 sm:pb-2">
-                               <h3 className="text-xs sm:text-sm font-semibold text-content-primary">Dernières opérations</h3>
-                               <span className="text-[10px] sm:text-xs text-content-muted">{transactions.length} transactions</span>
+                         <div className="space-y-1">
+                            <div className="flex justify-between items-center pb-1">
+                               <h3 className="text-xs font-semibold text-content-primary">Dernières opérations</h3>
+                               <span className="text-[10px] text-content-muted">{stats.nombreTransactions} transaction{stats.nombreTransactions > 1 ? 's' : ''}</span>
                             </div>
 
                             {transactions.length === 0 ? (
-                               <div className="text-center py-6 sm:py-10 text-content-muted text-xs sm:text-sm bg-surface/30 rounded-lg sm:rounded-xl border border-edge">
+                               <div className="text-center py-6 text-content-muted text-xs bg-surface/30 rounded-lg border border-edge">
                                   Aucune transaction
                                </div>
                             ) : (
-                               transactions.map((t) => {
-                                  const isDebit = isWithdrawalType(t.typePaiement) || t.montant < 0;
+                               <div className="divide-y divide-edge-subtle rounded-lg border border-edge-subtle overflow-hidden">
+                               {transactions.map((t) => {
+                                  // Use sens directly: DEBIT = money out, CREDIT = money in
+                                  const isDebit = t.sens === 'DEBIT';
+                                  const isCancelled = t.isReversed || t.isReversal;
                                   return (
-                                  <div key={t.id} className="bg-surface/30 border border-edge-subtle p-2 sm:p-3 rounded-lg sm:rounded-xl flex items-center justify-between hover:bg-surface/50 transition-colors group">
-                                     <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-                                        <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center shrink-0 ${
+                                  <div key={t.id} className={`px-2.5 py-2 flex items-center justify-between transition-colors group ${isCancelled ? 'opacity-50 bg-surface/20' : 'bg-surface/30 hover:bg-surface/50'}`}>
+                                     <div className="flex items-center gap-2 min-w-0 flex-1">
+                                        <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
+                                           isCancelled ? 'bg-surface-subtle text-content-muted' :
                                            !isDebit ? 'bg-status-success-bg text-status-success' : 'bg-status-danger-bg text-status-danger'
                                         }`}>
-                                           {!isDebit ? <TrendingUp size={14} className="sm:w-[18px] sm:h-[18px]"/> : <TrendingDown size={14} className="sm:w-[18px] sm:h-[18px]"/>}
+                                           {!isDebit ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
                                         </div>
                                         <div className="min-w-0">
-                                           <div className="font-medium text-content-secondary text-xs sm:text-sm truncate">{t.typeTransaction}</div>
-                                           <div className="text-[10px] sm:text-xs text-content-muted">
+                                           <div className={`font-medium text-xs truncate leading-tight ${isCancelled ? 'text-content-muted line-through' : 'text-content-secondary'}`}>
+                                             {t.isReversal ? `Annulation · ${t.typeTransaction}` : t.typeTransaction}
+                                           </div>
+                                           <div className="text-[10px] text-content-muted flex items-center gap-1 leading-tight mt-0.5">
                                              {new Date(t.dateTransaction).toLocaleDateString()} • {new Date(t.dateTransaction).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                             {t.isReversed && <Badge value="Annulé" size="xs" />}
+                                             {t.isReversal && <Badge value="Contrepassation" size="xs" />}
                                            </div>
                                         </div>
                                      </div>
                                      <div className="text-right shrink-0 ml-2">
-                                        <div className={`font-mono font-bold text-xs sm:text-sm ${!isDebit ? 'text-status-success' : 'text-status-danger'}`}>
+                                        <div className={`font-mono font-bold text-xs ${
+                                           isCancelled ? 'text-content-muted line-through' :
+                                           !isDebit ? 'text-status-success' : 'text-status-danger'
+                                        }`}>
                                            {!isDebit ? '+' : '-'}{Math.abs(t.montant).toLocaleString()}
                                         </div>
-                                        {/* Actions opacity 0 until hover */}
+                                        {!isCancelled && (
                                         <div className="opacity-0 group-hover:opacity-100 transition-opacity">
                                             <TransactionRowActions
                                                factureId={t.factureId}
@@ -429,10 +444,12 @@ export default function AccountDetailSlideOver({ compteId, isOpen, onClose, onRe
                                                compact
                                             />
                                         </div>
+                                        )}
                                      </div>
                                   </div>
                                   );
-                               })
+                               })}
+                               </div>
                             )}
                          </div>
                       )}

@@ -671,6 +671,8 @@ export default function CaisseDashboard({
           <div className="h-full animate-in fade-in slide-in-from-bottom-4 duration-300">
             <CaisseOperations
               sessionId={currentSession.id}
+              soldeSession={soldeActuel}
+              recentTransactions={transactions.slice(0, 5)}
               onTransactionComplete={() => {
                 loadSessionActive();
                 loadTransactionsJour();

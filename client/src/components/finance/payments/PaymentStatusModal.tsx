@@ -27,6 +27,8 @@ export interface PaymentStatusModalProps {
   montantNet?: number;
   onRetry?: () => void;
   onViewDetails?: () => void;
+  /** Countdown in seconds (shown during PENDING/CREATED) */
+  timeLeft?: number;
 }
 
 const statusConfig: Record<PaymentStatus, {
@@ -97,6 +99,7 @@ export function PaymentStatusModal({
   montantNet,
   onRetry,
   onViewDetails,
+  timeLeft,
 }: PaymentStatusModalProps) {
   if (!isOpen) return null;
 
@@ -157,9 +160,22 @@ export function PaymentStatusModal({
         </h3>
 
         {/* Status Description */}
-        <p className="text-sm text-content-muted text-center mb-4">
+        <p className="text-sm text-content-muted text-center mb-2">
           {errorMessage || config.description}
         </p>
+
+        {/* Countdown timer */}
+        {isPending && timeLeft != null && timeLeft > 0 && (
+          <p className="text-xs text-content-muted text-center mb-2 font-mono">
+            Expiration dans {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
+          </p>
+        )}
+        {isPending && timeLeft != null && timeLeft <= 0 && (
+          <p className="text-xs text-status-warning text-center mb-2">
+            Délai dépassé — vérifiez avec le client
+          </p>
+        )}
+        {!isPending && !timeLeft && <div className="mb-2" />}
 
         {/* Amount */}
         <div className={`py-3 px-4 rounded-xl mb-4 ${config.bgColor} text-center`}>
