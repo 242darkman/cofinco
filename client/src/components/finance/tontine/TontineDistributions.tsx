@@ -22,13 +22,21 @@ interface DistributionRequest {
   id: string;
   status: string;
   amountRequested?: number;
+  amountApproved?: number;
   amountPaid?: number;
   netAmount?: number;
+  penaltiesDeducted?: number;
+  feesDeducted?: number;
   payoutMethod?: string;
   createdAt?: string;
   paidAt?: string;
+  submittedAt?: string;
+  approvedAt?: string;
   turnId?: string;
   beneficiaryMemberId?: string;
+  submittedByUser?: { nom?: string; prenom?: string; username?: string };
+  approvedByUser?: { nom?: string; prenom?: string; username?: string };
+  rejectionReason?: string;
 }
 
 interface Membre {
@@ -362,9 +370,9 @@ export default function TontineDistributions({ tontineId, montantContribution, t
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <Badge variant={statusCfg.variant} className="text-[10px]" value={statusCfg.label} />
-                      {dist.createdAt && (
+                      {(dist.submittedAt || dist.createdAt) && (
                         <span className="text-[10px] text-content-muted">
-                          {new Date(dist.createdAt).toLocaleDateString('fr-FR')}
+                          {new Date(dist.submittedAt || dist.createdAt || '').toLocaleDateString('fr-FR')}
                         </span>
                       )}
                     </div>
@@ -373,6 +381,26 @@ export default function TontineDistributions({ tontineId, montantContribution, t
                       {getDistributionAmount(dist).toLocaleString()} {sym}
                       {dist.payoutMethod && ` • ${payoutMethodLabels[dist.payoutMethod] || dist.payoutMethod}`}
                     </div>
+                    {/* Deduction breakdown */}
+                    {(Number(dist.penaltiesDeducted) > 0 || Number(dist.feesDeducted) > 0) && (
+                      <div className="text-[10px] text-content-muted mt-1 space-x-2">
+                        {Number(dist.penaltiesDeducted) > 0 && (
+                          <span className="text-status-danger">-{Number(dist.penaltiesDeducted).toLocaleString()} pénalités</span>
+                        )}
+                        {Number(dist.feesDeducted) > 0 && (
+                          <span className="text-status-warning">-{Number(dist.feesDeducted).toLocaleString()} frais</span>
+                        )}
+                        {dist.netAmount != null && (
+                          <span className="text-content-primary font-medium">Net: {Number(dist.netAmount).toLocaleString()} {sym}</span>
+                        )}
+                      </div>
+                    )}
+                    {/* Submitted by */}
+                    {dist.submittedByUser && (
+                      <div className="text-[10px] text-content-muted mt-0.5">
+                        Soumis par {dist.submittedByUser.prenom || ''} {dist.submittedByUser.nom || dist.submittedByUser.username || ''}
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     {status === 'SUBMITTED' && (
@@ -434,9 +462,37 @@ export default function TontineDistributions({ tontineId, montantContribution, t
                       {method === 'MOBILE_MONEY' ? <Smartphone size={10} /> : <Banknote size={10} />}
                       {payoutMethodLabels[method] || method}
                     </div>
+                    {/* Deduction breakdown */}
+                    {(Number(dist.penaltiesDeducted) > 0 || Number(dist.feesDeducted) > 0) && (
+                      <div className="text-[10px] text-content-muted mt-1 space-x-2">
+                        {Number(dist.penaltiesDeducted) > 0 && (
+                          <span className="text-status-danger">-{Number(dist.penaltiesDeducted).toLocaleString()} pénalités</span>
+                        )}
+                        {Number(dist.feesDeducted) > 0 && (
+                          <span className="text-status-warning">-{Number(dist.feesDeducted).toLocaleString()} frais</span>
+                        )}
+                      </div>
+                    )}
+                    {/* Approval info */}
+                    {dist.approvedByUser && dist.approvedAt && (
+                      <div className="text-[10px] text-content-muted mt-0.5">
+                        Approuvé par {dist.approvedByUser.prenom || ''} {dist.approvedByUser.nom || ''} le {new Date(dist.approvedAt).toLocaleDateString('fr-FR')}
+                      </div>
+                    )}
+                    {/* Rejection reason */}
+                    {dist.rejectionReason && (
+                      <div className="text-[10px] text-status-danger mt-0.5 italic">
+                        Motif: {dist.rejectionReason}
+                      </div>
+                    )}
                   </div>
                   <div className="text-right">
                     <div className="font-bold text-status-success">{getDistributionAmount(dist).toLocaleString()} {sym}</div>
+                    {dist.netAmount != null && Number(dist.amountRequested) > 0 && Number(dist.netAmount) !== Number(dist.amountRequested) && (
+                      <div className="text-[10px] text-content-muted">
+                        Brut: {Number(dist.amountRequested).toLocaleString()}
+                      </div>
+                    )}
                   </div>
                 </div>
               </Card>

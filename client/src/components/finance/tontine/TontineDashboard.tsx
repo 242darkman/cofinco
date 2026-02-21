@@ -46,6 +46,8 @@ export default function TontineDashboard({
   const [dashboard, setDashboard] = useState<any>(null);
   const [turns, setTurns] = useState<any[]>([]);
   const [membres, setMembres] = useState<any[]>([]);
+  const [pendingDistributions, setPendingDistributions] = useState(0);
+  const [pendingPenalties, setPendingPenalties] = useState({ count: 0, amount: 0 });
 
   useEffect(() => {
     fetchDashboard();
@@ -70,6 +72,20 @@ export default function TontineDashboard({
         const turnsData = await tontineApi.getTurns(tontineId, dashData.currentCycle.id);
         setTurns(turnsData || []);
       }
+
+      // Fetch pending distributions & penalties
+      try {
+        const [distData, penData] = await Promise.all([
+          tontineApi.getDistributionRequests(tontineId).catch(() => []),
+          tontineApi.getPenalties(tontineId).catch(() => []),
+        ]);
+        setPendingDistributions((distData || []).filter((d: any) => d.status === 'SUBMITTED' || d.status === 'APPROVED').length);
+        const pendingPens = (penData || []).filter((p: any) => p.statut === 'PENDING');
+        setPendingPenalties({
+          count: pendingPens.length,
+          amount: pendingPens.reduce((s: number, p: any) => s + Number(p.montant || 0), 0),
+        });
+      } catch { /* ignore */ }
 
       // Build recent activity
       const activities = (contribData || [])
@@ -230,6 +246,43 @@ export default function TontineDashboard({
           )}
         </Card>
       </div>
+
+      {/* Cycle details + Pending alerts */}
+      {currentCycle && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Cycle dates */}
+          <Card className="p-3">
+            <div className="text-[10px] text-content-muted uppercase font-semibold mb-1">Période du cycle</div>
+            <div className="text-sm text-content-primary">
+              {currentCycle.startDate
+                ? new Date(currentCycle.startDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
+                : '—'}
+              {' → '}
+              {currentCycle.endDate
+                ? new Date(currentCycle.endDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
+                : 'En cours'}
+            </div>
+          </Card>
+
+          {/* Pending distributions */}
+          {pendingDistributions > 0 && (
+            <Card className="p-3 bg-status-warning-bg/30 border-status-warning/20">
+              <div className="text-[10px] text-status-warning uppercase font-semibold mb-1">Distributions en attente</div>
+              <div className="text-lg font-bold text-status-warning">{pendingDistributions}</div>
+              <div className="text-[10px] text-content-muted">à approuver</div>
+            </Card>
+          )}
+
+          {/* Pending penalties */}
+          {pendingPenalties.count > 0 && (
+            <Card className="p-3 bg-status-danger-bg/30 border-status-danger/20">
+              <div className="text-[10px] text-status-danger uppercase font-semibold mb-1">Pénalités impayées</div>
+              <div className="text-lg font-bold text-status-danger">{pendingPenalties.amount.toLocaleString()} FCFA</div>
+              <div className="text-[10px] text-content-muted">{pendingPenalties.count} pénalité{pendingPenalties.count > 1 ? 's' : ''}</div>
+            </Card>
+          )}
+        </div>
+      )}
 
       {/* Prochain bénéficiaire + Progression */}
       {currentCycle && (
