@@ -1578,7 +1578,7 @@ export async function getMyDashboard(employeId: string) {
   const derniersBulletins = await db.select()
     .from(bulletinsPaie)
     .where(eq(bulletinsPaie.employeId, employeId))
-    .orderBy(desc(bulletinsPaie.annee), desc(bulletinsPaie.mois))
+    .orderBy(desc(bulletinsPaie.mois))
     .limit(3);
 
   // Presence stats for current month
