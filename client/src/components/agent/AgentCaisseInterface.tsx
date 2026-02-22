@@ -69,7 +69,6 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
         if (data) setAgent(data);
       }
     } catch (error) {
-      console.error('Erreur chargement agent:', error);
     }
   };
 
@@ -81,7 +80,6 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
         setTransactions(data || []);
       }
     } catch (error) {
-      console.error('Erreur chargement transactions:', error);
     }
   };
 
@@ -100,7 +98,6 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
         setShowSearchResults(results.length > 0);
       }
     } catch (error) {
-      console.error('Erreur recherche clients:', error);
     }
   }, []);
 

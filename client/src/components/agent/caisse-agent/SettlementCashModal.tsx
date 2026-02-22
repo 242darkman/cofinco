@@ -59,7 +59,6 @@ export default function SettlementCashModal({
           setDestinationCaisseId(activeSessions[0].caisseId);
         }
       } catch (error) {
-        console.error('Erreur chargement caisses:', error);
         toast.error('Erreur lors du chargement des caisses');
       } finally {
         setLoadingCaisses(false);
@@ -123,7 +122,6 @@ export default function SettlementCashModal({
 
       onSuccess();
     } catch (error: any) {
-      console.error('Erreur création remise:', error);
       toast.error('Erreur lors de la création', {
         description: error.message
       });

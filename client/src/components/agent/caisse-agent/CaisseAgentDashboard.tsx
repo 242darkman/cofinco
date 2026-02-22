@@ -64,7 +64,7 @@ const getStatutBadge = (statut: string) => {
 };
 
 const isWithdrawalOp = (op: OperationTerrainWithRelations) => {
-  const meta = op.metadata as any;
+  const meta = op.metadata as Record<string, unknown>;
   const tpc = meta?.typePaiementClient;
   return tpc === TypeOperationTerrain.WITHDRAWAL_CURRENT || tpc === TypeOperationTerrain.WITHDRAWAL_SAVINGS;
 };
@@ -92,7 +92,7 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
   const [caisseSummary, setCaisseSummary] = useState<CaisseAgentSummary | null>(null);
   const [operations, setOperations] = useState<OperationTerrainWithRelations[]>([]);
   const [pendingOperations, setPendingOperations] = useState<OperationTerrainWithRelations[]>([]);
-  const [agentInfo, setAgentInfo] = useState<any>(null);
+  const [agentInfo, setAgentInfo] = useState<{ nom?: string; prenom?: string } | null>(null);
 
   // Modals
   const [showCollectModal, setShowCollectModal] = useState(false);
@@ -126,7 +126,6 @@ export default function CaisseAgentDashboard({ agentId, onModuleChange }: Caisse
       setPendingOperations(pendingResponse.operations || []);
 
     } catch (error: any) {
-      console.error('Erreur chargement données caisse agent:', error);
 
       // Si la caisse n'existe pas, proposer de la créer
       if (error.message?.includes('Caisse non trouvée') || error.message?.includes('404')) {

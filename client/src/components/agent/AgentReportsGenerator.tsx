@@ -73,7 +73,6 @@ export default function AgentReportsGenerator() {
         depenses: depensesRes.ok ? await depensesRes.json() : []
       });
     } catch (error) {
-      console.error('Erreur génération rapport:', error);
       alert('Erreur lors de la génération du rapport');
     } finally {
       setLoading(false);

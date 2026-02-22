@@ -89,7 +89,6 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
         setPlannings([]);
       }
     } catch (error) {
-      console.error('Erreur:', error);
       setPlannings([]);
     } finally {
       setLoading(false);
@@ -203,7 +202,7 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
   // Reset page when data changes
   useEffect(() => { setListPage(0); }, [activeEnquetes.length, plannings.length, selectedDate]);
 
-  const handleSubmit = async (e: React.FormEvent, force = false) => {
+  const handleSubmit = async (e: React.FormEvent | React.MouseEvent, force = false) => {
     e.preventDefault();
     setLoading(true);
     setConflicts([]);
@@ -247,7 +246,6 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
       setRecurrence({ type: 'none', endDate: '', days: [] });
       fetchPlannings();
     } catch (error: any) {
-      console.error('Erreur creation planning:', error);
     } finally {
       setLoading(false);
     }
@@ -272,7 +270,6 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
           setSelectedPlanning({ ...selectedPlanning, statut });
       }
     } catch (error: any) {
-      console.error('Erreur update statut:', error);
     }
   };
 
@@ -410,7 +407,7 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
                     </div>
                     <select
                         value={recurrence.type}
-                        onChange={(e) => setRecurrence({ ...recurrence, type: e.target.value as any })}
+                        onChange={(e) => setRecurrence({ ...recurrence, type: e.target.value as typeof recurrence.type })}
                         className="px-2 py-1 bg-surface border border-edge rounded text-content-primary text-xs"
                     >
                         <option value="none">Aucune</option>
@@ -447,7 +444,7 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
                 </div>
                 <button
                   type="button"
-                  onClick={(e) => { setForceCreate(true); handleSubmit(e as any, true); }}
+                  onClick={(e) => { setForceCreate(true); handleSubmit(e, true); }}
                   className="px-2 py-1 bg-status-warning hover:bg-status-warning text-white rounded text-[10px] font-bold transition"
                 >
                   Forcer

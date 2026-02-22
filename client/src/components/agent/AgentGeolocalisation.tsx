@@ -9,7 +9,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '
 import { useWebSocket } from '@/hooks/useWebSocket';
 
 // Fix Leaflet/Vite default icon
-delete (L.Icon.Default.prototype as any)._getIconUrl;
+delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
   iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
@@ -114,7 +114,6 @@ export default function AgentGeolocalisation({ agentId }: { agentId?: string }) 
         setSelectedAgent(actifs[0].id);
       }
     } catch (error) {
-      console.error('Erreur:', error);
     }
   };
 
@@ -136,7 +135,6 @@ export default function AgentGeolocalisation({ agentId }: { agentId?: string }) 
         setCurrentPage(1);
       }
     } catch (error) {
-      console.error('Erreur:', error);
     } finally {
       setLoading(false);
     }

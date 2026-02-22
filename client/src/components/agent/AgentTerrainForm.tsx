@@ -47,7 +47,7 @@ export default function AgentTerrainForm({ onClose, onSuccess, agent }: AgentTer
         }
       }
     } catch (error) {
-      console.error('Failed to fetch zones:', error);
+      // Error handled silently
     }
   };
 
@@ -109,7 +109,6 @@ export default function AgentTerrainForm({ onClose, onSuccess, agent }: AgentTer
 
       onSuccess();
     } catch (error: any) {
-      console.error('Erreur:', error);
       setErrors({ submit: error.error });
     } finally {
       setLoading(false);

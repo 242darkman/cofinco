@@ -67,7 +67,6 @@ export default function AgentRapports({ agentId }: { agentId?: string }) {
       setRapports(data || []);
       setCurrentPage(1);
     } catch (error) {
-      console.error('Erreur chargement rapports:', error);
       toast.error('Erreur lors du chargement des rapports');
     } finally {
       setLoading(false);

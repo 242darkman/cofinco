@@ -87,7 +87,6 @@ export default function AgentTeamLeaderboard({ agentId }: Props) {
         if (page === 1) setTopThree(result.data.slice(0, 3));
       }
     } catch (error) {
-      console.error('Erreur chargement classement:', error);
       setRankings([]);
     } finally {
       setLoading(false);

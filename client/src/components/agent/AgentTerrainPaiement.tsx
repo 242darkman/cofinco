@@ -252,7 +252,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
           toast.error('Le paiement a expiré');
         }
       } catch (error) {
-        console.error('[MM Poll] Error:', error);
+        // Error handled silently
       }
     };
 
@@ -308,7 +308,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
           setFeeEstimate(data);
         }
       } catch (err) {
-        console.error('Fee estimate error:', err);
+        // Error handled silently
       } finally {
         setLoadingFeeEstimate(false);
       }
@@ -322,7 +322,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
       const config = await securityConfigApi.getConfig();
       setSecurityConfig(config);
     } catch (error) {
-      console.error('Erreur chargement config sécurité:', error);
+      // Error handled silently
     }
   };
 
@@ -339,7 +339,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
       const data = await agentTerrainApi.getAllList();
       setAgents(data.filter((a: any) => a.statut === StatutUser.ACTIVE));
     } catch (error) {
-      console.error('Error loading agents:', error);
+      // Error handled silently
     }
   };
 
@@ -353,7 +353,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
       });
       setAllClients(activeClients);
     } catch (error) {
-      console.error('Error loading clients:', error);
+      // Error handled silently
     } finally {
       setLoadingClients(false);
     }
@@ -383,7 +383,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
         }
       }
     } catch (error) {
-      console.error('Error loading client details:', error);
+      // Error handled silently
     }
   };
 
@@ -398,7 +398,7 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
         if (tontines.length === 1) selectTontine(tontines[0]);
       }
     } catch (error: any) {
-      console.error('Error loading client tontines:', error);
+      // Error handled silently
     } finally {
       setLoadingTontines(false);
     }
@@ -411,7 +411,6 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
       const credits = await creditApi.getByClient(clientId);
       setClientCredits((credits || []).filter((c: any) => c.statut === StatutCredit.ACTIVE || c.statut === StatutCredit.LATE));
     } catch (error: any) {
-      console.error('Error loading client credits:', error);
       setClientCredits([]);
     } finally {
       setLoadingCredits(false);
@@ -424,7 +423,6 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
       const comptes = await compteEpargneApi.getByClient(clientId);
       setClientComptes(comptes || []);
     } catch (error: any) {
-      console.error('Error loading client accounts:', error);
       setClientComptes([]);
     } finally {
       setLoadingComptes(false);
@@ -501,7 +499,6 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
         await finaliserPaiementDirect(paiementData);
       }
     } catch (error: any) {
-      console.error('Erreur:', error);
       setErrors({ submit: error.message || error.error || 'Erreur inconnue' });
       setLoading(false);
       setMmPaymentStatus('idle');
@@ -603,7 +600,6 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
       setLastPaymentInfo(paiementData);
       setShowSuccessModal(true);
     } catch (error: any) {
-      console.error('Erreur:', error);
       setErrors({ submit: error.message || "Erreur lors de l'enregistrement" });
     } finally {
       setLoading(false);

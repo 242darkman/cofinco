@@ -85,7 +85,7 @@ export default function OperationDetailModal({
 }: OperationDetailModalProps) {
   const statutInfo = getStatutInfo(operation.statut);
   const StatutIcon = statutInfo.icon;
-  const metadata = operation.metadata as any;
+  const metadata = operation.metadata as Record<string, unknown>;
   const isWithdrawal = metadata?.typePaiementClient === TypeOperationTerrain.WITHDRAWAL_CURRENT
     || metadata?.typePaiementClient === TypeOperationTerrain.WITHDRAWAL_SAVINGS;
   const isCollect = operation.type === 'COLLECT_CASH' && !isWithdrawal;
@@ -175,7 +175,7 @@ export default function OperationDetailModal({
           {metadata?.typePaiementClient && (
             <div className="p-3 bg-surface-elevated rounded-lg border border-edge">
               <div className="flex items-center gap-2 mb-1">
-                {metadata.typePaiementClient.includes('Crédit') ? (
+                {String(metadata.typePaiementClient).includes('Crédit') ? (
                   <CreditCard size={14} className="text-status-warning" />
                 ) : (
                   <PiggyBank size={14} className="text-status-success" />
@@ -183,7 +183,7 @@ export default function OperationDetailModal({
                 <p className="text-xs text-content-muted">Type de paiement</p>
               </div>
               <p className="text-sm font-medium text-content-primary">
-                {TYPE_OPERATION_TERRAIN_LABELS[metadata.typePaiementClient as TypeOperationTerrainType] || metadata.typePaiementClient}
+                {TYPE_OPERATION_TERRAIN_LABELS[metadata.typePaiementClient as TypeOperationTerrainType] || String(metadata.typePaiementClient)}
               </p>
             </div>
           )}
@@ -197,7 +197,7 @@ export default function OperationDetailModal({
               <p className="text-xs text-content-muted">Numéro de reçu</p>
             </div>
             <p className="text-sm font-medium text-content-primary font-mono">
-              {metadata.numeroRecu}
+              {String(metadata.numeroRecu)}
             </p>
           </div>
         )}
@@ -210,7 +210,7 @@ export default function OperationDetailModal({
               <p className="text-xs text-content-muted">Position GPS</p>
             </div>
             <p className="text-sm text-content-secondary font-mono">
-              {metadata.latitude.toFixed(6)}, {metadata.longitude.toFixed(6)}
+              {Number(metadata.latitude).toFixed(6)}, {Number(metadata.longitude).toFixed(6)}
             </p>
           </div>
         )}
@@ -223,7 +223,7 @@ export default function OperationDetailModal({
               <p className="text-xs text-content-muted">Observations</p>
             </div>
             <p className="text-sm text-content-secondary">
-              {metadata.observations}
+              {String(metadata.observations)}
             </p>
           </div>
         )}

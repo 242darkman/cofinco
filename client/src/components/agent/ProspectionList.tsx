@@ -75,7 +75,6 @@ export default function ProspectionList({ agentId, onCreateNew }: ProspectionLis
       setTotalPages(result.meta?.pagination?.totalPages || 1);
       setTotal(result.meta?.pagination?.totalItems || 0);
     } catch (error) {
-      console.error('Error loading prospections:', error);
     } finally {
       setLoading(false);
     }
@@ -125,7 +124,7 @@ export default function ProspectionList({ agentId, onCreateNew }: ProspectionLis
           <button
             onClick={loadProspects}
             className="p-1.5 text-content-muted hover:text-content-primary hover:bg-surface rounded-lg transition"
-            title="Rafraîchir"
+            aria-label="Rafraîchir la liste"
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           </button>
@@ -155,6 +154,7 @@ export default function ProspectionList({ agentId, onCreateNew }: ProspectionLis
         </div>
         <button
           onClick={() => setShowFilters(!showFilters)}
+          aria-label="Afficher les filtres"
           className={`p-1.5 rounded-lg border transition ${showFilters ? 'bg-accent/10 border-accent/30 text-accent' : 'bg-surface/50 border-edge-subtle text-content-muted hover:text-content-primary'}`}
         >
           <Filter size={14} />

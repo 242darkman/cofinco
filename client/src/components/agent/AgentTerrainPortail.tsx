@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Map, FileText, GraduationCap, Package, AlertTriangle, Target, BarChart3, TrendingUp, Trophy, Download, LayoutDashboard, UserCircle, ChevronDown, Search, X, UserPlus, Eye, Menu, ChevronLeft, ChevronRight, Activity } from 'lucide-react';
+import { Map, FileText, GraduationCap, Package, AlertTriangle, Target, BarChart3, TrendingUp, Trophy, Download, LayoutDashboard, UserCircle, ChevronDown, Search, X, UserPlus, Eye, Menu, ChevronLeft, ChevronRight, Activity, Locate } from 'lucide-react';
 import { Card } from '../ui';
 import AgentCommissions from './AgentCommissions';
 import AgentPlanning from './AgentPlanning';
@@ -14,6 +14,7 @@ import AgentReportsGenerator from './AgentReportsGenerator';
 import AgentTeamLeaderboard from './AgentTeamLeaderboard';
 import ProspectionList from './ProspectionList';
 import ProspectionSupervisionPanel from './ProspectionSupervisionPanel';
+import TrackingDebugPage from './TrackingDebugPage';
 import AgentSessionManager from './sessions/AgentSessionManager';
 import LoadingScreen from '../ui/LoadingScreen';
 import { authService } from '../../lib/auth';
@@ -145,6 +146,7 @@ export default function AgentTerrainPortail({ agentId, activeView, onModuleChang
     { id: 'incidents', name: 'Incidents', icon: AlertTriangle, component: AgentIncidents },
     { id: 'objectifs', name: 'Objectifs', icon: Target, component: AgentObjectifs },
     { id: 'supervision-prospection', name: 'Supervision', icon: Eye, component: ProspectionSupervisionPanel },
+    { id: 'tracking-debug', name: 'Tracking Debug', icon: Locate, component: TrackingDebugPage },
   ];
 
   const ActiveComponent = modules.find(m => m.id === activeModule)?.component;
@@ -159,7 +161,7 @@ export default function AgentTerrainPortail({ agentId, activeView, onModuleChang
         {/* Mobile Menu Trigger */}
         <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
           <SheetTrigger asChild>
-            <button className="md:hidden p-2 text-content-muted hover:text-content-primary hover:bg-surface-elevated/50 rounded-lg">
+            <button aria-label="Ouvrir le menu" className="md:hidden p-2 text-content-muted hover:text-content-primary hover:bg-surface-elevated/50 rounded-lg">
               <Menu size={20} />
             </button>
           </SheetTrigger>
@@ -204,8 +206,9 @@ export default function AgentTerrainPortail({ agentId, activeView, onModuleChang
 
         {/* Desktop Horizontal Scroll Menu */}
         <div className="hidden md:flex flex-1 items-center gap-1 min-w-0">
-          <button 
+          <button
             onClick={() => scroll('left')}
+            aria-label="Modules précédents"
             className="p-1.5 rounded-lg text-content-muted hover:text-content-primary hover:bg-surface-elevated/50 transition-colors flex-shrink-0"
           >
             <ChevronLeft size={16} />
@@ -245,8 +248,9 @@ export default function AgentTerrainPortail({ agentId, activeView, onModuleChang
             })}
           </div>
 
-          <button 
+          <button
             onClick={() => scroll('right')}
+            aria-label="Modules suivants"
             className="p-1.5 rounded-lg text-content-muted hover:text-content-primary hover:bg-surface-elevated/50 transition-colors flex-shrink-0"
           >
             <ChevronRight size={16} />

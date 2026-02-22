@@ -220,7 +220,6 @@ export default function AgentDashboard({ agentId: propAgentId, selectedAgentId: 
           setAgentProfile(agent);
         } else {
           // Agent not found - reset selection and show selector
-          console.error('Agent terrain non trouvé:', selectedAgentId);
           setSelectedAgentId(null);
           setLoading(false);
           setRefreshing(false);
@@ -256,7 +255,6 @@ export default function AgentDashboard({ agentId: propAgentId, selectedAgentId: 
 
       // Guard: ensure we have a valid agent with ID before making API calls
       if (!agent || !agent.id) {
-        console.warn('Agent profile manquant ou invalide, abandon du chargement');
         setLoading(false);
         setRefreshing(false);
         return;
@@ -424,7 +422,6 @@ export default function AgentDashboard({ agentId: propAgentId, selectedAgentId: 
         objectifsJour,
       });
     } catch (error) {
-      console.error('Erreur chargement dashboard agent:', error);
       // Don't set fallback stats - show error state instead
     } finally {
       setLoading(false);

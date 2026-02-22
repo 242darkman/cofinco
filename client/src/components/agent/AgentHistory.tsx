@@ -58,7 +58,6 @@ export default function AgentHistory({ agentId }: AgentHistoryProps) {
       const data = Array.isArray(response) ? response : response.operations || [];
       setOperations(data);
     } catch (error) {
-      console.error('Failed to load agent history:', error);
       toast({
         title: t('erreur'),
         description: "Impossible de charger l'historique.",

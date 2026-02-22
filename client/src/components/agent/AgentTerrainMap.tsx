@@ -85,7 +85,6 @@ export default function AgentTerrainMap() {
 
       setLastUpdate(new Date());
     } catch (error) {
-      console.error('Error fetching map data:', error);
     } finally {
       setLoading(false);
     }
@@ -113,7 +112,6 @@ export default function AgentTerrainMap() {
         }),
       });
     } catch (error) {
-      console.error('Error sending location:', error);
     }
   }, [trackingEnabled, accuracy]);
 

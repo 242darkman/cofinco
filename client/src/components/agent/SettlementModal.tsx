@@ -59,7 +59,6 @@ export default function SettlementModal({ isOpen, onClose, onSuccess, agentId, a
       setCaisses(caissesData.filter((c: any) => c.statut === StatutCaisse.OPEN));
       setAgentSummary(summary);
     } catch (error) {
-      console.error('Erreur chargement données settlement:', error);
       toast({
         title: t('erreur'),
         description: "Impossible de charger les caisses disponibles.",

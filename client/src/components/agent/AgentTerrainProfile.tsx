@@ -85,7 +85,6 @@ export default function AgentTerrainProfile({ agentId, onClose, onEdit }: AgentT
         setStats(calculatedStats);
       }
     } catch (error) {
-      console.error('Erreur chargement données agent:', error);
     } finally {
       setLoading(false);
     }
@@ -130,7 +129,6 @@ export default function AgentTerrainProfile({ agentId, onClose, onEdit }: AgentT
         setPhotoUrl(newPhotoUrl);
       }
     } catch (error) {
-      console.error('Erreur upload photo:', error);
       alert('Erreur lors du téléversement de la photo');
     } finally {
       setUploadingPhoto(false);
@@ -192,6 +190,7 @@ export default function AgentTerrainProfile({ agentId, onClose, onEdit }: AgentT
               <button
                 onClick={() => photoInputRef.current?.click()}
                 disabled={uploadingPhoto}
+                aria-label="Modifier la photo de profil"
                 className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer"
               >
                 {uploadingPhoto ? (

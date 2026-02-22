@@ -111,7 +111,7 @@ export default function AgentEnquetes({ agentId }: AgentEnquetesProps) {
         setInvestigations(Array.isArray(result.data) ? result.data : []);
       }
     } catch (error) {
-      console.error('[AgentEnquetes] Error fetching investigations:', error);
+      // Error handled silently
     } finally {
       setLoading(false);
     }
@@ -129,10 +129,9 @@ export default function AgentEnquetes({ agentId }: AgentEnquetesProps) {
         fetchInvestigations();
       } else {
         const err = await response.json().catch(() => ({}));
-        console.error('[AgentEnquetes] Start error:', err.message);
       }
     } catch (error) {
-      console.error('[AgentEnquetes] Start error:', error);
+      // Error handled silently
     } finally {
       setStarting(null);
     }

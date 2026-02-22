@@ -62,7 +62,6 @@ export default function AgentCommissions({ agentId }: AgentCommissionsProps) {
       setCommissions(data || []);
       setCurrentPage(1);
     } catch (error) {
-      console.error('Erreur:', error);
     } finally {
       setLoading(false);
     }
@@ -167,7 +166,6 @@ export default function AgentCommissions({ agentId }: AgentCommissionsProps) {
       if (!response.ok) throw new Error('Erreur recalcul');
       await fetchCommissions();
     } catch (error) {
-      console.error('Erreur recalcul:', error);
     } finally {
       setRecalculating(null);
     }
@@ -185,7 +183,6 @@ export default function AgentCommissions({ agentId }: AgentCommissionsProps) {
       if (!response.ok) throw new Error('Erreur recalcul');
       await fetchCommissions();
     } catch (error) {
-      console.error('Erreur recalcul:', error);
     } finally {
       setRecalculating(null);
     }

@@ -59,7 +59,6 @@ export default function VisiteTerrainForm({ onClose, onSuccess, agentId, clientI
       const data = await agentTerrainApi.getAllList();
       setAgents(data.filter((a: any) => a.statut === StatutUser.ACTIVE));
     } catch (error) {
-      console.error('Erreur chargement agents:', error);
     }
   };
 
@@ -68,7 +67,6 @@ export default function VisiteTerrainForm({ onClose, onSuccess, agentId, clientI
       const data = await clientApi.getAllList();
       setClients(data.filter((c: any) => c.statut === StatutClient.ACTIVE).slice(0, 100));
     } catch (error) {
-      console.error('Erreur chargement clients:', error);
     }
   };
 
@@ -118,7 +116,6 @@ export default function VisiteTerrainForm({ onClose, onSuccess, agentId, clientI
 
       onSuccess();
     } catch (error: any) {
-      console.error('Erreur:', error);
       setErrors({ submit: error.error });
     } finally {
       setLoading(false);

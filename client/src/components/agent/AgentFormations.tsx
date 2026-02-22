@@ -103,7 +103,6 @@ export default function AgentFormations({ agentId }: { agentId?: string }) {
         if (cRes.ok) setCompliance(await cRes.json());
       }
     } catch (error) {
-      console.error('Erreur chargement formations:', error);
     } finally {
       setLoading(false);
     }

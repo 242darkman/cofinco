@@ -86,7 +86,6 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
       const data = await response.json();
       setObjectifs(data || []);
     } catch (error) {
-      console.error('Erreur:', error);
       setObjectifs([]);
     } finally {
       setLoading(false);

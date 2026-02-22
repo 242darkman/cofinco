@@ -115,7 +115,6 @@ export default function CollectCashModal({
         const data = await clientApi.getAllList();
         setClients(data || []);
       } catch (error) {
-        console.error('Erreur chargement clients:', error);
         toast.error('Erreur lors du chargement des clients');
       } finally {
         setLoadingClients(false);
@@ -133,7 +132,6 @@ export default function CollectCashModal({
           setLongitude(position.coords.longitude);
         },
         (error) => {
-          console.error('Erreur géolocalisation:', error);
           toast.error('Impossible d\'obtenir la position');
         }
       );
@@ -183,7 +181,6 @@ export default function CollectCashModal({
 
       onSuccess();
     } catch (error: any) {
-      console.error('Erreur création collecte:', error);
       toast.error('Erreur lors de la création', {
         description: error.message
       });

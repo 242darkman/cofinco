@@ -87,7 +87,6 @@ export default function OfflineDaySession({ agentId, agenceId }: OfflineDaySessi
         }
       }
     } catch (err) {
-      console.error('Error loading session:', err);
     } finally {
       setLoading(false);
     }

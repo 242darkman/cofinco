@@ -106,7 +106,6 @@ export default function AgentMateriel({ agentId }: { agentId?: string }) {
       const data = await response.json();
       setMateriels(data || []);
     } catch (error) {
-      console.error('Erreur:', error);
     } finally {
       setLoading(false);
     }

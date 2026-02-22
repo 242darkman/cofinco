@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, Button, Badge, EmptyState, FormField, SelectField } from '../../ui';
-import { caisseAgentApi, agentTerrainApi } from '../../../lib/api-client';
+import { caisseAgentApi, agentTerrainApi, type OperationTerrainFilters } from '../../../lib/api-client';
 import type { OperationTerrainWithRelations } from '@shared/schema';
 import OperationDetailModal from './OperationDetailModal';
 import RejectOperationModal from './RejectOperationModal';
@@ -40,7 +40,7 @@ const formatDate = (date: string) => {
 };
 
 const isWithdrawalOp = (op: OperationTerrainWithRelations) => {
-  const meta = op.metadata as any;
+  const meta = op.metadata as Record<string, unknown>;
   const tpc = meta?.typePaiementClient;
   return tpc === TypeOperationTerrain.WITHDRAWAL_CURRENT || tpc === TypeOperationTerrain.WITHDRAWAL_SAVINGS;
 };
@@ -74,7 +74,7 @@ export default function OperationsApprovalList({ onModuleChange }: OperationsApp
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [operations, setOperations] = useState<OperationTerrainWithRelations[]>([]);
-  const [agents, setAgents] = useState<any[]>([]);
+  const [agents, setAgents] = useState<{ id: string; nom: string; prenom: string }[]>([]);
   const [totalCount, setTotalCount] = useState(0);
 
   // Filters
@@ -101,7 +101,7 @@ export default function OperationsApprovalList({ onModuleChange }: OperationsApp
       setAgents(agentsData || []);
 
       // Construire les filtres
-      const filters: any = {
+      const filters: OperationTerrainFilters = {
         limit: 50,
       };
 
@@ -123,7 +123,6 @@ export default function OperationsApprovalList({ onModuleChange }: OperationsApp
       setTotalCount(response.total || 0);
 
     } catch (error: any) {
-      console.error('Erreur chargement opérations:', error);
       toast.error('Erreur lors du chargement des opérations');
     } finally {
       setLoading(false);
