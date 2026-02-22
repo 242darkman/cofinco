@@ -308,6 +308,8 @@ export default function CollectCashModal({
           />
         )}
 
+        {/* Champs suivants visibles seulement après sélection du type */}
+        {selectedClientId && typePaiement && (<>
         {/* Montant */}
         <FormField
           label={isWithdrawal ? "Montant à retirer" : "Montant collecté"}
@@ -370,6 +372,7 @@ export default function CollectCashModal({
               : "Cette opération sera soumise pour validation par un superviseur. Aucune écriture comptable ne sera effectuée avant l'approbation."}
           </p>
         </div>
+        </>)}
 
         {/* Actions */}
         <div className="flex justify-end gap-3 pt-4 border-t border-edge">

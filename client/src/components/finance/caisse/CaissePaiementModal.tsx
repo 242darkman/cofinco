@@ -735,7 +735,7 @@ export default function CaissePaiementModal({
           )}
   
           {/* Tontine selection */}
-          {isTontineOperation && (
+          {formData.client_id && isTontineOperation && (
              <div className="animate-in fade-in slide-in-from-top-2 duration-300">
                 <label className="text-[10px] sm:text-xs font-bold text-content-muted uppercase tracking-wider ml-1 mb-1.5 block">
                    Sélection Tontine
@@ -789,7 +789,7 @@ export default function CaissePaiementModal({
           )}
 
           {/* Credit selection */}
-          {isCreditOperation && clientCredits.length > 0 && (
+          {formData.client_id && isCreditOperation && clientCredits.length > 0 && (
             <div className="animate-in fade-in slide-in-from-top-2 duration-300">
               <label className="text-[10px] sm:text-xs font-bold text-content-muted uppercase tracking-wider ml-1 mb-1.5 block">
                 Sélection Crédit
@@ -837,7 +837,7 @@ export default function CaissePaiementModal({
           )}
 
           {/* Account selection */}
-          {isAccountOperation && (
+          {formData.client_id && isAccountOperation && (
              <div className="animate-in fade-in slide-in-from-top-2 duration-300">
                 <label className="text-[10px] sm:text-xs font-bold text-content-muted uppercase tracking-wider ml-1 mb-1.5 block">
                    Sélection Compte
@@ -866,7 +866,8 @@ export default function CaissePaiementModal({
              </div>
           )}
   
-          <div className="space-y-2">
+          {formData.client_id && formData.type_operation && (<>
+          <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
              <label className="text-[10px] sm:text-xs font-bold text-content-muted uppercase tracking-wider ml-1">Mode de paiement</label>
              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
                 {[
@@ -1071,6 +1072,7 @@ export default function CaissePaiementModal({
             />
             {errors.description && <p className="text-status-danger text-xs mt-1">{errors.description}</p>}
           </div>
+          </>)}
         </div>
 
         <div className="p-4 sm:p-5 bg-surface-base border-t border-edge flex flex-col gap-3">
