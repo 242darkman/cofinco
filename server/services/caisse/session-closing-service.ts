@@ -38,6 +38,7 @@ import { createLogger } from "../../lib/logger";
 import { getDigitalCaisseSummary } from "../mobile-money/mm-caisse-service";
 import { providerRegistry } from "../mobile-money/provider-registry";
 import { agencyClosureService } from "./agency-closure-service";
+import type { SessionRow, TransfertRow, DbTransaction, BilletageRecord } from "./types";
 
 const logger = createLogger('SessionClosing');
 
@@ -54,7 +55,7 @@ export interface InitiateCloseParams {
 
 export interface InitiateCloseResult {
   success: boolean;
-  session?: any;
+  session?: SessionRow;
   error?: string;
   errorCode?:
     | "SESSION_NOT_FOUND"
@@ -102,7 +103,7 @@ export interface SubmitCountParams {
 
 export interface SubmitCountResult {
   success: boolean;
-  session?: any;
+  session?: SessionRow;
   soldeTheorique?: number;
   montantPhysique?: number;
   ecart?: number;
@@ -127,8 +128,8 @@ export interface FinalizeCloseParams {
 
 export interface FinalizeCloseResult {
   success: boolean;
-  session?: any;
-  transfert?: any;
+  session?: SessionRow;
+  transfert?: TransfertRow | null;
   bordereauUrl?: string;
   error?: string;
   errorCode?:
@@ -161,8 +162,8 @@ export interface SubmitVerificationCountResult {
 }
 
 export interface SessionCountsResult {
-  primary: { total: number; billetage: any; countedBy?: string; countedAt?: string } | null;
-  verification: { total: number; billetage: any; countedBy?: string; countedAt?: string } | null;
+  primary: { total: number; billetage: BilletageRecord; countedBy?: string; countedAt?: string } | null;
+  verification: { total: number; billetage: BilletageRecord; countedBy?: string; countedAt?: string } | null;
   ecartVerification: number | null;
   matched: boolean | null;
 }
@@ -178,8 +179,8 @@ export interface ValidateClosingTransferParams {
 
 export interface ValidateClosingTransferResult {
   success: boolean;
-  session?: any;
-  transfert?: any;
+  session?: SessionRow;
+  transfert?: TransfertRow;
   error?: string;
   errorCode?: string;
 }
@@ -277,9 +278,10 @@ export class SessionClosingService {
 
       try {
         const pawaPayProvider = providerRegistry.getPawaPay();
-        if (typeof (pawaPayProvider as any).getBalancePerCorrespondent === 'function') {
+        const provider = pawaPayProvider as { getBalancePerCorrespondent?: () => Promise<Array<{ correspondent: string; balance: string }>> };
+        if (typeof provider.getBalancePerCorrespondent === 'function') {
           const startTime = Date.now();
-          const balanceResult = await (pawaPayProvider as any).getBalancePerCorrespondent();
+          const balanceResult = await provider.getBalancePerCorrespondent();
           balanceApiResponseTime = Date.now() - startTime;
 
           // Map correspondent balances to operators
@@ -295,7 +297,7 @@ export class SessionClosingService {
             }
           }
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         balanceApiFailed = true;
         balanceApiError = error.message;
         logger.warn({ err: error }, 'Erreur récupération balances pawaPay');
@@ -450,7 +452,7 @@ export class SessionClosingService {
           .where(
             and(
               eq(operationsCaisse.sessionId, sessionId),
-              eq(operationsCaisse.statut, "PENDING" as any)
+              eq(operationsCaisse.statut, "PENDING")
             )
           );
 
@@ -521,7 +523,7 @@ export class SessionClosingService {
         const [updatedSession] = await tx
           .update(sessionsCaisse)
           .set({
-            statut: "CLOSING_COUNT" as any,
+            statut: "CLOSING_COUNT",
             closingInitiatedAt: new Date(),
             montantFermetureTheorique: soldeTheorique.toString(),
             lastActivity: new Date(),
@@ -559,11 +561,11 @@ export class SessionClosingService {
           mmReconciliation,
         };
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error({ err: error }, 'initiateClose error');
       return {
         success: false,
-        error: error.message || "Erreur lors de l'initiation de la fermeture",
+        error: (error instanceof Error ? error.message : "Erreur lors de l'initiation de la fermeture"),
         errorCode: "DB_ERROR",
       };
     }
@@ -642,7 +644,7 @@ export class SessionClosingService {
         const [updatedSession] = await tx
           .update(sessionsCaisse)
           .set({
-            statut: "CLOSING_VALIDATION" as any,
+            statut: "CLOSING_VALIDATION",
             billetageFermeture,
             montantFermetureDeclare: montantPhysique.toString(),
             montantPhysique: montantPhysique.toString(),
@@ -714,11 +716,11 @@ export class SessionClosingService {
           ecart,
         };
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error({ err: error }, 'submitCount error');
       return {
         success: false,
-        error: error.message || "Erreur lors de la soumission du comptage",
+        error: (error instanceof Error ? error.message : "Erreur lors de la soumission du comptage"),
         errorCode: "DB_ERROR",
       };
     }
@@ -823,11 +825,11 @@ export class SessionClosingService {
               agenceId: session.agenceId!,
               coffreId: coffreFort.id,
               caisseId: session.caisseId,
-              typeTransfert: "CAISSE_VERS_COFFRE" as any,
+              typeTransfert: "CAISSE_VERS_COFFRE",
               montant: montantVersCoffre.toString(),
               motif: `Remise de clôture - Session ${sessionId.substring(0, 8)}`,
               reference: transfertReference,
-              statut: StatutTransfertCoffre.REQUESTED as any,
+              statut: StatutTransfertCoffre.REQUESTED,
               requestedBy: caissierId,
               sessionOuvertureId: null,
               isOpeningFund: false,
@@ -918,7 +920,7 @@ export class SessionClosingService {
         const [updatedSession] = await tx
           .update(sessionsCaisse)
           .set({
-            statut: "CLOSED" as any,
+            statut: "CLOSED",
             closedAt: new Date(),
             closingFinalizedAt: new Date(),
             montantVersCoffre: montantVersCoffre.toString(),
@@ -957,11 +959,11 @@ export class SessionClosingService {
           transfert: closingTransfert,
         };
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error({ err: error }, 'finalizeClose error');
       return {
         success: false,
-        error: error.message || "Erreur lors de la finalisation de la fermeture",
+        error: (error instanceof Error ? error.message : "Erreur lors de la finalisation de la fermeture"),
         errorCode: "DB_ERROR",
       };
     }
@@ -1078,7 +1080,7 @@ export class SessionClosingService {
           await tx
             .update(transfertsCoffreCaisse)
             .set({
-              statut: StatutTransfertCoffre.REJECTED as any,
+              statut: StatutTransfertCoffre.REJECTED,
               validatedBy: validatorId,
               validatedAt: new Date(),
               reasonRejection: reasonRejection,
@@ -1119,11 +1121,11 @@ export class SessionClosingService {
           };
         }
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error({ err: error }, 'validateClosingTransfer error');
       return {
         success: false,
-        error: error.message || "Erreur lors de la validation du transfert",
+        error: (error instanceof Error ? error.message : "Erreur lors de la validation du transfert"),
         errorCode: "DB_ERROR",
       };
     }
@@ -1139,7 +1141,7 @@ export class SessionClosingService {
     reason?: string;
     ipAddress?: string;
     userAgent?: string;
-  }): Promise<{ success: boolean; session?: any; error?: string; errorCode?: string }> {
+  }): Promise<{ success: boolean; session?: SessionRow; error?: string; errorCode?: string }> {
     const { sessionId, caissierId, reason, ipAddress, userAgent } = params;
 
     try {
@@ -1169,7 +1171,7 @@ export class SessionClosingService {
         const [updatedSession] = await tx
           .update(sessionsCaisse)
           .set({
-            statut: "OPEN" as any,
+            statut: "OPEN",
             closingInitiatedAt: null,
             lastActivity: new Date(),
             updatedAt: new Date(),
@@ -1190,7 +1192,7 @@ export class SessionClosingService {
 
         return { success: true, session: updatedSession };
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       return { success: false, error: error.message, errorCode: "DB_ERROR" };
     }
   }
@@ -1198,7 +1200,7 @@ export class SessionClosingService {
   // ─────────────────────────────────────────────────────────────────────────
   // Récupérer les sessions en cours de fermeture (pour supervision)
   // ─────────────────────────────────────────────────────────────────────────
-  async getClosingSessionsForAgence(agenceId: string): Promise<any[]> {
+  async getClosingSessionsForAgence(agenceId: string): Promise<(SessionRow & { caissierNom: string | null; caisseNom: string | undefined })[]> {
     const sessions = await db
       .select({
         session: sessionsCaisse,
@@ -1235,7 +1237,7 @@ export class SessionClosingService {
   // ─────────────────────────────────────────────────────────────────────────
 
   private async recordEcartAudit(
-    tx: any,
+    tx: DbTransaction,
     params: {
       sessionId: string;
       caissierId: string;
@@ -1270,7 +1272,7 @@ export class SessionClosingService {
   }
 
   private async createEcartComptable(
-    tx: any,
+    tx: DbTransaction,
     params: {
       sessionId: string;
       caissierId: string;
@@ -1423,9 +1425,9 @@ export class SessionClosingService {
           matched: Math.abs(ecartVerification) <= ECART_MINEUR_SEUIL,
         };
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error({ err: error }, 'submitVerificationCount error');
-      return { success: false, error: error.message || "Erreur lors du comptage de vérification", errorCode: "DB_ERROR" };
+      return { success: false, error: (error instanceof Error ? error.message : "Erreur lors du comptage de vérification"), errorCode: "DB_ERROR" };
     }
   }
 

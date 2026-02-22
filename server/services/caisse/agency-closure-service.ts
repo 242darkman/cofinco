@@ -18,6 +18,7 @@ import {
   caisses,
   transfertsCoffreCaisse,
   ecartsApprovalRequests,
+  remisesTerrain,
   agences,
   users,
   type AgencyDailyClosure,
@@ -225,8 +226,23 @@ export class AgencyClosureService {
       });
     }
 
-    // 4. TODO: Vérifier les remises terrain en attente
-    const pendingRemises = 0; // À implémenter avec la table remisesTerrain
+    // 4. Vérifier les remises terrain en attente
+    const pendingRemisesResult = await db.select({ count: count() })
+      .from(remisesTerrain)
+      .where(and(
+        eq(remisesTerrain.agenceId, agenceId),
+        eq(remisesTerrain.statut, 'PENDING'),
+      ));
+    const pendingRemises = Number(pendingRemisesResult[0]?.count || 0);
+    if (pendingRemises > 0) {
+      blockers.push({
+        type: 'REMISE_PENDING',
+        entityId: agenceId,
+        entityType: 'remise',
+        description: `${pendingRemises} remise${pendingRemises > 1 ? 's' : ''} terrain en attente de validation`,
+        montant: 0,
+      });
+    }
 
     // Déterminer si prêt
     const ready = blockers.length === 0;
@@ -303,7 +319,7 @@ export class AgencyClosureService {
           caissesClosed: readiness.caissesClosed,
           observations,
         },
-        ipAddress: ipAddress as any,
+        ipAddress: ipAddress ?? null,
       });
 
       logger.info({
@@ -317,7 +333,7 @@ export class AgencyClosureService {
         success: true,
         closure: updatedClosure,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error({ err: error, agenceId }, 'Erreur finalisation clôture');
       return {
         success: false,
@@ -394,7 +410,7 @@ export class AgencyClosureService {
       }, 'Clôture agence rouverte exceptionnellement');
 
       return { success: true, closure: updated };
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error({ err: error, closureId }, 'Erreur réouverture clôture');
       return { success: false, error: error.message };
     }

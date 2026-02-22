@@ -223,7 +223,7 @@ export async function checkUserAuthorization(
       or(
         eq(caisseUserAuthorizations.caisseId, caisseId),
         isNull(caisseUserAuthorizations.caisseId) // Agence-wide authorization
-      ) as any
+      )!
     );
   }
 
@@ -266,7 +266,7 @@ export async function validateSecurityCode(params: ValidateCodeParams): Promise<
       or(
         eq(caisseSecurityCodes.caisseId, caisseId),
         isNull(caisseSecurityCodes.caisseId)
-      ) as any
+      )!
     );
   }
 
@@ -275,7 +275,7 @@ export async function validateSecurityCode(params: ValidateCodeParams): Promise<
       or(
         eq(caisseSecurityCodes.agenceId, agenceId),
         isNull(caisseSecurityCodes.agenceId)
-      ) as any
+      )!
     );
   }
 

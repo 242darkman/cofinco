@@ -33,6 +33,7 @@ import { updateCoffreBalance, updateCaisseBalance } from "../coffre/coffre-guard
 import { balanceService } from "../balance-service";
 import { createLogger } from "../../lib/logger";
 import { postGlForMouvement, AccountingRuleNotFoundError } from "../accounting-posting-service";
+import type { SessionRow, TransfertRow } from "./types";
 
 const logger = createLogger('SessionOpening');
 
@@ -52,8 +53,8 @@ interface RequestOpeningParams {
 
 interface RequestOpeningResult {
   success: boolean;
-  session?: any;
-  transfert?: any;
+  session?: SessionRow;
+  transfert?: TransfertRow;
   error?: string;
   errorCode?:
     | "CAISSE_OCCUPIED"
@@ -75,8 +76,8 @@ interface ValidateOpeningParams {
 
 interface ValidateOpeningResult {
   success: boolean;
-  session?: any;
-  transfert?: any;
+  session?: SessionRow;
+  transfert?: TransfertRow;
   error?: string;
   errorCode?: string;
 }
@@ -90,9 +91,11 @@ interface ReceiveFundsParams {
   userAgent?: string;
 }
 
+type SessionRow = typeof sessionsCaisse.$inferSelect;
+
 interface ReceiveFundsResult {
   success: boolean;
-  session?: any;
+  session?: SessionRow;
   error?: string;
   errorCode?: string;
 }
@@ -158,7 +161,7 @@ export class SessionOpeningService {
                 "REQUESTING_FUNDS",
                 "FUNDS_DISPATCHED",
                 "OPEN",
-              ] as any)
+              ] as const)
             )
           )
           .limit(1);
@@ -179,7 +182,7 @@ export class SessionOpeningService {
                 "REQUESTING_FUNDS",
                 "FUNDS_DISPATCHED",
                 "OPEN",
-              ] as any)
+              ] as const)
             )
           )
           .limit(1);
@@ -218,7 +221,7 @@ export class SessionOpeningService {
             caissierId,
             caisseId,
             agenceId,
-            statut: "REQUESTING_FUNDS" as any,
+            statut: "REQUESTING_FUNDS",
             montantOuverture: "0", // Sera calculé à la Phase C
             montantFermetureTheorique: "0",
             montantDemande: montantDemande.toString(),
@@ -238,13 +241,13 @@ export class SessionOpeningService {
           .insert(transfertsCoffreCaisse)
           .values({
             agenceId,
-            typeTransfert: "COFFRE_VERS_CAISSE" as any,
+            typeTransfert: "COFFRE_VERS_CAISSE",
             coffreId: coffreFort.id,
             caisseId,
             montant: montantDemande.toString(),
             motif: `Approvisionnement ouverture caisse - Session ${session.id}`,
             reference,
-            statut: StatutTransfertCoffre.REQUESTED as any,
+            statut: "REQUESTED",
             requestedBy: caissierId,
             requestedAt: new Date(),
             sessionOuvertureId: session.id,
@@ -330,7 +333,7 @@ export class SessionOpeningService {
           transfert,
         };
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error.message === "CAISSE_OCCUPIED") {
         return {
           success: false,
@@ -355,7 +358,7 @@ export class SessionOpeningService {
       logger.error({ err: error }, 'Error in requestSessionOpening');
       return {
         success: false,
-        error: error.message || "Erreur interne",
+        error: (error instanceof Error ? error.message : "Erreur interne"),
         errorCode: "DB_ERROR",
       };
     }
@@ -453,7 +456,7 @@ export class SessionOpeningService {
         const [updatedTransfert] = await tx
           .update(transfertsCoffreCaisse)
           .set({
-            statut: newStatut as any,
+            statut: newStatut,
             validatedBy: validatorId,
             validatedAt: new Date(),
             reasonRejection: approved ? null : reasonRejection,
@@ -470,7 +473,7 @@ export class SessionOpeningService {
           [updatedSession] = await tx
             .update(sessionsCaisse)
             .set({
-              statut: "FUNDS_DISPATCHED" as any,
+              statut: "FUNDS_DISPATCHED",
               fundsDispatchedAt: new Date(),
               updatedAt: new Date(),
             })
@@ -589,11 +592,11 @@ export class SessionOpeningService {
           transfert: updatedTransfert,
         };
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error({ err: error }, 'Error in validateOpeningTransfer');
       return {
         success: false,
-        error: error.message || "Erreur interne",
+        error: (error instanceof Error ? error.message : "Erreur interne"),
         errorCode: "DB_ERROR",
       };
     }
@@ -725,7 +728,7 @@ export class SessionOpeningService {
         const [updatedSession] = await tx
           .update(sessionsCaisse)
           .set({
-            statut: "OPEN" as any,
+            statut: "OPEN",
             openedAt: new Date(),
             fundsReceivedAt: new Date(),
             // IMPORTANT: Le solde d'ouverture est CALCULÉ, jamais saisi manuellement
@@ -845,11 +848,11 @@ export class SessionOpeningService {
           },
         };
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error({ err: error }, 'Error in receiveFundsAndOpen');
       return {
         success: false,
-        error: error.message || "Erreur interne",
+        error: (error instanceof Error ? error.message : "Erreur interne"),
         errorCode: "DB_ERROR",
       };
     }
@@ -1054,7 +1057,7 @@ export class SessionOpeningService {
         await tx
           .update(operationsCaisse)
           .set({
-            statut: StatutTransaction.CANCELLED as any,
+            statut: "CANCELLED",
             annulledAt: new Date(),
             updatedAt: new Date(),
           })
@@ -1067,7 +1070,7 @@ export class SessionOpeningService {
         await tx
           .update(sessionsCaisse)
           .set({
-            statut: "CLOSED" as any,
+            statut: "CLOSED",
             closedAt: new Date(),
             openedAt: null,
             montantOuverture: "0",
@@ -1187,11 +1190,11 @@ export class SessionOpeningService {
 
         return { success: true };
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error({ err: error }, 'Error in cancelOpeningRequest');
       return {
         success: false,
-        error: error.message || "Erreur interne",
+        error: (error instanceof Error ? error.message : "Erreur interne"),
         errorCode: "DB_ERROR",
       };
     }
@@ -1211,7 +1214,7 @@ export class SessionOpeningService {
           inArray(sessionsCaisse.statut, [
             "REQUESTING_FUNDS",
             "FUNDS_DISPATCHED",
-          ] as any)
+          ] as const)
         )
       )
       .limit(1);
@@ -1258,7 +1261,7 @@ export class SessionOpeningService {
         and(
           eq(transfertsCoffreCaisse.agenceId, agenceId),
           eq(transfertsCoffreCaisse.isOpeningFund, true),
-          eq(transfertsCoffreCaisse.statut, StatutTransfertCoffre.REQUESTED as any)
+          eq(transfertsCoffreCaisse.statut, "REQUESTED")
         )
       )
       .orderBy(desc(transfertsCoffreCaisse.createdAt));
@@ -1307,7 +1310,7 @@ export class SessionOpeningService {
     userAgent?: string;
   }): Promise<{
     success: boolean;
-    session?: any;
+    session?: SessionRow;
     error?: string;
     errorCode?: string;
   }> {
@@ -1355,7 +1358,7 @@ export class SessionOpeningService {
                 "OPEN",
                 "CLOSING_COUNT",
                 "CLOSING_VALIDATION",
-              ] as any)
+              ] as const)
             )
           )
           .limit(1);
@@ -1382,7 +1385,7 @@ export class SessionOpeningService {
                 "OPEN",
                 "CLOSING_COUNT",
                 "CLOSING_VALIDATION",
-              ] as any)
+              ] as const)
             )
           )
           .limit(1);
@@ -1406,7 +1409,7 @@ export class SessionOpeningService {
             caissierId,
             caisseId,
             agenceId,
-            statut: "OPEN" as any,
+            statut: "OPEN",
             montantOuverture: soldeExistant.toString(),
             montantFermetureTheorique: soldeExistant.toString(), // Initialiser le solde théorique
             soldeVeille: soldeExistant.toString(), // Le solde vient de la veille (fonds reporté)
@@ -1486,11 +1489,11 @@ export class SessionOpeningService {
           session: newSession,
         };
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error({ err: error }, 'Error in openDirectWithExistingFunds');
       return {
         success: false,
-        error: error.message || "Erreur interne",
+        error: (error instanceof Error ? error.message : "Erreur interne"),
         errorCode: "DB_ERROR",
       };
     }

@@ -186,7 +186,7 @@ export class EcartApprovalService {
           actorId: caissierId,
           comment: `Écart mineur (${Math.abs(ecart)} XOF <= ${config.seuilAutoApprove} XOF)`,
           metadata: { ecart, threshold: config.seuilAutoApprove },
-          ipAddress: ipAddress as any,
+          ipAddress: ipAddress ?? null,
           userAgent,
         });
 
@@ -235,7 +235,7 @@ export class EcartApprovalService {
         actorId: caissierId,
         comment: `Demande d'approbation niveau ${approvalLevel} créée`,
         metadata: { ecart, threshold, level: approvalLevel },
-        ipAddress: ipAddress as any,
+        ipAddress: ipAddress ?? null,
         userAgent,
       });
 
@@ -252,7 +252,7 @@ export class EcartApprovalService {
       const wsInstance = getWsInstance();
       if (wsInstance) {
         wsInstance.broadcast({
-          type: 'ECART_APPROVAL_REQUEST' as any,
+          type: 'ECART_APPROVAL_REQUEST',
           payload: { requestId: request.id, sessionId, ecart, level: approvalLevel }
         });
       }
@@ -262,7 +262,7 @@ export class EcartApprovalService {
         request,
         autoApproved: false,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error({ err: error, sessionId }, 'Erreur création demande approbation');
       return {
         success: false,
@@ -329,7 +329,7 @@ export class EcartApprovalService {
           actorId: approverId,
           comment: comment || `Écart ${decision.toLowerCase()}`,
           metadata: { decision, previousStatus: request.statut },
-          ipAddress: ipAddress as any,
+          ipAddress: ipAddress ?? null,
           userAgent,
         });
 
@@ -343,7 +343,7 @@ export class EcartApprovalService {
         const wsInstance = getWsInstance();
         if (wsInstance) {
           wsInstance.broadcast({
-            type: 'ECART_APPROVAL_DECISION' as any,
+            type: 'ECART_APPROVAL_DECISION',
             payload: { requestId, sessionId: request.sessionId, decision }
           });
         }
@@ -353,7 +353,7 @@ export class EcartApprovalService {
           request: updatedRequest,
         };
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error({ err: error, requestId }, 'Erreur approbation écart');
       return {
         success: false,

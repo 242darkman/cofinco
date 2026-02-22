@@ -14,6 +14,7 @@ import { sessionsCaisse, sessionsCaisseAuditLogs, operationsCaisse, caisses, use
 import { eq, and, sql, desc, lt, gte, lte, or, isNull, isNotNull } from "drizzle-orm";
 import { ForcedCloseReason, SessionComputedStatus } from "@shared/enums";
 import { StatutTransaction, StatutSessionCaisse, StatutCaisse, CaisseOpeningStrictness, type CaisseOpeningStrictnessType } from "@shared/enum/status-constants";
+import type { TypeOperationCaisseDz, MethodePaiementDz } from "@shared/enum/enums";
 import {
   getOperationDelta,
   CAISSE_THRESHOLDS,
@@ -83,7 +84,7 @@ async function checkCaisseGlReconciliation(): Promise<GlReconciliationCheck> {
     FROM caisses c
     LEFT JOIN sessions_caisse s ON s.caisse_id = c.id AND s.closed_at IS NULL
   `);
-  const operationalBalance = parseFloat((operationalResult.rows[0] as any)?.total || '0');
+  const operationalBalance = parseFloat((operationalResult.rows[0] as { total?: string })?.total || '0');
 
   // Solde GL: comptes 521xxx
   const glResult = await db.execute(sql`
@@ -96,7 +97,7 @@ async function checkCaisseGlReconciliation(): Promise<GlReconciliationCheck> {
     WHERE pc.numero_compte LIKE '521%'
       AND e.statut = 'POSTED'
   `);
-  const glBalance = parseFloat((glResult.rows[0] as any)?.solde || '0');
+  const glBalance = parseFloat((glResult.rows[0] as { solde?: string })?.solde || '0');
 
   const discrepancy = Math.abs(operationalBalance - glBalance);
   const isReconciled = discrepancy <= MAX_ECART_THRESHOLD;
@@ -280,9 +281,11 @@ interface OpenSessionParams {
   discrepancyApprovedBy?: string; // User who approved the discrepancy (supervisor)
 }
 
+type SessionRow = typeof sessionsCaisse.$inferSelect;
+
 interface OpenSessionResult {
   success: boolean;
-  session?: any;
+  session?: SessionRow;
   error?: string;
   errorCode?:
     | "CAISSE_OCCUPIED"
@@ -644,48 +647,48 @@ export async function openSessionAtomic(params: OpenSessionParams): Promise<Open
         action: glGuardAction,
       },
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Parser les erreurs personnalisées
-    if (error.message?.startsWith("CAISSE_OCCUPIED:")) {
+    if ((error instanceof Error ? error.message : "").startsWith("CAISSE_OCCUPIED:")) {
       return {
         success: false,
-        error: error.message.replace("CAISSE_OCCUPIED:", ""),
+        error: (error instanceof Error ? error.message : "").replace("CAISSE_OCCUPIED:", ""),
         errorCode: "CAISSE_OCCUPIED",
       };
     }
-    if (error.message?.startsWith("USER_HAS_SESSION:")) {
+    if ((error instanceof Error ? error.message : "").startsWith("USER_HAS_SESSION:")) {
       return {
         success: false,
-        error: error.message.replace("USER_HAS_SESSION:", ""),
+        error: (error instanceof Error ? error.message : "").replace("USER_HAS_SESSION:", ""),
         errorCode: "USER_HAS_SESSION",
       };
     }
-    if (error.message?.startsWith("CAISSE_NOT_FOUND:")) {
+    if ((error instanceof Error ? error.message : "").startsWith("CAISSE_NOT_FOUND:")) {
       return {
         success: false,
-        error: error.message.replace("CAISSE_NOT_FOUND:", ""),
+        error: (error instanceof Error ? error.message : "").replace("CAISSE_NOT_FOUND:", ""),
         errorCode: "CAISSE_NOT_FOUND",
       };
     }
-    if (error.message?.startsWith("CAISSE_AGENCE_MISMATCH:")) {
+    if ((error instanceof Error ? error.message : "").startsWith("CAISSE_AGENCE_MISMATCH:")) {
       return {
         success: false,
-        error: error.message.replace("CAISSE_AGENCE_MISMATCH:", ""),
+        error: (error instanceof Error ? error.message : "").replace("CAISSE_AGENCE_MISMATCH:", ""),
         errorCode: "CAISSE_AGENCE_MISMATCH",
       };
     }
 
     // Erreur de contrainte unique (race condition attrapée par la DB)
-    if (error.code === "23505") {
+    if ((error as { code?: string }).code === "23505") {
       // unique_violation
-      if (error.constraint?.includes("caisse")) {
+      if ((error as { constraint?: string }).constraint?.includes("caisse")) {
         return {
           success: false,
           error: "Cette caisse vient d'être ouverte par un autre utilisateur",
           errorCode: "CAISSE_OCCUPIED",
         };
       }
-      if (error.constraint?.includes("user")) {
+      if ((error as { constraint?: string }).constraint?.includes("user")) {
         return {
           success: false,
           error: "Vous venez d'ouvrir une session sur une autre caisse",
@@ -697,7 +700,7 @@ export async function openSessionAtomic(params: OpenSessionParams): Promise<Open
     logger.error({ err: error }, 'Error opening session');
     return {
       success: false,
-      error: error.message || "Erreur lors de l'ouverture de la session",
+      error: (error instanceof Error ? error.message : "Erreur lors de l'ouverture de la session"),
       errorCode: "DB_ERROR",
     };
   }
@@ -722,7 +725,7 @@ interface CloseSessionParams {
 
 interface CloseSessionResult {
   success: boolean;
-  session?: any;
+  session?: SessionRow;
   ecart?: number;
   ecartAlert?: boolean;
   error?: string;
@@ -975,11 +978,11 @@ export async function closeSessionAtomic(params: CloseSessionParams): Promise<Cl
       ecart: result.ecart,
       ecartAlert: result.ecartAlert,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, 'Error closing session');
     return {
       success: false,
-      error: error.message || "Erreur lors de la fermeture de la session",
+      error: (error instanceof Error ? error.message : "Erreur lors de la fermeture de la session"),
     };
   }
 }
@@ -1388,6 +1391,8 @@ export interface CaisseHistoriqueOperation {
     openedAt: Date;
     closedAt: Date | null;
   };
+  // Metadata (ex: détail remise agent)
+  metadata?: Record<string, any> | null;
 }
 
 export interface CaisseHistoriqueResult {
@@ -1438,11 +1443,11 @@ export async function getCaisseHistorique(
   }
 
   if (typeOperation) {
-    conditions.push(eq(operationsCaisse.typeOperation, typeOperation as any));
+    conditions.push(eq(operationsCaisse.typeOperation, typeOperation as TypeOperationCaisseDz));
   }
 
   if (methodePaiement) {
-    conditions.push(eq(operationsCaisse.methodePaiement, methodePaiement as any));
+    conditions.push(eq(operationsCaisse.methodePaiement, methodePaiement as MethodePaiementDz));
   }
 
   const whereClause = and(...conditions);
@@ -1532,17 +1537,24 @@ export async function getCaisseHistorique(
         typeOperation: op.typeOperation,
         montant: op.montant,
         methodePaiement: op.methodePaiement,
+        modePaiement: op.methodePaiement,
         description: op.description,
         statut: op.statut,
         createdAt: op.createdAt,
         sessionId: op.sessionId,
         client: clientInfo,
         caissier: caissierInfo,
+        // Flat properties for client compatibility
+        clientNom: clientInfo?.nom || null,
+        clientPrenom: clientInfo?.prenom || null,
+        clientTelephone: clientInfo?.telephone || null,
+        caissierNom: caissierInfo ? `${caissierInfo.prenom || ''} ${caissierInfo.nom || ''}`.trim() : null,
         session: {
           id: sess.id,
           openedAt: sess.openedAt!,
           closedAt: sess.closedAt,
         },
+        metadata: op.metadata,
       };
     })
   );

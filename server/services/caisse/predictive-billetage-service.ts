@@ -212,7 +212,7 @@ export class PredictiveBilletageService {
           ? alternativeSuggestions
           : undefined,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error({ err: error, caisseId }, 'Erreur suggestion billetage');
 
       // Retourner une suggestion par défaut
@@ -310,8 +310,40 @@ export class PredictiveBilletageService {
       avgTransactionValue: Number(opStats?.avgValue) || 15000,
       preferredDenominations,
       smallDenominationRatio: totalValue > 0 ? totalSmallValue / totalValue : 0.3,
-      peakHourTransactions: {}, // TODO: Implémenter l'analyse par heure
+      peakHourTransactions: await this.analyzePeakHours(caisseId, thirtyDaysAgo),
     };
+  }
+
+  /**
+   * Analyse les heures de pointe par nombre moyen de transactions
+   */
+  private async analyzePeakHours(caisseId: string, since: Date): Promise<Record<number, number>> {
+    try {
+      const rows = await db.select({
+        hour: sql<number>`EXTRACT(HOUR FROM ${operationsCaisse.createdAt})`.as('hour'),
+        cnt: count().as('cnt'),
+      })
+      .from(operationsCaisse)
+      .innerJoin(sessionsCaisse, eq(operationsCaisse.sessionId, sessionsCaisse.id))
+      .where(and(
+        eq(sessionsCaisse.caisseId, caisseId),
+        gte(operationsCaisse.createdAt, since),
+      ))
+      .groupBy(sql`EXTRACT(HOUR FROM ${operationsCaisse.createdAt})`);
+
+      const sessionCount = (await db.select({ cnt: count() })
+        .from(sessionsCaisse)
+        .where(and(eq(sessionsCaisse.caisseId, caisseId), gte(sessionsCaisse.openedAt, since)))
+      )[0]?.cnt || 1;
+
+      const result: Record<number, number> = {};
+      for (const row of rows) {
+        result[Number(row.hour)] = Math.round(Number(row.cnt) / Number(sessionCount));
+      }
+      return result;
+    } catch {
+      return {};
+    }
   }
 
   /**
@@ -372,10 +404,21 @@ export class PredictiveBilletageService {
       }
     }
 
+    // Calculer les moyennes de transactions pour ces sessions
+    const sessionIds = sessions.map(s => s.id);
+    const [txStats] = sessionIds.length > 0
+      ? await db.select({
+          avgCount: sql<number>`COUNT(*)::float / ${sessions.length}`,
+          avgAmount: avg(operationsCaisse.montant),
+        })
+        .from(operationsCaisse)
+        .where(sql`${operationsCaisse.sessionId} = ANY(${sessionIds})`)
+      : [{ avgCount: 0, avgAmount: null }];
+
     return {
       dayOfWeek,
-      avgTransactionCount: 0, // TODO
-      avgTransactionAmount: 0, // TODO
+      avgTransactionCount: Number(txStats?.avgCount) || 0,
+      avgTransactionAmount: Number(txStats?.avgAmount) || 0,
       avgSmallDenominationUsage: totalSmallRatio / sessions.length,
       avgLargeDenominationUsage: totalLargeRatio / sessions.length,
     };

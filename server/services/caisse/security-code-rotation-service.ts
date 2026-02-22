@@ -194,7 +194,7 @@ export class SecurityCodeRotationService {
         codeId: newCode.id,
         expiresAt: expiresAt || undefined,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error({ err: error }, 'Erreur génération code sécurité');
       return {
         success: false,
@@ -308,7 +308,7 @@ export class SecurityCodeRotationService {
         error: 'Code invalide',
         errorCode: 'CODE_NOT_FOUND',
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error({ err: error }, 'Erreur validation code');
       return {
         success: false,
@@ -462,7 +462,7 @@ export class SecurityCodeRotationService {
       }, 'Rotation des codes effectuée');
 
       return result;
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error({ err: error }, 'Erreur rotation codes');
       return result;
     }
@@ -508,7 +508,7 @@ export class SecurityCodeRotationService {
 
       logger.info({ codeId, revokedBy, reason }, 'Code révoqué');
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error({ err: error, codeId }, 'Erreur révocation code');
       return false;
     }

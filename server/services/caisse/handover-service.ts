@@ -220,7 +220,7 @@ export class HandoverService {
           handover,
         };
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error({ err: error, sessionId }, 'Erreur initiation handover');
       return {
         success: false,
@@ -270,7 +270,7 @@ export class HandoverService {
       logger.info({ handoverId, toCaissierId }, 'Comptage démarré');
 
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error({ err: error, handoverId }, 'Erreur démarrage comptage');
       return { success: false, error: error.message };
     }
@@ -371,7 +371,7 @@ export class HandoverService {
           requiresApproval,
         };
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error({ err: error, handoverId }, 'Erreur confirmation handover');
       return {
         success: false,
@@ -437,7 +437,7 @@ export class HandoverService {
           handover: updatedHandover,
         };
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error({ err: error, handoverId }, 'Erreur approbation handover');
       return { success: false, error: error.message };
     }
@@ -464,7 +464,13 @@ export class HandoverService {
 
       // Vérifier que c'est un des participants ou un superviseur
       if (handover.fromCaissierId !== cancelledBy && handover.toCaissierId !== cancelledBy) {
-        // TODO: Vérifier si c'est un superviseur
+        const [user] = await db.select({ role: users.role })
+          .from(users)
+          .where(eq(users.id, cancelledBy));
+        const supervisorRoles = ['ADMIN', 'CHEF_AGENCE', 'SUPERVISEUR'];
+        if (!user || !supervisorRoles.includes(user.role)) {
+          return { success: false, error: 'Seuls les participants ou un superviseur peuvent annuler ce transfert' };
+        }
       }
 
       const [updatedHandover] = await db.update(caisseHandovers)
@@ -494,7 +500,7 @@ export class HandoverService {
         success: true,
         handover: updatedHandover,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error({ err: error, handoverId }, 'Erreur annulation handover');
       return { success: false, error: error.message };
     }
@@ -578,7 +584,7 @@ export class HandoverService {
    * Transfère la propriété de la session au nouveau caissier
    */
   private async transferSessionOwnership(
-    tx: any,
+    tx: typeof db,
     sessionId: string,
     newCaissierId: string,
     handoverId: string

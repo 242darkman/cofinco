@@ -133,7 +133,7 @@ class CountSuggestionService {
    * Ajuste le billetage d'ouverture en fonction des opérations
    */
   private adjustFromOpening(
-    openingCount: any,
+    openingCount: Record<string, number>,
     operations: { typeOperation: string; montant: string | null; metadata: unknown }[],
     targetTotal: number
   ): Record<string, number> {
