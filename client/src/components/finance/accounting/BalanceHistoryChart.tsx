@@ -145,15 +145,15 @@ export default function BalanceHistoryChart({
           </h3>
           
           {/* Period Selector - Segmented Control */}
-          <div className="flex bg-surface rounded-lg p-1 border border-edge-subtle">
+          <div className="flex bg-surface rounded-lg p-1 border border-edge">
             {periods.map((p) => (
               <button
                 key={p.value}
                 onClick={() => setPeriod(p.value)}
                 className={`
-                  px-3 py-1 text-[10px] font-medium rounded-md transition-all duration-200
-                  ${period === p.value 
-                    ? 'bg-surface-elevated text-content-primary shadow-sm' 
+                  px-3 py-1 text-[10px] font-bold rounded-md transition-all duration-200
+                  ${period === p.value
+                    ? 'bg-accent text-white shadow-sm'
                     : 'text-content-muted hover:text-content-secondary hover:bg-surface-elevated/50'}
                 `}
               >
