@@ -2908,10 +2908,13 @@ async function seedCoreSettings(context: SeedContext, dryRun: boolean): Promise<
   // Role Hierarchy — permission inheritance between roles
   const hierarchyData = [
     { parentRole: 'ADMIN', childRole: 'CHEF_AGENCE' },
+    { parentRole: 'ADMIN', childRole: 'AUDITEUR' },
+    { parentRole: 'ADMIN', childRole: 'SUPPORT_IT' },
     { parentRole: 'CHEF_AGENCE', childRole: 'SUPERVISEUR' },
     { parentRole: 'CHEF_AGENCE', childRole: 'COMPTABLE' },
     { parentRole: 'CHEF_AGENCE', childRole: 'GESTIONNAIRE_CREDIT' },
     { parentRole: 'CHEF_AGENCE', childRole: 'CAISSIER' },
+    { parentRole: 'CHEF_AGENCE', childRole: 'RH' },
     { parentRole: 'SUPERVISEUR', childRole: 'AGENT_TERRAIN' },
   ];
 
