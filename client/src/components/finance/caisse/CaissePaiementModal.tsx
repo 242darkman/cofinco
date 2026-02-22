@@ -682,56 +682,25 @@ export default function CaissePaiementModal({
                 <label className="text-[10px] sm:text-xs font-bold text-content-muted uppercase tracking-wider ml-1 flex items-center gap-1.5">
                    <FileText size={11}/> Nature Opération
                 </label>
-                <div className="relative h-11 sm:h-12">
-                   <select
-                      className={`h-full w-full bg-surface-base border border-edge rounded-xl px-4 appearance-none focus:border-accent outline-none transition-all ${
-                        !formData.client_id ? 'text-content-muted cursor-not-allowed' : 'text-content-primary'
-                      }`}
-                      value={formData.client_id ? formData.type_operation : ''}
-                      disabled={!formData.client_id || loadingClientData}
-                      onChange={(e) => setFormData(prev => ({ ...prev, type_operation: e.target.value }))}
-                   >
-                      {!formData.client_id ? (
-                        <option value="">Sélectionnez d'abord un client</option>
-                      ) : loadingClientData ? (
-                        <option value="">Chargement...</option>
-                      ) : (
-                        <>
-                          {/* Tontines group */}
-                          {hasTontines && (
-                            <optgroup label="Tontines" className="bg-surface-base">
-                              {availableCaisseOperations.filter(op => op.group === 'tontines').map(op => (
-                                <option key={op.value} value={op.value}>{op.label}</option>
-                              ))}
-                            </optgroup>
-                          )}
-                          {/* Credits group */}
-                          {(hasCredits || hasCreditsForDisbursement) && (
-                            <optgroup label="Crédits" className="bg-surface-base">
-                              {availableCaisseOperations.filter(op => op.group === 'credits').map(op => (
-                                <option key={op.value} value={op.value}>{op.label}</option>
-                              ))}
-                            </optgroup>
-                          )}
-                          {/* Comptes group */}
-                          {availableCaisseOperations.some(op => op.group === 'comptes') && (
-                            <optgroup label="Comptes" className="bg-surface-base">
-                              {availableCaisseOperations.filter(op => op.group === 'comptes').map(op => (
-                                <option key={op.value} value={op.value}>{op.label}</option>
-                              ))}
-                            </optgroup>
-                          )}
-                          {/* Divers group — always present */}
-                          <optgroup label="Divers" className="bg-surface-base">
-                            {availableCaisseOperations.filter(op => op.group === 'divers').map(op => (
-                              <option key={op.value} value={op.value}>{op.label}</option>
-                            ))}
-                          </optgroup>
-                        </>
-                      )}
-                   </select>
-                   <ArrowDownLeft size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-content-muted pointer-events-none rotate-[-45deg]" />
-                </div>
+                <SearchableSelect
+                   label=""
+                   name="type_operation"
+                   value={formData.client_id ? formData.type_operation : ''}
+                   onChange={(value) => setFormData(prev => ({ ...prev, type_operation: String(value) }))}
+                   options={availableCaisseOperations.map(op => ({
+                     value: op.value,
+                     label: op.label,
+                     subLabel: op.group === 'tontines' ? 'Tontines' : op.group === 'credits' ? 'Crédits' : op.group === 'comptes' ? 'Comptes' : 'Divers',
+                     hideAvatar: true,
+                   }))}
+                   placeholder={!formData.client_id ? "Sélectionnez d'abord un client" : 'Rechercher une opération...'}
+                   disabled={!formData.client_id || loadingClientData}
+                   isLoading={loadingClientData}
+                   className="h-11 sm:h-12"
+                   variant="dark"
+                   showAvatarInTrigger={false}
+                   icon={FileText}
+                />
              </div>
           </div>
   
