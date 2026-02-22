@@ -40,7 +40,7 @@ export function registerNotificationsRoutes(app: Express) {
   // GET /api/notifications-caisse
   // List notifications for caisse (payments pending, account activations)
   // ============================================
-  router.get("/", requireAuth, async (req, res) => {
+  router.get("/", requireAuth, attachAbility, async (req, res) => {
     try {
       if (!req.user) return res.status(401).json({ error: "Non autorisé" });
 
@@ -219,7 +219,7 @@ export function registerNotificationsRoutes(app: Express) {
   // PATCH /api/notifications-caisse/:id
   // Update notification status (mark as read, processed)
   // ============================================
-  router.patch("/:id", requireAuth, async (req, res) => {
+  router.patch("/:id", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.CAISSE), async (req, res) => {
     try {
       if (!req.user) return res.status(401).json({ error: "Non autorisé" });
 
@@ -270,7 +270,7 @@ export function registerNotificationsRoutes(app: Express) {
   // GET /api/notifications-caisse/count
   // Get count of unread caisse notifications
   // ============================================
-  router.get("/count", requireAuth, async (req, res) => {
+  router.get("/count", requireAuth, attachAbility, async (req, res) => {
     try {
       if (!req.user) return res.status(401).json({ error: "Non autorisé" });
 

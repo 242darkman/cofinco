@@ -38,6 +38,7 @@ import TransfertInterCoffresForm from './TransfertInterCoffresForm';
 import TransfertInterCoffresDetail from './TransfertInterCoffresDetail';
 import TransfertInterCoffresApproval from './TransfertInterCoffresApproval';
 import TransfertInterCoffresReception from './TransfertInterCoffresReception';
+import { usePermissions } from '../../auth/ProtectedFeature';
 
 // Types
 interface CoffreFort {
@@ -214,6 +215,9 @@ export default function TransfertInterCoffresModule({
   userRole = '',
   userAgenceId,
 }: TransfertInterCoffresModuleProps) {
+  const { hasPermission } = usePermissions();
+  const canManage = hasPermission('coffres', 'manage') || hasPermission('transferts', 'manage') || hasPermission('admin', 'manage');
+
   // State
   const [transferts, setTransferts] = useState<TransfertInterCoffre[]>([]);
   const [coffres, setCoffres] = useState<CoffreFort[]>([]);
@@ -713,6 +717,7 @@ export default function TransfertInterCoffresModule({
               >
                 <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
               </Button>
+              {canManage && (
               <Button
                 onClick={() => setShowCreateForm(true)}
                 className="bg-gradient-to-r from-status-success to-accent hover:from-status-success/90 hover:to-accent/90 text-white shadow-lg shadow-status-success/20"
@@ -721,6 +726,7 @@ export default function TransfertInterCoffresModule({
                 <span className="hidden sm:inline">Nouveau Transfert</span>
                 <Plus size={18} className="sm:hidden" />
               </Button>
+              )}
             </div>
           </div>
         </header>
@@ -877,7 +883,7 @@ export default function TransfertInterCoffresModule({
         </section>
 
         {/* Bulk Actions Bar */}
-        {selectedIds.size > 0 && (
+        {selectedIds.size > 0 && canManage && (
           <section className="bg-accent/10 border border-accent/30 rounded-lg p-3 flex items-center justify-between">
             <span className="text-sm text-accent font-medium">
               {selectedIds.size} transfert{selectedIds.size > 1 ? 's' : ''} sélectionné{selectedIds.size > 1 ? 's' : ''}

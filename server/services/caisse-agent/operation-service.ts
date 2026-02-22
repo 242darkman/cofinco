@@ -24,7 +24,7 @@ import { eq, and, isNull, desc, gte, lte, sql, count, asc, min } from "drizzle-o
 import { randomInt } from "crypto";
 import { caisseAgentService } from "./caisse-agent-service";
 import { StatutCaisseAgent, TypeOperationTerrain } from "@shared/enum/status-constants";
-import { normalizeRole, SystemRole } from "@shared/types/roles";
+import { SystemRole } from "@shared/types/roles";
 
 /**
  * Génère une référence unique pour une opération terrain
@@ -605,8 +605,7 @@ export class OperationService {
 
     // Filtre par agence: seul ADMIN voit toutes les agences
     // SUPERVISEUR voit uniquement son agence de rattachement
-    const normalizedUserRole = normalizeRole(userRole);
-    const isGlobalAdmin = normalizedUserRole === SystemRole.ADMIN;
+    const isGlobalAdmin = userRole === SystemRole.ADMIN;
     const needsAgencyFilter = !isGlobalAdmin && agenceId;
 
     let baseQuery;
@@ -790,8 +789,7 @@ export class OperationService {
 
     // Seul ADMIN voit toutes les opérations de toutes les agences
     // SUPERVISEUR et autres rôles voient uniquement leur agence
-    const normalizedUserRole = normalizeRole(userRole);
-    const isGlobalAdmin = normalizedUserRole === SystemRole.ADMIN;
+    const isGlobalAdmin = userRole === SystemRole.ADMIN;
 
     if (isGlobalAdmin) {
       const [result] = await db

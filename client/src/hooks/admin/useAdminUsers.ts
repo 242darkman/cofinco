@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { SystemRole, normalizeRole } from '@shared/types/roles';
+import { SystemRole } from '@shared/types/roles';
 
 export interface AdminUser {
   id: string;
@@ -50,7 +50,7 @@ export function useAdminUsers() {
       ...safeUser,
       name: getUserDisplayName(safeUser),
       username: safeUser?.username ?? safeUser?.email ?? '',
-      role: normalizeRole(safeUser?.role) || SystemRole.CLIENT
+      role: (safeUser?.role as SystemRole) || SystemRole.CLIENT
     };
   };
 
@@ -59,9 +59,8 @@ export function useAdminUsers() {
   };
 
   const getUsersByRole = (role: string): AdminUser[] => {
-    const normalizedRole = normalizeRole(role);
-    if (!normalizedRole) return [];
-    return users.filter(u => u.role === normalizedRole);
+    if (!role) return [];
+    return users.filter(u => u.role === role);
   };
 
   const searchUsers = (term: string): AdminUser[] => {

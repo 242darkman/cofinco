@@ -2700,6 +2700,9 @@ async function seedCoreSettings(context: SeedContext, dryRun: boolean): Promise<
       notificationSmsEnabled: true,
       smsPaymentValidationEnabled: true,
       mobileMoneyEnabled: true,
+      cashEnabled: true,
+      checkEnabled: true,
+      transferEnabled: true,
       maintenanceMode: false,
     });
     results.push({ table: 'systemSettings', action: 'created', count: 1 });

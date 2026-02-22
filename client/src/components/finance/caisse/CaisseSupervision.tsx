@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { SystemRole, normalizeRole } from '@shared/types/roles';
+import { SystemRole } from '@shared/types/roles';
 import { StatutUser } from '@shared/enum/status-constants';
 import { Wallet, User, Lock, RefreshCw, AlertTriangle, TrendingUp, Clock, Building2, Search, ChevronLeft, ChevronRight, Eye, UserX, UserCheck, BarChart3, X, ShieldAlert, Shield, Info, Calendar } from 'lucide-react';
 import Tooltip from '../../ui/Tooltip';
@@ -194,10 +194,9 @@ export default function CaisseSupervision({
   ).size;
 
   // Liste des caissiers filtrés
-  const caissierRoles = new Set([SystemRole.CAISSIER, SystemRole.ADMIN, SystemRole.SUPERVISEUR]);
+  const caissierRoles = new Set<string>([SystemRole.CAISSIER, SystemRole.ADMIN, SystemRole.SUPERVISEUR]);
   const allCaissiers = users.filter((u) => {
-    const normalized = normalizeRole(u.role);
-    return normalized ? caissierRoles.has(normalized) : false;
+    return u.role ? caissierRoles.has(u.role) : false;
   });
 
   // Helper pour vérifier si un caissier est actuellement en caisse

@@ -12,7 +12,7 @@ import { requireAuth } from "../auth";
 import { attachAbility, requireAbility } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
 import { normalizeKeysDeep, parsePagination, paginateResponse } from "./utils";
-import { SystemRole, normalizeRole } from "@shared/types/roles";
+import { SystemRole } from "@shared/types/roles"; // Enum for DB values
 import { getWsInstance } from "../ws-server";
 import { StorageService } from "../services/storage-service";
 import { db } from "../db";
@@ -917,18 +917,18 @@ export function registerOperationsRoutes(app: Express) {
         const user = req.session.user;
         let agenceId: string | undefined;
 
-        // For chef d'agence, automatically filter by their agency
-        const normalizedRole = normalizeRole(user?.role);
-        if (normalizedRole === SystemRole.CHEF_AGENCE) {
+        // Data scoping: admins see all, others see own agency
+        const isGlobalAdmin = req.ability?.can(Actions.MANAGE, 'all');
+        if (isGlobalAdmin) {
+          // For admin, use query parameter (optional)
+          agenceId = req.query.agenceId as string | undefined;
+          if (agenceId === 'all') agenceId = undefined;
+        } else {
           agenceId = user?.agenceId || undefined;
           if (!agenceId && user?.id) {
             const employe = await storage.getEmployeByUserId(user.id);
             agenceId = employe?.agenceId || undefined;
           }
-        } else if (normalizedRole === SystemRole.ADMIN) {
-          // For admin, use query parameter (optional)
-          agenceId = req.query.agenceId as string | undefined;
-          if (agenceId === 'all') agenceId = undefined;
         }
 
         const { page, perPage } = parsePagination(req.query);
@@ -950,10 +950,9 @@ export function registerOperationsRoutes(app: Express) {
   app.get("/api/pos-devices", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.TERRAIN), async (req, res) => {
       try {
         const user = req.session.user;
-        const normalizedRole = normalizeRole(user?.role);
         const queryAgenceId = req.query.agenceId as string | undefined;
-
-        const agenceId = normalizedRole === SystemRole.ADMIN ? queryAgenceId : user?.agenceId || queryAgenceId;
+        const isGlobalAdmin = req.ability?.can(Actions.MANAGE, 'all');
+        const agenceId = isGlobalAdmin ? queryAgenceId : user?.agenceId || queryAgenceId;
         const assignedTo = req.query.assignedTo as string | undefined;
 
         const { page, perPage } = parsePagination(req.query);
@@ -1040,10 +1039,9 @@ export function registerOperationsRoutes(app: Express) {
         return res.status(400).json({ error: "agent_id, start, end requis" });
       }
 
-      // Security: agents can only view their own positions
+      // Security: non-supervisors can only view their own positions
       const currentUser = req.user;
-      const userRole = normalizeRole(currentUser?.role);
-      const canSupervise = [SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR].includes(userRole!);
+      const canSupervise = req.ability?.can(Actions.MANAGE, Subjects.TERRAIN) || req.ability?.can(Actions.APPROVE, Subjects.TERRAIN);
       if (!canSupervise && agent_id !== currentUser?.id) {
         return res.status(403).json({ error: "Accès interdit" });
       }

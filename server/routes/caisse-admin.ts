@@ -18,8 +18,8 @@ import { db } from "../db";
 import { sessionsCaisseAuditLogs, denominationTemplates, caisses, sessionsCaisse } from "@shared/schema/finance";
 import { caisseSecurityCodes } from "@shared/schema/operations";
 import { users, userRoles, coffresForts, agences } from "@shared/schema";
+import { SystemRole } from "@shared/types/roles";
 import { eq, desc, and, gte, lte, sql, count, isNull, isNotNull, or } from "drizzle-orm";
-import { isAdminRole } from "@shared/types/roles";
 import { createMouvementFinancier } from "../services/ledger";
 
 export const caisseAdminRouter = Router();
@@ -1812,7 +1812,7 @@ caisseAdminRouter.get(
   async (req, res) => {
     try {
       const userRole = req.session.user?.role;
-      const isAdmin = isAdminRole(userRole);
+      const isAdmin = userRole === SystemRole.ADMIN;
       // Admins see all agencies (ignore agenceId param); regular users filter by their agency
       const agenceId = isAdmin ? undefined : (req.query.agenceId as string || req.session.user?.agenceId);
       const category = req.query.category as string | undefined;
@@ -1843,7 +1843,7 @@ caisseAdminRouter.get(
   async (req, res) => {
     try {
       const userRole = req.session.user?.role;
-      const isAdmin = isAdminRole(userRole);
+      const isAdmin = userRole === SystemRole.ADMIN;
 
       // Admins see all agencies (ignore agenceId param); regular users filter by their agency
       const agenceId = isAdmin ? undefined : (req.query.agenceId as string || req.session.user?.agenceId);

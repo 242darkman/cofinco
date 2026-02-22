@@ -6,7 +6,7 @@ import { usePermissions } from '../../auth/ProtectedFeature';
 import { authService } from '../../../lib/auth';
 import { api } from '../../../lib/api';
 import { sessionCaisseApi, caisseAccessControlApi, authApi } from '../../../lib/api-client';
-import { SystemRole, isAdminRole, normalizeRole } from '@shared/types/roles';
+import { Actions, Subjects } from '@/lib/casl';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
@@ -52,9 +52,8 @@ type OpeningMode = 'request' | 'direct'; // request = demander au coffre, direct
  */
 export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: CaisseOuvertureProps) {
   const queryClient = useQueryClient();
-  const { hasPermission } = usePermissions();
+  const { hasPermission, isAdmin, can } = usePermissions();
   const currentUser = authService.getCurrentUser();
-  const isAdmin = isAdminRole(currentUser?.role);
 
   // Déterminer l'étape initiale basée sur la session en attente
   const getInitialStep = (): WorkflowStep => {
@@ -187,8 +186,7 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
           // Exclure les coffres-forts — uniquement les caisses physiques
           let availableCaisses = res.data.filter((c: { type?: string }) => c.type !== 'Coffre-Fort');
 
-          const normalizedRole = normalizeRole(currentUser?.role);
-          const isManager = normalizedRole === SystemRole.CHEF_AGENCE || normalizedRole === SystemRole.ADMIN;
+          const isManager = isAdmin || can(Actions.MANAGE, Subjects.CAISSE);
 
           if (!isManager && currentUser?.id) {
             availableCaisses = availableCaisses.filter(c =>

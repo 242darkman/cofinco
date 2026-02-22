@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import CameraCapture from '../../shared/CameraCapture';
 import { toast } from '../../../lib/toast';
 import { useEntityUpload } from '../../../hooks/useEntityUpload';
-import { SystemRole, getRoleOptions, normalizeRole } from '@shared/types/roles';
+import { SystemRole, getRoleOptions } from '@shared/types/roles';
 import { StatutUser } from '@shared/enum/status-constants';
 import PasswordStrengthIndicator from '../../auth/PasswordStrengthIndicator';
 import { useSecuritySettings } from '../../../hooks/settings/useSecuritySettings';
@@ -61,8 +61,8 @@ const DEFAULT_PASSWORD_RULES = {
   requireSpecialChars: true,
 };
 
-const normalizeRoleValue = (role?: string) => {
-  return normalizeRole(role) || SystemRole.CAISSIER;
+const resolveRoleValue = (role?: string) => {
+  return (role as SystemRole) || SystemRole.CAISSIER;
 };
 
 const INPUT_CLASS = 'w-full h-10 sm:h-11 px-3 sm:px-4 bg-surface-base border border-edge rounded-xl text-sm text-content-primary placeholder:text-content-muted focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all';
@@ -159,7 +159,7 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
         prenom: resolvedNames.prenom,
         email: initialData.email || '',
         telephone: initialData.telephone || '',
-        role: normalizeRoleValue(initialData.role),
+        role: resolveRoleValue(initialData.role),
         statut: initialData.statut || StatutUser.ACTIVE,
         photoProfile: initialData.photoProfile || ''
       });

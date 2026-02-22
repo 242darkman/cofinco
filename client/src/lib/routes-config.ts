@@ -1,6 +1,6 @@
 import { lazy, ComponentType } from 'react';
 import type { AppModule } from '@shared/config/rbac';
-import { SystemRole, isAdminRole, normalizeRole } from '@shared/types/roles';
+import { SystemRole } from '@shared/types/roles';
 import { authService } from './auth';
 import { Action, Subject, MODULE_TO_SUBJECT, Actions, Subjects } from './casl';
 import type { AppAbility } from './casl';
@@ -205,7 +205,7 @@ export const ROUTES: RouteConfig[] = [
     key: 'validations',
     path: '/validations',
     component: ValidationsCenter,
-    requiredRoles: [SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR],
+    requiredAbility: { action: Actions.APPROVE, subject: Subjects.OPERATION_TERRAIN },
     label: 'Validations',
     labelKey: 'menuValidations',
     group: 'Opérations',
@@ -350,6 +350,7 @@ export const ROUTES: RouteConfig[] = [
       { path: '/administration/acces-clients', subModule: 'client-credentials', label: 'Accès Clients' },
       { path: '/administration/taux-produits', subModule: 'product-rates', label: 'Taux Produits' },
       { path: '/administration/zones-commerciales', subModule: 'zones-commerciales', label: 'Arrondissements & Marchés' },
+      { path: '/administration/paiements', subModule: 'payment-methods', label: 'Paiements' },
       { path: '/administration/devise', subModule: 'currency', label: 'Devise' },
       { path: '/administration/branding', subModule: 'branding', label: 'Branding' },
       { path: '/administration/reset-agence', subModule: 'reset-agence', label: 'Reset Agence' },

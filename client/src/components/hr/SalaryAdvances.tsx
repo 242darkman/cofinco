@@ -4,8 +4,6 @@ import { useEmployes } from '../../hooks/hr/useEmployes';
 import { Card, Button, ResponsiveTable, Badge } from '../ui';
 import { Plus, CheckCircle, XCircle, Banknote, ArrowDownCircle, X } from 'lucide-react';
 import { usePermissions } from '../auth/ProtectedFeature';
-import { isAdminRole } from '@shared/types/roles';
-import { useUserProfile } from '../../hooks/useUserProfile';
 import { toast } from '../../lib/toast';
 
 const STATUT_LABELS: Record<string, string> = {
@@ -25,9 +23,8 @@ const STATUT_VARIANTS: Record<string, 'warning' | 'success' | 'error' | 'default
 };
 
 export default function SalaryAdvances() {
-  const { user } = useUserProfile();
-  const { hasPermission } = usePermissions();
-  const isRH = isAdminRole(user?.role) || hasPermission('rh', 'edit');
+  const { isAdmin, hasPermission } = usePermissions();
+  const isRH = isAdmin || hasPermission('rh', 'edit');
   const { avances, isLoading, createAvance, isCreating, approveAvance, rejectAvance, payAvance, deductAvance } = useAvances();
   const { employes } = useEmployes();
 

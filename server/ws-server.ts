@@ -7,7 +7,7 @@ import { sessionMiddleware } from "./auth";
 import { storage } from "./storage";
 import { createLogger } from "./lib/logger";
 import { isSessionValid, updateSessionActivity } from "./session-tracker";
-import { isAdminRole } from "@shared/types/roles";
+import { SystemRole } from "@shared/types/roles";
 
 const logger = createLogger('WebSocket');
 
@@ -702,7 +702,7 @@ export function setupWebSocket(server: Server) {
         const clientAgence = (client as any).agence;
         const clientRole = (client as any).role;
         // Send to same agency OR admin users (who need visibility across all agencies)
-        if (clientAgence === agency || isAdminRole(clientRole)) {
+        if (clientAgence === agency || clientRole === SystemRole.ADMIN) {
           client.send(JSON.stringify(message));
         }
       });

@@ -30,7 +30,7 @@ import { useIsOnline } from '@/contexts/NetworkContext';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { SystemRole, normalizeRole } from '@shared/types/roles';
+import { usePermissions } from '@/components/auth/ProtectedFeature';
 import SecureValidationModal from '../agent/SecureValidationModal';
 import { StatutOperationTerrain } from '@shared/enum/status-constants';
 import type { OperationTerrainWithRelations, OperationTerrainMetadata } from '@shared/schema';
@@ -310,9 +310,8 @@ export default function AgentCollecteValidations() {
   const [pendingApprovalOp, setPendingApprovalOp] = useState<OperationTerrainWithRelations | null>(null);
   const [pendingApprovalAgentId, setPendingApprovalAgentId] = useState<string | null>(null);
 
-  // Check role for Agency Filter
-  const normalizedRole = normalizeRole(user?.role);
-  const isAdmin = normalizedRole === SystemRole.ADMIN || normalizedRole === SystemRole.SUPERVISEUR;
+  // Check permissions for Agency Filter
+  const { isAdmin } = usePermissions();
 
   useEffect(() => {
     loadData(false);

@@ -10,7 +10,7 @@
 
 import { db } from "../db";
 import { permissions, rolePermissions, userPermissions, modules, userRoles } from "@shared/schema";
-import { isAdminRole, isSystemRole, SystemRole } from "@shared/types/roles";
+import { isSystemRole, SystemRole } from "@shared/types/roles";
 import { eq, and, or, isNull, inArray } from "drizzle-orm";
 import { buildAbilityForUser, AbilityResponse } from "../authorization";
 
@@ -86,7 +86,7 @@ export async function getPermissionsForUser(
   userRole: string
 ): Promise<PermissionsResponse> {
   // Administrateur has all permissions
-  if (isAdminRole(userRole)) {
+  if (userRole === SystemRole.ADMIN) {
     const allPerms = await db.select({
       id: permissions.id,
       code: permissions.code,
@@ -235,7 +235,7 @@ export async function hasPermission(
   permissionCode: string
 ): Promise<boolean> {
   // Admin has all permissions
-  if (isAdminRole(userRole)) {
+  if (userRole === SystemRole.ADMIN) {
     return true;
   }
 

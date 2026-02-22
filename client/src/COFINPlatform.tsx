@@ -2,6 +2,8 @@ import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { FileText, CheckCircle, AlertCircle, Zap } from 'lucide-react';
 import { useLanguage } from './contexts/LanguageContext';
 import { useAppNavigation } from './hooks/useAppNavigation';
+import { tontineApi } from './lib/api-client';
+import { clientService } from './services/clientService';
 
 // ========== LAZY LOADED MODULES (Code Splitting) ==========
 // Each module is loaded only when needed, reducing initial bundle by ~70%
@@ -12,6 +14,8 @@ const Tontines = lazy(() => import('./components/finance/tontine/Tontines'));
 const Credits = lazy(() => import('./components/finance/credits/Credits'));
 const TransfertArgent = lazy(() => import('./components/finance/transfert/TransfertArgent'));
 const CreditRequestForm = lazy(() => import('./components/finance/credits/CreditRequestForm'));
+const CreateClientModal = lazy(() => import('./components/client/CreateClientModal'));
+const TontineGroupWizard = lazy(() => import('./components/admin/TontineGroupWizard/TontineGroupWizard'));
 const Comptes = lazy(() => import('./components/finance/compte/Comptes'));
 const CaisseDashboard = lazy(() => import('./components/finance/caisse/CaisseDashboard'));
 const CoffreFortDashboard = lazy(() => import('./components/finance/caisse/CoffreFortDashboard').then(m => ({ default: m.CoffreFortDashboard })));
@@ -65,7 +69,7 @@ import { PLATFORM_MENU_ITEMS } from './constants/menuItems';
 import { getRouteByKey, canAccessRoute } from './lib/routes-config';
 import ForcePasswordChange from './components/auth/ForcePasswordChange';
 import { useAbilityContext } from './contexts/AbilityContext';
-import { SystemRole, normalizeRole } from '@shared/types/roles';
+import { SystemRole } from '@shared/types/roles';
 import ActiveSessionsModal from './components/shared/ActiveSessionsModal';
 import PermissionRequestForm from './components/admin/permissions/PermissionRequestForm';
 import { useMyPermissionRequests } from './hooks/admin/usePermissionRequests';
@@ -98,7 +102,7 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
   );
   const [moduleData, setModuleData] = useState<any>(null);
   const { permissionsVersion, ability } = useAbilityContext();
-  const normalizedRole = normalizeRole(currentUser?.role) || SystemRole.CLIENT;
+  const normalizedRole = (currentUser?.role as string) || SystemRole.CLIENT;
   const { createRequest: createPermRequest } = useMyPermissionRequests();
   
   // Security: Check if user still has access to current module
@@ -164,6 +168,8 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
   const [breadcrumbs, setBreadcrumbs] = useState<string[]>(['Dashboard']);
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const [showCreditRequestForm, setShowCreditRequestForm] = useState(false);
+  const [showClientWizard, setShowClientWizard] = useState(false);
+  const [showTontineWizard, setShowTontineWizard] = useState(false);
   const [showReportGenerator, setShowReportGenerator] = useState(false);
   const [pendingCaissePayment, setPendingCaissePayment] = useState(false);
 
@@ -252,7 +258,7 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
     switch (action) {
 
       case 'new-client':
-        navigateToModule('clients', 'new');
+        setShowClientWizard(true);
         break;
 
       case 'new-credit':
@@ -264,6 +270,9 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
         break;
       case 'new-report':
         setShowReportGenerator(true);
+        break;
+      case 'new-tontine':
+        setShowTontineWizard(true);
         break;
       default:
         break;
@@ -561,6 +570,30 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
           </div>
         </div>
       )}
+
+      <Suspense fallback={null}>
+        <CreateClientModal
+          isOpen={showClientWizard}
+          onClose={() => setShowClientWizard(false)}
+          onSave={async (data) => {
+            await clientService.create(data);
+            setShowClientWizard(false);
+            showNotification('success', t('clientCreeSucces') || 'Client créé avec succès');
+          }}
+        />
+      </Suspense>
+
+      <Suspense fallback={null}>
+        <TontineGroupWizard
+          isOpen={showTontineWizard}
+          onClose={() => setShowTontineWizard(false)}
+          onSave={async (data) => {
+            await tontineApi.create(data);
+            setShowTontineWizard(false);
+            showNotification('success', t('tontineCreeSucces') || 'Tontine créée avec succès');
+          }}
+        />
+      </Suspense>
 
       {showReportGenerator && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">

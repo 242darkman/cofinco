@@ -12,6 +12,7 @@ import { securityConfigApi, SecurityConfigResponse, caisseAgentApi, creditApi, c
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { StatutUser, StatutClient, StatutCredit, StatutOperationTerrain, TypeOperationTerrain, TYPE_OPERATION_TERRAIN_LABELS, TYPE_COMPTE_LABELS, TypeCompteType } from '@shared/enum/status-constants';
 import { currencySymbol, formatMoney } from '@shared/config/currency';
+import { useEnabledPaymentMethods } from '../../contexts/FeatureFlagsContext';
 
 // MM Payment status types
 type MMPaymentStatus = 'idle' | 'pending' | 'success' | 'failed' | 'expired';
@@ -95,6 +96,7 @@ interface AgentTerrainPaiementProps {
 export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clientId, visiteId }: AgentTerrainPaiementProps) {
   const { hasPermission } = usePermissions();
   const canCreatePayments = hasPermission('agent_terrain', 'create') || hasPermission('paiements', 'create');
+  const enabledPayments = useEnabledPaymentMethods();
 
   const [loading, setLoading] = useState(false);
   const [loadingClients, setLoadingClients] = useState(false);
@@ -1070,10 +1072,10 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                   <p className="text-[13px] font-semibold text-content-secondary">Mode de paiement</p>
                   <div className="flex gap-3">
                     {[
-                      { id: 'Espèces', label: 'Espèces', icon: Banknote, color: 'emerald' },
-                      { id: 'Airtel Money', label: 'Airtel', icon: () => <AirtelLogo className="h-6 w-6" />, color: 'red' },
-                      { id: 'MTN Mobile Money', label: 'MTN', icon: () => <MTNLogo className="h-6 w-6" />, color: 'yellow' }
-                    ].map((m) => (
+                      { id: 'Espèces', label: 'Espèces', icon: Banknote, color: 'emerald', paymentKey: 'CASH' as const },
+                      { id: 'Airtel Money', label: 'Airtel', icon: () => <AirtelLogo className="h-6 w-6" />, color: 'red', paymentKey: 'MOBILE_MONEY' as const },
+                      { id: 'MTN Mobile Money', label: 'MTN', icon: () => <MTNLogo className="h-6 w-6" />, color: 'yellow', paymentKey: 'MOBILE_MONEY' as const }
+                    ].filter((m) => enabledPayments[m.paymentKey] !== false).map((m) => (
                       <button
                         key={m.id}
                         type="button"

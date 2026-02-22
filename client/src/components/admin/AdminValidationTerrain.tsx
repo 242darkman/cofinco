@@ -6,7 +6,7 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { useUserProfile } from '../../hooks/useUserProfile';
-import { isAdminRole } from '@shared/types/roles';
+import { usePermissions } from '../auth/ProtectedFeature';
 import { requestAllPages } from '../../lib/api-client';
 import DocumentPreviewModal from '../ui/DocumentPreviewModal';
 import ConfirmDialog from '../ui/ConfirmDialog';
@@ -72,8 +72,7 @@ export default function AdminValidationTerrain() {
     setShowDetailModal(true);
   };
 
-  // Check if user is admin (supports multiple role variants)
-  const isAdmin = isAdminRole(user?.role);
+  const { isAdmin } = usePermissions();
 
   // Fetch agences for selector (admins only)
   const { data: agences = [] } = useQuery<Agence[]>({

@@ -1,6 +1,7 @@
 
-import React, { useState } from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Sector } from 'recharts';
+import React, { useState, useMemo } from 'react';
+import { PieChart, Pie, Cell, ResponsiveContainer, Sector } from 'recharts';
+import { TrendingUp } from 'lucide-react';
 import { useLanguage } from '../../../contexts/LanguageContext';
 
 interface DistributionItem {
@@ -15,56 +16,70 @@ interface PortfolioDistributionChartProps {
 }
 
 const renderActiveShape = (props: any) => {
-  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, payload, percent, value } = props;
-
+  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props;
   return (
     <g>
       <Sector
         cx={cx}
         cy={cy}
         innerRadius={innerRadius}
-        outerRadius={outerRadius + 6}
+        outerRadius={outerRadius + 5}
         startAngle={startAngle}
         endAngle={endAngle}
         fill={fill}
-        cornerRadius={5}
+        cornerRadius={4}
       />
     </g>
   );
 };
 
-export default function PortfolioDistributionChart({ 
-  data, 
-  height = 350 
+export default function PortfolioDistributionChart({
+  data,
+  height = 350
 }: PortfolioDistributionChartProps) {
   const { t } = useLanguage();
   const [activeIndex, setActiveIndex] = useState<number | undefined>(undefined);
 
-  const onPieEnter = (_: any, index: number) => {
-    setActiveIndex(index);
-  };
-
-  const onPieLeave = () => {
-    setActiveIndex(undefined);
-  };
-
-  // Calculate total for center display
-  const total = data.reduce((acc, item) => acc + item.value, 0);
   const activeItem = activeIndex !== undefined ? data[activeIndex] : null;
 
+  // Punchline: identify dominant segment
+  const punchline = useMemo(() => {
+    if (!data.length) return null;
+    const sorted = [...data].sort((a, b) => b.value - a.value);
+    const top = sorted[0];
+    if (!top || top.value === 0) return null;
+
+    // All equal
+    if (sorted.length > 1 && sorted.every(s => s.value === sorted[0].value)) {
+      return `Répartition équilibrée — ${sorted.length} produits à ${top.value}%`;
+    }
+    // Dominant
+    const second = sorted[1];
+    if (second && top.value - second.value <= 5) {
+      return `${top.name} et ${second.name} dominent le portefeuille`;
+    }
+    return `${top.name} domine à ${top.value}% du portefeuille`;
+  }, [data]);
+
   return (
-    <div className="bg-surface-base border border-edge rounded-2xl overflow-hidden shadow-sm flex flex-col h-full min-h-[350px]">
-      <div className="p-5 border-b border-edge/50">
-        <h3 className="text-base font-bold text-content-primary mb-1">
-          {t('repartitionPortefeuille') || 'Répartition Portefeuille'}
-        </h3>
-        <p className="text-xs text-content-muted">
-          {t('vueDensembleComptes') || "Vue d'ensemble par type de produit"}
+    <div className="bg-surface-base border border-edge rounded-2xl overflow-hidden shadow-sm flex flex-col h-full">
+      {/* Header compact */}
+      <div className="px-4 pt-3 pb-2">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-content-primary">
+            {t('repartitionPortefeuille') || 'Répartition Portefeuille'}
+          </h3>
+          <TrendingUp size={14} className="text-content-muted" />
+        </div>
+        <p className="text-[10px] text-content-muted mt-0.5">
+          {t('vueDensembleComptes') || "Vue d'ensemble par produit"}
         </p>
       </div>
 
-      <div className="flex-1 relative flex flex-col items-center justify-center p-4">
-        <div className="w-full h-[200px] relative">
+      {/* Chart + Legend flex layout */}
+      <div className="flex-1 flex flex-col items-center justify-center px-3 pb-3 min-h-0">
+        {/* Donut */}
+        <div className="w-full relative" style={{ height: Math.min(180, height * 0.5) }}>
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
@@ -73,60 +88,61 @@ export default function PortfolioDistributionChart({
                 data={data}
                 cx="50%"
                 cy="50%"
-                innerRadius={60}
-                outerRadius={80}
-                paddingAngle={4}
+                innerRadius="55%"
+                outerRadius="75%"
+                paddingAngle={3}
                 dataKey="value"
-                onMouseEnter={onPieEnter}
-                onMouseLeave={onPieLeave}
-                cornerRadius={5}
+                onMouseEnter={(_, index) => setActiveIndex(index)}
+                onMouseLeave={() => setActiveIndex(undefined)}
+                cornerRadius={4}
                 stroke="none"
               >
                 {data.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
-              <Tooltip 
-                 contentStyle={{ 
-                   backgroundColor: 'rgba(15, 23, 42, 0.8)', 
-                   borderColor: '#334155', 
-                   borderRadius: '12px', 
-                   fontSize: '12px',
-                   boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                   backdropFilter: 'blur(8px)'
-                 }}
-                 itemStyle={{ color: '#e2e8f0', fontWeight: 600 }}
-                 separator=": "
-                 formatter={(value, name, props) => [`${value}%`, props.payload.name]}
-              />
             </PieChart>
           </ResponsiveContainer>
-          
-          {/* Centre du Donut */}
+
+          {/* Center label */}
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-             <div className="text-2xl font-bold text-content-primary tabular-nums">
-               {activeItem ? `${activeItem.value}%` : '100%'}
-             </div>
-             <div className="text-[10px] text-content-muted uppercase tracking-widest font-medium mt-1">
-               {activeItem ? activeItem.name : (t('global') || 'GLOBAL')}
-             </div>
+            <div className="text-xl font-bold text-content-primary tabular-nums leading-none">
+              {activeItem ? `${activeItem.value}%` : '100%'}
+            </div>
+            <div className="text-[9px] text-content-muted uppercase tracking-widest font-medium mt-1">
+              {activeItem ? activeItem.name : (t('global') || 'GLOBAL')}
+            </div>
           </div>
         </div>
 
-        {/* Custom Legend */}
-        <div className="grid grid-cols-2 gap-x-8 gap-y-3 mt-6 w-full px-4">
-          {data.map((item, index) => (
-            <div 
-              key={item.name} 
-              className={`flex items-center gap-3 transition-opacity duration-200 ${activeIndex !== undefined && activeIndex !== index ? 'opacity-30' : 'opacity-100'}`}
-              onMouseEnter={() => setActiveIndex(index)}
-              onMouseLeave={() => setActiveIndex(undefined)}
-            >
-              <div className="w-2.5 h-2.5 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.5)]" style={{ backgroundColor: item.color }} />
-              <span className="text-xs text-content-muted font-medium truncate flex-1">{item.name}</span>
-              <span className="text-xs font-bold text-content-primary tabular-nums">{item.value}%</span>
-            </div>
-          ))}
+        {/* Punchline */}
+        {punchline && (
+          <p className="text-[10px] text-content-muted font-medium text-center mt-1 mb-2 px-2 leading-tight">
+            {punchline}
+          </p>
+        )}
+
+        {/* Legend — compact horizontal bars */}
+        <div className="w-full space-y-1.5 mt-auto">
+          {data.map((item, index) => {
+            const dimmed = activeIndex !== undefined && activeIndex !== index;
+            return (
+              <div
+                key={item.name}
+                className={`flex items-center gap-2 transition-opacity duration-150 cursor-default ${dimmed ? 'opacity-30' : ''}`}
+                onMouseEnter={() => setActiveIndex(index)}
+                onMouseLeave={() => setActiveIndex(undefined)}
+              >
+                <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                <span className="text-[11px] text-content-secondary font-medium flex-1 truncate">{item.name}</span>
+                {/* Mini bar */}
+                <div className="w-16 h-1.5 bg-surface-elevated rounded-full overflow-hidden shrink-0">
+                  <div className="h-full rounded-full" style={{ width: `${item.value}%`, backgroundColor: item.color }} />
+                </div>
+                <span className="text-[11px] font-bold text-content-primary tabular-nums w-8 text-right">{item.value}%</span>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

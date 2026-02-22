@@ -73,6 +73,7 @@ import type {
   MethodePaiementDz,
   TypeOperationCaisseDz,
 } from "@shared/enum/enums";
+import { SystemRole } from "@shared/types/roles";
 
 // Types - Re-export from status-constants for consistency
 export type TypeCompte = TypeCompteType;
@@ -651,7 +652,6 @@ export async function retirerDuCompte(
     // Check if user is Admin to override (Architecture V3: rôle via userRoles)
     let isAdmin = false;
     if (userId) {
-       const { isAdminRole, SystemRole } = await import("@shared/types/roles");
        // Récupérer le rôle principal depuis userRoles
        const [primaryRole] = await db.select({ role: userRoles.role })
          .from(userRoles)
@@ -659,7 +659,7 @@ export async function retirerDuCompte(
          .limit(1);
 
        const effectiveRole = primaryRole?.role;
-       if (effectiveRole && isAdminRole(effectiveRole as string)) {
+       if (effectiveRole === SystemRole.ADMIN) {
            isAdmin = true;
        }
     }

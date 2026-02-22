@@ -4,10 +4,10 @@ import {
   configEvacuationCoffre,
   evacuationsCoffre,
 } from "@shared/schema";
-import { isAdminRole, normalizeRole } from "@shared/types/roles";
 import { eq, isNull } from "drizzle-orm";
 import { CANCELLABLE_STATES } from "./state-machine";
 import { currencySymbol } from "@shared/config/currency";
+import { SystemRole } from "@shared/types/roles";
 
 export interface ValidationResult {
   valid: boolean;
@@ -71,9 +71,7 @@ export class EvacuationCoffreValidator {
   }
 
   private normalizeRoleToken(role: string): string {
-    const normalized = normalizeRole(role);
-    if (normalized) return normalized;
-    return role.trim().toLowerCase();
+    return role.trim().toUpperCase();
   }
 
   /**
@@ -85,7 +83,7 @@ export class EvacuationCoffreValidator {
     const rolesRaw = (config.rolesCreateurs as string[]) || [];
     const roles = rolesRaw.map((r) => this.normalizeRoleToken(r));
 
-    if (!roles.includes(normalizedRole) && !isAdminRole(user.role)) {
+    if (!roles.includes(normalizedRole) && user.role !== SystemRole.ADMIN) {
       return {
         valid: false,
         errorCode: "EVC_023",
@@ -108,7 +106,7 @@ export class EvacuationCoffreValidator {
     const rolesRaw = (config.rolesApprobateurs as string[]) || [];
     const roles = rolesRaw.map((r) => this.normalizeRoleToken(r));
 
-    if (!roles.includes(normalizedRole) && !isAdminRole(user.role)) {
+    if (!roles.includes(normalizedRole) && user.role !== SystemRole.ADMIN) {
       return {
         valid: false,
         errorCode: "EVC_023",
@@ -140,7 +138,7 @@ export class EvacuationCoffreValidator {
     const rolesRaw = (config.rolesPreparateurs as string[]) || [];
     const roles = rolesRaw.map((r) => this.normalizeRoleToken(r));
 
-    if (!roles.includes(normalizedRole) && !isAdminRole(user.role)) {
+    if (!roles.includes(normalizedRole) && user.role !== SystemRole.ADMIN) {
       return {
         valid: false,
         errorCode: "EVC_023",
@@ -172,7 +170,7 @@ export class EvacuationCoffreValidator {
     const rolesRaw = (config.rolesDispatchers as string[]) || [];
     const roles = rolesRaw.map((r) => this.normalizeRoleToken(r));
 
-    if (!roles.includes(normalizedRole) && !isAdminRole(user.role)) {
+    if (!roles.includes(normalizedRole) && user.role !== SystemRole.ADMIN) {
       return {
         valid: false,
         errorCode: "EVC_023",
@@ -198,7 +196,7 @@ export class EvacuationCoffreValidator {
     user: UserContext,
     evacuation: typeof evacuationsCoffre.$inferSelect,
   ): Promise<ValidationResult> {
-    if (evacuation.createdBy !== user.id && !isAdminRole(user.role)) {
+    if (evacuation.createdBy !== user.id && user.role !== SystemRole.ADMIN) {
       return {
         valid: false,
         errorCode: "EVC_023",

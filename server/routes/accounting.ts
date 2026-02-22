@@ -1188,7 +1188,7 @@ export function registerAccountingRoutes(app: Express) {
       if (!agenceId) return res.status(400).json({ message: "agenceId requis" });
 
       // Only admin can close exercice
-      if (req.user?.role !== SystemRole.ADMIN && req.user?.role !== SystemRole.DIRECTOR) {
+      if (!req.ability?.can(Actions.MANAGE, Subjects.COMPTABILITE)) {
         return res.status(403).json({ message: "Seul un administrateur peut clôturer un exercice" });
       }
 

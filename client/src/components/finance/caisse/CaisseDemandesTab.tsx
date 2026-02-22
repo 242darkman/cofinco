@@ -23,6 +23,7 @@ import { toast } from 'sonner';
 import { formatMoney, formatClientName, resolveStorageUrl } from '../../../lib/format';
 import { caisseAgentApi } from '../../../lib/api-client';
 import { useWebSocket } from '../../../hooks/useWebSocket';
+import { usePermissions } from '../../auth/ProtectedFeature';
 import { formatDistance } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -207,6 +208,8 @@ export default function CaisseDemandesTab({
   onTotalCountChange,
 }: CaisseDemandesTabProps) {
   const { socket } = useWebSocket();
+  const { hasPermission } = usePermissions();
+  const canProcess = hasPermission('caisse', 'approve') || hasPermission('caisse', 'manage');
 
   // Data
   const [paymentRequests, setPaymentRequests] = useState<CaissePaymentRequest[]>([]);
@@ -561,7 +564,7 @@ export default function CaisseDemandesTab({
         </div>
 
         <div className="flex items-center gap-2">
-          {selectedLoanIds.size > 0 && (
+          {selectedLoanIds.size > 0 && canProcess && (
             <button
               onClick={() => setShowBatchConfirm(true)}
               className="px-3 py-1.5 text-xs font-bold bg-status-warning text-white rounded-lg hover:bg-status-warning transition flex items-center gap-1.5"
@@ -767,7 +770,7 @@ export default function CaisseDemandesTab({
                         </div>
 
                         {/* Non-loan actions — always visible mobile */}
-                        {!isLoan && (
+                        {!isLoan && canProcess && (
                           <div className="flex items-center gap-1.5">
                             {item.source !== 'agent-session' && (
                               <button
@@ -849,6 +852,7 @@ export default function CaisseDemandesTab({
                     </div>
 
                     {/* Actions */}
+                    {canProcess && (
                     <div className="flex gap-2">
                       <button
                         onClick={(e) => { e.stopPropagation(); setCancelTarget(item); setCancelReason('Client non présenté'); }}
@@ -870,6 +874,7 @@ export default function CaisseDemandesTab({
                         )}
                       </button>
                     </div>
+                    )}
                   </div>
                 )}
               </div>

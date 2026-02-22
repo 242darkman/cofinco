@@ -59,7 +59,7 @@ import session from 'express-session';
 import bcrypt from 'bcrypt';
 import { storage } from './storage';
 import type { User } from '@shared/schema';
-import { SystemRole, normalizeRole as normalizeSystemRole } from '@shared/types/roles';
+import { SystemRole } from '@shared/types/roles';
 import pgSession from 'connect-pg-simple';
 import pg from 'pg';
 import { createLogger } from './lib/logger';

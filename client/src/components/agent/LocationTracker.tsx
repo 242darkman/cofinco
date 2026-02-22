@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { authService } from '@/lib/auth';
-import { SystemRole, normalizeRole } from '@shared/types/roles';
+import { SystemRole } from '@shared/types/roles';
 import { createWebGeoTracker, type WebGeoTrackerInstance } from '@/services/tracking/webGeoTracker';
 import { isCapacitorNative } from '@/services/tracking/trackerFactory';
 import { haversineMeters } from '@/services/tracking/geoFilter';
@@ -30,8 +30,7 @@ const GPS_RETRY_INTERVAL_MS = 30_000; // retry every 30s if denied
 export default function LocationTracker() {
   const { sendMessage, isConnected } = useWebSocket();
   const user = authService.getCurrentUser();
-  const role = normalizeRole(user?.role);
-  const isAgent = role === SystemRole.AGENT_TERRAIN;
+  const isAgent = user?.role === SystemRole.AGENT_TERRAIN;
 
   const lastWsSentRef = useRef({ lat: 0, lng: 0, time: 0 });
   const batteryRef = useRef({ level: 1, charging: false });

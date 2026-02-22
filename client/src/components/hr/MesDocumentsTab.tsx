@@ -3,8 +3,6 @@ import { useDocumentRequests, DocumentRequest } from '../../hooks/hr/useDocument
 import { Card, Button, Badge, Modal, SelectField, FormField } from '../ui';
 import { Plus, FileText, Clock, CheckCircle, XCircle, Download, AlertTriangle } from 'lucide-react';
 import { usePermissions } from '../auth/ProtectedFeature';
-import { isAdminRole } from '@shared/types/roles';
-import { useUserProfile } from '../../hooks/useUserProfile';
 import { toast } from '../../lib/toast';
 
 const TYPE_LABELS: Record<string, string> = {
@@ -31,9 +29,8 @@ const PROCESS_STATUS_OPTIONS = [
 ];
 
 export default function MesDocumentsTab() {
-  const { user } = useUserProfile();
-  const { hasPermission } = usePermissions();
-  const isRH = isAdminRole(user?.role) || hasPermission('rh', 'edit');
+  const { isAdmin, hasPermission } = usePermissions();
+  const isRH = isAdmin || hasPermission('rh', 'edit');
 
   // Employee: own requests / RH: all requests
   const { requests, isLoading, createRequest, isCreating, processRequest, isProcessing } = useDocumentRequests(!isRH);

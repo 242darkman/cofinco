@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { X } from 'lucide-react';
-import { isAdminRole } from '@shared/types/roles';
+import { usePermissions } from '../../auth/ProtectedFeature';
 import { useUserProfile } from '../../../hooks/useUserProfile';
 import { toast } from '../../../lib/toast';
 import { ConfirmDialog, ProgressBar } from '../../ui';
@@ -45,7 +45,7 @@ interface CreateClientModalProps {
 export default function CreateClientModal({ isOpen, onClose, onSave, fromEmployee }: CreateClientModalProps) {
   const isConversion = !!fromEmployee;
   const { user } = useUserProfile();
-  const isAdmin = isAdminRole(user?.role);
+  const { isAdmin } = usePermissions();
   const tempEntityId = useMemo(() => crypto.randomUUID(), []);
 
   const [step, setStep] = useState(isConversion ? 3 : 1);

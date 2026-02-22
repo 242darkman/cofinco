@@ -74,7 +74,7 @@ import {
 } from "@shared/config/credit-durations";
 import { getWsInstance } from "../ws-server";
 import { eq, desc, and, sql, count, inArray } from "drizzle-orm";
-import { SystemRole, isAdminRole, normalizeRole } from "@shared/types/roles";
+import { SystemRole } from "@shared/types/roles";
 import * as sessionService from "../services/caisse/session-service";
 import { sessionOpeningService } from "../services/caisse/session-opening-service";
 import { sessionClosingService } from "../services/caisse/session-closing-service";
@@ -286,8 +286,20 @@ export function registerFinanceRoutes(app: Express) {
 
     const result = await storage.getAllCredits(filter, options);
 
+    // Optionally attach échéances to each credit (used by Échéancier view)
+    const includeEcheances = req.query.include_echeances === 'true';
+    let data = result.data;
+    if (includeEcheances) {
+      data = await Promise.all(
+        result.data.map(async (credit: any) => ({
+          ...credit,
+          echeances: await storage.getEcheancesByCredit(credit.id),
+        }))
+      );
+    }
+
     res.json({
-      data: result.data,
+      data,
       pagination: {
         total: result.total,
         page: result.page,
@@ -2044,8 +2056,8 @@ export function registerFinanceRoutes(app: Express) {
 
           if (user) {
               // Admin override
-              const normalizedRole = normalizeRole(user.role);
-              if (data.sessionCaisseId && (normalizedRole === SystemRole.ADMIN || normalizedRole === SystemRole.CHEF_AGENCE)) {
+              const isManager = req.ability?.can(Actions.MANAGE, Subjects.CAISSE) || req.ability?.can(Actions.MANAGE, 'all');
+              if (data.sessionCaisseId && isManager) {
                   activeSession = await storage.getSessionCaisse(data.sessionCaisseId);
                   if (activeSession && !activeSession.closedAt) {
                       sessionCaisseId = activeSession.id;
@@ -2666,7 +2678,7 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   // Agent starts an investigation — transitions enquête ASSIGNED → IN_PROGRESS, demande READY_FOR_INVESTIGATION → UNDER_INVESTIGATION
-  app.post("/api/enquetes-credit/:id/demarrer", requireAuth, async (req, res) => {
+  app.post("/api/enquetes-credit/:id/demarrer", requireAuth, attachAbility, async (req, res) => {
     try {
       const { id } = req.params;
       const userId = req.session?.user?.id;
@@ -2684,8 +2696,7 @@ export function registerFinanceRoutes(app: Express) {
 
       // The assigned agent can start, OR a supervisor acting on their behalf
       if (enquete.assignedAgentId !== userId) {
-        const role = normalizeRole(req.session?.user?.role);
-        const canSupervise = role === SystemRole.ADMIN || role === SystemRole.CHEF_AGENCE || role === SystemRole.SUPERVISEUR;
+        const canSupervise = req.ability?.can(Actions.APPROVE, Subjects.CAISSE) || req.ability?.can(Actions.MANAGE, Subjects.CAISSE);
         if (!canSupervise) {
           return res.status(403).json({ message: "Vous n'êtes pas l'agent assigné à cette enquête." });
         }
@@ -2728,7 +2739,7 @@ export function registerFinanceRoutes(app: Express) {
 
   // Agent-specific: list my assigned investigations with client info
   // Admin supervision: pass ?agentUserId=<users.id> to view a specific agent's investigations
-  app.get("/api/enquetes-credit/mes-enquetes", requireAuth, async (req, res) => {
+  app.get("/api/enquetes-credit/mes-enquetes", requireAuth, attachAbility, async (req, res) => {
     try {
       const sessionUserId = req.session?.user?.id;
       if (!sessionUserId) return res.status(401).json({ message: "Non authentifié" });
@@ -2737,8 +2748,7 @@ export function registerFinanceRoutes(app: Express) {
       const agentUserId = req.query.agentUserId as string | undefined;
       let targetUserId = sessionUserId;
       if (agentUserId) {
-        const role = normalizeRole(req.session?.user?.role);
-        const canSupervise = role === SystemRole.ADMIN || role === SystemRole.CHEF_AGENCE || role === SystemRole.SUPERVISEUR;
+        const canSupervise = req.ability?.can(Actions.APPROVE, Subjects.CAISSE) || req.ability?.can(Actions.MANAGE, Subjects.CAISSE);
         if (canSupervise) {
           targetUserId = agentUserId;
         }
@@ -2814,7 +2824,7 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   // Agent submits investigation data on an existing IN_PROGRESS enquête
-  app.patch("/api/enquetes-credit/:id/soumettre", requireAuth, async (req, res) => {
+  app.patch("/api/enquetes-credit/:id/soumettre", requireAuth, attachAbility, async (req, res) => {
     try {
       const { id } = req.params;
       const userId = req.session?.user?.id;
@@ -2825,8 +2835,7 @@ export function registerFinanceRoutes(app: Express) {
 
       // Only the assigned agent or a supervisor can submit
       if (enquete.assignedAgentId !== userId) {
-        const role = normalizeRole(req.session?.user?.role);
-        const canSupervise = role === SystemRole.ADMIN || role === SystemRole.CHEF_AGENCE || role === SystemRole.SUPERVISEUR;
+        const canSupervise = req.ability?.can(Actions.APPROVE, Subjects.CAISSE) || req.ability?.can(Actions.MANAGE, Subjects.CAISSE);
         if (!canSupervise) {
           return res.status(403).json({ message: "Vous n'êtes pas autorisé à soumettre cette enquête." });
         }
@@ -3375,7 +3384,7 @@ export function registerFinanceRoutes(app: Express) {
       const data = normalizeKeysDeep(req.body) as any;
       const user = req.session.user!;
       
-      const isAdmin = isAdminRole(user.role);
+      const isAdmin = user.role === SystemRole.ADMIN;
       
       // If admin, use provided agenceId (validate it exists?)
       // If not admin, FORCE user's agenceId
@@ -3558,13 +3567,12 @@ export function registerFinanceRoutes(app: Express) {
 
   // Session caisse (roles: admin, chef, caisse, et autres si assignés)
   // Utilise le service atomique pour éviter les race conditions
-  app.post("/api/sessions-caisse", requireAuth, async (req, res) => {
+  app.post("/api/sessions-caisse", requireAuth, attachAbility, async (req, res) => {
       // 1. Validate Roles & Assignments
       const user = req.session.user;
       if (!user) return res.status(401).json({ message: "Non authentifié" });
 
-      const normalizedRole = normalizeRole(user.role);
-      const isManager = normalizedRole === SystemRole.ADMIN || normalizedRole === SystemRole.CHEF_AGENCE;
+      const isManager = req.ability?.can(Actions.MANAGE, Subjects.CAISSE) || req.ability?.can(Actions.MANAGE, 'all');
 
       const data = normalizeKeysDeep(req.body) as any;
 
@@ -3632,7 +3640,7 @@ export function registerFinanceRoutes(app: Express) {
   });
 
   // Clôture de session
-  app.post("/api/sessions-caisse/:id/close", requireAuth, async (req, res) => {
+  app.post("/api/sessions-caisse/:id/close", requireAuth, attachAbility, async (req, res) => {
       const { id } = req.params;
       const user = req.session.user!;
       
@@ -3640,8 +3648,7 @@ export function registerFinanceRoutes(app: Express) {
       if (!session) return res.status(404).json({ message: "Session introuvable" });
 
       // Permission check: User must be the owner OR Admin/Chef
-      const normalizedRole = normalizeRole(user.role);
-      const isManager = normalizedRole === SystemRole.ADMIN || normalizedRole === SystemRole.CHEF_AGENCE;
+      const isManager = req.ability?.can(Actions.MANAGE, Subjects.CAISSE) || req.ability?.can(Actions.MANAGE, 'all');
       if (session.caissierId !== user.id && !isManager) {
           return res.status(403).json({ message: "Vous n'avez pas l'autorisation de fermer cette session" });
       }
@@ -3841,8 +3848,7 @@ export function registerFinanceRoutes(app: Express) {
         const session = await storage.getSessionCaisse(data.sessionId);
         if (!session) return res.status(404).json({ message: "Session introuvable" });
         
-        const normalizedRole = normalizeRole(user.role);
-        const isManager = normalizedRole === SystemRole.ADMIN || normalizedRole === SystemRole.CHEF_AGENCE;
+        const isManager = req.ability?.can(Actions.MANAGE, Subjects.CAISSE) || req.ability?.can(Actions.MANAGE, 'all');
         if (session.caissierId !== user.id && !isManager) {
             return res.status(403).json({ message: "Vous n'avez pas l'autorisation d'ajouter des opérations à cette session" });
         }
@@ -4167,8 +4173,7 @@ export function registerFinanceRoutes(app: Express) {
 
       // Permission check: User must be owner or manager
       const user = req.session.user!;
-      const normalizedRole = normalizeRole(user.role);
-      const isManager = normalizedRole === SystemRole.ADMIN || normalizedRole === SystemRole.CHEF_AGENCE;
+      const isManager = req.ability?.can(Actions.MANAGE, Subjects.CAISSE) || req.ability?.can(Actions.MANAGE, 'all');
       if (sessionSource.caissierId !== user.id && !isManager) {
           return res.status(403).json({ message: "Vous n'avez pas l'autorisation d'initier un transfert depuis cette session" });
       }
@@ -4474,7 +4479,7 @@ export function registerFinanceRoutes(app: Express) {
          return res.status(400).json({ message: `Cannot approve refund in status '${refund.statut}'` });
        }
 
-       if (refund.makerId === user.id && !isAdminRole(user.role)) {
+       if (refund.makerId === user.id && user.role !== SystemRole.ADMIN) {
          return res.status(403).json({ message: "Segregation of Duties: Maker cannot approve their own request." });
        }
 
@@ -5105,7 +5110,7 @@ export function registerFinanceRoutes(app: Express) {
    * POST /api/sessions-caisse/request-opening
    * Phase A: Le caissier demande l'ouverture de sa caisse avec un montant souhaité
    */
-  app.post("/api/sessions-caisse/request-opening", requireAuth, async (req, res) => {
+  app.post("/api/sessions-caisse/request-opening", requireAuth, attachAbility, async (req, res) => {
     const user = req.session.user!;
     const data = normalizeKeysDeep(req.body) as any;
 
@@ -5118,8 +5123,7 @@ export function registerFinanceRoutes(app: Express) {
     }
 
     // Vérifier l'assignation si pas manager (ou si override superviseur valide)
-    const normalizedRole = normalizeRole(user.role);
-    const isManager = normalizedRole === SystemRole.ADMIN || normalizedRole === SystemRole.CHEF_AGENCE;
+    const isManager = req.ability?.can(Actions.MANAGE, Subjects.CAISSE) || req.ability?.can(Actions.MANAGE, 'all');
 
     if (!isManager) {
       let hasOverride = false;
@@ -5189,7 +5193,7 @@ export function registerFinanceRoutes(app: Express) {
    * - Le caissier a un fonds de roulement reporté de la veille
    * - Le caissier souhaite ouvrir sa caisse à 0 FCFA (sans approvisionnement)
    */
-  app.post("/api/sessions-caisse/open-direct", requireAuth, async (req, res) => {
+  app.post("/api/sessions-caisse/open-direct", requireAuth, attachAbility, async (req, res) => {
     const user = req.session.user!;
     const data = normalizeKeysDeep(req.body) as any;
 
@@ -5199,8 +5203,7 @@ export function registerFinanceRoutes(app: Express) {
     }
 
     // Vérifier l'assignation si pas manager (ou si override superviseur valide)
-    const normalizedRole = normalizeRole(user.role);
-    const isManager = normalizedRole === SystemRole.ADMIN || normalizedRole === SystemRole.CHEF_AGENCE;
+    const isManager = req.ability?.can(Actions.MANAGE, Subjects.CAISSE) || req.ability?.can(Actions.MANAGE, 'all');
 
     if (!isManager) {
       let hasOverride = false;

@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Clock, Save, X, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
 import { Modal, Button, FormField } from '../ui';
+import { usePermissions } from '../auth/ProtectedFeature';
 import { caisseApi } from '../../lib/api-client';
 
 interface CaisseOperatingHoursModalProps {
@@ -30,6 +31,8 @@ const DAYS_OF_WEEK = [
 
 export default function CaisseOperatingHoursModal({ isOpen, onClose, caisse }: CaisseOperatingHoursModalProps) {
   const queryClient = useQueryClient();
+  const { hasPermission } = usePermissions();
+  const canEdit = hasPermission('caisses', 'edit') || hasPermission('admin', 'manage');
 
   const [enabled, setEnabled] = useState(false);
   const [startTime, setStartTime] = useState('08:00');
@@ -223,6 +226,7 @@ export default function CaisseOperatingHoursModal({ isOpen, onClose, caisse }: C
               <X className="w-4 h-4 mr-1.5" />
               Annuler
             </Button>
+            {canEdit && (
             <Button
               type="submit"
               isLoading={updateMutation.isPending}
@@ -231,6 +235,7 @@ export default function CaisseOperatingHoursModal({ isOpen, onClose, caisse }: C
               <Save className="w-4 h-4 mr-1.5" />
               Enregistrer
             </Button>
+            )}
           </div>
         </form>
       </div>

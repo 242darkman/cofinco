@@ -68,6 +68,9 @@ export function registerSettingsRoutes(app: Express) {
           notification_sms_enabled: true,
           sms_payment_validation_enabled: true,
           mobile_money_enabled: true,
+          cash_enabled: true,
+          check_enabled: true,
+          transfer_enabled: true,
           maintenance_mode: false
         });
       }
@@ -89,6 +92,9 @@ export function registerSettingsRoutes(app: Express) {
         notification_sms_enabled: result.notificationSmsEnabled,
         sms_payment_validation_enabled: result.smsPaymentValidationEnabled,
         mobile_money_enabled: result.mobileMoneyEnabled,
+        cash_enabled: result.cashEnabled,
+        check_enabled: result.checkEnabled,
+        transfer_enabled: result.transferEnabled,
         maintenance_mode: result.maintenanceMode
       });
     } catch (error) {
@@ -131,6 +137,8 @@ export function registerSettingsRoutes(app: Express) {
             wsInstance.broadcast({ type: "CURRENCY_CHANGED" as any, payload: getActiveCurrency() });
           }
       }
+
+      await logAudit(req, 'UPDATE', 'system_settings', '1', settings, 'success', 'medium');
 
       res.json({ success: true, message: 'Settings updated successfully' });
     } catch (error: any) {

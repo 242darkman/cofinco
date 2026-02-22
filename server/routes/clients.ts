@@ -23,7 +23,7 @@ import { getClientTags, addClientTag, removeClientTag, createTag, deleteTag, get
 import { requireAuth, hashPassword } from "../auth";
 import { attachAbility, requireAbility, requireAnyAbility } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
-import { SystemRole, normalizeRole } from "@shared/types/roles"; // Still needed for role checks in some logic
+import { SystemRole } from "@shared/types/roles"; // Enum for type annotations
 import { requireAgenceAccess, validateAgenceAction, requireAgenceIdAccess, validateAgenceIdAction } from "../middleware";
 import { logAudit } from "../audit";
 import { normalizeKeysDeep, coerceValueToSchema, parsePagination, paginateResponse } from "./utils";
@@ -1356,9 +1356,8 @@ export function registerClientRoutes(app: Express) {
   async function verifyClientAccess(req: Request, clientId: string): Promise<boolean> {
     const user = req.user;
     if (!user) return false;
-    const role = normalizeRole(user.role);
-    // Admins can access all clients
-    if (role === SystemRole.ADMIN) return true;
+    // Users with global manage can access all clients
+    if (req.ability?.can(Actions.MANAGE, 'all') || req.ability?.can(Actions.MANAGE, Subjects.CLIENTS)) return true;
     // Non-admins: check client belongs to user's agency
     const [client] = await db.select({ agenceId: clients.agenceId }).from(clients).where(eq(clients.id, clientId));
     if (!client) return false;
@@ -1366,7 +1365,7 @@ export function registerClientRoutes(app: Express) {
   }
 
   // Client Tags
-  app.get("/api/clients/:id/tags", requireAuth, async (req, res) => {
+  app.get("/api/clients/:id/tags", requireAuth, attachAbility, async (req, res) => {
       if (!(await verifyClientAccess(req, req.params.id))) {
         return res.status(403).json({ message: "Accès non autorisé à ce client" });
       }
@@ -1374,7 +1373,7 @@ export function registerClientRoutes(app: Express) {
       res.json(tags);
   });
 
-  app.post("/api/clients/:id/tags", requireAuth, async (req, res) => {
+  app.post("/api/clients/:id/tags", requireAuth, attachAbility, async (req, res) => {
      if (!(await verifyClientAccess(req, req.params.id))) {
        return res.status(403).json({ message: "Accès non autorisé à ce client" });
      }
@@ -1382,7 +1381,7 @@ export function registerClientRoutes(app: Express) {
      res.json(ct);
   });
 
-  app.delete("/api/clients/:id/tags/:tagId", requireAuth, async (req, res) => {
+  app.delete("/api/clients/:id/tags/:tagId", requireAuth, attachAbility, async (req, res) => {
      if (!(await verifyClientAccess(req, req.params.id))) {
        return res.status(403).json({ message: "Accès non autorisé à ce client" });
      }
@@ -1407,7 +1406,7 @@ export function registerClientRoutes(app: Express) {
   });
 
   // Client Activities
-  app.get("/api/clients/:id/activities", requireAuth, async (req, res) => {
+  app.get("/api/clients/:id/activities", requireAuth, attachAbility, async (req, res) => {
       if (!(await verifyClientAccess(req, req.params.id))) {
         return res.status(403).json({ message: "Accès non autorisé à ce client" });
       }
@@ -1415,7 +1414,7 @@ export function registerClientRoutes(app: Express) {
       res.json(acts);
   });
 
-  app.post("/api/clients/:id/activities", requireAuth, async (req, res) => {
+  app.post("/api/clients/:id/activities", requireAuth, attachAbility, async (req, res) => {
       if (!(await verifyClientAccess(req, req.params.id))) {
         return res.status(403).json({ message: "Accès non autorisé à ce client" });
       }
@@ -1425,7 +1424,7 @@ export function registerClientRoutes(app: Express) {
 
   // Helper: verify client belongs to user's agency (non-admin only)
   async function checkClientScoreAccess(req: any, res: any): Promise<boolean> {
-    if (req.session.user?.role === SystemRole.ADMIN) return true;
+    if (req.ability?.can(Actions.MANAGE, 'all') || req.ability?.can(Actions.MANAGE, Subjects.CLIENTS)) return true;
     const cl = await db.query.clients.findFirst({
       where: eq(clients.id, req.params.id),
       columns: { id: true, agenceId: true },
@@ -1509,8 +1508,7 @@ export function registerClientRoutes(app: Express) {
         let agenceId = req.query.agenceId as string | undefined;
 
         // Non-admin users are restricted to their own agency
-        const userRole = req.session.user?.role;
-        if (userRole !== SystemRole.ADMIN) {
+        if (!req.ability?.can(Actions.MANAGE, 'all')) {
           agenceId = req.session.user?.agenceId || agenceId;
         }
 

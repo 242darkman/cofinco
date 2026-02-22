@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Calendar, CheckCircle, Clock, AlertTriangle, DollarSign, Filter } from 'lucide-react';
+import { Calendar, CheckCircle, Clock, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { creditApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { formatMoney, formatClientName } from '../../../lib/format';
@@ -12,51 +12,60 @@ interface Echeance {
   creditId: string;
   numeroEcheance: number;
   dateEcheance: string;
-  montantPrincipal: number;
+  montantCapital: number;
   montantInteret: number;
   montantTotal: number;
   statut: string;
   datePaiement: string | null;
   montantPaye: number;
+  penaliteMontant: number;
   joursRetard: number;
-  penalite: number;
   credits: {
     numeroCredit: string;
-    clients: {
-      nom: string;
-    };
+    clients: { nom: string };
   };
 }
 
 type FilterType = 'all' | 'upcoming' | 'overdue' | 'paid';
 type DateFilterType = 'week' | 'month' | 'all';
 
+const PAGE_SIZE = 15;
+
 export default function CreditEcheancier() {
   const [echeances, setEcheances] = useState<Echeance[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterType>('upcoming');
   const [dateFilter, setDateFilter] = useState<DateFilterType>('month');
+  const [page, setPage] = useState(1);
 
-  // Charger les échéances via api-client
   const loadEcheances = useCallback(async () => {
     setLoading(true);
-
     try {
       const credits = await creditApi.getAll({ statut: StatutCredit.ACTIVE, includeEcheances: true });
 
-      let allEcheances: Echeance[] = [];
-
+      const allEcheances: Echeance[] = [];
       for (const credit of credits) {
         if (credit.echeances) {
           for (const ech of credit.echeances) {
             allEcheances.push({
-              ...ech,
+              id: ech.id,
+              creditId: ech.creditId,
+              numeroEcheance: ech.numeroEcheance,
+              dateEcheance: ech.dateEcheance,
+              montantCapital: Number(ech.montantCapital) || 0,
+              montantInteret: Number(ech.montantInteret) || 0,
+              montantTotal: Number(ech.montantTotal) || 0,
+              montantPaye: Number(ech.montantPaye) || 0,
+              penaliteMontant: Number(ech.penaliteMontant) || 0,
+              statut: ech.statut,
+              datePaiement: ech.datePaiement,
+              joursRetard: 0,
               credits: {
                 numeroCredit: credit.numeroCredit,
                 clients: {
-                  nom: formatClientName(credit.clients?.nom || credit.clientNom || 'Client', credit.clients?.prenom)
-                }
-              }
+                  nom: formatClientName(credit.clients?.nom || credit.clientNom || 'Client', credit.clients?.prenom),
+                },
+              },
             });
           }
         }
@@ -65,374 +74,295 @@ export default function CreditEcheancier() {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      // Calcul du retard pour chaque échéance
-      let processedEcheances = allEcheances.map(ech => {
+      let processed = allEcheances.map(ech => {
         const dateEch = new Date(ech.dateEcheance);
         dateEch.setHours(0, 0, 0, 0);
-        const joursRetard = ech.statut === StatutEcheanceCredit.UPCOMING && dateEch < today
-          ? Math.floor((today.getTime() - dateEch.getTime()) / (1000 * 60 * 60 * 24))
-          : 0;
-
+        const joursRetard =
+          (ech.statut === StatutEcheanceCredit.UPCOMING || ech.statut === StatutEcheanceCredit.LATE) && dateEch < today
+            ? Math.floor((today.getTime() - dateEch.getTime()) / (1000 * 60 * 60 * 24))
+            : 0;
         return {
           ...ech,
-          joursRetard: joursRetard,
-          statut: joursRetard > 0 ? StatutEcheanceCredit.LATE : ech.statut
+          joursRetard,
+          statut: joursRetard > 0 ? StatutEcheanceCredit.LATE : ech.statut,
         };
       });
 
-      // Application des filtres
       if (filter === 'upcoming') {
-        processedEcheances = processedEcheances.filter(e =>
-          e.statut === StatutEcheanceCredit.UPCOMING && new Date(e.dateEcheance) >= today
-        );
+        processed = processed.filter(e => e.statut === StatutEcheanceCredit.UPCOMING && new Date(e.dateEcheance) >= today);
       } else if (filter === 'overdue') {
-        processedEcheances = processedEcheances.filter(e => e.statut === StatutEcheanceCredit.LATE);
+        processed = processed.filter(e => e.statut === StatutEcheanceCredit.LATE);
       } else if (filter === 'paid') {
-        processedEcheances = processedEcheances.filter(e => e.statut === StatutEcheanceCredit.PAID);
+        processed = processed.filter(e => e.statut === StatutEcheanceCredit.PAID || e.statut === StatutEcheanceCredit.SETTLED);
       }
 
-      // Filtre par période
       if (dateFilter === 'week') {
-        const nextWeek = new Date();
-        nextWeek.setDate(nextWeek.getDate() + 7);
-        processedEcheances = processedEcheances.filter(e =>
-          new Date(e.dateEcheance) <= nextWeek
-        );
+        const limit = new Date();
+        limit.setDate(limit.getDate() + 7);
+        processed = processed.filter(e => new Date(e.dateEcheance) <= limit);
       } else if (dateFilter === 'month') {
-        const nextMonth = new Date();
-        nextMonth.setMonth(nextMonth.getMonth() + 1);
-        processedEcheances = processedEcheances.filter(e =>
-          new Date(e.dateEcheance) <= nextMonth
-        );
+        const limit = new Date();
+        limit.setMonth(limit.getMonth() + 1);
+        processed = processed.filter(e => new Date(e.dateEcheance) <= limit);
       }
 
-      // Tri par date
-      processedEcheances.sort((a, b) =>
-        new Date(a.dateEcheance).getTime() - new Date(b.dateEcheance).getTime()
-      );
-
-      setEcheances(processedEcheances);
+      processed.sort((a, b) => new Date(a.dateEcheance).getTime() - new Date(b.dateEcheance).getTime());
+      setEcheances(processed);
     } catch (error) {
-      const errorMessage = handleApiError(error, 'Erreur lors du chargement des échéances');
-      toast.error(errorMessage);
+      handleApiError(error, 'Erreur lors du chargement des échéances');
     } finally {
       setLoading(false);
     }
   }, [filter, dateFilter]);
 
-  useEffect(() => {
-    loadEcheances();
-  }, [loadEcheances]);
+  useEffect(() => { loadEcheances(); }, [loadEcheances]);
+  useEffect(() => { setPage(1); }, [filter, dateFilter]);
 
-  // Badge de statut mémorisé — labels centralisés depuis status-constants
-  const getStatutBadge = useCallback((statut: string, joursRetard: number) => {
-    if (statut === StatutEcheanceCredit.PAID) {
-      return (
-        <span
-          className="px-2 py-1 bg-status-success-bg text-status-success rounded text-xs font-semibold"
-          role="status"
-        >
-          {STATUT_ECHEANCE_CREDIT_LABELS[StatutEcheanceCredit.PAID]}
-        </span>
-      );
-    }
-    if (statut === StatutEcheanceCredit.LATE || joursRetard > 0) {
-      return (
-        <span
-          className="px-2 py-1 bg-status-danger-bg text-status-danger rounded text-xs font-semibold"
-          role="status"
-          aria-label={`${STATUT_ECHEANCE_CREDIT_LABELS[StatutEcheanceCredit.LATE]} de ${joursRetard} jours`}
-        >
-          {STATUT_ECHEANCE_CREDIT_LABELS[StatutEcheanceCredit.LATE]} ({joursRetard}j)
-        </span>
-      );
-    }
-    return (
-      <span
-        className="px-2 py-1 bg-accent/10 text-accent rounded text-xs font-semibold"
-        role="status"
-      >
-        {STATUT_ECHEANCE_CREDIT_LABELS[StatutEcheanceCredit.UPCOMING]}
-      </span>
-    );
-  }, []);
-
-  // Calcul des jours restants
-  const getDaysUntil = useCallback((date: string) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const echeance = new Date(date);
-    echeance.setHours(0, 0, 0, 0);
-    const diff = Math.floor((echeance.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-
-    if (diff < 0) return null;
-    if (diff === 0) return "Aujourd'hui";
-    if (diff === 1) return "Demain";
-    return `Dans ${diff} jours`;
-  }, []);
-
-  // Statistiques mémorisées
+  // Stats
   const stats = useMemo(() => ({
     total: echeances.length,
     enAttente: echeances.filter(e => e.statut === StatutEcheanceCredit.UPCOMING).length,
     enRetard: echeances.filter(e => e.statut === StatutEcheanceCredit.LATE || e.joursRetard > 0).length,
-    paye: echeances.filter(e => e.statut === StatutEcheanceCredit.PAID).length,
-    montantTotal: echeances.reduce((sum, e) => sum + (e.montantTotal || 0), 0),
-    montantEnAttente: echeances
-      .filter(e => e.statut === StatutEcheanceCredit.UPCOMING)
-      .reduce((sum, e) => sum + (e.montantTotal || 0), 0),
-    montantRetard: echeances
-      .filter(e => e.statut === StatutEcheanceCredit.LATE || e.joursRetard > 0)
-      .reduce((sum, e) => sum + (e.montantTotal || 0), 0)
+    paye: echeances.filter(e => e.statut === StatutEcheanceCredit.PAID || e.statut === StatutEcheanceCredit.SETTLED).length,
+    montantEnAttente: echeances.filter(e => e.statut === StatutEcheanceCredit.UPCOMING).reduce((s, e) => s + e.montantTotal, 0),
+    montantRetard: echeances.filter(e => e.statut === StatutEcheanceCredit.LATE || e.joursRetard > 0).reduce((s, e) => s + e.montantTotal, 0),
   }), [echeances]);
 
-  // Groupement par mois mémorisé
-  const groupedEcheances = useMemo(() => {
-    const grouped: Record<string, Echeance[]> = {};
+  // Pagination
+  const totalPages = Math.max(1, Math.ceil(echeances.length / PAGE_SIZE));
+  const pagedEcheances = useMemo(() => echeances.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [echeances, page]);
 
-    echeances.forEach(ech => {
-      const date = new Date(ech.dateEcheance);
-      const monthName = date.toLocaleDateString('fr-FR', { year: 'numeric', month: 'long' });
-
-      if (!grouped[monthName]) {
-        grouped[monthName] = [];
-      }
-      grouped[monthName].push(ech);
-    });
-
-    return grouped;
-  }, [echeances]);
-
-  // Handlers pour les filtres
-  const handleFilterChange = useCallback((newFilter: FilterType) => {
-    setFilter(newFilter);
+  // Helpers
+  const getDaysLabel = useCallback((date: string) => {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const d = new Date(date); d.setHours(0, 0, 0, 0);
+    const diff = Math.floor((d.getTime() - today.getTime()) / 86400000);
+    if (diff < 0) return null;
+    if (diff === 0) return "Aujourd'hui";
+    if (diff === 1) return 'Demain';
+    return `${diff}j`;
   }, []);
 
-  const handleDateFilterChange = useCallback((newDateFilter: DateFilterType) => {
-    setDateFilter(newDateFilter);
+  const getStatutBadge = useCallback((statut: string, joursRetard: number) => {
+    if (statut === StatutEcheanceCredit.PAID || statut === StatutEcheanceCredit.SETTLED) {
+      return <span className="px-1.5 py-0.5 bg-status-success-bg text-status-success rounded text-[10px] font-semibold">{STATUT_ECHEANCE_CREDIT_LABELS[StatutEcheanceCredit.PAID]}</span>;
+    }
+    if (statut === StatutEcheanceCredit.LATE || joursRetard > 0) {
+      return <span className="px-1.5 py-0.5 bg-status-danger-bg text-status-danger rounded text-[10px] font-semibold">{joursRetard}j retard</span>;
+    }
+    return <span className="px-1.5 py-0.5 bg-accent/10 text-accent rounded text-[10px] font-semibold">{STATUT_ECHEANCE_CREDIT_LABELS[StatutEcheanceCredit.UPCOMING]}</span>;
   }, []);
 
-  // État de chargement avec skeleton
   if (loading) {
     return (
-      <div className="space-y-6" role="status" aria-label="Chargement de l'échéancier">
-        {/* Stats skeleton */}
-        <div className="grid md:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => (
-            <SkeletonCard key={i} className="h-28 rounded-lg" />
-          ))}
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {[1, 2, 3, 4].map(i => <SkeletonCard key={i} className="h-16 rounded-lg" />)}
         </div>
-
-        {/* Filters skeleton */}
-        <div className="flex gap-4">
-          <SkeletonCard className="h-10 w-64" />
-          <div className="ml-auto flex gap-2">
-            <SkeletonCard className="h-10 w-20" />
-            <SkeletonCard className="h-10 w-20" />
-            <SkeletonCard className="h-10 w-20" />
-          </div>
-        </div>
-
-        {/* Content skeleton */}
-        <SkeletonCard className="h-96 rounded-lg" />
+        <SkeletonCard className="h-8 w-80" />
+        <SkeletonCard className="h-64 rounded-lg" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Cartes de statistiques */}
-      <section aria-label="Statistiques des échéances">
-        <div className="grid md:grid-cols-4 gap-4">
-          <div className="bg-gradient-to-br from-status-info/20 to-accent/20 border border-status-info/50 rounded-lg p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-status-info text-sm font-semibold">Total Échéances</span>
-              <Calendar className="text-status-info" size={20} aria-hidden="true" />
+    <div className="space-y-3">
+      {/* Stat cards — compact */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {([
+          { label: 'Total Échéances', value: stats.total, sub: 'Période sélectionnée', icon: Calendar, color: 'text-status-info', bg: 'bg-status-info-bg' },
+          { label: 'En Attente', value: stats.enAttente, sub: formatMoney(stats.montantEnAttente), icon: Clock, color: 'text-accent', bg: 'bg-accent/10' },
+          { label: 'En Retard', value: stats.enRetard, sub: formatMoney(stats.montantRetard), icon: AlertTriangle, color: 'text-status-danger', bg: 'bg-status-danger-bg' },
+          { label: 'Payé', value: stats.paye, sub: 'Complétées', icon: CheckCircle, color: 'text-status-success', bg: 'bg-status-success-bg' },
+        ] as const).map(({ label, value, sub, icon: Icon, color, bg }) => (
+          <div key={label} className={`${bg} border border-edge/50 rounded-lg px-3 py-2`}>
+            <div className="flex items-center justify-between">
+              <span className={`text-[10px] font-semibold uppercase tracking-wide ${color}`}>{label}</span>
+              <Icon size={13} className={color} />
             </div>
-            <div className="text-2xl font-bold text-content-primary break-words">{stats.total}</div>
-            <div className="text-xs text-status-info mt-1">Période sélectionnée</div>
+            <div className="text-lg font-bold text-content-primary leading-tight">{value}</div>
+            <div className={`text-[10px] ${color} truncate`}>{sub}</div>
           </div>
+        ))}
+      </div>
 
-          <div className="bg-gradient-to-br from-accent/20 to-accent/20 border border-accent/50 rounded-lg p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-accent text-sm font-semibold">En Attente</span>
-              <Clock className="text-accent" size={20} aria-hidden="true" />
-            </div>
-            <div className="text-2xl font-bold text-content-primary break-words">{stats.enAttente}</div>
-            <div className="text-xs text-accent mt-1">{formatMoney(stats.montantEnAttente)}</div>
-          </div>
-
-          <div className="bg-gradient-to-br from-status-danger/20 to-status-danger/20 border border-status-danger/50 rounded-lg p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-status-danger text-sm font-semibold">En Retard</span>
-              <AlertTriangle className="text-status-danger" size={20} aria-hidden="true" />
-            </div>
-            <div className="text-2xl font-bold text-content-primary break-words">{stats.enRetard}</div>
-            <div className="text-xs text-status-danger mt-1">{formatMoney(stats.montantRetard)}</div>
-          </div>
-
-          <div className="bg-gradient-to-br from-status-success/20 to-status-success/20 border border-status-success/50 rounded-lg p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-status-success text-sm font-semibold">Payé</span>
-              <CheckCircle className="text-status-success" size={20} aria-hidden="true" />
-            </div>
-            <div className="text-2xl font-bold text-content-primary break-words">{stats.paye}</div>
-            <div className="text-xs text-status-success mt-1">Complétées</div>
-          </div>
-        </div>
-      </section>
-
-      {/* Filtres */}
-      <nav aria-label="Filtres des échéances" className="flex gap-4 items-center flex-wrap">
-        <div className="flex gap-2" role="group" aria-label="Filtre par statut">
+      {/* Filters — inline compact */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex gap-1 bg-surface-elevated rounded-lg p-0.5">
           {([
-            { value: 'all', label: 'Toutes' },
-            { value: 'upcoming', label: 'À venir' },
-            { value: 'overdue', label: 'En retard' },
-            { value: 'paid', label: 'Payées' }
-          ] as const).map(({ value, label }) => (
+            { value: 'all' as const, label: 'Toutes' },
+            { value: 'upcoming' as const, label: 'À venir' },
+            { value: 'overdue' as const, label: 'En retard' },
+            { value: 'paid' as const, label: 'Payées' },
+          ]).map(({ value, label }) => (
             <button
               key={value}
-              onClick={() => handleFilterChange(value)}
-              className={`px-4 py-2 rounded-lg font-semibold text-sm transition-colors ${
+              onClick={() => setFilter(value)}
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
                 filter === value
-                  ? 'bg-accent-secondary text-content-primary'
-                  : 'bg-surface-elevated text-content-muted hover:bg-surface-subtle'
+                  ? 'bg-accent text-white shadow-sm'
+                  : 'text-content-muted hover:text-content-secondary'
               }`}
-              aria-pressed={filter === value}
-              aria-label={`Filtrer par ${label.toLowerCase()}`}
             >
               {label}
             </button>
           ))}
         </div>
 
-        <div className="ml-auto flex gap-2" role="group" aria-label="Filtre par période">
+        <div className="ml-auto flex gap-1 bg-surface-elevated rounded-lg p-0.5">
           {([
-            { value: 'week', label: '7 jours' },
-            { value: 'month', label: '30 jours' },
-            { value: 'all', label: 'Tout' }
-          ] as const).map(({ value, label }) => (
+            { value: 'week' as const, label: '7 jours' },
+            { value: 'month' as const, label: '30 jours' },
+            { value: 'all' as const, label: 'Tout' },
+          ]).map(({ value, label }) => (
             <button
               key={value}
-              onClick={() => handleDateFilterChange(value)}
-              className={`px-3 py-2 rounded-lg text-sm transition-colors ${
+              onClick={() => setDateFilter(value)}
+              className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${
                 dateFilter === value
-                  ? 'bg-surface-subtle text-content-primary'
-                  : 'bg-surface-elevated text-content-muted hover:bg-surface-subtle'
+                  ? 'bg-surface-base text-content-primary shadow-sm'
+                  : 'text-content-muted hover:text-content-secondary'
               }`}
-              aria-pressed={dateFilter === value}
-              aria-label={`Afficher ${label}`}
             >
               {label}
             </button>
           ))}
         </div>
-      </nav>
+      </div>
 
-      {/* Liste des échéances */}
-      {Object.keys(groupedEcheances).length === 0 ? (
-        <div
-          className="text-center py-12 text-content-muted"
-          role="status"
-          aria-label="Aucune échéance trouvée"
-        >
+      {/* Table */}
+      {echeances.length === 0 ? (
+        <div className="text-center py-10 text-content-muted text-sm">
           Aucune échéance à afficher pour les filtres sélectionnés
         </div>
       ) : (
-        <div className="space-y-6">
-          {Object.entries(groupedEcheances).map(([month, echs]) => (
-            <section
-              key={month}
-              className="bg-surface/50 border border-edge rounded-lg overflow-hidden"
-              aria-labelledby={`month-${month.replace(/\s+/g, '-')}`}
-            >
-              <header className="bg-surface-elevated/50 px-6 py-3 border-b border-edge">
-                <h3
-                  id={`month-${month.replace(/\s+/g, '-')}`}
-                  className="text-lg font-bold text-content-primary capitalize"
+        <div className="border border-edge rounded-lg overflow-hidden">
+          {/* Header */}
+          <div className="hidden sm:grid grid-cols-[1fr_1fr_auto_auto_auto] gap-2 px-3 py-2 bg-surface-elevated/60 text-[10px] font-semibold text-content-muted uppercase tracking-wider border-b border-edge">
+            <span>Crédit / Client</span>
+            <span>Date</span>
+            <span className="text-right w-24">Montant</span>
+            <span className="text-center w-20">Statut</span>
+            <span className="text-right w-20">Payé</span>
+          </div>
+
+          {/* Rows */}
+          <div className="divide-y divide-edge/50">
+            {pagedEcheances.map(ech => {
+              const daysLabel = getDaysLabel(ech.dateEcheance);
+              const isUrgent = daysLabel === "Aujourd'hui" || daysLabel === 'Demain';
+              const pct = ech.montantTotal > 0 ? Math.round((ech.montantPaye / ech.montantTotal) * 100) : 0;
+
+              return (
+                <div
+                  key={ech.id}
+                  className={`grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto_auto_auto] gap-1 sm:gap-2 items-center px-3 py-2 hover:bg-surface-subtle/50 transition-colors ${isUrgent ? 'bg-status-warning-bg/30' : ''}`}
                 >
-                  {escapeHtml(month)}
-                </h3>
-                <div className="text-sm text-content-muted mt-1">
-                  {echs.length} échéance{echs.length > 1 ? 's' : ''} · {formatMoney(echs.reduce((sum, e) => sum + (e.montantTotal || 0), 0))}
-                </div>
-              </header>
+                  {/* Credit + Client */}
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[11px] text-accent font-mono font-bold">{escapeHtml(ech.credits.numeroCredit)}</span>
+                      <span className="text-[11px] text-content-primary font-medium truncate">{escapeHtml(ech.credits.clients.nom)}</span>
+                    </div>
+                    <span className="text-[10px] text-content-muted">Éch. #{ech.numeroEcheance}</span>
+                  </div>
 
-              <ul className="divide-y divide-edge">
-                {echs.map(echeance => {
-                  const daysUntil = getDaysUntil(echeance.dateEcheance);
-                  const isUrgent = daysUntil && (daysUntil === "Aujourd'hui" || daysUntil === "Demain");
+                  {/* Date */}
+                  <div className="flex items-center gap-1.5 text-[11px] text-content-secondary">
+                    <Calendar size={11} className="shrink-0 text-content-muted" />
+                    <time dateTime={ech.dateEcheance}>
+                      {new Date(ech.dateEcheance).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: '2-digit' })}
+                    </time>
+                    {daysLabel && (
+                      <span className={`text-[9px] font-semibold px-1 py-0.5 rounded ${isUrgent ? 'bg-status-warning-bg text-status-warning' : 'text-accent'}`}>
+                        {daysLabel}
+                      </span>
+                    )}
+                  </div>
 
-                  return (
-                    <li
-                      key={echeance.id}
-                      className={`p-4 hover:bg-surface-elevated/30 transition-colors ${isUrgent ? 'bg-accent/5' : ''}`}
-                    >
-                      <div className="flex items-center justify-between flex-wrap gap-4">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-3 mb-2 flex-wrap">
-                            <span className="text-accent font-mono font-bold">
-                              {escapeHtml(echeance.credits.numeroCredit)}
-                            </span>
-                            <span className="text-content-primary font-semibold">
-                              {escapeHtml(echeance.credits.clients.nom)}
-                            </span>
-                            {getStatutBadge(echeance.statut, echeance.joursRetard)}
-                            {isUrgent && (
-                              <span
-                                className="px-2 py-1 bg-status-success-bg text-status-success rounded text-xs font-semibold"
-                                role="status"
-                              >
-                                Urgent
-                              </span>
-                            )}
-                          </div>
+                  {/* Montant */}
+                  <div className="text-right w-24">
+                    <div className="text-xs font-bold text-content-primary">{formatMoney(ech.montantTotal)}</div>
+                    <div className="text-[9px] text-content-muted">
+                      C:{formatMoney(ech.montantCapital)} I:{formatMoney(ech.montantInteret)}
+                    </div>
+                  </div>
 
-                          <div className="flex items-center gap-6 text-sm text-content-muted flex-wrap">
-                            <div className="flex items-center gap-2">
-                              <Calendar size={16} aria-hidden="true" />
-                              <time dateTime={echeance.dateEcheance}>
-                                {new Date(echeance.dateEcheance).toLocaleDateString('fr-FR', {
-                                  weekday: 'short',
-                                  day: 'numeric',
-                                  month: 'short',
-                                  year: 'numeric'
-                                })}
-                              </time>
-                              {daysUntil && <span className="text-accent">({daysUntil})</span>}
-                            </div>
+                  {/* Statut */}
+                  <div className="flex justify-center w-20">
+                    {getStatutBadge(ech.statut, ech.joursRetard)}
+                  </div>
 
-                            <div className="flex items-center gap-2">
-                              <DollarSign size={16} aria-hidden="true" />
-                              <span>Échéance #{echeance.numeroEcheance}</span>
-                            </div>
-
-                            {echeance.penalite > 0 && (
-                              <div className="flex items-center gap-2 text-status-danger">
-                                <AlertTriangle size={16} aria-hidden="true" />
-                                <span>Pénalité: {formatMoney(echeance.penalite)}</span>
-                              </div>
-                            )}
-                          </div>
+                  {/* Payé */}
+                  <div className="text-right w-20">
+                    <div className="text-[11px] font-semibold text-content-primary">{formatMoney(ech.montantPaye)}</div>
+                    {ech.montantTotal > 0 && (
+                      <div className="flex items-center gap-1 justify-end">
+                        <div className="w-10 h-1 bg-surface-elevated rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${pct >= 100 ? 'bg-status-success' : pct > 0 ? 'bg-accent' : 'bg-surface-elevated'}`}
+                            style={{ width: `${Math.min(pct, 100)}%` }}
+                          />
                         </div>
-
-                        <div className="text-right">
-                          <div className="text-2xl font-bold text-content-primary">
-                            {formatMoney(echeance.montantTotal)}
-                          </div>
-                          <div className="text-xs text-content-muted mt-1">
-                            Principal: {formatMoney(echeance.montantPrincipal)} ·
-                            Intérêt: {formatMoney(echeance.montantInteret)}
-                          </div>
-                        </div>
+                        <span className="text-[9px] text-content-muted">{pct}%</span>
                       </div>
-                    </li>
+                    )}
+                    {ech.penaliteMontant > 0 && (
+                      <div className="text-[9px] text-status-danger">+{formatMoney(ech.penaliteMontant)} pén.</div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-3 py-2 border-t border-edge bg-surface-elevated/40">
+              <span className="text-[10px] text-content-muted">
+                {((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, echeances.length)} sur {echeances.length}
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page <= 1}
+                  className="p-1 rounded hover:bg-surface-subtle disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft size={14} className="text-content-secondary" />
+                </button>
+                {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                  let p: number;
+                  if (totalPages <= 5) {
+                    p = i + 1;
+                  } else if (page <= 3) {
+                    p = i + 1;
+                  } else if (page >= totalPages - 2) {
+                    p = totalPages - 4 + i;
+                  } else {
+                    p = page - 2 + i;
+                  }
+                  return (
+                    <button
+                      key={p}
+                      onClick={() => setPage(p)}
+                      className={`w-6 h-6 rounded text-[10px] font-semibold transition-colors ${
+                        page === p ? 'bg-accent text-white' : 'text-content-muted hover:bg-surface-subtle'
+                      }`}
+                    >
+                      {p}
+                    </button>
                   );
                 })}
-              </ul>
-            </section>
-          ))}
+                <button
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages}
+                  className="p-1 rounded hover:bg-surface-subtle disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronRight size={14} className="text-content-secondary" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -25,6 +25,7 @@ import {
 } from './hooks/useCaisseOperation';
 import { ReceiptActions } from '../shared/ReceiptActions';
 import { toast } from 'sonner';
+import { useEnabledPaymentMethods } from '../../../contexts/FeatureFlagsContext';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -76,6 +77,7 @@ export default function CaisseOperationModal({
   securityLimits,
 }: CaisseOperationModalProps) {
   const amountRef = useRef<HTMLInputElement>(null);
+  const enabledPayments = useEnabledPaymentMethods();
 
   const {
     selectedAccountId,
@@ -275,7 +277,7 @@ export default function CaisseOperationModal({
                 Méthode de paiement
               </label>
               <div className="grid grid-cols-2 gap-2">
-                {PAYMENT_METHODS.map(({ id, label, icon: Icon }) => {
+                {PAYMENT_METHODS.filter(({ id }) => enabledPayments[id as keyof typeof enabledPayments] !== false).map(({ id, label, icon: Icon }) => {
                   const selected = paymentMethod === id;
                   return (
                     <button

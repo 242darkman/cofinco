@@ -2,8 +2,8 @@ import { Request, Response, NextFunction } from "express";
 import { db } from "../db";
 import { maintenanceModules } from "@shared/schema";
 import { eq } from "drizzle-orm";
-import { isAdminRole } from "@shared/types/roles";
 import { createLogger } from "../lib/logger";
+import { SystemRole } from "@shared/types/roles";
 
 const logger = createLogger('Maintenance');
 
@@ -35,7 +35,7 @@ const getModuleStatus = async () => {
 
 export const checkMaintenanceMode = async (req: Request, res: Response, next: NextFunction) => {
   // Always allow admin to bypass
-  if (req.user && isAdminRole(req.user.role)) {
+  if (req.user && req.user.role === SystemRole.ADMIN) {
     return next();
   }
 

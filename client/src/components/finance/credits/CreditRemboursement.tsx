@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { DollarSign, Search, Calendar, User, CreditCard, Check, X, Smartphone, Banknote, FileCheck, Building, ReceiptText, AlertTriangle, Loader2, Printer, WifiOff } from 'lucide-react';
 import PaymentValidationModal from '../operations/PaymentValidationModal';
-import { useFeatureFlags } from '../../../contexts/FeatureFlagsContext';
+import { useFeatureFlags, useEnabledPaymentMethods } from '../../../contexts/FeatureFlagsContext';
 import { usePermissions } from '../../auth/ProtectedFeature';
 import { creditApi, remboursementApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
@@ -75,6 +75,7 @@ interface Echeance {
 
 export default function CreditRemboursement() {
   const { mobileMoneyEnabled, mobileMoneyMessage } = useFeatureFlags();
+  const enabledPayments = useEnabledPaymentMethods();
   const { componentRef, printData, print, isPrinting } = usePrinter();
   const {
     componentRef: invoiceRef,
@@ -725,7 +726,10 @@ export default function CreditRemboursement() {
                   </legend>
                   <div className="grid grid-cols-3 gap-2" role="radiogroup">
                     {PAYMENT_MODES.map(({ id, icon: Icon, label, disabled }) => {
-                      const isDisabled = isOffline ? id !== 'Cash' : (id === 'Mobile Money' ? !mobileMoneyEnabled : disabled);
+                      const paymentKeyMap: Record<string, string> = { 'Cash': 'CASH', 'Mobile Money': 'MOBILE_MONEY', 'Virement': 'TRANSFER', 'Chèque': 'CHECK' };
+                      const paymentKey = paymentKeyMap[id];
+                      const methodDisabled = paymentKey ? enabledPayments[paymentKey as keyof typeof enabledPayments] === false : false;
+                      const isDisabled = methodDisabled || (isOffline ? id !== 'Cash' : (id === 'Mobile Money' ? !mobileMoneyEnabled : disabled));
                       const isSelected = paymentData.mode_paiement === id;
 
                       return (

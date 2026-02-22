@@ -12,9 +12,7 @@ export {
   ROLE_LABELS,
   getRoleLabel,
   getRoleOptions,
-  normalizeRole,
   hasRole,
-  isAdminRole,
   isSystemRole,
 } from './roles';
 

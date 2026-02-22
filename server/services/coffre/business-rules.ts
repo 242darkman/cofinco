@@ -1,5 +1,5 @@
 import type { TransfertCoffreCaisse, ConfigCoffreFort } from "@shared/schema";
-import { isAdminRole, normalizeRole } from "@shared/types/roles";
+import { SystemRole } from "@shared/types/roles";
 // Assuming User type needs to be defined or imported. Using basic shape matching usage.
 interface User {
   id: string;
@@ -16,9 +16,7 @@ interface Caisse {
 
 const normalizeRoleToken = (role?: string | null): string | undefined => {
   if (!role) return undefined;
-  const normalized = normalizeRole(role);
-  if (normalized) return normalized;
-  return role.trim().toLowerCase();
+  return role.trim().toUpperCase();
 };
 
 export interface TransfertBusinessRules {
@@ -80,7 +78,7 @@ export const businessRules: TransfertBusinessRules = {
 
   canCancel: (user, transfert) => {
     // Seul l'initiateur ou un admin peut annuler avant validation
-    return transfert.requestedBy === user.id || isAdminRole(user.role);
+    return transfert.requestedBy === user.id || user.role === SystemRole.ADMIN;
   },
 
   validateSufficientFunds: (caisse, montant) => {

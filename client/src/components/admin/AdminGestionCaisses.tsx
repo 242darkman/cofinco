@@ -3,14 +3,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Search, Monitor, Lock, MoreVertical, User, UserMinus, UserPlus, XCircle, Trash2, Clock, ChevronsLeft, ChevronsRight, ChevronLeft, ChevronRight, CalendarDays, X, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button, FormField, SelectField, Modal, ConfirmDialog, SearchableSelect } from '../ui';
-import { authService } from '../../lib/auth';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { api, caisseApi } from '../../lib/api-client';
 import { ForceCloseModal } from './ForceCloseModal';
 import AssignCashierModal from './AssignCashierModal';
 import CaisseOperatingHoursModal from './CaisseOperatingHoursModal';
-import { isAdminRole, normalizeRole } from '@shared/types/roles';
+import { usePermissions } from '../auth/ProtectedFeature';
 import { StatutClient, StatutCaisseAgent, StatutCaisse, StatutCaisseType, TYPE_CAISSE_LABELS, TypeCaisseType } from '@shared/enum/status-constants';
+import { SystemRole } from '@shared/types/roles';
 
 interface AssignmentDetail {
   id: string;
@@ -43,8 +43,7 @@ interface Caisse {
 }
 
 export default function AdminGestionCaisses() {
-  const user = authService.getCurrentUser();
-  const isAdmin = isAdminRole(user?.role);
+  const { user, isAdmin } = usePermissions();
   const queryClient = useQueryClient();
   const { confirmState, openConfirm, closeConfirm, handleConfirm } = useConfirmDialog();
   const [searchTerm, setSearchTerm] = useState('');
@@ -90,10 +89,8 @@ export default function AdminGestionCaisses() {
     queryFn: async () => {
         const res = await api.get<any[]>(`/employes?agenceId=${targetAgenceId}`);
         return (res || []).filter((emp: any) => {
-          // Le rôle est dans user.role (Architecture V3)
           const role = emp.user?.role || emp.role;
-          const normalizedRole = normalizeRole(role);
-          return !isAdminRole(normalizedRole);
+          return role !== SystemRole.ADMIN;
         }).map((emp: any) => ({
           id: emp.user?.id,
           nom: emp.user?.nom,

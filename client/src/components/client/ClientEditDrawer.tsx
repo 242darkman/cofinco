@@ -9,7 +9,8 @@ import { FormField, SelectField, Button } from '../ui';
 import SmartDocumentUpload, { type UploadedDocument, type DocumentType } from '../ui/SmartDocumentUpload';
 import FaceLivenessCapture from '../security/FaceLivenessCapture';
 import { useUserProfile } from '../../hooks/useUserProfile';
-import { isAdminRole, SystemRole } from '@shared/types/roles';
+import { SystemRole } from '@shared/types/roles';
+import { usePermissions } from '../auth/ProtectedFeature';
 import { agenceApi, employeApi, villeApi, catalogApi } from '../../lib/api-client';
 import { useEntityUpload } from '../../hooks/useEntityUpload';
 import { resolveStorageUrl } from '../../lib/format';
@@ -59,7 +60,7 @@ const SEXE_OPTIONS = [
 export default function ClientEditDrawer({ client, isOpen, onClose, onSave }: ClientEditDrawerProps) {
   const { label: currencyLabel } = useCurrency();
   const { user } = useUserProfile();
-  const isAdmin = isAdminRole(user?.role);
+  const { isAdmin } = usePermissions();
 
   const [isLivenessOpen, setIsLivenessOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);

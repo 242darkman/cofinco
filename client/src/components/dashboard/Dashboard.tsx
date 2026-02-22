@@ -16,6 +16,9 @@ import {
   BarChart3,
   ShieldAlert,
   Search,
+  Target,
+  CreditCard,
+  PiggyBank,
 } from 'lucide-react';
 
 import { useQuery } from '@tanstack/react-query';
@@ -39,7 +42,7 @@ const ComparativeAnalytics = React.lazy(() => import('./ComparativeAnalytics'));
 interface DashboardProps {
   userRole?: string;
   userName?: string;
-  onModuleChange?: (module: string) => void;
+  onModuleChange?: (module: string, subModule?: string, data?: any) => void;
   onQuickAction?: (action: string) => void;
   onLogout?: () => void;
   treasuryThreshold?: number;
@@ -175,6 +178,7 @@ export default function Dashboard({
   // CORRECTION: Use backend calculated KPIs (Value-based PAR30)
   const par30 = stats?.global?.par30 ?? 0;
   const liquidityRatio = stats?.global?.liquidityRatio ?? 100;
+  const tauxRecouvrement = stats?.global?.tauxRecouvrement ?? 0;
 
   // Total actionable items for "A Traiter" section
   const upcomingPaymentsCount = stats?.widgets?.upcomingPayments?.length || 0;
@@ -293,9 +297,9 @@ export default function Dashboard({
           { key: 'new-credit', module: 'credits', action: 'create', icon: Banknote, label: t('creditRapide'),
             btnClass: 'bg-accent/10 hover:bg-accent/10 border-accent/20 text-accent',
             iconClass: 'bg-accent', handler: () => onQuickAction?.('new-credit') },
-          { key: 'tontines', module: 'tontines', action: 'view', icon: Users, label: t('collecteTontine'),
+          { key: 'new-tontine', module: 'tontines', action: 'create', icon: Users, label: t('nouvelleTontine'),
             btnClass: 'bg-status-info-bg hover:bg-status-info-bg border-status-info/20 text-status-info',
-            iconClass: 'bg-status-info', handler: () => onModuleChange?.('tontines') },
+            iconClass: 'bg-status-info', handler: () => onQuickAction?.('new-tontine') },
         ].filter(a => {
           const mapping = MODULE_ACTION_TO_CASL[`${a.module}.${a.action}`];
           if (!mapping) return false;
@@ -394,7 +398,7 @@ export default function Dashboard({
                     <p className="text-[10px] text-content-muted">{t('validationRequise')}</p>
                   </div>
                 </div>
-                <Button size="sm" variant="outline" onClick={() => onModuleChange?.('credits')} className="h-6 text-[10px] px-2 shrink-0 ml-2">
+                <Button size="sm" variant="outline" onClick={() => onModuleChange?.('credits', 'demandes')} className="h-6 text-[10px] px-2 shrink-0 ml-2">
                   {t('voir')}
                 </Button>
               </div>
@@ -411,7 +415,7 @@ export default function Dashboard({
                     <p className="text-[10px] text-content-muted">{t('aRelancer')}</p>
                   </div>
                 </div>
-                <Button size="sm" variant="outline" onClick={() => onModuleChange?.('credits')} className="h-6 text-[10px] px-2 shrink-0 ml-2">
+                <Button size="sm" variant="outline" onClick={() => onModuleChange?.('credits', 'echeancier')} className="h-6 text-[10px] px-2 shrink-0 ml-2">
                   {t('relancer') || 'Relancer'}
                 </Button>
               </div>
@@ -462,7 +466,7 @@ export default function Dashboard({
                     <p className="text-[10px] text-content-muted">Dans les 7 prochains jours</p>
                   </div>
                 </div>
-                <Button size="sm" variant="outline" onClick={() => onModuleChange?.('credits')} className="h-6 text-[10px] px-2 shrink-0 ml-2">
+                <Button size="sm" variant="outline" onClick={() => onModuleChange?.('credits', 'echeancier')} className="h-6 text-[10px] px-2 shrink-0 ml-2">
                   {t('voir')}
                 </Button>
               </div>
@@ -483,7 +487,7 @@ export default function Dashboard({
                     )}
                   </div>
                 </div>
-                <Button size="sm" variant="outline" onClick={() => onModuleChange?.('credits')} className="h-6 text-[10px] px-2 shrink-0 ml-2">
+                <Button size="sm" variant="outline" onClick={() => onModuleChange?.('credits', 'enquetes')} className="h-6 text-[10px] px-2 shrink-0 ml-2">
                   {t('voir')}
                 </Button>
               </div>
@@ -503,133 +507,164 @@ export default function Dashboard({
             )}
           </section>
 
-          {/* Section: Santé & Risque */}
+          {/* Section: Santé 360 */}
           <section className="space-y-2" aria-labelledby="health-section-title">
             <h3 id="health-section-title" className="text-xs font-semibold text-content-muted uppercase tracking-widest flex items-center gap-1.5">
               <Activity size={12} aria-hidden="true" />
               {t('santeFinanciere')}
             </h3>
 
-            <div className="grid grid-cols-2 gap-2">
-              {/* Jauge Risque PAR 30 */}
-              <Card variant="default" padding="sm" className="bg-surface/40 p-2">
-                 <div className="flex items-center justify-between mb-1">
-                   <span id="par30-label" className="text-[10px] text-content-muted">{t('risquePar30')}</span>
-                   <AlertTriangle size={12} className={par30 > 5 ? 'text-status-danger' : 'text-content-muted'} aria-hidden="true" />
-                 </div>
-                 <div className="text-lg font-bold text-content-primary mb-1.5" aria-live="polite">{par30.toFixed(1)}%</div>
-                 <div
-                   className="w-full h-1 bg-surface-elevated rounded-full overflow-hidden"
-                   role="progressbar"
-                   aria-labelledby="par30-label"
-                   aria-valuenow={par30}
-                   aria-valuemin={0}
-                   aria-valuemax={10}
-                 >
-                   <div
-                      className={`h-full rounded-full ${par30 > 5 ? 'bg-status-danger' : par30 > 3 ? 'bg-status-warning' : 'bg-status-success'}`}
-                      style={{ width: `${Math.min(par30 * 10, 100)}%` }}
-                   />
-                 </div>
-                 <p className="text-[9px] text-content-muted mt-1">{t('ciblePar30')}</p>
-              </Card>
-
-              {/* Jauge Liquidité */}
-              <Card variant="default" padding="sm" className="bg-surface/40 p-2">
-                 <div className="flex items-center justify-between mb-1">
-                   <span id="liquidity-label" className="text-[10px] text-content-muted">{t('liquidite')}</span>
-                   <TrendingUp size={12} className="text-status-info" aria-hidden="true" />
-                 </div>
-                 <div className="text-lg font-bold text-content-primary mb-1.5" aria-live="polite">{liquidityRatio}%</div>
-                 <div
-                   className="w-full h-1 bg-surface-elevated rounded-full overflow-hidden"
-                   role="progressbar"
-                   aria-labelledby="liquidity-label"
-                   aria-valuenow={liquidityRatio}
-                   aria-valuemin={0}
-                   aria-valuemax={100}
-                 >
-                   <div
-                      className="h-full rounded-full bg-status-info"
-                      style={{ width: `${liquidityRatio}%` }}
-                   />
-                 </div>
-                 <p className="text-[9px] text-content-muted mt-1">{t('ratioLiquidite')}</p>
-              </Card>
+            {/* Row 1: 3 KPI gauges */}
+            <div className="grid grid-cols-3 gap-1.5">
+              {([
+                {
+                  label: 'PAR 30',
+                  value: par30,
+                  format: (v: number) => `${v.toFixed(1)}%`,
+                  target: '< 3%',
+                  icon: AlertTriangle,
+                  color: par30 > 5 ? 'text-status-danger' : par30 > 3 ? 'text-status-warning' : 'text-status-success',
+                  barColor: par30 > 5 ? 'bg-status-danger' : par30 > 3 ? 'bg-status-warning' : 'bg-status-success',
+                  barPct: Math.min(par30 * 10, 100),
+                },
+                {
+                  label: 'Liquidité',
+                  value: liquidityRatio,
+                  format: (v: number) => `${v}%`,
+                  target: 'L/D',
+                  icon: TrendingUp,
+                  color: liquidityRatio >= 100 ? 'text-status-success' : liquidityRatio >= 50 ? 'text-status-warning' : 'text-status-danger',
+                  barColor: liquidityRatio >= 100 ? 'bg-status-info' : liquidityRatio >= 50 ? 'bg-status-warning' : 'bg-status-danger',
+                  barPct: Math.min(liquidityRatio, 100),
+                },
+                {
+                  label: 'Recouv.',
+                  value: tauxRecouvrement,
+                  format: (v: number) => `${v.toFixed(0)}%`,
+                  target: '> 95%',
+                  icon: Target,
+                  color: tauxRecouvrement >= 95 ? 'text-status-success' : tauxRecouvrement >= 80 ? 'text-status-warning' : 'text-status-danger',
+                  barColor: tauxRecouvrement >= 95 ? 'bg-status-success' : tauxRecouvrement >= 80 ? 'bg-status-warning' : 'bg-status-danger',
+                  barPct: Math.min(tauxRecouvrement, 100),
+                },
+              ] as const).map(kpi => (
+                <div key={kpi.label} className="bg-surface/50 border border-edge/40 rounded-lg p-2">
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="text-[9px] text-content-muted font-medium">{kpi.label}</span>
+                    <kpi.icon size={10} className={kpi.color} />
+                  </div>
+                  <div className={`text-sm font-bold leading-tight ${kpi.color}`}>{kpi.format(kpi.value)}</div>
+                  <div className="w-full h-0.5 bg-surface-elevated rounded-full overflow-hidden mt-1">
+                    <div className={`h-full rounded-full ${kpi.barColor}`} style={{ width: `${kpi.barPct}%` }} />
+                  </div>
+                  <p className="text-[8px] text-content-muted mt-0.5">{kpi.target}</p>
+                </div>
+              ))}
             </div>
 
-             <Card variant="default" className="flex items-center justify-between p-2.5 bg-surface/40">
-               <div className="flex items-center gap-2">
-                 <div
-                   className="w-8 h-8 rounded-full bg-surface-elevated flex items-center justify-center font-bold text-xs text-content-secondary border-2 border-edge-strong"
-                   aria-label={`${stats?.global?.agentsActifs || 0} ${t('agentsActifs') || 'agents actifs'}`}
-                 >
-                   {stats?.global?.agentsActifs || 0}
-                 </div>
-                 <div>
-                   <div className="text-xs font-medium text-content-primary">{t('activiteAgents')}</div>
-                   <div className="text-[9px] text-content-muted">
-                     {stats?.global?.totalAgents ? `${stats.global.agentsActifs || 0} / ${stats.global.totalAgents} ${t('actifs')}` : '-'}
-                   </div>
-                 </div>
-               </div>
-               <div className="h-6 w-[1px] bg-surface-elevated mx-2" aria-hidden="true"></div>
-               <div>
-                 <div className="text-xs font-bold text-content-primary text-right" aria-live="polite">{stats?.daily.nouveauxClients || 0}</div>
-                 <div className="text-[9px] text-content-muted text-right">{t('nouveauxClients')}</div>
-               </div>
-             </Card>
-          </section>
-
-          {/* Section: Scoring Clients */}
-          {scoreStats && scoreStats.length > 0 && (() => {
-            const agg = scoreStats.reduce((acc, s) => ({
-              totalClients: acc.totalClients + s.totalClients,
-              sumScore: acc.sumScore + s.avgScore * s.totalClients,
-              VIP: acc.VIP + s.segments.VIP,
-              Premium: acc.Premium + s.segments.Premium,
-              Standard: acc.Standard + s.segments.Standard,
-              Risque: acc.Risque + s.segments.Risque,
-            }), { totalClients: 0, sumScore: 0, VIP: 0, Premium: 0, Standard: 0, Risque: 0 });
-            const avgScore = agg.totalClients > 0 ? Math.round(agg.sumScore / agg.totalClients) : 0;
-            const scoreColor = avgScore >= 80 ? 'text-status-success' : avgScore >= 65 ? 'text-status-info' : avgScore >= 40 ? 'text-status-warning' : 'text-status-danger';
-            return (
-              <section className="space-y-2" aria-labelledby="scoring-section-title">
-                <h3 id="scoring-section-title" className="text-xs font-semibold text-content-muted uppercase tracking-widest flex items-center gap-1.5">
-                  <BarChart3 size={12} aria-hidden="true" />
-                  Scoring Clients
-                </h3>
-                <Card variant="default" padding="sm" className="bg-surface/40 p-2.5">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] text-content-muted">Score moyen</span>
-                    <span className={`text-lg font-bold ${scoreColor}`}>{avgScore}</span>
+            {/* Row 2: Portfolio + Activity compact */}
+            <div className="grid grid-cols-2 gap-1.5">
+              <div className="bg-surface/50 border border-edge/40 rounded-lg p-2">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <CreditCard size={10} className="text-accent" />
+                  <span className="text-[9px] text-content-muted font-medium">Portefeuille</span>
+                </div>
+                <div className="space-y-0.5">
+                  <div className="flex justify-between">
+                    <span className="text-[10px] text-content-muted">Crédits actifs</span>
+                    <span className="text-[10px] font-bold text-content-primary">{stats?.global?.creditsEnCours || 0}</span>
                   </div>
-                  <div className="space-y-1">
-                    {([
-                      { label: 'VIP', count: agg.VIP, color: 'bg-status-success' },
-                      { label: 'Premium', count: agg.Premium, color: 'bg-status-info' },
-                      { label: 'Standard', count: agg.Standard, color: 'bg-status-warning' },
-                      { label: 'Risque', count: agg.Risque, color: 'bg-status-danger' },
-                    ] as const).map(seg => (
-                      <div key={seg.label} className="flex items-center gap-2">
-                        <span className="text-[10px] text-content-muted w-14">{seg.label}</span>
-                        <div className="flex-1 h-1.5 bg-surface-elevated rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full ${seg.color}`}
-                            style={{ width: `${agg.totalClients > 0 ? (seg.count / agg.totalClients) * 100 : 0}%` }}
-                          />
-                        </div>
-                        <span className="text-[10px] font-medium text-content-secondary w-6 text-right">{seg.count}</span>
+                  <div className="flex justify-between">
+                    <span className="text-[10px] text-content-muted">En retard</span>
+                    <span className={`text-[10px] font-bold ${overdueInstallments > 0 ? 'text-status-danger' : 'text-content-primary'}`}>{overdueInstallments}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[10px] text-content-muted">Épargnes</span>
+                    <span className="text-[10px] font-bold text-content-primary">{stats?.global?.epargneActive || 0}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[10px] text-content-muted">Tontines</span>
+                    <span className="text-[10px] font-bold text-content-primary">{stats?.global?.tontinesActives || 0}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-surface/50 border border-edge/40 rounded-lg p-2">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Users size={10} className="text-status-info" />
+                  <span className="text-[9px] text-content-muted font-medium">Activité</span>
+                </div>
+                <div className="space-y-0.5">
+                  <div className="flex justify-between">
+                    <span className="text-[10px] text-content-muted">Agents</span>
+                    <span className="text-[10px] font-bold text-content-primary">{stats?.global?.agentsActifs || 0}/{stats?.global?.totalAgents || 0}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[10px] text-content-muted">Clients actifs</span>
+                    <span className="text-[10px] font-bold text-content-primary">{stats?.global?.clientsActifs || 0}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[10px] text-content-muted">Nouv. clients</span>
+                    <span className="text-[10px] font-bold text-accent">{stats?.daily?.nouveauxClients || 0}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[10px] text-content-muted">Caisses ouv.</span>
+                    <span className="text-[10px] font-bold text-content-primary">{stats?.global?.sessionsOuvertes || 0}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Row 3: Scoring compact */}
+            {scoreStats && scoreStats.length > 0 && (() => {
+              const agg = scoreStats.reduce((acc, s) => ({
+                totalClients: acc.totalClients + s.totalClients,
+                sumScore: acc.sumScore + s.avgScore * s.totalClients,
+                VIP: acc.VIP + s.segments.VIP,
+                Premium: acc.Premium + s.segments.Premium,
+                Standard: acc.Standard + s.segments.Standard,
+                Risque: acc.Risque + s.segments.Risque,
+              }), { totalClients: 0, sumScore: 0, VIP: 0, Premium: 0, Standard: 0, Risque: 0 });
+              const avgScore = agg.totalClients > 0 ? Math.round(agg.sumScore / agg.totalClients) : 0;
+              const scoreColor = avgScore >= 80 ? 'text-status-success' : avgScore >= 65 ? 'text-status-info' : avgScore >= 40 ? 'text-status-warning' : 'text-status-danger';
+              const segments = [
+                { label: 'VIP', count: agg.VIP, color: 'bg-status-success' },
+                { label: 'Prem.', count: agg.Premium, color: 'bg-status-info' },
+                { label: 'Std', count: agg.Standard, color: 'bg-status-warning' },
+                { label: 'Risq.', count: agg.Risque, color: 'bg-status-danger' },
+              ];
+              return (
+                <div className="bg-surface/50 border border-edge/40 rounded-lg p-2">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <BarChart3 size={10} className="text-content-muted" />
+                      <span className="text-[9px] text-content-muted font-medium">Scoring</span>
+                    </div>
+                    <div className="flex items-baseline gap-1">
+                      <span className={`text-sm font-bold ${scoreColor}`}>{avgScore}</span>
+                      <span className="text-[8px] text-content-muted">/ 100</span>
+                    </div>
+                  </div>
+                  {/* Stacked bar */}
+                  <div className="flex h-2 rounded-full overflow-hidden bg-surface-elevated mb-1.5">
+                    {segments.map(seg => {
+                      const pct = agg.totalClients > 0 ? (seg.count / agg.totalClients) * 100 : 0;
+                      return pct > 0 ? <div key={seg.label} className={`${seg.color}`} style={{ width: `${pct}%` }} /> : null;
+                    })}
+                  </div>
+                  {/* Legend row */}
+                  <div className="flex justify-between">
+                    {segments.map(seg => (
+                      <div key={seg.label} className="flex items-center gap-1">
+                        <div className={`w-1.5 h-1.5 rounded-full ${seg.color}`} />
+                        <span className="text-[9px] text-content-muted">{seg.label}</span>
+                        <span className="text-[9px] font-semibold text-content-secondary">{seg.count}</span>
                       </div>
                     ))}
                   </div>
-                  <div className="text-[9px] text-content-muted mt-1.5 text-right">
-                    {agg.totalClients} client{agg.totalClients > 1 ? 's' : ''}
-                  </div>
-                </Card>
-              </section>
-            );
-          })()}
+                </div>
+              );
+            })()}
+          </section>
 
         </aside>
 

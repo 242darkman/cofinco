@@ -23,7 +23,7 @@ import { createLogger } from '../lib/logger';
 import { db } from '../db';
 import { users, userRoles } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
-import { normalizeRole, SystemRole } from '@shared/types/roles';
+import { SystemRole } from '@shared/types/roles';
 
 const logger = createLogger('Authorization');
 
@@ -330,10 +330,10 @@ export function requireResetPassword() {
           .where(and(eq(userRoles.userId, targetUserId), eq(userRoles.isPrimary, true)));
 
         if (targetUser) {
-          const targetNormalized = normalizeRole(targetUser.role);
-          const requesterNormalized = normalizeRole(req.session?.user?.role);
+          const isTargetAdmin = targetUser.role === SystemRole.ADMIN;
+          const isRequesterSuperAdmin = req.ability?.can(Actions.MANAGE, Subjects.ALL);
 
-          if (targetNormalized === SystemRole.ADMIN && requesterNormalized !== SystemRole.ADMIN) {
+          if (isTargetAdmin && !isRequesterSuperAdmin) {
             res.status(403).json({
               error: 'Accès refusé',
               message: 'Seul un administrateur peut réinitialiser le mot de passe d\'un autre administrateur',

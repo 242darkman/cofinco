@@ -1,4 +1,4 @@
-import { ROLE_LABELS, SystemRole, normalizeRole } from '@shared/types/roles';
+import { ROLE_LABELS, SystemRole } from '@shared/types/roles';
 import { StatutUser } from '@shared/enum/status-constants';
 
 const ROLE_CLASSES: Record<SystemRole, string> = {
@@ -22,17 +22,17 @@ export const getRoleBadgeStyle = (role: string) => {
   if (!role) {
     return { label: 'Inconnu', classes: 'bg-surface-subtle/30 text-content-muted border-edge-strong/20' };
   }
-  const normalizedRole = normalizeRole(role);
-  if (!normalizedRole) {
-    return { 
-      label: role.charAt(0).toUpperCase() + role.slice(1).replace(/_/g, ' '), 
-      classes: 'bg-surface-subtle/30 text-content-muted border-edge-strong/20' 
+  const knownRole = role as SystemRole;
+  if (!ROLE_CLASSES[knownRole]) {
+    return {
+      label: role.charAt(0).toUpperCase() + role.slice(1).replace(/_/g, ' '),
+      classes: 'bg-surface-subtle/30 text-content-muted border-edge-strong/20'
     };
   }
 
   return {
-    label: ROLE_LABELS[normalizedRole],
-    classes: ROLE_CLASSES[normalizedRole],
+    label: ROLE_LABELS[knownRole],
+    classes: ROLE_CLASSES[knownRole],
   };
 };
 

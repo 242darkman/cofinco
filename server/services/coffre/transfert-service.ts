@@ -10,10 +10,10 @@ import {
   agences,
 } from "@shared/schema";
 import { StatutTransfertCoffre, StatutCoffre } from "@shared/enum/status-constants";
+import { SystemRole } from "@shared/types/roles";
 import { eq, and, or, desc, gte, lte, count } from "drizzle-orm";
 import { executeTransfertCoffre } from "./transfer-executor";
 import { TransfertCoffreValidator } from "./transfert-validator";
-import { isAdminRole } from "@shared/types/roles";
 import { getDailyCoffreTotal } from "./coffre-guard";
 import { randomInt } from "crypto";
 import { currencyCode } from "@shared/config/currency";
@@ -295,7 +295,7 @@ export class TransfertCoffreService {
     const [primaryRole] = await db.select({ role: userRoles.role })
       .from(userRoles)
       .where(and(eq(userRoles.userId, params.cancelledBy), eq(userRoles.isPrimary, true)));
-    const isAdmin = isAdminRole(primaryRole?.role);
+    const isAdmin = primaryRole?.role === SystemRole.ADMIN;
     
     if (transfert.requestedBy !== params.cancelledBy && !isAdmin) {
       return { success: false, errorCode: "PERMISSION_DENIED", error: "Seul l'initiateur peut annuler" };

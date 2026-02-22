@@ -56,7 +56,7 @@
 import { createMongoAbility, MongoAbility, RawRuleOf } from '@casl/ability';
 import { db } from '../db';
 import { permissions, rolePermissions, userPermissions, modules, userRoles, agences, roleHierarchy } from '@shared/schema';
-import { isAdminRole, SystemRole } from '@shared/types/roles';
+import { SystemRole } from '@shared/types/roles';
 import { eq, and, or, isNull, inArray } from 'drizzle-orm';
 import {
   AppAbility,
@@ -469,7 +469,7 @@ export async function buildAbilityForUser(context: AbilityContext): Promise<Abil
   // 2. Determine primary role and check if admin
   const primaryRole = effectiveRoles.find(r => r.isPrimary)?.role || effectiveRoles[0].role;
   const directRoleNames = Array.from(new Set(effectiveRoles.map(r => r.role)));
-  const isAdmin = directRoleNames.some(r => isAdminRole(r));
+  const isAdmin = directRoleNames.some(r => r === SystemRole.ADMIN);
 
   // 2b. Expand roles with hierarchy (e.g. CHEF_AGENCE inherits SUPERVISEUR, COMPTABLE, etc.)
   const roleNames = isAdmin
@@ -739,14 +739,14 @@ export async function getPermissionSources(
   .where(eq(userRoles.userId, userId));
 
   const roleNames = userRolesResult.map(r => r.role as SystemRole);
-  const isAdmin = roleNames.some(r => isAdminRole(r));
+  const isAdmin = roleNames.some(r => r === SystemRole.ADMIN);
 
   // 2. If admin, they have all permissions
   if (isAdmin) {
     return {
       code: normalizedCode,
       grantedBy: 'admin',
-      roles: roleNames.filter(r => isAdminRole(r)),
+      roles: roleNames.filter(r => r === SystemRole.ADMIN),
     };
   }
 
@@ -808,7 +808,7 @@ export async function getAllPermissionSources(userId: string): Promise<Map<strin
   .where(eq(userRoles.userId, userId));
 
   const roleNames = userRolesResult.map(r => r.role as SystemRole);
-  const isAdmin = roleNames.some(r => isAdminRole(r));
+  const isAdmin = roleNames.some(r => r === SystemRole.ADMIN);
 
   // Get all permissions
   const allPerms = await db.select({
@@ -818,7 +818,7 @@ export async function getAllPermissionSources(userId: string): Promise<Map<strin
 
   // If admin, all permissions come from admin role
   if (isAdmin) {
-    const adminRoles = roleNames.filter(r => isAdminRole(r));
+    const adminRoles = roleNames.filter(r => r === SystemRole.ADMIN);
     for (const perm of allPerms) {
       sources.set(perm.code, {
         code: perm.code,

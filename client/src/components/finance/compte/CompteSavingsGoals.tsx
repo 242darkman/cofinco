@@ -12,6 +12,7 @@ import { validateAmount, validateDate, VALIDATION_LIMITS } from '../../../lib/va
 import { formatMoney, formatDate, getDaysRemaining } from '../../../lib/format';
 import { ALL_STATUS_LABELS } from '../../../lib/status-labels';
 import { useConfirmDialog } from '../../../hooks/useConfirmDialog';
+import { usePermissions } from '../../auth/ProtectedFeature';
 import { StatutObjectif, StatutObjectifType } from '@shared/enum/status-constants';
 
 interface Objectif {
@@ -40,6 +41,8 @@ interface FormErrors {
 
 export default function CompteSavingsGoals({ compteId, compteSolde, onClose }: CompteSavingsGoalsProps) {
   const queryClient = useQueryClient();
+  const { hasPermission } = usePermissions();
+  const canManage = hasPermission('epargne', 'manage') || hasPermission('comptes', 'edit');
   const [submitting, setSubmitting] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
@@ -246,7 +249,7 @@ export default function CompteSavingsGoals({ compteId, compteSolde, onClose }: C
           )}
 
           {/* Add button */}
-          {!showForm && (
+          {!showForm && canManage && (
             <Button onClick={() => setShowForm(true)} variant="success" fullWidth icon={Plus}>
               Nouvel Objectif
             </Button>
@@ -421,6 +424,7 @@ export default function CompteSavingsGoals({ compteId, compteSolde, onClose }: C
                         </div>
                       </div>
 
+                      {canManage && (
                       <button
                         onClick={() => handleDelete(objectif)}
                         className="p-2 text-status-danger hover:bg-status-danger-bg rounded-lg transition"
@@ -429,6 +433,7 @@ export default function CompteSavingsGoals({ compteId, compteSolde, onClose }: C
                       >
                         <Trash2 size={18} aria-hidden="true" />
                       </button>
+                      )}
                     </div>
 
                     {/* Progress bar */}

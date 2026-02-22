@@ -9,6 +9,7 @@
 
 import { Router, Request, Response } from 'express';
 import { requireAuth } from '../auth';
+import { attachAbility } from '../authorization';
 import { db } from '../db';
 import { sql, eq, gt, and, inArray } from 'drizzle-orm';
 import { idempotencyKeys } from '@shared/schema';
@@ -327,7 +328,7 @@ interface PushOperation {
  * Each operation is processed with idempotency protection.
  * Returns per-operation results so the client can mark them accordingly.
  */
-router.post('/push', requireAuth, async (req: Request, res: Response) => {
+router.post('/push', requireAuth, attachAbility, async (req: Request, res: Response) => {
   const userId = (req.user as any)?.id;
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
@@ -447,7 +448,7 @@ router.post('/push', requireAuth, async (req: Request, res: Response) => {
  *   hasMore: { clients: false, credits: true }
  * }
  */
-router.post('/pull', requireAuth, async (req: Request, res: Response) => {
+router.post('/pull', requireAuth, attachAbility, async (req: Request, res: Response) => {
   const userId = (req.user as any)?.id;
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 

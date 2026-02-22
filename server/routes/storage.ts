@@ -3,12 +3,11 @@ import multer from 'multer';
 import { createLogger } from '../lib/logger';
 import { StorageService } from '../services/storage-service';
 import { requireAuth } from '../auth';
-import { attachAbility } from '../authorization';
-import { Actions } from '@shared/ability';
+import { attachAbility, requireAbility } from '../authorization';
+import { Actions, Subjects } from '@shared/ability';
 import { db } from '../db';
 import { clients } from '@shared/schema';
 import { eq, sql } from 'drizzle-orm';
-import { SystemRole, normalizeRole } from '@shared/types/roles';
 import {
   StorageFileType,
   StorageEntityType,
@@ -134,11 +133,6 @@ router.get('/documents/:id/view', requireAuth, attachAbility, async (req, res) =
   try {
     const { id } = req.params;
     const user = req.user!;
-    const normalizedRole = normalizeRole(user.role);
-
-    if (!normalizedRole) {
-      return res.status(403).json({ error: 'Accès refusé' });
-    }
 
     let objectKey: string | null = null;
     let ownerId: string | null = null;
@@ -211,7 +205,7 @@ router.get('/documents/:id/view', requireAuth, attachAbility, async (req, res) =
  * DELETE /api/storage/:key(*)
  * Delete file by key or URL
  */
-router.delete('/:key(*)', requireAuth, async (req, res) => {
+router.delete('/:key(*)', requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.ADMIN), async (req, res) => {
   try {
     const rawKey = req.params.key;
 
@@ -243,7 +237,7 @@ router.delete('/:key(*)', requireAuth, async (req, res) => {
  * - entityType: 'client' | 'user' | 'employe' | 'credit' | 'tontine'
  * - entityId: UUID de l'entité
  */
-router.post('/entity/upload', requireAuth, upload.single('file'), async (req, res) => {
+router.post('/entity/upload', requireAuth, attachAbility, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'Aucun fichier fourni' });
@@ -271,8 +265,7 @@ router.post('/entity/upload', requireAuth, upload.single('file'), async (req, re
 
     // Authorization check: verify user can upload for this entity
     const user = req.user!;
-    const normalizedRole = normalizeRole(user.role);
-    const isPrivileged = normalizedRole === SystemRole.ADMIN || normalizedRole === SystemRole.CHEF_AGENCE;
+    const isPrivileged = req.ability?.can(Actions.MANAGE, 'all') || req.ability?.can(Actions.MANAGE, Subjects.ADMIN);
 
     // Non-privileged users can only upload for their own entity
     if (!isPrivileged && entityType === 'user' && entityId !== user.id) {
@@ -316,7 +309,7 @@ router.post('/entity/upload', requireAuth, upload.single('file'), async (req, re
  * POST /api/storage/entity/presigned-url
  * Get presigned URL avec organisation par entité
  */
-router.post('/entity/presigned-url', requireAuth, async (req, res) => {
+router.post('/entity/presigned-url', requireAuth, attachAbility, async (req, res) => {
   try {
     const { filename, contentType, fileType, entityType, entityId } = req.body;
 
@@ -364,16 +357,8 @@ router.post('/entity/presigned-url', requireAuth, async (req, res) => {
  * Supprime TOUS les fichiers d'une entité (cascade)
  * Réservé aux admins
  */
-router.delete('/entity/:entityType/:entityId', requireAuth, async (req, res) => {
+router.delete('/entity/:entityType/:entityId', requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.ADMIN), async (req, res) => {
   try {
-    const user = req.user;
-    const normalizedRole = normalizeRole(user?.role);
-
-    // Vérification admin uniquement
-    if (normalizedRole !== SystemRole.ADMIN) {
-      return res.status(403).json({ error: 'Accès réservé aux administrateurs' });
-    }
-
     const { entityType, entityId } = req.params;
 
     // validEntityTypes defined at module top

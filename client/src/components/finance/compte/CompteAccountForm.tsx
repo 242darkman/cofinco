@@ -7,7 +7,7 @@ import {
 import { clientApi, compteEpargneApi, paymentsApi } from '../../../lib/api-client';
 import mtnLogo from '@/assets/logos/mtn-logo.png';
 import airtelLogo from '@/assets/logos/airtel-logo.png';
-import { useFeatureFlags } from '../../../contexts/FeatureFlagsContext';
+import { useFeatureFlags, useEnabledPaymentMethods } from '../../../contexts/FeatureFlagsContext';
 import { toast, handleApiError } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
 import { sanitizeInput } from '../../../lib/sanitize';
@@ -81,6 +81,7 @@ const normalizeTypeCompte = (value: string): TypeCompte => {
 
 export default function CompteAccountForm({ onClose, onSuccess, clientId }: CompteAccountFormProps) {
   const { mobileMoneyEnabled } = useFeatureFlags();
+  const enabledPayments = useEnabledPaymentMethods();
   // Data State
   const [clients, setClients] = useState<Client[]>([]);
   const [comptesExistants, setComptesExistants] = useState<CompteExistant[]>([]);
@@ -571,9 +572,11 @@ export default function CompteAccountForm({ onClose, onSuccess, clientId }: Comp
       blue: 'border-status-info bg-status-info-bg text-status-info',
     };
 
-    // Disable if transfer not eligible or MM not enabled
+    // Disable if transfer not eligible or payment method not enabled
     const isMM = id === 'MTN' || id === 'AIRTEL';
-    const disabled = (id === 'TRANSFER' && !eligibleForTransfer) || (isMM && !mobileMoneyEnabled);
+    const paymentKey = isMM ? 'MOBILE_MONEY' : id === 'TRANSFER' ? 'TRANSFER' : id === 'CASH' ? 'CASH' : 'CHECK';
+    const methodDisabled = enabledPayments[paymentKey as keyof typeof enabledPayments] === false;
+    const disabled = methodDisabled || (id === 'TRANSFER' && !eligibleForTransfer) || (isMM && !mobileMoneyEnabled);
 
     return (
       <button

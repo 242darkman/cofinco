@@ -12,7 +12,6 @@ import {
 import { useEmployes } from '../../../hooks/hr/useEmployes';
 import { useUserProfile } from '../../../hooks/useUserProfile';
 import { usePermissions } from '../../auth/ProtectedFeature';
-import { isAdminRole } from '@shared/types/roles';
 import { Card, Button, Badge, SelectField, SearchableSelect, EmptyState, FilterBar } from '../../ui';
 import {
   ChevronLeft,
@@ -99,8 +98,8 @@ function getStatutVariant(s: string) {
 
 export default function FeuilleDeTempTab() {
   const { user } = useUserProfile();
-  const { hasPermission } = usePermissions();
-  const isRH = isAdminRole(user?.role) || hasPermission('rh', 'edit');
+  const { isAdmin, hasPermission } = usePermissions();
+  const isRH = isAdmin || hasPermission('rh', 'edit');
 
   // Filters
   const [selectedWeek, setSelectedWeek] = useState(getCurrentWeek);

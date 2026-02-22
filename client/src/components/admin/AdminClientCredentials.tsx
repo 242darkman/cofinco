@@ -19,6 +19,7 @@ import { Card, Button, IconButton, FeatureHeader, FEATURE_DESCRIPTIONS } from '.
 import ConfirmDialog from '../ui/ConfirmDialog';
 import { toast, handleApiError } from '../../lib/toast';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
+import { usePermissions } from '../auth/ProtectedFeature';
 
 interface ClientWithoutCredentials {
   id: string;
@@ -51,6 +52,8 @@ export default function AdminClientCredentials() {
   const [sendEmail, setSendEmail] = useState(true);
 
   const { confirmState, openConfirm, closeConfirm, handleConfirm } = useConfirmDialog();
+  const { hasPermission } = usePermissions();
+  const canManage = hasPermission('clients', 'manage') || hasPermission('admin', 'manage');
 
   const loadClientsWithoutCredentials = useCallback(async () => {
     setLoading(true);
@@ -196,6 +199,7 @@ export default function AdminClientCredentials() {
             actions={
               <div className="flex items-center gap-2 flex-wrap">
               {/* Toggle envoi email */}
+              {canManage && (
               <label className="flex items-center gap-2 px-3 py-1.5 bg-surface-muted/50 rounded-lg border border-edge cursor-pointer hover:bg-surface-muted transition-colors">
                 <input
                   type="checkbox"
@@ -208,6 +212,7 @@ export default function AdminClientCredentials() {
                   Envoyer par email
                 </span>
               </label>
+              )}
               <Button
                 variant="secondary"
                 size="sm"
@@ -217,6 +222,7 @@ export default function AdminClientCredentials() {
               >
                 Actualiser
               </Button>
+              {canManage && (
               <Button
                 variant="primary"
                 size="sm"
@@ -227,6 +233,7 @@ export default function AdminClientCredentials() {
               >
                 {generating ? 'Génération...' : `Générer ${selectedClients.size > 0 ? `(${selectedClients.size})` : 'Tous'}`}
               </Button>
+              )}
               </div>
             }
           />

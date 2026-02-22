@@ -41,6 +41,9 @@ export const systemSettings = pgTable("system_settings", {
   notificationSmsEnabled: boolean("notification_sms_enabled").default(true),
   smsPaymentValidationEnabled: boolean("sms_payment_validation_enabled").default(true),
   mobileMoneyEnabled: boolean("mobile_money_enabled").default(true),
+  cashEnabled: boolean("cash_enabled").default(true),
+  checkEnabled: boolean("check_enabled").default(true),
+  transferEnabled: boolean("transfer_enabled").default(true),
   maintenanceMode: boolean("maintenance_mode").default(false),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

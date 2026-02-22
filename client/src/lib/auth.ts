@@ -1,7 +1,7 @@
 import { authApi, AuthUser, setOnUnauthorized, ApiError } from './api-client';
 import { initEncryptionKey, clearEncryptionKey, clearSigningKey, clearHmacKey } from './offline-crypto';
 import { initializeDeviceKey, teardownDeviceKey } from './device-key-manager';
-import { SystemRole, hasRole as hasSystemRole, isAdminRole, normalizeRole } from '@shared/types/roles';
+import { SystemRole, hasRole as hasSystemRole } from '@shared/types/roles';
 import { StatutUser } from '@shared/enum/status-constants';
 
 export interface User {
@@ -84,11 +84,6 @@ class AuthService {
    * Mapper AuthUser vers User
    */
   private mapAuthUser(authUser: AuthUser): User {
-    const normalizedRole = normalizeRole(authUser.role);
-    if (!normalizedRole) {
-      console.warn('[Auth] Unknown role received:', authUser.role);
-    }
-
     return {
       id: authUser.id,
       username: authUser.username,
@@ -96,7 +91,7 @@ class AuthService {
       name: `${authUser.prenom || ''} ${authUser.nom}`.trim(),
       nom: authUser.nom,
       prenom: authUser.prenom,
-      role: normalizedRole || SystemRole.CLIENT,
+      role: (authUser.role as SystemRole) || SystemRole.CLIENT,
       status: authUser.statut || StatutUser.ACTIVE,
       agence: authUser.agence,
       agenceId: authUser.agenceId,
@@ -270,13 +265,11 @@ class AuthService {
 
   hasRole(roleCode: SystemRole | string): boolean {
     if (!this.currentUser?.role) return false;
-    const normalizedRole = normalizeRole(roleCode);
-    if (!normalizedRole) return false;
-    return hasSystemRole(this.currentUser.role, normalizedRole);
+    return hasSystemRole(this.currentUser.role, roleCode as SystemRole);
   }
 
   isAdmin(): boolean {
-    return isAdminRole(this.currentUser?.role);
+    return this.currentUser?.role === SystemRole.ADMIN;
   }
 
   isAgentCaisse(): boolean {

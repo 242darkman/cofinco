@@ -10,7 +10,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { UniversalPaymentSuccessModal } from './shared/UniversalPaymentSuccessModal';
 import { ReceiptData } from '../../ui/printable/ReceiptTemplate';
 import { currencySymbol } from '@shared/config/currency';
-import { useFeatureFlags } from '../../../contexts/FeatureFlagsContext';
+import { useFeatureFlags, useEnabledPaymentMethods } from '../../../contexts/FeatureFlagsContext';
 import mtnLogo from '@/assets/logos/mtn-logo.png';
 import airtelLogo from '@/assets/logos/airtel-logo.png';
 
@@ -85,6 +85,7 @@ export function AccountActivationModal({
 
   // Feature flags
   const { mobileMoneyEnabled } = useFeatureFlags();
+  const enabledPayments = useEnabledPaymentMethods();
 
   // Fetch client accounts for internal transfer
   useEffect(() => {
@@ -404,8 +405,10 @@ export function AccountActivationModal({
   const renderPaymentButton = (id: ModePaiement, label: string, color: string, content: React.ReactNode) => {
     const isSelected = modePaiement === id;
     const isMmBtn = id === 'MTN' || id === 'AIRTEL';
+    const paymentKey = isMmBtn ? 'MOBILE_MONEY' : id === 'TRANSFER' ? 'TRANSFER' : id === 'CASH' ? 'CASH' : 'CHECK';
+    const methodDisabled = enabledPayments[paymentKey as keyof typeof enabledPayments] === false;
     const isTransferDisabled = id === 'TRANSFER' && (!eligibleForTransfer || transferFetchFailed);
-    const isDisabled = isTransferDisabled || (isMmBtn && !mobileMoneyEnabled) || mmStep === 'pending';
+    const isDisabled = methodDisabled || isTransferDisabled || (isMmBtn && !mobileMoneyEnabled) || mmStep === 'pending';
     const colorMap: Record<string, string> = {
       success: 'border-status-success bg-status-success-bg text-status-success',
       warning: 'border-status-warning bg-status-warning-bg text-status-warning',

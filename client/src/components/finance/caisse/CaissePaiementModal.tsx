@@ -14,6 +14,7 @@ import { UniversalPaymentSuccessModal } from './shared/UniversalPaymentSuccessMo
 import { ReceiptData } from '../../ui/printable/ReceiptTemplate';
 import { currencySymbol } from '@shared/config/currency';
 import { useBranding } from '@/contexts/BrandingContext';
+import { useEnabledPaymentMethods } from '../../../contexts/FeatureFlagsContext';
 import { v4 as uuidv4 } from 'uuid';
 import {
   TypeOperationCaisse,
@@ -69,6 +70,7 @@ export default function CaissePaiementModal({
   // RBAC permissions
   const { hasPermission } = usePermissions();
   const { branding } = useBranding();
+  const enabledPayments = useEnabledPaymentMethods();
   const canCreatePayments = hasPermission('caisse', 'create') || hasPermission('paiements', 'create');
 
   const [loading, setLoading] = useState(false);
@@ -879,7 +881,7 @@ export default function CaissePaiementModal({
                    { id: MethodePaiement.MOBILE_MONEY, provider: 'MTN' as const, label: 'MTN MoMo', img: mtnMomoLogo, selectedBorder: 'border-status-warning/50', selectedBg: 'bg-status-warning/10' },
                    { id: MethodePaiement.MOBILE_MONEY, provider: 'AIRTEL' as const, label: 'Airtel Money', img: airtelMoneyLogo, selectedBorder: 'border-status-danger/50', selectedBg: 'bg-status-danger/10' },
                    { id: MethodePaiement.TRANSFER, provider: null, label: 'Virement', icon: Building2, selectedBorder: 'border-accent/50', selectedBg: 'bg-accent/10' },
-                ].map((m) => {
+                ].filter((m) => enabledPayments[m.id as keyof typeof enabledPayments] !== false).map((m) => {
                    const isSelected = formData.mode_paiement === m.id && (m.provider ? mobileProvider === m.provider : true);
                    const Icon = m.icon;
 

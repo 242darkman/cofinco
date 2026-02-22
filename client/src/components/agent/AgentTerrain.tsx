@@ -9,7 +9,7 @@ import {
 import { toast } from 'sonner';
 import { agentTerrainApi, caisseAgentApi } from '../../lib/api-client';
 import { authService } from '../../lib/auth';
-import { useIsAdmin } from '../../contexts/AbilityContext';
+import { useIsAdmin, useAbility } from '../../contexts/AbilityContext';
 import AgentTerrainPaiement from './AgentTerrainPaiement';
 import SettlementModal from './SettlementModal';
 import CloseSessionModal from './CloseSessionModal';
@@ -24,7 +24,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '../ui/sheet';
 import { useIsOnline } from '@/contexts/NetworkContext';
 import { getOperationStats } from '@/lib/offline-db';
 import { StatutUser, StatutOperationTerrain, TYPE_OPERATION_TERRAIN_LABELS, TypeOperationTerrainType } from '@shared/enum/status-constants';
-import { SystemRole, normalizeRole } from '@shared/types/roles';
+import { Actions, Subjects } from '@/lib/casl';
 import { currencySymbol } from '@shared/config/currency';
 import { resolveStorageUrl } from '../../lib/format';
 
@@ -123,8 +123,8 @@ export default function AgentTerrain({ activeView, agentId: propAgentId, embedde
   // Auth & Role
   const currentUser = authService.getCurrentUser();
   const isAdmin = useIsAdmin();
-  const userRole = normalizeRole(currentUser?.role);
-  const canSupervise = isAdmin || userRole === SystemRole.CHEF_AGENCE || userRole === SystemRole.SUPERVISEUR;
+  const ability = useAbility();
+  const canSupervise = isAdmin || ability.can(Actions.MANAGE, Subjects.TERRAIN) || ability.can(Actions.APPROVE, Subjects.TERRAIN);
 
   // Target agent: supervisor uses selected agent, normal agent uses themselves
   const targetAgentId = canSupervise ? selectedAgentId : currentAgent?.id;

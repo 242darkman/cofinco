@@ -9,7 +9,8 @@ import SelectField from '../ui/SelectField';
 import Button from '../ui/Button';
 import SmartDocumentUpload, { type UploadedDocument, type DocumentType } from '../ui/SmartDocumentUpload';
 import { useUserProfile } from '../../hooks/useUserProfile';
-import { isAdminRole, SystemRole } from '@shared/types/roles';
+import { SystemRole } from '@shared/types/roles';
+import { usePermissions } from '../auth/ProtectedFeature';
 import { agenceApi, employeApi, villeApi, catalogApi } from '../../lib/api-client';
 import { useEntityUpload } from '../../hooks/useEntityUpload';
 import { resolveStorageUrl } from '../../lib/format';
@@ -106,7 +107,7 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
   const { user } = useUserProfile();
   const [agences, setAgences] = useState<{ id: string; nom: string }[]>([]);
   const [agentsReferents, setAgentsReferents] = useState<{ id: string; nom: string; prenom: string }[]>([]);
-  const isAdmin = isAdminRole(user?.role);
+  const { isAdmin } = usePermissions();
 
   // Form State
   const [formData, setFormData] = useState<ClientFormData>({

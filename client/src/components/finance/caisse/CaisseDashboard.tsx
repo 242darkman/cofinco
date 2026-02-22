@@ -28,7 +28,6 @@ import CaissePaiementModal from './CaissePaiementModal';
 import { UniversalPaymentSuccessModal } from './shared/UniversalPaymentSuccessModal';
 import { ReceiptData } from '../../ui/printable/ReceiptTemplate';
 import { SupervisionSession } from './shared/SupervisionConfirmModal';
-import { isAdminRole } from '@shared/types/roles';
 
 import { useSessionTimeout } from '../../../hooks/finance/useSessionTimeout';
 import { usePendingSessionSync } from '../../../hooks/finance/usePendingSessionSync';
@@ -80,7 +79,7 @@ export default function CaisseDashboard({
   initialState
 }: CaisseProps) {
   // RBAC permissions
-  const { hasPermission } = usePermissions();
+  const { isAdmin, hasPermission } = usePermissions();
   const canOpenCaisse = hasPermission('caisse', 'open') || hasPermission('caisse', 'manage');
   const canCloseCaisse = hasPermission('caisse', 'close') || hasPermission('caisse', 'manage');
   const canCreatePayments = hasPermission('caisse', 'deposit') || hasPermission('paiements', 'create');
@@ -126,7 +125,7 @@ export default function CaisseDashboard({
   const [supervisionInfo, setSupervisionInfo] = useState<SupervisionSession | null>(null);
   const [supervisionTimeElapsed, setSupervisionTimeElapsed] = useState(0);
 
-  const [accessGranted, setAccessGranted] = useState(isAdminRole(userRole));
+  const [accessGranted, setAccessGranted] = useState(isAdmin);
 
   // End of day reminder state
   const [showEndOfDayReminder, setShowEndOfDayReminder] = useState(false);
@@ -851,7 +850,7 @@ export default function CaisseDashboard({
                 </>
               )}
 
-              {isAdminRole(userRole) && (
+              {isAdmin && (
                 <button
                   onClick={() => handleTabChange('supervision')}
                   className="text-sm text-content-muted hover:text-accent underline decoration-content-primary hover:decoration-accent/50 underline-offset-4 transition-all"
@@ -965,7 +964,7 @@ export default function CaisseDashboard({
                 </>
               )}
 
-              {isAdminRole(userRole) && (
+              {isAdmin && (
                 <button
                   onClick={() => handleTabChange('supervision')}
                   className="text-sm text-content-muted hover:text-accent underline decoration-content-primary hover:decoration-accent/50 underline-offset-4 transition-all"
@@ -1002,7 +1001,7 @@ export default function CaisseDashboard({
                     </Button>
                   )}
 
-                  {isAdminRole(userRole) && (
+                  {isAdmin && (
                     <button
                       onClick={() => handleTabChange('supervision')}
                       className="text-sm text-content-muted hover:text-accent underline decoration-content-primary hover:decoration-accent/50 underline-offset-4 transition-all"

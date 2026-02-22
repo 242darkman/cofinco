@@ -28,8 +28,8 @@
 import { Request, Response, NextFunction } from "express";
 import { sql } from "drizzle-orm";
 import { pool, db } from "../db";
-import { isAdminRole } from "../../shared/types/roles";
 import { createLogger } from "../lib/logger";
+import { SystemRole } from "@shared/types/roles";
 
 const logger = createLogger('DbContext');
 
@@ -56,7 +56,7 @@ export function buildRLSContext(req: Request): RLSContext {
     };
   }
 
-  const isAdmin = isAdminRole(user.role);
+  const isAdmin = user.role === SystemRole.ADMIN;
 
   // Déterminer l'agence à utiliser
   // Priorité: selectedAgenceId (header) > session.agenceId > user.agenceId

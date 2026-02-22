@@ -46,7 +46,6 @@ import { idempotencyMiddleware } from "../middleware/idempotency";
 import { requireAuth, comparePasswords } from "../auth";
 import { attachAbility, requireAbility } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
-import { SystemRole, normalizeRole } from "@shared/types/roles";
 import { db } from "../db";
 import { users } from "@shared/schema/auth";
 import { operationsTerrain } from "@shared/schema";
@@ -686,20 +685,19 @@ caisseAgentRouter.get(
  */
 caisseAgentRouter.post(
   "/agents/:id/caisse/suspend",
+  attachAbility,
   async (req, res) => {
     try {
       const agentId = req.params.id;
       const userId = req.user?.id;
-      const userRole = req.user?.role;
 
       if (!userId) {
         return res.status(401).json({ error: "Non authentifié" });
       }
 
-      // Vérification basique des rôles
-      const normalizedRole = normalizeRole(userRole);
-      const allowedRoles = new Set([SystemRole.ADMIN, SystemRole.SUPERVISEUR, SystemRole.CHEF_AGENCE]);
-      if (!normalizedRole || !allowedRoles.has(normalizedRole)) {
+      // Vérification CASL des permissions
+      const canSupervise = req.ability?.can(Actions.MANAGE, Subjects.CAISSE) || req.ability?.can(Actions.APPROVE, Subjects.CAISSE);
+      if (!canSupervise) {
         return res.status(403).json({
           error: "Permission refusée",
           code: "FORBIDDEN",
@@ -737,20 +735,19 @@ caisseAgentRouter.post(
  */
 caisseAgentRouter.post(
   "/agents/:id/caisse/reactivate",
+  attachAbility,
   async (req, res) => {
     try {
       const agentId = req.params.id;
       const userId = req.user?.id;
-      const userRole = req.user?.role;
 
       if (!userId) {
         return res.status(401).json({ error: "Non authentifié" });
       }
 
-      // Vérification basique des rôles
-      const normalizedRole = normalizeRole(userRole);
-      const allowedRoles = new Set([SystemRole.ADMIN, SystemRole.SUPERVISEUR, SystemRole.CHEF_AGENCE]);
-      if (!normalizedRole || !allowedRoles.has(normalizedRole)) {
+      // Vérification CASL des permissions
+      const canSupervise = req.ability?.can(Actions.MANAGE, Subjects.CAISSE) || req.ability?.can(Actions.APPROVE, Subjects.CAISSE);
+      if (!canSupervise) {
         return res.status(403).json({
           error: "Permission refusée",
           code: "FORBIDDEN",
@@ -881,18 +878,17 @@ caisseAgentRouter.post("/sessions", async (req, res) => {
 caisseAgentRouter.post(
   "/sessions/:id/dispatch",
   idempotencyMiddleware("session-dispatch"),
+  attachAbility,
   async (req, res) => {
     try {
       const userId = req.user?.id;
-      const userRole = req.user?.role;
 
       if (!userId) {
         return res.status(401).json({ error: "Non authentifié" });
       }
 
-      const normalizedRole = normalizeRole(userRole);
-      const allowedRoles = new Set([SystemRole.ADMIN, SystemRole.SUPERVISEUR, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER]);
-      if (!normalizedRole || !allowedRoles.has(normalizedRole)) {
+      const canAccess = req.ability?.can(Actions.VIEW, Subjects.CAISSE);
+      if (!canAccess) {
         return res.status(403).json({ error: "Permission refusée", code: "FORBIDDEN" });
       }
 
@@ -978,18 +974,17 @@ caisseAgentRouter.post("/sessions/:id/initiate-close", async (req, res) => {
 caisseAgentRouter.post(
   "/sessions/:id/finalize-close",
   idempotencyMiddleware("session-finalize-close"),
+  attachAbility,
   async (req, res) => {
     try {
       const userId = req.user?.id;
-      const userRole = req.user?.role;
 
       if (!userId) {
         return res.status(401).json({ error: "Non authentifié" });
       }
 
-      const normalizedRole = normalizeRole(userRole);
-      const allowedRoles = new Set([SystemRole.ADMIN, SystemRole.SUPERVISEUR, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER]);
-      if (!normalizedRole || !allowedRoles.has(normalizedRole)) {
+      const canAccess = req.ability?.can(Actions.VIEW, Subjects.CAISSE);
+      if (!canAccess) {
         return res.status(403).json({ error: "Permission refusée", code: "FORBIDDEN" });
       }
 
@@ -1077,7 +1072,7 @@ caisseAgentRouter.post(
  * GET /api/caisse-agent/sessions
  * Lister les sessions avec filtres et pagination
  */
-caisseAgentRouter.get("/sessions", async (req, res) => {
+caisseAgentRouter.get("/sessions", attachAbility, async (req, res) => {
   try {
     const user = req.user;
     if (!user) {
@@ -1093,8 +1088,7 @@ caisseAgentRouter.get("/sessions", async (req, res) => {
     }
 
     // Non-admin users can only see their agency's sessions
-    const normalizedRole = normalizeRole(user.role);
-    const isAdmin = normalizedRole === SystemRole.ADMIN || normalizedRole === SystemRole.SUPERVISEUR;
+    const isAdmin = req.ability?.can(Actions.MANAGE, Subjects.CAISSE) || req.ability?.can(Actions.MANAGE, 'all');
     const agenceId = isAdmin ? parsed.data.agenceId : (user.agenceId ?? undefined);
 
     const sessions = await sessionAgentService.listSessions({
@@ -1363,6 +1357,7 @@ caisseAgentRouter.post(
  */
 caisseAgentRouter.get(
   "/mm-payments",
+  attachAbility,
   async (req, res) => {
     try {
       const user = req.user;
@@ -1380,8 +1375,7 @@ caisseAgentRouter.get(
       }
 
       // Appliquer le filtre d'agence pour les non-admins
-      const normalizedRole = normalizeRole(user.role);
-      const isAdmin = normalizedRole === SystemRole.ADMIN || normalizedRole === SystemRole.SUPERVISEUR;
+      const isAdmin = req.ability?.can(Actions.MANAGE, Subjects.CAISSE) || req.ability?.can(Actions.MANAGE, 'all');
 
       const filter = {
         ...parsed.data,

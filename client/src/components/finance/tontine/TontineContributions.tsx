@@ -24,6 +24,7 @@ import {
 } from '@shared/enum/status-constants';
 import mtnLogo from '@/assets/logos/mtn-logo.png';
 import airtelLogo from '@/assets/logos/airtel-logo.png';
+import { useEnabledPaymentMethods } from '../../../contexts/FeatureFlagsContext';
 
 const MOBILE_OPERATORS = [
   { id: 'mtn', name: 'MTN Mobile Money', color: 'bg-status-warning-bg', prefix: '+242 05/06', logo: mtnLogo },
@@ -311,6 +312,7 @@ export default function TontineContributions({ tontineId }: TontineContributions
   // RBAC permissions
   const { hasPermission } = usePermissions();
   const canCreateContributions = hasPermission('tontines', 'create') || hasPermission('tontines', 'edit');
+  const enabledPayments = useEnabledPaymentMethods();
 
   // Offline support
   const networkStatus = useNetworkStatus();
@@ -961,7 +963,7 @@ export default function TontineContributions({ tontineId }: TontineContributions
                   Mode de paiement *
                 </label>
                 <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Mode de paiement">
-                  {PAYMENT_MODE_OPTIONS.map((option) => {
+                  {PAYMENT_MODE_OPTIONS.filter((option) => enabledPayments[option.value as keyof typeof enabledPayments] !== false).map((option) => {
                     const modeDisabled = isOffline
                       ? option.value !== MethodePaiement.CASH
                       : false;

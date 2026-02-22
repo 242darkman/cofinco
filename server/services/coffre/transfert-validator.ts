@@ -1,16 +1,14 @@
 import { db } from "../../db";
 import { caisses, configCoffreFort, users, userRoles } from "@shared/schema";
-import { isAdminRole, normalizeRole } from "@shared/types/roles";
 import { eq, and } from "drizzle-orm";
 import { validateTransition } from "./state-machine";
 import { currencySymbol } from "@shared/config/currency";
+import { SystemRole } from "@shared/types/roles";
 
 export class TransfertCoffreValidator {
   private normalizeRoleToken(role?: string | null): string {
     if (!role) return "";
-    const normalized = normalizeRole(role);
-    if (normalized) return normalized;
-    return role.trim().toLowerCase();
+    return role.trim().toUpperCase();
   }
   
   // ─────────────────────────────────────────────────────────────────────────
@@ -94,7 +92,7 @@ export class TransfertCoffreValidator {
       }
 
       case "cancel": {
-        const isAdmin = isAdminRole(primaryRole?.role);
+        const isAdmin = primaryRole?.role === SystemRole.ADMIN;
         const isInitiator = params.transfert?.requestedBy === params.userId;
         if (!isAdmin && !isInitiator) {
           return { valid: false, error: "Seul l'initiateur ou un admin peut annuler" };

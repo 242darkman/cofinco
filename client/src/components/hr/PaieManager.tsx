@@ -10,7 +10,6 @@ import {
 } from 'lucide-react';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { toast } from '../../lib/toast';
-import { isAdminRole } from '@shared/types/roles';
 import SalaryAdvances from './SalaryAdvances';
 import PayrollConfigPanel from './PayrollConfigPanel';
 import { PayslipViewer } from './PayslipViewer';
@@ -81,7 +80,8 @@ export default function PaieManager() {
   } = usePaie();
 
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
-  const isRH = isAdminRole(user?.role) || canViewAllPaie || canGeneratePaie;
+  const { isAdmin } = usePermissions();
+  const isRH = isAdmin || canViewAllPaie || canGeneratePaie;
   const [activeTab, setActiveTab] = useState('generate');
 
   // Run detail

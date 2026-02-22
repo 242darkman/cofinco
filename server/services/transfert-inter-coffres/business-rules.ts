@@ -5,9 +5,9 @@ import {
   transfertsInterCoffres,
   users,
 } from "@shared/schema";
-import { isAdminRole, normalizeRole } from "@shared/types/roles";
 import { eq, and, isNull } from "drizzle-orm";
 import { currencySymbol } from "@shared/config/currency";
+import { SystemRole } from "@shared/types/roles";
 
 export interface ValidationResult {
   valid: boolean;
@@ -74,9 +74,7 @@ export class TransfertInterCoffresValidator {
    * Normalise le rôle pour comparaison
    */
   private normalizeRoleToken(role: string): string {
-    const normalized = normalizeRole(role);
-    if (normalized) return normalized;
-    return role.trim().toLowerCase();
+    return role.trim().toUpperCase();
   }
 
   /**
@@ -88,7 +86,7 @@ export class TransfertInterCoffresValidator {
     const rolesCreateursRaw = (config.rolesCreateurs as string[] || []);
     const rolesCreateurs = rolesCreateursRaw.map((r) => this.normalizeRoleToken(r));
 
-    if (!rolesCreateurs.includes(normalizedRole) && !isAdminRole(user.role)) {
+    if (!rolesCreateurs.includes(normalizedRole) && user.role !== SystemRole.ADMIN) {
       return {
         valid: false,
         errorCode: "TIC_023",
@@ -113,7 +111,7 @@ export class TransfertInterCoffresValidator {
     const rolesApprobateurs = rolesApprobateursRaw.map((r) => this.normalizeRoleToken(r));
 
     // Vérifier le rôle
-    if (!rolesApprobateurs.includes(normalizedRole) && !isAdminRole(user.role)) {
+    if (!rolesApprobateurs.includes(normalizedRole) && user.role !== SystemRole.ADMIN) {
       return {
         valid: false,
         errorCode: "TIC_023",
@@ -147,7 +145,7 @@ export class TransfertInterCoffresValidator {
     const rolesApprobateurs = rolesApprobateursRaw.map((r) => this.normalizeRoleToken(r));
 
     // Vérifier le rôle
-    if (!rolesApprobateurs.includes(normalizedRole) && !isAdminRole(user.role)) {
+    if (!rolesApprobateurs.includes(normalizedRole) && user.role !== SystemRole.ADMIN) {
       return {
         valid: false,
         errorCode: "TIC_023",
@@ -181,7 +179,7 @@ export class TransfertInterCoffresValidator {
     const rolesRecepteurs = rolesRecepteursRaw.map((r) => this.normalizeRoleToken(r));
 
     // Vérifier le rôle
-    if (!rolesRecepteurs.includes(normalizedRole) && !isAdminRole(user.role)) {
+    if (!rolesRecepteurs.includes(normalizedRole) && user.role !== SystemRole.ADMIN) {
       return {
         valid: false,
         errorCode: "TIC_023",
@@ -211,7 +209,7 @@ export class TransfertInterCoffresValidator {
     transfert: typeof transfertsInterCoffres.$inferSelect
   ): Promise<ValidationResult> {
     // Seul le créateur ou un admin peut annuler
-    if (transfert.createdBy !== user.id && !isAdminRole(user.role)) {
+    if (transfert.createdBy !== user.id && user.role !== SystemRole.ADMIN) {
       return {
         valid: false,
         errorCode: "TIC_023",

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Search, Globe, User, ChevronDown, Shield } from 'lucide-react';
 import NotificationBadge from '../shared/NotificationBadge';
-import { SystemRole, getRoleLabel, normalizeRole } from '@shared/types/roles';
+import { SystemRole, getRoleLabel } from '@shared/types/roles';
 
 interface HeaderProps {
   language: string;
@@ -27,8 +27,7 @@ export default function Header({
 
   const getRoleBadgeColor = (role: string) => {
     // Professional blue-based palette for institutional consistency
-    const normalizedRole = normalizeRole(role);
-    switch (normalizedRole) {
+    switch (role) {
       case SystemRole.ADMIN:
         return 'bg-surface text-white border-edge';
       case SystemRole.COMPTABLE:

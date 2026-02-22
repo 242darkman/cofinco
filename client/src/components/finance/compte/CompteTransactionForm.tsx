@@ -8,6 +8,7 @@ import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import PaymentValidationModal from '../operations/PaymentValidationModal';
 import { StatutCompte } from '@shared/enum/status-constants';
 import { useNetworkStatus } from '../../../contexts/NetworkContext';
+import { useEnabledPaymentMethods } from '../../../contexts/FeatureFlagsContext';
 import { executeOfflineOperation } from '../../../lib/offline-treasury';
 import { useUserProfile } from '../../../hooks/useUserProfile';
 
@@ -61,6 +62,7 @@ export default function CompteTransactionForm({ compte, type, onClose, onSuccess
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const networkStatus = useNetworkStatus();
+  const enabledPayments = useEnabledPaymentMethods();
   const { user } = useUserProfile();
   const isOffline = networkStatus === 'offline' || networkStatus === 'api_down';
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -357,7 +359,7 @@ export default function CompteTransactionForm({ compte, type, onClose, onSuccess
                 Mode de Paiement <span className="text-status-danger">*</span>
               </legend>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" role="radiogroup" aria-label="Sélectionner le mode de paiement">
-                {PAYMENT_MODES.map(({ id, icon: Icon, label }) => (
+                {PAYMENT_MODES.filter(({ id }) => enabledPayments[id as keyof typeof enabledPayments] !== false).map(({ id, icon: Icon, label }) => (
                   <button
                     key={id}
                     type="button"

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { SystemRole, getRoleLabel as getSystemRoleLabel, normalizeRole } from '@shared/types/roles';
+import { SystemRole, getRoleLabel as getSystemRoleLabel } from '@shared/types/roles';
+import { usePermissions } from '@/components/auth/ProtectedFeature';
 import { toast } from '../lib/toast';
 
 export interface UserData {
@@ -39,6 +40,7 @@ export interface PasswordData {
 }
 
 export function useUserProfile() {
+  const { can, isAdmin } = usePermissions();
   const [user, setUser] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -63,12 +65,10 @@ export function useUserProfile() {
         throw new Error('Erreur lors du chargement du profil');
       }
       const userData = await response.json();
-      const normalizedRole = normalizeRole(userData.role) || SystemRole.CLIENT;
-
       // Mapper les données imbriquées pour l'affichage
       setUser({
         ...userData,
-        role: normalizedRole,
+        role: (userData.role as SystemRole) || SystemRole.CLIENT,
         // Extraire les noms depuis les objets imbriqués (jobPosition, department)
         poste: userData.poste || userData.jobPosition?.name || null,
         departement: userData.departement || userData.department?.name || null,
@@ -164,14 +164,14 @@ export function useUserProfile() {
   // Vérifier si l'utilisateur peut voir les données salariales (admin/RH)
   const canViewSalary = useCallback(() => {
     if (!user) return false;
-    return [SystemRole.ADMIN, SystemRole.CHEF_AGENCE].includes(user.role);
-  }, [user]);
+    return isAdmin || can('manage', 'rh');
+  }, [user, isAdmin, can]);
 
   // Vérifier si l'utilisateur est un caissier (peut avoir un PIN)
   const isCashier = useCallback(() => {
     if (!user) return false;
-    return [SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER, SystemRole.SUPERVISEUR].includes(user.role);
-  }, [user]);
+    return isAdmin || can('view', 'CaisseSession') || can('manage', 'caisse');
+  }, [user, isAdmin, can]);
 
   return {
     user,

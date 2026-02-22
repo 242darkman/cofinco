@@ -5,6 +5,7 @@ import {
   CheckSquare, XCircle
 } from 'lucide-react';
 import { Button, Badge, type BadgeVariant, FormField, SelectField } from '../../ui';
+import { usePermissions } from '../../auth/ProtectedFeature';
 import { toast } from '../../../lib/toast';
 import { api } from '../../../lib/api-client';
 import { formatMoney } from '../../../lib/format';
@@ -53,6 +54,9 @@ export default function TransferReconciliationPanel({
   agenceId,
   onReconcile,
 }: TransferReconciliationPanelProps) {
+  const { hasPermission } = usePermissions();
+  const canReconcile = hasPermission('caisse', 'approve') || hasPermission('caisse', 'manage');
+
   const [transfers, setTransfers] = useState<CaisseTransfert[]>([]);
   const [stats, setStats] = useState<ReconciliationStats | null>(null);
   const [loading, setLoading] = useState(false);
@@ -320,7 +324,7 @@ export default function TransferReconciliationPanel({
                       size="xs"
                     />
 
-                    {!transfer.reconciled && (
+                    {!transfer.reconciled && canReconcile && (
                       <div className="flex items-center gap-1">
                         {/* If we're the receiving agency and transfer is SENT, show confirm receipt */}
                         {!isSource && transfer.statut === 'SENT' && (

@@ -1,10 +1,10 @@
 import type { Express } from "express";
 import { insertUserSchema, users, userPermissions, modules, permissions, userAgences, agences, userRoles, employes, activeSessions } from "@shared/schema";
-import { SystemRole, isAdminRole, normalizeRole } from "@shared/types/roles";
+import { SystemRole } from "@shared/types/roles";
 import { storage } from "../storage";
 import { getClientByUserId } from "../storage/clients";
 import { loginUser, registerUser, requireAuth, hashPassword, comparePasswords, SESSION_CONFIG } from "../auth";
-import { attachAbility, requireAbility, requireResetPassword } from "../authorization";
+import { attachAbility, requireAbility, requireResetPassword, getAbilityForUser } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
 import { logAudit, logLoginAttempt, getLoginLockoutInfo, validatePassword, getPasswordRequirements, getAuditLogs, clearLoginAttemptsOnSuccess, purgeOldAuditLogs, getAuditLogStats } from "../audit";
 import { createSessionRecord, deleteSessionRecord, deleteUserSessions, getActiveSessions, isSessionValid, markSessionInactive, markUserSessionsInactive, sessionGuard, enforceSessionLimit, countUserSessions, getUserSessions, getMaxSessionsPerUser } from "../session-tracker";
@@ -607,7 +607,7 @@ export function registerAuthRoutes(app: Express) {
           eq(userRoles.isPrimary, true)
         ));
 
-      const effectiveRole = normalizeRole(primaryRole?.role) || SystemRole.CLIENT;
+      const effectiveRole = (primaryRole?.role as SystemRole) || SystemRole.CLIENT;
 
       // Get user's primary agence
       const primaryAgence = await resolvePrimaryAgence(user.id);
@@ -2241,7 +2241,7 @@ export function registerAuthRoutes(app: Express) {
       const expectedCode = `${(module as string).toLowerCase()}.${(action as string).toLowerCase()}`;
 
       // Admins have all permissions
-      if (isAdminRole(user.role)) {
+      if (user.role === SystemRole.ADMIN) {
         return res.json({ allowed: true });
       }
 
@@ -2299,10 +2299,10 @@ export function registerAuthRoutes(app: Express) {
         return res.status(401).json({ message: "Identifiants incorrects" });
       }
 
-      // Check if user has supervisor role (Architecture V3: via userRoles)
+      // Check if user has supervisor permission via CASL ability
       const effectiveRole = await getEffectiveRole(user.id);
-      const supervisorRoles = [SystemRole.ADMIN, SystemRole.CHEF_AGENCE];
-      if (!supervisorRoles.includes(effectiveRole)) {
+      const ability = await getAbilityForUser({ userId: user.id });
+      if (!ability.can(Actions.MANAGE, Subjects.CAISSE_SESSION)) {
         return res.status(403).json({ message: "Rôle insuffisant. Seul un superviseur peut autoriser l'ouverture." });
       }
 
@@ -2336,18 +2336,10 @@ export function registerAuthRoutes(app: Express) {
   });
 
   // Set/Update own caisse PIN (Admins/Chefs only)
-  app.put("/api/auth/caisse-pin", requireAuth, async (req, res) => {
+  app.put("/api/auth/caisse-pin", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE_SESSION), async (req, res) => {
     try {
       const userId = req.session.user!.id;
-      const userRole = req.session.user!.role;
       const { currentPassword, newPin } = req.body;
-
-      // Restrict to admins and chefs
-      const normalizedRole = normalizeRole(userRole);
-      const authorizedRoles = [SystemRole.ADMIN, SystemRole.CHEF_AGENCE];
-      if (!normalizedRole || !authorizedRoles.includes(normalizedRole)) {
-        return res.status(403).json({ message: "Action non autorisée. Seuls les Administrateurs et Chefs d'Agence peuvent modifier leur propre PIN." });
-      }
 
       if (!currentPassword || !newPin) {
         return res.status(400).json({ message: "Mot de passe actuel et nouveau PIN requis" });

@@ -7,11 +7,12 @@ import { toast } from 'sonner';
 import { sessionCaisseApi, authApi, caisseAccessControlApi } from '../../../lib/api-client';
 import { UniversalPaymentSuccessModal } from '../caisse/shared/UniversalPaymentSuccessModal';
 import { ReceiptData } from '../../ui/printable/ReceiptTemplate';
-import { SystemRole, normalizeRole } from '@shared/types/roles';
+import { usePermissions } from '@/components/auth/ProtectedFeature';
 import { MethodePaiement, METHODE_PAIEMENT_LABELS, type MethodePaiementType } from '@shared/enum/status-constants';
 import mtnMomoLogo from '@/assets/logos/mtn-logo.png';
 import airtelMoneyLogo from '@/assets/logos/airtel-logo.png';
 import { currencySymbol } from '@shared/config/currency';
+import { useEnabledPaymentMethods } from '../../../contexts/FeatureFlagsContext';
 
 interface CreditFeesPaymentModalProps {
   demande: any;
@@ -33,6 +34,7 @@ const PAYMENT_METHODS = [
 
 export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: CreditFeesPaymentModalProps) {
   const { payerFrais, envoyerEnCaisse } = useDemandes();
+  const enabledPayments = useEnabledPaymentMethods();
 
   // Calculer le montant des frais
   const feeAmount = useMemo(() => {
@@ -74,8 +76,6 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
   const [checkingSession, setCheckingSession] = useState(true);
   const [userSession, setUserSession] = useState<any>(null);
   const [takenSession, setTakenSession] = useState<any>(null);
-  const [userRole, setUserRole] = useState<SystemRole>(SystemRole.CLIENT);
-
   // Caisse List State
   const [agencyCaisses, setAgencyCaisses] = useState<any[]>([]);
   const [loadingCaisses, setLoadingCaisses] = useState(false);
@@ -120,7 +120,7 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
   }, []);
 
   const activeSession = takenSession || userSession;
-  const isAdmin = userRole === SystemRole.ADMIN || userRole === SystemRole.CHEF_AGENCE;
+  const { isAdmin } = usePermissions();
 
   const fetchAgencyCaisses = async () => {
     const agenceId = demande.clients?.agenceId;
@@ -697,7 +697,10 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
                 <div>
                   <label className="text-xs font-semibold text-content-muted mb-2 block">Mode de paiement</label>
                   <div className="grid grid-cols-2 gap-2">
-                    {PAYMENT_METHODS.map((m) => {
+                    {PAYMENT_METHODS.filter((m) => {
+                      const key = m.value === 'mtn' || m.value === 'airtel' ? 'MOBILE_MONEY' : m.value;
+                      return enabledPayments[key as keyof typeof enabledPayments] !== false;
+                    }).map((m) => {
                       const isSelected = method === m.value;
                       const Icon = 'icon' in m ? m.icon : undefined;
                       const img = 'img' in m ? m.img : undefined;

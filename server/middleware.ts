@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { db } from './db';
 import { userAgences, agences } from '../shared/schema';
 import { eq, and } from 'drizzle-orm';
-import { SystemRole, isAdminRole, normalizeRole } from '../shared/types/roles';
+import { SystemRole } from '../shared/types/roles';
 import { createLogger } from './lib/logger';
 
 const logger = createLogger('Middleware');
@@ -100,7 +100,7 @@ export function requireAgenceAccess(entityAgenceField: string = "agence") {
     const userRole = req.user.role;
 
     // 1. Administrateurs : Accès global
-    if (isAdminRole(userRole)) {
+    if (userRole === SystemRole.ADMIN) {
       req.agenceFilter = null; // Pas de filtre
       return next();
     }
@@ -143,7 +143,7 @@ export function validateAgenceAction(bodyAgenceField: string = "agence") {
     req.user = req.session.user;
 
     // Admin bypass
-    if (isAdminRole(req.user.role)) {
+    if (req.user.role === SystemRole.ADMIN) {
       return next();
     }
 
@@ -207,7 +207,7 @@ export function requireAgenceIdAccess() {
     // Si aucune agence sélectionnée
     if (!selectedAgenceId) {
       // Pour les admins: pas de filtre (accès global)
-    if (isAdminRole(userRole)) {
+    if (userRole === SystemRole.ADMIN) {
       req.selectedAgenceId = null;
       req.agenceFilter = null;
       return next();
@@ -261,7 +261,7 @@ export function requireAgenceIdAccess() {
     // Une agence est sélectionnée: vérifier l'accès
     // Admins: accès à toutes les agences
     // Admins: accès à toutes les agences
-    if (isAdminRole(userRole)) {
+    if (userRole === SystemRole.ADMIN) {
       if (selectedAgenceId === 'all') {
         req.selectedAgenceId = null;
         req.agenceFilter = null;
@@ -315,7 +315,7 @@ export function validateAgenceIdAction() {
     const targetAgenceId = req.body.agenceId;
 
     // Admin: peut spécifier n'importe quelle agence
-    if (isAdminRole(userRole)) {
+    if (userRole === SystemRole.ADMIN) {
       // Si pas d'agenceId dans le body mais une agence sélectionnée, l'injecter
       if (!targetAgenceId && req.selectedAgenceId) {
         req.body.agenceId = req.selectedAgenceId;

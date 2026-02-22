@@ -3,7 +3,6 @@ import { Plus, CheckCircle, XCircle, Calendar, Clock, Lock, RefreshCw, AlertCirc
 import { DemandeConge } from '../../hooks/hr/useConges';
 import { Card, Button, Modal, FormField, SelectField, Badge, StatCard, ResponsiveTable } from '../ui';
 import { useUserProfile } from '../../hooks/useUserProfile';
-import { isAdminRole } from '@shared/types/roles';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { StatutConge, STATUT_CONGE_LABELS } from '@shared/enum/status-constants';
 import { useHrRealtime, useHrSyncStatus } from '../../hooks/hr/useHrRealtime';
@@ -65,13 +64,12 @@ export default function CongesManager({
   employes = [],
 }: CongesManagerProps) {
   // RBAC permissions
-  const { hasPermission } = usePermissions();
+  const { isAdmin, hasPermission } = usePermissions();
   const canCreateConges = hasPermission('rh', 'edit') || hasPermission('conges', 'create');
   const canApproveConges = hasPermission('rh', 'approve') || hasPermission('conges', 'approve');
 
   // Hook appelé au niveau racine du composant (règle des hooks respectée)
   const { user, getFullName } = useUserProfile();
-  const isAdmin = isAdminRole(user?.role);
   const canApproveActions = canApproveConges || isAdmin;
 
   // Resolve current employee ID from user profile or prop

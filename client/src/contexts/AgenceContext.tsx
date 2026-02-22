@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { authService } from '../lib/auth';
 import { setCurrentAgenceId } from '../lib/api-client';
-import { isAdminRole } from '@shared/types/roles';
 import { StatutCoffre, TypeAgence, TypeAgenceType } from '@shared/enum/status-constants';
+import { SystemRole } from '@shared/types/roles';
 
 export interface Agence {
   id: string;
@@ -50,7 +50,7 @@ export function AgenceProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
   const user = authService.getCurrentUser();
-  const isAdmin = isAdminRole(user?.role);
+  const isAdmin = user?.role === SystemRole.ADMIN;
 
   // Charger les agences de l'utilisateur
   const fetchUserAgences = useCallback(async () => {

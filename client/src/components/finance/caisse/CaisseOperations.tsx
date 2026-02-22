@@ -18,6 +18,7 @@ import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import ConfirmDialog from '../../ui/ConfirmDialog';
 import { UniversalPaymentSuccessModal } from './shared/UniversalPaymentSuccessModal';
 import { PaymentStatusModal, PaymentStatus } from '../payments';
+import { useEnabledPaymentMethods } from '../../../contexts/FeatureFlagsContext';
 import { ReceiptData } from '../../ui/printable/ReceiptTemplate';
 import { authService } from '../../../lib/auth';
 import { StatutCredit, TypeCompte, TypeOperationCaisse, FREQUENCE_TONTINE_LABELS } from '@shared/enum/status-constants';
@@ -197,6 +198,7 @@ interface CaisseOperationsProps {
 
 export default function CaisseOperations({ sessionId, soldeSession, recentTransactions, onTransactionComplete }: CaisseOperationsProps) {
   const user = authService.getCurrentUser();
+  const enabledPayments = useEnabledPaymentMethods();
 
   // ── Client Search ──
   const [searchTerm, setSearchTerm] = useState('');
@@ -1284,7 +1286,8 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
                   <div className="animate-in fade-in slide-in-from-bottom-2">
                     <label className="text-[9px] uppercase tracking-wider text-content-muted font-bold mb-2 block">Moyen de paiement</label>
                     <div className="flex gap-2">
-                      {/* Cash always available */}
+                      {/* Cash */}
+                      {enabledPayments.CASH && (
                       <button
                         onClick={() => { setMoyenPaiement('CASH'); setPhoneNumber(''); }}
                         className={`flex-1 flex items-center justify-center gap-2 px-3 py-3 rounded-xl border-2 transition-all ${
@@ -1296,9 +1299,10 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
                         <Coins size={18} className={moyenPaiement === 'CASH' ? 'text-accent' : 'text-content-muted'} />
                         <span className={`text-xs font-bold ${moyenPaiement === 'CASH' ? 'text-content-primary' : 'text-content-muted'}`}>Espèces</span>
                       </button>
+                      )}
 
                       {/* Mobile Money providers */}
-                      {PROVIDERS.map(p => (
+                      {enabledPayments.MOBILE_MONEY && PROVIDERS.map(p => (
                         <button
                           key={p.id}
                           onClick={() => {

@@ -5,7 +5,7 @@ import { Modal, FormField, SelectField, Button } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { userApi, roleApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
-import { SystemRole, getRoleOptions, normalizeRole } from '@shared/types/roles';
+import { SystemRole, getRoleOptions } from '@shared/types/roles';
 
 interface RoleOption {
   value: SystemRole;
@@ -31,7 +31,7 @@ export default function AdminUserForm({ user, onClose, onSuccess }: AdminUserFor
     prenom: user?.prenom || '',
     nom: user?.nom || '',
     telephone: user?.telephone || '',
-    role: normalizeRole(user?.role) || SystemRole.CLIENT,
+    role: (user?.role as SystemRole) || SystemRole.CLIENT,
     statut: user?.statut || 'actif',
     password: ''
   });

@@ -5,7 +5,8 @@ import { db } from "../db";
 import { eq, and, gte, lte, asc, desc, sql } from "drizzle-orm";
 import { agentLocationLogs, trackingSessions } from "@shared/schema";
 import { requireAuth } from "../auth";
-import { SystemRole, normalizeRole } from "@shared/types/roles";
+import { attachAbility } from "../authorization";
+import { Actions, Subjects } from "@shared/ability";
 import { logAudit } from "../lib/logger";
 
 const logger = createLogger('Routes:Tracking');
@@ -51,14 +52,12 @@ export function registerTrackingRoutes(app: Express) {
    * POST /api/tracking/batch
    * Receive a batch of GPS points from the client and persist them.
    */
-  app.post("/api/tracking/batch", requireAuth, async (req, res) => {
+  app.post("/api/tracking/batch", requireAuth, attachAbility, async (req, res) => {
     try {
       const currentUser = req.user;
-      const userRole = normalizeRole(currentUser?.role);
 
-      // Only agents, supervisors, and admins can submit tracking data
-      const allowed = [SystemRole.AGENT_TERRAIN, SystemRole.SUPERVISEUR, SystemRole.CHEF_AGENCE, SystemRole.ADMIN];
-      if (!userRole || !allowed.includes(userRole)) {
+      // Only users with terrain access can submit tracking data
+      if (!req.ability?.can(Actions.VIEW, Subjects.TERRAIN) && !req.ability?.can(Actions.CREATE, Subjects.OPERATION_TERRAIN)) {
         return res.status(403).json({ message: "Non autorise" });
       }
 
@@ -72,8 +71,9 @@ export function registerTrackingRoutes(app: Express) {
 
       const batch = parsed.data;
 
-      // Security: agents can only submit their own data
-      if (userRole === SystemRole.AGENT_TERRAIN && batch.agentId !== String(currentUser!.id)) {
+      // Security: non-managers can only submit their own data
+      const canManageTerrain = req.ability?.can(Actions.MANAGE, Subjects.TERRAIN);
+      if (!canManageTerrain && batch.agentId !== String(currentUser!.id)) {
         return res.status(403).json({ message: "Impossible de soumettre des donnees pour un autre agent" });
       }
 
@@ -158,7 +158,7 @@ export function registerTrackingRoutes(app: Express) {
    * GET /api/tracking/sessions
    * List tracking sessions for an agent within a date range.
    */
-  app.get("/api/tracking/sessions", requireAuth, async (req, res) => {
+  app.get("/api/tracking/sessions", requireAuth, attachAbility, async (req, res) => {
     try {
       const parsed = sessionsQuerySchema.safeParse(req.query);
       if (!parsed.success) {
@@ -170,18 +170,17 @@ export function registerTrackingRoutes(app: Express) {
 
       const { agent_id } = parsed.data;
       const currentUser = req.user;
-      const userRole = normalizeRole(currentUser?.role);
 
-      // Security: agents can only view their own sessions
-      const canSupervise = [SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR].includes(userRole!);
+      // Security: non-managers can only view their own sessions
+      const canSupervise = req.ability?.can(Actions.MANAGE, Subjects.TERRAIN) || req.ability?.can(Actions.APPROVE, Subjects.TERRAIN);
       if (!canSupervise && String(currentUser!.id) !== agent_id) {
         return res.status(403).json({ message: "Acces non autorise" });
       }
 
       const conditions = [eq(trackingSessions.agentId, agent_id)];
 
-      // Filtre agence pour les superviseurs non-admin
-      if (canSupervise && userRole !== SystemRole.ADMIN) {
+      // Filtre agence pour les superviseurs non-superadmin
+      if (canSupervise && !req.ability?.can(Actions.MANAGE, 'all')) {
         const userAgenceId = currentUser?.agenceId;
         if (userAgenceId) {
           conditions.push(eq(trackingSessions.agencyId, userAgenceId));

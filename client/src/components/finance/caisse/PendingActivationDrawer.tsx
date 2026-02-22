@@ -7,6 +7,7 @@ import { Search, UserCheck, Clock, CheckCircle2, CheckSquare, Square, Loader2 } 
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { api, compteEpargneApi } from '../../../lib/api-client';
+import { usePermissions } from '../../auth/ProtectedFeature';
 import { resolveClientPhotoUrl } from '@/lib/format';
 import { getStatusLabel, ACCOUNT_TYPE_LABELS } from '@/lib/status-labels';
 import { toast } from '../../../lib/toast';
@@ -37,6 +38,8 @@ interface PendingActivationDrawerProps {
 export function PendingActivationDrawer({ open, onClose, sessionId, onActivate }: PendingActivationDrawerProps) {
   const [search, setSearch] = useState('');
   const queryClient = useQueryClient();
+  const { hasPermission } = usePermissions();
+  const canActivate = hasPermission('comptes', 'create') || hasPermission('caisse', 'manage');
 
   // Batch selection state
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -170,7 +173,7 @@ export function PendingActivationDrawer({ open, onClose, sessionId, onActivate }
                 {allSelected ? 'Tout désélectionner' : 'Tout sélectionner'}
               </button>
 
-              {someSelected && (
+              {someSelected && canActivate && (
                 <Button
                   size="sm"
                   variant="primary"
@@ -261,12 +264,14 @@ export function PendingActivationDrawer({ open, onClose, sessionId, onActivate }
                         </div>
                      </div>
 
+                     {canActivate && (
                      <Button
                         className="w-full bg-status-success hover:bg-status-success text-white h-11 font-medium shadow-lg shadow-status-success/10 active:scale-[0.98] transition-all"
                         onClick={() => onActivate(account)}
                      >
                         Encaisser maintenant
                      </Button>
+                     )}
                   </div>
                 );
              })

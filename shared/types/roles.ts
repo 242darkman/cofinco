@@ -22,93 +22,10 @@ export const isSystemRole = (role?: string | null): role is SystemRole => {
   return SYSTEM_ROLE_VALUES.includes(role as SystemRole);
 };
 
-const ROLE_ALIASES: Record<string, SystemRole> = {
-  // ADMIN aliases
-  'admin': SystemRole.ADMIN,
-  'administrateur': SystemRole.ADMIN,
-  'administrateur systeme': SystemRole.ADMIN,
-  'administrateur système': SystemRole.ADMIN,
-  'admin_generale': SystemRole.ADMIN,
-  'admin générale': SystemRole.ADMIN,
-  'admin generale': SystemRole.ADMIN,
-  'direction': SystemRole.ADMIN,
-  'directeur': SystemRole.ADMIN,
-  'directeur financier': SystemRole.ADMIN,
-  'pdg': SystemRole.ADMIN,
-  'dg': SystemRole.ADMIN,
-  'manager': SystemRole.ADMIN, // Generic manager → Admin
-
-  // CHEF_AGENCE aliases
-  'chef': SystemRole.CHEF_AGENCE,
-  'chef_agence': SystemRole.CHEF_AGENCE,
-  'chef agence': SystemRole.CHEF_AGENCE,
-  "chef d'agence": SystemRole.CHEF_AGENCE,
-  'trésorier': SystemRole.CHEF_AGENCE, // Trésorier → Chef d'Agence level
-
-  // CAISSIER aliases
-  'chef caisse': SystemRole.CAISSIER,
-  'chef_caisse': SystemRole.CAISSIER,
-  'caissier': SystemRole.CAISSIER,
-  'caisse': SystemRole.CAISSIER,
-  'agent caisse': SystemRole.CAISSIER,
-  'agent_caisse': SystemRole.CAISSIER,
-  'agent de caisse': SystemRole.CAISSIER,
-
-  // AGENT_TERRAIN aliases
-  'agent terrain': SystemRole.AGENT_TERRAIN,
-  'agent_terrain': SystemRole.AGENT_TERRAIN,
-  'terrain': SystemRole.AGENT_TERRAIN,
-  'agent': SystemRole.AGENT_TERRAIN,
-
-  // COMPTABLE aliases
-  'comptable': SystemRole.COMPTABLE,
-
-  // SUPERVISEUR aliases
-  'superviseur': SystemRole.SUPERVISEUR,
-  'supervision': SystemRole.SUPERVISEUR,
-
-  // GESTIONNAIRE_CREDIT aliases
-  'gestionnaire crédit': SystemRole.GESTIONNAIRE_CREDIT,
-  'gestionnaire credit': SystemRole.GESTIONNAIRE_CREDIT,
-  'gestionnaire_credit': SystemRole.GESTIONNAIRE_CREDIT,
-  'credit': SystemRole.GESTIONNAIRE_CREDIT,
-
-  // AUDITEUR aliases
-  'auditeur': SystemRole.AUDITEUR,
-  'audit': SystemRole.AUDITEUR,
-  'auditeur interne': SystemRole.AUDITEUR,
-  'commissaire aux comptes': SystemRole.AUDITEUR,
-  'inspecteur': SystemRole.AUDITEUR,
-
-  // RH aliases
-  'rh': SystemRole.RH,
-  'ressources humaines': SystemRole.RH,
-  'responsable rh': SystemRole.RH,
-
-  // SUPPORT_IT aliases
-  'support_it': SystemRole.SUPPORT_IT,
-  'support it': SystemRole.SUPPORT_IT,
-  'support': SystemRole.SUPPORT_IT,
-  'it': SystemRole.SUPPORT_IT,
-  'informatique': SystemRole.SUPPORT_IT,
-
-  // CLIENT aliases
-  'client': SystemRole.CLIENT
-};
-
-export const normalizeRole = (role?: string | null): SystemRole | undefined => {
-  if (!role) return undefined;
-  if (isSystemRole(role)) return role;
-  const key = role.trim().toLowerCase();
-  return ROLE_ALIASES[key];
-};
-
 export const hasRole = (role: string | null | undefined, ...allowed: SystemRole[]): boolean => {
-  const normalized = normalizeRole(role);
-  return !!normalized && allowed.includes(normalized);
+  if (!role) return false;
+  return isSystemRole(role) && allowed.includes(role);
 };
-
-export const isAdminRole = (role?: string | null): boolean => normalizeRole(role) === SystemRole.ADMIN;
 
 /**
  * Libellés d'affichage (Modifiables pour l'UI)
@@ -128,9 +45,8 @@ export const ROLE_LABELS: Record<SystemRole, string> = {
 };
 
 export const getRoleLabel = (role?: string | null): string => {
-  const normalized = normalizeRole(role);
-  if (normalized) return ROLE_LABELS[normalized];
   if (!role) return 'Inconnu';
+  if (isSystemRole(role)) return ROLE_LABELS[role];
   return role;
 };
 
