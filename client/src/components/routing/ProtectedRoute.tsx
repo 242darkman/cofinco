@@ -1,4 +1,4 @@
-import { ReactNode, Suspense, useEffect, useState, useMemo } from 'react';
+import { ReactNode, Suspense, useMemo } from 'react';
 import { Redirect, useLocation } from 'wouter';
 import { authService } from '@/lib/auth';
 import { buildLoginUrl } from '@/lib/navigation';
@@ -6,6 +6,7 @@ import { canAccessRoute, type RouteConfig } from '@/lib/routes-config';
 import { SystemRole } from '@shared/types/roles';
 import LoadingScreen from '@/components/ui/LoadingScreen';
 import { useSession, useIsSessionValid } from '@/contexts/SessionContext';
+import { useIsAdmin, useAbility } from '@/contexts/AbilityContext';
 
 interface ProtectedRouteProps {
   route: RouteConfig;
@@ -14,22 +15,15 @@ interface ProtectedRouteProps {
 
 /**
  * Route protégée avec vérification RBAC ET validation session serveur
- *
- * Workflow de sécurité:
- * 1. Vérifie que le contexte de session est valide (sync serveur)
- * 2. Vérifie que l'utilisateur existe en mémoire locale
- * 3. Vérifie les permissions RBAC pour la route
- * 4. Redirige vers /login si session invalide
- * 5. Redirige vers /dashboard si permissions insuffisantes
  */
 export function ProtectedRoute({ route, children }: ProtectedRouteProps) {
   const sessionValid = useIsSessionValid();
   const { isChecking } = useSession();
   const user = authService.getCurrentUser();
+  const ability = useAbility();
   const [location] = useLocation();
   const loginUrl = useMemo(() => buildLoginUrl(location), [location]);
 
-  // Pendant la vérification initiale, afficher un loader
   if (sessionValid === null || isChecking) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
@@ -38,22 +32,18 @@ export function ProtectedRoute({ route, children }: ProtectedRouteProps) {
     );
   }
 
-  // Session invalide côté serveur → redirection login avec returnTo
   if (!sessionValid) {
     return <Redirect to={loginUrl} replace />;
   }
 
-  // Pas d'utilisateur en mémoire (incohérence) → redirection login
   if (!user) {
     return <Redirect to={loginUrl} replace />;
   }
 
-  // Vérification RBAC de la route
-  if (!canAccessRoute(route, user.role)) {
+  if (!canAccessRoute(route, ability)) {
     return <Redirect to="/" replace />;
   }
 
-  // Lazy loading avec suspense
   return (
     <Suspense fallback={<LoadingScreen message="Chargement du module..." fullScreen={false} />}>
       {children}
@@ -63,15 +53,11 @@ export function ProtectedRoute({ route, children }: ProtectedRouteProps) {
 
 /**
  * Route protégée simplifiée (sans config de route)
- * Utilisée pour les routes qui nécessitent juste une authentification
  */
 interface SimpleProtectedRouteProps {
   children: ReactNode;
-  /** Rôles requis pour accéder à la route */
   requiredRoles?: SystemRole[];
-  /** Nécessite un rôle admin */
   requireAdmin?: boolean;
-  /** Route de redirection si non autorisé */
   fallbackRoute?: string;
 }
 
@@ -84,10 +70,10 @@ export function SimpleProtectedRoute({
   const sessionValid = useIsSessionValid();
   const { isChecking } = useSession();
   const user = authService.getCurrentUser();
+  const isAdmin = useIsAdmin();
   const [location] = useLocation();
   const loginUrl = useMemo(() => buildLoginUrl(location), [location]);
 
-  // Pendant la vérification, afficher un loader
   if (sessionValid === null || isChecking) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
@@ -96,17 +82,14 @@ export function SimpleProtectedRoute({
     );
   }
 
-  // Session invalide → login avec returnTo
   if (!sessionValid || !user) {
     return <Redirect to={loginUrl} replace />;
   }
 
-  // Vérification admin
-  if (requireAdmin && !authService.isAdmin()) {
+  if (requireAdmin && !isAdmin) {
     return <Redirect to={fallbackRoute} />;
   }
 
-  // Vérification des rôles requis
   if (requiredRoles && requiredRoles.length > 0) {
     if (!requiredRoles.includes(user.role)) {
       return <Redirect to={fallbackRoute} />;
@@ -122,14 +105,14 @@ export function SimpleProtectedRoute({
 export function useRouteAccess(moduleKey: string) {
   const sessionValid = useIsSessionValid();
   const user = authService.getCurrentUser();
+  const isAdmin = useIsAdmin();
 
   return {
-    canAccess: (requiredRoles?: SystemRole[], requireAdmin?: boolean) => {
-      // Session invalide = pas d'accès
+    canAccess: (requiredRoles?: SystemRole[], requireAdminAccess?: boolean) => {
       if (!sessionValid || !user) return false;
 
-      if (requireAdmin) {
-        return authService.isAdmin();
+      if (requireAdminAccess) {
+        return isAdmin;
       }
 
       if (requiredRoles && requiredRoles.length > 0) {

@@ -3,6 +3,7 @@ import { ROUTES, canAccessRoute, getRouteByKey, type RouteConfig } from '@/lib/r
 import { authService } from '@/lib/auth';
 import { SystemRole, getRoleLabel } from '@shared/types/roles';
 import LoadingScreen from '@/components/ui/LoadingScreen';
+import { useAbility } from '@/contexts/AbilityContext';
 
 interface AppRouterProps {
   currentModule: string;
@@ -23,9 +24,11 @@ export default function AppRouter({
   onAccessDenied,
   componentProps = {},
 }: AppRouterProps) {
+  const ability = useAbility();
+
   // Trouver la route principale
   const route = ROUTES.find(r => r.key === currentModule);
-  
+
   if (!route) {
     return (
       <div className="text-center py-20">
@@ -35,8 +38,8 @@ export default function AppRouter({
     );
   }
 
-  // Vérifier l'accès RBAC
-  if (!canAccessRoute(route, userRole)) {
+  // Vérifier l'accès RBAC via CASL
+  if (!canAccessRoute(route, ability)) {
     if (onAccessDenied) {
       onAccessDenied();
     }
@@ -62,7 +65,7 @@ export default function AppRouter({
   if (currentSubModule && route.children) {
     const childRoute = route.children.find(c => c.key === currentSubModule);
     if (childRoute && childRoute.component) {
-      if (canAccessRoute(childRoute, userRole)) {
+      if (canAccessRoute(childRoute, ability)) {
         ComponentToRender = childRoute.component;
         activeRoute = childRoute;
       }

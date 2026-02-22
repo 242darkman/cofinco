@@ -180,9 +180,6 @@ export function validateAgenceAction(bodyAgenceField: string = "agence") {
   };
 }
 
-// NOTE: requireRole has been replaced by requireAbility from server/authorization
-// Use: attachAbility, requireAbility(Actions.X, Subjects.Y) instead
-
 /**
  * Middleware pour le filtrage multi-agences basé sur le header X-Agence-Id.
  *

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Package, Plus, AlertCircle, CheckCircle, DollarSign, Shield, Wrench, TrendingDown, Calendar, ChevronLeft, ChevronRight, Eye, AlertTriangle, X } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../ui/sheet';
 import { authService } from '../../lib/auth';
+import { useIsAdmin } from '../../contexts/AbilityContext';
 
 interface Maintenance {
   date: string;
@@ -53,7 +54,7 @@ function getWarrantyStatus(dateGarantieFin?: string): { label: string; color: st
 export default function AgentMateriel({ agentId }: { agentId?: string }) {
   const [materiels, setMateriels] = useState<Materiel[]>([]);
   const [loading, setLoading] = useState(true);
-  const isAdmin = authService.isAdmin();
+  const isAdmin = useIsAdmin();
   const isChefAgence = authService.hasRole?.('chef_agence') || false;
   const canManage = isAdmin || isChefAgence;
 

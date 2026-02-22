@@ -7,8 +7,8 @@ import { PLATFORM_MENU_ITEMS } from '../../constants/menuItems';
 import { ROUTES, canAccessRoute, type RouteConfig, getRouteByKey } from '../../lib/routes-config';
 import IconButton from '../ui/IconButton';
 import { useBranding } from '../../contexts/BrandingContext';
-import { useAbilityContextOptional } from '../../contexts/AbilityContext';
-import { isAdminRole } from '@shared/types/roles';
+import { useAbilityContextOptional, useAbility } from '../../contexts/AbilityContext';
+import { Actions, Subjects } from '../../lib/casl';
 import { useValidationsBadge } from '../../hooks/useValidationsBadge';
 import { useCaisseBadge } from '../../hooks/useCaisseBadge';
 import { useUnreadMessagesCount } from '../../hooks/useUnreadMessagesCount';
@@ -37,6 +37,7 @@ export default function PlatformSidebarContent({
   const { t } = useLanguage();
   const { branding } = useBranding();
   useAbilityContextOptional(); // Subscribe to permission changes to force re-render
+  const ability = useAbility();
   const appName = branding.appName;
 
   // Maintenance Status State
@@ -67,7 +68,7 @@ export default function PlatformSidebarContent({
   // Fetch Pending Refunds Count (Restitutions Frais)
   const fetchPendingRefundsCount = async () => {
     try {
-      if (canAccessRoute(getRouteByKey('remboursements')!, userRole)) {
+      if (canAccessRoute(getRouteByKey('remboursements')!, ability)) {
         const result = await creditRefundsApi.countPending();
         if (result && typeof result.count === 'number') {
           setPendingRefundsCount(result.count);
@@ -179,7 +180,7 @@ export default function PlatformSidebarContent({
   };
 
   // Group routes
-  const accessibleRoutes = ROUTES.filter(route => canAccessRoute(route, userRole));
+  const accessibleRoutes = ROUTES.filter(route => canAccessRoute(route, ability));
   const groupedRoutes: Record<string, RouteConfig[]> = {};
 
   // Define group order and labels
@@ -299,7 +300,7 @@ export default function PlatformSidebarContent({
     
     // Allow admin to bypass maintenance visual lock if needed, but for now we show lock to all
     // Or better, check role:
-    const isAdmin = isAdminRole(userRole);
+    const isAdmin = ability.can(Actions.MANAGE, Subjects.ALL);
     const showMaintenanceLock = (isMaintenanceLocked || isPlatformLocked) && !isAdmin;
 
     const isDisabled = route.key === 'bourse' || showMaintenanceLock;

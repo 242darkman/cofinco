@@ -400,86 +400,37 @@ export const ROUTES: RouteConfig[] = [
 ];
 
 /**
- * Vérifie si un utilisateur peut accéder à une route
- * Utilise authService.canAccessModule() qui prend en compte les permissions de la BDD (CASL)
+ * Vérifie si un utilisateur peut accéder à une route via CASL ability
  */
-export function canAccessRoute(route: RouteConfig, userRole: string): boolean {
-  // Admin a accès à tout
-  if (isAdminRole(userRole)) {
-    return true;
-  }
-
-  // Route réservée admin uniquement
-  if (route.requireAdmin) {
-    return false;
-  }
-
-  // Override avec requiredRoles si spécifié (cas particuliers)
-  if (route.requiredRoles && route.requiredRoles.length > 0) {
-    const normalizedRole = normalizeRole(userRole);
-    if (!normalizedRole) return false;
-    return route.requiredRoles.includes(normalizedRole);
-  }
-
-  // Vérifier via authService qui utilise les permissions de l'API (CASL)
-  if (route.requiredModule) {
-    if (authService.isAuthenticated()) {
-      return authService.canAccessModule(route.requiredModule);
-    }
-    // Utilisateur non authentifié - pas d'accès
-    return false;
-  }
-
-  // Par défaut, accessible à tous (routes publiques comme profil)
-  return true;
-}
-
-/**
- * V2: Check route access using CASL ability
- * This is the preferred method when using CASL
- *
- * @param route - The route configuration
- * @param ability - The CASL ability instance
- * @returns true if user can access the route
- */
-export function canAccessRouteWithAbility(route: RouteConfig, ability: AppAbility): boolean {
-  // Check manage all (admin)
+export function canAccessRoute(route: RouteConfig, ability: AppAbility): boolean {
+  // Admin (manage all)
   if (ability.can(Actions.MANAGE, Subjects.ALL)) {
     return true;
   }
 
   // Route réservée admin uniquement
   if (route.requireAdmin) {
-    return ability.can(Actions.MANAGE, Subjects.ALL);
+    return false;
   }
 
-  // Priority 1: CASL requiredAbility check
+  // CASL requiredAbility check
   if (route.requiredAbility) {
     return ability.can(route.requiredAbility.action, route.requiredAbility.subject);
   }
 
-  // Priority 2: Convert requiredModule to CASL subject
+  // Convert requiredModule to CASL subject
   if (route.requiredModule) {
     const subject = MODULE_TO_SUBJECT[route.requiredModule];
     if (subject) {
       return ability.can(Actions.VIEW, subject);
     }
-    // Unknown module - fall through to legacy check
   }
 
-  // Priority 3: Legacy role check (for backwards compatibility)
+  // Role check for specific routes
   if (route.requiredRoles && route.requiredRoles.length > 0) {
     const user = authService.getCurrentUser();
     if (!user) return false;
     return route.requiredRoles.includes(user.role);
-  }
-
-  // Priority 4: Legacy module check
-  if (route.requiredModule) {
-    if (authService.isAuthenticated()) {
-      return authService.canAccessModule(route.requiredModule);
-    }
-    return false;
   }
 
   // Par défaut, accessible à tous (routes publiques comme profil)
@@ -487,26 +438,14 @@ export function canAccessRouteWithAbility(route: RouteConfig, ability: AppAbilit
 }
 
 /**
- * Obtient les routes accessibles pour un rôle (avec enfants filtrés)
+ * Obtient les routes accessibles via CASL ability (avec enfants filtrés)
  */
-export function getAccessibleRoutes(userRole: string): RouteConfig[] {
+export function getAccessibleRoutes(ability: AppAbility): RouteConfig[] {
   return ROUTES
-    .filter(route => canAccessRoute(route, userRole))
+    .filter(route => canAccessRoute(route, ability))
     .map(route => ({
       ...route,
-      children: route.children?.filter(child => canAccessRoute(child, userRole)),
-    }));
-}
-
-/**
- * V2: Get accessible routes using CASL ability
- */
-export function getAccessibleRoutesWithAbility(ability: AppAbility): RouteConfig[] {
-  return ROUTES
-    .filter(route => canAccessRouteWithAbility(route, ability))
-    .map(route => ({
-      ...route,
-      children: route.children?.filter(child => canAccessRouteWithAbility(child, ability)),
+      children: route.children?.filter(child => canAccessRoute(child, ability)),
     }));
 }
 

@@ -12,7 +12,7 @@ import {
 import { Button, Badge, IconButton, Switch } from '../ui';
 import { formatDate, formatMoney } from '../../lib/format';
 import { compteEpargneApi } from '../../lib/api-client';
-import { authService } from '../../lib/auth';
+import { useIsAdmin } from '../../contexts/AbilityContext';
 
 // --- Types ---
 
@@ -97,7 +97,7 @@ export default function ScheduledTransferDetails({
     const isDesktop = useMediaQuery('(min-width: 768px)');
     const [history, setHistory] = useState<HistoryItem[]>([]);
     const [loadingHistory, setLoadingHistory] = useState(false);
-    const isAdmin = authService.isAdmin();
+    const isAdmin = useIsAdmin();
 
     // Fetch real execution history
     useEffect(() => {

@@ -12,6 +12,7 @@ import CompteInterestCalculator from './CompteInterestCalculator';
 import CompteSavingsGoals from './CompteSavingsGoals';
 import ComptesBloquesSection from '../operations/ComptesBloquesSection';
 import { ProtectedFeature, usePermissions } from '../../auth/ProtectedFeature';
+import { Actions, Subjects } from '../../../lib/casl';
 import { getAccountBalance } from '../../../lib/account-config';
 import { computeSessionStatus } from '../../../lib/format';
 import { TypeCompte, type TypeCompteType, StatutCompte, type StatutCompteType } from '@shared/enum/status-constants';
@@ -244,7 +245,7 @@ export default function Comptes({ activeView }: ComptesProps) {
         helpText={FEATURE_DESCRIPTIONS['finance.epargne'].helpText}
         icon={<PiggyBank size={24} />}
         actions={
-          <ProtectedFeature requiredPermission={{ module: 'epargnes', action: 'create' }}>
+          <ProtectedFeature requiredAbility={{ action: Actions.CREATE, subject: Subjects.COMPTE_EPARGNE }}>
             <button
               onClick={() => setShowAccountForm(true)}
               className="px-3 py-1.5 bg-status-info hover:bg-status-info text-white rounded-lg transition shadow-sm shadow-status-info/20 flex items-center gap-1.5 font-medium text-xs"

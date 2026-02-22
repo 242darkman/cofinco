@@ -6,6 +6,7 @@ import Button from '../ui/Button';
 import Badge from '../ui/Badge';
 import { FeatureHeader, FEATURE_DESCRIPTIONS } from '../ui/FeatureHeader';
 import { authService } from '../../lib/auth';
+import { useIsAdmin } from '../../contexts/AbilityContext';
 import { prospectionApi } from '../../lib/api-client';
 
 interface AgentProfile {
@@ -137,7 +138,7 @@ export default function AgentDashboard({ agentId: propAgentId, selectedAgentId: 
   const [selectedPeriod, setSelectedPeriod] = useState<'jour' | 'semaine' | 'mois'>('jour');
 
   // Admin agent selector state
-  const [isAdmin] = useState(() => authService.isAdmin());
+  const isAdmin = useIsAdmin();
   const [agentsList, setAgentsList] = useState<AgentTerrainOption[]>([]);
   const [loadingAgents, setLoadingAgents] = useState(true);
   // Use parent's selectedAgentId if provided, otherwise use local state

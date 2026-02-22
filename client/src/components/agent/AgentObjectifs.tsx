@@ -4,6 +4,7 @@ import { StatutObjectif } from '@shared/enum/status-constants';
 import { ALL_STATUS_LABELS } from '@/lib/status-labels';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../ui/sheet';
 import { authService } from '../../lib/auth';
+import { useIsAdmin } from '../../contexts/AbilityContext';
 import { currencySymbol, formatMoney } from '@shared/config/currency';
 import { useAvantages, type Avantage } from '../../hooks/hr/useAvantages';
 import { toast } from '../../lib/toast';
@@ -35,7 +36,7 @@ export default function AgentObjectifs({ agentId }: { agentId?: string }) {
   const [selectedPeriode, setSelectedPeriode] = useState(new Date().toISOString().slice(0, 7));
   const [recalculating, setRecalculating] = useState<string | null>(null);
 
-  const isAdmin = authService.isAdmin();
+  const isAdmin = useIsAdmin();
   const isSupervisor = authService.hasRole?.('superviseur') || authService.hasRole?.('chef_agence') || false;
   const canManage = isAdmin || isSupervisor;
 

@@ -3,6 +3,7 @@ import type { ClientWithIdentity } from '@shared/schema';
 import { Edit2, Trash2, Phone, Mail, User, Calendar, MapPin, Globe, BarChart3 } from 'lucide-react';
 import { Card, Badge, Button } from '../ui';
 import { usePermissions, ProtectedFeature } from '../auth/ProtectedFeature';
+import { Actions, Subjects } from '../../lib/casl';
 import { formatClientName, resolveStorageUrl, iso2ToFlag, formatPhoneNumber } from '../../lib/format';
 import { StatutClient, STATUT_CLIENT_LABELS } from '@shared/enum/status-constants';
 import { getStatusLabel, getStatusColor, CLIENT_SEGMENT_LABELS, CLIENT_SEGMENT_COLORS } from '../../lib/status-labels';
@@ -125,7 +126,7 @@ export default function ClientIdentityCard({ client, onEdit, onDelete }: ClientI
 
         {/* Action buttons */}
         <div className="flex items-center gap-2 mb-5">
-          <ProtectedFeature requiredPermission={{ module: 'clients', action: 'edit' }}>
+          <ProtectedFeature requiredAbility={{ action: Actions.EDIT, subject: Subjects.CLIENT }}>
             <Button
               variant="secondary"
               size="sm"
@@ -136,7 +137,7 @@ export default function ClientIdentityCard({ client, onEdit, onDelete }: ClientI
               Modifier
             </Button>
           </ProtectedFeature>
-          <ProtectedFeature requiredPermission={{ module: 'clients', action: 'delete' }}>
+          <ProtectedFeature requiredAbility={{ action: Actions.DELETE, subject: Subjects.CLIENT }}>
             <Button
               variant="ghost"
               size="sm"

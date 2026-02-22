@@ -22,6 +22,7 @@ import { ReevaluationWorkflowPage } from './ReevaluationWorkflowPage';
 import { formatClientName, resolveClientPhotoUrl } from '../../../lib/format';
 import { TableColumn } from '../../ui/ResponsiveTable';
 import { ProtectedFeature } from '../../auth/ProtectedFeature';
+import { Actions, Subjects } from '../../../lib/casl';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../../lib/offline-db';
 import { toast } from 'sonner';
@@ -578,7 +579,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
                 }
               />
             )}
-            <ProtectedFeature requiredPermission={{ module: 'credits', action: 'create' }}>
+            <ProtectedFeature requiredAbility={{ action: Actions.CREATE, subject: Subjects.CREDIT }}>
               <Button size="sm" variant="primary" onClick={() => setShowRequestForm(true)} icon={FileText}>
                 Nouvelle Demande
               </Button>
@@ -830,7 +831,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
             }}
             density="compact"
             actions={(item) => (
-               <ProtectedFeature requiredPermission={{ module: 'credits', action: 'approve' }}>
+               <ProtectedFeature requiredAbility={{ action: Actions.APPROVE, subject: Subjects.CREDIT }}>
                  <Button 
                     size="sm" 
                     variant="primary"
@@ -871,7 +872,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
             density="compact"
             actions={(item) => (
                <div className="flex gap-2">
-                 <ProtectedFeature requiredPermission={{ module: 'credits', action: 'reject' }}>
+                 <ProtectedFeature requiredAbility={{ action: Actions.REJECT, subject: Subjects.CREDIT }}>
                    <Button 
                       size="sm" 
                       variant="danger"
@@ -885,7 +886,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
                      Rejeter
                    </Button>
                  </ProtectedFeature>
-                 <ProtectedFeature requiredPermission={{ module: 'credits', action: 'approve' }}>
+                 <ProtectedFeature requiredAbility={{ action: Actions.APPROVE, subject: Subjects.CREDIT }}>
                    <Button 
                       size="sm" 
                       className="bg-status-success hover:bg-status-success text-white"
@@ -1008,7 +1009,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
                     title="Voir Détails"
                     aria-label="Voir Détails"
                   />
-                 <ProtectedFeature requiredPermission={{ module: 'credits', action: 'delete' }}>
+                 <ProtectedFeature requiredAbility={{ action: Actions.DELETE, subject: Subjects.CREDIT }}>
                    <IconButton
                       icon={Trash2}
                       size="sm"
@@ -1023,7 +1024,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
                     />
                  </ProtectedFeature>
                   {(item.statut === StatutDemande.PENDING_FEES || item.statut === StatutDemande.READY_FOR_INVESTIGATION) && (
-                     <ProtectedFeature requiredPermission={{ module: 'credits', action: 'edit' }}>
+                     <ProtectedFeature requiredAbility={{ action: Actions.EDIT, subject: Subjects.CREDIT }}>
                        <IconButton
                           icon={XCircle}
                           size="sm"
@@ -1079,7 +1080,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
                 <div className="flex items-center gap-1.5">
                   {/* Assigner — pour les demandes sans enquête assignée */}
                   {item.statut === StatutDemande.READY_FOR_INVESTIGATION && !hasEnquete && (
-                    <ProtectedFeature requiredPermission={{ module: 'credits', action: 'create' }}>
+                    <ProtectedFeature requiredAbility={{ action: Actions.CREATE, subject: Subjects.CREDIT }}>
                       <Button
                         size="xs"
                         variant="primary"
@@ -1096,7 +1097,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
                   )}
                   {/* Réassigner — enquête assignée mais agent n'a pas encore démarré, ou en cours */}
                   {((item.statut === StatutDemande.READY_FOR_INVESTIGATION && hasEnquete) || item.statut === StatutDemande.UNDER_INVESTIGATION) && (
-                    <ProtectedFeature requiredPermission={{ module: 'credits', action: 'edit' }}>
+                    <ProtectedFeature requiredAbility={{ action: Actions.EDIT, subject: Subjects.CREDIT }}>
                       <Button
                         size="xs"
                         variant="ghost"
@@ -1133,7 +1134,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
                   )}
                   {/* Valider — uniquement quand l'agent terrain a terminé l'enquête */}
                   {item.statut === StatutDemande.INVESTIGATION_COMPLETE && (
-                    <ProtectedFeature requiredPermission={{ module: 'credits', action: 'create' }}>
+                    <ProtectedFeature requiredAbility={{ action: Actions.CREATE, subject: Subjects.CREDIT }}>
                       <Button
                         size="xs"
                         variant="primary"

@@ -96,7 +96,7 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
     typeof window !== 'undefined' ? !window.matchMedia('(max-width: 1023px)').matches : true
   );
   const [moduleData, setModuleData] = useState<any>(null);
-  const { permissionsVersion } = useAbilityContext();
+  const { permissionsVersion, ability } = useAbilityContext();
   const normalizedRole = normalizeRole(currentUser?.role) || SystemRole.CLIENT;
   
   // Security: Check if user still has access to current module
@@ -113,7 +113,7 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
     // Find the route config for currentModule
     const route = getRouteByKey(currentModule);
 
-    if (route && !canAccessRoute(route, normalizedRole)) {
+    if (route && !canAccessRoute(route, ability)) {
        // Access revoked!
        console.warn(`[Security] Access to module ${currentModule} revoked. Redirecting...`);
        
@@ -124,7 +124,7 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
        showNotification('error', `Votre accès au module "${moduleName}" a été révoqué.`);
        navigateToModule('dashboard');
     }
-  }, [currentModule, permissionsVersion, currentUser, normalizedRole, navigateToModule]);
+  }, [currentModule, permissionsVersion, currentUser, ability, navigateToModule]);
   
   useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 1023px)');

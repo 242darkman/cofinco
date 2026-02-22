@@ -375,9 +375,6 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
 
 export const ROLES = SystemRole;
 
-// NOTE: requireRole has been replaced by requireAbility from server/authorization
-// Use: attachAbility, requireAbility(Actions.X, Subjects.Y) instead
-
 export async function loginUser(username: string, password: string): Promise<User | null> {
   const user = await storage.getUserByUsername(username);
   if (!user || !user.password) return null;
