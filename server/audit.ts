@@ -3,6 +3,8 @@ import { auditLogs, loginAttempts, InsertAuditLog, InsertLoginAttempt, securityS
 import { Request } from 'express';
 import { eq, and, gte, lte, desc, asc, sql, count } from 'drizzle-orm';
 import { createLogger } from './lib/logger';
+import * as fs from 'fs';
+import * as path from 'path';
 
 const logger = createLogger('Audit');
 
@@ -293,34 +295,85 @@ export function validatePassword(
 }
 
 // ============================================
-// AUDIT LOG PURGE SYSTEM (Every 3 months)
+// AUDIT LOG ARCHIVE & PURGE SYSTEM
 // ============================================
+// Rétention en BDD: 6 mois.
+// Les logs > 6 mois sont archivés en fichier JSONL puis supprimés de la BDD.
+// Les archives sont conservées dans logs/audit-archives/ (rétention fichier: illimitée).
 
-const RETENTION_MONTHS = 3;
+const RETENTION_MONTHS = 6;
+const ARCHIVE_BATCH_SIZE = 5000;
+const ARCHIVE_DIR = path.join(process.cwd(), 'logs', 'audit-archives');
 
-export async function purgeOldAuditLogs(): Promise<{ deletedCount: number; error?: string }> {
+export async function purgeOldAuditLogs(): Promise<{ archivedCount: number; deletedCount: number; error?: string }> {
   try {
     const cutoffDate = new Date();
     cutoffDate.setMonth(cutoffDate.getMonth() - RETENTION_MONTHS);
 
-    // Count logs to be deleted (for reporting)
+    // Count logs to archive
     const [countResult] = await db.select({ count: count() })
       .from(auditLogs)
       .where(lte(auditLogs.createdAt, cutoffDate));
 
-    const logsToDelete = countResult?.count || 0;
+    const logsToArchive = Number(countResult?.count || 0);
 
-    if (logsToDelete > 0) {
-      // SECURITY: Audit logs and login attempts must NEVER be hard-deleted.
-      // They are immutable records required for compliance and breach investigation.
-      // Retention-based archival should be implemented instead.
-      logger.info({ logsToDelete, cutoffDate: cutoffDate.toISOString() }, 'AUDIT PURGE: Skipped deletion of audit logs (hard delete disabled for compliance)');
+    if (logsToArchive === 0) {
+      return { archivedCount: 0, deletedCount: 0 };
     }
 
-    return { deletedCount: 0 };
+    logger.info({ logsToArchive, cutoffDate: cutoffDate.toISOString() }, 'AUDIT PURGE: Starting archive');
+
+    // Ensure archive directory exists
+    fs.mkdirSync(ARCHIVE_DIR, { recursive: true });
+
+    // Archive in batches to avoid memory pressure
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const archiveFile = path.join(ARCHIVE_DIR, `audit-logs-${timestamp}.jsonl`);
+    const writeStream = fs.createWriteStream(archiveFile, { encoding: 'utf-8' });
+
+    let archived = 0;
+    let lastId: string | null = null;
+
+    while (true) {
+      const batch = lastId
+        ? await db.select().from(auditLogs)
+            .where(and(lte(auditLogs.createdAt, cutoffDate), sql`${auditLogs.id} > ${lastId}`))
+            .orderBy(asc(auditLogs.id))
+            .limit(ARCHIVE_BATCH_SIZE)
+        : await db.select().from(auditLogs)
+            .where(lte(auditLogs.createdAt, cutoffDate))
+            .orderBy(asc(auditLogs.id))
+            .limit(ARCHIVE_BATCH_SIZE);
+
+      if (batch.length === 0) break;
+
+      for (const log of batch) {
+        writeStream.write(JSON.stringify(log) + '\n');
+      }
+
+      lastId = batch[batch.length - 1].id;
+      archived += batch.length;
+    }
+
+    writeStream.end();
+    await new Promise<void>((resolve, reject) => {
+      writeStream.on('finish', resolve);
+      writeStream.on('error', reject);
+    });
+
+    logger.info({ archived, archiveFile }, 'AUDIT PURGE: Archive written');
+
+    // Delete archived logs from database
+    const deleteResult = await db.delete(auditLogs)
+      .where(lte(auditLogs.createdAt, cutoffDate));
+
+    const deletedCount = (deleteResult as any).rowCount ?? archived;
+    logger.info({ deletedCount, archiveFile }, 'AUDIT PURGE: Old logs deleted from database');
+
+    return { archivedCount: archived, deletedCount };
   } catch (error) {
-    logger.error({ err: error }, 'AUDIT PURGE: Error during purge');
-    return { deletedCount: 0, error: String(error) };
+    logger.error({ err: error }, 'AUDIT PURGE: Error during archive/purge');
+    return { archivedCount: 0, deletedCount: 0, error: String(error) };
   }
 }
 

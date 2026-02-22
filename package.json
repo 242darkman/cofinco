@@ -158,8 +158,6 @@
     "uuid": "^13.0.0",
     "vaul": "^1.1.2",
     "web-push": "^3.6.7",
-    "winston": "^3.19.0",
-    "winston-daily-rotate-file": "^5.0.0",
     "wouter": "^3.3.5",
     "ws": "^8.18.0",
     "xlsx": "^0.18.5",

@@ -51,6 +51,8 @@ import { startTontineAutoPenaltiesCron } from "./cron/tontine-auto-penalties";
 import { startProvisionCron } from "./cron/provision-scheduler";
 import { startAmortissementCron } from "./cron/amortissement-scheduler";
 import { startCobacReportingCron } from "./cron/cobac-reporting-scheduler";
+import { startLogCleanupCron } from "./cron/log-cleanup";
+import { startStorageOrphanCleanupCron } from "./cron/storage-orphan-cleanup";
 import { StorageService } from "./services/storage-service";
 
 const app = express();
@@ -417,7 +419,13 @@ app.get("/api/health", async (_req, res) => {
     startTontineAutoPenaltiesCron();
     logger.info('Tontine auto-penalties cron started (daily 06:00)');
 
-    logger.info('All cron jobs started: disbursements, repayments, credit-status, migrations, reconciliation, temp-permissions, balance-reconciliation, mm-reconciliation-report, treasury-reconciliation, gl-reconciliation-monitor, gl-auto-fix, late-installments, daily-integrity-audit, auto-lift-suspension');
+    // Start Log Cleanup Cron (weekly — cleans old log files per retention policy)
+    startLogCleanupCron();
+
+    // Start Storage Orphan Cleanup Cron (monthly — removes unreferenced MinIO files)
+    startStorageOrphanCleanupCron();
+
+    logger.info('All cron jobs started: disbursements, repayments, credit-status, migrations, reconciliation, temp-permissions, balance-reconciliation, mm-reconciliation-report, treasury-reconciliation, gl-reconciliation-monitor, gl-auto-fix, late-installments, daily-integrity-audit, auto-lift-suspension, log-cleanup, storage-orphan-cleanup');
 
     // Start Account Cleanup Cron
     const { accountCleanup } = await import("./services/account-cleanup");
