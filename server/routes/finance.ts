@@ -3401,7 +3401,8 @@ export function registerFinanceRoutes(app: Express) {
     if (!caisse) return res.status(404).json({ message: "Caisse non trouvée" });
 
     // Check Agency Access
-    if (!isAdminRole(user.role) && caisse.agenceId !== user.agenceId) {
+    const isGlobalAdmin = req.ability?.can(Actions.MANAGE, 'all');
+    if (!isGlobalAdmin && caisse.agenceId !== user.agenceId) {
         return res.status(403).json({ message: "Accès refusé à cette agence" });
     }
 
@@ -6038,7 +6039,8 @@ export function registerFinanceRoutes(app: Express) {
       }
 
       // Check agency access
-      if (!isAdminRole(user.role) && caisse.agenceId !== user.agenceId) {
+      const isGlobalAdmin = req.ability?.can(Actions.MANAGE, 'all');
+      if (!isGlobalAdmin && caisse.agenceId !== user.agenceId) {
         return res.status(403).json({ error: "Accès refusé à cette agence" });
       }
 

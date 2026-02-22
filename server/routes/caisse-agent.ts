@@ -599,24 +599,14 @@ caisseAgentRouter.get(
  */
 caisseAgentRouter.post(
   "/agents/:id/caisse",
+  attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE_AGENT),
   async (req, res) => {
     try {
       const agentId = req.params.id;
       const userId = req.user?.id;
-      const userRole = req.user?.role;
 
       if (!userId) {
         return res.status(401).json({ error: "Non authentifié" });
-      }
-
-      // Vérification basique des rôles
-      const normalizedRole = normalizeRole(userRole);
-      const allowedRoles = new Set([SystemRole.ADMIN, SystemRole.CHEF_AGENCE]);
-      if (!normalizedRole || !allowedRoles.has(normalizedRole)) {
-        return res.status(403).json({
-          error: "Permission refusée",
-          code: "FORBIDDEN",
-        });
       }
 
       const result = await caisseAgentService.createCaisseAgent({
@@ -1187,19 +1177,12 @@ caisseAgentRouter.get("/sessions/:id/audit", async (req, res) => {
  * Transférer un agent vers une autre agence
  * Rôles: ADMIN, SUPERVISEUR
  */
-caisseAgentRouter.post("/agents/:id/transfer-agency", async (req, res) => {
+caisseAgentRouter.post("/agents/:id/transfer-agency", attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE_AGENT), async (req, res) => {
   try {
     const userId = req.user?.id;
-    const userRole = req.user?.role;
 
     if (!userId) {
       return res.status(401).json({ error: "Non authentifié" });
-    }
-
-    const normalizedRole = normalizeRole(userRole);
-    const allowedRoles = new Set([SystemRole.ADMIN, SystemRole.SUPERVISEUR]);
-    if (!normalizedRole || !allowedRoles.has(normalizedRole)) {
-      return res.status(403).json({ error: "Permission refusée", code: "FORBIDDEN" });
     }
 
     const parsed = transferAgencySchema.safeParse(req.body);

@@ -5,7 +5,6 @@ import { TransfertCoffreService } from "../services/coffre/transfert-service";
 const logger = createLogger('Routes:Coffre');
 import { idempotencyMiddleware } from "../middleware/idempotency";
 import { z } from "zod";
-import { SystemRole, isAdminRole, normalizeRole } from "@shared/types/roles";
 import { db } from "../db";
 import { configCoffreFort } from "@shared/schema";
 import { eq, and, sql, desc } from "drizzle-orm";
@@ -821,10 +820,13 @@ coffreRouter.put("/config", attachAbility, requireAbility(Actions.MANAGE, Subjec
 
     const body = schema.parse(req.body);
 
-    // Vérification ROLE ADMIN
-    const userRole = req.user?.role;
-    if (!isAdminRole(userRole)) {
-      return res.status(403).json({ error: "Access denied. Admin only." });
+    // Vérification agence : non-admin restreint à sa propre agence
+    const isGlobalAdmin = req.ability?.can(Actions.MANAGE, 'all');
+    if (!isGlobalAdmin) {
+      const userAgenceId = req.session.user?.agenceId;
+      if (body.agenceId !== userAgenceId) {
+        return res.status(403).json({ error: "Accès interdit: configuration d'une autre agence" });
+      }
     }
 
     // Check if exists
