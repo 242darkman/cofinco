@@ -16,6 +16,7 @@ export * from "./operations";
 export * from "./transferts";
 export * from "./hr";
 export * from "./accounting";
+export * from "./analytique";
 export * from "./treasury";
 export * from "./remboursement-allocations";
 export * from "./agences";
