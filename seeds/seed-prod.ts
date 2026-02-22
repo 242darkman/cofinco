@@ -4588,6 +4588,13 @@ async function seedNotificationSystem(context: SeedContext, dryRun: boolean): Pr
       placeholders: 'employeeName,startDate,endDate',
       description: 'SMS d\'approbation de conge',
     },
+    {
+      code: 'HR_LEAVE_REJECTED',
+      nom: 'Conge refuse SMS',
+      contenu: 'Bonjour {{employeNom}}, votre demande de conge a ete refusee. Motif: {{reason}}. Contactez votre RH. COFIN&CO-M',
+      placeholders: 'employeNom,reason',
+      description: 'SMS de refus de conge',
+    },
     // ── Credit lifecycle SMS templates ──
     {
       code: 'CREDIT_APPLICATION_RECEIVED',

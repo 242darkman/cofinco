@@ -1400,6 +1400,9 @@ export async function handleHrLeaveApproved(data: HrLeaveApprovedData) {
           },
         ]
       : [],
+    inAppRecipients: employee.userId
+      ? [{ userId: employee.userId, type: "HR_LEAVE_APPROVED", titre: "Congé approuvé", message: `Votre demande de congé a été approuvée par ${payload.approvedBy}`, priorite: "NORMAL" as const }]
+      : [],
   });
 
   logNotificationEvent("info", "Domain event: HR_LEAVE_APPROVED", {
@@ -1429,6 +1432,9 @@ export async function handleHrLeaveRejected(data: HrLeaveRejectedData) {
             agenceId: data.agenceId,
           },
         ]
+      : [],
+    inAppRecipients: employee.userId
+      ? [{ userId: employee.userId, type: "HR_LEAVE_REJECTED", titre: "Congé refusé", message: `Votre demande de congé a été refusée. Motif : ${payload.reason}`, priorite: "NORMAL" as const }]
       : [],
   });
 
