@@ -2,19 +2,8 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import {
   Shield, Users, Key, Settings, BarChart3, Activity, Monitor, Power, Building2, MapPin,
   MessageSquare, KeyRound, Clock, UserPlus, Award, Package, CreditCard, CalendarClock,
-  AlertTriangle, ShieldCheck, LayoutGrid, UserCog, Lock, ChevronLeft, ChevronRight, Percent, Coins,
-  RotateCcw, History, GitBranch, Braces, Eye, MessageSquarePlus
+  AlertTriangle, Lock, ChevronLeft, ChevronRight, Coins, RotateCcw, Wallet, Percent, Palette,
 } from 'lucide-react';
-import { Button, ConfirmDialog } from '../ui';
-
-// Hooks
-import { useModules } from '../../hooks/admin/useModules';
-import { usePermissions } from '../../hooks/admin/usePermissions';
-import { useRolePermissions } from '../../hooks/admin/useRolePermissions';
-import { useAllRolePermissions } from '../../hooks/admin/useAllRolePermissions';
-import { useUserPermissions } from '../../hooks/admin/useUserPermissions';
-import { useAdminUsers } from '../../hooks/admin/useAdminUsers';
-import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 
 // Constants
 import { ADMIN_TABS, AdminTabId } from '../../constants/admin-constants';
@@ -24,7 +13,6 @@ import { getPermissionMapping } from '@shared/ability/mappings';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 
 // Sub-components
-import AdminGestionUtilisateurs from './AdminGestionUtilisateurs';
 import AdminGestionProfils from './AdminGestionProfils';
 import AdminDashboard from './AdminDashboard';
 import AdminActivityLogs from './AdminActivityLogs';
@@ -36,22 +24,10 @@ import AdminGestionZones from './AdminGestionZones';
 import AdminNotificationsMonitor from './AdminNotificationsMonitor';
 import NotificationTemplatesAdmin from './notifications/NotificationTemplatesAdmin';
 import AdminVersionInfo from './AdminVersionInfo';
-import { SystemRole } from '@shared/types/roles';
 import AdminCaisseAccessCodes from './AdminCaisseAccessCodes';
 import AdminGestionCaisses from './AdminGestionCaisses';
 import AdminCreditsGestion from './AdminCreditsGestion';
-import RolesPermissionsManager from './permissions/RolesPermissionsManager';
-import ModulePermissionsView from './permissions/ModulePermissionsView';
-import UserCustomPermissionsManager from './permissions/UserCustomPermissionsManager';
-import TemporaryPermissionsManager from './permissions/TemporaryPermissionsManager';
-import PermissionAnalyticsDashboard from './permissions/PermissionAnalyticsDashboard';
-import RbacAuditHistoryViewer from './permissions/RbacAuditHistoryViewer';
-import RoleHierarchyTree from './permissions/RoleHierarchyTree';
-import CriticalPatternsManager from './permissions/CriticalPatternsManager';
-import ConditionTemplatesManager from './permissions/ConditionTemplatesManager';
-import PermissionSimulator from './permissions/PermissionSimulator';
-import ModulePermissionsEditor from './permissions/ModulePermissionsEditor';
-import PermissionRequestsManager from './permissions/PermissionRequestsManager';
+import AccessManagement from './AccessManagement';
 import RegularizationDashboard from './RegularizationDashboard';
 import AdminClientCredentials from './AdminClientCredentials';
 import AdminProductRates from './AdminProductRates';
@@ -60,6 +36,7 @@ import AdminCurrencySettings from './AdminCurrencySettings';
 import AdminBrandingSettings from './AdminBrandingSettings';
 import AdminAgencyReset from './AdminAgencyReset';
 import AdminScoring from './AdminScoring';
+import AdminPaymentMethodToggles from './AdminPaymentMethodToggles';
 
 
 interface AdminModuleCompletProps {
@@ -83,46 +60,10 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
     navigateToModule('administrateur', tab);
   }, [navigateToModule]);
 
-  const [accessViewMode, setAccessViewMode] = useState<'roles' | 'modules' | 'users' | 'temporary' | 'analytics' | 'historique' | 'hierarchy' | 'patterns' | 'conditions' | 'simulation' | 'demandes'>('roles');
-  const [selectedRole, setSelectedRole] = useState<SystemRole>(SystemRole.ADMIN);
-  const [selectedUserId, setSelectedUserId] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [confirmMessage, setConfirmMessage] = useState('');
-  
   // Navigation Scroll State
   const scrollContainerRef = useRef<HTMLElement>(null);
   const [showLeftShadow, setShowLeftShadow] = useState(false);
   const [showRightShadow, setShowRightShadow] = useState(false);
-
-  // Hooks
-  const { modules, fetchModules: refreshModules } = useModules();
-  const { permissions, searchPermissions, fetchPermissions: refreshPermissions } = usePermissions();
-  const {
-    rolePermissions,
-    fetchRolePermissions,
-    toggleRolePermission: toggleRolePerm,
-    roleHasPermission: singleRoleHasPermission
-  } = useRolePermissions(selectedRole);
-
-  // Hook pour la Vue Globale - charge les permissions de TOUS les rôles
-  const {
-    roleHasPermission: allRolesHasPermission,
-    fetchAllRolePermissions
-  } = useAllRolePermissions();
-  const {
-    userPermissions,
-    fetchUserPermissions,
-    toggleUserPermission,
-    activateAllPermissions,
-    blockAllPermissions,
-    resetPermissions,
-    getUserPermissionStatus,
-    countActivePermissions,
-    getAvailablePermissionsToAdd,
-    getAvailablePermissionsToRemove
-  } = useUserPermissions(selectedUserId);
-  const { users, getUserDisplayName } = useAdminUsers();
-  const { confirmState, openConfirm, closeConfirm, handleConfirm } = useConfirmDialog();
 
   // Legacy: si activeView est passé via l'ancien système (avant URL sync), on redirige
   useEffect(() => {
@@ -135,30 +76,6 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
     }
   }, [activeView, currentSubModule, navigateToModule]);
 
-  useEffect(() => {
-    fetchRolePermissions();
-  }, [selectedRole]);
-
-  // Recharger les permissions globales quand on passe en mode "modules" (Vue Globale)
-  useEffect(() => {
-    if (accessViewMode === 'modules') {
-      fetchAllRolePermissions();
-    }
-  }, [accessViewMode, fetchAllRolePermissions]);
-
-  useEffect(() => {
-    if (selectedUserId) {
-      fetchUserPermissions(selectedUserId);
-    }
-  }, [selectedUserId]);
-
-  useEffect(() => {
-    if (confirmMessage) {
-      const timer = setTimeout(() => setConfirmMessage(''), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [confirmMessage]);
-  
   // Scroll Management
   const checkScroll = () => {
     if (scrollContainerRef.current) {
@@ -205,63 +122,6 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
     }
   };
 
-  const handleRoleChange = (role: SystemRole) => setSelectedRole(role);
-  const handleToggleRolePermission = async (_role: string, permCode: string) => {
-    const perm = permissions.find(p => p.code === permCode);
-    if (!perm) return;
-
-    // Check if currently granted (for single role view)
-    const isGranted = singleRoleHasPermission(perm.code);
-
-    // toggleRolePerm now uses permissionCode
-    await toggleRolePerm(permCode, isGranted);
-  };
-  const handleToggleUserPermission = async (permId: string) => {
-    const perm = permissions.find(p => p.id === permId);
-    if (!perm) return;
-    const status = getUserPermissionStatus(perm.code);
-    await toggleUserPermission(selectedUserId, permId, status.granted);
-  };
-
-  const handleActivateAll = async () => {
-    if (!selectedUserId) return;
-    openConfirm({
-      title: 'Activer Toutes les Permissions',
-      message: 'Voulez-vous vraiment activer toutes les permissions pour cet utilisateur ?',
-      variant: 'warning',
-      onConfirm: async () => {
-        const success = await activateAllPermissions(selectedUserId, permissions);
-        if (success) setConfirmMessage('Toutes les permissions ont été activées');
-      }
-    });
-  };
-
-  const handleBlockAll = async () => {
-    if (!selectedUserId) return;
-    openConfirm({
-      title: 'Bloquer Toutes les Permissions',
-      message: 'Voulez-vous vraiment bloquer toutes les permissions pour cet utilisateur ? Cette action est critique.',
-      variant: 'danger',
-      onConfirm: async () => {
-        const success = await blockAllPermissions(selectedUserId, permissions);
-        if (success) setConfirmMessage('Toutes les permissions ont été bloquées');
-      }
-    });
-  };
-
-  const handleResetPermissions = async () => {
-    if (!selectedUserId) return;
-    openConfirm({
-      title: 'Réinitialiser les Permissions',
-      message: 'Voulez-vous vraiment supprimer tous les overrides personnalisés ? L\'utilisateur reviendra aux permissions de son rôle.',
-      variant: 'warning',
-      onConfirm: async () => {
-        const success = await resetPermissions(selectedUserId);
-        if (success) setConfirmMessage('Permissions réinitialisées');
-      }
-    });
-  };
-
   const iconMap: Record<string, any> = {
     'BarChart3': BarChart3, 'UserPlus': UserPlus, 'Users': Users, 'Building2': Building2,
     'MapPin': MapPin, 'KeyRound': KeyRound, 'Activity': Activity, 'Monitor': Monitor,
@@ -270,11 +130,11 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
     'CalendarClock': CalendarClock,
     'CreditCard': CreditCard,
     'AlertTriangle': AlertTriangle,
-    'RotateCcw': RotateCcw
+    'RotateCcw': RotateCcw,
+    'Wallet': Wallet,
+    'Percent': Percent,
+    'Palette': Palette,
   };
-
-  const filteredPermissions = searchTerm ? searchPermissions(searchTerm) : (permissions || []);
-  const activeRolePermissionsCount = (permissions || []).filter(p => singleRoleHasPermission(p.code)).length;
 
   return (
     <div className="flex flex-col h-full overflow-y-auto overflow-x-hidden bg-surface-base">
@@ -384,7 +244,6 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
               <div className="flex-1 relative overflow-hidden flex flex-col">
                   {activeTab === 'dashboard' && <AdminDashboard />}
                   {activeTab === 'profils' && <AdminGestionProfils />}
-                  {activeTab === 'users' && <AdminGestionUtilisateurs />}
                   {activeTab === 'logs' && <AdminActivityLogs />}
                   {activeTab === 'sessions' && <AdminSessionsManager />}
                   {activeTab === 'agences' && <AdminGestionAgences />}
@@ -402,223 +261,17 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
                   {activeTab === 'client-credentials' && <AdminClientCredentials />}
                   {activeTab === 'product-rates' && <AdminProductRates />}
                   {activeTab === 'zones-commerciales' && <ZoneManagement />}
+                  {activeTab === 'payment-methods' && <AdminPaymentMethodToggles />}
                   {activeTab === 'currency' && <AdminCurrencySettings />}
                   {activeTab === 'branding' && <AdminBrandingSettings />}
                   {activeTab === 'reset-agence' && <AdminAgencyReset />}
                   {activeTab === 'scoring' && <AdminScoring />}
 
-                  {activeTab === 'roles' && (
-                    <div className="flex flex-col h-full overflow-hidden space-y-2">
-                      <div className="border-b border-edge pb-2 shrink-0">
-                        {(() => {
-                        const viewTabs = [
-                          {
-                            id: 'roles' as const,
-                            label: 'Par Rôle',
-                            icon: ShieldCheck,
-                            description: 'Gérez les permissions attribuées à chaque rôle. Les modifications s\'appliquent à TOUS les utilisateurs ayant ce rôle.'
-                          },
-                          {
-                            id: 'modules' as const,
-                            label: 'Vue Globale',
-                            icon: LayoutGrid,
-                            description: 'Visualisez la matrice complète des permissions par module. Comparez rapidement les droits entre tous les rôles.'
-                          },
-                          {
-                            id: 'users' as const,
-                            label: 'Exceptions',
-                            icon: UserCog,
-                            description: 'Accordez ou retirez des permissions spécifiques à UN utilisateur, indépendamment de son rôle. Idéal pour les cas particuliers.'
-                          },
-                          {
-                            id: 'temporary' as const,
-                            label: 'Temporaires',
-                            icon: Clock,
-                            description: 'Attribuez des permissions à durée limitée. Parfait pour les remplacements, formations ou accès ponctuels.'
-                          },
-                          {
-                            id: 'analytics' as const,
-                            label: 'Analytics',
-                            icon: BarChart3,
-                            description: 'Analysez l\'utilisation des permissions, identifiez les incohérences et optimisez la configuration des accès.'
-                          },
-                          {
-                            id: 'historique' as const,
-                            label: 'Historique',
-                            icon: History,
-                            description: 'Consultez l\'historique complet des modifications de permissions. Suivez qui a changé quoi, quand et pourquoi.'
-                          },
-                          {
-                            id: 'hierarchy' as const,
-                            label: 'Hiérarchie',
-                            icon: GitBranch,
-                            description: 'Visualisez l\'arbre d\'héritage des rôles. Les rôles parents héritent automatiquement des permissions de leurs enfants.'
-                          },
-                          {
-                            id: 'patterns' as const,
-                            label: 'Patterns Critiques',
-                            icon: AlertTriangle,
-                            description: 'Gérez les patterns de permissions qui nécessitent une justification lors de modification.'
-                          },
-                          {
-                            id: 'conditions' as const,
-                            label: 'Conditions',
-                            icon: Braces,
-                            description: 'Gérez les templates de conditions CASL pour restreindre les permissions (montant max, même agence, etc.).'
-                          },
-                          {
-                            id: 'simulation' as const,
-                            label: 'Simulation',
-                            icon: Eye,
-                            description: 'Prévisualisez les permissions effectives d\'un utilisateur. Vue lecture seule, rien n\'est modifié.'
-                          },
-                          {
-                            id: 'demandes' as const,
-                            label: 'Demandes',
-                            icon: MessageSquarePlus,
-                            description: 'Gérez les demandes de permissions des utilisateurs. Approuvez ou rejetez les demandes en attente.'
-                          },
-                        ];
-                        const activeTab = viewTabs.find(t => t.id === accessViewMode);
-
-                        return (
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-4">
-                              <span className="text-sm text-content-muted font-medium">Vue :</span>
-                              <div className="flex bg-surface-base rounded-lg p-1 border border-edge">
-                                {viewTabs.map((tab) => {
-                                  const isActive = accessViewMode === tab.id;
-                                  return (
-                                    <button
-                                      key={tab.id}
-                                      onClick={() => setAccessViewMode(tab.id)}
-                                      className={`
-                                        flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all
-                                        ${isActive
-                                          ? 'bg-surface text-content-primary shadow-sm border border-edge'
-                                          : 'text-content-muted hover:text-content-secondary'
-                                        }
-                                      `}
-                                    >
-                                      <tab.icon size={12} />
-                                      <span>{tab.label}</span>
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                            {activeTab && (
-                              <p className="text-xs text-content-muted pl-12 max-w-2xl">
-                                {activeTab.description}
-                              </p>
-                            )}
-                          </div>
-                        );
-                      })()}
-                      </div>
-                      
-                      <div className="flex-1 overflow-hidden relative">
-                        {accessViewMode === 'roles' && (
-                            <RolesPermissionsManager
-                            modules={modules}
-                            permissions={permissions}
-                            selectedRole={selectedRole}
-                            onRoleChange={handleRoleChange}
-                            roleHasPermission={(_role, code) => selectedRole === SystemRole.ADMIN ? true : singleRoleHasPermission(code)}
-                            toggleRolePermission={handleToggleRolePermission}
-                            activePermissionsCount={selectedRole === SystemRole.ADMIN ? (permissions?.length || 0) : activeRolePermissionsCount}
-                            confirmMessage={confirmMessage}
-                            rolePermissionsData={rolePermissions}
-                            />
-                        )}
-
-                        {accessViewMode === 'modules' && (
-                          ability.can(Actions.MANAGE, Subjects.RBAC) ? (
-                            <ModulePermissionsEditor
-                              modules={modules}
-                              permissions={permissions}
-                              onRefresh={() => { refreshModules(); refreshPermissions(); }}
-                            />
-                          ) : (
-                            <ModulePermissionsView
-                              modules={modules}
-                              permissions={permissions}
-                              searchTerm={searchTerm}
-                              onSearchChange={setSearchTerm}
-                              roleHasPermission={allRolesHasPermission}
-                              selectedRole={selectedRole}
-                            />
-                          )
-                        )}
-
-                        {accessViewMode === 'users' && (
-                            <UserCustomPermissionsManager
-                            users={users}
-                            permissions={permissions}
-                            selectedUserId={selectedUserId}
-                            onUserChange={setSelectedUserId}
-                            userPermissions={userPermissions}
-                            getUserDisplayName={getUserDisplayName}
-                            getUserPermissionStatus={getUserPermissionStatus}
-                            toggleUserPermission={handleToggleUserPermission}
-                            onActivateAll={handleActivateAll}
-                            onBlockAll={handleBlockAll}
-                            onResetPermissions={handleResetPermissions}
-                            activePermissionsCount={countActivePermissions()}
-                            confirmMessage={confirmMessage}
-                            />
-                        )}
-
-                        {accessViewMode === 'temporary' && (
-                            <TemporaryPermissionsManager
-                            users={users.map(u => ({ ...u, nom: u.nom || '' }))}
-                            />
-                        )}
-
-                        {accessViewMode === 'analytics' && (
-                            <PermissionAnalyticsDashboard />
-                        )}
-
-                        {accessViewMode === 'historique' && (
-                            <RbacAuditHistoryViewer />
-                        )}
-
-                        {accessViewMode === 'hierarchy' && (
-                            <RoleHierarchyTree />
-                        )}
-
-                        {accessViewMode === 'patterns' && (
-                            <CriticalPatternsManager />
-                        )}
-
-                        {accessViewMode === 'conditions' && (
-                            <ConditionTemplatesManager />
-                        )}
-
-                        {accessViewMode === 'simulation' && (
-                            <PermissionSimulator users={users} />
-                        )}
-
-                        {accessViewMode === 'demandes' && (
-                            <PermissionRequestsManager />
-                        )}
-                      </div>
-                    </div>
-                  )}
+                  {activeTab === 'roles' && <AccessManagement />}
               </div>
            </div>
         </div>
       </main>
-
-      <ConfirmDialog
-        isOpen={confirmState.isOpen}
-        onClose={closeConfirm}
-        onConfirm={handleConfirm}
-        title={confirmState.title || "Confirmer l'action"}
-        message={confirmState.message || "Êtes-vous sûr ?"}
-        variant={confirmState.variant || 'warning'}
-        confirmText={confirmState.confirmText || 'Confirmer'}
-      />
     </div>
   );
 }
