@@ -133,11 +133,17 @@ export function SessionProvider({
   const wsHeartbeatRef = useRef<NodeJS.Timeout | null>(null);
   const activityThrottleRef = useRef<number>(0);
   const isMountedRef = useRef(true);
+  const onSessionInvalidRef = useRef(onSessionInvalid);
 
   // Sync state ref
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
+
+  // Sync callback ref (prevents verifySession identity from changing on callback change)
+  useEffect(() => {
+    onSessionInvalidRef.current = onSessionInvalid;
+  }, [onSessionInvalid]);
 
   // ----------------------------------------
   // Fonctions utilitaires
@@ -188,7 +194,7 @@ export function SessionProvider({
         }));
 
         if (!isValid) {
-          onSessionInvalid?.('Session invalide ou expirée');
+          onSessionInvalidRef.current?.('Session invalide ou expirée');
         }
 
         return isValid;
@@ -220,13 +226,13 @@ export function SessionProvider({
     // Après trop d'échecs consécutifs, invalider la session
     if (failures >= CONFIG.MAX_RETRIES) {
       setState(prev => ({ ...prev, isValid: false }));
-      onSessionInvalid?.('Impossible de vérifier la session après plusieurs tentatives');
+      onSessionInvalidRef.current?.('Impossible de vérifier la session après plusieurs tentatives');
       return false;
     }
 
     // Sinon, garder l'état précédent
     return stateRef.current.isValid;
-  }, [disabled, onSessionInvalid]);
+  }, [disabled]);
 
   // ----------------------------------------
   // Mise à jour d'activité (throttled)

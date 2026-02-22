@@ -311,9 +311,7 @@ function App() {
           <WebSocketProvider>
               <AbilityProvider>
                 <SessionProvider
-                  onSessionInvalid={(reason) => {
-                    handleSessionExpired(reason);
-                  }}
+                  onSessionInvalid={handleSessionExpired}
                 >
                   <ErrorBoundary>
                     <Toaster position="top-right" richColors closeButton />

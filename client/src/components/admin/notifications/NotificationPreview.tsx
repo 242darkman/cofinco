@@ -3,7 +3,7 @@
  * Preview rendered notification content before sending
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Eye,
   MessageSquare,
@@ -48,22 +48,28 @@ const CHANNEL_COLORS = {
   IN_APP: 'text-status-success bg-status-success-bg',
 };
 
+const EMPTY_SAMPLE_DATA: Record<string, string> = {};
+
 export default function NotificationPreview({
   template,
-  sampleData = {},
+  sampleData = EMPTY_SAMPLE_DATA,
   onClose,
 }: NotificationPreviewProps) {
-  const [data, setData] = useState<Record<string, string>>({});
+  const [data, setData] = useState<Record<string, string>>(() => {
+    const init: Record<string, string> = {};
+    template.placeholders.forEach((p) => { init[p] = sampleData[p] || ''; });
+    return init;
+  });
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    // Initialize with sample data or empty strings
-    const initialData: Record<string, string> = {};
-    template.placeholders.forEach((placeholder) => {
-      initialData[placeholder] = sampleData[placeholder] || '';
-    });
-    setData(initialData);
-  }, [template, sampleData]);
+  // Reset only when the template itself changes (by id)
+  const [prevTemplateId, setPrevTemplateId] = useState(template.id);
+  if (template.id !== prevTemplateId) {
+    setPrevTemplateId(template.id);
+    const init: Record<string, string> = {};
+    template.placeholders.forEach((p) => { init[p] = sampleData[p] || ''; });
+    setData(init);
+  }
 
   const renderContent = (content: string) => {
     let rendered = content;
@@ -71,6 +77,8 @@ export default function NotificationPreview({
       const value = data[placeholder] || `{{${placeholder}}}`;
       rendered = rendered.replace(new RegExp(`\\{\\{${placeholder}\\}\\}`, 'g'), value);
     });
+    // Replace email CID references with actual public path for browser preview
+    rendered = rendered.replace(/src=["']cid:company-logo["']/g, 'src="/cofin-logo.png"');
     return rendered;
   };
 
