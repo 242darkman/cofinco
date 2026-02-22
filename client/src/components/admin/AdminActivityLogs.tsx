@@ -24,7 +24,7 @@ interface LogEntry {
 
 interface AdminActivityLogsProps {
   /**
-   * 'compact' - Simple card-based view for embedded use (e.g., AdminGestionAcces)
+   * 'compact' - Simple card-based view for embedded use
    * 'full' - Full-featured table view with pagination and details drawer (default)
    */
   variant?: 'compact' | 'full';

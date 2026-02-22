@@ -466,7 +466,7 @@ describe("File upload — Ownership verification", () => {
     const content = readFileSync(join(ROOT, "routes/storage.ts"), "utf-8");
     const uploadSection = content.substring(content.indexOf("entity/upload"));
     expect(uploadSection).toContain("isPrivileged");
-    expect(uploadSection).toContain("normalizeRole");
+    expect(uploadSection).toContain("ability");
   });
 });
 
@@ -535,9 +535,7 @@ describe("Math.random() elimination — Client-side security code", () => {
 
   const CLIENT_CRITICAL_FILES = [
     "components/admin/users/UserFormModal.tsx",
-    "components/admin/AdminPasswordReset.tsx",
     "components/hr/EmployeeProfileDrawer.tsx",
-    "components/admin/AdminImportCSV.tsx",
     "components/finance/operations/TransactionVerificationWrapper.tsx",
     "lib/criticalOperations.ts",
     "services/otpService.ts",

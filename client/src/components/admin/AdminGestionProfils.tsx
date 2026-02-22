@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Users, Plus, Edit2, Trash2, Lock, Unlock, Eye, EyeOff, Shield, CheckCircle, XCircle, Search, Filter, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Upload, Image as ImageIcon, Loader2, User, Briefcase, Check, Save, CreditCard } from 'lucide-react';
+import { Users, Plus, Edit2, Trash2, Lock, Unlock, Eye, EyeOff, Shield, CheckCircle, XCircle, Search, Filter, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Upload, Image as ImageIcon, Loader2, User, Briefcase, Check, Save, CreditCard, KeyRound } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, Button, IconButton, ResponsiveTable } from '../ui';
 import ConfirmDialog from '../ui/ConfirmDialog';
@@ -8,7 +8,7 @@ import { userApi, employeApi } from '../../lib/api-client';
 import { useAgence } from '../../contexts/AgenceContext';
 import { toast, handleApiError } from '../../lib/toast';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
-import { SystemRole, getRoleOptions, normalizeRole } from '@shared/types/roles';
+import { SystemRole, getRoleOptions } from '@shared/types/roles';
 import { StatutUser } from '@shared/enum/status-constants';
 import { resolveStorageUrl } from '../../lib/format';
 
@@ -18,6 +18,7 @@ import { usePermissions as useAdminPermissions } from '../../hooks/admin/usePerm
 import { useUserPermissions } from '../../hooks/admin/useUserPermissions';
 import { useAdminUsers } from '../../hooks/admin/useAdminUsers';
 import UserCustomPermissionsManager from './permissions/UserCustomPermissionsManager';
+import UserPinModal from './users/UserPinModal';
 import CreateClientModal from '../client/CreateClientModal';
 
 // Local types removed to use shared entities or any for flexibility
@@ -65,6 +66,8 @@ export default function AdminGestionProfils() {
   const [createStep, setCreateStep] = useState(1);
   const [showCreateSuccess, setShowCreateSuccess] = useState(false);
   const [showPermissionsModal, setShowPermissionsModal] = useState(false);
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [pinUser, setPinUser] = useState<any | null>(null);
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
   const [userAccess, setUserAccess] = useState<Record<string, UserAccess>>({});
   const [allUsersAccess, setAllUsersAccess] = useState<Record<string, Record<string, UserAccess>>>({});
@@ -366,7 +369,7 @@ export default function AdminGestionProfils() {
 
   const getDefaultAccessForRole = (role: string): Record<string, UserAccess> => {
     const defaults: Record<string, UserAccess> = {};
-    const normalizedRole = normalizeRole(role);
+    const normalizedRole = role as SystemRole;
 
     if (normalizedRole === SystemRole.CAISSIER) {
       defaults['Caisse'] = { module_name: 'Caisse', peut_voir: true, peut_creer: true, peut_modifier: true, peut_supprimer: false, peut_valider: true, peut_exporter: false };
@@ -538,7 +541,7 @@ export default function AdminGestionProfils() {
       const email = (user.email || '').toLowerCase();
       const phone = (user.telephone || '').toLowerCase();
       // Architecture V3: utiliser user.role depuis userRoles
-      const userRole = normalizeRole(user.role);
+      const userRole = user.role as SystemRole;
 
       const matchesSearch = fullName.includes(searchQuery.toLowerCase()) ||
                           email.includes(searchQuery.toLowerCase()) ||
@@ -760,6 +763,17 @@ export default function AdminGestionProfils() {
                           className="text-status-info hover:bg-status-info-bg"
                           title="Permissions"
                           aria-label="Gérer les permissions"
+                        />
+                      )}
+                      {canManageUsers && user.role !== SystemRole.CLIENT && (
+                        <IconButton
+                          icon={KeyRound}
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => { e.stopPropagation(); setPinUser(emp); setShowPinModal(true); }}
+                          className="text-status-warning hover:bg-status-warning-bg"
+                          title="PIN Caisse"
+                          aria-label="Définir PIN Caisse"
                         />
                       )}
                       {canEditUsers && (user.typeCompte === 'employe') && (
@@ -1428,6 +1442,16 @@ export default function AdminGestionProfils() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* PIN Caisse Modal */}
+      {pinUser && (
+        <UserPinModal
+          isOpen={showPinModal}
+          onClose={() => { setShowPinModal(false); setPinUser(null); }}
+          userId={pinUser.user?.id || pinUser.userId || pinUser.id}
+          userName={`${pinUser.user?.prenom || pinUser.prenom || ''} ${pinUser.user?.nom || pinUser.nom || ''}`}
+        />
       )}
 
       {/* Convert Employee to Client Modal */}
