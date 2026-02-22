@@ -377,9 +377,11 @@ export const ROUTES: RouteConfig[] = [
       { path: '/mon-espace/coordonnees', subModule: 'coordonnees', label: 'Coordonnées' },
       { path: '/mon-espace/presence', subModule: 'presence', label: 'Présence' },
       { path: '/mon-espace/conges', subModule: 'conges', label: 'Congés' },
+      { path: '/mon-espace/equipe', subModule: 'equipe', label: 'Mon Équipe' },
       { path: '/mon-espace/bulletins', subModule: 'bulletins', label: 'Bulletins' },
       { path: '/mon-espace/documents', subModule: 'documents', label: 'Documents' },
       { path: '/mon-espace/evaluations', subModule: 'evaluations', label: 'Évaluations' },
+      { path: '/mon-espace/offres', subModule: 'offres', label: 'Offres' },
     ],
   },
   {
