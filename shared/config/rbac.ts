@@ -499,5 +499,95 @@ export const SEED_ROLE_PERMISSIONS: Record<SystemRole, string[]> = {
     'loyalty.view', 'loyalty.redeem',
     'rh.view',
   ],
+  [SystemRole.AUDITEUR]: [
+    'dashboard.view',
+    // Clients
+    'clients.view',
+    // Crédits
+    'credits.view', 'credits.reevaluations.view',
+    // Épargnes / Comptes
+    'epargnes.view',
+    // Tontines
+    'tontines.view',
+    // Comptabilité
+    'comptabilite.view', 'comptabilite.export',
+    // Caisse
+    'caisse.view',
+    // Caisse Agent
+    'caisseagent.view',
+    // Agent Terrain
+    'agent.view',
+    // Remboursements
+    'remboursements.view',
+    // Rapports
+    'rapports.view', 'rapports.export',
+    // RH / Paie
+    'rh.view', 'paie.view',
+    // Employés
+    'employes.view',
+    // Coffre-Fort
+    'coffre.view', 'coffre.config.view',
+    // Audit
+    'audit.view', 'audit.export',
+    // Administration (logs only)
+    'admin.logs',
+    // Communications
+    'communications.view', 'messages.view',
+    // Fidélité
+    'loyalty.view',
+    // Régularisation
+    'regularisation.view',
+    // Agences
+    'agences.view',
+    // Prospection
+    'prospection.view', 'prospection.primes.view', 'prospection.supervision.view',
+    // Zones / Visites / Paiements
+    'zones.view', 'visites.view', 'paiements.view',
+    // Incidents
+    'incidents.view',
+    // Transferts
+    'transferts.view',
+    // Virements Programmés
+    'virements_programmes.view',
+    // Départements
+    'departments.view',
+  ],
+  [SystemRole.RH]: [
+    'dashboard.view',
+    // RH complet
+    'rh.view', 'rh.create', 'rh.edit', 'rh.approve', 'rh.manage',
+    // Paie complet
+    'paie.view', 'paie.create', 'paie.edit', 'paie.approve',
+    // Employés complet
+    'employes.view', 'employes.create', 'employes.edit', 'employes.delete', 'employes.manage',
+    // Départements
+    'departments.view', 'departments.create', 'departments.edit', 'departments.manage',
+    // Vues basiques
+    'agences.view',
+    'clients.view',
+    'users.view',
+    'communications.view', 'messages.view',
+    'rapports.view', 'rapports.export',
+    'loyalty.view',
+  ],
+  [SystemRole.SUPPORT_IT]: [
+    'dashboard.view',
+    // Administration
+    'admin.users', 'admin.logs', 'admin.settings', 'admin.roles',
+    'users.view', 'users.create', 'users.edit',
+    // RBAC
+    'rbac.view', 'permissions.view',
+    // Maintenance complet
+    'maintenance.view', 'maintenance.purge', 'maintenance.migrate', 'maintenance.seed', 'maintenance.manage',
+    // Paramètres
+    'parametres.view', 'parametres.edit',
+    // Audit
+    'audit.view', 'audit.export',
+    // Vues basiques
+    'agences.view',
+    'communications.view', 'messages.view',
+    // Stockage
+    'loge.view', 'loge.upload',
+  ],
   [SystemRole.CLIENT]: []
 };

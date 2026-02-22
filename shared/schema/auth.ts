@@ -12,6 +12,9 @@ export const roleEnum = pgEnum("user_role", [
   SystemRole.COMPTABLE,
   SystemRole.SUPERVISEUR,
   SystemRole.GESTIONNAIRE_CREDIT,
+  SystemRole.AUDITEUR,
+  SystemRole.RH,
+  SystemRole.SUPPORT_IT,
   SystemRole.CLIENT
 ]);
 

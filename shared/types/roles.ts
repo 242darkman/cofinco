@@ -9,6 +9,9 @@ export enum SystemRole {
   COMPTABLE = 'COMPTABLE',
   SUPERVISEUR = 'SUPERVISEUR',
   GESTIONNAIRE_CREDIT = 'GESTIONNAIRE_CREDIT',
+  AUDITEUR = 'AUDITEUR',
+  RH = 'RH',
+  SUPPORT_IT = 'SUPPORT_IT',
   CLIENT = 'CLIENT'
 }
 
@@ -33,8 +36,6 @@ const ROLE_ALIASES: Record<string, SystemRole> = {
   'directeur financier': SystemRole.ADMIN,
   'pdg': SystemRole.ADMIN,
   'dg': SystemRole.ADMIN,
-  'audit': SystemRole.ADMIN, // Audit permissions → Admin
-  'rh': SystemRole.ADMIN, // RH permissions → Admin (HR module access)
   'manager': SystemRole.ADMIN, // Generic manager → Admin
 
   // CHEF_AGENCE aliases
@@ -72,6 +73,25 @@ const ROLE_ALIASES: Record<string, SystemRole> = {
   'gestionnaire_credit': SystemRole.GESTIONNAIRE_CREDIT,
   'credit': SystemRole.GESTIONNAIRE_CREDIT,
 
+  // AUDITEUR aliases
+  'auditeur': SystemRole.AUDITEUR,
+  'audit': SystemRole.AUDITEUR,
+  'auditeur interne': SystemRole.AUDITEUR,
+  'commissaire aux comptes': SystemRole.AUDITEUR,
+  'inspecteur': SystemRole.AUDITEUR,
+
+  // RH aliases
+  'rh': SystemRole.RH,
+  'ressources humaines': SystemRole.RH,
+  'responsable rh': SystemRole.RH,
+
+  // SUPPORT_IT aliases
+  'support_it': SystemRole.SUPPORT_IT,
+  'support it': SystemRole.SUPPORT_IT,
+  'support': SystemRole.SUPPORT_IT,
+  'it': SystemRole.SUPPORT_IT,
+  'informatique': SystemRole.SUPPORT_IT,
+
   // CLIENT aliases
   'client': SystemRole.CLIENT
 };
@@ -101,6 +121,9 @@ export const ROLE_LABELS: Record<SystemRole, string> = {
   [SystemRole.COMPTABLE]: 'Comptable',
   [SystemRole.SUPERVISEUR]: 'Superviseur',
   [SystemRole.GESTIONNAIRE_CREDIT]: 'Gestionnaire de Crédit',
+  [SystemRole.AUDITEUR]: 'Auditeur',
+  [SystemRole.RH]: 'Responsable RH',
+  [SystemRole.SUPPORT_IT]: 'Support Informatique',
   [SystemRole.CLIENT]: 'Client'
 };
 
