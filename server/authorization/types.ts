@@ -23,26 +23,14 @@ export type AppAbilityRule = RawRuleOf<AppAbility>;
 
 /**
  * Response type for /api/my-permissions endpoint
- * Includes both legacy permissionsMap and new CASL rules
  */
 export interface AbilityResponse {
-  // Legacy support
   role: string;
-  roles: string[]; // All effective roles (multi-role)
-  permissions: Record<string, string[]>; // Legacy permissionsMap
+  roles: string[];
+  permissions: Record<string, string[]>;
   isAdmin: boolean;
-
-  // CASL rules (new)
   caslRules: AppAbilityRule[];
-
-  // Context
   agenceIdActive?: string;
   agenceNom?: string;
-
-  // Module locks
   lockedFeatures?: string[];
 }
-
-// Note: PERMISSION_CODE_MAPPINGS, normalizePermissionCode, and parsePermissionCode
-// have been moved to @shared/ability/mappings.ts as the single source of truth.
-// Import from '@shared/ability' instead.

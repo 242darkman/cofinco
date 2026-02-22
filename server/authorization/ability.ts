@@ -55,7 +55,7 @@
 
 import { createMongoAbility, MongoAbility, RawRuleOf } from '@casl/ability';
 import { db } from '../db';
-import { permissions, rolePermissions, userPermissions, modules, userRoles, agences } from '@shared/schema';
+import { permissions, rolePermissions, userPermissions, modules, userRoles, agences, roleHierarchy } from '@shared/schema';
 import { isAdminRole, SystemRole } from '@shared/types/roles';
 import { eq, and, or, isNull, inArray } from 'drizzle-orm';
 import {
@@ -69,6 +69,7 @@ import {
 } from './types';
 import { getPermissionMapping, normalizePermissionCode } from '@shared/ability';
 import { getActiveTemporaryPermissionCodes } from '../services/temporary-permissions-service';
+import { resolveConditions, type ConditionContext } from './condition-resolver';
 
 /**
  * Context for building ability
@@ -97,6 +98,87 @@ interface PermissionEntry {
   conditions?: Record<string, any> | null;
   isTemporary?: boolean;
 }
+
+// ============================================
+// Role Hierarchy — Permission Inheritance
+// ============================================
+
+let hierarchyCache: Map<string, string[]> | null = null;
+let hierarchyCacheTimestamp = 0;
+const HIERARCHY_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Load the full role hierarchy graph from DB and cache it.
+ * Returns a Map where key = parentRole, value = direct childRoles.
+ */
+async function loadHierarchyGraph(): Promise<Map<string, string[]>> {
+  const now = Date.now();
+  if (hierarchyCache && (now - hierarchyCacheTimestamp) < HIERARCHY_CACHE_TTL) {
+    return hierarchyCache;
+  }
+
+  const rows = await db.select({
+    parentRole: roleHierarchy.parentRole,
+    childRole: roleHierarchy.childRole,
+  }).from(roleHierarchy);
+
+  const graph = new Map<string, string[]>();
+  for (const row of rows) {
+    const children = graph.get(row.parentRole) || [];
+    children.push(row.childRole);
+    graph.set(row.parentRole, children);
+  }
+
+  hierarchyCache = graph;
+  hierarchyCacheTimestamp = now;
+  return graph;
+}
+
+/**
+ * Expand a set of roles to include all inherited (child) roles via the hierarchy.
+ * e.g. [CHEF_AGENCE] → [CHEF_AGENCE, SUPERVISEUR, COMPTABLE, GESTIONNAIRE_CREDIT, CAISSIER, AGENT_TERRAIN]
+ */
+export async function expandRolesWithHierarchy(roleCodes: string[]): Promise<string[]> {
+  const graph = await loadHierarchyGraph();
+  const expanded = new Set<string>(roleCodes);
+  const queue = [...roleCodes];
+
+  while (queue.length > 0) {
+    const current = queue.pop()!;
+    const children = graph.get(current);
+    if (children) {
+      for (const child of children) {
+        if (!expanded.has(child)) {
+          expanded.add(child);
+          queue.push(child);
+        }
+      }
+    }
+  }
+
+  return Array.from(expanded);
+}
+
+/**
+ * Get inherited roles for a single role (excludes the role itself).
+ * Useful for API responses showing which roles are inherited.
+ */
+export async function getInheritedRoles(roleCode: string): Promise<string[]> {
+  const all = await expandRolesWithHierarchy([roleCode]);
+  return all.filter(r => r !== roleCode);
+}
+
+/**
+ * Invalidate the role hierarchy cache (e.g. after admin modifies hierarchy).
+ */
+export function invalidateRoleHierarchyCache(): void {
+  hierarchyCache = null;
+  hierarchyCacheTimestamp = 0;
+}
+
+// ============================================
+// User Role Resolution
+// ============================================
 
 /**
  * Get all effective roles for a user
@@ -156,6 +238,7 @@ async function getRolePermissions(roles: SystemRole[]): Promise<PermissionEntry[
     code: permissions.code,
     granted: rolePermissions.granted,
     moduleName: modules.name,
+    conditions: rolePermissions.conditions,
   })
   .from(rolePermissions)
   .innerJoin(permissions, eq(rolePermissions.permissionId, permissions.id))
@@ -169,6 +252,7 @@ async function getRolePermissions(roles: SystemRole[]): Promise<PermissionEntry[
     code: normalizePermissionCode(p.code),
     granted: true,
     moduleName: p.moduleName,
+    conditions: p.conditions as Record<string, any> | null,
   }));
 }
 
@@ -181,6 +265,7 @@ async function getUserPermissionOverrides(userId: string): Promise<PermissionEnt
     code: permissions.code,
     granted: userPermissions.granted,
     moduleName: modules.name,
+    conditions: userPermissions.conditions,
   })
   .from(userPermissions)
   .innerJoin(permissions, eq(userPermissions.permissionId, permissions.id))
@@ -191,6 +276,7 @@ async function getUserPermissionOverrides(userId: string): Promise<PermissionEnt
     code: normalizePermissionCode(p.code),
     granted: p.granted,
     moduleName: p.moduleName,
+    conditions: p.conditions as Record<string, any> | null,
   }));
 }
 
@@ -239,11 +325,15 @@ async function getAgenceName(agenceId: string): Promise<string | null> {
 }
 
 /**
- * Build CASL rules from permission entries
+ * Build CASL rules from permission entries.
+ * Merges DB-stored conditions with static mapping conditions, then resolves template variables.
+ *
+ * Priority: DB conditions override mapping conditions (shallow merge).
  */
 function buildRulesFromPermissions(
   permissions: PermissionEntry[],
-  isAdmin: boolean
+  isAdmin: boolean,
+  conditionCtx?: ConditionContext
 ): AppAbilityRule[] {
   const rules: AppAbilityRule[] = [];
 
@@ -259,10 +349,25 @@ function buildRulesFromPermissions(
     if (!mapping) continue;
 
     if (perm.granted) {
+      // Merge conditions: mapping (static) + DB (dynamic, overrides)
+      let mergedConditions: Record<string, any> | undefined;
+
+      if (mapping.conditions || perm.conditions) {
+        mergedConditions = {
+          ...(mapping.conditions || {}),
+          ...(perm.conditions || {}),
+        };
+      }
+
+      // Resolve template variables (${userId}, ${agenceId}, etc.)
+      if (mergedConditions && conditionCtx) {
+        mergedConditions = resolveConditions(mergedConditions, conditionCtx);
+      }
+
       rules.push({
         action: mapping.action,
         subject: mapping.subject,
-        ...(mapping.conditions && { conditions: mapping.conditions }),
+        ...(mergedConditions && { conditions: mergedConditions }),
       });
     } else {
       // Inverted rule (deny)
@@ -278,7 +383,8 @@ function buildRulesFromPermissions(
 }
 
 /**
- * Build legacy permissionsMap for backwards compatibility
+ * Build permissions map: { moduleName: [action1, action2, ...] }
+ * Used by frontend for quick module-level permission checks.
  */
 function buildPermissionsMap(permissions: PermissionEntry[]): Record<string, string[]> {
   const map: Record<string, string[]> = {};
@@ -362,8 +468,13 @@ export async function buildAbilityForUser(context: AbilityContext): Promise<Abil
 
   // 2. Determine primary role and check if admin
   const primaryRole = effectiveRoles.find(r => r.isPrimary)?.role || effectiveRoles[0].role;
-  const roleNames = Array.from(new Set(effectiveRoles.map(r => r.role)));
-  const isAdmin = roleNames.some(r => isAdminRole(r));
+  const directRoleNames = Array.from(new Set(effectiveRoles.map(r => r.role)));
+  const isAdmin = directRoleNames.some(r => isAdminRole(r));
+
+  // 2b. Expand roles with hierarchy (e.g. CHEF_AGENCE inherits SUPERVISEUR, COMPTABLE, etc.)
+  const roleNames = isAdmin
+    ? directRoleNames
+    : (await expandRolesWithHierarchy(directRoleNames)) as SystemRole[];
 
   // 3. Get agency info
   let agenceNom: string | undefined;
@@ -383,8 +494,8 @@ export async function buildAbilityForUser(context: AbilityContext): Promise<Abil
     // Admin gets all permissions
     effectivePermissions = await getAllPermissions();
   } else {
-    // Get role-based permissions (union of all roles)
-    const rolePerms = await getRolePermissions(roleNames);
+    // Get role-based permissions (union of all roles including inherited)
+    const rolePerms = await getRolePermissions(roleNames as SystemRole[]);
 
     // Get temporary permissions (active and not expired)
     const tempPermCodes = await getActiveTemporaryPermissionCodes(userId);
@@ -425,25 +536,31 @@ export async function buildAbilityForUser(context: AbilityContext): Promise<Abil
     effectivePermissions = Array.from(permissionMap.values());
   }
 
-  // 6. Build CASL rules
-  const rules = buildRulesFromPermissions(effectivePermissions, isAdmin);
+  // 6. Build CASL rules with condition context for template variable resolution
+  const conditionCtx: ConditionContext = {
+    userId,
+    agenceId: agenceIdActive,
+    role: primaryRole,
+    roles: directRoleNames,
+  };
+  const rules = buildRulesFromPermissions(effectivePermissions, isAdmin, conditionCtx);
 
   // 7. Add deny rules for locked features
   if (lockedFeatures.length > 0) {
     addLockedFeatureRules(rules, lockedFeatures);
   }
 
-  // 8. Build legacy permissionsMap
+  // 8. Build permissionsMap for frontend module-level checks
   const permissionsMap = buildPermissionsMap(effectivePermissions);
 
-  // Admin wildcard for legacy support
+  // Admin wildcard
   if (isAdmin) {
     permissionsMap['*'] = ['view', 'create', 'edit', 'delete', 'manage', 'approve', 'export'];
   }
 
   return {
     role: primaryRole,
-    roles: roleNames,
+    roles: directRoleNames,
     permissions: permissionsMap,
     isAdmin,
     caslRules: rules,

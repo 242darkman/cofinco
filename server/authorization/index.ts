@@ -72,11 +72,21 @@ export {
   getAbilityForUser,
   hasPermissionCode,
   canDisburse,
+  expandRolesWithHierarchy,
+  getInheritedRoles,
+  invalidateRoleHierarchyCache,
   DISBURSEMENT_PERMISSION_FALLBACKS,
 } from './ability';
 
 // Ability builder (type-only)
 export type { AbilityContext } from './ability';
+
+// Critical permission patterns (DB-backed)
+export {
+  loadCriticalPatterns,
+  isCriticalPermissionFromDb,
+  invalidateCriticalPatternsCache,
+} from './critical-patterns';
 
 // Middleware
 export {

@@ -17,9 +17,24 @@ import {
   generateLivreInventaire, livreInventaireToMarkdown,
   generateTrialBalance,
 } from "../services/gl-reporting-service";
+import { calculateProvisions, getProvisionSummary } from "../services/provision-service";
+import { lettrerLignes, delettrerLignes, autoLettrage, getLignesNonLettrees, getBalanceAgee } from "../services/lettrage-service";
+import { generateFEC, previewFEC } from "../services/fec-export-service";
+import { clotureExercice, executeClotureStep, getClotureStatus } from "../services/exercice-cloture-service";
+import { createRapprochement, importBankLines, autoMatch, manualMatch, unmatch, completeRapprochement, getRapprochementDetail, listRapprochements } from "../services/rapprochement-bancaire-service";
+import { calculateAmortissements, getAmortissementSummary } from "../services/amortissement-service";
+import { exportComptable } from "../services/export-comptable-service";
+import { calculateCobacRatios, getCurrentRatios, getRatiosHistory, getSeuils, updateSeuil } from "../services/cobac-ratios-service";
+import { generateDsf, getDsf, listDsf, validateDsf } from "../services/dsf-service";
+import { getBalanceAnalytique, getCompteResultatAnalytique } from "../services/analytique-service";
+import { syncEngagementsFromCredits, createEngagement, updateEngagement, getEtatEngagements, listEngagements } from "../services/engagements-hors-bilan-service";
+import { generateConsolidatedBilan, generateConsolidatedCompteResultat, generateConsolidationReport } from "../services/consolidation-service";
+import { generateTafire } from "../services/tafire-service";
+import { runCobacReporting } from "../cron/cobac-reporting-scheduler";
 import { db } from "../db";
-import { glPeriods, glPostingLinks, ecritures, lignesEcritures, planComptable, journaux, mouvementsFinanciers, accountingRules } from "@shared/schema";
-import { eq, and, desc, asc, sql, count } from "drizzle-orm";
+import { glPeriods, glPostingLinks, ecritures, lignesEcritures, planComptable, journaux, mouvementsFinanciers, accountingRules, provisionsCredits, exercices, immobilisations, amortissements } from "@shared/schema";
+import { centresCouts, lignesProduits, clesRepartition, clesRepartitionLignes } from "@shared/schema/analytique";
+import { eq, and, desc, asc, sql, count, gte, lte, ne } from "drizzle-orm";
 import { SystemRole } from "@shared/types/roles";
 
 /** Typed Express Request with authenticated user from requireAuth middleware */
@@ -228,53 +243,19 @@ export function registerAccountingRoutes(app: Express) {
     }
   });
 
-  // 10. TAFIRE (Tableau Financier des Ressources et Emplois) (roles: admin, chef, comptable)
-  app.get("/api/comptabilite/tafire", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req, res) => {
-    const exercice = parseInt(req.query.exercice as string) || new Date().getFullYear();
-    const dateDebut = `${exercice}-01-01`;
-    const dateFin = `${exercice}-12-31`;
-    const dateDebutN1 = `${exercice - 1}-01-01`;
-    const dateFinN1 = `${exercice - 1}-12-31`;
-
+  // 10. TAFIRE (Tableau Financier des Ressources et Emplois) — OHADA complet
+  app.get("/api/comptabilite/tafire", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: AuthenticatedRequest, res) => {
     try {
-      const balanceN = await storage.getBalance(dateDebut, dateFin);
-      const balanceN1 = await storage.getBalance(dateDebutN1, dateFinN1);
+      const exercice = parseInt(req.query.exercice as string) || new Date().getFullYear();
+      const agenceId = req.query.consolide === 'true' ? null : (req.user?.agenceId || req.query.agenceId as string);
 
-      const getNetBalance = (balance: Array<Record<string, unknown>>, prefixes: string[]) =>
-        balance
-          .filter(c => prefixes.some(p => String(c.numero_compte || '').startsWith(p)))
-          .reduce((sum, c) => sum + (Number(c.solde_debiteur) || 0) - (Number(c.solde_crediteur) || 0), 0);
+      if (!agenceId && req.query.consolide !== 'true') {
+        return res.status(400).json({ message: "agenceId requis (ou consolide=true)" });
+      }
 
-      const result = {
-        ressourcesDurables: [
-          { code: 'RA', libelle: 'Capacité d\'autofinancement globale (CAFG)', montantN: Math.abs(getNetBalance(balanceN, ['12', '13'])), montantN1: Math.abs(getNetBalance(balanceN1, ['12', '13'])) },
-          { code: 'RB', libelle: 'Cessions d\'immobilisations incorporelles', montantN: Math.abs(getNetBalance(balanceN, ['21'])), montantN1: Math.abs(getNetBalance(balanceN1, ['21'])) },
-          { code: 'RC', libelle: 'Cessions d\'immobilisations corporelles', montantN: Math.abs(getNetBalance(balanceN, ['22', '23', '24'])), montantN1: Math.abs(getNetBalance(balanceN1, ['22', '23', '24'])) },
-          { code: 'RD', libelle: 'Cessions d\'immobilisations financières', montantN: Math.abs(getNetBalance(balanceN, ['26', '27'])), montantN1: Math.abs(getNetBalance(balanceN1, ['26', '27'])) },
-          { code: 'RE', libelle: 'Augmentation des capitaux propres', montantN: Math.abs(getNetBalance(balanceN, ['10'])), montantN1: Math.abs(getNetBalance(balanceN1, ['10'])) },
-          { code: 'RF', libelle: 'Augmentation des dettes financières', montantN: Math.abs(getNetBalance(balanceN, ['16'])), montantN1: Math.abs(getNetBalance(balanceN1, ['16'])) },
-        ],
-        emploisDurables: [
-          { code: 'EA', libelle: 'Acquisitions d\'immobilisations incorporelles', montantN: Math.abs(getNetBalance(balanceN, ['21'])), montantN1: Math.abs(getNetBalance(balanceN1, ['21'])) },
-          { code: 'EB', libelle: 'Acquisitions d\'immobilisations corporelles', montantN: Math.abs(getNetBalance(balanceN, ['22', '23', '24'])), montantN1: Math.abs(getNetBalance(balanceN1, ['22', '23', '24'])) },
-          { code: 'EC', libelle: 'Acquisitions d\'immobilisations financières', montantN: Math.abs(getNetBalance(balanceN, ['26', '27'])), montantN1: Math.abs(getNetBalance(balanceN1, ['26', '27'])) },
-          { code: 'ED', libelle: 'Remboursement des emprunts', montantN: 0, montantN1: 0 },
-          { code: 'EE', libelle: 'Prélèvements sur le capital', montantN: 0, montantN1: 0 },
-          { code: 'EF', libelle: 'Dividendes distribués', montantN: 0, montantN1: 0 },
-        ],
-        variationBFR: [
-          { code: 'VA', libelle: 'Variation des stocks', montantN: getNetBalance(balanceN, ['3']) - getNetBalance(balanceN1, ['3']), montantN1: 0 },
-          { code: 'VB', libelle: 'Variation des créances', montantN: getNetBalance(balanceN, ['41']) - getNetBalance(balanceN1, ['41']), montantN1: 0 },
-          { code: 'VC', libelle: 'Variation des dettes circulantes', montantN: getNetBalance(balanceN, ['40']) - getNetBalance(balanceN1, ['40']), montantN1: 0 },
-        ],
-        tresorerie: [
-          { code: 'TI', libelle: 'Trésorerie nette au 1er janvier', montantN: getNetBalance(balanceN1, ['5']), montantN1: 0 },
-          { code: 'TF', libelle: 'Trésorerie nette au 31 décembre', montantN: getNetBalance(balanceN, ['5']), montantN1: getNetBalance(balanceN1, ['5']) },
-        ]
-      };
-
+      const result = await generateTafire(exercice, agenceId);
       res.json(result);
-    } catch (error: unknown) {
+    } catch (error) {
       logger.error({ err: error }, 'Erreur TAFIRE');
       const err = toHttpError(error);
       res.status(err.status).json({ code: err.code, message: err.message });
@@ -977,6 +958,927 @@ export function registerAccountingRoutes(app: Express) {
       res.status(500).json({ success: false, error: "Failed to generate coverage report" });
     }
   });
+
+  // ======================================================================
+  // PROVISIONS
+  // ======================================================================
+
+  // List provisions with filters
+  app.get("/api/comptabilite/provisions", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const agenceId = req.user?.agenceId || req.query.agenceId as string;
+      if (!agenceId) return res.status(400).json({ message: "agenceId requis" });
+
+      const { periodeDate, categorie, page = '1', limit = '50' } = req.query;
+      const pageNum = parseInt(page as string);
+      const limitNum = parseInt(limit as string);
+
+      let query = db.select().from(provisionsCredits).where(eq(provisionsCredits.agenceId, agenceId)).$dynamic();
+
+      if (periodeDate) {
+        query = query.where(eq(provisionsCredits.periodeDate, periodeDate as string));
+      }
+      if (categorie) {
+        query = query.where(eq(provisionsCredits.categorie, categorie as string));
+      }
+
+      const provisions = await query
+        .orderBy(desc(provisionsCredits.periodeDate))
+        .limit(limitNum)
+        .offset((pageNum - 1) * limitNum);
+
+      res.json({ data: provisions, page: pageNum, limit: limitNum });
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // Calculate provisions manually
+  app.post("/api/comptabilite/provisions/calculate", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.ECRITURE_COMPTABLE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const agenceId = req.user?.agenceId || req.body.agenceId;
+      if (!agenceId) return res.status(400).json({ message: "agenceId requis" });
+
+      const periodeDate = req.body.periodeDate ? new Date(req.body.periodeDate) : new Date();
+      const result = await calculateProvisions(agenceId, periodeDate, req.user?.id);
+
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // Provision summary (PAR report)
+  app.get("/api/comptabilite/provisions/summary", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const agenceId = req.user?.agenceId || req.query.agenceId as string;
+      if (!agenceId) return res.status(400).json({ message: "agenceId requis" });
+
+      const periodeDate = req.query.periodeDate as string | undefined;
+      const result = await getProvisionSummary(agenceId, periodeDate);
+
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // ======================================================================
+  // LETTRAGE
+  // ======================================================================
+
+  // Lettrer lignes
+  app.post("/api/comptabilite/lettrage", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.ECRITURE_COMPTABLE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { ligneIds } = req.body;
+      if (!ligneIds || !Array.isArray(ligneIds) || ligneIds.length < 2) {
+        return res.status(400).json({ message: "ligneIds doit contenir au moins 2 IDs" });
+      }
+
+      const result = await lettrerLignes(ligneIds, req.user!.id);
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // Dé-lettrer
+  app.delete("/api/comptabilite/lettrage/:key", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.ECRITURE_COMPTABLE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { key } = req.params;
+      const { compteId } = req.query;
+      if (!compteId) return res.status(400).json({ message: "compteId requis" });
+
+      const result = await delettrerLignes(key, compteId as string);
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // Auto-lettrage
+  app.post("/api/comptabilite/lettrage/auto/:compteId", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.ECRITURE_COMPTABLE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { compteId } = req.params;
+      const agenceId = req.user?.agenceId || req.body.agenceId;
+      if (!agenceId) return res.status(400).json({ message: "agenceId requis" });
+
+      const result = await autoLettrage(compteId, agenceId, req.user!.id);
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // Lignes non lettrées
+  app.get("/api/comptabilite/lettrage/non-lettrees/:compteId", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { compteId } = req.params;
+      const agenceId = req.user?.agenceId || req.query.agenceId as string;
+      if (!agenceId) return res.status(400).json({ message: "agenceId requis" });
+
+      const result = await getLignesNonLettrees(compteId, agenceId);
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // Balance âgée
+  app.get("/api/comptabilite/balance-agee/:compteId", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { compteId } = req.params;
+      const agenceId = req.user?.agenceId || req.query.agenceId as string;
+      if (!agenceId) return res.status(400).json({ message: "agenceId requis" });
+
+      const dateRef = req.query.dateReference ? new Date(req.query.dateReference as string) : undefined;
+      const result = await getBalanceAgee(compteId, agenceId, dateRef);
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // ======================================================================
+  // FEC EXPORT
+  // ======================================================================
+
+  // Download FEC file
+  app.get("/api/comptabilite/fec/:exerciceId/download", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { exerciceId } = req.params;
+      const agenceId = req.user?.agenceId || req.query.agenceId as string;
+      if (!agenceId) return res.status(400).json({ message: "agenceId requis" });
+
+      const siren = req.query.siren as string | undefined;
+      const fec = await generateFEC(agenceId, exerciceId, siren);
+
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${fec.filename}"`);
+      res.send(fec.content);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // Preview FEC
+  app.get("/api/comptabilite/fec/:exerciceId/preview", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { exerciceId } = req.params;
+      const agenceId = req.user?.agenceId || req.query.agenceId as string;
+      if (!agenceId) return res.status(400).json({ message: "agenceId requis" });
+
+      const limit = parseInt(req.query.limit as string || '50');
+      const result = await previewFEC(agenceId, exerciceId, limit);
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // ======================================================================
+  // CLOTURE EXERCICE
+  // ======================================================================
+
+  // Launch exercice closing
+  app.post("/api/comptabilite/exercices/:id/cloture", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.ECRITURE_COMPTABLE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { id } = req.params;
+      const agenceId = req.user?.agenceId || req.body.agenceId;
+      if (!agenceId) return res.status(400).json({ message: "agenceId requis" });
+
+      // Only admin can close exercice
+      if (req.user?.role !== SystemRole.ADMIN && req.user?.role !== SystemRole.DIRECTOR) {
+        return res.status(403).json({ message: "Seul un administrateur peut clôturer un exercice" });
+      }
+
+      const result = await clotureExercice(id, agenceId, req.user!.id);
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // Get closing status
+  app.get("/api/comptabilite/exercices/:id/cloture/status", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { id } = req.params;
+      const result = await getClotureStatus(id);
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // Execute specific closing step (retry)
+  app.post("/api/comptabilite/exercices/:id/cloture/step", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.ECRITURE_COMPTABLE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { id } = req.params;
+      const { step } = req.body;
+      const agenceId = req.user?.agenceId || req.body.agenceId;
+      if (!agenceId) return res.status(400).json({ message: "agenceId requis" });
+      if (!step) return res.status(400).json({ message: "step requis" });
+
+      const result = await executeClotureStep(id, agenceId, step, req.user!.id);
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // ======================================================================
+  // RAPPROCHEMENT BANCAIRE
+  // ======================================================================
+
+  // List reconciliation sessions
+  app.get("/api/comptabilite/rapprochements", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const agenceId = req.user?.agenceId || req.query.agenceId as string;
+      if (!agenceId) return res.status(400).json({ message: "agenceId requis" });
+
+      const result = await listRapprochements(agenceId);
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // Create reconciliation session
+  app.post("/api/comptabilite/rapprochements", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.ECRITURE_COMPTABLE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const agenceId = req.user?.agenceId || req.body.agenceId;
+      if (!agenceId) return res.status(400).json({ message: "agenceId requis" });
+
+      const { compteGl, period, soldeBanqueDebut, soldeBanqueFin } = req.body;
+      if (!compteGl || !period) return res.status(400).json({ message: "compteGl et period requis" });
+
+      const result = await createRapprochement({
+        agenceId,
+        compteGl,
+        period,
+        soldeBanqueDebut: parseFloat(soldeBanqueDebut || '0'),
+        soldeBanqueFin: parseFloat(soldeBanqueFin || '0'),
+        userId: req.user!.id,
+      });
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // Get reconciliation detail
+  app.get("/api/comptabilite/rapprochements/:id", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const result = await getRapprochementDetail(req.params.id);
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // Import bank statement lines
+  app.post("/api/comptabilite/rapprochements/:id/import", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.ECRITURE_COMPTABLE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { lines, fileName } = req.body;
+      if (!lines || !Array.isArray(lines)) return res.status(400).json({ message: "lines (array) requis" });
+
+      const result = await importBankLines(req.params.id, lines, fileName);
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // Auto-match
+  app.post("/api/comptabilite/rapprochements/:id/auto-match", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.ECRITURE_COMPTABLE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const result = await autoMatch(req.params.id);
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // Manual match
+  app.post("/api/comptabilite/rapprochements/:id/match", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.ECRITURE_COMPTABLE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { glLineId, bankLineId } = req.body;
+      if (!glLineId || !bankLineId) return res.status(400).json({ message: "glLineId et bankLineId requis" });
+
+      await manualMatch(glLineId, bankLineId);
+      res.json({ success: true });
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // Unmatch
+  app.post("/api/comptabilite/rapprochements/:id/unmatch", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.ECRITURE_COMPTABLE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { lineId } = req.body;
+      if (!lineId) return res.status(400).json({ message: "lineId requis" });
+
+      await unmatch(lineId);
+      res.json({ success: true });
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // Complete reconciliation
+  app.post("/api/comptabilite/rapprochements/:id/complete", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.ECRITURE_COMPTABLE), async (req: AuthenticatedRequest, res) => {
+    try {
+      await completeRapprochement(req.params.id, req.user!.id);
+      res.json({ success: true });
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // ======================================================================
+  // IMMOBILISATIONS & AMORTISSEMENTS
+  // ======================================================================
+
+  // List immobilisations
+  app.get("/api/comptabilite/immobilisations", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const agenceId = req.user?.agenceId || req.query.agenceId as string;
+      if (!agenceId) return res.status(400).json({ message: "agenceId requis" });
+
+      const { categorie, statut } = req.query;
+      let query = db.select().from(immobilisations).where(eq(immobilisations.agenceId, agenceId)).$dynamic();
+
+      if (categorie) query = query.where(eq(immobilisations.categorie, categorie as string));
+      if (statut) query = query.where(eq(immobilisations.statut, statut as string));
+
+      const result = await query.orderBy(asc(immobilisations.code));
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // Create immobilisation
+  app.post("/api/comptabilite/immobilisations", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.ECRITURE_COMPTABLE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const agenceId = req.user?.agenceId || req.body.agenceId;
+      if (!agenceId) return res.status(400).json({ message: "agenceId requis" });
+
+      const data = req.body;
+      const valeurAcquisition = parseFloat(data.valeurAcquisition || '0');
+      const valeurResiduelle = parseFloat(data.valeurResiduelle || '0');
+      const cumulAmortissements = parseFloat(data.cumulAmortissements || '0');
+
+      const [created] = await db.insert(immobilisations).values({
+        agenceId,
+        code: data.code,
+        designation: data.designation,
+        categorie: data.categorie,
+        compteImmobilisation: data.compteImmobilisation,
+        compteAmortissement: data.compteAmortissement,
+        dateAcquisition: data.dateAcquisition,
+        dateMiseEnService: data.dateMiseEnService,
+        valeurAcquisition: valeurAcquisition.toFixed(2),
+        valeurResiduelle: valeurResiduelle.toFixed(2),
+        dureeAmortissementMois: parseInt(data.dureeAmortissementMois),
+        methodeAmortissement: data.methodeAmortissement || 'LINEAIRE',
+        tauxAmortissement: data.tauxAmortissement,
+        cumulAmortissements: cumulAmortissements.toFixed(2),
+        valeurNetteComptable: (valeurAcquisition - cumulAmortissements).toFixed(2),
+        fournisseur: data.fournisseur,
+        numeroFacture: data.numeroFacture,
+        localisation: data.localisation,
+        description: data.description,
+        createdBy: req.user!.id,
+      }).returning();
+
+      res.json(created);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // Get immobilisation detail with amortissement history
+  app.get("/api/comptabilite/immobilisations/:id", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const [immo] = await db.select().from(immobilisations).where(eq(immobilisations.id, req.params.id)).limit(1);
+      if (!immo) return res.status(404).json({ message: "Immobilisation non trouvée" });
+
+      const history = await db.select().from(amortissements)
+        .where(eq(amortissements.immobilisationId, req.params.id))
+        .orderBy(asc(amortissements.periodeDate));
+
+      res.json({ ...immo, amortissements: history });
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // Calculate amortissements manually
+  app.post("/api/comptabilite/amortissements/calculate", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.ECRITURE_COMPTABLE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const agenceId = req.user?.agenceId || req.body.agenceId;
+      if (!agenceId) return res.status(400).json({ message: "agenceId requis" });
+
+      const periodeDate = req.body.periodeDate ? new Date(req.body.periodeDate) : new Date();
+      const result = await calculateAmortissements(agenceId, periodeDate, req.user?.id);
+
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // Amortissement summary
+  app.get("/api/comptabilite/amortissements/summary", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const agenceId = req.user?.agenceId || req.query.agenceId as string;
+      if (!agenceId) return res.status(400).json({ message: "agenceId requis" });
+
+      const result = await getAmortissementSummary(agenceId);
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // ======================================================================
+  // EXPORT COMPTABLE (SAGE / CIEL / EBP)
+  // ======================================================================
+
+  app.get("/api/comptabilite/export/:exerciceId/:format", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { exerciceId, format } = req.params;
+      const agenceId = req.user?.agenceId || req.query.agenceId as string;
+      if (!agenceId) return res.status(400).json({ message: "agenceId requis" });
+
+      const validFormats = ['SAGE', 'CIEL', 'EBP'];
+      const upperFormat = format.toUpperCase();
+      if (!validFormats.includes(upperFormat)) {
+        return res.status(400).json({ message: `Format invalide. Formats supportés: ${validFormats.join(', ')}` });
+      }
+
+      const result = await exportComptable(agenceId, exerciceId, upperFormat as any);
+
+      res.setHeader('Content-Type', result.contentType);
+      res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+      res.send(result.content);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // ======================================================================
+  // RATIOS PRUDENTIELS COBAC
+  // ======================================================================
+
+  // Calculate COBAC ratios
+  app.post("/api/comptabilite/cobac/calculate", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.ECRITURE_COMPTABLE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const agenceId = req.user?.agenceId || req.body.agenceId;
+      if (!agenceId) return res.status(400).json({ message: "agenceId requis" });
+
+      const periodeDate = req.body.periodeDate ? new Date(req.body.periodeDate) : new Date();
+      const result = await calculateCobacRatios(agenceId, periodeDate, req.user?.id);
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // Get current ratios
+  app.get("/api/comptabilite/cobac/current", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const agenceId = req.user?.agenceId || req.query.agenceId as string;
+      if (!agenceId) return res.status(400).json({ message: "agenceId requis" });
+
+      const result = await getCurrentRatios(agenceId);
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // Get ratios history
+  app.get("/api/comptabilite/cobac/history", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const agenceId = req.user?.agenceId || req.query.agenceId as string;
+      if (!agenceId) return res.status(400).json({ message: "agenceId requis" });
+
+      const fromDate = req.query.fromDate as string || `${new Date().getFullYear()}-01-01`;
+      const toDate = req.query.toDate as string || new Date().toISOString().split('T')[0];
+
+      const result = await getRatiosHistory(agenceId, fromDate, toDate);
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // Get COBAC thresholds
+  app.get("/api/comptabilite/cobac/seuils", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (_req, res) => {
+    try {
+      const result = await getSeuils();
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // Update a threshold
+  app.patch("/api/comptabilite/cobac/seuils/:id", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.COMPTABILITE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const { seuilMinimum, seuilWarning, seuilMaximum } = req.body;
+      const result = await updateSeuil(req.params.id, { seuilMinimum, seuilWarning, seuilMaximum });
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // ======================================================================
+  // DSF (Déclaration Statistique et Fiscale)
+  // ======================================================================
+
+  // Generate DSF
+  app.post("/api/comptabilite/dsf/generate", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.ECRITURE_COMPTABLE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const agenceId = req.user?.agenceId || req.body.agenceId;
+      if (!agenceId) return res.status(400).json({ message: "agenceId requis" });
+
+      const { exerciceId } = req.body;
+      if (!exerciceId) return res.status(400).json({ message: "exerciceId requis" });
+
+      const result = await generateDsf(agenceId, exerciceId, req.user?.id);
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // List DSF declarations
+  app.get("/api/comptabilite/dsf", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const agenceId = req.user?.agenceId || req.query.agenceId as string;
+      if (!agenceId) return res.status(400).json({ message: "agenceId requis" });
+
+      const result = await listDsf(agenceId);
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // Get DSF detail
+  app.get("/api/comptabilite/dsf/:id", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const result = await getDsf(req.params.id);
+      if (!result) return res.status(404).json({ message: "DSF non trouvée" });
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // Validate DSF
+  app.post("/api/comptabilite/dsf/:id/validate", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.COMPTABILITE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const result = await validateDsf(req.params.id, req.user!.id);
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // ======================================================================
+  // COMPTABILITE ANALYTIQUE
+  // ======================================================================
+
+  // Balance analytique (by centre or produit)
+  app.get("/api/comptabilite/analytique/balance", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const agenceId = req.user?.agenceId || req.query.agenceId as string;
+      if (!agenceId) return res.status(400).json({ message: "agenceId requis" });
+
+      const dateDebut = req.query.dateDebut as string || `${new Date().getFullYear()}-01-01`;
+      const dateFin = req.query.dateFin as string || new Date().toISOString().split('T')[0];
+      const groupBy = req.query.groupBy as 'centre_cout' | 'ligne_produit' || 'centre_cout';
+
+      const result = await getBalanceAnalytique(agenceId, dateDebut, dateFin, groupBy);
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // Compte de résultat analytique
+  app.get("/api/comptabilite/analytique/compte-resultat", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const agenceId = req.user?.agenceId || req.query.agenceId as string;
+      if (!agenceId) return res.status(400).json({ message: "agenceId requis" });
+
+      const dateDebut = req.query.dateDebut as string || `${new Date().getFullYear()}-01-01`;
+      const dateFin = req.query.dateFin as string || new Date().toISOString().split('T')[0];
+      const centreCoutId = req.query.centreCoutId as string | undefined;
+      const ligneProduitId = req.query.ligneProduitId as string | undefined;
+
+      const result = await getCompteResultatAnalytique(agenceId, dateDebut, dateFin, centreCoutId, ligneProduitId);
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // CRUD: Centres de coûts
+  app.get("/api/comptabilite/analytique/centres", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const agenceId = req.user?.agenceId || req.query.agenceId as string;
+      const result = await db.select().from(centresCouts)
+        .where(agenceId ? eq(centresCouts.agenceId, agenceId) : sql`true`)
+        .orderBy(centresCouts.code);
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  app.post("/api/comptabilite/analytique/centres", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.COMPTABILITE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const agenceId = req.user?.agenceId || req.body.agenceId;
+      const { code, intitule, typeCenter, responsable } = req.body;
+      if (!code || !intitule) return res.status(400).json({ message: "code et intitule requis" });
+
+      const [result] = await db.insert(centresCouts).values({
+        agenceId, code, intitule, typeCenter, responsable,
+      }).returning();
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // CRUD: Lignes de produits
+  app.get("/api/comptabilite/analytique/produits", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const agenceId = req.user?.agenceId || req.query.agenceId as string;
+      const result = await db.select().from(lignesProduits)
+        .where(agenceId ? eq(lignesProduits.agenceId, agenceId) : sql`true`)
+        .orderBy(lignesProduits.code);
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  app.post("/api/comptabilite/analytique/produits", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.COMPTABILITE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const agenceId = req.user?.agenceId || req.body.agenceId;
+      const { code, intitule, categorie } = req.body;
+      if (!code || !intitule) return res.status(400).json({ message: "code et intitule requis" });
+
+      const [result] = await db.insert(lignesProduits).values({
+        agenceId, code, intitule, categorie,
+      }).returning();
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // CRUD: Clés de répartition
+  app.get("/api/comptabilite/analytique/cles", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const agenceId = req.user?.agenceId || req.query.agenceId as string;
+      const keys = await db.select().from(clesRepartition)
+        .where(agenceId ? eq(clesRepartition.agenceId, agenceId) : sql`true`)
+        .orderBy(clesRepartition.code);
+
+      // Load lines for each key
+      const result = [];
+      for (const key of keys) {
+        const lignes = await db.select().from(clesRepartitionLignes)
+          .where(eq(clesRepartitionLignes.cleId, key.id));
+        result.push({ ...key, lignes });
+      }
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  app.post("/api/comptabilite/analytique/cles", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.COMPTABILITE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const agenceId = req.user?.agenceId || req.body.agenceId;
+      const { code, intitule, lignes } = req.body;
+      if (!code || !intitule) return res.status(400).json({ message: "code et intitule requis" });
+
+      const [key] = await db.insert(clesRepartition).values({
+        agenceId, code, intitule,
+      }).returning();
+
+      if (lignes && Array.isArray(lignes)) {
+        for (const ligne of lignes) {
+          await db.insert(clesRepartitionLignes).values({
+            cleId: key.id,
+            centreCoutId: ligne.centreCoutId,
+            pourcentage: ligne.pourcentage,
+          });
+        }
+      }
+
+      res.json(key);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // ======================================================================
+  // ENGAGEMENTS HORS BILAN
+  // ======================================================================
+
+  // Sync from credits
+  app.post("/api/comptabilite/engagements/sync", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.ECRITURE_COMPTABLE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const agenceId = req.user?.agenceId || req.body.agenceId;
+      if (!agenceId) return res.status(400).json({ message: "agenceId requis" });
+
+      const result = await syncEngagementsFromCredits(agenceId);
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // List engagements
+  app.get("/api/comptabilite/engagements", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const agenceId = req.user?.agenceId || req.query.agenceId as string;
+      if (!agenceId) return res.status(400).json({ message: "agenceId requis" });
+
+      const filters = {
+        sousClasse: req.query.sousClasse as string | undefined,
+        statut: req.query.statut as string | undefined,
+        creditId: req.query.creditId as string | undefined,
+      };
+
+      const result = await listEngagements(agenceId, filters);
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // Create engagement manually
+  app.post("/api/comptabilite/engagements", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.ECRITURE_COMPTABLE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const agenceId = req.user?.agenceId || req.body.agenceId;
+      if (!agenceId) return res.status(400).json({ message: "agenceId requis" });
+
+      const result = await createEngagement({
+        ...req.body,
+        agenceId,
+        createdBy: req.user?.id,
+      });
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // Update engagement
+  app.patch("/api/comptabilite/engagements/:id", requireAuth, attachAbility, requireAbility(Actions.CREATE, Subjects.ECRITURE_COMPTABLE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const result = await updateEngagement(req.params.id, req.body);
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // État des engagements hors bilan
+  app.get("/api/comptabilite/engagements/etat", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const agenceId = req.user?.agenceId || req.query.agenceId as string;
+      if (!agenceId) return res.status(400).json({ message: "agenceId requis" });
+
+      const dateRef = req.query.dateReference as string | undefined;
+      const result = await getEtatEngagements(agenceId, dateRef);
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // ======================================================================
+  // CONSOLIDATION MULTI-AGENCES (F11)
+  // ======================================================================
+
+  // Consolidated Bilan
+  app.get("/api/comptabilite/consolidation/bilan", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const dateFin = req.query.dateFin as string || new Date().toISOString().split('T')[0];
+      const result = await generateConsolidatedBilan(dateFin);
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // Consolidated Compte de Résultat
+  app.get("/api/comptabilite/consolidation/compte-resultat", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const year = parseInt(req.query.exercice as string) || new Date().getFullYear();
+      const dateDebut = req.query.dateDebut as string || `${year}-01-01`;
+      const dateFin = req.query.dateFin as string || `${year}-12-31`;
+      const result = await generateConsolidatedCompteResultat(dateDebut, dateFin);
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // Full consolidation report (bilan + CR + trial balance)
+  app.get("/api/comptabilite/consolidation/report", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: AuthenticatedRequest, res) => {
+    try {
+      const year = parseInt(req.query.exercice as string) || new Date().getFullYear();
+      const dateFin = req.query.dateFin as string || `${year}-12-31`;
+      const result = await generateConsolidationReport(dateFin);
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // ======================================================================
+  // COBAC AUTO-REPORTING TRIGGER (F13)
+  // ======================================================================
+
+  // Manually trigger COBAC ratio calculation for all agencies
+  app.post("/api/comptabilite/cobac/run-all", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.COMPTABILITE), async (_req: AuthenticatedRequest, res) => {
+    try {
+      const result = await runCobacReporting();
+      res.json(result);
+    } catch (error) {
+      const err = toHttpError(error);
+      res.status(err.status).json({ code: err.code, message: err.message });
+    }
+  });
+
+  // ======================================================================
+  // LEGACY DEPRECATION
+  // ======================================================================
 
   const legacyTombstone = (_req: Request, res: Response) => {
     res.set("Deprecation", "true");

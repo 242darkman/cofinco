@@ -6,17 +6,20 @@ import {
   rolePermissions,
   userPermissions,
   userRoles,
-  isCriticalPermission,
+  roleHierarchy,
+  criticalPermissionPatterns,
+  permissionConditionTemplates,
   bulkUserPermissionUpdateSchema,
   toggleUserPermissionSchema,
   type BulkUserPermissionUpdate,
 } from "@shared/schema";
+import { isCriticalPermissionFromDb, invalidateCriticalPatternsCache } from "../authorization/critical-patterns";
 
 const logger = createLogger('Routes:RBAC');
-import { SystemRole, getRoleOptions, isAdminRole, normalizeRole } from "@shared/types/roles";
+import { SystemRole, getRoleOptions, isAdminRole, normalizeRole, getRoleLabel, ROLE_LABELS } from "@shared/types/roles";
 import { requireAuth } from "../auth";
-import { attachAbility, requireAbility, requireAnyAbility } from "../authorization";
-import { eq, and, desc } from "drizzle-orm";
+import { attachAbility, requireAbility, requireAnyAbility, invalidateRoleHierarchyCache } from "../authorization";
+import { eq, and, desc, count } from "drizzle-orm";
 import { db } from "../db";
 import { logAudit } from "../audit";
 import { auditTrailService } from "../services/audit-trail-service";
@@ -33,6 +36,15 @@ import {
   resetUserPermissionOverrides,
   buildRbacUpdatePayload,
   getUserIdsWithRole,
+  detectUserPermissionConflicts,
+  simulateUserPermissions,
+  createModule as createModuleService,
+  updateModule as updateModuleService,
+  deleteModule as deleteModuleService,
+  createPermission as createPermissionService,
+  updatePermission as updatePermissionService,
+  deletePermission as deletePermissionService,
+  incrementRbacVersion,
 } from "../services/rbac-service";
 import {
   logRbacChange,
@@ -197,6 +209,7 @@ export function registerRbacRoutes(app: Express) {
         return res.status(400).json({ message: "Le paramètre 'role' est requis" });
       }
 
+      // Direct permissions for this role
       const rolePerms = await db.select({
         id: rolePermissions.id,
         role: rolePermissions.role,
@@ -211,6 +224,45 @@ export function registerRbacRoutes(app: Express) {
         .leftJoin(permissions, eq(rolePermissions.permissionId, permissions.id))
         .leftJoin(modules, eq(permissions.moduleId, modules.id))
         .where(eq(rolePermissions.role, normalizedRole));
+
+      // Inherited permissions from child roles via hierarchy
+      const { getInheritedRoles } = await import("../authorization/ability");
+      const inheritedRoleNames = await getInheritedRoles(normalizedRole);
+
+      if (inheritedRoleNames.length > 0) {
+        const directPermIds = new Set(rolePerms.map(p => p.permissionId));
+
+        const inheritedPerms = await db.select({
+          id: rolePermissions.id,
+          role: rolePermissions.role,
+          permissionId: rolePermissions.permissionId,
+          granted: rolePermissions.granted,
+          permissionName: permissions.name,
+          permissionCode: permissions.code,
+          moduleName: modules.name,
+          moduleId: modules.id,
+        })
+          .from(rolePermissions)
+          .leftJoin(permissions, eq(rolePermissions.permissionId, permissions.id))
+          .leftJoin(modules, eq(permissions.moduleId, modules.id))
+          .where(and(
+            inArray(rolePermissions.role, inheritedRoleNames),
+            eq(rolePermissions.granted, true)
+          ));
+
+        // Add inherited perms that are not already directly granted
+        const seen = new Set<string>();
+        for (const perm of inheritedPerms) {
+          if (!directPermIds.has(perm.permissionId) && !seen.has(perm.permissionId)) {
+            seen.add(perm.permissionId);
+            rolePerms.push({
+              ...perm,
+              inherited: true,
+              inheritedFrom: perm.role,
+            } as any);
+          }
+        }
+      }
 
       res.json(rolePerms);
     } catch (error) {
@@ -1008,7 +1060,7 @@ export function registerRbacRoutes(app: Express) {
       }
 
       const { role } = req.params;
-      const { permissionId, granted, permissionCode } = req.body;
+      const { permissionId, granted, permissionCode, conditions } = req.body;
       const normalizedRole = normalizeRole(role);
 
       if (!normalizedRole) {
@@ -1032,7 +1084,7 @@ export function registerRbacRoutes(app: Express) {
       // Get permission code for the event
       const [perm] = await db.select().from(permissions).where(eq(permissions.id, resolvedPermissionId));
 
-      const result = await toggleRolePermission(normalizedRole, resolvedPermissionId, granted);
+      const result = await toggleRolePermission(normalizedRole, resolvedPermissionId, granted, conditions);
 
       await logAudit(
         req,
@@ -1184,7 +1236,7 @@ export function registerRbacRoutes(app: Express) {
     async (req, res) => {
       try {
         const { userId } = req.params;
-        const { permissionId, granted, permissionCode, reason, scope = 'GLOBAL', agenceId } = req.body;
+        const { permissionId, granted, permissionCode, reason, scope = 'GLOBAL', agenceId, conditions } = req.body;
 
         // Resolve permission ID
         let resolvedPermissionId = permissionId;
@@ -1209,7 +1261,7 @@ export function registerRbacRoutes(app: Express) {
         // Validate reason for critical permissions
         const reasonRequired = await isReasonRequiredForCritical();
         if (resolvedPermissionCode) {
-          const validation = validateReasonForCritical(resolvedPermissionCode, reason, reasonRequired);
+          const validation = await validateReasonForCritical(resolvedPermissionCode, reason, reasonRequired);
           if (!validation.valid) {
             return res.status(400).json({ message: validation.error, requiresReason: true });
           }
@@ -1225,7 +1277,7 @@ export function registerRbacRoutes(app: Express) {
         const oldValue = existing?.granted ?? null;
 
         // Execute the toggle
-        const result = await toggleUserPermissionOverride(userId, resolvedPermissionId, granted);
+        const result = await toggleUserPermissionOverride(userId, resolvedPermissionId, granted, conditions);
 
         // Log to RBAC audit trail
         await logRbacChange(getAuditContext(req), {
@@ -2071,7 +2123,7 @@ export function registerRbacRoutes(app: Express) {
     async (req, res) => {
       try {
         const { code } = req.params;
-        const isCritical = isCriticalPermission(code);
+        const isCritical = await isCriticalPermissionFromDb(code);
         const reasonRequired = await isReasonRequiredForCritical();
 
         res.json({
@@ -2082,6 +2134,1065 @@ export function registerRbacRoutes(app: Express) {
       } catch (error) {
         logger.error({ err: error }, 'Check critical permission error');
         res.status(500).json({ message: "Erreur lors de la vérification" });
+      }
+    }
+  );
+
+  // ============================================================
+  // ROLE HIERARCHY
+  // ============================================================
+
+  /**
+   * GET /api/rbac/role-hierarchy
+   * Get role hierarchy tree with permission counts
+   */
+  app.get("/api/rbac/role-hierarchy",
+    requireAuth,
+    attachAbility,
+    requireAnyAbility([
+      { action: Actions.VIEW, subject: Subjects.RBAC },
+      { action: Actions.MANAGE, subject: Subjects.ALL },
+    ]),
+    async (_req: Request, res: Response) => {
+      try {
+        // Fetch hierarchy relations
+        const relations = await db
+          .select()
+          .from(roleHierarchy)
+          .orderBy(roleHierarchy.parentRole, roleHierarchy.childRole);
+
+        // Fetch permission counts per role
+        const allRoles = Object.values(SystemRole);
+        const roleCounts = await Promise.all(
+          allRoles.map(async (role) => {
+            const [result] = await db
+              .select({ count: count() })
+              .from(rolePermissions)
+              .where(
+                and(
+                  eq(rolePermissions.role, role),
+                  eq(rolePermissions.granted, true)
+                )
+              );
+            return { role, directPermissions: result?.count || 0 };
+          })
+        );
+
+        // Build nodes
+        const nodes = roleCounts.map((rc) => ({
+          role: rc.role,
+          label: getRoleLabel(rc.role),
+          directPermissions: rc.directPermissions,
+          children: relations
+            .filter((r) => r.parentRole === rc.role)
+            .map((r) => r.childRole),
+          parents: relations
+            .filter((r) => r.childRole === rc.role)
+            .map((r) => r.parentRole),
+        }));
+
+        res.json({ nodes, relations });
+      } catch (error) {
+        logger.error({ err: error }, 'Get role hierarchy error');
+        res.status(500).json({ message: "Erreur lors de la récupération de la hiérarchie" });
+      }
+    }
+  );
+
+  /**
+   * POST /api/rbac/role-hierarchy
+   * Create a parent→child role relation
+   */
+  app.post("/api/rbac/role-hierarchy",
+    requireAuth,
+    attachAbility,
+    requireAnyAbility([
+      { action: Actions.MANAGE, subject: Subjects.RBAC },
+      { action: Actions.MANAGE, subject: Subjects.ALL },
+    ]),
+    async (req: Request, res: Response) => {
+      try {
+        const { parentRole, childRole } = req.body;
+
+        // Validate roles exist
+        const validRoles = Object.values(SystemRole) as string[];
+        if (!validRoles.includes(parentRole) || !validRoles.includes(childRole)) {
+          return res.status(400).json({ message: "Rôle invalide" });
+        }
+
+        if (parentRole === childRole) {
+          return res.status(400).json({ message: "Un rôle ne peut pas être son propre enfant" });
+        }
+
+        // Check duplicate
+        const [existing] = await db
+          .select()
+          .from(roleHierarchy)
+          .where(
+            and(
+              eq(roleHierarchy.parentRole, parentRole),
+              eq(roleHierarchy.childRole, childRole)
+            )
+          );
+
+        if (existing) {
+          return res.status(409).json({ message: "Cette relation existe déjà" });
+        }
+
+        // Cycle detection: check if childRole is already an ancestor of parentRole
+        const allRelations = await db.select().from(roleHierarchy);
+        const ancestors = new Set<string>();
+        const findAncestors = (role: string) => {
+          for (const rel of allRelations) {
+            if (rel.childRole === role && !ancestors.has(rel.parentRole)) {
+              ancestors.add(rel.parentRole);
+              findAncestors(rel.parentRole);
+            }
+          }
+        };
+        findAncestors(parentRole);
+
+        if (ancestors.has(childRole)) {
+          return res.status(400).json({ message: "Cette relation créerait un cycle dans la hiérarchie" });
+        }
+
+        const [created] = await db
+          .insert(roleHierarchy)
+          .values({ parentRole, childRole })
+          .returning();
+
+        invalidateRoleHierarchyCache();
+
+        logAudit(req, {
+          action: 'create',
+          entity: 'role_hierarchy',
+          details: { parentRole, childRole },
+        });
+
+        res.status(201).json(created);
+      } catch (error) {
+        logger.error({ err: error }, 'Create role hierarchy relation error');
+        res.status(500).json({ message: "Erreur lors de la création de la relation" });
+      }
+    }
+  );
+
+  /**
+   * DELETE /api/rbac/role-hierarchy/:id
+   * Remove a parent→child role relation
+   */
+  app.delete("/api/rbac/role-hierarchy/:id",
+    requireAuth,
+    attachAbility,
+    requireAnyAbility([
+      { action: Actions.MANAGE, subject: Subjects.RBAC },
+      { action: Actions.MANAGE, subject: Subjects.ALL },
+    ]),
+    async (req: Request, res: Response) => {
+      try {
+        const { id } = req.params;
+
+        const [existing] = await db
+          .select()
+          .from(roleHierarchy)
+          .where(eq(roleHierarchy.id, id));
+
+        if (!existing) {
+          return res.status(404).json({ message: "Relation non trouvée" });
+        }
+
+        await db
+          .delete(roleHierarchy)
+          .where(eq(roleHierarchy.id, id));
+
+        invalidateRoleHierarchyCache();
+
+        logAudit(req, {
+          action: 'delete',
+          entity: 'role_hierarchy',
+          details: { id, parentRole: existing.parentRole, childRole: existing.childRole },
+        });
+
+        res.status(204).send();
+      } catch (error) {
+        logger.error({ err: error }, 'Delete role hierarchy relation error');
+        res.status(500).json({ message: "Erreur lors de la suppression de la relation" });
+      }
+    }
+  );
+
+  // ============================================================
+  // CRITICAL PERMISSION PATTERNS CRUD
+  // ============================================================
+
+  /**
+   * GET /api/rbac/critical-patterns
+   * List all critical permission patterns
+   */
+  app.get("/api/rbac/critical-patterns",
+    requireAuth,
+    attachAbility,
+    requireAnyAbility([
+      { action: Actions.VIEW, subject: Subjects.RBAC },
+      { action: Actions.MANAGE, subject: Subjects.ALL },
+    ]),
+    async (_req: Request, res: Response) => {
+      try {
+        const patterns = await db
+          .select()
+          .from(criticalPermissionPatterns)
+          .orderBy(criticalPermissionPatterns.pattern);
+
+        res.json(patterns);
+      } catch (error) {
+        logger.error({ err: error }, 'Get critical patterns error');
+        res.status(500).json({ message: "Erreur lors de la récupération des patterns critiques" });
+      }
+    }
+  );
+
+  /**
+   * POST /api/rbac/critical-patterns
+   * Create a new critical permission pattern
+   */
+  app.post("/api/rbac/critical-patterns",
+    requireAuth,
+    attachAbility,
+    requireAnyAbility([
+      { action: Actions.MANAGE, subject: Subjects.RBAC },
+      { action: Actions.MANAGE, subject: Subjects.ALL },
+    ]),
+    async (req: Request, res: Response) => {
+      try {
+        const { pattern, description, requireReason, requireSupervisorApproval } = req.body;
+
+        if (!pattern || pattern.trim().length === 0) {
+          return res.status(400).json({ message: "Le pattern est requis" });
+        }
+
+        // Check uniqueness
+        const [existing] = await db
+          .select()
+          .from(criticalPermissionPatterns)
+          .where(eq(criticalPermissionPatterns.pattern, pattern.trim()));
+
+        if (existing) {
+          return res.status(409).json({ message: "Ce pattern existe déjà" });
+        }
+
+        const [created] = await db
+          .insert(criticalPermissionPatterns)
+          .values({
+            pattern: pattern.trim(),
+            description: description || null,
+            requireReason: requireReason !== false,
+            requireSupervisorApproval: requireSupervisorApproval === true,
+          })
+          .returning();
+
+        invalidateCriticalPatternsCache();
+
+        logAudit(req, {
+          action: 'create',
+          entity: 'critical_pattern',
+          details: { pattern: pattern.trim() },
+        });
+
+        res.status(201).json(created);
+      } catch (error) {
+        logger.error({ err: error }, 'Create critical pattern error');
+        res.status(500).json({ message: "Erreur lors de la création du pattern" });
+      }
+    }
+  );
+
+  /**
+   * PATCH /api/rbac/critical-patterns/:id
+   * Update a critical permission pattern
+   */
+  app.patch("/api/rbac/critical-patterns/:id",
+    requireAuth,
+    attachAbility,
+    requireAnyAbility([
+      { action: Actions.MANAGE, subject: Subjects.RBAC },
+      { action: Actions.MANAGE, subject: Subjects.ALL },
+    ]),
+    async (req: Request, res: Response) => {
+      try {
+        const { id } = req.params;
+        const { description, requireReason, requireSupervisorApproval } = req.body;
+
+        const [existing] = await db
+          .select()
+          .from(criticalPermissionPatterns)
+          .where(eq(criticalPermissionPatterns.id, id));
+
+        if (!existing) {
+          return res.status(404).json({ message: "Pattern non trouvé" });
+        }
+
+        const updateData: Record<string, unknown> = {};
+        if (description !== undefined) updateData.description = description;
+        if (requireReason !== undefined) updateData.requireReason = requireReason;
+        if (requireSupervisorApproval !== undefined) updateData.requireSupervisorApproval = requireSupervisorApproval;
+
+        const [updated] = await db
+          .update(criticalPermissionPatterns)
+          .set(updateData)
+          .where(eq(criticalPermissionPatterns.id, id))
+          .returning();
+
+        invalidateCriticalPatternsCache();
+
+        logAudit(req, {
+          action: 'update',
+          entity: 'critical_pattern',
+          details: { id, pattern: updated.pattern },
+        });
+
+        res.json(updated);
+      } catch (error) {
+        logger.error({ err: error }, 'Update critical pattern error');
+        res.status(500).json({ message: "Erreur lors de la mise à jour du pattern" });
+      }
+    }
+  );
+
+  /**
+   * DELETE /api/rbac/critical-patterns/:id
+   * Delete a critical permission pattern
+   */
+  app.delete("/api/rbac/critical-patterns/:id",
+    requireAuth,
+    attachAbility,
+    requireAnyAbility([
+      { action: Actions.MANAGE, subject: Subjects.RBAC },
+      { action: Actions.MANAGE, subject: Subjects.ALL },
+    ]),
+    async (req: Request, res: Response) => {
+      try {
+        const { id } = req.params;
+
+        const [existing] = await db
+          .select()
+          .from(criticalPermissionPatterns)
+          .where(eq(criticalPermissionPatterns.id, id));
+
+        if (!existing) {
+          return res.status(404).json({ message: "Pattern non trouvé" });
+        }
+
+        await db
+          .delete(criticalPermissionPatterns)
+          .where(eq(criticalPermissionPatterns.id, id));
+
+        invalidateCriticalPatternsCache();
+
+        logAudit(req, {
+          action: 'delete',
+          entity: 'critical_pattern',
+          details: { id, pattern: existing.pattern },
+        });
+
+        res.status(204).send();
+      } catch (error) {
+        logger.error({ err: error }, 'Delete critical pattern error');
+        res.status(500).json({ message: "Erreur lors de la suppression du pattern" });
+      }
+    }
+  );
+
+  // ============================================================
+  // PERMISSION CONFLICT DETECTION
+  // ============================================================
+
+  /**
+   * GET /api/rbac/users/:userId/conflicts
+   * Detect conflicts between user overrides and role permissions
+   */
+  app.get("/api/rbac/users/:userId/conflicts",
+    requireAuth,
+    attachAbility,
+    requireAnyAbility([
+      { action: Actions.VIEW, subject: Subjects.RBAC },
+      { action: Actions.MANAGE, subject: Subjects.ALL },
+    ]),
+    async (req: Request, res: Response) => {
+      try {
+        const { userId } = req.params;
+        const result = await detectUserPermissionConflicts(userId);
+        res.json(result);
+      } catch (error) {
+        logger.error({ err: error }, 'Detect permission conflicts error');
+        res.status(500).json({ message: "Erreur lors de la détection des conflits" });
+      }
+    }
+  );
+
+  // ============================================================
+  // CONDITION TEMPLATES CRUD
+  // ============================================================
+
+  /**
+   * GET /api/rbac/condition-templates
+   * List all condition templates (system first, then custom)
+   */
+  app.get("/api/rbac/condition-templates",
+    requireAuth,
+    attachAbility,
+    requireAnyAbility([
+      { action: Actions.VIEW, subject: Subjects.RBAC },
+      { action: Actions.MANAGE, subject: Subjects.ALL },
+    ]),
+    async (_req: Request, res: Response) => {
+      try {
+        const templates = await db
+          .select()
+          .from(permissionConditionTemplates)
+          .orderBy(
+            desc(permissionConditionTemplates.isSystem),
+            permissionConditionTemplates.name
+          );
+
+        res.json(templates);
+      } catch (error) {
+        logger.error({ err: error }, 'Get condition templates error');
+        res.status(500).json({ message: "Erreur lors de la récupération des templates" });
+      }
+    }
+  );
+
+  /**
+   * POST /api/rbac/condition-templates
+   * Create a new condition template (cannot create system templates via API)
+   */
+  app.post("/api/rbac/condition-templates",
+    requireAuth,
+    attachAbility,
+    requireAnyAbility([
+      { action: Actions.MANAGE, subject: Subjects.RBAC },
+      { action: Actions.MANAGE, subject: Subjects.ALL },
+    ]),
+    async (req: Request, res: Response) => {
+      try {
+        const { name, description, conditionSchema, variables, examples } = req.body;
+
+        if (!name?.trim()) {
+          return res.status(400).json({ message: "Le nom est requis" });
+        }
+
+        if (!conditionSchema || typeof conditionSchema !== 'object' || Object.keys(conditionSchema).length === 0) {
+          return res.status(400).json({ message: "Le schéma de condition est requis et doit être un objet JSON non-vide" });
+        }
+
+        // Check name uniqueness
+        const [existing] = await db
+          .select()
+          .from(permissionConditionTemplates)
+          .where(eq(permissionConditionTemplates.name, name.trim()));
+
+        if (existing) {
+          return res.status(409).json({ message: `Un template avec le nom "${name}" existe déjà` });
+        }
+
+        const [created] = await db
+          .insert(permissionConditionTemplates)
+          .values({
+            name: name.trim(),
+            description: description?.trim() || null,
+            conditionSchema,
+            variables: variables || [],
+            examples: examples || [],
+            isSystem: false, // Never allow creating system templates via API
+          })
+          .returning();
+
+        logAudit(req, {
+          action: 'create',
+          entity: 'condition_template',
+          details: { id: created.id, name: created.name },
+        });
+
+        res.status(201).json(created);
+      } catch (error) {
+        logger.error({ err: error }, 'Create condition template error');
+        res.status(500).json({ message: "Erreur lors de la création du template" });
+      }
+    }
+  );
+
+  /**
+   * PATCH /api/rbac/condition-templates/:id
+   * Update a condition template (system templates are read-only)
+   */
+  app.patch("/api/rbac/condition-templates/:id",
+    requireAuth,
+    attachAbility,
+    requireAnyAbility([
+      { action: Actions.MANAGE, subject: Subjects.RBAC },
+      { action: Actions.MANAGE, subject: Subjects.ALL },
+    ]),
+    async (req: Request, res: Response) => {
+      try {
+        const { id } = req.params;
+        const { name, description, conditionSchema, variables, examples } = req.body;
+
+        const [existing] = await db
+          .select()
+          .from(permissionConditionTemplates)
+          .where(eq(permissionConditionTemplates.id, id));
+
+        if (!existing) {
+          return res.status(404).json({ message: "Template non trouvé" });
+        }
+
+        if (existing.isSystem) {
+          return res.status(403).json({ message: "Les templates système ne sont pas modifiables" });
+        }
+
+        if (conditionSchema && (typeof conditionSchema !== 'object' || Object.keys(conditionSchema).length === 0)) {
+          return res.status(400).json({ message: "Le schéma de condition doit être un objet JSON non-vide" });
+        }
+
+        // Check name uniqueness if changing name
+        if (name && name.trim() !== existing.name) {
+          const [dup] = await db
+            .select()
+            .from(permissionConditionTemplates)
+            .where(eq(permissionConditionTemplates.name, name.trim()));
+          if (dup) {
+            return res.status(409).json({ message: `Un template avec le nom "${name}" existe déjà` });
+          }
+        }
+
+        const updateData: Record<string, unknown> = { updatedAt: new Date() };
+        if (name !== undefined) updateData.name = name.trim();
+        if (description !== undefined) updateData.description = description?.trim() || null;
+        if (conditionSchema !== undefined) updateData.conditionSchema = conditionSchema;
+        if (variables !== undefined) updateData.variables = variables;
+        if (examples !== undefined) updateData.examples = examples;
+
+        const [updated] = await db
+          .update(permissionConditionTemplates)
+          .set(updateData)
+          .where(eq(permissionConditionTemplates.id, id))
+          .returning();
+
+        logAudit(req, {
+          action: 'update',
+          entity: 'condition_template',
+          details: { id, name: updated.name },
+        });
+
+        res.json(updated);
+      } catch (error) {
+        logger.error({ err: error }, 'Update condition template error');
+        res.status(500).json({ message: "Erreur lors de la mise à jour du template" });
+      }
+    }
+  );
+
+  /**
+   * DELETE /api/rbac/condition-templates/:id
+   * Delete a condition template (system templates cannot be deleted)
+   */
+  app.delete("/api/rbac/condition-templates/:id",
+    requireAuth,
+    attachAbility,
+    requireAnyAbility([
+      { action: Actions.MANAGE, subject: Subjects.RBAC },
+      { action: Actions.MANAGE, subject: Subjects.ALL },
+    ]),
+    async (req: Request, res: Response) => {
+      try {
+        const { id } = req.params;
+
+        const [existing] = await db
+          .select()
+          .from(permissionConditionTemplates)
+          .where(eq(permissionConditionTemplates.id, id));
+
+        if (!existing) {
+          return res.status(404).json({ message: "Template non trouvé" });
+        }
+
+        if (existing.isSystem) {
+          return res.status(403).json({ message: "Les templates système ne sont pas supprimables" });
+        }
+
+        await db
+          .delete(permissionConditionTemplates)
+          .where(eq(permissionConditionTemplates.id, id));
+
+        logAudit(req, {
+          action: 'delete',
+          entity: 'condition_template',
+          details: { id, name: existing.name },
+        });
+
+        res.status(204).send();
+      } catch (error) {
+        logger.error({ err: error }, 'Delete condition template error');
+        res.status(500).json({ message: "Erreur lors de la suppression du template" });
+      }
+    }
+  );
+
+  // ============================================================
+  // PERMISSION SIMULATOR (Feature 9)
+  // ============================================================
+
+  /**
+   * GET /api/rbac/users/:userId/simulate
+   * Simulate effective permissions for a user (read-only preview)
+   */
+  app.get("/api/rbac/users/:userId/simulate",
+    requireAuth,
+    attachAbility,
+    requireAnyAbility([
+      { action: Actions.VIEW, subject: Subjects.RBAC },
+      { action: Actions.MANAGE, subject: Subjects.ALL },
+    ]),
+    async (req: Request, res: Response) => {
+      try {
+        const { userId } = req.params;
+        const agenceId = req.query.agenceId as string | undefined;
+        const result = await simulateUserPermissions(userId, agenceId || undefined);
+        res.json(result);
+      } catch (error) {
+        logger.error({ err: error }, 'Simulate user permissions error');
+        res.status(500).json({ message: "Erreur lors de la simulation" });
+      }
+    }
+  );
+
+  // ============================================================
+  // MODULE / PERMISSION CRUD (Feature 10)
+  // ============================================================
+
+  /**
+   * POST /api/rbac/modules — Create a new module
+   */
+  app.post("/api/rbac/modules",
+    requireAuth,
+    attachAbility,
+    requireAnyAbility([
+      { action: Actions.MANAGE, subject: Subjects.RBAC },
+      { action: Actions.MANAGE, subject: Subjects.ALL },
+    ]),
+    async (req: Request, res: Response) => {
+      try {
+        const { name, description, icon, category, isActive, orderIndex } = req.body;
+        if (!name || !category) {
+          return res.status(400).json({ message: "name et category requis" });
+        }
+
+        const created = await createModuleService({ name, description, icon, category, isActive, orderIndex });
+
+        const ctx = getAuditContext(req);
+        await logRbacChange(ctx, {
+          action: 'MODULE_CREATE' as any,
+          permissionCode: created.name,
+          metadata: { moduleId: created.id, name: created.name, category: created.category },
+        });
+
+        const newVersion = await incrementRbacVersion('module_create', 'module', { id: created.id });
+        await broadcastRbacUpdate(buildRbacUpdatePayload('global', newVersion));
+
+        res.status(201).json(created);
+      } catch (error: any) {
+        if (error?.code === '23505') {
+          return res.status(400).json({ message: "Un module avec ce nom existe déjà" });
+        }
+        logger.error({ err: error }, 'Create module error');
+        res.status(500).json({ message: "Erreur lors de la création du module" });
+      }
+    }
+  );
+
+  /**
+   * PATCH /api/rbac/modules/:id — Update a module
+   */
+  app.patch("/api/rbac/modules/:id",
+    requireAuth,
+    attachAbility,
+    requireAnyAbility([
+      { action: Actions.MANAGE, subject: Subjects.RBAC },
+      { action: Actions.MANAGE, subject: Subjects.ALL },
+    ]),
+    async (req: Request, res: Response) => {
+      try {
+        const { id } = req.params;
+        const { name, description, icon, category, isActive, orderIndex } = req.body;
+
+        const updated = await updateModuleService(id, {
+          ...(name !== undefined && { name }),
+          ...(description !== undefined && { description }),
+          ...(icon !== undefined && { icon }),
+          ...(category !== undefined && { category }),
+          ...(isActive !== undefined && { isActive }),
+          ...(orderIndex !== undefined && { orderIndex }),
+        });
+
+        if (!updated) {
+          return res.status(404).json({ message: "Module non trouvé" });
+        }
+
+        const ctx = getAuditContext(req);
+        await logRbacChange(ctx, {
+          action: 'MODULE_UPDATE' as any,
+          permissionCode: updated.name,
+          metadata: { moduleId: id, changes: req.body },
+        });
+
+        const newVersion = await incrementRbacVersion('module_update', 'module', { id });
+        await broadcastRbacUpdate(buildRbacUpdatePayload('global', newVersion));
+
+        res.json(updated);
+      } catch (error: any) {
+        if (error?.code === '23505') {
+          return res.status(400).json({ message: "Un module avec ce nom existe déjà" });
+        }
+        logger.error({ err: error }, 'Update module error');
+        res.status(500).json({ message: "Erreur lors de la mise à jour du module" });
+      }
+    }
+  );
+
+  /**
+   * DELETE /api/rbac/modules/:id — Delete a module (if no active assignments)
+   */
+  app.delete("/api/rbac/modules/:id",
+    requireAuth,
+    attachAbility,
+    requireAnyAbility([
+      { action: Actions.MANAGE, subject: Subjects.RBAC },
+      { action: Actions.MANAGE, subject: Subjects.ALL },
+    ]),
+    async (req: Request, res: Response) => {
+      try {
+        const { id } = req.params;
+
+        // Get module info before deletion
+        const [existing] = await db.select().from(modules).where(eq(modules.id, id));
+        if (!existing) {
+          return res.status(404).json({ message: "Module non trouvé" });
+        }
+
+        const result = await deleteModuleService(id);
+        if (!result.success) {
+          return res.status(400).json({ message: result.error });
+        }
+
+        const ctx = getAuditContext(req);
+        await logRbacChange(ctx, {
+          action: 'MODULE_DELETE' as any,
+          permissionCode: existing.name,
+          metadata: { moduleId: id, name: existing.name },
+        });
+
+        const newVersion = await incrementRbacVersion('module_delete', 'module', { id });
+        await broadcastRbacUpdate(buildRbacUpdatePayload('global', newVersion));
+
+        res.status(204).send();
+      } catch (error) {
+        logger.error({ err: error }, 'Delete module error');
+        res.status(500).json({ message: "Erreur lors de la suppression du module" });
+      }
+    }
+  );
+
+  /**
+   * POST /api/rbac/permissions — Create a new permission
+   */
+  app.post("/api/rbac/permissions",
+    requireAuth,
+    attachAbility,
+    requireAnyAbility([
+      { action: Actions.MANAGE, subject: Subjects.RBAC },
+      { action: Actions.MANAGE, subject: Subjects.ALL },
+    ]),
+    async (req: Request, res: Response) => {
+      try {
+        const { moduleId, name, code, description } = req.body;
+        if (!moduleId || !name || !code) {
+          return res.status(400).json({ message: "moduleId, name et code requis" });
+        }
+
+        const created = await createPermissionService({ moduleId, name, code, description });
+
+        const ctx = getAuditContext(req);
+        await logRbacChange(ctx, {
+          action: 'PERMISSION_CREATE' as any,
+          permissionCode: created.code,
+          metadata: { permissionId: created.id, moduleId, name: created.name },
+        });
+
+        const newVersion = await incrementRbacVersion('permission_create', 'permission', { id: created.id });
+        await broadcastRbacUpdate(buildRbacUpdatePayload('global', newVersion));
+
+        res.status(201).json(created);
+      } catch (error: any) {
+        if (error?.code === '23505') {
+          return res.status(400).json({ message: "Une permission avec ce code existe déjà" });
+        }
+        logger.error({ err: error }, 'Create permission error');
+        res.status(500).json({ message: "Erreur lors de la création de la permission" });
+      }
+    }
+  );
+
+  /**
+   * PATCH /api/rbac/permissions/:id — Update a permission
+   */
+  app.patch("/api/rbac/permissions/:id",
+    requireAuth,
+    attachAbility,
+    requireAnyAbility([
+      { action: Actions.MANAGE, subject: Subjects.RBAC },
+      { action: Actions.MANAGE, subject: Subjects.ALL },
+    ]),
+    async (req: Request, res: Response) => {
+      try {
+        const { id } = req.params;
+        const { name, code, description } = req.body;
+
+        const updated = await updatePermissionService(id, {
+          ...(name !== undefined && { name }),
+          ...(code !== undefined && { code }),
+          ...(description !== undefined && { description }),
+        });
+
+        if (!updated) {
+          return res.status(404).json({ message: "Permission non trouvée" });
+        }
+
+        const ctx = getAuditContext(req);
+        await logRbacChange(ctx, {
+          action: 'PERMISSION_UPDATE' as any,
+          permissionId: id,
+          permissionCode: updated.code,
+          metadata: { changes: req.body },
+        });
+
+        const newVersion = await incrementRbacVersion('permission_update', 'permission', { id });
+        await broadcastRbacUpdate(buildRbacUpdatePayload('global', newVersion));
+
+        res.json(updated);
+      } catch (error: any) {
+        if (error?.code === '23505') {
+          return res.status(400).json({ message: "Une permission avec ce code existe déjà" });
+        }
+        logger.error({ err: error }, 'Update permission error');
+        res.status(500).json({ message: "Erreur lors de la mise à jour de la permission" });
+      }
+    }
+  );
+
+  /**
+   * DELETE /api/rbac/permissions/:id — Delete a permission (if no active assignments)
+   */
+  app.delete("/api/rbac/permissions/:id",
+    requireAuth,
+    attachAbility,
+    requireAnyAbility([
+      { action: Actions.MANAGE, subject: Subjects.RBAC },
+      { action: Actions.MANAGE, subject: Subjects.ALL },
+    ]),
+    async (req: Request, res: Response) => {
+      try {
+        const { id } = req.params;
+
+        // Get permission info before deletion
+        const [existing] = await db.select().from(permissions).where(eq(permissions.id, id));
+        if (!existing) {
+          return res.status(404).json({ message: "Permission non trouvée" });
+        }
+
+        const result = await deletePermissionService(id);
+        if (!result.success) {
+          return res.status(400).json({ message: result.error });
+        }
+
+        const ctx = getAuditContext(req);
+        await logRbacChange(ctx, {
+          action: 'PERMISSION_DELETE' as any,
+          permissionId: id,
+          permissionCode: existing.code,
+          metadata: { name: existing.name, moduleId: existing.moduleId },
+        });
+
+        const newVersion = await incrementRbacVersion('permission_delete', 'permission', { id });
+        await broadcastRbacUpdate(buildRbacUpdatePayload('global', newVersion));
+
+        res.status(204).send();
+      } catch (error) {
+        logger.error({ err: error }, 'Delete permission error');
+        res.status(500).json({ message: "Erreur lors de la suppression de la permission" });
+      }
+    }
+  );
+
+  // ============================================================
+  // AUDIT REVERT (Feature 11)
+  // ============================================================
+
+  /**
+   * POST /api/rbac/audit/:id/revert — Revert a RBAC audit entry
+   */
+  app.post("/api/rbac/audit/:id/revert",
+    requireAuth,
+    attachAbility,
+    requireAnyAbility([
+      { action: Actions.MANAGE, subject: Subjects.RBAC },
+      { action: Actions.MANAGE, subject: Subjects.ALL },
+    ]),
+    async (req: Request, res: Response) => {
+      try {
+        const { id } = req.params;
+        const { reason } = req.body;
+        const { revertAuditEntry } = await import("../services/rbac-audit-service");
+        const ctx = getAuditContext(req);
+        const result = await revertAuditEntry(id, ctx, reason);
+
+        if (!result.success) {
+          return res.status(400).json({ message: result.error });
+        }
+
+        const newVersion = await incrementRbacVersion('revert', 'audit', { revertedAuditId: id });
+        await broadcastRbacUpdate(buildRbacUpdatePayload('global', newVersion));
+
+        res.json({ ...result, newVersion });
+      } catch (error) {
+        logger.error({ err: error }, 'Revert audit entry error');
+        res.status(500).json({ message: "Erreur lors de l'annulation" });
+      }
+    }
+  );
+
+  // ============================================================
+  // PERMISSION REQUEST WORKFLOW (Feature 12)
+  // ============================================================
+
+  /**
+   * POST /api/rbac/permission-requests — Create a permission request (any authenticated user)
+   */
+  app.post("/api/rbac/permission-requests",
+    requireAuth,
+    async (req: Request, res: Response) => {
+      try {
+        const requesterId = req.session?.user?.id || req.session?.userId;
+        if (!requesterId) return res.status(401).json({ message: "Non authentifié" });
+
+        const { createPermissionRequest } = await import("../services/permission-request-service");
+        const result = await createPermissionRequest(requesterId, req.body);
+        res.status(201).json(result);
+      } catch (error: any) {
+        logger.error({ err: error }, 'Create permission request error');
+        res.status(400).json({ message: error.message || "Erreur lors de la création de la demande" });
+      }
+    }
+  );
+
+  /**
+   * GET /api/rbac/permission-requests/my — Get current user's requests
+   */
+  app.get("/api/rbac/permission-requests/my",
+    requireAuth,
+    async (req: Request, res: Response) => {
+      try {
+        const userId = req.session?.user?.id || req.session?.userId;
+        if (!userId) return res.status(401).json({ message: "Non authentifié" });
+
+        const { getMyRequests } = await import("../services/permission-request-service");
+        const status = req.query.status as string | undefined;
+        const result = await getMyRequests(userId, { status });
+        res.json(result);
+      } catch (error) {
+        logger.error({ err: error }, 'Get my permission requests error');
+        res.status(500).json({ message: "Erreur lors de la récupération des demandes" });
+      }
+    }
+  );
+
+  /**
+   * GET /api/rbac/permission-requests — Get all requests (admin)
+   */
+  app.get("/api/rbac/permission-requests",
+    requireAuth,
+    attachAbility,
+    requireAnyAbility([
+      { action: Actions.MANAGE, subject: Subjects.RBAC },
+      { action: Actions.MANAGE, subject: Subjects.ALL },
+    ]),
+    async (req: Request, res: Response) => {
+      try {
+        const { getPendingRequests } = await import("../services/permission-request-service");
+        const status = req.query.status as string | undefined;
+        const result = await getPendingRequests({ status });
+        res.json(result);
+      } catch (error) {
+        logger.error({ err: error }, 'Get permission requests error');
+        res.status(500).json({ message: "Erreur lors de la récupération des demandes" });
+      }
+    }
+  );
+
+  /**
+   * PATCH /api/rbac/permission-requests/:id — Approve/reject a request (admin)
+   */
+  app.patch("/api/rbac/permission-requests/:id",
+    requireAuth,
+    attachAbility,
+    requireAnyAbility([
+      { action: Actions.MANAGE, subject: Subjects.RBAC },
+      { action: Actions.MANAGE, subject: Subjects.ALL },
+    ]),
+    async (req: Request, res: Response) => {
+      try {
+        const { id } = req.params;
+        const reviewerId = req.session?.user?.id || req.session?.userId;
+        if (!reviewerId) return res.status(401).json({ message: "Non authentifié" });
+
+        const { decision, reviewReason } = req.body;
+        if (!decision || !['APPROVED', 'REJECTED'].includes(decision)) {
+          return res.status(400).json({ message: "decision (APPROVED ou REJECTED) requis" });
+        }
+
+        const { reviewRequest } = await import("../services/permission-request-service");
+        const ctx = getAuditContext(req);
+        const result = await reviewRequest(id, reviewerId, decision, reviewReason, ctx);
+
+        if (decision === 'APPROVED') {
+          const newVersion = await incrementRbacVersion('request_approved', 'permission_request', { requestId: id });
+          await broadcastRbacUpdate(buildRbacUpdatePayload('global', newVersion));
+        }
+
+        res.json(result);
+      } catch (error: any) {
+        logger.error({ err: error }, 'Review permission request error');
+        res.status(400).json({ message: error.message || "Erreur lors du traitement de la demande" });
+      }
+    }
+  );
+
+  /**
+   * DELETE /api/rbac/permission-requests/:id — Cancel own request
+   */
+  app.delete("/api/rbac/permission-requests/:id",
+    requireAuth,
+    async (req: Request, res: Response) => {
+      try {
+        const { id } = req.params;
+        const requesterId = req.session?.user?.id || req.session?.userId;
+        if (!requesterId) return res.status(401).json({ message: "Non authentifié" });
+
+        const { cancelRequest } = await import("../services/permission-request-service");
+        await cancelRequest(id, requesterId);
+        res.status(204).send();
+      } catch (error: any) {
+        logger.error({ err: error }, 'Cancel permission request error');
+        res.status(400).json({ message: error.message || "Erreur lors de l'annulation de la demande" });
       }
     }
   );

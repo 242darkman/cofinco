@@ -29,7 +29,7 @@ const logger = createLogger('Ledger');
 export type MouvementFinancier = typeof mouvementsFinanciers.$inferSelect;
 
 // Types for the ledger service
-export type SourceModule = "CAISSE" | "EPARGNE" | "CREDIT" | "TONTINE" | "TERRAIN" | "TRANSFERT" | "SYSTEME" | "CAISSE_AGENT" | "VERSEMENT_AUTO" | "DECAISSEMENT_PROGRAMME" | "COMPTE" | "COFFRE" | "MOBILE_MONEY" | "RH_PAYROLL" | "COFFRE_TRANSFER" | "INTER_COFFRE" | "EVACUATION_COFFRE" | "FRAIS";
+export type SourceModule = "CAISSE" | "EPARGNE" | "CREDIT" | "TONTINE" | "TERRAIN" | "TRANSFERT" | "SYSTEME" | "CAISSE_AGENT" | "VERSEMENT_AUTO" | "DECAISSEMENT_PROGRAMME" | "COMPTE" | "COFFRE" | "MOBILE_MONEY" | "RH_PAYROLL" | "COFFRE_TRANSFER" | "INTER_COFFRE" | "EVACUATION_COFFRE" | "FRAIS" | "REMISE" | "CONTRIBUTION";
 export type SensMouvement = "DEBIT" | "CREDIT";
 export type TypeEvenement =
   | "MOUVEMENT_CREE"
@@ -42,6 +42,20 @@ export type TypeEvenement =
   | "COMPTE_BLOQUE"
   | "COMPTE_DEBLOQUE"
   | "COMPTE_TRANSFERE_AGENCE"
+  | "CAISSE_AGENT_SOLDE_CHANGE"
+  | "OPERATION_TERRAIN_CREATED"
+  | "OPERATION_TERRAIN_SUBMITTED"
+  | "OPERATION_TERRAIN_APPROVED"
+  | "OPERATION_TERRAIN_REJECTED"
+  | "OPERATION_TERRAIN_SETTLED"
+  | "SESSION_FORCE_CLOSED"
+  | "CAISSE_STATUS_CHANGED"
+  | "CAISSE_LIQUIDATED"
+  | "REMISE_CREATED"
+  | "REMISE_SETTLED"
+  | "REMISE_REJECTED"
+  | "ECART_APPROVAL_REQUEST"
+  | "ECART_APPROVAL_DECISION"
   | "GL_POSTING_FAILED"
   | "LIQUIDITY_CHANGED"
   | "GL_ENTRY_POSTED";
@@ -106,6 +120,8 @@ export function generateReference(sourceModule: SourceModule | "TIC" | "EVC" | "
     EVC: "EVC",
     SAL: "SAL",
     FRAIS: "FRA",
+    REMISE: "REM",
+    CONTRIBUTION: "CTB",
   };
   
   return `${prefixes[sourceModule]}-${year}${month}${day}-${time}${random}`;

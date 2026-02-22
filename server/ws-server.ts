@@ -172,7 +172,12 @@ export type GlobalMessage = {
     // =============================================
     // MIGRATION D'AGENCE
     // =============================================
-    | "MIGRATION_PROGRESS" | "MIGRATION_STATUS";
+    | "MIGRATION_PROGRESS" | "MIGRATION_STATUS"
+
+    // =============================================
+    // ÉCARTS DE CAISSE — APPROBATION
+    // =============================================
+    | "ECART_APPROVAL_REQUEST" | "ECART_APPROVAL_DECISION";
 
   payload: any;
 };

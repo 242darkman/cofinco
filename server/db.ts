@@ -225,6 +225,21 @@ export async function ensureCustomFunctions(): Promise<void> {
     console.log('[DB] ✓ update_updated_at_column()');
     objectCount++;
 
+    // --- ENUM EXTENSIONS (idempotent) ---
+    // Add new audit action values for RBAC features 9-12
+    const newAuditActions = [
+      'MODULE_CREATE', 'MODULE_UPDATE', 'MODULE_DELETE',
+      'PERMISSION_CREATE', 'PERMISSION_UPDATE', 'PERMISSION_DELETE',
+      'REVERT', 'REQUEST_APPROVED', 'REQUEST_REJECTED',
+    ];
+    for (const val of newAuditActions) {
+      try {
+        await db.execute(sql.raw(`ALTER TYPE rbac_audit_action ADD VALUE IF NOT EXISTS '${val}'`));
+      } catch (_) { /* already exists */ }
+    }
+    console.log('[DB] ✓ rbac_audit_action enum extended');
+    objectCount++;
+
     // --- DATA MIGRATIONS ---
 
     // Backfill total_du for existing credits (one-time, idempotent)

@@ -10,7 +10,7 @@
  */
 
 import { db } from '../db';
-import { eq, and, desc, asc, inArray, sql, isNull } from 'drizzle-orm';
+import { eq, and, desc, asc, inArray, sql, isNull, ne } from 'drizzle-orm';
 import {
   modules,
   permissions,
@@ -18,6 +18,7 @@ import {
   userPermissions,
   userRoles,
   users,
+  temporaryPermissions,
 } from '@shared/schema';
 import { SystemRole } from '@shared/types/roles';
 import {
@@ -31,6 +32,7 @@ import {
   type UserPermissionOverrides,
   type RbacUpdatePayload,
 } from '@shared/ability';
+import { getInheritedRoles } from '../authorization/ability';
 
 // ============================================
 // VERSION MANAGEMENT
@@ -152,10 +154,10 @@ export async function getPermissionCatalog(): Promise<{
 // ============================================
 
 /**
- * Get permissions for a specific role
+ * Get permissions for a specific role, including inherited permissions from child roles.
  */
 export async function getRolePermissions(role: SystemRole): Promise<RolePermissionsSummary> {
-  // Get all permissions with their role_permission status for this role
+  // Get direct permissions for this role
   const permissionRows = await db
     .select({
       permissionId: permissions.id,
@@ -173,12 +175,53 @@ export async function getRolePermissions(role: SystemRole): Promise<RolePermissi
     )
     .orderBy(asc(permissions.code));
 
-  const permissionsList = permissionRows.map((p) => ({
-    permissionId: p.permissionId,
-    code: p.code,
-    granted: p.rolePermissionId ? (p.granted ?? true) : false,
-    isDefault: p.rolePermissionId !== null,
-  }));
+  // Build direct permissions map
+  const directPerms = new Map<string, boolean>();
+  for (const p of permissionRows) {
+    if (p.rolePermissionId && (p.granted ?? true)) {
+      directPerms.set(p.permissionId, true);
+    }
+  }
+
+  // Get inherited roles via hierarchy
+  const inheritedRoleNames = await getInheritedRoles(role);
+
+  // Get inherited permissions from child roles
+  const inheritedPerms = new Map<string, string>(); // permissionId → inheritedFrom role
+  if (inheritedRoleNames.length > 0) {
+    const inheritedRows = await db
+      .select({
+        permissionId: rolePermissions.permissionId,
+        role: rolePermissions.role,
+        granted: rolePermissions.granted,
+      })
+      .from(rolePermissions)
+      .where(and(
+        inArray(rolePermissions.role, inheritedRoleNames),
+        eq(rolePermissions.granted, true)
+      ));
+
+    for (const row of inheritedRows) {
+      // Only mark as inherited if not directly granted by this role
+      if (!directPerms.has(row.permissionId) && !inheritedPerms.has(row.permissionId)) {
+        inheritedPerms.set(row.permissionId, row.role);
+      }
+    }
+  }
+
+  const permissionsList = permissionRows.map((p) => {
+    const isDirectlyGranted = p.rolePermissionId ? (p.granted ?? true) : false;
+    const inheritedFrom = inheritedPerms.get(p.permissionId);
+    const isInherited = !!inheritedFrom;
+
+    return {
+      permissionId: p.permissionId,
+      code: p.code,
+      granted: isDirectlyGranted || isInherited,
+      isDefault: p.rolePermissionId !== null,
+      ...(isInherited && !isDirectlyGranted && { inherited: true, inheritedFrom }),
+    };
+  });
 
   const totalGranted = permissionsList.filter((p) => p.granted).length;
 
@@ -186,6 +229,7 @@ export async function getRolePermissions(role: SystemRole): Promise<RolePermissi
     role,
     roleLabel: getRoleLabel(role),
     totalPermissions: totalGranted,
+    inheritedRoles: inheritedRoleNames.length > 0 ? inheritedRoleNames : undefined,
     permissions: permissionsList,
   };
 }
@@ -196,7 +240,8 @@ export async function getRolePermissions(role: SystemRole): Promise<RolePermissi
 export async function toggleRolePermission(
   role: SystemRole,
   permissionId: string,
-  granted: boolean
+  granted: boolean,
+  conditions?: Record<string, any> | null
 ): Promise<{ success: boolean; newVersion: number }> {
   // Check if permission exists
   const [permission] = await db
@@ -218,10 +263,10 @@ export async function toggleRolePermission(
 
   if (existing) {
     if (granted) {
-      // Update to granted
+      // Update to granted (with optional conditions)
       await db
         .update(rolePermissions)
-        .set({ granted: true, updatedAt: new Date() })
+        .set({ granted: true, updatedAt: new Date(), ...(conditions !== undefined && { conditions }) })
         .where(eq(rolePermissions.id, existing.id));
     } else {
       // Remove the role permission entirely (no permission = not granted)
@@ -233,6 +278,7 @@ export async function toggleRolePermission(
       role,
       permissionId,
       granted: true,
+      ...(conditions && { conditions }),
     });
   }
   // If not granted and doesn't exist, nothing to do
@@ -350,7 +396,8 @@ export async function getUserPermissionOverrides(
 export async function toggleUserPermissionOverride(
   userId: string,
   permissionId: string,
-  granted: boolean | null // null = remove override (inherit from role)
+  granted: boolean | null, // null = remove override (inherit from role)
+  conditions?: Record<string, any> | null
 ): Promise<{ success: boolean; newVersion: number }> {
   // Check if permission exists
   const [permission] = await db
@@ -385,7 +432,7 @@ export async function toggleUserPermissionOverride(
     // Update existing override
     await db
       .update(userPermissions)
-      .set({ granted, updatedAt: new Date() })
+      .set({ granted, updatedAt: new Date(), ...(conditions !== undefined && { conditions }) })
       .where(eq(userPermissions.id, existing.id));
   } else {
     // Insert new override
@@ -393,6 +440,7 @@ export async function toggleUserPermissionOverride(
       userId,
       permissionId,
       granted,
+      ...(conditions && { conditions }),
     });
   }
 
@@ -574,4 +622,385 @@ export async function isUserAdmin(userId: string): Promise<boolean> {
     .where(and(eq(userRoles.userId, userId), eq(userRoles.role, SystemRole.ADMIN)));
 
   return !!adminRole;
+}
+
+// ============================================
+// PERMISSION CONFLICT DETECTION
+// ============================================
+
+export type ConflictType = 'DENY_OVERRIDE' | 'GRANT_OVERRIDE' | 'REDUNDANT_GRANT' | 'REDUNDANT_DENY';
+
+export interface PermissionConflict {
+  permissionId: string;
+  permissionCode: string;
+  permissionName: string;
+  roleGranted: boolean;
+  overrideGranted: boolean;
+  conflictType: ConflictType;
+  sourceRoles: string[];
+}
+
+/**
+ * Detect conflicts between a user's role permissions and their overrides.
+ * A conflict occurs when a user override contradicts or duplicates a role permission.
+ */
+export async function detectUserPermissionConflicts(
+  userId: string
+): Promise<{
+  conflicts: PermissionConflict[];
+  summary: { total: number; denyOverrides: number; grantOverrides: number; redundant: number };
+}> {
+  // 1. Get user's roles (expanded with hierarchy)
+  const userRoleRows = await db
+    .select({ role: userRoles.role })
+    .from(userRoles)
+    .where(eq(userRoles.userId, userId));
+
+  const roleCodes = userRoleRows.map(r => r.role);
+  if (roleCodes.length === 0) {
+    return { conflicts: [], summary: { total: 0, denyOverrides: 0, grantOverrides: 0, redundant: 0 } };
+  }
+
+  const { expandRolesWithHierarchy } = await import('../authorization/ability');
+  const expandedRoles = await expandRolesWithHierarchy(roleCodes);
+
+  // 2. Get all role permissions (granted) for these roles
+  const rolePerms = await db
+    .select({
+      permissionId: rolePermissions.permissionId,
+      role: rolePermissions.role,
+      granted: rolePermissions.granted,
+    })
+    .from(rolePermissions)
+    .where(inArray(rolePermissions.role, expandedRoles));
+
+  // Build a map: permissionId -> { granted, sourceRoles[] }
+  const rolePermMap = new Map<string, { granted: boolean; sourceRoles: string[] }>();
+  for (const rp of rolePerms) {
+    const existing = rolePermMap.get(rp.permissionId);
+    if (existing) {
+      // Any role granting => granted
+      if (rp.granted) existing.granted = true;
+      existing.sourceRoles.push(rp.role);
+    } else {
+      rolePermMap.set(rp.permissionId, {
+        granted: rp.granted,
+        sourceRoles: [rp.role],
+      });
+    }
+  }
+
+  // 3. Get user overrides
+  const overrides = await db
+    .select({
+      permissionId: userPermissions.permissionId,
+      granted: userPermissions.granted,
+    })
+    .from(userPermissions)
+    .where(eq(userPermissions.userId, userId));
+
+  if (overrides.length === 0) {
+    return { conflicts: [], summary: { total: 0, denyOverrides: 0, grantOverrides: 0, redundant: 0 } };
+  }
+
+  // 4. Get permission details for all overridden permissions
+  const overridePermIds = overrides.map(o => o.permissionId);
+  const permDetails = await db
+    .select({ id: permissions.id, code: permissions.code, name: permissions.name })
+    .from(permissions)
+    .where(inArray(permissions.id, overridePermIds));
+
+  const permMap = new Map(permDetails.map(p => [p.id, p]));
+
+  // 5. Compare overrides against role permissions
+  const conflicts: PermissionConflict[] = [];
+  for (const override of overrides) {
+    const perm = permMap.get(override.permissionId);
+    if (!perm) continue;
+
+    const rolePerm = rolePermMap.get(override.permissionId);
+    const roleGranted = rolePerm?.granted ?? false;
+
+    let conflictType: ConflictType;
+    if (roleGranted && !override.granted) {
+      conflictType = 'DENY_OVERRIDE';
+    } else if (!roleGranted && override.granted) {
+      conflictType = 'GRANT_OVERRIDE';
+    } else if (roleGranted && override.granted) {
+      conflictType = 'REDUNDANT_GRANT';
+    } else {
+      conflictType = 'REDUNDANT_DENY';
+    }
+
+    conflicts.push({
+      permissionId: override.permissionId,
+      permissionCode: perm.code,
+      permissionName: perm.name,
+      roleGranted,
+      overrideGranted: override.granted,
+      conflictType,
+      sourceRoles: rolePerm?.sourceRoles || [],
+    });
+  }
+
+  const summary = {
+    total: conflicts.length,
+    denyOverrides: conflicts.filter(c => c.conflictType === 'DENY_OVERRIDE').length,
+    grantOverrides: conflicts.filter(c => c.conflictType === 'GRANT_OVERRIDE').length,
+    redundant: conflicts.filter(c => c.conflictType === 'REDUNDANT_GRANT' || c.conflictType === 'REDUNDANT_DENY').length,
+  };
+
+  return { conflicts, summary };
+}
+
+// ============================================
+// PERMISSION SIMULATION
+// ============================================
+
+export interface SimulatedPermission {
+  id: string;
+  code: string;
+  name: string;
+  granted: boolean;
+  source: 'ROLE' | 'TEMPORARY' | 'OVERRIDE_GLOBAL' | 'OVERRIDE_AGENCE' | 'ADMIN' | 'NONE';
+  sourceRole?: string;
+  expiresAt?: string | null;
+}
+
+export interface SimulatedModule {
+  id: string;
+  name: string;
+  category: string;
+  icon: string | null;
+  permissions: SimulatedPermission[];
+}
+
+export interface SimulationResult {
+  user: { id: string; nom: string; prenom: string | null };
+  roles: string[];
+  isAdmin: boolean;
+  summary: {
+    total: number;
+    granted: number;
+    denied: number;
+    bySource: { role: number; override: number; temporary: number };
+  };
+  modules: SimulatedModule[];
+}
+
+/**
+ * Simulate permissions for a user — read-only preview of effective permissions grouped by module
+ */
+export async function simulateUserPermissions(
+  userId: string,
+  agenceId?: string
+): Promise<SimulationResult> {
+  const { buildAbilityForUser } = await import('../authorization/ability');
+  const { getEffectivePermissionsWithSource } = await import('./rbac-audit-service');
+
+  // Get user info
+  const [user] = await db
+    .select({ id: users.id, nom: users.nom, prenom: users.prenom })
+    .from(users)
+    .where(eq(users.id, userId));
+
+  if (!user) throw new Error('Utilisateur non trouvé');
+
+  // Get ability info (roles, isAdmin)
+  const ability = await buildAbilityForUser({ userId, agenceIdActive: agenceId });
+
+  // Get effective permissions with source
+  const effective = await getEffectivePermissionsWithSource(userId, agenceId);
+  const effectiveMap = new Map(effective.map(e => [e.permissionCode, e]));
+
+  // Get temporary permissions for expiry info
+  const tempPerms = await db
+    .select({
+      permissionId: temporaryPermissions.permissionId,
+      expiresAt: temporaryPermissions.expiresAt,
+    })
+    .from(temporaryPermissions)
+    .where(and(
+      eq(temporaryPermissions.userId, userId),
+      eq(temporaryPermissions.isActive, true),
+    ));
+  const tempMap = new Map(tempPerms.map(t => [t.permissionId, t.expiresAt]));
+
+  // Get full catalog
+  const catalog = await getPermissionCatalog();
+
+  // Build simulation grouped by module
+  const simulatedModules: SimulatedModule[] = catalog.modules.map(mod => {
+    const modulePerms = catalog.permissions.filter(p => p.moduleId === mod.id);
+    const simPerms: SimulatedPermission[] = modulePerms.map(p => {
+      const eff = effectiveMap.get(p.code);
+      const tempExpiry = tempMap.get(p.id);
+      return {
+        id: p.id,
+        code: p.code,
+        name: p.name,
+        granted: eff?.granted ?? false,
+        source: eff?.source ?? 'NONE',
+        sourceRole: eff?.sourceRole || undefined,
+        expiresAt: tempExpiry ? tempExpiry.toISOString() : null,
+      };
+    });
+    return {
+      id: mod.id,
+      name: mod.name,
+      category: mod.category,
+      icon: mod.icon,
+      permissions: simPerms,
+    };
+  });
+
+  // Summary
+  const allPerms = simulatedModules.flatMap(m => m.permissions);
+  const granted = allPerms.filter(p => p.granted).length;
+  const summary = {
+    total: allPerms.length,
+    granted,
+    denied: allPerms.length - granted,
+    bySource: {
+      role: allPerms.filter(p => p.source === 'ROLE').length,
+      override: allPerms.filter(p => p.source === 'OVERRIDE_GLOBAL' || p.source === 'OVERRIDE_AGENCE').length,
+      temporary: allPerms.filter(p => p.source === 'TEMPORARY').length,
+    },
+  };
+
+  return {
+    user: { id: user.id, nom: user.nom, prenom: user.prenom },
+    roles: ability.roles || [ability.role],
+    isAdmin: ability.isAdmin,
+    summary,
+    modules: simulatedModules,
+  };
+}
+
+// ============================================
+// MODULE / PERMISSION CRUD
+// ============================================
+
+/**
+ * Create a new module
+ */
+export async function createModule(data: {
+  name: string;
+  description?: string;
+  icon?: string;
+  category: string;
+  isActive?: boolean;
+  orderIndex?: number;
+}) {
+  const [created] = await db
+    .insert(modules)
+    .values({
+      name: data.name,
+      description: data.description || null,
+      icon: data.icon || 'Shield',
+      category: data.category,
+      isActive: data.isActive ?? true,
+      orderIndex: data.orderIndex ?? 0,
+    })
+    .returning();
+  return created;
+}
+
+/**
+ * Update a module
+ */
+export async function updateModule(id: string, data: Partial<{
+  name: string;
+  description: string | null;
+  icon: string;
+  category: string;
+  isActive: boolean;
+  orderIndex: number;
+}>) {
+  const [updated] = await db
+    .update(modules)
+    .set(data)
+    .where(eq(modules.id, id))
+    .returning();
+  return updated;
+}
+
+/**
+ * Delete a module — refuses if it has permissions with active assignments
+ */
+export async function deleteModule(id: string): Promise<{ success: boolean; error?: string }> {
+  // Check for active assignments on the module's permissions
+  const assignmentCount = await db.execute<{ cnt: string }>(sql`
+    SELECT (
+      (SELECT COUNT(*) FROM role_permissions WHERE permission_id IN (SELECT id FROM permissions WHERE module_id = ${id}))
+      +
+      (SELECT COUNT(*) FROM user_permissions WHERE permission_id IN (SELECT id FROM permissions WHERE module_id = ${id}))
+    ) as cnt
+  `);
+  const cnt = parseInt(assignmentCount.rows[0]?.cnt || '0', 10);
+  if (cnt > 0) {
+    return { success: false, error: `Ce module a ${cnt} assignation(s) active(s). Supprimez-les d'abord.` };
+  }
+
+  await db.delete(modules).where(eq(modules.id, id));
+  return { success: true };
+}
+
+/**
+ * Create a new permission
+ */
+export async function createPermission(data: {
+  moduleId: string;
+  name: string;
+  code: string;
+  description?: string;
+}) {
+  const [created] = await db
+    .insert(permissions)
+    .values({
+      moduleId: data.moduleId,
+      name: data.name,
+      code: data.code,
+      description: data.description || null,
+    })
+    .returning();
+  return created;
+}
+
+/**
+ * Update a permission
+ */
+export async function updatePermission(id: string, data: Partial<{
+  name: string;
+  code: string;
+  description: string | null;
+}>) {
+  const [updated] = await db
+    .update(permissions)
+    .set(data)
+    .where(eq(permissions.id, id))
+    .returning();
+  return updated;
+}
+
+/**
+ * Delete a permission — refuses if it has active role/user assignments
+ */
+export async function deletePermission(id: string): Promise<{ success: boolean; error?: string }> {
+  const assignmentCount = await db.execute<{ cnt: string }>(sql`
+    SELECT (
+      (SELECT COUNT(*) FROM role_permissions WHERE permission_id = ${id})
+      +
+      (SELECT COUNT(*) FROM user_permissions WHERE permission_id = ${id})
+      +
+      (SELECT COUNT(*) FROM temporary_permissions WHERE permission_id = ${id} AND is_active = true)
+    ) as cnt
+  `);
+  const cnt = parseInt(assignmentCount.rows[0]?.cnt || '0', 10);
+  if (cnt > 0) {
+    return { success: false, error: `Cette permission a ${cnt} assignation(s) active(s). Supprimez-les d'abord.` };
+  }
+
+  await db.delete(permissions).where(eq(permissions.id, id));
+  return { success: true };
 }

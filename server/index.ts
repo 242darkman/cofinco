@@ -48,6 +48,9 @@ import { startAutoLiftSuspensionCron } from "./cron/auto-lift-suspension";
 import { startInterestAccrualCron } from "./cron/interest-accrual";
 import { startHrAlertsGeneratorCron } from "./cron/hr-alerts-generator";
 import { startTontineAutoPenaltiesCron } from "./cron/tontine-auto-penalties";
+import { startProvisionCron } from "./cron/provision-scheduler";
+import { startAmortissementCron } from "./cron/amortissement-scheduler";
+import { startCobacReportingCron } from "./cron/cobac-reporting-scheduler";
 import { StorageService } from "./services/storage-service";
 
 const app = express();
@@ -389,6 +392,18 @@ app.get("/api/health", async (_req, res) => {
     // Start Interest Accrual Cron (SYSCOHADA art. 46 — D 2718 / C 7071 monthly)
     startInterestAccrualCron();
     logger.info('Interest accrual cron started (1st of month at 02:00)');
+
+    // Start Provision Cron (COBAC — D691/C2917 monthly, 1st of month)
+    startProvisionCron();
+    logger.info('Provision calculation cron started (1st of month)');
+
+    // Start Amortissement Cron (SYSCOHADA — D681/C28x monthly, 2nd of month)
+    startAmortissementCron();
+    logger.info('Amortissement cron started (2nd of month)');
+
+    // Start COBAC Reporting Cron (prudential ratios — 3rd of month at 03:00)
+    startCobacReportingCron();
+    logger.info('COBAC reporting cron started (3rd of month)');
 
     // Start Score Recalculation Cron (weekly — keeps tenure-based scores fresh)
     startScoreRecalculationCron();

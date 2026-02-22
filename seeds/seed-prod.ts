@@ -66,13 +66,15 @@ import {
   permissionConditionTemplates,
   systemFeatureFlags,
   criticalPermissionPatterns,
+  roleHierarchy,
   rbacVersions,
   tontinePlans,
 } from '@shared/schema';
 import { pays } from '@shared/schema/pays';
 import { seedRegions, migrateCongoDeptsToRegions, seedDepartementsADM2, cleanupLegacyDepts, loadGeonamesStaging, enrichFromStaging } from './seed-geography-world';
 import { departments, jobPositions, employes, payrollConfig, conventionsCollectives, qualificationCoefficients, chargeDefinitions, rubriqueDefinitions, payrollGlMapping, irppBaremes, evaluationTemplates, evaluationCriteria, hrAlertConfig } from '@shared/schema';
-import { accountingRules } from '@shared/schema/accounting';
+import { accountingRules, baremeProvisions, cobacSeuils } from '@shared/schema/accounting';
+import { centresCouts, lignesProduits } from '@shared/schema/analytique';
 import { caissesAgent } from '@shared/schema/caisse-agent';
 import { agentsTerrain } from '@shared/schema/operations';
 
@@ -215,6 +217,10 @@ const PLAN_COMPTABLE_DATA = [
   { num: '2718', label: 'Intérêts courus sur prêts', classe: 2, type: 'Actif', sens: 'Débit', isSystem: true },
   { num: '2917', label: 'Provisions pour dépréciation des prêts', classe: 2, type: 'Actif', sens: 'Crédit', isSystem: true },
   { num: '28', label: 'Amortissements', classe: 2, type: 'Actif', sens: 'Crédit', isSystem: true },
+  { num: '281', label: 'Amortissements des immobilisations incorporelles', classe: 2, type: 'Actif', sens: 'Crédit', isSystem: true },
+  { num: '282', label: 'Amortissements des terrains', classe: 2, type: 'Actif', sens: 'Crédit', isSystem: true },
+  { num: '283', label: 'Amortissements des bâtiments', classe: 2, type: 'Actif', sens: 'Crédit', isSystem: true },
+  { num: '284', label: 'Amortissements du matériel', classe: 2, type: 'Actif', sens: 'Crédit', isSystem: true },
 
   // Classe 3: Stocks
   { num: '31', label: 'Marchandises', classe: 3, type: 'Actif', sens: 'Débit', isSystem: true },
@@ -313,6 +319,22 @@ const PLAN_COMPTABLE_DATA = [
   { num: '772', label: 'Produits sur transit', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
   { num: '76', label: 'Produits financiers', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
   { num: '79', label: 'Reprises provisions', classe: 7, type: 'Produit', sens: 'Crédit', isSystem: true },
+  // Classe 8: Comptes spéciaux / Engagements hors bilan
+  { num: '81', label: 'Engagements donnés', classe: 8, type: 'Actif', sens: 'Débit', isSystem: true },
+  { num: '811', label: 'Avals et cautions donnés', classe: 8, type: 'Actif', sens: 'Débit', isSystem: true },
+  { num: '812', label: 'Crédits non décaissés', classe: 8, type: 'Actif', sens: 'Débit', isSystem: true },
+  { num: '813', label: 'Engagements de crédit irrévocables', classe: 8, type: 'Actif', sens: 'Débit', isSystem: true },
+  { num: '82', label: 'Engagements reçus', classe: 8, type: 'Passif', sens: 'Crédit', isSystem: true },
+  { num: '821', label: 'Avals et cautions reçus', classe: 8, type: 'Passif', sens: 'Crédit', isSystem: true },
+  { num: '822', label: 'Sûretés réelles reçues', classe: 8, type: 'Passif', sens: 'Crédit', isSystem: true },
+  { num: '823', label: 'Garanties personnelles reçues', classe: 8, type: 'Passif', sens: 'Crédit', isSystem: true },
+  // Classe 9: Comptabilité analytique
+  { num: '90', label: 'Comptes de liaison analytique', classe: 9, type: 'Actif', sens: 'Débit', isSystem: true },
+  { num: '91', label: 'Charges par nature réfléchies', classe: 9, type: 'Charge', sens: 'Débit', isSystem: true },
+  { num: '92', label: 'Charges par centre de coût', classe: 9, type: 'Charge', sens: 'Débit', isSystem: true },
+  { num: '93', label: 'Produits par ligne de produit', classe: 9, type: 'Produit', sens: 'Crédit', isSystem: true },
+  { num: '97', label: 'Écarts sur coûts préétablis', classe: 9, type: 'Charge', sens: 'Débit', isSystem: true },
+  { num: '98', label: 'Résultats analytiques', classe: 9, type: 'Produit', sens: 'Crédit', isSystem: true },
 ];
 
 const JOURNAUX_DATA = [
@@ -2254,6 +2276,50 @@ const ACCOUNTING_RULES_DATA = [
   },
 ];
 
+// Barème COBAC de provisionnement des créances douteuses
+const BAREME_PROVISIONS_DATA = [
+  { joursRetardMin: 0, joursRetardMax: 30, tauxProvision: '0', categorie: 'SAIN' },
+  { joursRetardMin: 31, joursRetardMax: 90, tauxProvision: '25', categorie: 'PRE_DOUTEUX' },
+  { joursRetardMin: 91, joursRetardMax: 180, tauxProvision: '50', categorie: 'DOUTEUX' },
+  { joursRetardMin: 181, joursRetardMax: null, tauxProvision: '100', categorie: 'COMPROMIS' },
+];
+
+// Seuils réglementaires COBAC
+const COBAC_SEUILS_DATA = [
+  { ratioCode: 'ROE', libelle: 'Return on Equity', seuilMinimum: '5', seuilWarning: '8' },
+  { ratioCode: 'ROA', libelle: 'Return on Assets', seuilMinimum: '1', seuilWarning: '2' },
+  { ratioCode: 'SOLVABILITE', libelle: 'Ratio de solvabilité (fonds propres / encours pondéré)', seuilMinimum: '8', seuilWarning: '10' },
+  { ratioCode: 'LIQUIDITE', libelle: 'Ratio de liquidité (actifs liquides / passifs CT)', seuilMinimum: '100', seuilWarning: '120' },
+  { ratioCode: 'COEFF_EXPLOITATION', libelle: 'Coefficient d\'exploitation (charges / PNB)', seuilMaximum: '70', seuilWarning: '60' },
+  { ratioCode: 'PAR30', libelle: 'Portfolio at Risk > 30 jours', seuilMaximum: '10', seuilWarning: '5' },
+  { ratioCode: 'PAR60', libelle: 'Portfolio at Risk > 60 jours', seuilMaximum: '7', seuilWarning: '4' },
+  { ratioCode: 'PAR90', libelle: 'Portfolio at Risk > 90 jours', seuilMaximum: '5', seuilWarning: '3' },
+];
+
+// Centres de coûts par défaut
+const CENTRES_COUTS_DATA = [
+  { code: 'DG', intitule: 'Direction Générale', typeCenter: 'COST' },
+  { code: 'CREDIT', intitule: 'Service Crédit', typeCenter: 'PROFIT' },
+  { code: 'EPARGNE', intitule: 'Service Épargne', typeCenter: 'PROFIT' },
+  { code: 'CAISSE', intitule: 'Service Caisse', typeCenter: 'COST' },
+  { code: 'COMPTA', intitule: 'Service Comptabilité', typeCenter: 'COST' },
+  { code: 'IT', intitule: 'Service Informatique', typeCenter: 'COST' },
+  { code: 'RH', intitule: 'Ressources Humaines', typeCenter: 'COST' },
+  { code: 'TERRAIN', intitule: 'Agents Terrain', typeCenter: 'PROFIT' },
+];
+
+// Lignes de produits par défaut
+const LIGNES_PRODUITS_DATA = [
+  { code: 'CREDIT_GRP', intitule: 'Crédits Groupe', categorie: 'CREDIT' },
+  { code: 'CREDIT_IND', intitule: 'Crédits Individuels', categorie: 'CREDIT' },
+  { code: 'CREDIT_PME', intitule: 'Crédits PME', categorie: 'CREDIT' },
+  { code: 'EPARGNE_VUE', intitule: 'Épargne à vue', categorie: 'EPARGNE' },
+  { code: 'EPARGNE_TERME', intitule: 'Épargne à terme', categorie: 'EPARGNE' },
+  { code: 'TONTINES', intitule: 'Tontines', categorie: 'EPARGNE' },
+  { code: 'TRANSFERTS', intitule: 'Transferts', categorie: 'SERVICES' },
+  { code: 'MOBILE_MONEY', intitule: 'Mobile Money', categorie: 'SERVICES' },
+];
+
 // ============================================================================
 // PREFLIGHT CHECK
 // ============================================================================
@@ -2839,6 +2905,31 @@ async function seedCoreSettings(context: SeedContext, dryRun: boolean): Promise<
   results.push({ table: 'criticalPermissionPatterns', action: 'created', count: patternsCreated, details: `${patternsCreated} new patterns (${criticalPatternsData.length} total)` });
   logger.info(`Critical permission patterns: ${patternsCreated} created`);
 
+  // Role Hierarchy — permission inheritance between roles
+  const hierarchyData = [
+    { parentRole: 'ADMIN', childRole: 'CHEF_AGENCE' },
+    { parentRole: 'CHEF_AGENCE', childRole: 'SUPERVISEUR' },
+    { parentRole: 'CHEF_AGENCE', childRole: 'COMPTABLE' },
+    { parentRole: 'CHEF_AGENCE', childRole: 'GESTIONNAIRE_CREDIT' },
+    { parentRole: 'CHEF_AGENCE', childRole: 'CAISSIER' },
+    { parentRole: 'SUPERVISEUR', childRole: 'AGENT_TERRAIN' },
+  ];
+
+  let hierarchyCreated = 0;
+  for (const rel of hierarchyData) {
+    const [existing] = await db.select().from(roleHierarchy)
+      .where(and(
+        eq(roleHierarchy.parentRole, rel.parentRole),
+        eq(roleHierarchy.childRole, rel.childRole)
+      ));
+    if (!existing && !dryRun) {
+      await db.insert(roleHierarchy).values(rel);
+      hierarchyCreated++;
+    }
+  }
+  results.push({ table: 'roleHierarchy', action: 'created', count: hierarchyCreated, details: `${hierarchyCreated} new relations (${hierarchyData.length} total)` });
+  logger.info(`Role hierarchy: ${hierarchyCreated} created`);
+
   // RBAC Versions — initial row for cache invalidation
   const [existingRbacVersion] = await db.select().from(rbacVersions).where(eq(rbacVersions.id, 'global'));
   if (!existingRbacVersion && !dryRun) {
@@ -3237,6 +3328,9 @@ async function seedAccountingBootstrap(context: SeedContext, dryRun: boolean): P
     return [
       { table: 'planComptable', action: 'skipped', count: PLAN_COMPTABLE_DATA.length, details: 'dry-run' },
       { table: 'accountingRules', action: 'skipped', count: ACCOUNTING_RULES_DATA.length, details: 'dry-run' },
+      { table: 'cobacSeuils', action: 'skipped', count: COBAC_SEUILS_DATA.length, details: 'dry-run' },
+      { table: 'centresCouts', action: 'skipped', count: CENTRES_COUTS_DATA.length, details: 'dry-run' },
+      { table: 'lignesProduits', action: 'skipped', count: LIGNES_PRODUITS_DATA.length, details: 'dry-run' },
     ];
   }
 
@@ -3310,6 +3404,50 @@ async function seedAccountingBootstrap(context: SeedContext, dryRun: boolean): P
     }
   }
   results.push({ table: 'accountingRules', action: 'created', count: rulesCreated, details: `${rulesCreated} new, ${rulesUpdated} updated (${ACCOUNTING_RULES_DATA.length} total)` });
+
+  // Barème Provisions COBAC - upsert by categorie
+  let baremeCreated = 0;
+  for (const b of BAREME_PROVISIONS_DATA) {
+    const [existing] = await db.select().from(baremeProvisions).where(eq(baremeProvisions.categorie, b.categorie));
+    if (!existing) {
+      await db.insert(baremeProvisions).values(b);
+      baremeCreated++;
+    }
+  }
+  results.push({ table: 'baremeProvisions', action: 'created', count: baremeCreated, details: `${baremeCreated} new (${BAREME_PROVISIONS_DATA.length} total)` });
+
+  // Seuils COBAC - upsert by ratioCode
+  let seuilsCreated = 0;
+  for (const s of COBAC_SEUILS_DATA) {
+    const [existing] = await db.select().from(cobacSeuils).where(eq(cobacSeuils.ratioCode, s.ratioCode));
+    if (!existing) {
+      await db.insert(cobacSeuils).values(s);
+      seuilsCreated++;
+    }
+  }
+  results.push({ table: 'cobacSeuils', action: 'created', count: seuilsCreated, details: `${seuilsCreated} new (${COBAC_SEUILS_DATA.length} total)` });
+
+  // Centres de coûts - upsert by code (global, no agenceId)
+  let centresCreated = 0;
+  for (const c of CENTRES_COUTS_DATA) {
+    const [existing] = await db.select().from(centresCouts).where(and(eq(centresCouts.code, c.code), sql`${centresCouts.agenceId} IS NULL`));
+    if (!existing) {
+      await db.insert(centresCouts).values(c);
+      centresCreated++;
+    }
+  }
+  results.push({ table: 'centresCouts', action: 'created', count: centresCreated, details: `${centresCreated} new (${CENTRES_COUTS_DATA.length} total)` });
+
+  // Lignes de produits - upsert by code (global, no agenceId)
+  let produitsCreated = 0;
+  for (const p of LIGNES_PRODUITS_DATA) {
+    const [existing] = await db.select().from(lignesProduits).where(and(eq(lignesProduits.code, p.code), sql`${lignesProduits.agenceId} IS NULL`));
+    if (!existing) {
+      await db.insert(lignesProduits).values(p);
+      produitsCreated++;
+    }
+  }
+  results.push({ table: 'lignesProduits', action: 'created', count: produitsCreated, details: `${produitsCreated} new (${LIGNES_PRODUITS_DATA.length} total)` });
 
   return results;
 }
