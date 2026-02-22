@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { ArrowUpRight, ArrowDownLeft, Wallet, Clock, User, CreditCard, Filter, UserCircle } from 'lucide-react';
 import { Card, ResponsiveTable } from '@/components/ui';
 import { CaisseTransaction, SessionCaisse } from '@/types/finance';
+import { formatMoney } from '@shared/config/currency';
 
 interface CashJournalProps {
   sessions: SessionCaisse[];
@@ -85,7 +86,9 @@ export function CashJournal({
       for (const tx of sessionTransactions) {
         const montant = Number(tx.montant);
         const typeOp = tx.typeOperation || '';
-        const isEntree = isEntreeOperation(typeOp);
+        const isReversal = tx.description?.startsWith('[ANNULATION]') || false;
+        // Une annulation inverse le sens : annuler un dépôt = sortie, annuler un retrait = entrée
+        const isEntree = isReversal ? !isEntreeOperation(typeOp) : isEntreeOperation(typeOp);
 
         if (isEntree) {
           soldeProgressif += montant;
@@ -247,9 +250,9 @@ export function CashJournal({
           align: 'right' as const,
           format: (_: any, entry: JournalEntry) => (
              entry.sens === 'ENTREE' ? (
-                <span className="text-status-success font-bold font-mono">+{entry.montant.toLocaleString('fr-FR')}</span>
+                <span className="text-status-success font-bold font-mono">+{formatMoney(entry.montant, { showCurrency: false })}</span>
              ) : entry.type === 'OUVERTURE' ? (
-                <span className="text-status-info font-medium font-mono">+{entry.montant.toLocaleString('fr-FR')}</span>
+                <span className="text-status-info font-medium font-mono">+{formatMoney(entry.montant, { showCurrency: false })}</span>
              ) : <span className="text-content-muted">—</span>
           ),
           hideOnMobile: true
@@ -260,7 +263,7 @@ export function CashJournal({
           align: 'right' as const,
           format: (_: any, entry: JournalEntry) => (
              entry.sens === 'SORTIE' ? (
-                <span className="text-status-danger font-bold font-mono">-{entry.montant.toLocaleString('fr-FR')}</span>
+                <span className="text-status-danger font-bold font-mono">-{formatMoney(entry.montant, { showCurrency: false })}</span>
              ) : <span className="text-content-muted">—</span>
           ),
           hideOnMobile: true
@@ -271,19 +274,19 @@ export function CashJournal({
             align: 'right' as const,
             format: (val: number, entry: JournalEntry) => (
                 <span className="text-content-primary font-bold font-mono bg-surface/50 px-2 py-1 rounded text-xs">
-                    {entry.soldeProgressif.toLocaleString('fr-FR')}
+                    {formatMoney(entry.soldeProgressif, { showCurrency: false })}
                 </span>
             ),
             mobileFormat: (val: number, entry: JournalEntry) => (
                 <div className="flex justify-between items-center mt-2 pt-2 border-t border-edge/50">
                     <div className="text-lg font-bold">
-                        {entry.sens === 'ENTREE' && <span className="text-status-success">+{entry.montant.toLocaleString('fr-FR')}</span>}
-                        {entry.sens === 'SORTIE' && <span className="text-status-danger">-{entry.montant.toLocaleString('fr-FR')}</span>}
-                        {entry.sens === 'NEUTRE' && <span className="text-status-info">{entry.montant.toLocaleString('fr-FR')}</span>}
+                        {entry.sens === 'ENTREE' && <span className="text-status-success">+{formatMoney(entry.montant, { showCurrency: false })}</span>}
+                        {entry.sens === 'SORTIE' && <span className="text-status-danger">-{formatMoney(entry.montant, { showCurrency: false })}</span>}
+                        {entry.sens === 'NEUTRE' && <span className="text-status-info">{formatMoney(entry.montant, { showCurrency: false })}</span>}
                     </div>
                     <div>
                          <span className="text-[10px] text-content-muted mr-2">Solde</span>
-                         <span className="text-content-primary font-mono font-bold">{entry.soldeProgressif.toLocaleString('fr-FR')}</span>
+                         <span className="text-content-primary font-mono font-bold">{formatMoney(entry.soldeProgressif, { showCurrency: false })}</span>
                     </div>
                 </div>
             )
@@ -309,14 +312,14 @@ export function CashJournal({
           <ArrowDownLeft size={14} className="text-status-success shrink-0" />
           <div className="min-w-0">
             <p className="text-[10px] text-status-success/70 font-medium">Entrées</p>
-            <p className="text-sm font-bold text-status-success truncate">+{totaux.entrees.toLocaleString('fr-FR')}</p>
+            <p className="text-sm font-bold text-status-success truncate">+{formatMoney(totaux.entrees)}</p>
           </div>
         </div>
         <div className="bg-status-danger/5 border border-status-danger/20 rounded-lg p-2 flex items-center gap-2">
           <ArrowUpRight size={14} className="text-status-danger shrink-0" />
           <div className="min-w-0">
             <p className="text-[10px] text-status-danger/70 font-medium">Sorties</p>
-            <p className="text-sm font-bold text-status-danger truncate">-{totaux.sorties.toLocaleString('fr-FR')}</p>
+            <p className="text-sm font-bold text-status-danger truncate">-{formatMoney(totaux.sorties)}</p>
           </div>
         </div>
         <div className="bg-status-info/5 border border-status-info/20 rounded-lg p-2 flex items-center gap-2">
