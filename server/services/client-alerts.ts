@@ -770,3 +770,145 @@ export async function getAlertsSummary(
     topClients,
   };
 }
+
+// ============================================================================
+// PAGINATED ALERT CLIENTS (AlertsDrawer)
+// ============================================================================
+
+export interface AlertClientEntry {
+  id: string;
+  nom: string;
+  prenom: string;
+  codeClient: string;
+  photoProfile: string | null;
+  flags: string[];
+  flagCount: number;
+  score: number;
+  severity: "critical" | "warning" | "info";
+}
+
+export interface AlertsSummaryPaginatedResponse {
+  clients: AlertClientEntry[];
+  total: number;
+  page: number;
+  perPage: number;
+  totalPages: number;
+}
+
+/**
+ * Paginated list of at-risk clients for the AlertsDrawer.
+ * Reuses the same indexed-column SQL logic as getAlertsSummary()
+ * but adds pagination, search, and severity filtering.
+ */
+export async function getAlertsSummaryPaginated(
+  agenceId?: string,
+  options?: {
+    page?: number;
+    perPage?: number;
+    search?: string;
+    severityFilter?: string;
+  }
+): Promise<AlertsSummaryPaginatedResponse> {
+  const page = options?.page ?? 1;
+  const perPage = options?.perPage ?? 20;
+  const offset = (page - 1) * perPage;
+  const search = options?.search?.trim();
+  const severityFilter = options?.severityFilter;
+
+  const agenceCondition = agenceId
+    ? sql`AND c.agence_id = ${agenceId}`
+    : sql``;
+
+  const searchCondition = search
+    ? sql`AND (c.nom ILIKE ${"%" + search + "%"} OR c.prenom ILIKE ${"%" + search + "%"} OR c.code_client ILIKE ${"%" + search + "%"})`
+    : sql``;
+
+  // Severity-based WHERE filtering
+  let severityCondition = sql``;
+  if (severityFilter === "critical") {
+    severityCondition = sql`AND (c.is_blacklisted = true OR c.risk_level IN ('HIGH', 'VERY_HIGH') OR c.kyc_status = 'EXPIRED' OR c.date_expiration_piece < NOW())`;
+  } else if (severityFilter === "warning") {
+    severityCondition = sql`AND (c.is_pep = true OR c.numero_piece IS NULL OR c.statut_verification_piece = 'REJECTED')`;
+  } else if (severityFilter === "info") {
+    severityCondition = sql`AND c.score < ${ALERT_THRESHOLDS.scoreDropThreshold}`;
+  }
+
+  const result = await db.execute(sql`
+    SELECT
+      c.id,
+      c.nom,
+      c.prenom,
+      c.code_client,
+      c.photo_profile,
+      c.score,
+      c.is_blacklisted,
+      c.is_pep,
+      c.risk_level,
+      c.kyc_status,
+      c.date_expiration_piece,
+      c.numero_piece,
+      c.statut_verification_piece,
+      COUNT(*) OVER() AS total_count
+    FROM clients c
+    WHERE c.statut != 'INACTIF'
+      ${agenceCondition}
+      ${searchCondition}
+      ${severityCondition}
+      AND (
+        c.is_blacklisted = true
+        OR c.is_pep = true
+        OR c.risk_level IN ('HIGH', 'VERY_HIGH')
+        OR c.kyc_status = 'EXPIRED'
+        OR c.date_expiration_piece < NOW()
+        OR c.numero_piece IS NULL
+        OR c.statut_verification_piece = 'REJECTED'
+        OR c.score < ${ALERT_THRESHOLDS.scoreDropThreshold}
+      )
+    ORDER BY
+      c.is_blacklisted DESC,
+      c.risk_level = 'VERY_HIGH' DESC,
+      c.risk_level = 'HIGH' DESC,
+      c.score ASC
+    LIMIT ${perPage}
+    OFFSET ${offset}
+  `);
+
+  const rows = (result as any).rows || result || [];
+  const total = rows.length > 0 ? Number((rows[0] as any).total_count) : 0;
+
+  const clients: AlertClientEntry[] = rows.map((row: any) => {
+    const flags: string[] = [];
+    if (row.is_blacklisted) flags.push("blacklisted");
+    if (row.is_pep) flags.push("pep");
+    if (row.risk_level === "HIGH" || row.risk_level === "VERY_HIGH") flags.push("high_risk");
+    if (row.kyc_status === "EXPIRED") flags.push("kyc_expired");
+    if (row.date_expiration_piece && new Date(row.date_expiration_piece) < new Date()) flags.push("id_expired");
+    if (!row.numero_piece || row.statut_verification_piece === "REJECTED") flags.push("id_missing");
+    if (Number(row.score ?? 50) < ALERT_THRESHOLDS.scoreDropThreshold) flags.push("low_score");
+
+    // Derive severity from flags
+    const hasCritical = flags.some(f => ["blacklisted", "high_risk", "kyc_expired", "id_expired"].includes(f));
+    const hasWarning = flags.some(f => ["pep", "id_missing"].includes(f));
+    const severity: "critical" | "warning" | "info" = hasCritical ? "critical" : hasWarning ? "warning" : "info";
+
+    return {
+      id: row.id,
+      nom: row.nom || "",
+      prenom: row.prenom || "",
+      codeClient: row.code_client || "",
+      photoProfile: row.photo_profile || null,
+      flags,
+      flagCount: flags.length,
+      score: Number(row.score ?? 50),
+      severity,
+    };
+  });
+
+  return {
+    clients,
+    total,
+    page,
+    perPage,
+    totalPages: Math.ceil(total / perPage),
+  };
+}

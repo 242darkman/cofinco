@@ -1,25 +1,21 @@
 
 import React, { useState, useEffect, Suspense, useRef, useCallback } from 'react';
 import {
-  Building2,
   Wifi,
   WifiOff,
   UserPlus,
   Wallet,
   Banknote,
   Users,
-  ChevronDown,
   AlertTriangle,
   CheckCircle2,
   Clock,
-  TrendingDown,
   TrendingUp,
   Activity,
-  ArrowUpRight,
   Database,
   BarChart3,
   ShieldAlert,
-  ChevronRight
+  Search,
 } from 'lucide-react';
 
 import { useQuery } from '@tanstack/react-query';
@@ -36,6 +32,7 @@ import { Actions, Subjects, type Action, type Subject } from '../../lib/casl';
 
 import AgencySelector from './AgencySelector';
 import AnalyticsGrid from './AnalyticsGrid';
+import { AlertsDrawer } from './AlertsDrawer';
 
 const ComparativeAnalytics = React.lazy(() => import('./ComparativeAnalytics'));
 
@@ -72,6 +69,8 @@ export default function Dashboard({
   const { isConnected } = useWebSocketContext();
   const { stats, loading, refresh } = useDashboardStats(userRole);
   const ability = useAbility();
+
+  const [alertsDrawerOpen, setAlertsDrawerOpen] = useState(false);
 
   // Treasury v2: Single Source of Truth depuis le Grand Livre (GL)
   const { data: encaisse, isLoading: encaisseLoading } = useEncaisse(selectedAgence?.id);
@@ -176,6 +175,14 @@ export default function Dashboard({
   // CORRECTION: Use backend calculated KPIs (Value-based PAR30)
   const par30 = stats?.global?.par30 ?? 0;
   const liquidityRatio = stats?.global?.liquidityRatio ?? 100;
+
+  // Total actionable items for "A Traiter" section
+  const upcomingPaymentsCount = stats?.widgets?.upcomingPayments?.length || 0;
+  const enquetesEnCours = stats?.enquetes?.enCours || 0;
+  const alertsTotal = pendingCredits + overdueInstallments
+    + (alertsSummary?.totalAtRisk || 0)
+    + upcomingPaymentsCount
+    + enquetesEnCours;
 
   // -- Render Helpers --
 
@@ -357,77 +364,142 @@ export default function Dashboard({
         >
 
           {/* Section: À Traiter */}
-          <section className="space-y-2" aria-labelledby="tasks-section-title">
-            <h3 id="tasks-section-title" className="text-xs font-semibold text-content-muted uppercase tracking-widest flex items-center gap-1.5">
-              <Clock size={12} aria-hidden="true" />
-              {t('aTraiter')}
-            </h3>
+          <section className="space-y-1.5" aria-labelledby="tasks-section-title">
+            <div className="flex items-center justify-between">
+              <h3 id="tasks-section-title" className="text-xs font-semibold text-content-muted uppercase tracking-widest flex items-center gap-1.5">
+                <Clock size={12} aria-hidden="true" />
+                {t('aTraiter')}
+                {alertsTotal > 0 && (
+                  <Badge value={alertsTotal} size="sm" variant="danger" />
+                )}
+              </h3>
+              {(alertsSummary?.totalAtRisk || 0) > 0 && (
+                <button
+                  onClick={() => setAlertsDrawerOpen(true)}
+                  className="text-[10px] text-accent font-medium hover:underline"
+                >
+                  {t('voirTout') || 'Voir tout'}
+                </button>
+              )}
+            </div>
 
-            {pendingCredits > 0 ? (
-              <Card variant="default" className="border-l-4 border-l-status-warning bg-surface/50" role="alert" aria-live="polite">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-status-warning-bg rounded-lg text-status-warning" aria-hidden="true">
-                      <Clock size={16} />
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-content-primary text-xs">
-                        {pendingCredits} {t('demandesAttente')}
-                      </h4>
-                      <p className="text-[10px] text-content-muted">{t('validationRequise')}</p>
+            {pendingCredits > 0 && (
+              <div className="flex items-center justify-between p-2 rounded-lg bg-surface/50 border-l-4 border-l-status-warning border border-edge/30">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="p-1.5 bg-status-warning-bg rounded-lg text-status-warning shrink-0">
+                    <Clock size={14} />
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="font-bold text-content-primary text-xs truncate">{pendingCredits} {t('demandesAttente')}</h4>
+                    <p className="text-[10px] text-content-muted">{t('validationRequise')}</p>
+                  </div>
+                </div>
+                <Button size="sm" variant="outline" onClick={() => onModuleChange?.('credits')} className="h-6 text-[10px] px-2 shrink-0 ml-2">
+                  {t('voir')}
+                </Button>
+              </div>
+            )}
+
+            {overdueInstallments > 0 && (
+              <div className="flex items-center justify-between p-2 rounded-lg bg-surface/50 border-l-4 border-l-status-danger border border-edge/30">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="p-1.5 bg-status-danger-bg rounded-lg text-status-danger shrink-0">
+                    <AlertTriangle size={14} />
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="font-bold text-content-primary text-xs truncate">{overdueInstallments} {t('echeancesRetard')}</h4>
+                    <p className="text-[10px] text-content-muted">{t('aRelancer')}</p>
+                  </div>
+                </div>
+                <Button size="sm" variant="outline" onClick={() => onModuleChange?.('credits')} className="h-6 text-[10px] px-2 shrink-0 ml-2">
+                  {t('relancer') || 'Relancer'}
+                </Button>
+              </div>
+            )}
+
+            {alertsSummary && alertsSummary.totalAtRisk > 0 && (
+              <div className="flex items-center justify-between p-2 rounded-lg bg-surface/50 border-l-4 border-l-status-danger border border-edge/30">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="p-1.5 bg-status-danger-bg rounded-lg text-status-danger shrink-0">
+                    <ShieldAlert size={14} />
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="font-bold text-content-primary text-xs truncate">
+                      {alertsSummary.totalAtRisk} {t('clientsARisque') || 'clients a risque'}
+                    </h4>
+                    <div className="flex flex-wrap gap-1 mt-0.5">
+                      {alertsSummary.breakdown.blacklisted > 0 && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-status-danger-bg text-status-danger font-medium">{alertsSummary.breakdown.blacklisted} liste noire</span>
+                      )}
+                      {alertsSummary.breakdown.highRisk > 0 && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-status-danger-bg text-status-danger font-medium">{alertsSummary.breakdown.highRisk} risque</span>
+                      )}
+                      {alertsSummary.breakdown.kycExpired > 0 && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-status-warning-bg text-status-warning font-medium">{alertsSummary.breakdown.kycExpired} KYC</span>
+                      )}
+                      {alertsSummary.breakdown.idExpired > 0 && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-status-warning-bg text-status-warning font-medium">{alertsSummary.breakdown.idExpired} ID</span>
+                      )}
                     </div>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => onModuleChange?.('credits')}
-                    className="h-7 text-xs px-2"
-                    aria-label={`${t('voir')} ${pendingCredits} ${t('demandesAttente')}`}
-                  >
-                    {t('voir')}
-                  </Button>
                 </div>
-              </Card>
-            ) : null}
+                <Button size="sm" variant="outline" onClick={() => setAlertsDrawerOpen(true)} className="h-6 text-[10px] px-2 shrink-0 ml-2">
+                  {t('details') || 'Details'}
+                </Button>
+              </div>
+            )}
 
-            {overdueInstallments > 0 ? (
-              <Card variant="default" className="border-l-4 border-l-status-danger bg-surface/50" role="alert" aria-live="polite">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-status-danger-bg rounded-lg text-status-danger" aria-hidden="true">
-                      <AlertTriangle size={16} />
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-content-primary text-xs">
-                        {overdueInstallments} {t('echeancesRetard')}
-                      </h4>
-                      <p className="text-[10px] text-content-muted">{t('aRelancer')}</p>
-                    </div>
+            {upcomingPaymentsCount > 0 && (
+              <div className="flex items-center justify-between p-2 rounded-lg bg-surface/50 border-l-4 border-l-status-info border border-edge/30">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="p-1.5 bg-status-info-bg rounded-lg text-status-info shrink-0">
+                    <Banknote size={14} />
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => onModuleChange?.('credits')}
-                    className="h-7 text-xs px-2"
-                    aria-label={`${t('relancer') || 'Relancer'} ${overdueInstallments} ${t('echeancesRetard')}`}
-                  >
-                    {t('relancer') || 'Relancer'}
-                  </Button>
+                  <div className="min-w-0">
+                    <h4 className="font-bold text-content-primary text-xs truncate">
+                      {upcomingPaymentsCount} {t('paiementsAVenir') || 'paiements a venir'}
+                    </h4>
+                    <p className="text-[10px] text-content-muted">Dans les 7 prochains jours</p>
+                  </div>
+                </div>
+                <Button size="sm" variant="outline" onClick={() => onModuleChange?.('credits')} className="h-6 text-[10px] px-2 shrink-0 ml-2">
+                  {t('voir')}
+                </Button>
+              </div>
+            )}
+
+            {enquetesEnCours > 0 && ability.can(Actions.VIEW, Subjects.CREDIT) && (
+              <div className="flex items-center justify-between p-2 rounded-lg bg-surface/50 border-l-4 border-l-status-info border border-edge/30">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="p-1.5 bg-status-info-bg rounded-lg text-status-info shrink-0">
+                    <Search size={14} />
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="font-bold text-content-primary text-xs truncate">
+                      {enquetesEnCours} {t('enquetesEnCours') || 'enquetes en cours'}
+                    </h4>
+                    {(stats?.enquetes?.soumises || 0) > 0 && (
+                      <p className="text-[10px] text-content-muted">{stats!.enquetes!.soumises} soumise(s)</p>
+                    )}
+                  </div>
+                </div>
+                <Button size="sm" variant="outline" onClick={() => onModuleChange?.('credits')} className="h-6 text-[10px] px-2 shrink-0 ml-2">
+                  {t('voir')}
+                </Button>
+              </div>
+            )}
+
+            {alertsTotal === 0 && (
+              <Card variant="default" className="bg-status-success/5 border-status-success/20 border-dashed py-2" role="status">
+                <div className="flex flex-col items-center justify-center text-center">
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <div className="p-1 bg-status-success-bg rounded-full" aria-hidden="true">
+                      <CheckCircle2 size={10} className="text-status-success" />
+                    </div>
+                    <h4 className="text-status-success font-bold text-xs">{t('aucuneUrgence')}</h4>
+                  </div>
                 </div>
               </Card>
-            ) : null}
-
-            {pendingCredits === 0 && overdueInstallments === 0 && (
-               <Card variant="default" className="bg-status-success/5 border-status-success/20 border-dashed py-2" role="status">
-                 <div className="flex flex-col items-center justify-center text-center">
-                   <div className="flex items-center gap-1.5 mb-0.5">
-                     <div className="p-1 bg-status-success-bg rounded-full" aria-hidden="true">
-                       <CheckCircle2 size={10} className="text-status-success" />
-                     </div>
-                     <h4 className="text-status-success font-bold text-xs">{t('aucuneUrgence')}</h4>
-                   </div>
-                 </div>
-               </Card>
             )}
           </section>
 
@@ -559,87 +631,11 @@ export default function Dashboard({
             );
           })()}
 
-          {/* Clients a risque */}
-          {alertsSummary && alertsSummary.totalAtRisk > 0 && (
-            <section className="space-y-2" aria-labelledby="risque-section-title">
-              <h3 id="risque-section-title" className="text-xs font-semibold text-content-muted uppercase tracking-widest flex items-center gap-1.5">
-                <ShieldAlert size={12} aria-hidden="true" />
-                Clients a risque
-                <Badge value={alertsSummary.totalAtRisk} size="sm" variant="danger" />
-              </h3>
-              <Card variant="default" padding="sm" className="bg-surface/40 p-2.5">
-                {/* Breakdown badges */}
-                <div className="flex flex-wrap gap-1.5 mb-3">
-                  {alertsSummary.breakdown.blacklisted > 0 && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-status-danger-bg text-status-danger font-medium">
-                      {alertsSummary.breakdown.blacklisted} liste noire
-                    </span>
-                  )}
-                  {alertsSummary.breakdown.pep > 0 && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-status-warning-bg text-status-warning font-medium">
-                      {alertsSummary.breakdown.pep} PEP
-                    </span>
-                  )}
-                  {alertsSummary.breakdown.highRisk > 0 && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-status-danger-bg text-status-danger font-medium">
-                      {alertsSummary.breakdown.highRisk} risque eleve
-                    </span>
-                  )}
-                  {alertsSummary.breakdown.kycExpired > 0 && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-status-warning-bg text-status-warning font-medium">
-                      {alertsSummary.breakdown.kycExpired} KYC expire
-                    </span>
-                  )}
-                  {alertsSummary.breakdown.idExpired > 0 && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-status-warning-bg text-status-warning font-medium">
-                      {alertsSummary.breakdown.idExpired} ID expiree
-                    </span>
-                  )}
-                  {alertsSummary.breakdown.lowScore > 0 && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-status-info-bg text-status-info font-medium">
-                      {alertsSummary.breakdown.lowScore} score faible
-                    </span>
-                  )}
-                </div>
-
-                {/* Top clients list */}
-                <div className="space-y-1">
-                  {alertsSummary.topClients.slice(0, 5).map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => {
-                        window.dispatchEvent(new CustomEvent('navigate-module', { detail: { module: 'clients', subModule: `${c.id}/alertes` } }));
-                      }}
-                      className="w-full flex items-center justify-between py-1.5 px-2 rounded hover:bg-surface-elevated/50 transition-colors text-left group"
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-6 h-6 rounded-full bg-status-danger-bg flex items-center justify-center shrink-0">
-                          <span className="text-[10px] font-bold text-status-danger">{c.flags.length}</span>
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-medium text-content-primary truncate">
-                            {c.prenom} {c.nom}
-                          </p>
-                          <p className="text-[10px] text-content-muted font-mono">{c.codeClient}</p>
-                        </div>
-                      </div>
-                      <ChevronRight size={12} className="text-content-muted group-hover:text-content-primary transition-colors shrink-0" />
-                    </button>
-                  ))}
-                </div>
-
-                {alertsSummary.totalAtRisk > 5 && (
-                  <p className="text-[9px] text-content-muted text-right mt-1.5">
-                    + {alertsSummary.totalAtRisk - 5} autre(s)
-                  </p>
-                )}
-              </Card>
-            </section>
-          )}
         </aside>
 
       </div>
+
+      <AlertsDrawer open={alertsDrawerOpen} onClose={() => setAlertsDrawerOpen(false)} />
     </main>
   );
 }

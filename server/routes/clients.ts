@@ -34,7 +34,7 @@ import { eq, sql, or, isNull, and, gte, lte, desc } from "drizzle-orm";
 import { getComptesByClient, getCreditsByClient, getDemandesByClient } from "../storage/finance";
 import { autoCreateCourantAccount } from "../services/comptes";
 import { dispatchDomainEvent } from "../services/notifications/domain-events/event-registry";
-import { evaluateClientAlerts, resolveClientAlert, resolveAllClientAlerts, snoozeClientAlert, getAlertsSummary, KNOWN_ALERT_TYPES } from "../services/client-alerts";
+import { evaluateClientAlerts, resolveClientAlert, resolveAllClientAlerts, snoozeClientAlert, getAlertsSummary, getAlertsSummaryPaginated, KNOWN_ALERT_TYPES } from "../services/client-alerts";
 import { normalizePhone } from "@shared/utils/phone";
 
 export function registerClientRoutes(app: Express) {
@@ -1959,6 +1959,33 @@ export function registerClientRoutes(app: Express) {
     } catch (error) {
       logger.error({ err: error }, 'Error fetching alerts summary');
       res.status(500).json({ message: "Erreur lors du chargement du resume des alertes" });
+    }
+  });
+
+  /**
+   * GET /api/alerts/clients
+   * Paginated list of at-risk clients for the AlertsDrawer
+   */
+  app.get("/api/alerts/clients", requireAuth, requireAgenceIdAccess(), async (req, res) => {
+    try {
+      const agenceFilter = req.agenceFilter as { agenceId?: string } | null;
+      const page = Math.max(1, Number(req.query.page) || 1);
+      const perPage = Math.min(50, Math.max(5, Number(req.query.perPage) || 20));
+      const search = typeof req.query.search === "string" ? req.query.search.trim() : undefined;
+      const severityFilter = typeof req.query.severity === "string" ? req.query.severity : undefined;
+
+      const result = await getAlertsSummaryPaginated(agenceFilter?.agenceId, {
+        page,
+        perPage,
+        search: search || undefined,
+        severityFilter: severityFilter || undefined,
+      });
+
+      res.set("Cache-Control", "private, max-age=30");
+      res.json(result);
+    } catch (error) {
+      logger.error({ err: error }, "Error fetching paginated alert clients");
+      res.status(500).json({ message: "Erreur lors du chargement des clients en alerte" });
     }
   });
 
