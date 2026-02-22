@@ -335,17 +335,23 @@ export default function AgentTerrain({ activeView, agentId: propAgentId, embedde
 
   useEffect(() => { loadAgents(); }, []);
 
-  // Reload when target agent changes
+  // Reload when target agent changes — clear stale data immediately
   useEffect(() => {
+    let stale = false;
     if (targetAgentId) {
       setLoading(true);
+      // Clear previous agent's data to avoid flash of stale content
+      setAgentSummary(null);
+      setTransactions([]);
+      setTodayPlannings([]);
       const agent = allAgents.find(a => a.id === targetAgentId);
       if (agent) setCurrentAgent(agent);
       Promise.all([
         loadAgentSummary(targetAgentId),
         loadOperations(targetAgentId),
         loadKPIs(targetAgentId),
-      ]).finally(() => setLoading(false));
+      ]).finally(() => { if (!stale) setLoading(false); });
+      return () => { stale = true; };
     } else if (canSupervise) {
       setLoading(false);
       setAgentSummary(null);

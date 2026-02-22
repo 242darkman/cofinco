@@ -183,6 +183,7 @@ export const ROUTES: RouteConfig[] = [
     labelKey: 'menuAgentModules',
     group: 'Opérations',
     subRoutes: [
+      { path: '/agent-terrain/operations', subModule: 'operations', label: 'Opérations' },
       { path: '/agent-terrain/dashboard', subModule: 'dashboard', label: 'Tableau de bord' },
       { path: '/agent-terrain/session', subModule: 'session', label: 'Session' },
       { path: '/agent-terrain/reports', subModule: 'reports', label: 'Rapports' },

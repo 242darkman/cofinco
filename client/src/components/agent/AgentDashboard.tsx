@@ -71,6 +71,7 @@ interface AgentDashboardProps {
   agentId?: string;
   selectedAgentId?: string | null;
   onAgentChange?: (agentId: string | null) => void;
+  embedded?: boolean;
 }
 
 function ProspectionKpiSection({ agentId }: { agentId?: string }) {
@@ -129,7 +130,7 @@ function ProspectionKpiSection({ agentId }: { agentId?: string }) {
   );
 }
 
-export default function AgentDashboard({ agentId: propAgentId, selectedAgentId: parentSelectedAgentId, onAgentChange }: AgentDashboardProps) {
+export default function AgentDashboard({ agentId: propAgentId, selectedAgentId: parentSelectedAgentId, onAgentChange, embedded }: AgentDashboardProps) {
   const [agentProfile, setAgentProfile] = useState<AgentProfile | null>(null);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -176,9 +177,9 @@ export default function AgentDashboard({ agentId: propAgentId, selectedAgentId: 
     return res.json();
   };
 
-  // Load agents list for admin users
+  // Load agents list for admin users (skip in embedded mode — parent provides selection)
   useEffect(() => {
-    if (isAdmin) {
+    if (isAdmin && !embedded) {
       setLoadingAgents(true);
       fetchJson('/api/agents-terrain')
         .then((response) => {
@@ -464,8 +465,8 @@ export default function AgentDashboard({ agentId: propAgentId, selectedAgentId: 
     );
   }
 
-  // Admin without agent selected - show selector
-  if (isAdmin && !selectedAgentId && !agentProfile) {
+  // Admin without agent selected - show selector (only in standalone mode)
+  if (isAdmin && !selectedAgentId && !agentProfile && !embedded) {
     return (
       <div className="space-y-4">
         <FeatureHeader
@@ -573,8 +574,8 @@ export default function AgentDashboard({ agentId: propAgentId, selectedAgentId: 
         icon={<LayoutDashboard size={24} />}
         actions={
           <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
-            {/* Admin agent selector dropdown */}
-            {isAdmin && (
+            {/* Admin agent selector dropdown (hidden in embedded mode — parent controls selection) */}
+            {isAdmin && !embedded && (
               <div className="relative">
                 <button
                   onClick={() => setShowAgentSelector(!showAgentSelector)}
