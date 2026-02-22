@@ -18,7 +18,7 @@ import {
   CheckCircle,
   Landmark,
   RefreshCcw,
-  Briefcase,
+
   BarChart3,
   UserCog,
 } from 'lucide-react';
@@ -37,8 +37,7 @@ export const PLATFORM_MENU_ITEMS: MenuItem[] = [
 
   // Opérations
   { labelKey: 'menuCaisse', icon: Wallet, key: 'caisse', section: 'operations' },
-  { labelKey: 'menuAgentTerrain', icon: MapPinned, key: 'agentTerrain', section: 'operations' },
-  { labelKey: 'menuAgentModules', icon: Briefcase, key: 'agentModules', section: 'operations' },
+  { labelKey: 'menuAgentModules', icon: MapPinned, key: 'agentModules', section: 'operations' },
   { labelKey: 'menuValidations', icon: CheckCircle, key: 'validations', section: 'operations' },
   { labelKey: 'menuTransfert', icon: ArrowLeftRight, key: 'transfert', section: 'operations' },
   { labelKey: 'menuCoffre', icon: Shield, key: 'coffre', section: 'operations' },

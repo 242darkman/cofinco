@@ -213,13 +213,13 @@ const NAVIGATION_ITEMS: SearchResult[] = [
   },
   {
     id: 'nav-terrain',
-    title: 'Collecte terrain',
-    keywords: ['agents terrain', 'collecte', 'field', 'terrain'],
+    title: 'Gestion Agent',
+    keywords: ['agents terrain', 'collecte', 'field', 'terrain', 'opérations'],
     group: 'Navigation',
     icon: MapPin,
     iconBg: 'bg-accent/10 text-accent',
     type: 'navigation',
-    moduleKey: 'agentTerrain',
+    moduleKey: 'agentModules',
     permission: { action: Actions.VIEW, subject: Subjects.TERRAIN },
   },
   {

@@ -12,7 +12,6 @@ const Comptes = lazy(() => import('@/components/finance/compte/Comptes'));
 const Tontines = lazy(() => import('@/components/finance/tontine/Tontines'));
 const Comptabilite = lazy(() => import('@/components/finance/accounting/ComptabiliteSageOHADA'));
 const RessourcesHumaines = lazy(() => import('@/components/hr/RessourcesHumaines'));
-const AgentTerrain = lazy(() => import('@/components/agent/AgentTerrain'));
 const AgentTerrainPortail = lazy(() => import('@/components/agent/AgentTerrainPortail'));
 const ValidationsCenter = lazy(() => import('@/components/validations/ValidationsCenter'));
 const CaisseDashboard = lazy(() => import('@/components/finance/caisse/CaisseDashboard'));
@@ -176,37 +175,29 @@ export const ROUTES: RouteConfig[] = [
     ],
   },
   {
-    key: 'agentTerrain',
-    path: '/agent-terrain',
-    component: AgentTerrain,
-    requiredModule: 'Agent Terrain',
-    label: 'Collecte terrain',
-    labelKey: 'menuTerrain',
-    group: 'Opérations',
-  },
-  {
     key: 'agentModules',
-    path: '/agent-terrain/modules',
+    path: '/agent-terrain',
     component: AgentTerrainPortail,
     requiredModule: 'Agent Terrain',
     label: 'Gestion Agent',
     labelKey: 'menuAgentModules',
     group: 'Opérations',
     subRoutes: [
-      { path: '/agent-terrain/modules/session', subModule: 'session', label: 'Session' },
-      { path: '/agent-terrain/modules/reports', subModule: 'reports', label: 'Rapports' },
-      { path: '/agent-terrain/modules/leaderboard', subModule: 'leaderboard', label: 'Classement' },
-      { path: '/agent-terrain/modules/prospections', subModule: 'prospections', label: 'Prospections' },
-      { path: '/agent-terrain/modules/commissions', subModule: 'commissions', label: 'Commissions' },
-      { path: '/agent-terrain/modules/planning', subModule: 'planning', label: 'Planning' },
-      { path: '/agent-terrain/modules/gps', subModule: 'gps', label: 'Géolocalisation' },
-      { path: '/agent-terrain/modules/rapports', subModule: 'rapports', label: 'Stats' },
-      { path: '/agent-terrain/modules/formations', subModule: 'formations', label: 'Formations' },
-      { path: '/agent-terrain/modules/materiel', subModule: 'materiel', label: 'Matériel' },
-      { path: '/agent-terrain/modules/incidents', subModule: 'incidents', label: 'Incidents' },
-      { path: '/agent-terrain/modules/objectifs', subModule: 'objectifs', label: 'Objectifs' },
-      { path: '/agent-terrain/modules/supervision-prospection', subModule: 'supervision-prospection', label: 'Supervision' },
-      { path: '/agent-terrain/modules/tracking-debug', subModule: 'tracking-debug', label: 'Tracking Debug' },
+      { path: '/agent-terrain/dashboard', subModule: 'dashboard', label: 'Tableau de bord' },
+      { path: '/agent-terrain/session', subModule: 'session', label: 'Session' },
+      { path: '/agent-terrain/reports', subModule: 'reports', label: 'Rapports' },
+      { path: '/agent-terrain/leaderboard', subModule: 'leaderboard', label: 'Classement' },
+      { path: '/agent-terrain/prospections', subModule: 'prospections', label: 'Prospections' },
+      { path: '/agent-terrain/commissions', subModule: 'commissions', label: 'Commissions' },
+      { path: '/agent-terrain/planning', subModule: 'planning', label: 'Planning' },
+      { path: '/agent-terrain/gps', subModule: 'gps', label: 'Géolocalisation' },
+      { path: '/agent-terrain/rapports', subModule: 'rapports', label: 'Stats' },
+      { path: '/agent-terrain/formations', subModule: 'formations', label: 'Formations' },
+      { path: '/agent-terrain/materiel', subModule: 'materiel', label: 'Matériel' },
+      { path: '/agent-terrain/incidents', subModule: 'incidents', label: 'Incidents' },
+      { path: '/agent-terrain/objectifs', subModule: 'objectifs', label: 'Objectifs' },
+      { path: '/agent-terrain/supervision-prospection', subModule: 'supervision-prospection', label: 'Supervision' },
+      { path: '/agent-terrain/tracking-debug', subModule: 'tracking-debug', label: 'Tracking Debug' },
     ],
   },
   {

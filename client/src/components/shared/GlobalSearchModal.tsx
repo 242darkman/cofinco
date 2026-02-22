@@ -36,7 +36,7 @@ const QUICK_ACCESS = [
   { icon: Users, iconBg: 'bg-status-info-bg text-status-info', label: 'Clients', moduleKey: 'clients' },
   { icon: CreditCard, iconBg: 'bg-status-success-bg text-status-success', label: 'Crédits', moduleKey: 'credits' },
   { icon: DollarSign, iconBg: 'bg-status-warning-bg text-status-warning', label: 'Tontines', moduleKey: 'tontines' },
-  { icon: MapPin, iconBg: 'bg-accent/10 text-accent', label: 'Agents Terrain', moduleKey: 'agentTerrain' },
+  { icon: MapPin, iconBg: 'bg-accent/10 text-accent', label: 'Agents Terrain', moduleKey: 'agentModules' },
   { icon: Landmark, iconBg: 'bg-accent/10 text-accent', label: 'Caisse', moduleKey: 'caisse' },
 ] as const;
 

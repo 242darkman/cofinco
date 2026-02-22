@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Map, FileText, GraduationCap, Package, AlertTriangle, Target, BarChart3, TrendingUp, Trophy, Download, LayoutDashboard, UserCircle, ChevronDown, Search, X, UserPlus, Eye, Menu, ChevronLeft, ChevronRight, Activity, Locate } from 'lucide-react';
+import { Map, FileText, GraduationCap, Package, AlertTriangle, Target, BarChart3, TrendingUp, Trophy, Download, LayoutDashboard, UserCircle, ChevronDown, Search, X, UserPlus, Eye, Menu, ChevronLeft, ChevronRight, Activity, Locate, Wallet } from 'lucide-react';
 import { Card } from '../ui';
 import AgentCommissions from './AgentCommissions';
 import AgentPlanning from './AgentPlanning';
@@ -15,6 +15,7 @@ import AgentTeamLeaderboard from './AgentTeamLeaderboard';
 import ProspectionList from './ProspectionList';
 import ProspectionSupervisionPanel from './ProspectionSupervisionPanel';
 import TrackingDebugPage from './TrackingDebugPage';
+import AgentTerrain from './AgentTerrain';
 import AgentSessionManager from './sessions/AgentSessionManager';
 import LoadingScreen from '../ui/LoadingScreen';
 import { authService } from '../../lib/auth';
@@ -38,7 +39,7 @@ interface AgentTerrainPortailProps {
 }
 
 export default function AgentTerrainPortail({ agentId, activeView, onModuleChange }: AgentTerrainPortailProps) {
-  const [activeModule, setActiveModule] = useState<string>(activeView || 'dashboard');
+  const [activeModule, setActiveModule] = useState<string>(activeView || 'operations');
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const scroll = (direction: 'left' | 'right') => {
@@ -60,11 +61,26 @@ export default function AgentTerrainPortail({ agentId, activeView, onModuleChang
   // Admin / Supervisor shared state
   const _isAdmin = useIsAdmin();
   const isAdminOrSupervisor = _isAdmin || authService.hasRole?.('superviseur') || authService.hasRole?.('chef_agence');
-  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(agentId || null);
+  // Persist selected agent in URL query param ?agent=<uuid>
+  const getAgentFromUrl = () => new URLSearchParams(window.location.search).get('agent');
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(
+    getAgentFromUrl() || agentId || null
+  );
   const [agentsList, setAgentsList] = useState<AgentOption[]>([]);
   const [loadingAgents, setLoadingAgents] = useState(false);
   const [showAgentSelector, setShowAgentSelector] = useState(false);
   const [agentSearchQuery, setAgentSearchQuery] = useState('');
+
+  // Sync selectedAgentId to URL (replaceState to avoid polluting history)
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (selectedAgentId) {
+      url.searchParams.set('agent', selectedAgentId);
+    } else {
+      url.searchParams.delete('agent');
+    }
+    window.history.replaceState({}, '', url.toString());
+  }, [selectedAgentId]);
 
   React.useEffect(() => {
     if (isAdminOrSupervisor && agentsList.length === 0) {
@@ -102,8 +118,8 @@ export default function AgentTerrainPortail({ agentId, activeView, onModuleChang
     setTimeout(() => {
       setActiveModule(moduleName);
       setModuleLoading(false);
-      // Sync to URL: 'dashboard' = no sub-module
-      onModuleChange?.('agentModules', moduleName === 'dashboard' ? undefined : moduleName);
+      // Sync to URL: 'operations' (default) = no sub-module
+      onModuleChange?.('agentModules', moduleName === 'operations' ? undefined : moduleName);
     }, 300);
   };
 
@@ -132,6 +148,7 @@ export default function AgentTerrainPortail({ agentId, activeView, onModuleChang
   }, [user, isAdminOrSupervisor]);
 
   const modules = [
+    { id: 'operations', name: 'Opérations', icon: Wallet, component: AgentTerrain },
     { id: 'dashboard', name: 'Tableau de Bord', icon: LayoutDashboard, component: AgentDashboard },
     { id: 'session', name: 'Session', icon: Activity, component: SessionManagerWrapper },
     { id: 'reports', name: 'Rapports', icon: Download, component: AgentReportsGenerator },
@@ -346,6 +363,7 @@ export default function AgentTerrainPortail({ agentId, activeView, onModuleChang
             agentId={isAdminOrSupervisor ? (selectedAgentId ?? undefined) : agentId}
             selectedAgentId={selectedAgentId ?? undefined}
             onAgentChange={setSelectedAgentId}
+            embedded={true}
           />
         ) : (
           <Card className="p-12 text-center text-content-muted border-dashed">

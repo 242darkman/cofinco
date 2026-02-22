@@ -173,7 +173,7 @@ export const agentsProvider: SearchProvider = {
       icon: MapPin,
       iconBg: 'bg-accent/10 text-accent',
       type: 'entity' as const,
-      moduleKey: 'agentTerrain',
+      moduleKey: 'agentModules',
       params: { id: a.id },
       permission: { action: Actions.VIEW, subject: Subjects.AGENT_TERRAIN },
     }));

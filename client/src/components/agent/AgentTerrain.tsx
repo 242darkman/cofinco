@@ -79,6 +79,8 @@ type StatusFilter = '' | 'SUBMITTED' | 'APPROVED' | 'PENDING_SETTLEMENT' | 'SETT
 
 interface AgentTerrainProps {
   activeView?: string;
+  agentId?: string;
+  embedded?: boolean;
 }
 
 const TX_PAGE_SIZE = 15;
@@ -90,11 +92,11 @@ function getTodayRange() {
   return { dateFrom: start.toISOString(), dateTo: end.toISOString() };
 }
 
-export default function AgentTerrain({ activeView }: AgentTerrainProps) {
+export default function AgentTerrain({ activeView, agentId: propAgentId, embedded }: AgentTerrainProps) {
   const [loading, setLoading] = useState(true);
   const [allAgents, setAllAgents] = useState<Agent[]>([]);
   const [currentAgent, setCurrentAgent] = useState<Agent | null>(null);
-  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(propAgentId || null);
   const [agentSummary, setAgentSummary] = useState<{ disponible: number; valide: number; pendingIn: number } | null>(null);
 
   // Operations state
@@ -151,6 +153,13 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
     return () => { document.body.classList.remove('modal-open'); };
   }, [showPaiementForm, showSettlementModal, showProspectionForm,
       showFullPlanning, enqueteFormData, showCloseSessionModal]);
+
+  // Sync agentId prop from parent (embedded mode)
+  useEffect(() => {
+    if (propAgentId !== undefined) {
+      setSelectedAgentId(propAgentId || null);
+    }
+  }, [propAgentId]);
 
   // Agent dropdown search
   const [agentDropdownOpen, setAgentDropdownOpen] = useState(false);
@@ -545,60 +554,62 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
           </button>
         </div>
 
-        {/* Agent card (compact) or agent selector */}
-        <div className="px-3 pb-2">
-          {(canSupervise && !selectedAgentId) ? (
-            <AgentSelector
-              agents={allAgents}
-              open={agentDropdownOpen}
-              searchQuery={agentSearchQuery}
-              onToggle={() => setAgentDropdownOpen(!agentDropdownOpen)}
-              onSelect={(id) => { setSelectedAgentId(id); setAgentDropdownOpen(false); setAgentSearchQuery(''); }}
-              onSearchChange={setAgentSearchQuery}
-              onClose={() => { setAgentDropdownOpen(false); setAgentSearchQuery(''); }}
-            />
-          ) : (
-            <div className="flex items-center justify-between gap-3 relative">
-              <div className="flex items-center gap-2.5 min-w-0">
-                {currentAgent?.photoProfile ? (
-                  <img src={resolveStorageUrl(currentAgent.photoProfile)} alt="" className="w-8 h-8 rounded-full object-cover shrink-0 border-2 border-accent/30" />
-                ) : (
-                  <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center font-bold text-xs text-white shrink-0">
-                    {currentAgent ? `${currentAgent.nom.charAt(0)}${currentAgent.prenom.charAt(0)}` : <Users size={14} />}
-                  </div>
-                )}
-                <div className="min-w-0">
-                  <div className="text-[9px] text-content-muted uppercase font-bold tracking-wider">
-                    {canSupervise ? 'Supervision' : 'Agent Actif'}
-                  </div>
-                  <div className="text-sm font-bold leading-tight truncate">
-                    {currentAgent ? `${currentAgent.nom} ${currentAgent.prenom}` : '...'}
+        {/* Agent card (compact) or agent selector — hidden in embedded mode (parent controls selection) */}
+        {!embedded && (
+          <div className="px-3 pb-2">
+            {(canSupervise && !selectedAgentId) ? (
+              <AgentSelector
+                agents={allAgents}
+                open={agentDropdownOpen}
+                searchQuery={agentSearchQuery}
+                onToggle={() => setAgentDropdownOpen(!agentDropdownOpen)}
+                onSelect={(id) => { setSelectedAgentId(id); setAgentDropdownOpen(false); setAgentSearchQuery(''); }}
+                onSearchChange={setAgentSearchQuery}
+                onClose={() => { setAgentDropdownOpen(false); setAgentSearchQuery(''); }}
+              />
+            ) : (
+              <div className="flex items-center justify-between gap-3 relative">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  {currentAgent?.photoProfile ? (
+                    <img src={resolveStorageUrl(currentAgent.photoProfile)} alt="" className="w-8 h-8 rounded-full object-cover shrink-0 border-2 border-accent/30" />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center font-bold text-xs text-white shrink-0">
+                      {currentAgent ? `${currentAgent.nom.charAt(0)}${currentAgent.prenom.charAt(0)}` : <Users size={14} />}
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <div className="text-[9px] text-content-muted uppercase font-bold tracking-wider">
+                      {canSupervise ? 'Supervision' : 'Agent Actif'}
+                    </div>
+                    <div className="text-sm font-bold leading-tight truncate">
+                      {currentAgent ? `${currentAgent.nom} ${currentAgent.prenom}` : '...'}
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="text-right shrink-0">
-                <div className="text-lg font-bold text-status-success leading-tight tabular-nums">
-                  {loading ? '...' : formatMoney(agentSummary?.disponible || 0)}
-                </div>
-                {!loading && agentSummary && agentSummary.pendingIn > 0 ? (
-                  <div className="text-[10px] text-status-warning font-medium">
-                    +{formatMoney(agentSummary.pendingIn)} en attente
+                <div className="text-right shrink-0">
+                  <div className="text-lg font-bold text-status-success leading-tight tabular-nums">
+                    {loading ? '...' : formatMoney(agentSummary?.disponible || 0)}
                   </div>
-                ) : (
-                  <div className="text-[9px] text-status-success font-bold">{currencySymbol()}</div>
+                  {!loading && agentSummary && agentSummary.pendingIn > 0 ? (
+                    <div className="text-[10px] text-status-warning font-medium">
+                      +{formatMoney(agentSummary.pendingIn)} en attente
+                    </div>
+                  ) : (
+                    <div className="text-[9px] text-status-success font-bold">{currencySymbol()}</div>
+                  )}
+                </div>
+                {canSupervise && (
+                  <button
+                    onClick={() => setSelectedAgentId(null)}
+                    className="absolute inset-0 opacity-0 hover:opacity-100 bg-black/60 backdrop-blur-sm flex items-center justify-center z-20 text-content-primary text-xs font-bold transition-all rounded-lg"
+                  >
+                    Changer d'agent
+                  </button>
                 )}
               </div>
-              {canSupervise && (
-                <button
-                  onClick={() => setSelectedAgentId(null)}
-                  className="absolute inset-0 opacity-0 hover:opacity-100 bg-black/60 backdrop-blur-sm flex items-center justify-center z-20 text-content-primary text-xs font-bold transition-all rounded-lg"
-                >
-                  Changer d'agent
-                </button>
-              )}
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
         {/* ═══ 2. TAB BAR (sticky) ═══ */}
         {!agentDisabled && (
