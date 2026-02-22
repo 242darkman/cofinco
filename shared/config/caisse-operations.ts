@@ -40,6 +40,9 @@ export const CAISSE_IN_OPERATIONS = [
   // Transferts entrants
   "SAFE_SUPPLY",
   "TRANSFER_IN",
+
+  // Agent terrain
+  "AGENT_SETTLEMENT",
 ] as const;
 
 /**

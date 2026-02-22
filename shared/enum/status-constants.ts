@@ -1019,6 +1019,8 @@ export const TypeOperationCaisse = {
   SALARY_PAYMENT: "SALARY_PAYMENT",
   FEE_REFUND: "FEE_REFUND",
   ACCOUNT_ACTIVATION: "ACCOUNT_ACTIVATION",
+  // Agent terrain
+  AGENT_SETTLEMENT: "AGENT_SETTLEMENT",
 } as const;
 
 export type TypeOperationCaisseType = (typeof TypeOperationCaisse)[keyof typeof TypeOperationCaisse];
@@ -1043,6 +1045,7 @@ export const TYPES_OPERATIONS_CAISSE = [
   { value: TypeOperationCaisse.MISC_COLLECTION, label: "Encaissement Divers", isEntree: true },
   { value: TypeOperationCaisse.MISC_DISBURSEMENT, label: "Décaissement Divers", isEntree: false },
   { value: TypeOperationCaisse.BANK_FEE, label: "Frais Bancaires", isEntree: true },
+  { value: TypeOperationCaisse.AGENT_SETTLEMENT, label: "Remise Agent Terrain", isEntree: true },
 ] as const;
 
 /** Mapping label FR -> value EN pour rétrocompatibilité */

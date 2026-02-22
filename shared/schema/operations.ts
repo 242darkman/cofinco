@@ -583,15 +583,41 @@ export const agentLocationLogs = pgTable("agent_location_logs", {
   heading: numeric("heading"),
   source: text("source").notNull().default("gps"),
   batteryLevel: integer("battery_level"),
+  sessionId: text("session_id"),
+  dayKey: text("day_key"),
+  clientPointId: text("client_point_id"),
+  activityType: text("activity_type"),
   capturedAt: timestamp("captured_at").notNull().defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
 }, (t) => [
   index("idx_agent_loc_agent_captured").on(t.agentId, t.capturedAt),
+  index("idx_agent_loc_session").on(t.sessionId),
+  uniqueIndex("idx_agent_loc_client_point").on(t.agentId, t.clientPointId),
 ]);
 
 export const insertAgentLocationLogSchema = createInsertSchema(agentLocationLogs).omit({ id: true, createdAt: true });
 export type InsertAgentLocationLog = z.infer<typeof insertAgentLocationLogSchema>;
 export type AgentLocationLog = typeof agentLocationLogs.$inferSelect;
+
+// Tracking Sessions — daily field agent GPS sessions
+export const trackingSessions = pgTable("tracking_sessions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  sessionId: text("session_id").notNull().unique(),
+  agentId: uuid("agent_id").notNull().references(() => users.id),
+  agencyId: uuid("agency_id").references(() => agences.id),
+  dayKey: text("day_key").notNull(),
+  startedAt: timestamp("started_at").notNull(),
+  endedAt: timestamp("ended_at"),
+  pointCount: integer("point_count").notNull().default(0),
+  totalDistanceM: numeric("total_distance_m").default("0"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [
+  index("idx_tracking_sessions_agent_day").on(t.agentId, t.dayKey),
+]);
+
+export const insertTrackingSessionSchema = createInsertSchema(trackingSessions).omit({ id: true, createdAt: true });
+export type InsertTrackingSession = z.infer<typeof insertTrackingSessionSchema>;
+export type TrackingSessionRow = typeof trackingSessions.$inferSelect;
 
 // Caisses definition moved to finance.ts to avoid circular dependency
 

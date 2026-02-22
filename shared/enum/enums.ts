@@ -256,6 +256,10 @@ export const sourceModuleEnum = pgEnum("source_module_enum", [
   "COFFRE_TRANSFER",
   "INTER_COFFRE",
   "EVACUATION_COFFRE",
+  "FRAIS",
+  // Caisse agent settlements
+  "REMISE",
+  "CONTRIBUTION",
 ]);
 
 export const typeEvenementEnum = pgEnum("type_evenement_enum", [
@@ -281,6 +285,13 @@ export const typeEvenementEnum = pgEnum("type_evenement_enum", [
   "SESSION_FORCE_CLOSED",
   "CAISSE_STATUS_CHANGED",
   "CAISSE_LIQUIDATED",
+  // Remise terrain events
+  "REMISE_CREATED",
+  "REMISE_SETTLED",
+  "REMISE_REJECTED",
+  // Ecart approval events
+  "ECART_APPROVAL_REQUEST",
+  "ECART_APPROVAL_DECISION",
   // GL Posting events (PR-0)
   "GL_POSTING_FAILED",
   // Liquidity & GL events
