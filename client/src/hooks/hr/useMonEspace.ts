@@ -92,7 +92,7 @@ export function useUpdateMyProfile() {
       body: JSON.stringify(data),
     }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/hr/my'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/hr/my/profile'] });
       toast.success('Profil mis à jour');
     },
     onError: (err: Error) => toast.error(err.message),

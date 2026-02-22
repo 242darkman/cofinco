@@ -7024,6 +7024,29 @@ hrRouter.get("/my/evaluations", getAuthUser, async (req, res) => {
     }
 });
 
+// GET /api/hr/my/profile
+hrRouter.get("/my/profile", getAuthUser, async (req, res) => {
+    try {
+        const user = (req as any).user;
+        const [emp] = await db.select({
+            situationFamiliale: employes.situationFamiliale,
+            nombreEnfantsCharge: employes.nombreEnfantsCharge,
+            paymentMethod: employes.paymentMethod,
+            paymentDetails: employes.paymentDetails,
+            bankName: employes.bankName,
+            bankCode: employes.bankCode,
+            branchCode: employes.branchCode,
+            bankAccountNumber: employes.bankAccountNumber,
+            accountKey: employes.accountKey,
+        }).from(employes).where(eq(employes.userId, user.id));
+        if (!emp) return res.status(404).json({ error: "Profil employé introuvable" });
+        res.json(emp);
+    } catch (error) {
+        logger.error({ err: error }, "Erreur lecture profil Mon Espace");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
 // PUT /api/hr/my/profile
 hrRouter.put("/my/profile", getAuthUser, async (req, res) => {
     try {
