@@ -9,7 +9,6 @@ vi.mock('server/middleware', () => ({
     req.user = { id: 'test-user', role: 'agent' };
     next();
   },
-  requireRole: () => (req: any, res: any, next: any) => next()
 }));
 
 // MOCK AUTHORIZATION (routes use attachAbility/requireAbility)

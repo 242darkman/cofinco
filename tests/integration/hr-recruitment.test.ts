@@ -9,7 +9,6 @@ vi.mock('server/middleware', () => ({
     req.user = { id: 'test-user', role: 'rh' };
     next();
   },
-  requireRole: (roles: any) => (req: any, res: any, next: any) => next()
 }));
 
 // MOCK DB
