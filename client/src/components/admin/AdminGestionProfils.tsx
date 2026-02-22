@@ -147,6 +147,9 @@ export default function AdminGestionProfils() {
     [SystemRole.AGENT_TERRAIN]: 'terrain',
     [SystemRole.SUPERVISEUR]: 'superviseur',
     [SystemRole.GESTIONNAIRE_CREDIT]: 'gestionnaire_credit',
+    [SystemRole.AUDITEUR]: 'auditeur',
+    [SystemRole.RH]: 'rh',
+    [SystemRole.SUPPORT_IT]: 'support_it',
     [SystemRole.CLIENT]: 'client'
   };
 

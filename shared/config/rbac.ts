@@ -573,7 +573,7 @@ export const SEED_ROLE_PERMISSIONS: Record<SystemRole, string[]> = {
   [SystemRole.SUPPORT_IT]: [
     'dashboard.view',
     // Administration
-    'admin.users', 'admin.logs', 'admin.settings', 'admin.roles',
+    'admin.users', 'admin.logs', 'admin.settings',
     'users.view', 'users.create', 'users.edit',
     // RBAC
     'rbac.view', 'permissions.view',
@@ -589,5 +589,16 @@ export const SEED_ROLE_PERMISSIONS: Record<SystemRole, string[]> = {
     // Stockage
     'loge.view', 'loge.upload',
   ],
-  [SystemRole.CLIENT]: []
+  [SystemRole.CLIENT]: [
+    'dashboard.view',
+    // Consultation de ses propres produits financiers
+    'credits.view',
+    'remboursements.view',
+    'epargnes.view',
+    'tontines.view',
+    // Communications et messagerie
+    'communications.view', 'messages.view',
+    // Programme de fidélité
+    'loyalty.view',
+  ]
 };

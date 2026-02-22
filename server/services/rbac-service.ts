@@ -607,6 +607,9 @@ function getRoleLabel(role: SystemRole): string {
     [SystemRole.COMPTABLE]: 'Comptable',
     [SystemRole.SUPERVISEUR]: 'Superviseur',
     [SystemRole.GESTIONNAIRE_CREDIT]: 'Gestionnaire Crédit',
+    [SystemRole.AUDITEUR]: 'Auditeur',
+    [SystemRole.RH]: 'Responsable RH',
+    [SystemRole.SUPPORT_IT]: 'Support Informatique',
     [SystemRole.CLIENT]: 'Client',
   };
   return labels[role] || role;

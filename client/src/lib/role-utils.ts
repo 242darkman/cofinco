@@ -9,6 +9,9 @@ const ROLE_CLASSES: Record<SystemRole, string> = {
   [SystemRole.SUPERVISEUR]: 'bg-accent/10 text-accent border-accent/20',
   [SystemRole.CAISSIER]: 'bg-status-info-bg text-status-info border-status-info/20',
   [SystemRole.AGENT_TERRAIN]: 'bg-pink-500/10 text-pink-400 border-pink-500/20',
+  [SystemRole.AUDITEUR]: 'bg-status-warning-bg text-status-warning border-status-warning/20',
+  [SystemRole.RH]: 'bg-status-success-bg text-status-success border-status-success/20',
+  [SystemRole.SUPPORT_IT]: 'bg-status-info-bg text-status-info border-status-info/20',
   [SystemRole.CLIENT]: 'bg-surface-subtle/30 text-content-muted border-edge-strong/20',
 };
 

@@ -23,6 +23,9 @@ export const ROLE_COLORS: Record<SystemRole, string> = {
   [SystemRole.COMPTABLE]: 'bg-accent/10 text-accent border-accent/30',
   [SystemRole.GESTIONNAIRE_CREDIT]: 'bg-accent/10 text-accent border-accent/30',
   [SystemRole.SUPERVISEUR]: 'bg-surface-subtle/40 text-content-muted border-edge-strong/30',
+  [SystemRole.AUDITEUR]: 'bg-status-warning-bg text-status-warning border-status-warning/30',
+  [SystemRole.RH]: 'bg-status-success-bg text-status-success border-status-success/30',
+  [SystemRole.SUPPORT_IT]: 'bg-status-info-bg text-status-info border-status-info/30',
   [SystemRole.CLIENT]: 'bg-surface-subtle/40 text-content-muted border-edge-strong/30',
 };
 
