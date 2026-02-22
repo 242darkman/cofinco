@@ -39,6 +39,7 @@ const CaisseHistoriqueGlobal = lazy(() => import('./CaisseHistoriqueGlobal'));
 const CaisseDemandesTab = lazy(() => import('./CaisseDemandesTab'));
 import { TransactionsList, TransactionDetailDrawer, TransactionHistoryPage } from '../transactions';
 import type { TransactionItem, TransactionDetails } from '../transactions';
+import { CaisseDashboardWidgets, CaisseDashboardSkeleton } from './CaisseDashboardWidgets';
 
 
 import { SessionCaisse, CaisseTransaction as Transaction } from '../../../types/finance';
@@ -1014,6 +1015,11 @@ export default function CaisseDashboard({
            );
         }
 
+        // Show skeleton during initial load
+        if (loading && !transactions.length) {
+          return <CaisseDashboardSkeleton />;
+        }
+
         return (
           <div className="space-y-2 animate-in fade-in duration-500 h-full flex flex-col">
       {currentSession && (
@@ -1023,7 +1029,22 @@ export default function CaisseDashboard({
           onNouvelleOperation={handleNouvelleOperation}
         />
       )}
-      
+
+      {/* Dashboard Widgets: Alerts + KPIs + Charts */}
+      {currentSession && (
+        <CaisseDashboardWidgets
+          transactions={transactions}
+          session={currentSession}
+          soldeActuel={soldeActuel}
+          totalEntrees={totalEntrees}
+          totalSorties={totalSorties}
+          nbEntrees={nbEntrees}
+          nbSorties={nbSorties}
+          demandesCount={demandesCount}
+          onNavigate={handleTabChange}
+        />
+      )}
+
       {/* Top Session Stats - Compact View */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <StatCard
