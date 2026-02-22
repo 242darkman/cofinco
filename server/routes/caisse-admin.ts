@@ -496,7 +496,7 @@ caisseAdminRouter.post(
         return sum + (parseInt(denom) * (count as number));
       }, 0);
 
-      const userId = (req.user as any)?.id;
+      const userId = req.user?.id;
 
       const [created] = await db.insert(denominationTemplates).values({
         nom,
@@ -729,7 +729,7 @@ caisseAdminRouter.get(
       .leftJoin(users, eq(ecartsApprovalRequests.caissierId, users.id))
       .where(and(
         eq(ecartsApprovalRequests.agenceId, agenceId),
-        eq(ecartsApprovalRequests.statut, statut as any)
+        eq(ecartsApprovalRequests.statut, statut)
       ))
       .orderBy(desc(ecartsApprovalRequests.createdAt));
 
@@ -826,7 +826,21 @@ caisseAdminRouter.post(
         return res.status(400).json({ error: result.error });
       }
 
-      // TODO: Envoyer notification WebSocket au caissier
+      // Notification WebSocket au caissier
+      try {
+        const { getWsInstance } = await import("../ws-server");
+        const ws = getWsInstance();
+        if (ws && result.request) {
+          ws.broadcast({
+            type: 'ECART_APPROVAL_DECISION',
+            payload: {
+              requestId: id,
+              decision,
+              sessionId: result.request.sessionId,
+            },
+          });
+        }
+      } catch { /* WS notification is best-effort */ }
 
       res.json({
         message: decision === 'APPROVED' ? 'Écart approuvé' : 'Écart rejeté',

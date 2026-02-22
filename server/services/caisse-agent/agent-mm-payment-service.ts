@@ -246,7 +246,7 @@ class AgentMmPaymentService {
       logger.error({ err: error }, 'Failed to initiate payment');
 
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      const errorCode = (error as any)?.code || "PROVIDER_ERROR";
+      const errorCode = (error as { code?: string })?.code || "PROVIDER_ERROR";
 
       const [failedPayment] = await db
         .update(agentMmPayments)

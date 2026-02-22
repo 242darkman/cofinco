@@ -626,7 +626,7 @@ export class SessionAgentService {
               ecart: String(ecart),
               ecartJustification: params.ecartJustification,
             },
-          } as any)
+          })
           .returning();
 
         // 2. Créer mouvement financier: retour fonds agent → caisse
@@ -921,7 +921,7 @@ export class SessionAgentService {
               ecart: String(ecart),
               ecartJustification: params.ecartJustification,
             },
-          } as any)
+          })
           .returning();
 
         // 4. Financial movement: return funds agent → caisse
@@ -1170,7 +1170,7 @@ export class SessionAgentService {
               })
               .returning();
             clientMouvement = mvt;
-            const refContrib = generateReference("CONTRIBUTION" as any);
+            const refContrib = generateReference("CONTRIBUTION");
             await tx.insert(contributionsTontine).values({
               tontineId: paiement.tontineId,
               clientId: paiement.clientId,

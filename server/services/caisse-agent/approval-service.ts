@@ -882,7 +882,7 @@ export class ApprovalService {
       .returning();
 
     // NEW: Insérer dans la table métier contributionsTontine
-    const refContribution = generateReference("CONTRIBUTION" as any);
+    const refContribution = generateReference("CONTRIBUTION");
     await tx.insert(contributionsTontine).values({
       tontineId: metadata.tontineId!,
       clientId: operation.clientId,
@@ -1200,7 +1200,7 @@ export class ApprovalService {
           metadata: { settledFromPartialRemise: true, operationId: operation.id },
         }).returning();
         clientMvt = mvt;
-        const refContrib = generateReference("CONTRIBUTION" as any);
+        const refContrib = generateReference("CONTRIBUTION");
         await tx.insert(contributionsTontine).values({
           tontineId: paiement.tontineId,
           clientId: paiement.clientId,

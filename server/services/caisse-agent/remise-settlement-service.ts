@@ -32,6 +32,7 @@ import {
   sessionsCaisse,
   caisses,
   operationsCaisse,
+  clients,
   users,
   remboursements,
   transactionsCompte,
@@ -130,7 +131,7 @@ export class RemiseSettlementService {
       const montantCalcule = paiements.reduce((sum, p) => sum + parseFloat(p.montant), 0);
 
       // 4. Créer le bordereau de remise
-      const reference = `REM-${generateReference("REMISE" as any)}`;
+      const reference = `REM-${generateReference("REMISE")}`;
       const [remise] = await tx
         .insert(remisesTerrain)
         .values({
@@ -185,7 +186,7 @@ export class RemiseSettlementService {
 
       // 8. Outbox event
       await tx.insert(evenementsOutbox).values({
-        type: "REMISE_CREATED" as any,
+        type: "REMISE_CREATED",
         aggregateType: "remise_terrain",
         aggregateId: remise.id,
         payload: {
@@ -307,7 +308,7 @@ export class RemiseSettlementService {
       }
 
       // Mouvement de sortie caisse agent
-      const refCaisseAgent = generateReference("CAISSE_AGENT" as any);
+      const refCaisseAgent = generateReference("CAISSE_AGENT");
       const [mouvementSortieCaisseAgent] = await tx
         .insert(mouvementsFinanciers)
         .values({
@@ -318,7 +319,7 @@ export class RemiseSettlementService {
           methodePaiement: "CASH",
           reference: refCaisseAgent,
           agentId: remise.agentId,
-          sourceModule: "CAISSE_AGENT" as any,
+          sourceModule: "CAISSE_AGENT",
           sourceTable: "remises_terrain",
           sourceId: remise.id,
           createdBy: params.validatedBy,
@@ -392,19 +393,50 @@ export class RemiseSettlementService {
           ? `${agentUser.prenom || ''} ${agentUser.nom || ''}`.trim()
           : remise.agentId;
 
+        // 7b. Résoudre les noms clients pour le détail embarqué dans le metadata
+        const detailPaiements = [];
+        for (const paiement of paiements) {
+          const [clientData] = await tx
+            .select({ nom: clients.nom, prenom: clients.prenom })
+            .from(clients)
+            .where(eq(clients.id, paiement.clientId));
+
+          const clientName = clientData
+            ? `${clientData.prenom || ''} ${clientData.nom || ''}`.trim()
+            : 'Client';
+
+          const typePaiementLabel =
+            paiement.typePaiement === 'CREDIT_REPAYMENT' ? 'Remb. crédit' :
+            paiement.typePaiement === 'DEPOSIT_SAVINGS' ? 'Dépôt épargne' :
+            paiement.typePaiement === 'TONTINE_CONTRIBUTION' ? 'Cotisation tontine' :
+            paiement.typePaiement;
+
+          detailPaiements.push({
+            paiementId: paiement.id,
+            clientId: paiement.clientId,
+            clientName,
+            typePaiement: paiement.typePaiement,
+            typePaiementLabel,
+            montant: parseFloat(paiement.montant),
+          });
+        }
+
         await tx.insert(operationsCaisse).values({
           sessionId: targetSessionId,
           mouvementId: mouvementEntreeCaisse.id,
-          typeOperation: "AGENT_SETTLEMENT" as any,
+          typeOperation: TypeOperationCaisse.AGENT_SETTLEMENT,
           statut: StatutTransaction.POSTED,
           montant: remise.montantCalcule,
           methodePaiement: "CASH",
           reference: refCaisse,
-          description: `Remise agent terrain - ${agentDisplayName}`,
+          description: `Remise agent terrain - ${agentDisplayName} (${paiements.length} opération${paiements.length > 1 ? 's' : ''})`,
           createdBy: params.validatedBy,
           metadata: {
             remiseId: remise.id,
             agentId: remise.agentId,
+            agentName: agentDisplayName,
+            paiementCount: paiements.length,
+            detailPaiements,
           },
         });
       } else {
@@ -451,7 +483,7 @@ export class RemiseSettlementService {
 
       // 10. Outbox events
       await tx.insert(evenementsOutbox).values({
-        type: "REMISE_SETTLED" as any,
+        type: "REMISE_SETTLED",
         aggregateType: "remise_terrain",
         aggregateId: remise.id,
         payload: {
@@ -464,7 +496,7 @@ export class RemiseSettlementService {
 
       // Notification changement solde caisse agent
       await tx.insert(evenementsOutbox).values({
-        type: "CAISSE_AGENT_SOLDE_CHANGE" as any,
+        type: "CAISSE_AGENT_SOLDE_CHANGE",
         aggregateType: "caisse_agent",
         aggregateId: caisseAgent.id,
         payload: {
@@ -675,7 +707,7 @@ export class RemiseSettlementService {
       .returning();
 
     // Créer l'entrée dans contributionsTontine
-    const refContribution = generateReference("CONTRIBUTION" as any);
+    const refContribution = generateReference("CONTRIBUTION");
     await tx.insert(contributionsTontine).values({
       tontineId: paiement.tontineId!,
       clientId: paiement.clientId,
@@ -819,7 +851,7 @@ export class RemiseSettlementService {
 
       // Outbox event
       await tx.insert(evenementsOutbox).values({
-        type: "REMISE_REJECTED" as any,
+        type: "REMISE_REJECTED",
         aggregateType: "remise_terrain",
         aggregateId: remise.id,
         payload: {

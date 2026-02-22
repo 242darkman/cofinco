@@ -698,7 +698,7 @@ export class OperationService {
 
         // For PROVISIONING ops, resolve source caisse from metadata.sessionCaisseId
         let sourceCaisse = null;
-        const metaSessionCaisseId = (op.metadata as any)?.sessionCaisseId;
+        const metaSessionCaisseId = (op.metadata as Record<string, unknown>)?.sessionCaisseId;
         if (op.type === 'PROVISIONING' && metaSessionCaisseId) {
           const [caisseData] = await db
             .select({ id: caisses.id, nom: caisses.nom })

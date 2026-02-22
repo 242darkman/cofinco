@@ -483,7 +483,7 @@ caisseAgentRouter.get(
         dateTo: parsed.data.dateTo ? new Date(parsed.data.dateTo) : undefined,
       };
 
-      const result = await operationService.getOperations(filters as any, user.id, user.role, user.agenceId);
+      const result = await operationService.getOperations(filters as Parameters<typeof operationService.getOperations>[0], user.id, user.role, user.agenceId);
 
       res.json({
         operations: result.operations,
@@ -679,7 +679,7 @@ caisseAgentRouter.get(
       const result = await operationService.getOperations({
         agentId,
         ...parsed.data,
-      } as any);
+      } as Parameters<typeof operationService.getOperations>[0]);
 
       res.json({
         operations: result.operations,
