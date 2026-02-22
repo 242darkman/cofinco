@@ -20,9 +20,10 @@ import { UniversalPaymentSuccessModal } from './shared/UniversalPaymentSuccessMo
 import { PaymentStatusModal, PaymentStatus } from '../payments';
 import { ReceiptData } from '../../ui/printable/ReceiptTemplate';
 import { authService } from '../../../lib/auth';
-import { StatutCredit, TypeCompte, TypeOperationCaisse } from '@shared/enum/status-constants';
+import { StatutCredit, TypeCompte, TypeOperationCaisse, FREQUENCE_TONTINE_LABELS } from '@shared/enum/status-constants';
 import { isIncomingOperation } from '@shared/config/caisse-operations';
 import { useOperationInfo } from './hooks/useOperationInfo';
+import { useClientOperations } from './hooks/useClientOperations';
 import { currencySymbol } from '@shared/config/currency';
 import type { CaisseTransaction } from '../../../types/finance';
 import airtelLogo from '@/assets/logos/airtel-logo.png';
@@ -250,18 +251,68 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
   } | null>(null);
   const [loadingFeeEstimate, setLoadingFeeEstimate] = useState(false);
 
-  // ── Credit / Tontine / Comptes Data ──
-  const [creditsActifs, setCreditsActifs] = useState<CreditInfo[]>([]);
+  // ── Credit / Tontine / Comptes Data (via hook) ──
+  const {
+    clientCredits: creditsActifs,
+    clientTontines: hookTontines,
+    clientAccounts: comptesClient,
+    loading: loadingClientOps,
+    hasCredits: clientHasCredits,
+    hasCreditsForDisbursement: clientHasCreditsForDisbursement,
+    hasTontines: clientHasTontines,
+    hasAccountType: clientHasAccountType,
+  } = useClientOperations(selectedClient?.id);
+
+  // Map hook tontine shape to local TontineInfo for useOperationInfo compatibility
+  const tontinesActives = useMemo<TontineInfo[]>(() =>
+    hookTontines.map(t => ({ id: t.tontineId, nom: t.tontine.nom, montantCotisation: t.tontine.montantCotisation })),
+    [hookTontines]
+  );
+
   const [creditSelectionne, setCreditSelectionne] = useState<CreditInfo | null>(null);
   const [prochaineEcheance, setProchaineEcheance] = useState<EcheanceInfo | null>(null);
-  const [tontinesActives, setTontinesActives] = useState<TontineInfo[]>([]);
   const [tontineSelectionnee, setTontineSelectionnee] = useState<TontineInfo | null>(null);
-  const [comptesClient, setComptesClient] = useState<CompteInfo[]>([]);
 
   // ── Receipt & Success ──
   const [lastOperationData, setLastOperationData] = useState<LastOperationInfo | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [receiptData, setReceiptData] = useState<ReceiptData | undefined>(undefined);
+
+  // ── Filtered sub-type pills based on client data ──
+  const availableDepotSubTypes = useMemo<TypeDepot[]>(() => {
+    if (!selectedClient) return [];
+    const types: TypeDepot[] = [];
+    if (clientHasAccountType('CURRENT')) types.push('Compte Courant');
+    if (clientHasAccountType('SAVINGS')) types.push('Compte Épargne');
+    if (clientHasAccountType('BLOCKED')) types.push('Compte Bloqué');
+    if (clientHasTontines) types.push('Cotisation Tontine');
+    if (clientHasCredits) types.push('Remboursement Crédit');
+    return types;
+  }, [selectedClient, clientHasAccountType, clientHasTontines, clientHasCredits]);
+
+  const availableRetraitSubTypes = useMemo<TypeRetrait[]>(() => {
+    if (!selectedClient) return [];
+    const types: TypeRetrait[] = [];
+    if (clientHasAccountType('CURRENT')) types.push('Retrait Compte Courant');
+    if (clientHasAccountType('SAVINGS')) types.push('Retrait Épargne');
+    if (clientHasCreditsForDisbursement) types.push('Décaissement Crédit');
+    if (clientHasTontines) types.push('Distribution Tontine');
+    return types;
+  }, [selectedClient, clientHasAccountType, clientHasCreditsForDisbursement, clientHasTontines]);
+
+  // Reset sub-type if it becomes unavailable after client change
+  useEffect(() => {
+    if (typeOperation === 'Dépôt' && typeDepot && !availableDepotSubTypes.includes(typeDepot)) {
+      setTypeDepot(null);
+      setMontant('');
+      setMontantError(null);
+    }
+    if (typeOperation === 'Retrait' && typeRetrait && !availableRetraitSubTypes.includes(typeRetrait)) {
+      setTypeRetrait(null);
+      setMontant('');
+      setMontantError(null);
+    }
+  }, [availableDepotSubTypes, availableRetraitSubTypes, typeOperation, typeDepot, typeRetrait]);
 
   // ── Dynamic Info Hook ──
   const { infoCardData, suggestedAmount, loading: infoLoading } = useOperationInfo({
@@ -507,15 +558,7 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
 
       if (data) {
         setSelectedClient(data);
-        // Load related data in parallel
-        const [credits, tontines, comptes] = await Promise.all([
-          creditApi.getAll({ clientId: data.id, statut: StatutCredit.ACTIVE }).catch(() => []),
-          tontineApi.getByClient(data.id).catch(() => []),
-          compteEpargneApi.getByClient(data.id).catch(() => [])
-        ]);
-        setCreditsActifs(credits || []);
-        setTontinesActives(tontines || []);
-        setComptesClient(comptes || []);
+        // Credits, tontines, comptes are now loaded by useClientOperations hook
         toast.success(`Client ${escapeHtml(data.nom)} ${escapeHtml(data.prenom || '')} sélectionné`);
       } else {
         toast.warning('Aucun client trouvé avec ces critères');
@@ -810,11 +853,11 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
         feeOption: feeOption || undefined
       };
 
-      if ((subType === 'Remboursement Crédit' || subType === 'Décaissement Crédit') && creditsActifs.length > 0) {
-        payload.creditId = creditsActifs[0].id;
+      if ((subType === 'Remboursement Crédit' || subType === 'Décaissement Crédit') && creditSelectionne) {
+        payload.creditId = creditSelectionne.id;
       }
-      if ((subType === 'Cotisation Tontine' || subType === 'Distribution Tontine') && tontinesActives.length > 0) {
-        payload.tontineId = tontinesActives[0].id;
+      if ((subType === 'Cotisation Tontine' || subType === 'Distribution Tontine') && tontineSelectionnee) {
+        payload.tontineId = tontineSelectionnee.id;
       }
       if (comptesClient.length > 0 && !payload.creditId && !payload.tontineId) {
         payload.compteId = comptesClient[0].id;
@@ -845,7 +888,7 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
     } finally {
       setLoading(false);
     }
-  }, [selectedClient, typeOperation, typeDepot, typeRetrait, montant, phoneNumber, moyenPaiement, user, sessionId, creditsActifs, tontinesActives, comptesClient]);
+  }, [selectedClient, typeOperation, typeDepot, typeRetrait, montant, phoneNumber, moyenPaiement, user, sessionId, creditSelectionne, tontineSelectionnee, comptesClient]);
 
   const handleMoMoSubmit = useCallback(async () => {
     const subType = typeOperation === 'Dépôt' ? typeDepot : typeRetrait;
@@ -1190,36 +1233,45 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
                   </div>
                 </div>
 
-                {/* Step 2: Sub-type pills */}
+                {/* Step 2: Sub-type pills (filtered by client data) */}
                 {typeOperation && (
                   <div className="animate-in fade-in slide-in-from-top-2">
-                    <label className="text-[9px] uppercase tracking-wider text-content-muted font-bold mb-1.5 block">Destination</label>
-                    <div className="flex flex-wrap gap-1.5">
-                      {(typeOperation === 'Dépôt'
-                        ? ['Compte Courant', 'Compte Épargne', 'Compte Bloqué', 'Cotisation Tontine', 'Remboursement Crédit']
-                        : ['Retrait Compte Courant', 'Retrait Épargne', 'Décaissement Crédit', 'Distribution Tontine']
-                      ).map((subType: string) => (
-                        <button
-                          key={subType}
-                          onClick={() => {
-                            if (typeOperation === 'Dépôt') setTypeDepot(subType as TypeDepot);
-                            else setTypeRetrait(subType as TypeRetrait);
-                            setCreditSelectionne(null);
-                            setTontineSelectionnee(null);
-                            setMontant('');
-                            setMontantError(null);
-                            setMoyenPaiement(null);
-                          }}
-                          className={`px-2.5 py-1 rounded-md text-[10px] font-medium border transition-all ${
-                            (typeDepot === subType || typeRetrait === subType)
-                              ? 'bg-surface-elevated text-content-primary border-edge-strong shadow-sm'
-                              : 'bg-transparent border-edge text-content-muted hover:border-edge'
-                          }`}
-                        >
-                          {subType}
-                        </button>
-                      ))}
-                    </div>
+                    <label className="text-[9px] uppercase tracking-wider text-content-muted font-bold mb-1.5 block">
+                      {typeOperation === 'Dépôt' ? 'Destination' : 'Source'}
+                    </label>
+                    {loadingClientOps ? (
+                      <div className="flex items-center gap-2 text-xs text-content-muted py-1">
+                        <Loader2 size={12} className="animate-spin" /> Chargement...
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5">
+                        {(typeOperation === 'Dépôt' ? availableDepotSubTypes : availableRetraitSubTypes
+                        ).map((subType: string) => (
+                          <button
+                            key={subType}
+                            onClick={() => {
+                              if (typeOperation === 'Dépôt') setTypeDepot(subType as TypeDepot);
+                              else setTypeRetrait(subType as TypeRetrait);
+                              setCreditSelectionne(null);
+                              setTontineSelectionnee(null);
+                              setMontant('');
+                              setMontantError(null);
+                              setMoyenPaiement(null);
+                            }}
+                            className={`px-2.5 py-1 rounded-md text-[10px] font-medium border transition-all ${
+                              (typeDepot === subType || typeRetrait === subType)
+                                ? 'bg-surface-elevated text-content-primary border-edge-strong shadow-sm'
+                                : 'bg-transparent border-edge text-content-muted hover:border-edge'
+                            }`}
+                          >
+                            {subType}
+                          </button>
+                        ))}
+                        {(typeOperation === 'Dépôt' ? availableDepotSubTypes : availableRetraitSubTypes).length === 0 && (
+                          <p className="text-[10px] text-content-muted py-1">Aucune opération disponible pour ce type</p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1292,6 +1344,35 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
                               <div className="text-[10px] text-content-muted mt-0.5">Reste: <span className="text-status-info font-bold">{formatMoney(credit.solde_restant)}</span></div>
                             </div>
                           ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tontine selector */}
+                    {((typeDepot === 'Cotisation Tontine') || (typeRetrait === 'Distribution Tontine')) && tontinesActives.length > 0 && (
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] font-bold text-content-muted uppercase tracking-wider">Tontine</label>
+                        <div className="flex overflow-x-auto gap-2 pb-1 scrollbar-thin scrollbar-thumb-edge">
+                          {hookTontines.map((t) => {
+                            const tInfo = tontinesActives.find(ta => ta.id === t.tontineId);
+                            return (
+                              <div
+                                key={t.tontineId}
+                                onClick={() => tInfo && setTontineSelectionnee(tInfo)}
+                                className={`min-w-[160px] p-2.5 rounded-xl border cursor-pointer transition-all ${
+                                  tontineSelectionnee?.id === t.tontineId
+                                    ? 'border-accent/50 bg-accent/5 shadow-lg'
+                                    : 'border-edge bg-surface-base/50 hover:border-edge-strong'
+                                }`}
+                              >
+                                <div className="text-xs font-bold text-content-secondary truncate">{escapeHtml(t.tontine.nom)}</div>
+                                <div className="text-[10px] text-content-muted mt-0.5">
+                                  {formatMoney(t.tontine.montantCotisation)}/
+                                  {FREQUENCE_TONTINE_LABELS[t.tontine.frequence as keyof typeof FREQUENCE_TONTINE_LABELS] || t.tontine.frequence}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     )}

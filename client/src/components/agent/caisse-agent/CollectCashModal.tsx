@@ -5,12 +5,13 @@
  * effectuée chez un client.
  */
 
-import React, { useState, useEffect } from 'react';
-import { X, Search, User, Wallet, FileText, MapPin, CreditCard, PiggyBank } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { FileText, MapPin, CreditCard, PiggyBank } from 'lucide-react';
 import { toast } from 'sonner';
 import { Modal, Button, FormField, SelectField, SearchableSelect } from '../../ui';
-import { caisseAgentApi, clientApi, creditApi, compteEpargneApi } from '../../../lib/api-client';
-import { StatutCredit, TypeOperationTerrain, TYPE_OPERATION_TERRAIN_LABELS } from '@shared/enum/status-constants';
+import { caisseAgentApi, clientApi } from '../../../lib/api-client';
+import { TypeOperationTerrain, TYPE_OPERATION_TERRAIN_LABELS } from '@shared/enum/status-constants';
+import { useClientOperations } from '../../finance/caisse/hooks/useClientOperations';
 
 interface CollectCashModalProps {
   agentId: string;
@@ -67,8 +68,6 @@ export default function CollectCashModal({
   const [loading, setLoading] = useState(false);
   const [loadingClients, setLoadingClients] = useState(true);
   const [clients, setClients] = useState<any[]>([]);
-  const [clientCredits, setClientCredits] = useState<any[]>([]);
-  const [clientComptes, setClientComptes] = useState<any[]>([]);
 
   // Form state
   const [selectedClientId, setSelectedClientId] = useState('');
@@ -81,6 +80,33 @@ export default function CollectCashModal({
   const [useGeolocation, setUseGeolocation] = useState(false);
   const [latitude, setLatitude] = useState<number | undefined>();
   const [longitude, setLongitude] = useState<number | undefined>();
+
+  // Client operations hook — filters available types based on client data
+  const {
+    clientCredits,
+    clientAccounts: clientComptes,
+    availableTerrainOperations,
+    loading: loadingClientOps,
+  } = useClientOperations(selectedClientId || null);
+
+  // Filtered type options from hook
+  const filteredTypeOptions = useMemo(() => {
+    if (!selectedClientId) return TYPE_PAIEMENT_OPTIONS;
+    if (availableTerrainOperations.length === 0 && !loadingClientOps) return [];
+    return availableTerrainOperations;
+  }, [selectedClientId, availableTerrainOperations, loadingClientOps]);
+
+  // Reset typePaiement if it becomes unavailable after client change
+  useEffect(() => {
+    if (selectedClientId && typePaiement && filteredTypeOptions.length > 0) {
+      const stillAvailable = filteredTypeOptions.some(opt => opt.value === typePaiement);
+      if (!stillAvailable) {
+        setTypePaiement('');
+        setCreditId('');
+        setCompteId('');
+      }
+    }
+  }, [filteredTypeOptions, selectedClientId, typePaiement]);
 
   // Load clients
   useEffect(() => {
@@ -97,29 +123,6 @@ export default function CollectCashModal({
     };
     loadClients();
   }, []);
-
-  // Load client's credits and accounts when selected
-  useEffect(() => {
-    if (!selectedClientId) {
-      setClientCredits([]);
-      setClientComptes([]);
-      return;
-    }
-
-    const loadClientData = async () => {
-      try {
-        const [credits, comptes] = await Promise.all([
-          creditApi.getByClient(selectedClientId),
-          compteEpargneApi.getByClient(selectedClientId)
-        ]);
-        setClientCredits(credits?.filter((c: any) => c.statut === StatutCredit.ACTIVE || c.statut === StatutCredit.LATE) || []);
-        setClientComptes(comptes || []);
-      } catch (error) {
-        console.error('Erreur chargement données client:', error);
-      }
-    };
-    loadClientData();
-  }, [selectedClientId]);
 
   // Get geolocation
   useEffect(() => {
@@ -197,12 +200,12 @@ export default function CollectCashModal({
 
   const creditOptions = clientCredits.map((c) => ({
     value: c.id,
-    label: `Crédit #${c.numero || c.id.slice(0, 8)} - ${new Intl.NumberFormat('fr-FR').format(c.soldeRestant || 0)} XOF`
+    label: `Crédit #${c.numeroCredit || c.id.slice(0, 8)} - ${new Intl.NumberFormat('fr-FR').format(Number(c.solde_restant || c.soldeRestant || 0))} XOF`
   }));
 
-  const compteOptions = clientComptes.map((c) => ({
+  const compteOptions = clientComptes.map((c: any) => ({
     value: c.id,
-    label: `${c.typeCompte || 'Épargne'} - ${c.numero || c.id.slice(0, 8)}`,
+    label: `${c.typeCompte || 'Épargne'} - ${c.numeroCompte || c.id.slice(0, 8)}`,
     typeCompte: c.typeCompte,
     solde: c.soldeCourant,
   }));
@@ -256,9 +259,19 @@ export default function CollectCashModal({
             setCreditId('');
             setCompteId('');
           }}
-          options={TYPE_PAIEMENT_OPTIONS}
+          options={selectedClientId ? filteredTypeOptions : TYPE_PAIEMENT_OPTIONS}
           required
           icon={FileText}
+          disabled={!selectedClientId || loadingClientOps}
+          helperText={
+            !selectedClientId
+              ? 'Sélectionnez d\'abord un client'
+              : loadingClientOps
+                ? 'Chargement des données client...'
+                : filteredTypeOptions.length === 0
+                  ? 'Ce client n\'a aucun produit actif'
+                  : undefined
+          }
         />
 
         {/* Credit selection (si remboursement) */}

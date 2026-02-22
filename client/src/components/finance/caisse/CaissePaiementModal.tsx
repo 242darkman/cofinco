@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { X, User, FileText, Users, CreditCard, ArrowDownLeft, ArrowUpRight, Loader2, Banknote, CheckCircle, Building2 } from 'lucide-react';
+import { X, User, FileText, Users, CreditCard, ArrowDownLeft, ArrowUpRight, Loader2, Banknote, CheckCircle, Building2, Wallet } from 'lucide-react';
 import mtnMomoLogo from '../../../assets/logos/mtn-logo.png';
 import airtelMoneyLogo from '../../../assets/logos/airtel-logo.png';
 import SearchableSelect from '../../ui/SearchableSelect';
 import { saveToLoge } from '../../../lib/loge-storage';
 import { usePermissions } from '../../auth/ProtectedFeature';
-import { clientApi, clientSearchApi, transactionApi, compteEpargneApi } from '../../../lib/api-client';
+import { clientApi, transactionApi, echeanceCreditApi, tontineApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { formatMoney } from '../../../lib/format';
 import { VALIDATION_LIMITS } from '../../../lib/validation';
@@ -16,9 +16,6 @@ import { currencySymbol } from '@shared/config/currency';
 import { useBranding } from '@/contexts/BrandingContext';
 import { v4 as uuidv4 } from 'uuid';
 import {
-  StatutCompte,
-  StatutParticipationTontine,
-  StatutTransaction,
   TypeOperationCaisse,
   MethodePaiement,
   MethodePaiementType,
@@ -28,24 +25,9 @@ import {
   getOperationCaisseLabel,
   METHODE_PAIEMENT_LABELS,
   FREQUENCE_TONTINE_LABELS,
-  FrequenceTontineType
 } from '@shared/enum/status-constants';
 import { getStatusLabel, ACCOUNT_TYPE_LABELS } from '../../../lib/status-labels';
-
-interface ClientTontine {
-  id: string;
-  tontineId: string;
-  clientId: string;
-  statut: string;
-  totalCotisations: string;
-  tontine: {
-    id: string;
-    nom: string;
-    montantCotisation: string;
-    frequence: string;
-    statut: string;
-  };
-}
+import { useClientOperations, type ClientTontineInfo, type ClientCreditInfo } from './hooks/useClientOperations';
 
 interface CaissePaiementModalProps {
   sessionId: string;
@@ -92,9 +74,7 @@ export default function CaissePaiementModal({
   const [clients, setClients] = useState<any[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const [clientTontines, setClientTontines] = useState<ClientTontine[]>([]);
-  const [selectedTontine, setSelectedTontine] = useState<ClientTontine | null>(null);
-  const [loadingTontines, setLoadingTontines] = useState(false);
+  const [selectedTontine, setSelectedTontine] = useState<ClientTontineInfo | null>(null);
   const [showReceipt, setShowReceipt] = useState(false);
   const [receiptData, setReceiptData] = useState<ReceiptData | undefined>(undefined);
   const [factureId, setFactureId] = useState<string | undefined>(undefined);
@@ -108,13 +88,17 @@ export default function CaissePaiementModal({
     feeOption: string;
   } | null>(null);
   const [loadingFeeEstimate, setLoadingFeeEstimate] = useState(false);
-  const [clientAccounts, setClientAccounts] = useState<any[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
-  const [selectedAccount, setSelectedAccount] = useState<any>(null); // Full object for status check
+  const [selectedAccount, setSelectedAccount] = useState<any>(null);
 
-  // Client Summary State
-  const [clientCredits, setClientCredits] = useState<any[]>([]);
-  const [activeTontinesCount, setActiveTontinesCount] = useState(0);
+  // Credit selection state
+  const [selectedCredit, setSelectedCredit] = useState<ClientCreditInfo | null>(null);
+  const [prochaineEcheance, setProchaineEcheance] = useState<{ montantTotal: number; dateEcheance?: string } | null>(null);
+  const [loadingEcheance, setLoadingEcheance] = useState(false);
+
+  // Tontine retirable amount
+  const [retirableAmount, setRetirableAmount] = useState<number | null>(null);
+  const [loadingRetirable, setLoadingRetirable] = useState(false);
 
   const [formData, setFormData] = useState<FormData>({
     client_id: preSelectedClientId || '',
@@ -154,6 +138,20 @@ export default function CaissePaiementModal({
       }));
     }
   }, [initialType]);
+
+  // Client operations hook — provides filtered operations + client data
+  const {
+    clientCredits,
+    clientTontines,
+    clientAccounts,
+    activeTontinesCount,
+    loading: loadingClientData,
+    hasCredits,
+    hasCreditsForDisbursement,
+    hasTontines,
+    hasAccountType,
+    availableCaisseOperations,
+  } = useClientOperations(formData.client_id || null);
 
   const idempotencyKey = useMemo(() => uuidv4(), []);
 
@@ -214,6 +212,10 @@ export default function CaissePaiementModal({
     TypeOperationCaisse.WITHDRAWAL_BLOCKED
   ] as readonly string[]).includes(formData.type_operation);
 
+  const isCreditOperation =
+    formData.type_operation === TypeOperationCaisse.LOAN_REPAYMENT ||
+    formData.type_operation === TypeOperationCaisse.CREDIT_DISBURSEMENT;
+
   const loadClients = useCallback(async () => {
     try {
       const data = await clientApi.getAllList();
@@ -230,77 +232,105 @@ export default function CaissePaiementModal({
     }
   }, [loadClients, canCreatePayments]);
 
-  const selectTontine = useCallback((tontine: ClientTontine) => {
+  const selectTontine = useCallback(async (tontine: ClientTontineInfo) => {
     setSelectedTontine(tontine);
-    const montantCotisation = tontine.tontine.montantCotisation;
-    setFormData(prev => ({
-      ...prev,
-      montant: montantCotisation,
-      description: sanitizeInput(`Cotisation ${tontine.tontine.nom} - ${(FREQUENCE_TONTINE_LABELS as Record<string, string>)[tontine.tontine.frequence] || tontine.tontine.frequence}`)
-    }));
     setErrors(prev => {
       const newErrors = { ...prev };
       delete newErrors.montant;
       delete newErrors.tontine;
       return newErrors;
     });
-  }, []);
 
+    if (formData.type_operation === TypeOperationCaisse.TONTINE_CONTRIBUTION) {
+      // Pre-fill with cotisation amount
+      const montantCotisation = tontine.tontine.montantCotisation;
+      setFormData(prev => ({
+        ...prev,
+        montant: montantCotisation,
+        description: sanitizeInput(`Cotisation ${tontine.tontine.nom} - ${(FREQUENCE_TONTINE_LABELS as Record<string, string>)[tontine.tontine.frequence] || tontine.tontine.frequence}`)
+      }));
+    } else if (formData.type_operation === TypeOperationCaisse.TONTINE_WITHDRAWAL) {
+      // Fetch retirable amount for withdrawal
+      setLoadingRetirable(true);
+      setRetirableAmount(null);
+      try {
+        const result = await tontineApi.getRetirable(tontine.tontineId, tontine.id);
+        const amount = typeof result === 'number' ? result : parseFloat(result?.montant || result?.amount || '0');
+        setRetirableAmount(amount);
+        if (amount > 0) {
+          setFormData(prev => ({
+            ...prev,
+            montant: amount.toString(),
+            description: sanitizeInput(`Retrait ${tontine.tontine.nom}`)
+          }));
+        } else {
+          setFormData(prev => ({
+            ...prev,
+            montant: '',
+            description: sanitizeInput(`Retrait ${tontine.tontine.nom}`)
+          }));
+        }
+      } catch {
+        setRetirableAmount(0);
+        setFormData(prev => ({
+          ...prev,
+          description: sanitizeInput(`Retrait ${tontine.tontine.nom}`)
+        }));
+      } finally {
+        setLoadingRetirable(false);
+      }
+    }
+  }, [formData.type_operation]);
+
+  // Auto-fill phone from selected client
   useEffect(() => {
     if (formData.client_id) {
-        // Auto-fill phone from selected client
-        const selectedCl = clients.find(c => c.id === formData.client_id);
-        if (selectedCl?.telephone && !formData.numero_telephone) {
-          setFormData(prev => ({ ...prev, numero_telephone: selectedCl.telephone }));
-        }
+      const selectedCl = clients.find(c => c.id === formData.client_id);
+      if (selectedCl?.telephone && !formData.numero_telephone) {
+        setFormData(prev => ({ ...prev, numero_telephone: selectedCl.telephone }));
+      }
+    }
+  }, [formData.client_id, clients]);
 
-        setLoadingTontines(true);
-        const displayClientSummary = async () => {
-             try {
-                 const credits = await clientSearchApi.getCredits(formData.client_id, { statut: 'Accordé' });
-                 setClientCredits(credits || []);
-
-                 const tontines = await clientSearchApi.getTontines(formData.client_id);
-                 setClientTontines(tontines || []);
-                 setActiveTontinesCount((tontines || []).filter(t =>
-                   t.statut === StatutParticipationTontine.ACTIVE || isActiveStatus(t.statut)
-                 ).length);
-
-                 if (isTontineOperation && tontines && tontines.length === 1) {
-                      selectTontine(tontines[0]);
-                 }
-
-                 const comptes = await compteEpargneApi.getByClient(formData.client_id);
-                 setClientAccounts(comptes || []);
-
-                 if (preSelectedAccountId && comptes) {
-                     const preSelected = comptes.find((c: any) => c.id === preSelectedAccountId);
-                     if (preSelected) {
-                         setSelectedAccountId(preSelectedAccountId);
-                         setSelectedAccount(preSelected);
-                     }
-                 } else if (comptes?.length === 1) {
-                     setSelectedAccountId(comptes[0].id);
-                     setSelectedAccount(comptes[0]);
-                 }
-             } catch (err) {
-                 console.error("Error loading client details", err);
-             } finally {
-                 setLoadingTontines(false);
-             }
-        }
-        displayClientSummary();
-    } else {
-      setClientTontines([]);
-      setClientCredits([]);
-      setSelectedTontine(null);
-      setClientAccounts([]);
+  // Reset selections when client changes
+  useEffect(() => {
+    setSelectedTontine(null);
+    setSelectedCredit(null);
+    setProchaineEcheance(null);
+    setRetirableAmount(null);
+    if (!formData.client_id) {
       setSelectedAccountId('');
       setSelectedAccount(null);
-      setActiveTontinesCount(0);
-      setLoadingTontines(false);
     }
-  }, [formData.client_id, isTontineOperation, selectTontine, preSelectedAccountId]);
+  }, [formData.client_id]);
+
+  // Reset operation type if it becomes unavailable for new client
+  useEffect(() => {
+    if (!formData.client_id || loadingClientData) return;
+    const currentOp = formData.type_operation;
+    const isAvailable = availableCaisseOperations.some(op => op.value === currentOp);
+    if (!isAvailable && availableCaisseOperations.length > 0) {
+      setFormData(prev => ({ ...prev, type_operation: availableCaisseOperations[0].value }));
+    }
+  }, [formData.client_id, availableCaisseOperations, loadingClientData]);
+
+  // Auto-select account when hook data loads (for pre-selected accounts or single account)
+  useEffect(() => {
+    if (preSelectedAccountId && clientAccounts.length > 0) {
+      const preSelected = clientAccounts.find(c => c.id === preSelectedAccountId);
+      if (preSelected) {
+        setSelectedAccountId(preSelectedAccountId);
+        setSelectedAccount(preSelected);
+      }
+    }
+  }, [preSelectedAccountId, clientAccounts]);
+
+  // Auto-select single tontine when applicable
+  useEffect(() => {
+    if (isTontineOperation && clientTontines.length === 1 && !selectedTontine) {
+      selectTontine(clientTontines[0]);
+    }
+  }, [isTontineOperation, clientTontines, selectedTontine, selectTontine]);
 
   const filteredAccounts = useMemo(() => {
      if (!clientAccounts) return [];
@@ -329,6 +359,61 @@ export default function CaissePaiementModal({
          }
      }
   }, [isAccountOperation, filteredAccounts, selectedAccountId]);
+
+  // Credit selection: load next instalment when credit is selected
+  const selectCredit = useCallback(async (credit: ClientCreditInfo) => {
+    setSelectedCredit(credit);
+    setErrors(prev => { const { credit: _, ...rest } = prev; return rest; });
+
+    if (formData.type_operation === TypeOperationCaisse.LOAN_REPAYMENT) {
+      setLoadingEcheance(true);
+      try {
+        const echeance = await echeanceCreditApi.getProchaine(credit.id);
+        if (echeance) {
+          setProchaineEcheance(echeance);
+          setFormData(prev => ({
+            ...prev,
+            montant: echeance.montantTotal.toString(),
+            description: sanitizeInput(`Remboursement crédit #${credit.numeroCredit}`)
+          }));
+        } else {
+          setProchaineEcheance(null);
+          setFormData(prev => ({
+            ...prev,
+            description: sanitizeInput(`Remboursement crédit #${credit.numeroCredit}`)
+          }));
+        }
+      } catch {
+        setProchaineEcheance(null);
+      } finally {
+        setLoadingEcheance(false);
+      }
+    } else if (formData.type_operation === TypeOperationCaisse.CREDIT_DISBURSEMENT) {
+      const montant = parseFloat(String(credit.montant || '0'));
+      if (montant > 0) {
+        setFormData(prev => ({
+          ...prev,
+          montant: montant.toString(),
+          description: sanitizeInput(`Décaissement crédit #${credit.numeroCredit}`)
+        }));
+      }
+    }
+  }, [formData.type_operation]);
+
+  // Auto-select single credit when applicable
+  useEffect(() => {
+    if (isCreditOperation && clientCredits.length === 1 && !selectedCredit) {
+      selectCredit(clientCredits[0]);
+    }
+  }, [isCreditOperation, clientCredits, selectedCredit, selectCredit]);
+
+  // Reset credit/tontine selections when operation type changes
+  useEffect(() => {
+    setSelectedTontine(null);
+    setSelectedCredit(null);
+    setProchaineEcheance(null);
+    setRetirableAmount(null);
+  }, [formData.type_operation]);
 
   const genererReference = useCallback(() => {
     const date = new Date();
@@ -381,13 +466,16 @@ export default function CaissePaiementModal({
     if (isTontineOperation && !selectedTontine) {
       newErrors.tontine = 'Veuillez sélectionner une tontine';
     }
+    if (isCreditOperation && !selectedCredit) {
+      newErrors.credit = 'Veuillez sélectionner un crédit';
+    }
     if (isAccountOperation && !selectedAccountId) {
       newErrors.account = 'Veuillez sélectionner un compte';
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [formData, isTontineOperation, selectedTontine, isAccountOperation, selectedAccountId]);
+  }, [formData, isTontineOperation, selectedTontine, isCreditOperation, selectedCredit, isAccountOperation, selectedAccountId]);
 
   const generateReceiptHTML = useCallback((data: ReceiptData) => {
     const now = new Date();
@@ -447,12 +535,13 @@ export default function CaissePaiementModal({
         amount: Number(formData.montant),
         paymentMethod: formData.mode_paiement,
         natureOperation: formData.type_operation,
-        targetId: selectedTontine?.tontineId || selectedAccountId || undefined,
+        targetId: selectedTontine?.tontineId || selectedCredit?.id || selectedAccountId || undefined,
         description: sanitizeInput(formData.description),
-        
+
         // Specific fields
         tontineId: selectedTontine?.tontineId,
         membreId: selectedTontine?.id,
+        creditId: selectedCredit?.id,
         compteId: selectedAccountId,
         
         // Metadata
@@ -594,31 +683,52 @@ export default function CaissePaiementModal({
                    <FileText size={11}/> Nature Opération
                 </label>
                 <div className="relative h-11 sm:h-12">
-                   <select 
-                      className="h-full w-full bg-surface-base border border-edge rounded-xl px-4 text-content-primary appearance-none focus:border-accent outline-none transition-all"
-                      value={formData.type_operation}
+                   <select
+                      className={`h-full w-full bg-surface-base border border-edge rounded-xl px-4 appearance-none focus:border-accent outline-none transition-all ${
+                        !formData.client_id ? 'text-content-muted cursor-not-allowed' : 'text-content-primary'
+                      }`}
+                      value={formData.client_id ? formData.type_operation : ''}
+                      disabled={!formData.client_id || loadingClientData}
                       onChange={(e) => setFormData(prev => ({ ...prev, type_operation: e.target.value }))}
                    >
-                      <optgroup label="Tontines" className="bg-surface-base">
-                        <option value={TypeOperationCaisse.TONTINE_CONTRIBUTION}>Cotisation Tontine</option>
-                        <option value={TypeOperationCaisse.TONTINE_WITHDRAWAL}>Retrait Tontine</option>
-                      </optgroup>
-                      <optgroup label="Crédits" className="bg-surface-base">
-                        <option value={TypeOperationCaisse.LOAN_REPAYMENT}>Remboursement Prêt</option>
-                        <option value={TypeOperationCaisse.CREDIT_DISBURSEMENT}>Décaissement Prêt</option>
-                      </optgroup>
-                      <optgroup label="Comptes" className="bg-surface-base">
-                        <option value={TypeOperationCaisse.DEPOSIT_SAVINGS}>Versement Épargne</option>
-                        <option value={TypeOperationCaisse.WITHDRAWAL_SAVINGS}>Retrait Épargne</option>
-                        <option value={TypeOperationCaisse.DEPOSIT_CURRENT}>Versement Courant</option>
-                        <option value={TypeOperationCaisse.WITHDRAWAL_CURRENT}>Retrait Courant</option>
-                        <option value={TypeOperationCaisse.DEPOSIT_BLOCKED}>Versement Compte Bloqué</option>
-                        <option value={TypeOperationCaisse.WITHDRAWAL_BLOCKED}>Retrait Compte Bloqué</option>
-                      </optgroup>
-                      <optgroup label="Divers" className="bg-surface-base">
-                        <option value={TypeOperationCaisse.MISC_COLLECTION}>Encaissement Divers</option>
-                        <option value={TypeOperationCaisse.MISC_DISBURSEMENT}>Décaissement Divers</option>
-                      </optgroup>
+                      {!formData.client_id ? (
+                        <option value="">Sélectionnez d'abord un client</option>
+                      ) : loadingClientData ? (
+                        <option value="">Chargement...</option>
+                      ) : (
+                        <>
+                          {/* Tontines group */}
+                          {hasTontines && (
+                            <optgroup label="Tontines" className="bg-surface-base">
+                              {availableCaisseOperations.filter(op => op.group === 'tontines').map(op => (
+                                <option key={op.value} value={op.value}>{op.label}</option>
+                              ))}
+                            </optgroup>
+                          )}
+                          {/* Credits group */}
+                          {(hasCredits || hasCreditsForDisbursement) && (
+                            <optgroup label="Crédits" className="bg-surface-base">
+                              {availableCaisseOperations.filter(op => op.group === 'credits').map(op => (
+                                <option key={op.value} value={op.value}>{op.label}</option>
+                              ))}
+                            </optgroup>
+                          )}
+                          {/* Comptes group */}
+                          {availableCaisseOperations.some(op => op.group === 'comptes') && (
+                            <optgroup label="Comptes" className="bg-surface-base">
+                              {availableCaisseOperations.filter(op => op.group === 'comptes').map(op => (
+                                <option key={op.value} value={op.value}>{op.label}</option>
+                              ))}
+                            </optgroup>
+                          )}
+                          {/* Divers group — always present */}
+                          <optgroup label="Divers" className="bg-surface-base">
+                            {availableCaisseOperations.filter(op => op.group === 'divers').map(op => (
+                              <option key={op.value} value={op.value}>{op.label}</option>
+                            ))}
+                          </optgroup>
+                        </>
+                      )}
                    </select>
                    <ArrowDownLeft size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-content-muted pointer-events-none rotate-[-45deg]" />
                 </div>
@@ -646,55 +756,142 @@ export default function CaissePaiementModal({
                         <div className="text-[9px] sm:text-[10px] font-black text-content-muted uppercase tracking-widest">Tontines</div>
                         <div className="text-xs sm:text-sm font-bold text-status-success flex items-center gap-1"><Users size={11}/> {activeTontinesCount}</div>
                       </div>
+                      <div>
+                        <div className="text-[9px] sm:text-[10px] font-black text-content-muted uppercase tracking-widest">Comptes</div>
+                        <div className="text-xs sm:text-sm font-bold text-accent flex items-center gap-1"><Wallet size={11}/> {clientAccounts.length}</div>
+                      </div>
                    </div>
                 </div>
              </div>
           )}
   
-          {(isTontineOperation || isAccountOperation) && (
+          {/* Tontine selection */}
+          {isTontineOperation && (
              <div className="animate-in fade-in slide-in-from-top-2 duration-300">
                 <label className="text-[10px] sm:text-xs font-bold text-content-muted uppercase tracking-wider ml-1 mb-1.5 block">
-                   {isTontineOperation ? 'Sélection Tontine' : 'Sélection Compte'}
+                   Sélection Tontine
                 </label>
                 <div className="h-11 sm:h-12">
-                    {isTontineOperation ? (
-                      <SearchableSelect
-                        label=""
-                        name="tontine_id"
-                        value={selectedTontine?.id || ''}
-                        onChange={(val) => {
-                            const t = clientTontines.find(ct => ct.id === val);
-                            if (t) selectTontine(t);
-                        }}
-                        options={clientTontines.map(ct => ({
-                            value: ct.id,
-                            label: `${ct.tontine.nom} (${formatMoney(parseFloat(ct.tontine.montantCotisation))})`,
-                            subLabel: ct.tontine.frequence
-                        }))}
-                        placeholder="Sélectionner une tontine..."
-                        error={errors.tontine}
-                        className="h-full w-full bg-surface-base border-edge rounded-xl"
-                      />
-                    ) : (
-                      <div className="relative h-full">
-                        <select 
-                            className="w-full h-full bg-surface-base border border-edge rounded-xl px-4 text-content-primary appearance-none focus:border-accent outline-none transition-all"
-                            value={selectedAccountId}
-                            onChange={(e) => {
-                                setSelectedAccountId(e.target.value);
-                                setSelectedAccount(filteredAccounts.find(a => a.id === e.target.value));
-                            }}
-                        >
-                            <option value="">Sélectionner un compte...</option>
-                            {filteredAccounts.map(acc => (
-                                <option key={acc.id} value={acc.id}>
-                                    {acc.numeroCompte} - {getStatusLabel(acc.typeCompte, ACCOUNT_TYPE_LABELS)} ({formatMoney(acc.solde || 0)})
-                                </option>
-                            ))}
-                        </select>
-                        <ArrowDownLeft size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-content-muted pointer-events-none rotate-[-45deg]" />
+                  <SearchableSelect
+                    label=""
+                    name="tontine_id"
+                    value={selectedTontine?.id || ''}
+                    onChange={(val) => {
+                        const t = clientTontines.find(ct => ct.id === val);
+                        if (t) selectTontine(t);
+                    }}
+                    options={clientTontines.map(ct => ({
+                        value: ct.id,
+                        label: `${ct.tontine.nom} (${formatMoney(parseFloat(ct.tontine.montantCotisation))})`,
+                        subLabel: (FREQUENCE_TONTINE_LABELS as Record<string, string>)[ct.tontine.frequence] || ct.tontine.frequence
+                    }))}
+                    placeholder="Sélectionner une tontine..."
+                    error={errors.tontine}
+                    className="h-full w-full bg-surface-base border-edge rounded-xl"
+                  />
+                </div>
+                {errors.tontine && <p className="text-status-danger text-xs mt-1">{errors.tontine}</p>}
+                {/* Tontine info card */}
+                {selectedTontine && (
+                  <div className="mt-2 p-2.5 rounded-lg border border-edge bg-surface-base/50 text-xs space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-content-muted">Cotisation</span>
+                      <span className="font-bold text-content-primary">{formatMoney(parseFloat(selectedTontine.tontine.montantCotisation))}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-content-muted">Fréquence</span>
+                      <span className="text-content-secondary">{(FREQUENCE_TONTINE_LABELS as Record<string, string>)[selectedTontine.tontine.frequence] || selectedTontine.tontine.frequence}</span>
+                    </div>
+                    {formData.type_operation === TypeOperationCaisse.TONTINE_WITHDRAWAL && (
+                      <div className="flex justify-between pt-1 border-t border-edge">
+                        <span className="text-content-muted">Montant retirable</span>
+                        {loadingRetirable ? (
+                          <Loader2 size={12} className="animate-spin text-accent" />
+                        ) : (
+                          <span className={`font-bold ${retirableAmount && retirableAmount > 0 ? 'text-status-success' : 'text-status-warning'}`}>
+                            {retirableAmount != null ? (retirableAmount > 0 ? formatMoney(retirableAmount) : 'Aucun') : '—'}
+                          </span>
+                        )}
                       </div>
                     )}
+                  </div>
+                )}
+             </div>
+          )}
+
+          {/* Credit selection */}
+          {isCreditOperation && clientCredits.length > 0 && (
+            <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+              <label className="text-[10px] sm:text-xs font-bold text-content-muted uppercase tracking-wider ml-1 mb-1.5 block">
+                Sélection Crédit
+              </label>
+              <div className="flex overflow-x-auto gap-2 pb-1 scrollbar-thin scrollbar-thumb-edge">
+                {clientCredits.map((credit) => (
+                  <div
+                    key={credit.id}
+                    onClick={() => selectCredit(credit)}
+                    className={`min-w-[160px] p-2.5 rounded-xl border cursor-pointer transition-all shrink-0 ${
+                      selectedCredit?.id === credit.id
+                        ? 'border-status-info/50 bg-status-info-bg shadow-lg'
+                        : 'border-edge bg-surface-base/50 hover:border-edge-strong'
+                    }`}
+                  >
+                    <div className="text-xs font-bold text-content-secondary"># {escapeHtml(credit.numeroCredit)}</div>
+                    <div className="text-[10px] text-content-muted mt-0.5">
+                      Reste: <span className="text-status-info font-bold">{formatMoney(parseFloat(String(credit.solde_restant || credit.soldeRestant || 0)))}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {errors.credit && <p className="text-status-danger text-xs mt-1">{errors.credit}</p>}
+              {/* Credit info card */}
+              {selectedCredit && prochaineEcheance && (
+                <div className="mt-2 p-2.5 rounded-lg border border-edge bg-surface-base/50 text-xs space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-content-muted">Prochaine échéance</span>
+                    <span className="font-bold text-content-primary">{formatMoney(prochaineEcheance.montantTotal)}</span>
+                  </div>
+                  {prochaineEcheance.dateEcheance && (
+                    <div className="flex justify-between">
+                      <span className="text-content-muted">Date</span>
+                      <span className="text-content-secondary">{new Date(prochaineEcheance.dateEcheance).toLocaleDateString('fr-FR')}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+              {loadingEcheance && (
+                <div className="mt-2 flex items-center gap-2 text-xs text-content-muted">
+                  <Loader2 size={12} className="animate-spin" /> Chargement échéance...
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Account selection */}
+          {isAccountOperation && (
+             <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                <label className="text-[10px] sm:text-xs font-bold text-content-muted uppercase tracking-wider ml-1 mb-1.5 block">
+                   Sélection Compte
+                </label>
+                <div className="h-11 sm:h-12">
+                  <div className="relative h-full">
+                    <select
+                        className="w-full h-full bg-surface-base border border-edge rounded-xl px-4 text-content-primary appearance-none focus:border-accent outline-none transition-all"
+                        value={selectedAccountId}
+                        onChange={(e) => {
+                            setSelectedAccountId(e.target.value);
+                            setSelectedAccount(filteredAccounts.find(a => a.id === e.target.value));
+                        }}
+                    >
+                        <option value="">Sélectionner un compte...</option>
+                        {filteredAccounts.map(acc => (
+                            <option key={acc.id} value={acc.id}>
+                                {acc.numeroCompte} - {getStatusLabel(acc.typeCompte, ACCOUNT_TYPE_LABELS)} ({formatMoney(acc.solde || acc.soldeCourant || 0)})
+                            </option>
+                        ))}
+                    </select>
+                    <ArrowDownLeft size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-content-muted pointer-events-none rotate-[-45deg]" />
+                  </div>
                 </div>
                 {errors.account && <p className="text-status-danger text-xs mt-1">{errors.account}</p>}
              </div>
