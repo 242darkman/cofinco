@@ -3,6 +3,8 @@ import multer from 'multer';
 import { createLogger } from '../lib/logger';
 import { StorageService } from '../services/storage-service';
 import { requireAuth } from '../auth';
+import { attachAbility } from '../authorization';
+import { Actions } from '@shared/ability';
 import { db } from '../db';
 import { clients } from '@shared/schema';
 import { eq, sql } from 'drizzle-orm';
@@ -128,7 +130,7 @@ router.get('/files/:key(*)', async (req, res) => {
  * GET /api/storage/documents/:id/view
  * Get secure download URL for private documents
  */
-router.get('/documents/:id/view', requireAuth, async (req, res) => {
+router.get('/documents/:id/view', requireAuth, attachAbility, async (req, res) => {
   try {
     const { id } = req.params;
     const user = req.user!;
@@ -180,14 +182,11 @@ router.get('/documents/:id/view', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Document introuvable' });
     }
 
-    // Vérification des permissions
-    const isPrivileged =
-      normalizedRole === SystemRole.ADMIN || normalizedRole === SystemRole.CHEF_AGENCE;
-    const isSelfRole =
-      normalizedRole === SystemRole.CLIENT || normalizedRole === SystemRole.AGENT_TERRAIN;
-
-    if (!isPrivileged) {
-      if (!isSelfRole || !ownerId || ownerId !== user.id) {
+    // Vérification des permissions via CASL
+    const isGlobalAdmin = req.ability?.can(Actions.MANAGE, 'all');
+    if (!isGlobalAdmin) {
+      // Non-admin: uniquement ses propres documents
+      if (!ownerId || ownerId !== user.id) {
         return res.status(403).json({ error: 'Accès refusé' });
       }
     }

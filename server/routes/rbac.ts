@@ -889,7 +889,7 @@ export function registerRbacRoutes(app: Express) {
   });
 
   // Check if current user has a specific permission
-  app.get("/api/rbac/check", requireAuth, async (req, res) => {
+  app.get("/api/rbac/check", requireAuth, attachAbility, async (req, res) => {
     try {
       const { module: moduleName, action } = req.query;
       const userRole = req.session.user?.role;
@@ -898,8 +898,9 @@ export function registerRbacRoutes(app: Express) {
         return res.json({ hasPermission: false });
       }
 
-      // Administrateur has all permissions
-      if (isAdminRole(userRole)) {
+      // Global admin has all permissions (via CASL)
+      const isGlobalAdmin = req.ability?.can(Actions.MANAGE, 'all');
+      if (isGlobalAdmin) {
         return res.json({ hasPermission: true });
       }
 

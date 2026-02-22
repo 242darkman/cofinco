@@ -45,9 +45,14 @@ export function registerTreasuryRoutes(app: Express) {
   app.get(
     "/api/treasury/v2/encaisse",
     requireAuth,
+    attachAbility,
+    requireAbility(Actions.VIEW, Subjects.COMPTABILITE),
     async (req, res) => {
       try {
-        const agenceId = req.query.agenceId as string | undefined;
+        // Agency enforcement: non-admin forced to own agency
+        const isGlobalAdmin = req.ability?.can(Actions.MANAGE, 'all');
+        const queryAgenceId = req.query.agenceId as string | undefined;
+        const agenceId = isGlobalAdmin ? queryAgenceId : (req.session.user?.agenceId || queryAgenceId);
         const withReconciliation = req.query.withReconciliation === "true";
 
         logger.debug(

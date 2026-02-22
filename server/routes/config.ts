@@ -2,6 +2,8 @@ import type { Express } from "express";
 import { createLogger } from "../lib/logger";
 import { storage } from "../storage";
 import { requireAuth } from "../auth";
+import { attachAbility, requireAbility } from "../authorization";
+import { Actions, Subjects } from "@shared/ability";
 import { D, roundFCFA } from "../lib/money";
 import {
   getActiveCurrency,
@@ -263,7 +265,7 @@ export function registerConfigRoutes(app: Express) {
   });
 
   /** POST /api/config/currency/presets — create a new preset */
-  app.post("/api/config/currency/presets", requireAuth, async (req, res) => {
+  app.post("/api/config/currency/presets", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.SETTINGS), async (req, res) => {
     try {
       const data = currencyPresetSchema.parse(req.body);
 
@@ -296,7 +298,7 @@ export function registerConfigRoutes(app: Express) {
   });
 
   /** PUT /api/config/currency/presets/:id — update a preset */
-  app.put("/api/config/currency/presets/:id", requireAuth, async (req, res) => {
+  app.put("/api/config/currency/presets/:id", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.SETTINGS), async (req, res) => {
     try {
       const { id } = req.params;
       const data = currencyPresetSchema.partial().parse(req.body);
@@ -322,7 +324,7 @@ export function registerConfigRoutes(app: Express) {
   });
 
   /** DELETE /api/config/currency/presets/:id — delete a preset (not the active one) */
-  app.delete("/api/config/currency/presets/:id", requireAuth, async (req, res) => {
+  app.delete("/api/config/currency/presets/:id", requireAuth, attachAbility, requireAbility(Actions.EDIT, Subjects.SETTINGS), async (req, res) => {
     try {
       const { id } = req.params;
 
