@@ -407,12 +407,16 @@ export default function CaissePaiementModal({
     }
   }, [isCreditOperation, clientCredits, selectedCredit, selectCredit]);
 
-  // Reset credit/tontine selections when operation type changes
+  // Reset selections + form fields when operation type changes
   useEffect(() => {
     setSelectedTontine(null);
     setSelectedCredit(null);
     setProchaineEcheance(null);
     setRetirableAmount(null);
+    setSelectedAccountId('');
+    setSelectedAccount(null);
+    setFormData(prev => ({ ...prev, montant: '', description: '' }));
+    setErrors({});
   }, [formData.type_operation]);
 
   const genererReference = useCallback(() => {

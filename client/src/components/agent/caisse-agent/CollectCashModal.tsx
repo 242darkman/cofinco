@@ -258,6 +258,8 @@ export default function CollectCashModal({
             setTypePaiement(e.target.value);
             setCreditId('');
             setCompteId('');
+            setMontant('');
+            setObservations('');
           }}
           options={selectedClientId ? filteredTypeOptions : TYPE_PAIEMENT_OPTIONS}
           required
