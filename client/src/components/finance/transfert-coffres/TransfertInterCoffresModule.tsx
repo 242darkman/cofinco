@@ -23,6 +23,11 @@ import {
   RefreshCw,
   Download,
   Eye,
+  Trash2,
+  CheckSquare,
+  Square,
+  XCircle,
+  Printer,
 } from 'lucide-react';
 import { Button, Card, Badge, Pagination, Modal, StatCard, Tooltip, ResponsiveTable } from '@/components/ui';
 import { toast, handleApiError } from '../../../lib/toast';
@@ -158,6 +163,48 @@ const api = {
     });
     return res.json();
   },
+
+  async deleteTransfert(id: string): Promise<any> {
+    const res = await fetch(`/api/transferts-inter-coffres/transferts/${id}`, {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+    return res.json();
+  },
+
+  async bulkApprove(ids: string[], level: 1 | 2): Promise<any> {
+    const res = await fetch(`/api/transferts-inter-coffres/transferts/bulk-approve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ ids, level }),
+    });
+    return res.json();
+  },
+
+  async bulkReject(ids: string[], reason: string): Promise<any> {
+    const res = await fetch(`/api/transferts-inter-coffres/transferts/bulk-reject`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ ids, reason }),
+    });
+    return res.json();
+  },
+
+  async exportCsv(params?: Record<string, string>): Promise<void> {
+    const query = params ? '?' + new URLSearchParams(params).toString() : '';
+    const res = await fetch(`/api/transferts-inter-coffres/transferts/export/csv${query}`, {
+      credentials: 'include',
+    });
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `transferts-coffres-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
 };
 
 export { api as transfertInterCoffresApi };
@@ -180,6 +227,16 @@ export default function TransfertInterCoffresModule({
   const [statutFilter, setStatutFilter] = useState('all');
   const [dateDebutFilter, setDateDebutFilter] = useState('');
   const [dateFinFilter, setDateFinFilter] = useState('');
+  const [montantMin, setMontantMin] = useState('');
+  const [montantMax, setMontantMax] = useState('');
+
+  // Bulk selection
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkRejectReason, setBulkRejectReason] = useState('');
+  const [showBulkRejectModal, setShowBulkRejectModal] = useState(false);
+
+  // Delete draft
+  const [deleteTarget, setDeleteTarget] = useState<TransfertInterCoffre | null>(null);
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -235,6 +292,8 @@ export default function TransfertInterCoffresModule({
       if (searchQuery) params.search = searchQuery;
       if (dateDebutFilter) params.dateDebut = dateDebutFilter;
       if (dateFinFilter) params.dateFin = dateFinFilter;
+      if (montantMin) params.montantMin = montantMin;
+      if (montantMax) params.montantMax = montantMax;
 
       const [result, tStatsData] = await Promise.all([
         api.getTransferts(params),
@@ -258,6 +317,15 @@ export default function TransfertInterCoffresModule({
   useEffect(() => {
     loadTransferts();
   }, [currentPage, statutFilter, searchQuery, dateDebutFilter, dateFinFilter]);
+
+  // Real-time WebSocket updates
+  useEffect(() => {
+    const handler = () => {
+      loadTransferts();
+    };
+    window.addEventListener('transfert-coffre-update', handler);
+    return () => window.removeEventListener('transfert-coffre-update', handler);
+  }, [loadTransferts]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -363,6 +431,115 @@ export default function TransfertInterCoffresModule({
     await loadTransferts();
   };
 
+  // Delete draft
+  const handleDeleteDraft = async () => {
+    if (!deleteTarget) return;
+    const loadingId = toast.loading('Suppression en cours...');
+    try {
+      const result = await api.deleteTransfert(deleteTarget.id);
+      toast.dismiss(loadingId);
+      if (result.success) {
+        toast.success('Brouillon supprimé');
+        await loadTransferts();
+      } else {
+        toast.error(result.error || 'Erreur lors de la suppression');
+      }
+    } catch {
+      toast.dismiss(loadingId);
+      toast.error('Erreur lors de la suppression');
+    } finally {
+      setDeleteTarget(null);
+    }
+  };
+
+  // Bulk selection helpers
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === transferts.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(transferts.map(t => t.id)));
+    }
+  };
+
+  const selectedTransferts = transferts.filter(t => selectedIds.has(t.id));
+
+  // Check what bulk actions are possible
+  const bulkCanApproveL1 = selectedTransferts.length > 0 && selectedTransferts.every(t => t.statut === 'SUBMITTED');
+  const bulkCanApproveL2 = selectedTransferts.length > 0 && selectedTransferts.every(t => t.statut === 'APPROVED_L1');
+  const bulkCanReject = selectedTransferts.length > 0 && selectedTransferts.every(t => ['SUBMITTED', 'APPROVED_L1'].includes(t.statut));
+
+  const handleBulkApprove = async (level: 1 | 2) => {
+    const loadingId = toast.loading(`Approbation groupée N${level}...`);
+    try {
+      const result = await api.bulkApprove(Array.from(selectedIds), level);
+      toast.dismiss(loadingId);
+      if (result.success) {
+        toast.success(`${result.data.approved} transfert(s) approuvé(s)`);
+        if (result.data.failed > 0) {
+          toast.warning(`${result.data.failed} transfert(s) en erreur`);
+        }
+        setSelectedIds(new Set());
+        await loadTransferts();
+      } else {
+        toast.error(result.error || 'Erreur lors de l\'approbation groupée');
+      }
+    } catch {
+      toast.dismiss(loadingId);
+      toast.error('Erreur lors de l\'approbation groupée');
+    }
+  };
+
+  const handleBulkReject = async () => {
+    if (bulkRejectReason.length < 10) {
+      toast.error('Le motif doit contenir au moins 10 caractères');
+      return;
+    }
+    const loadingId = toast.loading('Rejet groupé en cours...');
+    try {
+      const result = await api.bulkReject(Array.from(selectedIds), bulkRejectReason);
+      toast.dismiss(loadingId);
+      if (result.success) {
+        toast.success(`${result.data.rejected} transfert(s) rejeté(s)`);
+        setSelectedIds(new Set());
+        setShowBulkRejectModal(false);
+        setBulkRejectReason('');
+        await loadTransferts();
+      } else {
+        toast.error(result.error || 'Erreur lors du rejet groupé');
+      }
+    } catch {
+      toast.dismiss(loadingId);
+      toast.error('Erreur lors du rejet groupé');
+    }
+  };
+
+  const handleExportCsv = async () => {
+    const loadingId = toast.loading('Export en cours...');
+    try {
+      const params: Record<string, string> = {};
+      if (statutFilter !== 'all') params.statut = statutFilter;
+      if (searchQuery) params.search = searchQuery;
+      if (dateDebutFilter) params.dateDebut = dateDebutFilter;
+      if (dateFinFilter) params.dateFin = dateFinFilter;
+      if (montantMin) params.montantMin = montantMin;
+      if (montantMax) params.montantMax = montantMax;
+      await api.exportCsv(params);
+      toast.dismiss(loadingId);
+      toast.success('Export CSV téléchargé');
+    } catch {
+      toast.dismiss(loadingId);
+      toast.error('Erreur lors de l\'export');
+    }
+  };
+
   // Computed stats
   const computedStats = useMemo(() => {
     const bs = transfertStats?.byStatus || {};
@@ -403,7 +580,7 @@ export default function TransfertInterCoffresModule({
 
     switch (transfert.statut) {
       case 'DRAFT':
-        actions.push('submit', 'cancel');
+        actions.push('submit', 'delete', 'cancel');
         break;
       case 'SUBMITTED':
         actions.push('approve_l1', 'reject', 'cancel');
@@ -424,8 +601,21 @@ export default function TransfertInterCoffresModule({
 
   // Loading state
   const tableColumns = useMemo(() => [
-    { 
-      key: 'reference', 
+    {
+      key: 'select',
+      label: (
+        <button onClick={(e) => { e.stopPropagation(); toggleSelectAll(); }} className="p-0.5">
+          {selectedIds.size === transferts.length && transferts.length > 0 ? <CheckSquare size={14} className="text-accent" /> : <Square size={14} className="text-content-muted" />}
+        </button>
+      ) as any,
+      format: (_: any, row: TransfertInterCoffre) => (
+        <button onClick={(e) => { e.stopPropagation(); toggleSelect(row.id); }} className="p-0.5">
+          {selectedIds.has(row.id) ? <CheckSquare size={14} className="text-accent" /> : <Square size={14} className="text-content-muted" />}
+        </button>
+      ),
+    },
+    {
+      key: 'reference',
       label: 'Référence',
       format: (val: string) => <span className="font-mono text-xs text-content-muted">{val}</span>
     },
@@ -468,7 +658,7 @@ export default function TransfertInterCoffresModule({
       align: 'center' as const,
       format: (val: string) => <Badge value={val} variant={getStatutBadge(val)} />
     }
-  ], []);
+  ], [selectedIds, transferts]);
 
   // Use ResponsiveTable inside render instead of custom table
 
@@ -502,6 +692,17 @@ export default function TransfertInterCoffresModule({
             </div>
 
             <div className="flex items-center gap-2">
+              <Tooltip content="Exporter CSV" position="bottom">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleExportCsv}
+                  className="h-10 w-10 p-0 rounded-full text-content-muted hover:bg-surface"
+                  aria-label="Exporter CSV"
+                >
+                  <Download size={18} />
+                </Button>
+              </Tooltip>
               <Button
                 variant="ghost"
                 size="sm"
@@ -647,8 +848,62 @@ export default function TransfertInterCoffresModule({
                 className="px-2 py-2 bg-surface-base border border-edge rounded-lg text-sm text-content-primary focus:ring-2 focus:ring-accent/30 outline-none"
               />
             </div>
+
+            {/* Amount range filter */}
+            <div className="hidden lg:flex items-center gap-2">
+              <input
+                type="number"
+                placeholder="Min"
+                value={montantMin}
+                onChange={(e) => {
+                  setMontantMin(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-24 px-2 py-2 bg-surface-base border border-edge rounded-lg text-sm text-content-primary focus:ring-2 focus:ring-accent/30 outline-none"
+              />
+              <span className="text-content-muted text-xs">→</span>
+              <input
+                type="number"
+                placeholder="Max"
+                value={montantMax}
+                onChange={(e) => {
+                  setMontantMax(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-24 px-2 py-2 bg-surface-base border border-edge rounded-lg text-sm text-content-primary focus:ring-2 focus:ring-accent/30 outline-none"
+              />
+            </div>
           </div>
         </section>
+
+        {/* Bulk Actions Bar */}
+        {selectedIds.size > 0 && (
+          <section className="bg-accent/10 border border-accent/30 rounded-lg p-3 flex items-center justify-between">
+            <span className="text-sm text-accent font-medium">
+              {selectedIds.size} transfert{selectedIds.size > 1 ? 's' : ''} sélectionné{selectedIds.size > 1 ? 's' : ''}
+            </span>
+            <div className="flex items-center gap-2">
+              {bulkCanApproveL1 && (
+                <Button size="sm" onClick={() => handleBulkApprove(1)} className="h-7 px-3 text-xs bg-status-success text-white">
+                  <CheckCircle size={12} className="mr-1" /> Approuver N1
+                </Button>
+              )}
+              {bulkCanApproveL2 && (
+                <Button size="sm" onClick={() => handleBulkApprove(2)} className="h-7 px-3 text-xs bg-status-info text-white">
+                  <Shield size={12} className="mr-1" /> Approuver N2
+                </Button>
+              )}
+              {bulkCanReject && (
+                <Button size="sm" onClick={() => setShowBulkRejectModal(true)} className="h-7 px-3 text-xs bg-status-danger text-white">
+                  <XCircle size={12} className="mr-1" /> Rejeter
+                </Button>
+              )}
+              <Button size="sm" variant="ghost" onClick={() => setSelectedIds(new Set())} className="h-7 px-3 text-xs text-content-muted">
+                Désélectionner
+              </Button>
+            </div>
+          </section>
+        )}
 
         {/* Transfers List - ResponsiveTable */}
         <section className="bg-surface-base/50 border border-edge rounded-lg overflow-hidden">
@@ -726,6 +981,55 @@ export default function TransfertInterCoffresModule({
                               </Button>
                             </Tooltip>
                           )}
+
+                          {/* Submit draft */}
+                          {getAvailableActions(transfert).includes('submit') && (
+                            <Tooltip content="Soumettre le brouillon" position="top">
+                              <Button
+                                size="sm"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  const loadingId = toast.loading('Soumission...');
+                                  try {
+                                    const result = await api.submitTransfert(transfert.id);
+                                    toast.dismiss(loadingId);
+                                    if (result.success) { toast.success('Transfert soumis'); await loadTransferts(); }
+                                    else toast.error(result.error || 'Erreur');
+                                  } catch { toast.dismiss(loadingId); toast.error('Erreur'); }
+                                }}
+                                className="h-7 px-3 text-xs bg-accent hover:bg-accent text-white font-semibold shadow-sm"
+                              >
+                                <Send size={12} className="mr-1" />
+                                Soumettre
+                              </Button>
+                            </Tooltip>
+                          )}
+
+                          {/* Delete draft */}
+                          {getAvailableActions(transfert).includes('delete') && (
+                            <Tooltip content="Supprimer le brouillon" position="top">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setDeleteTarget(transfert); }}
+                                className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-status-danger hover:bg-status-danger-bg transition-colors"
+                                aria-label="Supprimer"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </Tooltip>
+                          )}
+
+                          {/* Cancel */}
+                          {getAvailableActions(transfert).includes('cancel') && transfert.statut !== 'DRAFT' && (
+                            <Tooltip content="Annuler le transfert" position="top">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleCancel(transfert); }}
+                                className="h-8 w-8 inline-flex items-center justify-center rounded-lg text-content-muted hover:text-status-danger hover:bg-status-danger-bg transition-colors"
+                                aria-label="Annuler"
+                              >
+                                <X size={14} />
+                              </button>
+                            </Tooltip>
+                          )}
                     </div>
                 )}
              />
@@ -783,6 +1087,47 @@ export default function TransfertInterCoffresModule({
             }}
             onComplete={handleReceptionComplete}
           />
+        )}
+
+        {/* Delete Draft Confirm */}
+        <ConfirmDialog
+          isOpen={!!deleteTarget}
+          title="Supprimer le brouillon"
+          message={`Supprimer définitivement le brouillon ${deleteTarget?.reference} ? Cette action est irréversible.`}
+          onConfirm={handleDeleteDraft}
+          onClose={() => setDeleteTarget(null)}
+          variant="danger"
+          confirmText="Supprimer"
+          cancelText="Annuler"
+        />
+
+        {/* Bulk Reject Modal */}
+        {showBulkRejectModal && (
+          <Modal onClose={() => { setShowBulkRejectModal(false); setBulkRejectReason(''); }} title="Rejet groupé">
+            <div className="space-y-4 p-4">
+              <p className="text-sm text-content-secondary">
+                Rejeter {selectedIds.size} transfert{selectedIds.size > 1 ? 's' : ''} sélectionné{selectedIds.size > 1 ? 's' : ''}.
+              </p>
+              <div>
+                <label className="text-xs text-content-muted uppercase block mb-2">Motif de rejet *</label>
+                <textarea
+                  value={bulkRejectReason}
+                  onChange={(e) => setBulkRejectReason(e.target.value)}
+                  className="w-full px-3 py-2 bg-surface-base border border-edge rounded-lg text-sm text-content-primary"
+                  rows={3}
+                  placeholder="Minimum 10 caractères..."
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="ghost" onClick={() => { setShowBulkRejectModal(false); setBulkRejectReason(''); }}>
+                  Annuler
+                </Button>
+                <Button onClick={handleBulkReject} className="bg-status-danger text-white">
+                  <XCircle size={14} className="mr-1" /> Rejeter
+                </Button>
+              </div>
+            </div>
+          </Modal>
         )}
 
         {/* Confirm Dialog */}

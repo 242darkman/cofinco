@@ -109,6 +109,11 @@ type MessageType =
   | "BRANDING_CHANGED" | "PRESETS_CHANGED" | "CURRENCY_CHANGED"
 
   // =============================================
+  // TRANSFERTS INTER-COFFRES
+  // =============================================
+  | "TRANSFERT_COFFRE_UPDATED"
+
+  // =============================================
   // CAISSE REQUESTS
   // =============================================
   | "CAISSE_REQUEST_CREATED" | "CAISSE_REQUEST_COMPLETED" | "CAISSE_REQUEST_CANCELLED";
@@ -566,6 +571,14 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          debounceInvalidate(coffreKeys.pendingOpeningRequests(message.payload?.agenceId || ''));
          debounceInvalidate(coffreKeys.transferts());
          debounceInvalidate(coffreKeys.stats());
+         break;
+
+      case "TRANSFERT_COFFRE_UPDATED":
+         debounceInvalidate(coffreKeys.transferts());
+         debounceInvalidate(coffreKeys.stats());
+         debounceInvalidate(coffreKeys.all);
+         debounceInvalidate(dashboardKeys.stats());
+         window.dispatchEvent(new CustomEvent('transfert-coffre-update', { detail: message.payload }));
          break;
 
       case "HR_UPDATE":

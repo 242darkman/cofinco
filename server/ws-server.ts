@@ -165,6 +165,11 @@ export type GlobalMessage = {
     | "INTEGRITY_AUDIT_ALERT"
 
     // =============================================
+    // TRANSFERTS INTER-COFFRES
+    // =============================================
+    | "TRANSFERT_COFFRE_UPDATED"
+
+    // =============================================
     // MIGRATION D'AGENCE
     // =============================================
     | "MIGRATION_PROGRESS" | "MIGRATION_STATUS";

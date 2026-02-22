@@ -38,6 +38,8 @@ interface ListParams {
   search?: string;
   sortBy?: string;
   sortOrder?: "asc" | "desc";
+  montantMin?: string;
+  montantMax?: string;
 }
 
 export class TransfertInterCoffresService {
@@ -821,6 +823,12 @@ export class TransfertInterCoffresService {
           ilike(transfertsInterCoffres.motif, `%${search}%`)
         )
       );
+    }
+    if (params.montantMin) {
+      conditions.push(gte(transfertsInterCoffres.montant, params.montantMin));
+    }
+    if (params.montantMax) {
+      conditions.push(lte(transfertsInterCoffres.montant, params.montantMax));
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;

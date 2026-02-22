@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   X,
   ArrowRightLeft,
@@ -28,7 +28,7 @@ import {
 import { Button, Badge } from '@/components/ui';
 import { formatMoney } from '../../../lib/format';
 import { ALL_STATUS_LABELS } from '../../../lib/status-labels';
-import { InternalOperationReceipt, InternalOperationReceiptData } from '../../ui/printable';
+import { TransfertCoffreBonTemplate, type BonType, type TransfertCoffreBonData } from '../../ui/printable';
 import { useReactToPrint } from 'react-to-print';
 import { currencyCode } from '@shared/config/currency';
 
@@ -132,55 +132,56 @@ export default function TransfertInterCoffresDetail({
 }: TransfertInterCoffresDetailProps) {
   // Print functionality
   const receiptRef = useRef<HTMLDivElement>(null);
+  const [printBonType, setPrintBonType] = useState<BonType>('TRANSFERT');
+  const [showPrintMenu, setShowPrintMenu] = useState(false);
 
   const handlePrint = useReactToPrint({
     contentRef: receiptRef,
-    documentTitle: `Transfert-${transfert.reference}`,
+    documentTitle: `${printBonType === 'TRANSFERT' ? 'Bon-Transfert' : printBonType === 'SORTIE' ? 'Bon-Sortie' : 'Bon-Entree'}-${transfert.reference}`,
   });
 
-  // Build receipt data for printing
-  const buildReceiptData = (): InternalOperationReceiptData => ({
+  const printBon = (type: BonType) => {
+    setPrintBonType(type);
+    setShowPrintMenu(false);
+    setTimeout(() => handlePrint(), 100);
+  };
+
+  const formatUserName = (u?: { nom: string; prenom: string }) =>
+    u ? `${u.prenom || ''} ${u.nom || ''}`.trim() : undefined;
+
+  // Build bon data for printing
+  const buildBonData = (): TransfertCoffreBonData => ({
+    bonType: printBonType,
     reference: transfert.reference,
-    date: transfert.dateTransfert || transfert.createdAt,
-    type: 'TRANSFER_INTER_CAISSE',
+    dateTransfert: transfert.dateTransfert || transfert.createdAt,
+    dateDispatch: transfert.dispatchedAt || undefined,
+    dateReception: transfert.receivedAt || undefined,
     montant: parseFloat(transfert.montant),
     devise: transfert.devise || currencyCode(),
-    source: transfert.coffreSource ? {
-      type: 'COFFRE',
-      id: transfert.coffreSource.id,
-      nom: transfert.coffreSource.agenceNom || transfert.coffreSource.nom,
-      code: transfert.coffreSource.code,
-    } : undefined,
-    destination: transfert.coffreDestination ? {
-      type: 'COFFRE',
-      id: transfert.coffreDestination.id,
-      nom: transfert.coffreDestination.agenceNom || transfert.coffreDestination.nom,
-      code: transfert.coffreDestination.code,
-    } : undefined,
-    autorisation: transfert.approbateurN2 ? {
-      par: `${transfert.approbateurN2.prenom || ''} ${transfert.approbateurN2.nom || ''}`.trim(),
-      role: 'Approbateur N2',
-      date: transfert.approvedAtN2 || undefined,
-    } : transfert.approbateurN1 ? {
-      par: `${transfert.approbateurN1.prenom || ''} ${transfert.approbateurN1.nom || ''}`.trim(),
-      role: 'Approbateur N1',
-      date: transfert.approvedAtN1 || undefined,
-    } : undefined,
-    motif: transfert.motif || undefined,
-    statut: transfert.statut === 'Reçu' ? 'VALIDE'
-      : transfert.statut === 'Annulé' ? 'ANNULE'
-      : transfert.statut === 'Rejeté' ? 'REJETE'
-      : 'EN_ATTENTE',
-    operateur: transfert.createur ? {
-      nom: transfert.createur.nom || '',
-      prenom: transfert.createur.prenom,
-    } : undefined,
-    details: [
-      { label: 'Type de transfert', value: transfert.typeTransfert.replace(/_/g, ' → ') },
-      { label: 'Conditionnement', value: transfert.typeConditionnement },
-      ...(transfert.numeroScelle ? [{ label: 'N° Scellé', value: transfert.numeroScelle }] : []),
-    ],
-    footerMessage: transfert.commentaireReception || undefined,
+    motif: transfert.motif,
+    typeTransfert: transfert.typeTransfert,
+    typeConditionnement: transfert.typeConditionnement,
+    numeroScelle: transfert.numeroScelle,
+    statut: transfert.statut,
+    coffreSource: {
+      code: transfert.coffreSource?.code || '',
+      nom: transfert.coffreSource?.nom || '',
+      agenceNom: transfert.coffreSource?.agenceNom,
+    },
+    coffreDestination: {
+      code: transfert.coffreDestination?.code || '',
+      nom: transfert.coffreDestination?.nom || '',
+      agenceNom: transfert.coffreDestination?.agenceNom,
+    },
+    agentsTransport: transfert.agentsTransport,
+    createur: formatUserName(transfert.createur),
+    approbateurL1: formatUserName(transfert.approbateurN1),
+    approbateurL2: formatUserName(transfert.approbateurN2),
+    dispatchPar: formatUserName(transfert.dispatcher),
+    receptionPar: formatUserName(transfert.recepteur),
+    montantRecu: transfert.montantRecu ? parseFloat(transfert.montantRecu) : undefined,
+    ecart: transfert.ecartMontant ? parseFloat(transfert.ecartMontant) : undefined,
+    observations: transfert.commentaireReception || undefined,
   });
 
   // Status configuration
@@ -326,13 +327,32 @@ export default function TransfertInterCoffresDetail({
                 </div>
               </div>
               <div className="flex items-center gap-1.5">
-                <button
-                  onClick={() => handlePrint()}
-                  className="p-2 rounded-lg bg-surface/80 hover:bg-accent-secondary-hover/20 text-content-muted hover:text-accent transition-all border border-edge-subtle"
-                  title="Imprimer le reçu"
-                >
-                  <Printer size={18} />
-                </button>
+                <div className="relative">
+                  <button
+                    onClick={() => setShowPrintMenu(!showPrintMenu)}
+                    className="p-2 rounded-lg bg-surface/80 hover:bg-accent-secondary-hover/20 text-content-muted hover:text-accent transition-all border border-edge-subtle"
+                    title="Imprimer un bon"
+                  >
+                    <Printer size={18} />
+                  </button>
+                  {showPrintMenu && (
+                    <div className="absolute right-0 top-full mt-1 bg-surface-elevated border border-edge rounded-lg shadow-xl z-50 min-w-[180px] py-1">
+                      <button onClick={() => printBon('TRANSFERT')} className="w-full text-left px-3 py-2 text-sm text-content-primary hover:bg-surface-subtle transition-colors">
+                        Bon de Transfert
+                      </button>
+                      {['IN_TRANSIT', 'RECEIVED', 'RECEIVED_WITH_DISCREPANCY'].includes(transfert.statut) && (
+                        <button onClick={() => printBon('SORTIE')} className="w-full text-left px-3 py-2 text-sm text-content-primary hover:bg-surface-subtle transition-colors">
+                          Bon de Sortie
+                        </button>
+                      )}
+                      {['RECEIVED', 'RECEIVED_WITH_DISCREPANCY'].includes(transfert.statut) && (
+                        <button onClick={() => printBon('ENTREE')} className="w-full text-left px-3 py-2 text-sm text-content-primary hover:bg-surface-subtle transition-colors">
+                          Bon d'Entrée
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
                 <button
                   onClick={onClose}
                   className="p-2 rounded-lg bg-surface/80 hover:bg-surface-elevated text-content-muted hover:text-content-primary transition-all border border-edge-subtle"
@@ -774,9 +794,9 @@ export default function TransfertInterCoffresDetail({
           )}
       </div>
 
-      {/* Hidden Receipt for Printing */}
+      {/* Hidden Bon Template for Printing */}
       <div className="hidden">
-        <InternalOperationReceipt ref={receiptRef} data={buildReceiptData()} />
+        <TransfertCoffreBonTemplate ref={receiptRef} data={buildBonData()} />
       </div>
     </>
   );

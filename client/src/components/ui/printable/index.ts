@@ -16,3 +16,5 @@ export { CreditSchedulePDF } from './CreditScheduleTemplate';
 export { ClosingReportTemplate } from './ClosingReportTemplate';
 export { EnqueteReportTemplate } from './EnqueteReportTemplate';
 export type { EnqueteReportData } from './EnqueteReportTemplate';
+export { TransfertCoffreBonTemplate } from './TransfertCoffreBonTemplate';
+export type { TransfertCoffreBonData, BonType } from './TransfertCoffreBonTemplate';

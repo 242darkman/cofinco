@@ -16,9 +16,21 @@ import {
   tachesRegularisation,
   configTransfertInterCoffres,
 } from "@shared/schema";
-import { StatutCoffre, StatutReconciliation, StatutTacheRegularisation } from "@shared/enum/status-constants";
+import { StatutCoffre, StatutReconciliation, StatutTacheRegularisation, StatutTransfertInterCoffre } from "@shared/enum/status-constants";
 import { currencyCode } from "@shared/config/currency";
-import { eq, and, desc, asc, gte, isNull } from "drizzle-orm";
+import { eq, and, desc, asc, gte, lte, isNull, inArray, sql } from "drizzle-orm";
+import { getWsInstance } from "../ws-server";
+
+/** Broadcast a transfert coffre event to all connected clients */
+function broadcastTransfertUpdate(action: string, transfertId: string, payload?: any) {
+  const ws = getWsInstance();
+  if (ws) {
+    ws.broadcast({
+      type: "TRANSFERT_COFFRE_UPDATED",
+      payload: { action, transfertId, ...payload },
+    });
+  }
+}
 
 export const transfertsInterCoffresRouter = Router();
 
@@ -186,6 +198,8 @@ transfertsInterCoffresRouter.get("/transferts", async (req, res) => {
       search,
       sortBy,
       sortOrder,
+      montantMin,
+      montantMax,
     } = req.query;
 
     const result = await transfertService.listTransferts({
@@ -199,6 +213,8 @@ transfertsInterCoffresRouter.get("/transferts", async (req, res) => {
       search: search as string,
       sortBy: sortBy as string,
       sortOrder: sortOrder as "asc" | "desc",
+      montantMin: montantMin as string,
+      montantMax: montantMax as string,
     });
 
     res.json(result);
@@ -250,6 +266,7 @@ transfertsInterCoffresRouter.post("/transferts", async (req, res) => {
       return res.status(400).json(result);
     }
 
+    broadcastTransfertUpdate('CREATED', result.data?.id || '', { reference: result.data?.reference });
     res.status(201).json(result);
   } catch (error: any) {
     logger.error({ err: error }, 'Erreur POST /transferts');
@@ -297,6 +314,7 @@ transfertsInterCoffresRouter.post("/transferts/:id/submit", async (req, res) => 
       return res.status(400).json(result);
     }
 
+    broadcastTransfertUpdate('SUBMITTED', id, { statut: 'SUBMITTED' });
     res.json(result);
   } catch (error: any) {
     logger.error({ err: error }, 'Erreur POST /transferts/:id/submit');
@@ -339,6 +357,9 @@ transfertsInterCoffresRouter.post("/transferts/:id/approve", async (req, res) =>
       return res.status(400).json(result);
     }
 
+    broadcastTransfertUpdate(data.approved ? `APPROVED_L${approvalLevel}` : 'REJECTED', id, {
+      statut: result.data?.statut,
+    });
     res.json(result);
   } catch (error: any) {
     logger.error({ err: error }, 'Erreur POST /transferts/:id/approve');
@@ -380,6 +401,7 @@ transfertsInterCoffresRouter.post("/transferts/:id/reject", async (req, res) => 
       return res.status(400).json(result);
     }
 
+    broadcastTransfertUpdate('REJECTED', id, { statut: 'REJECTED' });
     res.json(result);
   } catch (error: any) {
     logger.error({ err: error }, 'Erreur POST /transferts/:id/reject');
@@ -422,6 +444,7 @@ transfertsInterCoffresRouter.post("/transferts/:id/dispatch", async (req, res) =
       return res.status(400).json(result);
     }
 
+    broadcastTransfertUpdate('DISPATCHED', id, { statut: 'IN_TRANSIT' });
     res.json(result);
   } catch (error: any) {
     logger.error({ err: error }, 'Erreur POST /transferts/:id/dispatch');
@@ -475,6 +498,10 @@ transfertsInterCoffresRouter.post("/transferts/:id/receive", async (req, res) =>
       return res.status(400).json(result);
     }
 
+    broadcastTransfertUpdate('RECEIVED', id, {
+      statut: data.conforme ? 'RECEIVED' : 'RECEIVED_WITH_DISCREPANCY',
+      conforme: data.conforme,
+    });
     res.json(result);
   } catch (error: any) {
     logger.error({ err: error }, 'Erreur POST /transferts/:id/receive');
@@ -520,6 +547,7 @@ transfertsInterCoffresRouter.post("/transferts/:id/cancel", async (req, res) => 
       return res.status(400).json(result);
     }
 
+    broadcastTransfertUpdate('CANCELLED', id, { statut: 'CANCELLED' });
     res.json(result);
   } catch (error: any) {
     logger.error({ err: error }, 'Erreur POST /transferts/:id/cancel');
@@ -742,5 +770,285 @@ transfertsInterCoffresRouter.put("/config", attachAbility, requireAbility(Action
   } catch (error: any) {
     logger.error({ err: error }, 'Erreur PUT /config');
     res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// NOUVELLES FONCTIONNALITÉS
+// ═══════════════════════════════════════════════════════════════════
+
+// DELETE /transferts/:id - Supprimer un brouillon
+transfertsInterCoffresRouter.delete("/transferts/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ success: false, error: "Non authentifié" });
+
+    // Vérifier que le transfert est bien en DRAFT
+    const [transfert] = await db.select().from(transfertsInterCoffres).where(eq(transfertsInterCoffres.id, id));
+    if (!transfert) return res.status(404).json({ success: false, error: "Transfert introuvable" });
+    if (transfert.statut !== StatutTransfertInterCoffre.DRAFT) {
+      return res.status(400).json({ success: false, error: "Seuls les brouillons peuvent être supprimés" });
+    }
+
+    await db.delete(transfertsInterCoffres).where(eq(transfertsInterCoffres.id, id));
+    broadcastTransfertUpdate('DELETED', id);
+    res.json({ success: true });
+  } catch (error: any) {
+    logger.error({ err: error }, 'Erreur DELETE /transferts/:id');
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// POST /transferts/bulk-approve - Approuver en lot
+transfertsInterCoffresRouter.post("/transferts/bulk-approve", async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    const userRole = req.user?.role ?? '';
+    if (!userId) return res.status(401).json({ success: false, error: "Non authentifié" });
+
+    const schema = z.object({
+      transfertIds: z.array(z.string().uuid()).min(1).max(50),
+      level: z.number().min(1).max(2),
+      commentaire: z.string().optional(),
+    });
+    const { transfertIds, level, commentaire } = schema.parse(req.body);
+
+    const results: Array<{ id: string; success: boolean; error?: string }> = [];
+    for (const tid of transfertIds) {
+      try {
+        const result = await transfertService.approveTransfert({
+          transfertId: tid,
+          level,
+          approved: true,
+          commentaire,
+          userId,
+          userRole,
+          ipAddress: req.ip,
+          userAgent: req.headers["user-agent"],
+        });
+        results.push({ id: tid, success: result.success, error: result.error });
+        if (result.success) broadcastTransfertUpdate(`APPROVED_L${level}`, tid);
+      } catch (e: any) {
+        results.push({ id: tid, success: false, error: e.message });
+      }
+    }
+
+    const succeeded = results.filter(r => r.success).length;
+    res.json({ success: true, data: { total: transfertIds.length, succeeded, failed: transfertIds.length - succeeded, results } });
+  } catch (error: any) {
+    logger.error({ err: error }, 'Erreur POST /transferts/bulk-approve');
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// POST /transferts/bulk-reject - Rejeter en lot
+transfertsInterCoffresRouter.post("/transferts/bulk-reject", async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    const userRole = req.user?.role ?? '';
+    if (!userId) return res.status(401).json({ success: false, error: "Non authentifié" });
+
+    const schema = z.object({
+      transfertIds: z.array(z.string().uuid()).min(1).max(50),
+      level: z.number().min(1).max(2),
+      reason: z.string().min(10),
+    });
+    const { transfertIds, level, reason } = schema.parse(req.body);
+
+    const results: Array<{ id: string; success: boolean; error?: string }> = [];
+    for (const tid of transfertIds) {
+      try {
+        const result = await transfertService.approveTransfert({
+          transfertId: tid,
+          level,
+          approved: false,
+          rejectionReason: reason,
+          userId,
+          userRole,
+          ipAddress: req.ip,
+          userAgent: req.headers["user-agent"],
+        });
+        results.push({ id: tid, success: result.success, error: result.error });
+        if (result.success) broadcastTransfertUpdate('REJECTED', tid);
+      } catch (e: any) {
+        results.push({ id: tid, success: false, error: e.message });
+      }
+    }
+
+    const succeeded = results.filter(r => r.success).length;
+    res.json({ success: true, data: { total: transfertIds.length, succeeded, failed: transfertIds.length - succeeded, results } });
+  } catch (error: any) {
+    logger.error({ err: error }, 'Erreur POST /transferts/bulk-reject');
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// GET /transferts/export/csv - Export CSV de la liste des transferts
+transfertsInterCoffresRouter.get("/transferts/export/csv", async (req, res) => {
+  try {
+    const { statut, dateDebut, dateFin, montantMin, montantMax } = req.query;
+
+    const conditions = [];
+    if (statut && statut !== "all") conditions.push(eq(transfertsInterCoffres.statut, statut as any));
+    if (dateDebut) conditions.push(gte(transfertsInterCoffres.dateTransfert, dateDebut as string));
+    if (dateFin) conditions.push(lte(transfertsInterCoffres.dateTransfert, dateFin as string));
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const rows = await db
+      .select({
+        reference: transfertsInterCoffres.reference,
+        dateTransfert: transfertsInterCoffres.dateTransfert,
+        montant: transfertsInterCoffres.montant,
+        devise: transfertsInterCoffres.devise,
+        typeTransfert: transfertsInterCoffres.typeTransfert,
+        statut: transfertsInterCoffres.statut,
+        motif: transfertsInterCoffres.motif,
+        typeConditionnement: transfertsInterCoffres.typeConditionnement,
+        numeroScelle: transfertsInterCoffres.numeroScelle,
+        createdAt: transfertsInterCoffres.createdAt,
+      })
+      .from(transfertsInterCoffres)
+      .where(whereClause)
+      .orderBy(desc(transfertsInterCoffres.dateTransfert));
+
+    // Filtrage montant en JS (les champs numeric sont des strings)
+    let filteredRows = rows;
+    if (montantMin) filteredRows = filteredRows.filter(r => parseFloat(r.montant || '0') >= parseFloat(montantMin as string));
+    if (montantMax) filteredRows = filteredRows.filter(r => parseFloat(r.montant || '0') <= parseFloat(montantMax as string));
+
+    const header = 'Référence;Date;Montant;Devise;Type;Statut;Motif;Conditionnement;N° Scellé';
+    const csvRows = filteredRows.map(r =>
+      [
+        r.reference,
+        r.dateTransfert ? new Date(r.dateTransfert).toLocaleDateString('fr-FR') : '',
+        r.montant,
+        r.devise,
+        r.typeTransfert,
+        r.statut,
+        `"${(r.motif || '').replace(/"/g, '""')}"`,
+        r.typeConditionnement,
+        r.numeroScelle || '',
+      ].join(';')
+    );
+
+    const csv = [header, ...csvRows].join('\n');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename=transferts_inter_coffres_${new Date().toISOString().slice(0, 10)}.csv`);
+    res.send('\uFEFF' + csv); // BOM for Excel
+  } catch (error: any) {
+    logger.error({ err: error }, 'Erreur GET /transferts/export/csv');
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /taches/stats - Statistiques des tâches de régularisation
+transfertsInterCoffresRouter.get("/taches/stats", async (req, res) => {
+  try {
+    const taches = await db.select().from(tachesRegularisation);
+    const stats = {
+      total: taches.length,
+      open: taches.filter(t => t.statut === StatutTacheRegularisation.OPEN).length,
+      inProgress: taches.filter(t => t.statut === 'IN_PROGRESS').length,
+      resolved: taches.filter(t => t.statut === StatutTacheRegularisation.RESOLVED).length,
+      escalated: taches.filter(t => t.statut === 'ESCALATED').length,
+      critical: taches.filter(t => t.priorite === 'CRITICAL').length,
+      high: taches.filter(t => t.priorite === 'HIGH').length,
+    };
+    res.json({ success: true, data: stats });
+  } catch (error: any) {
+    logger.error({ err: error }, 'Erreur GET /taches/stats');
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// POST /taches/:id/escalate - Escalader une tâche
+transfertsInterCoffresRouter.post("/taches/:id/escalate", attachAbility, requireAbility(Actions.APPROVE, Subjects.COFFRE_TRANSFERT), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id;
+
+    const [updated] = await db
+      .update(tachesRegularisation)
+      .set({
+        statut: 'ESCALATED' as any,
+        priorite: 'CRITICAL' as any,
+        updatedAt: new Date(),
+      })
+      .where(eq(tachesRegularisation.id, id))
+      .returning();
+
+    if (!updated) return res.status(404).json({ success: false, error: "Tâche introuvable" });
+
+    broadcastTransfertUpdate('TASK_ESCALATED', id, { tacheId: id });
+    res.json({ success: true, tache: updated });
+  } catch (error: any) {
+    logger.error({ err: error }, 'Erreur POST /taches/:id/escalate');
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// POST /reconciliations/:id/resolve - Résoudre manuellement une réconciliation
+transfertsInterCoffresRouter.post("/reconciliations/:id/resolve", attachAbility, requireAbility(Actions.APPROVE, Subjects.COFFRE_TRANSFERT), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user?.id;
+
+    const schema = z.object({
+      resolution: z.string().min(10),
+      montantAjuste: z.number().optional(),
+    });
+    const { resolution, montantAjuste } = schema.parse(req.body);
+
+    const updateData: any = {
+      statut: StatutReconciliation.RECONCILED,
+      commentaire: resolution,
+      resolvedBy: userId,
+      resolvedAt: new Date(),
+      updatedAt: new Date(),
+    };
+    if (montantAjuste !== undefined) {
+      updateData.montantRecu = montantAjuste.toString();
+    }
+
+    const [updated] = await db
+      .update(reconciliationsLiaison)
+      .set(updateData)
+      .where(eq(reconciliationsLiaison.id, id))
+      .returning();
+
+    if (!updated) return res.status(404).json({ success: false, error: "Réconciliation introuvable" });
+
+    broadcastTransfertUpdate('RECONCILIATION_RESOLVED', id);
+    res.json({ success: true, reconciliation: updated });
+  } catch (error: any) {
+    logger.error({ err: error }, 'Erreur POST /reconciliations/:id/resolve');
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// GET /transferts/stale - Transferts bloqués (escalation check)
+transfertsInterCoffresRouter.get("/transferts/stale", async (req, res) => {
+  try {
+    const hoursThreshold = parseInt(req.query.hours as string) || 24;
+    const cutoff = new Date(Date.now() - hoursThreshold * 60 * 60 * 1000);
+
+    const stale = await db.select()
+      .from(transfertsInterCoffres)
+      .where(and(
+        inArray(transfertsInterCoffres.statut, [
+          StatutTransfertInterCoffre.SUBMITTED,
+          StatutTransfertInterCoffre.APPROVED_L1,
+          StatutTransfertInterCoffre.IN_TRANSIT,
+        ] as any),
+        lte(transfertsInterCoffres.updatedAt, cutoff),
+      ))
+      .orderBy(asc(transfertsInterCoffres.updatedAt));
+
+    res.json({ success: true, data: stale, count: stale.length, thresholdHours: hoursThreshold });
+  } catch (error: any) {
+    logger.error({ err: error }, 'Erreur GET /transferts/stale');
+    res.status(500).json({ success: false, error: error.message });
   }
 });
