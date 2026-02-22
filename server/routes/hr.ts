@@ -86,7 +86,7 @@ import { getWsInstance } from "../ws-server";
 import { z } from "zod";
 import { dispatchDomainEvent } from "../services/notifications/domain-events/event-registry";
 import { currencySymbol } from "@shared/config/currency";
-import { enqueueNotification } from "../services/notifications/notification-service";
+import { enqueueNotification, sendInAppNotification } from "../services/notifications/notification-service";
 import multer from "multer";
 import { importEmployees, parseCsv } from "../services/hr-import-service";
 import { StorageService } from "../services/storage-service";
@@ -3710,6 +3710,11 @@ hrRouter.get("/stats", getAuthUser, async (req, res) => {
 
 hrRouter.get("/pending-count", getAuthUser, attachAbility, async (req, res) => {
     try {
+        // Only return counts for users who can access HR module
+        if (!req.ability?.can(Actions.READ, Subjects.RH)) {
+            return res.json({ pendingConges: 0, pendingDocuments: 0, total: 0 });
+        }
+
         const [congesResult] = await db
             .select({ count: sql<number>`COUNT(*)::int` })
             .from(demandesConges)
@@ -5887,6 +5892,23 @@ hrRouter.patch("/document-requests/:id/process", getAuthUser, attachAbility, asy
         }
 
         broadcastHrEvent({ entity: 'document_request', action: 'updated', id: result.id });
+
+        // Notify the employee that their request was processed
+        if (statut === 'COMPLETED' || statut === 'REJECTED') {
+            const [emp] = await db.select({ userId: employes.userId }).from(employes).where(eq(employes.id, result.employeId)).limit(1);
+            if (emp?.userId) {
+                const isCompleted = statut === 'COMPLETED';
+                sendInAppNotification({
+                    userId: emp.userId,
+                    type: isCompleted ? 'HR_DOCUMENT_REQUEST_COMPLETED' : 'HR_DOCUMENT_REQUEST_REJECTED',
+                    titre: isCompleted ? 'Document prêt' : 'Demande de document rejetée',
+                    message: isCompleted
+                        ? `Votre demande de ${result.type} a été traitée. Le document est disponible.`
+                        : `Votre demande de ${result.type} a été rejetée.${motifRejet ? ` Motif : ${motifRejet}` : ''}`,
+                    priorite: 'NORMAL',
+                }).catch((err) => logger.error({ err }, "Erreur notification in-app document request"));
+            }
+        }
 
         res.json(result);
     } catch (error) {
