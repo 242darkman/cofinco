@@ -1428,7 +1428,7 @@ export default function CaisseDashboard({
               </button>
               <button
                 onClick={resetSessionTimeout}
-                className="flex-1 px-4 py-2 bg-accent-secondary hover:bg-accent-secondary-hover text-content-primary rounded-lg text-sm font-bold transition"
+                className="flex-1 px-4 py-2 bg-accent-secondary hover:bg-accent-secondary-hover text-white rounded-lg text-sm font-bold transition"
               >
                 Rester connecté
               </button>
