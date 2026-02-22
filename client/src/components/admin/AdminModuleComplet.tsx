@@ -3,7 +3,7 @@ import {
   Shield, Users, Key, Settings, BarChart3, Activity, Monitor, Power, Building2, MapPin,
   MessageSquare, KeyRound, Clock, UserPlus, Award, Package, CreditCard, CalendarClock,
   AlertTriangle, ShieldCheck, LayoutGrid, UserCog, Lock, ChevronLeft, ChevronRight, Percent, Coins,
-  RotateCcw
+  RotateCcw, History, GitBranch, Braces, Eye, MessageSquarePlus
 } from 'lucide-react';
 import { Button, ConfirmDialog } from '../ui';
 
@@ -45,6 +45,13 @@ import ModulePermissionsView from './permissions/ModulePermissionsView';
 import UserCustomPermissionsManager from './permissions/UserCustomPermissionsManager';
 import TemporaryPermissionsManager from './permissions/TemporaryPermissionsManager';
 import PermissionAnalyticsDashboard from './permissions/PermissionAnalyticsDashboard';
+import RbacAuditHistoryViewer from './permissions/RbacAuditHistoryViewer';
+import RoleHierarchyTree from './permissions/RoleHierarchyTree';
+import CriticalPatternsManager from './permissions/CriticalPatternsManager';
+import ConditionTemplatesManager from './permissions/ConditionTemplatesManager';
+import PermissionSimulator from './permissions/PermissionSimulator';
+import ModulePermissionsEditor from './permissions/ModulePermissionsEditor';
+import PermissionRequestsManager from './permissions/PermissionRequestsManager';
 import RegularizationDashboard from './RegularizationDashboard';
 import AdminClientCredentials from './AdminClientCredentials';
 import AdminProductRates from './AdminProductRates';
@@ -76,7 +83,7 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
     navigateToModule('administrateur', tab);
   }, [navigateToModule]);
 
-  const [accessViewMode, setAccessViewMode] = useState<'roles' | 'modules' | 'users' | 'temporary' | 'analytics'>('roles');
+  const [accessViewMode, setAccessViewMode] = useState<'roles' | 'modules' | 'users' | 'temporary' | 'analytics' | 'historique' | 'hierarchy' | 'patterns' | 'conditions' | 'simulation' | 'demandes'>('roles');
   const [selectedRole, setSelectedRole] = useState<SystemRole>(SystemRole.ADMIN);
   const [selectedUserId, setSelectedUserId] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -88,10 +95,10 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
   const [showRightShadow, setShowRightShadow] = useState(false);
 
   // Hooks
-  const { modules } = useModules();
-  const { permissions, searchPermissions } = usePermissions();
+  const { modules, fetchModules: refreshModules } = useModules();
+  const { permissions, searchPermissions, fetchPermissions: refreshPermissions } = usePermissions();
   const {
-    rolePermissions, // eslint-disable-line @typescript-eslint/no-unused-vars
+    rolePermissions,
     fetchRolePermissions,
     toggleRolePermission: toggleRolePerm,
     roleHasPermission: singleRoleHasPermission
@@ -435,6 +442,42 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
                             icon: BarChart3,
                             description: 'Analysez l\'utilisation des permissions, identifiez les incohérences et optimisez la configuration des accès.'
                           },
+                          {
+                            id: 'historique' as const,
+                            label: 'Historique',
+                            icon: History,
+                            description: 'Consultez l\'historique complet des modifications de permissions. Suivez qui a changé quoi, quand et pourquoi.'
+                          },
+                          {
+                            id: 'hierarchy' as const,
+                            label: 'Hiérarchie',
+                            icon: GitBranch,
+                            description: 'Visualisez l\'arbre d\'héritage des rôles. Les rôles parents héritent automatiquement des permissions de leurs enfants.'
+                          },
+                          {
+                            id: 'patterns' as const,
+                            label: 'Patterns Critiques',
+                            icon: AlertTriangle,
+                            description: 'Gérez les patterns de permissions qui nécessitent une justification lors de modification.'
+                          },
+                          {
+                            id: 'conditions' as const,
+                            label: 'Conditions',
+                            icon: Braces,
+                            description: 'Gérez les templates de conditions CASL pour restreindre les permissions (montant max, même agence, etc.).'
+                          },
+                          {
+                            id: 'simulation' as const,
+                            label: 'Simulation',
+                            icon: Eye,
+                            description: 'Prévisualisez les permissions effectives d\'un utilisateur. Vue lecture seule, rien n\'est modifié.'
+                          },
+                          {
+                            id: 'demandes' as const,
+                            label: 'Demandes',
+                            icon: MessageSquarePlus,
+                            description: 'Gérez les demandes de permissions des utilisateurs. Approuvez ou rejetez les demandes en attente.'
+                          },
                         ];
                         const activeTab = viewTabs.find(t => t.id === accessViewMode);
 
@@ -485,18 +528,27 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
                             toggleRolePermission={handleToggleRolePermission}
                             activePermissionsCount={selectedRole === SystemRole.ADMIN ? (permissions?.length || 0) : activeRolePermissionsCount}
                             confirmMessage={confirmMessage}
+                            rolePermissionsData={rolePermissions}
                             />
                         )}
 
                         {accessViewMode === 'modules' && (
-                            <ModulePermissionsView
-                            modules={modules}
-                            permissions={permissions}
-                            searchTerm={searchTerm}
-                            onSearchChange={setSearchTerm}
-                            roleHasPermission={allRolesHasPermission}
-                            selectedRole={selectedRole}
+                          ability.can(Actions.MANAGE, Subjects.RBAC) ? (
+                            <ModulePermissionsEditor
+                              modules={modules}
+                              permissions={permissions}
+                              onRefresh={() => { refreshModules(); refreshPermissions(); }}
                             />
+                          ) : (
+                            <ModulePermissionsView
+                              modules={modules}
+                              permissions={permissions}
+                              searchTerm={searchTerm}
+                              onSearchChange={setSearchTerm}
+                              roleHasPermission={allRolesHasPermission}
+                              selectedRole={selectedRole}
+                            />
+                          )
                         )}
 
                         {accessViewMode === 'users' && (
@@ -525,6 +577,30 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
 
                         {accessViewMode === 'analytics' && (
                             <PermissionAnalyticsDashboard />
+                        )}
+
+                        {accessViewMode === 'historique' && (
+                            <RbacAuditHistoryViewer />
+                        )}
+
+                        {accessViewMode === 'hierarchy' && (
+                            <RoleHierarchyTree />
+                        )}
+
+                        {accessViewMode === 'patterns' && (
+                            <CriticalPatternsManager />
+                        )}
+
+                        {accessViewMode === 'conditions' && (
+                            <ConditionTemplatesManager />
+                        )}
+
+                        {accessViewMode === 'simulation' && (
+                            <PermissionSimulator users={users} />
+                        )}
+
+                        {accessViewMode === 'demandes' && (
+                            <PermissionRequestsManager />
                         )}
                       </div>
                     </div>

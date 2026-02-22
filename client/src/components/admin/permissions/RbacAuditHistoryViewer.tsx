@@ -24,17 +24,54 @@ import {
   Loader2,
   AlertCircle,
   Download,
+  Undo2,
 } from 'lucide-react';
-import { Button, Badge, SearchInput, SelectField } from '@/components/ui';
+import { Button, Badge, SearchInput, SelectField, Modal } from '@/components/ui';
 import {
   useRbacAuditHistory,
+  useAuditRevert,
   AUDIT_ACTION_LABELS,
+  REVERTABLE_ACTIONS,
   type RbacAuditEntry,
   type RbacAuditAction,
   type PermissionScope,
 } from '@/hooks/admin/useRbacAudit';
 import { format, formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
+
+/**
+ * Export audit history to CSV
+ */
+function exportAuditToCSV(history: RbacAuditEntry[]) {
+  const escapeCsv = (val: string) => `"${(val || '').replace(/"/g, '""')}"`;
+
+  const csvRows: string[] = [
+    // Header
+    ['Date', 'Acteur', 'Cible', 'Action', 'Permission', 'Ancienne Valeur', 'Nouvelle Valeur', 'Scope', 'Raison'].join(';'),
+  ];
+
+  for (const entry of history) {
+    csvRows.push([
+      format(new Date(entry.createdAt), 'yyyy-MM-dd HH:mm:ss'),
+      escapeCsv(entry.actorName || 'Système'),
+      escapeCsv(entry.targetName || entry.targetRole || '—'),
+      escapeCsv(AUDIT_ACTION_LABELS[entry.action] || entry.action),
+      escapeCsv(entry.permissionCode || '—'),
+      entry.oldValue !== null && entry.oldValue !== undefined ? (entry.oldValue ? 'Activé' : 'Désactivé') : '—',
+      entry.newValue !== null && entry.newValue !== undefined ? (entry.newValue ? 'Activé' : 'Désactivé') : '—',
+      entry.scope || 'GLOBAL',
+      escapeCsv(entry.reason || ''),
+    ].join(';'));
+  }
+
+  const blob = new Blob(['\ufeff' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `audit_rbac_${format(new Date(), 'yyyy-MM-dd_HHmmss')}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
 
 interface RbacAuditHistoryViewerProps {
   userId?: string; // If provided, filter to this user
@@ -70,6 +107,23 @@ export default function RbacAuditHistoryViewer({
       ? { targetUserId: userId, limit: maxItems || 50 }
       : { limit: maxItems || 50 }
   );
+
+  // Revert functionality
+  const { revertEntry, loading: revertLoading } = useAuditRevert();
+  const [revertTarget, setRevertTarget] = useState<RbacAuditEntry | null>(null);
+  const [revertReason, setRevertReason] = useState('');
+
+  const handleRevert = async () => {
+    if (!revertTarget) return;
+    try {
+      await revertEntry(revertTarget.id, revertReason || undefined);
+      setRevertTarget(null);
+      setRevertReason('');
+      refresh();
+    } catch (_) {
+      // Error handled in hook
+    }
+  };
 
   // Filter locally by search term
   const filteredHistory = useMemo(() => {
@@ -210,15 +264,27 @@ export default function RbacAuditHistoryViewer({
               </div>
             )}
 
-            {/* Timestamp */}
-            <div className="mt-1.5 flex items-center gap-1 text-[9px] text-content-muted">
-              <Clock size={9} />
-              <span title={format(new Date(entry.createdAt), 'PPPpp', { locale: fr })}>
-                {formatDistanceToNow(new Date(entry.createdAt), {
-                  addSuffix: true,
-                  locale: fr,
-                })}
-              </span>
+            {/* Timestamp + Revert */}
+            <div className="mt-1.5 flex items-center gap-2 text-[9px] text-content-muted">
+              <div className="flex items-center gap-1">
+                <Clock size={9} />
+                <span title={format(new Date(entry.createdAt), 'PPPpp', { locale: fr })}>
+                  {formatDistanceToNow(new Date(entry.createdAt), {
+                    addSuffix: true,
+                    locale: fr,
+                  })}
+                </span>
+              </div>
+              {REVERTABLE_ACTIONS.includes(entry.action) && (
+                <button
+                  onClick={() => setRevertTarget(entry)}
+                  className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-status-warning hover:bg-status-warning-bg transition-colors"
+                  title="Annuler cette action"
+                >
+                  <Undo2 size={9} />
+                  <span>Annuler</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -241,14 +307,26 @@ export default function RbacAuditHistoryViewer({
             </Badge>
           </div>
 
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => refresh()}
-            disabled={loading}
-          >
-            <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => exportAuditToCSV(filteredHistory)}
+              disabled={filteredHistory.length === 0}
+              title="Exporter en CSV"
+            >
+              <Download size={12} />
+              <span className="text-[10px]">CSV</span>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => refresh()}
+              disabled={loading}
+            >
+              <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
+            </Button>
+          </div>
         </div>
       )}
 
@@ -347,6 +425,51 @@ export default function RbacAuditHistoryViewer({
             </Button>
           </div>
         </div>
+      )}
+
+      {/* Revert confirmation modal */}
+      {revertTarget && (
+        <Modal isOpen={!!revertTarget} onClose={() => { setRevertTarget(null); setRevertReason(''); }} title="Annuler cette action ?">
+          <div className="space-y-4">
+            <div className="p-3 rounded-lg bg-surface-subtle border border-edge-subtle text-sm">
+              <div className="flex items-center gap-2 mb-1">
+                <Undo2 size={14} className="text-status-warning" />
+                <span className="font-medium text-content-primary">
+                  {AUDIT_ACTION_LABELS[revertTarget.action] || revertTarget.action}
+                </span>
+              </div>
+              {revertTarget.permissionCode && (
+                <div className="text-xs text-content-muted mt-1">
+                  Permission : <code className="font-mono">{revertTarget.permissionCode}</code>
+                </div>
+              )}
+              {revertTarget.oldValue !== null && revertTarget.oldValue !== undefined && (
+                <div className="text-xs text-content-muted mt-1">
+                  Retour à : {revertTarget.oldValue ? 'Activé' : 'Désactivé'}
+                </div>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-content-primary mb-1">Raison (optionnel)</label>
+              <textarea
+                value={revertReason}
+                onChange={e => setRevertReason(e.target.value)}
+                rows={2}
+                placeholder="Pourquoi annuler cette action ?"
+                className="w-full px-3 py-2 text-sm bg-input border border-input-border rounded-lg focus:border-input-focus focus:outline-none text-content-primary resize-none"
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" size="sm" onClick={() => { setRevertTarget(null); setRevertReason(''); }}>
+                Fermer
+              </Button>
+              <Button size="sm" variant="destructive" onClick={handleRevert} disabled={revertLoading}>
+                {revertLoading && <Loader2 size={14} className="animate-spin mr-1" />}
+                Confirmer l'annulation
+              </Button>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );

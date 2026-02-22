@@ -23,3 +23,10 @@ export { default as EnhancedPermissionRow } from './EnhancedPermissionRow';
 export type { EnhancedPermissionData } from './EnhancedPermissionRow';
 
 export { default as RbacAuditHistoryViewer } from './RbacAuditHistoryViewer';
+export { default as RoleHierarchyTree } from './RoleHierarchyTree';
+export { default as CriticalPatternsManager } from './CriticalPatternsManager';
+export { default as ConditionTemplatesManager } from './ConditionTemplatesManager';
+export { default as PermissionSimulator } from './PermissionSimulator';
+export { default as ModulePermissionsEditor } from './ModulePermissionsEditor';
+export { default as PermissionRequestsManager } from './PermissionRequestsManager';
+export { default as PermissionRequestForm } from './PermissionRequestForm';

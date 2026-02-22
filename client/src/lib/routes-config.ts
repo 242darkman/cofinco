@@ -206,6 +206,7 @@ export const ROUTES: RouteConfig[] = [
       { path: '/agent-terrain/modules/incidents', subModule: 'incidents', label: 'Incidents' },
       { path: '/agent-terrain/modules/objectifs', subModule: 'objectifs', label: 'Objectifs' },
       { path: '/agent-terrain/modules/supervision-prospection', subModule: 'supervision-prospection', label: 'Supervision' },
+      { path: '/agent-terrain/modules/tracking-debug', subModule: 'tracking-debug', label: 'Tracking Debug' },
     ],
   },
   {

@@ -16,6 +16,7 @@ interface PlatformHeaderProps {
   onMenuToggle: () => void;
   onProfileClick: () => void;
   onSessionsClick?: () => void;
+  onPermissionRequestClick?: () => void;
   onLogout: () => void;
   user: {
     nom?: string;
@@ -34,6 +35,7 @@ export default function PlatformHeader({
   onMenuToggle,
   onProfileClick,
   onSessionsClick,
+  onPermissionRequestClick,
   onLogout,
   user
 }: PlatformHeaderProps) {
@@ -119,6 +121,7 @@ export default function PlatformHeader({
             user={user}
             onProfileClick={onProfileClick}
             onSessionsClick={onSessionsClick}
+            onPermissionRequestClick={onPermissionRequestClick}
             onLogout={onLogout}
           />
         </div>

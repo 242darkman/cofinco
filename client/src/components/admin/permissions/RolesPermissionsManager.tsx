@@ -3,9 +3,11 @@ import { Shield, Award, CheckCircle, AlertCircle, Search, AlertTriangle, Eye, Ed
 import { SelectField, SearchInput, Switch, Button } from '../../ui';
 import { Module } from '../../../hooks/admin/useModules';
 import { Permission } from '../../../hooks/admin/usePermissions';
+import { RolePermission } from '../../../hooks/admin/useRolePermissions';
 import { ADMIN_ROLES, CATEGORY_LABELS } from '../../../constants/admin-constants';
 import { getRoleBadgeStyle } from '../../../lib/role-utils';
-import { SystemRole } from '@shared/types/roles';
+import { SystemRole, getRoleLabel } from '@shared/types/roles';
+import { Link2 } from 'lucide-react';
 
 interface RolesPermissionsManagerProps {
   modules: Module[];
@@ -16,6 +18,7 @@ interface RolesPermissionsManagerProps {
   toggleRolePermission: (role: SystemRole, permCode: string) => void;
   activePermissionsCount: number;
   confirmMessage?: string;
+  rolePermissionsData?: RolePermission[];
 }
 
 // Helper to categorize permissions by action type
@@ -100,17 +103,29 @@ export default function RolesPermissionsManager({
   roleHasPermission,
   toggleRolePermission,
   activePermissionsCount,
-  confirmMessage
+  confirmMessage,
+  rolePermissionsData = [],
 }: RolesPermissionsManagerProps) {
   const [activeModuleId, setActiveModuleId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   // Pending changes management - Map<permCode, newState>
   const [pendingChanges, setPendingChanges] = useState<Map<string, boolean>>(new Map());
   const [isSaving, setIsSaving] = useState(false);
-  
+
   const roleOptions = ADMIN_ROLES.map(role => ({ value: role, label: getRoleBadgeStyle(role).label }));
   const isSuperAdmin = selectedRole === SystemRole.ADMIN;
+
+  // Build inheritance lookup: permissionCode → inheritedFrom role
+  const inheritanceMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const rp of rolePermissionsData) {
+      if (rp.inherited && rp.inheritedFrom && rp.permissionCode) {
+        map.set(rp.permissionCode, rp.inheritedFrom);
+      }
+    }
+    return map;
+  }, [rolePermissionsData]);
 
   // Reset pending changes when role changes
   useEffect(() => {
@@ -441,39 +456,59 @@ export default function RolesPermissionsManager({
                         const isGranted = isSuperAdmin ? true : getEffectivePermissionState(perm.code);
                         const isDanger = category === 'danger';
                         const hasPending = pendingChanges.has(perm.code);
+                        const inheritedFrom = inheritanceMap.get(perm.code);
+                        const isInherited = !!inheritedFrom;
+                        const isDisabled = isSuperAdmin || isInherited;
 
                         return (
                           <div
                             key={perm.id}
-                            onClick={() => handleLocalToggle(perm.code)}
+                            onClick={() => !isDisabled && handleLocalToggle(perm.code)}
+                            title={isInherited ? `Hérité du rôle ${getRoleLabel(inheritedFrom as SystemRole)}` : undefined}
                             className={`
                               flex items-center justify-between px-2.5 py-2 rounded border transition-all
-                              ${isSuperAdmin
-                                ? 'cursor-not-allowed bg-status-info/5 border-status-info/10 opacity-75'
+                              ${isDisabled
+                                ? 'cursor-not-allowed opacity-75'
                                 : 'cursor-pointer hover:bg-surface/70'
                               }
+                              ${isInherited
+                                ? 'bg-status-info/5 border-status-info/15'
+                                : isSuperAdmin
+                                  ? 'bg-status-info/5 border-status-info/10'
+                                  : ''
+                              }
                               ${hasPending ? 'ring-1 ring-status-warning/50' : ''}
-                              ${isGranted && !isSuperAdmin
+                              ${isGranted && !isDisabled
                                 ? isDanger
                                   ? 'bg-status-danger/5 border-status-danger/20 hover:bg-status-danger/10'
                                   : 'bg-surface/50 border-edge hover:border-edge-strong'
-                                : !isSuperAdmin ? 'bg-transparent border-edge hover:border-edge' : ''
+                                : !isDisabled ? 'bg-transparent border-edge hover:border-edge' : ''
                               }
                             `}
                           >
-                            <span className={`text-xs font-medium truncate pr-2 ${isGranted ? 'text-content-secondary' : 'text-content-muted'}`}>
-                              {perm.name}
-                            </span>
+                            <div className="flex items-center gap-1.5 min-w-0 pr-2">
+                              <span className={`text-xs font-medium truncate ${isGranted ? 'text-content-secondary' : 'text-content-muted'}`}>
+                                {perm.name}
+                              </span>
+                              {isInherited && (
+                                <span className="inline-flex items-center gap-0.5 shrink-0 px-1 py-0.5 rounded bg-status-info/10 border border-status-info/20 text-[8px] font-semibold text-status-info">
+                                  <Link2 size={8} />
+                                  {getRoleLabel(inheritedFrom as SystemRole)}
+                                </span>
+                              )}
+                            </div>
 
                             {/* Toggle Switch Visual - Compact */}
                             <div className={`
                               w-8 h-4 rounded-full relative transition-colors shrink-0
                               ${isGranted
-                                ? isSuperAdmin
-                                  ? 'bg-status-info'
-                                  : isDanger
-                                    ? 'bg-status-danger'
-                                    : 'bg-accent'
+                                ? isInherited
+                                  ? 'bg-status-info/60'
+                                  : isSuperAdmin
+                                    ? 'bg-status-info'
+                                    : isDanger
+                                      ? 'bg-status-danger'
+                                      : 'bg-accent'
                                 : 'bg-surface-subtle/50'
                               }
                             `}>

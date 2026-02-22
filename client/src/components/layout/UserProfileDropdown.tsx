@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { User, LogOut, ChevronDown, Activity, Building2, Shield } from 'lucide-react';
+import { User, LogOut, ChevronDown, Activity, Building2, Shield, KeyRound } from 'lucide-react';
 import { getRoleLabel } from '@shared/types/roles';
 import { resolveStorageUrl } from '../../lib/format';
 
@@ -16,6 +16,7 @@ interface UserProfileDropdownProps {
   onProfileClick: () => void;
   onActivityClick?: () => void;
   onSessionsClick?: () => void;
+  onPermissionRequestClick?: () => void;
   onLogout: () => void;
   className?: string;
 }
@@ -133,6 +134,7 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({
   onProfileClick,
   onActivityClick,
   onSessionsClick,
+  onPermissionRequestClick,
   onLogout,
   className = ''
 }) => {
@@ -150,6 +152,7 @@ const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({
     { id: 'profile', label: 'Mon Profil', icon: User, onClick: onProfileClick },
     ...(onSessionsClick ? [{ id: 'sessions', label: 'Sessions actives', icon: Shield, onClick: onSessionsClick }] : []),
     ...(onActivityClick ? [{ id: 'activity', label: "Journal d'activité", icon: Activity, onClick: onActivityClick }] : []),
+    ...(onPermissionRequestClick ? [{ id: 'permissions', label: 'Demander une permission', icon: KeyRound, onClick: onPermissionRequestClick }] : []),
   ];
   const totalItems = menuItems.length + 1; // +1 for logout button
 

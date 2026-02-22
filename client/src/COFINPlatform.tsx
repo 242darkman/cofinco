@@ -68,6 +68,8 @@ import ForcePasswordChange from './components/auth/ForcePasswordChange';
 import { useAbilityContext } from './contexts/AbilityContext';
 import { SystemRole, normalizeRole } from '@shared/types/roles';
 import ActiveSessionsModal from './components/shared/ActiveSessionsModal';
+import PermissionRequestForm from './components/admin/permissions/PermissionRequestForm';
+import { useMyPermissionRequests } from './hooks/admin/usePermissionRequests';
 
 // ========== MODULE LOADING FALLBACK ==========
 // Skeleton loader shown while modules are being fetched
@@ -98,6 +100,7 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
   const [moduleData, setModuleData] = useState<any>(null);
   const { permissionsVersion, ability } = useAbilityContext();
   const normalizedRole = normalizeRole(currentUser?.role) || SystemRole.CLIENT;
+  const { createRequest: createPermRequest } = useMyPermissionRequests();
   
   // Security: Check if user still has access to current module
   useEffect(() => {
@@ -143,6 +146,7 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
   const [showMessagesPanel, setShowMessagesPanel] = useState(false);
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
   const [showSessionsModal, setShowSessionsModal] = useState(false);
+  const [showPermRequestModal, setShowPermRequestModal] = useState(false);
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
   const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -496,6 +500,7 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
             onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
             onProfileClick={() => navigateToModule('profil')}
             onSessionsClick={() => setShowSessionsModal(true)}
+            onPermissionRequestClick={() => setShowPermRequestModal(true)}
             onLogout={onLogout}
             user={{
               nom: currentUser?.nom,
@@ -536,6 +541,15 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
       <ActiveSessionsModal
         isOpen={showSessionsModal}
         onClose={() => setShowSessionsModal(false)}
+      />
+
+      <PermissionRequestForm
+        isOpen={showPermRequestModal}
+        onClose={() => setShowPermRequestModal(false)}
+        onSubmit={async (data) => {
+          await createPermRequest(data);
+          setShowPermRequestModal(false);
+        }}
       />
 
 

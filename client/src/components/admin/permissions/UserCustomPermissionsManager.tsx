@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Users, Shield, Search, CheckCircle,
   RotateCcw, Filter, Wifi, ArrowLeft, Award, Loader2, Sparkles, Ban,
-  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight
+  ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, AlertTriangle, Info
 } from 'lucide-react';
 import { Permission } from '../../../hooks/admin/usePermissions';
 import { UserPermission } from '../../../hooks/admin/useUserPermissions';
@@ -11,6 +11,7 @@ import { usePagination } from '../../../hooks/usePagination';
 import { getRoleBadgeStyle } from '../../../lib/role-utils';
 import { resolveStorageUrl } from '../../../lib/format';
 import { toast } from '../../../lib/toast';
+import { usePermissionConflicts, type PermissionConflict } from '../../../hooks/admin/usePermissionConflicts';
 
 interface UserCustomPermissionsManagerProps {
   users: any[];
@@ -94,8 +95,19 @@ export default function UserCustomPermissionsManager({
   const [userSearchTerm, setUserSearchTerm] = useState('');
   const [permSearchTerm, setPermSearchTerm] = useState('');
   const [showOnlyCustom, setShowOnlyCustom] = useState(false);
+  const [showOnlyConflicts, setShowOnlyConflicts] = useState(false);
   const [activeModuleId, setActiveModuleId] = useState<string | null>(null);
   const [isSelectionView, setIsSelectionView] = useState(!preselectedUserId);
+
+  // Conflict detection
+  const { conflicts, summary: conflictSummary, refresh: refreshConflicts } = usePermissionConflicts(
+    selectedUserId || null
+  );
+  const conflictMap = useMemo(() => {
+    const map = new Map<string, PermissionConflict>();
+    for (const c of conflicts) map.set(c.permissionCode, c);
+    return map;
+  }, [conflicts]);
 
   // Loading states for better UX
   const [loadingPermId, setLoadingPermId] = useState<string | null>(null);
@@ -109,6 +121,7 @@ export default function UserCustomPermissionsManager({
       await toggleUserPermission(permId);
       setRecentlyToggled(permId);
       setTimeout(() => setRecentlyToggled(null), 1500);
+      refreshConflicts();
 
       toast.success(
         currentStatus
@@ -121,20 +134,21 @@ export default function UserCustomPermissionsManager({
     } finally {
       setLoadingPermId(null);
     }
-  }, [toggleUserPermission]);
+  }, [toggleUserPermission, refreshConflicts]);
 
   // Enhanced reset with loading
   const handleReset = useCallback(async () => {
     setIsResetting(true);
     try {
       await onResetPermissions();
+      refreshConflicts();
       toast.success('Permissions réinitialisées aux valeurs du rôle', { duration: 3000 });
     } catch (error) {
       toast.error('Erreur lors de la réinitialisation');
     } finally {
       setIsResetting(false);
     }
-  }, [onResetPermissions]);
+  }, [onResetPermissions, refreshConflicts]);
 
   useEffect(() => {
     if (preselectedUserId) {
@@ -184,23 +198,27 @@ export default function UserCustomPermissionsManager({
   const activeModule = modulesList.find(m => m.id === activeModuleId);
   const activeModulePermissions = useMemo(() => {
     if (!activeModule) return [];
-    
+
     let perms = activeModule.permissions;
-    
+
     if (showOnlyCustom) {
       perms = perms.filter(p => getUserPermissionStatus(p.code).source === 'custom');
     }
 
+    if (showOnlyConflicts) {
+      perms = perms.filter(p => conflictMap.has(p.code));
+    }
+
     if (permSearchTerm) {
       const lower = permSearchTerm.toLowerCase();
-      perms = perms.filter(p => 
-        p.name.toLowerCase().includes(lower) || 
+      perms = perms.filter(p =>
+        p.name.toLowerCase().includes(lower) ||
         p.code.toLowerCase().includes(lower)
       );
     }
 
     return perms;
-  }, [activeModule, permSearchTerm, showOnlyCustom, getUserPermissionStatus]);
+  }, [activeModule, permSearchTerm, showOnlyCustom, showOnlyConflicts, getUserPermissionStatus, conflictMap]);
 
   // Total exceptions count
   const totalExceptions = useMemo(() => {
@@ -507,6 +525,27 @@ export default function UserCustomPermissionsManager({
         </div>
       )}
 
+      {/* Conflict banner */}
+      {conflictSummary.denyOverrides > 0 && (
+        <div className="px-2 py-1.5 bg-status-warning-bg border border-status-warning/20 rounded flex items-center gap-1.5 text-[10px] text-status-warning shrink-0">
+          <AlertTriangle size={10} />
+          <span className="font-medium">{conflictSummary.denyOverrides} conflit{conflictSummary.denyOverrides > 1 ? 's' : ''}</span>
+          <span className="text-content-muted">— des overrides contredisent les permissions de rôle</span>
+          {conflictSummary.redundant > 0 && (
+            <span className="ml-auto text-content-muted flex items-center gap-1">
+              <Info size={8} />
+              {conflictSummary.redundant} redondant{conflictSummary.redundant > 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
+      )}
+      {conflictSummary.denyOverrides === 0 && conflictSummary.redundant > 0 && (
+        <div className="px-2 py-1.5 bg-surface-subtle/30 border border-edge-subtle rounded flex items-center gap-1.5 text-[10px] text-content-muted shrink-0">
+          <Info size={10} />
+          {conflictSummary.redundant} override{conflictSummary.redundant > 1 ? 's' : ''} redondant{conflictSummary.redundant > 1 ? 's' : ''}
+        </div>
+      )}
+
       {/* SPLIT VIEW - Compact */}
       <div className="grid grid-cols-12 gap-2 items-start flex-1 min-h-0">
 
@@ -567,20 +606,37 @@ export default function UserCustomPermissionsManager({
                   </p>
                 </div>
               </div>
-              {/* Filter toggle */}
-              <button
-                onClick={() => setShowOnlyCustom(!showOnlyCustom)}
-                className={`
-                  px-1.5 py-1 rounded text-[9px] border flex items-center gap-1 transition-all whitespace-nowrap shrink-0
-                  ${showOnlyCustom
-                    ? 'bg-status-warning-bg border-status-warning/40 text-status-warning'
-                    : 'bg-surface-base border-edge text-content-muted hover:bg-surface'
-                  }
-                `}
-              >
-                <Filter size={9} />
-                Exc.
-              </button>
+              {/* Filter toggles */}
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  onClick={() => { setShowOnlyCustom(!showOnlyCustom); if (!showOnlyCustom) setShowOnlyConflicts(false); }}
+                  className={`
+                    px-1.5 py-1 rounded text-[9px] border flex items-center gap-1 transition-all whitespace-nowrap
+                    ${showOnlyCustom
+                      ? 'bg-status-warning-bg border-status-warning/40 text-status-warning'
+                      : 'bg-surface-base border-edge text-content-muted hover:bg-surface'
+                    }
+                  `}
+                >
+                  <Filter size={9} />
+                  Exc.
+                </button>
+                {conflictSummary.total > 0 && (
+                  <button
+                    onClick={() => { setShowOnlyConflicts(!showOnlyConflicts); if (!showOnlyConflicts) setShowOnlyCustom(false); }}
+                    className={`
+                      px-1.5 py-1 rounded text-[9px] border flex items-center gap-1 transition-all whitespace-nowrap
+                      ${showOnlyConflicts
+                        ? 'bg-status-warning-bg border-status-warning/40 text-status-warning'
+                        : 'bg-surface-base border-edge text-content-muted hover:bg-surface'
+                      }
+                    `}
+                  >
+                    <AlertTriangle size={9} />
+                    {conflictSummary.total}
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Search - Compact */}
@@ -603,6 +659,7 @@ export default function UserCustomPermissionsManager({
                 {activeModulePermissions.map(perm => {
                   const status = getUserPermissionStatus(perm.code);
                   const isCustom = status.source === 'custom';
+                  const conflict = conflictMap.get(perm.code);
 
                   let statusLabel = 'Hérité';
                   let borderColor = 'border-edge/50';
@@ -648,6 +705,16 @@ export default function UserCustomPermissionsManager({
                                 : 'bg-status-danger/10 text-status-danger'
                             }`}>
                               {statusLabel}
+                            </span>
+                          )}
+                          {conflict && conflict.conflictType === 'DENY_OVERRIDE' && (
+                            <span title="Override contredit le rôle" className="shrink-0">
+                              <AlertTriangle size={9} className="text-status-warning" />
+                            </span>
+                          )}
+                          {conflict && (conflict.conflictType === 'REDUNDANT_GRANT' || conflict.conflictType === 'REDUNDANT_DENY') && (
+                            <span title="Override redondant" className="shrink-0">
+                              <Info size={9} className="text-content-muted" />
                             </span>
                           )}
                         </div>
