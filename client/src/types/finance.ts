@@ -84,6 +84,9 @@ export interface SessionCaisse {
   closingTransfertId?: string;
   coffre_validation_status?: 'PENDING' | 'APPROVED' | 'REJECTED';
   coffreValidationStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
+
+  // Operations attached by the API for closure reports
+  operations?: Array<{ montant: number | string; typeOperation: string }>;
 }
 
 export interface CaisseTransaction {
@@ -108,4 +111,5 @@ export interface CaisseTransaction {
   statut?: string;
   method_paiement?: string;
   methodePaiement?: string;
+  metadata?: Record<string, any>;
 }

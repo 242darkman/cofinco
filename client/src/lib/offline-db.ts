@@ -371,14 +371,45 @@ export interface OfflineLimits {
 
 export interface GpsTrackPoint {
   id?: number;
+  /** Client-generated unique ID for idempotent sync (UUID v4). */
+  clientPointId?: string;
   agentId: string;
   latitude: number;
   longitude: number;
   accuracy: number;
+  speed?: number | null;
+  heading?: number | null;
+  altitude?: number | null;
   timestamp: number;
   synced: boolean;
+  sessionId?: string;
+  dayKey?: string;
+  batteryLevel?: number;
   activityType?: 'collection' | 'visit' | 'delivery' | 'other';
   metadata?: string;
+}
+
+// ========== GEOCODE CACHE ==========
+
+export interface GeocodeCacheEntry {
+  coordKey: string; // PK: "lat4dec,lng4dec" e.g. "-4.2634,15.2429"
+  data: string; // JSON-serialized GeoAddress
+  resolvedAt: number;
+}
+
+// ========== TRACKING SESSIONS ==========
+
+export interface TrackingSession {
+  id?: number;
+  sessionId: string;
+  agentId: string;
+  agencyId?: string;
+  dayKey: string;
+  startedAt: number;
+  endedAt?: number;
+  pointCount: number;
+  totalDistanceM: number;
+  synced: boolean;
 }
 
 // ========== DATABASE CLASS ==========
@@ -412,6 +443,10 @@ class OfflineDatabase extends Dexie {
   mapTiles!: Table<CachedMapTile>;
   gpsTrackPoints!: Table<GpsTrackPoint>;
 
+  // Geocode cache & tracking sessions
+  geocodeCache!: Table<GeocodeCacheEntry>;
+  trackingSessions!: Table<TrackingSession>;
+
   // Offline-native ledger tables
   journalEntries!: Table<JournalEntry>;
   deviceKeys!: Table<DeviceKey>;
@@ -420,6 +455,60 @@ class OfflineDatabase extends Dexie {
 
   constructor() {
     super('COFINOfflineDB');
+
+    // Version 4: Enhanced GPS tracking with sessions, geocode cache
+    this.version(4).stores({
+      // Sync queue tables
+      operations: '++id, uuid, type, priority, status, createdAt, idempotencyKey, userId, agenceId, backgroundSyncTag',
+      conflicts: '++id, operationId, entityType, entityId, createdAt, resolvedAt',
+      metadata: '++id, key',
+
+      // Entity tables
+      clients: '++id, uuid, serverId, isDirty, lastSyncedAt, agenceId, isDeleted',
+      transfers: '++id, uuid, serverId, status, lastSyncedAt, agenceId',
+      caisseTransactions: '++id, uuid, serverId, isDirty, lastSyncedAt, caisseId, sessionId',
+      epargneAccounts: '++id, uuid, serverId, clientId, isDirty, lastSyncedAt',
+      credits: '++id, uuid, serverId, clientId, isDirty, lastSyncedAt, status',
+      tontines: '++id, uuid, serverId, isDirty, lastSyncedAt',
+      remises: '++id, uuid, serverId, agentId, status, createdAt',
+      enquetes: '++id, uuid, serverId, clientId, demandeId, synced, timestamp, agentId',
+
+      // Cache tables
+      cachedQueries: '++id, key, timestamp',
+      cachedConfigs: '++id, key, version',
+      preferences: '++id, key, userId',
+
+      // Session & Maps
+      offlineSessions: '++id, userId, expiresAt',
+      mapTiles: '++id, tileUrl, zoom, [zoom+x+y], timestamp',
+      gpsTrackPoints: '++id, &clientPointId, agentId, timestamp, synced, [agentId+dayKey], sessionId',
+
+      // Geocode cache & tracking sessions (NEW in v4)
+      geocodeCache: '&coordKey, resolvedAt',
+      trackingSessions: '++id, &sessionId, agentId, dayKey, synced, [agentId+dayKey]',
+
+      // Offline-native ledger tables
+      journalEntries: '++id, sequence, uuid, type, syncStatus, sessionId, [agentId+syncStatus], idempotencyKey, localTimestamp',
+      deviceKeys: 'id, status, agentId, deviceFingerprint',
+      agentDaySessions: '++id, date, agentId, syncStatus, [agentId+date]',
+      offlineLimits: 'id'
+    }).upgrade(tx => {
+      // v3 → v4: backfill clientPointId on existing gpsTrackPoints rows
+      // (new unique index &clientPointId requires every row to have a value)
+      console.info('[OfflineDB] Running v3→v4 migration: backfilling clientPointId on gpsTrackPoints');
+      return tx.table('gpsTrackPoints').toCollection().modify(row => {
+        if (!row.clientPointId) {
+          row.clientPointId = crypto.randomUUID();
+        }
+        // Ensure new columns have defaults
+        if (row.sessionId === undefined) row.sessionId = '';
+        if (row.dayKey === undefined) row.dayKey = new Date(row.timestamp || Date.now()).toISOString().slice(0, 10);
+      }).then(count => {
+        console.info(`[OfflineDB] v3→v4 migration: backfilled ${count} gpsTrackPoints rows`);
+      }).catch(err => {
+        console.warn('[OfflineDB] v3→v4 migration partial failure (non-critical):', err);
+      });
+    });
 
     // Version 3: Offline-native ledger with cryptographic integrity
     this.version(3).stores({
@@ -515,6 +604,28 @@ class OfflineDatabase extends Dexie {
 export const db = new OfflineDatabase();
 // Alias for backward compatibility
 export const offlineDb = db;
+
+/**
+ * Safely open the database, handling version upgrade failures.
+ * If the upgrade fails (e.g. corrupt data, schema conflict), deletes the DB
+ * and re-creates it. Call this once at app startup.
+ */
+export async function ensureOfflineDb(): Promise<void> {
+  try {
+    await db.open();
+    console.info('[OfflineDB] Opened successfully (v' + db.verno + ')');
+  } catch (err) {
+    console.error('[OfflineDB] Failed to open — attempting recovery:', err);
+    try {
+      await db.delete();
+      console.warn('[OfflineDB] Deleted corrupt database');
+      await db.open();
+      console.info('[OfflineDB] Re-created successfully (v' + db.verno + ')');
+    } catch (fatal) {
+      console.error('[OfflineDB] Fatal: could not recover IndexedDB:', fatal);
+    }
+  }
+}
 
 // ========== CACHE TTL CONFIGURATION ==========
 
@@ -1228,6 +1339,73 @@ export async function clearOldTrackPoints(maxAgeMs: number = 7 * 24 * 60 * 60 * 
   const toDelete = await db.gpsTrackPoints.filter((p) => p.timestamp < cutoff && p.synced).toArray();
   await db.gpsTrackPoints.bulkDelete(toDelete.map((p) => p.id!));
   return toDelete.length;
+}
+
+/** Get all track points for a given agent and day. */
+export async function getTrackPointsByDay(agentId: string, dayKey: string): Promise<GpsTrackPoint[]> {
+  return db.gpsTrackPoints
+    .where('[agentId+dayKey]')
+    .equals([agentId, dayKey])
+    .sortBy('timestamp');
+}
+
+// ========== GEOCODE CACHE ==========
+
+const GEOCODE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+
+export async function getCachedGeocode(coordKey: string): Promise<GeocodeCacheEntry | undefined> {
+  const entry = await db.geocodeCache.get(coordKey);
+  if (!entry) return undefined;
+  // TTL check
+  if (Date.now() - entry.resolvedAt > GEOCODE_TTL) {
+    await db.geocodeCache.delete(coordKey);
+    return undefined;
+  }
+  return entry;
+}
+
+export async function setCachedGeocode(entry: GeocodeCacheEntry): Promise<void> {
+  await db.geocodeCache.put(entry);
+}
+
+export async function clearExpiredGeocodes(): Promise<number> {
+  const cutoff = Date.now() - GEOCODE_TTL;
+  const expired = await db.geocodeCache.filter((e) => e.resolvedAt < cutoff).toArray();
+  await db.geocodeCache.bulkDelete(expired.map((e) => e.coordKey));
+  return expired.length;
+}
+
+// ========== TRACKING SESSIONS ==========
+
+export async function upsertTrackingSession(session: TrackingSession): Promise<void> {
+  const existing = await db.trackingSessions.where('sessionId').equals(session.sessionId).first();
+  if (existing) {
+    await db.trackingSessions.update(existing.id!, session);
+  } else {
+    await db.trackingSessions.add(session);
+  }
+}
+
+export async function getTrackingSession(sessionId: string): Promise<TrackingSession | undefined> {
+  return db.trackingSessions.where('sessionId').equals(sessionId).first();
+}
+
+export async function getTrackingSessionsByDay(agentId: string, dayKey: string): Promise<TrackingSession[]> {
+  return db.trackingSessions
+    .where('[agentId+dayKey]')
+    .equals([agentId, dayKey])
+    .toArray();
+}
+
+export async function getUnsyncedSessions(): Promise<TrackingSession[]> {
+  return db.trackingSessions.filter((s) => !s.synced).toArray();
+}
+
+export async function markSessionSynced(sessionId: string): Promise<void> {
+  const session = await db.trackingSessions.where('sessionId').equals(sessionId).first();
+  if (session?.id) {
+    await db.trackingSessions.update(session.id, { synced: true });
+  }
 }
 
 // ========== STORAGE STATISTICS ==========

@@ -9,6 +9,8 @@ export interface RolePermission {
   permissionCode?: string;
   moduleName?: string;
   moduleId?: string;
+  inherited?: boolean;
+  inheritedFrom?: string;
 }
 
 export function useRolePermissions(selectedRole: string) {

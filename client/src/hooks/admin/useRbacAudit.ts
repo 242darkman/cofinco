@@ -22,7 +22,16 @@ export type RbacAuditAction =
   | 'RESET'
   | 'GRANT_TEMPORARY'
   | 'REVOKE_TEMPORARY'
-  | 'EXPIRE_TEMPORARY';
+  | 'EXPIRE_TEMPORARY'
+  | 'MODULE_CREATE'
+  | 'MODULE_UPDATE'
+  | 'MODULE_DELETE'
+  | 'PERMISSION_CREATE'
+  | 'PERMISSION_UPDATE'
+  | 'PERMISSION_DELETE'
+  | 'REVERT'
+  | 'REQUEST_APPROVED'
+  | 'REQUEST_REJECTED';
 
 export type PermissionScope = 'GLOBAL' | 'AGENCE';
 
@@ -432,7 +441,47 @@ export const AUDIT_ACTION_LABELS: Record<RbacAuditAction, string> = {
   GRANT_TEMPORARY: 'Attribution temporaire',
   REVOKE_TEMPORARY: 'Révocation temporaire',
   EXPIRE_TEMPORARY: 'Expiration temporaire',
+  MODULE_CREATE: 'Création module',
+  MODULE_UPDATE: 'Modification module',
+  MODULE_DELETE: 'Suppression module',
+  PERMISSION_CREATE: 'Création permission',
+  PERMISSION_UPDATE: 'Modification permission',
+  PERMISSION_DELETE: 'Suppression permission',
+  REVERT: 'Annulation',
+  REQUEST_APPROVED: 'Demande approuvée',
+  REQUEST_REJECTED: 'Demande rejetée',
 };
+
+// Revertable actions
+export const REVERTABLE_ACTIONS: RbacAuditAction[] = ['TOGGLE', 'BULK_UPDATE'];
+
+/**
+ * Hook for reverting audit entries
+ */
+export function useAuditRevert() {
+  const [loading, setLoading] = useState(false);
+
+  const revertEntry = useCallback(async (auditId: string, reason?: string) => {
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/rbac/audit/${auditId}/revert`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ reason }),
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.message || "Erreur lors de l'annulation");
+      }
+      return await response.json();
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  return { revertEntry, loading };
+}
 
 export const PERMISSION_SOURCE_LABELS: Record<PermissionSource, string> = {
   ROLE: 'Hérité du rôle',

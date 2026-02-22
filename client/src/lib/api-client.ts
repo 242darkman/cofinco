@@ -598,6 +598,7 @@ export interface CaisseHistoriqueOperation {
   clientTelephone: string | null;
   sessionId: string;
   caissierNom: string | null;
+  metadata?: Record<string, any> | null;
 }
 
 export interface CaisseHistoriqueSummary {
