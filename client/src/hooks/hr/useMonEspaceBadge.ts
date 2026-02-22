@@ -1,12 +1,14 @@
 /**
  * useMonEspaceBadge - Real-time badge counter for unread items in Mon Espace
  *
- * Counts: unread bulletins (VALIDATED/PAID not viewed) + new completed documents (not viewed).
+ * Counts: unread bulletins (VALIDATED/PAID not viewed) + new completed documents (not viewed) + team pending leaves.
  * Listens to `hr-update` DOM events for real-time updates.
+ * Delegates team count to useTeamPendingCount to avoid duplicate fetches.
  */
 
 import { useState, useEffect, useCallback } from 'react';
 import { useIsOnline } from '@/contexts/NetworkContext';
+import { useTeamPendingCount } from './useTeamPendingCount';
 
 interface MonEspaceUnreadCount {
   unreadBulletins: number;
@@ -17,6 +19,7 @@ interface MonEspaceUnreadCount {
 export function useMonEspaceBadge() {
   const [counts, setCounts] = useState<MonEspaceUnreadCount>({ unreadBulletins: 0, newDocuments: 0, total: 0 });
   const [isLoading, setIsLoading] = useState(true);
+  const { pendingCount: teamPending } = useTeamPendingCount();
 
   const loadCount = useCallback(async () => {
     try {
@@ -59,10 +62,13 @@ export function useMonEspaceBadge() {
     return () => window.removeEventListener('hr-update', handler);
   }, [loadCount]);
 
+  const tp = teamPending ?? 0;
+
   return {
     unreadBulletins: counts.unreadBulletins,
     newDocuments: counts.newDocuments,
-    totalUnread: counts.total,
+    teamPending: tp,
+    totalUnread: counts.total + tp,
     isLoading,
     refresh: loadCount,
   };

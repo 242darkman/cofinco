@@ -76,7 +76,7 @@ interface UseHrRealtimeOptions {
 // Query key mappings for each entity
 const QUERY_KEY_MAPPINGS: Record<HrEntity, string[][]> = {
   employe: [['/api/employes'], ['/api/hr/stats'], ['/api/hr/organigramme']],
-  conge: [['/api/hr/conges'], ['/api/hr/stats'], ['/api/hr/conges/balance'], ['/api/hr/pending-count']],
+  conge: [['/api/hr/conges'], ['/api/hr/stats'], ['/api/hr/conges/balance'], ['/api/hr/pending-count'], ['/api/hr/conges/team'], ['/api/hr/conges/team/count']],
   presence: [['/api/hr/presence'], ['/api/hr/presence/today'], ['/api/hr/stats']],
   paie: [['/api/hr/paie'], ['/api/hr/bulletins'], ['/api/hr/stats']],
   bulletin: [['/api/hr/bulletins'], ['/api/hr/paie/my'], ['/api/hr/stats']],

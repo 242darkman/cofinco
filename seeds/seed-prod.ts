@@ -4388,6 +4388,15 @@ async function seedNotificationSystem(context: SeedContext, dryRun: boolean): Pr
       description: 'Notification RH pour nouvelle demande de conge',
     },
     {
+      code: 'HR_LEAVE_REQUESTED_TO_MANAGER',
+      nom: 'Nouvelle demande de conge (notif manager)',
+      subject: 'Demande de conge de {{employeeName}} - COFIN&CO-M',
+      contenuHtml: emailWrap('<h2 style="color:#1b2d4b;margin:0 0 16px">Demande de conge — Votre equipe</h2><p style="color:#495057;line-height:1.6"><strong>{{employeeName}}</strong> a soumis une demande de conge necessitant votre validation.</p><table role="presentation" style="background:#eff6ff;border-radius:8px;width:100%;margin:20px 0" cellpadding="0" cellspacing="0"><tr><td style="padding:16px 20px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding:4px 0"><span style="color:#868e96;font-size:13px">Employe</span></td><td align="right"><strong style="color:#1b2d4b">{{employeeName}}</strong></td></tr><tr><td style="padding:4px 0"><span style="color:#868e96;font-size:13px">Type de conge</span></td><td align="right"><strong style="color:#1b2d4b">{{leaveType}}</strong></td></tr><tr><td style="padding:4px 0"><span style="color:#868e96;font-size:13px">Periode</span></td><td align="right"><strong style="color:#1b2d4b">{{startDate}} - {{endDate}}</strong></td></tr></table></td></tr></table><p style="color:#495057;line-height:1.6">Connectez-vous a la plateforme pour approuver ou refuser cette demande.</p>'),
+      contenuText: 'COFIN&CO-M: {{employeeName}} demande un conge ({{leaveType}}) du {{startDate}} au {{endDate}}. Connectez-vous pour approuver ou refuser.',
+      placeholders: 'employeeName,leaveType,startDate,endDate',
+      description: 'Notification manager direct pour nouvelle demande de conge',
+    },
+    {
       code: 'HR_DOCUMENT_REQUEST_TO_HR',
       nom: 'Nouvelle demande de document (notif RH)',
       subject: 'Nouvelle demande de document de {{employeeName}} - COFIN&CO-M',

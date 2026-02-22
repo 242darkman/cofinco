@@ -603,6 +603,8 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
              case 'conge':
                debounceInvalidate(["/api/hr/conges"]);
                debounceInvalidate(["/api/hr/conges/balance"]);
+               debounceInvalidate(["/api/hr/conges/team"]);
+               debounceInvalidate(["/api/hr/conges/team/count"]);
                break;
              case 'document_request':
                debounceInvalidate(["/api/hr/document-requests"]);

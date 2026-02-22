@@ -69,7 +69,7 @@ import { systemSettings } from "@shared/schema/settings";
 import { agences } from "@shared/schema/agences";
 import { normalizeRole } from "@shared/types/roles";
 import { StatutCandidature, StatutConge, StatutUser, StatutVisiteTerrain, StatutArchive } from "@shared/enum/status-constants";
-import { eq, desc, and, gte, lte, sql, count, isNull } from "drizzle-orm";
+import { eq, desc, and, gte, lte, sql, count, isNull, inArray } from "drizzle-orm";
 import { getAuthUser } from "server/middleware";
 import { attachAbility, requireAbility } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
@@ -711,11 +711,9 @@ hrRouter.patch("/conges/:id/approve", getAuthUser, async (req, res) => {
     const userId = req.user?.id;
     const userRole = req.user?.role;
 
-    // RBAC Check
+    // RBAC Check — admins/chefs/superviseurs can approve any leave
     const allowedRoles = ['ADMIN', 'CHEF_AGENCE', 'SUPERVISEUR'];
-    if (!roleIn(userRole, allowedRoles)) {
-        return res.status(403).json(errorResponse('FORBIDDEN', 'Non autorisé à approuver'));
-    }
+    let isAuthorized = roleIn(userRole, allowedRoles);
 
     // Get current state for audit
     const [currentConge] = await db.select().from(demandesConges).where(eq(demandesConges.id, parseInt(id)));
@@ -731,18 +729,20 @@ hrRouter.patch("/conges/:id/approve", getAuthUser, async (req, res) => {
       ));
     }
 
-    // Manager hierarchy check (if manager role)
-    if (roleIn(userRole, ['manager'])) {
+    // Manager hierarchy check: direct manager can approve their subordinate's leave
+    if (!isAuthorized) {
       const managerEmploye = await storage.getEmployeByUserId(userId!);
       if (managerEmploye) {
-        const [targetEmploye] = await db.select().from(employes).where(eq(employes.id, currentConge.employeId));
-        if (targetEmploye && targetEmploye.managerId !== managerEmploye.id) {
-          // Not a direct report - check if admin override
-          if (!roleIn(userRole, ['admin', 'rh', 'direction'])) {
-            return res.status(403).json(errorResponse('FORBIDDEN', 'Vous ne pouvez approuver que les demandes de vos subordonnés directs'));
-          }
+        const [targetEmploye] = await db.select({ managerId: employes.managerId })
+          .from(employes).where(eq(employes.id, currentConge.employeId));
+        if (targetEmploye?.managerId === managerEmploye.id) {
+          isAuthorized = true;
         }
       }
+    }
+
+    if (!isAuthorized) {
+      return res.status(403).json(errorResponse('FORBIDDEN', 'Non autorisé à approuver'));
     }
 
     const [updated] = await db.update(demandesConges)
@@ -822,11 +822,9 @@ hrRouter.patch("/conges/:id/reject", getAuthUser, async (req, res) => {
       return res.status(400).json(errorResponse('VALIDATION_ERROR', 'Un commentaire est obligatoire pour rejeter une demande'));
     }
 
-    // RBAC Check
-    const allowedRoles = ['ADMIN', 'CHEF_AGENCE', 'SUPERVISEUR'];
-    if (!roleIn(userRole, allowedRoles)) {
-        return res.status(403).json(errorResponse('FORBIDDEN', 'Non autorisé à refuser'));
-    }
+    // RBAC Check — admins/chefs/superviseurs can reject any leave
+    const allowedRolesReject = ['ADMIN', 'CHEF_AGENCE', 'SUPERVISEUR'];
+    let isAuthorizedReject = roleIn(userRole, allowedRolesReject);
 
     // Get current state for audit
     const [currentConge] = await db.select().from(demandesConges).where(eq(demandesConges.id, parseInt(id)));
@@ -840,6 +838,22 @@ hrRouter.patch("/conges/:id/reject", getAuthUser, async (req, res) => {
         'INVALID_STATUS',
         `Cette demande a déjà été ${currentConge.statut === LeaveStatus.REJECTED ? 'rejetée' : 'traitée'}`
       ));
+    }
+
+    // Manager hierarchy check: direct manager can reject their subordinate's leave
+    if (!isAuthorizedReject) {
+      const managerEmploye = await storage.getEmployeByUserId(userId!);
+      if (managerEmploye) {
+        const [targetEmploye] = await db.select({ managerId: employes.managerId })
+          .from(employes).where(eq(employes.id, currentConge.employeId));
+        if (targetEmploye?.managerId === managerEmploye.id) {
+          isAuthorizedReject = true;
+        }
+      }
+    }
+
+    if (!isAuthorizedReject) {
+      return res.status(403).json(errorResponse('FORBIDDEN', 'Non autorisé à refuser'));
     }
 
     const [updated] = await db.update(demandesConges)
@@ -902,6 +916,59 @@ hrRouter.patch("/conges/:id/reject", getAuthUser, async (req, res) => {
     res.json(successResponse(updated));
   } catch (error) {
     logger.error({ err: error }, 'Erreur rejet congé');
+    res.status(500).json(errorResponse('SERVER_ERROR', 'Erreur serveur'));
+  }
+});
+
+// GET /api/hr/conges/team - Congés PENDING des subordonnés directs du manager connecté
+// NOTE: Must be declared BEFORE /conges/balance/:employeId to avoid "team" matching as :employeId
+hrRouter.get("/conges/team", getAuthUser, async (req, res) => {
+  try {
+    const employe = await storage.getEmployeByUserId(req.user!.id);
+    if (!employe) return res.json([]);
+
+    const subordinateIds = await db.select({ id: employes.id })
+      .from(employes)
+      .where(and(eq(employes.managerId, employe.id), eq(employes.statut, 'ACTIVE')));
+
+    if (subordinateIds.length === 0) return res.json([]);
+
+    const ids = subordinateIds.map(s => s.id);
+    const result = await db.select().from(demandesConges)
+      .where(and(
+        inArray(demandesConges.employeId, ids),
+        eq(demandesConges.statut, 'PENDING')
+      ))
+      .orderBy(desc(demandesConges.createdAt));
+
+    res.json(result);
+  } catch (error) {
+    logger.error({ err: error }, 'Erreur récupération congés équipe');
+    res.status(500).json(errorResponse('SERVER_ERROR', 'Erreur serveur'));
+  }
+});
+
+// GET /api/hr/conges/team/count - Nombre de congés PENDING dans l'équipe du manager
+hrRouter.get("/conges/team/count", getAuthUser, async (req, res) => {
+  try {
+    const employe = await storage.getEmployeByUserId(req.user!.id);
+    if (!employe) return res.json({ pending: 0, isManager: false });
+
+    const subordinateIds = await db.select({ id: employes.id })
+      .from(employes)
+      .where(and(eq(employes.managerId, employe.id), eq(employes.statut, 'ACTIVE')));
+
+    if (subordinateIds.length === 0) return res.json({ pending: 0, isManager: false });
+
+    const [result] = await db.select({ count: count() }).from(demandesConges)
+      .where(and(
+        inArray(demandesConges.employeId, subordinateIds.map(s => s.id)),
+        eq(demandesConges.statut, 'PENDING')
+      ));
+
+    res.json({ pending: result?.count ?? 0, isManager: true });
+  } catch (error) {
+    logger.error({ err: error }, 'Erreur récupération count congés équipe');
     res.status(500).json(errorResponse('SERVER_ERROR', 'Erreur serveur'));
   }
 });
