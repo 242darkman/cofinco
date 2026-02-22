@@ -205,7 +205,9 @@ export default function AdminGestionUtilisateurs() {
                         )}
                         <div className="min-w-0">
                           <p className="text-xs font-semibold text-content-primary truncate max-w-[100px] sm:max-w-xs">{getDisplayName(user)}</p>
-                          <p className="text-[10px] text-content-muted truncate">@{user.username}</p>
+                          {user.username && (
+                            <p className="text-[10px] text-content-muted truncate">@{user.username}</p>
+                          )}
                         </div>
                       </div>
                     )
