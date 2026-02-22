@@ -190,8 +190,8 @@ export default function CaissePaiementModal({
           const data = await res.json();
           setFeeEstimate(data);
         }
-      } catch (err) {
-        console.error('Fee estimate error:', err);
+      } catch {
+        // fee estimate failed silently
       } finally {
         setLoadingFeeEstimate(false);
       }
@@ -220,9 +220,8 @@ export default function CaissePaiementModal({
   const loadClients = useCallback(async () => {
     try {
       const data = await clientApi.getAllList();
-      setClients(data.filter((c: any) => isActiveStatus(c.statut) || isActiveStatus(c.status)));
-    } catch (error) {
-      console.error('Error loading clients:', error);
+      setClients(data.filter((c: { statut?: string; status?: string }) => isActiveStatus(c.statut) || isActiveStatus(c.status)));
+    } catch {
       setClients([]);
     }
   }, []);
@@ -525,12 +524,12 @@ export default function CaissePaiementModal({
         referenceType: 'recu_caisse',
         referenceId: data.reference
       });
-    } catch (e) {
-      console.error('Loge save error:', e);
+    } catch {
+      // loge save is best-effort
     }
   }, [generateReceiptHTML]);
 
-  const executeOperationDirect = useCallback(async (operationData: any) => {
+  const executeOperationDirect = useCallback(async (operationData: Record<string, unknown>) => {
     try {
       setLoading(true);
       

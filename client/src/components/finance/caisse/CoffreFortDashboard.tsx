@@ -51,7 +51,7 @@ interface CoffreFortDashboardProps {
 // Types pour le dialogue de confirmation
 interface ConfirmAction {
   type: 'validate' | 'reject' | 'execute' | 'validate-opening' | 'reject-opening';
-  transfert: any;
+  transfert: TransfertCoffreRow;
 }
 
 const TAB_HELP: Record<string, string> = {
@@ -113,10 +113,10 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
 
   const transferts = transfertsData?.data || [];
 
-  const pendingCount = transferts.filter((t: any) => t.statut === StatutTransfertCoffre.REQUESTED).length;
+  const pendingCount = transferts.filter((t: TransfertCoffreRow) => t.statut === StatutTransfertCoffre.REQUESTED).length;
   const todayVolume = transferts
-    .filter((t: any) => new Date(t.createdAt).toDateString() === new Date().toDateString())
-    .reduce((acc: number, t: any) => acc + Number(t.montant), 0);
+    .filter((t: TransfertCoffreRow) => new Date(t.createdAt).toDateString() === new Date().toDateString())
+    .reduce((acc: number, t: TransfertCoffreRow) => acc + Number(t.montant), 0);
 
   const handleValidate = async (id: string, approved: boolean) => {
     setActionLoading(id);
@@ -126,8 +126,8 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
         description: `Le transfert a été ${approved ? "validé" : "rejeté"}`
       });
       refetch();
-    } catch (e: any) {
-      const errorMessage = e.message || "";
+    } catch (e: unknown) {
+      const errorMessage = (e instanceof Error ? e.message : "");
       // Mapper les messages d'erreur connus vers des messages utilisateur
       let userMessage = errorMessage;
       if (errorMessage.includes("propre demande") || errorMessage.includes("same user")) {
@@ -164,8 +164,8 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
       });
       refetch();
       refetchStats(); // Mise à jour du solde en temps réel
-    } catch (e: any) {
-      const errorMessage = e.message || "";
+    } catch (e: unknown) {
+      const errorMessage = (e instanceof Error ? e.message : "");
       // Mapper les messages d'erreur connus vers des messages utilisateur
       let userMessage = errorMessage;
       if (errorMessage.toLowerCase().includes("insuffisant") || errorMessage.toLowerCase().includes("insufficient")) {
@@ -202,8 +202,8 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
       refetchStats(); // Refresh coffre balance
       // Invalidate session queries to update cashier view
       queryClient.invalidateQueries({ queryKey: caisseKeys.sessions() });
-    } catch (e: any) {
-      const errorMessage = e.message || "";
+    } catch (e: unknown) {
+      const errorMessage = (e instanceof Error ? e.message : "");
       let userMessage = errorMessage;
       if (errorMessage.includes("propre demande") || errorMessage.includes("same user")) {
         userMessage = "Vous ne pouvez pas valider votre propre demande d'ouverture.";
@@ -255,7 +255,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
       // Close modal and reset state
       setTransfertToCancel(null);
       setCancelReason('');
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error(error.message || 'Erreur lors de l\'annulation');
     } finally {
       setIsCancelling(false);
@@ -428,7 +428,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
   const handleExportTransferts = useCallback(() => {
     if (transferts.length === 0) return;
     const headers = ['Date', 'Type', 'Caisse', 'Montant', 'Statut', 'Initié par'];
-    const rows = transferts.map((t: any) => [
+    const rows = transferts.map((t: TransfertCoffreRow) => [
       format(new Date(t.createdAt), 'dd/MM/yyyy HH:mm', { locale: fr }),
       t.typeTransfert === 'COFFRE_VERS_CAISSE' ? 'Sortie' : 'Entrée',
       t.typeTransfert === 'COFFRE_VERS_CAISSE' ? t.caisseDestinationNom : t.caisseSourceNom,
@@ -460,12 +460,12 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
     {
       key: 'createdAt',
       label: 'Date',
-      format: (_: any, row: any) => (
+      format: (_: unknown, row: TransfertCoffreRow) => (
         <span className="text-xs text-content-secondary whitespace-nowrap">
            {format(new Date(row.createdAt), "dd/MM HH:mm", { locale: fr })}
         </span>
       ),
-      mobileFormat: (_: any, row: any) => (
+      mobileFormat: (_: unknown, row: TransfertCoffreRow) => (
         <span className="text-[10px] text-content-muted">
           {format(new Date(row.createdAt), "dd/MM/yy HH:mm", { locale: fr })}
         </span>
@@ -475,7 +475,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
       key: 'typeTransfert',
       label: 'Type',
       primary: true,
-      format: (_: any, row: any) => (
+      format: (_: unknown, row: TransfertCoffreRow) => (
         <div className="flex items-center gap-1.5">
             {row.typeTransfert === "COFFRE_VERS_CAISSE" ? (
                 <Badge variant="warning" size="sm" icon={<ArrowUpRight size={10} />} value="Sortie" className="text-[10px] whitespace-nowrap" />
@@ -487,7 +487,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
             </span>
         </div>
       ),
-      mobileFormat: (_: any, row: any) => (
+      mobileFormat: (_: unknown, row: TransfertCoffreRow) => (
         <div className="flex items-center gap-2">
           {row.typeTransfert === "COFFRE_VERS_CAISSE" ? (
             <Badge variant="warning" size="sm" icon={<ArrowUpRight size={10} />} value="Sortie" className="text-[10px]" />
@@ -509,7 +509,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
       key: 'trajet',
       label: 'Caisse',
       hideOnMobile: true,
-      format: (_: any, row: any) => (
+      format: (_: unknown, row: TransfertCoffreRow) => (
         <span className="font-medium text-content-primary text-xs truncate max-w-[140px] block" title={row.typeTransfert === "COFFRE_VERS_CAISSE" ? row.caisseDestinationNom : row.caisseSourceNom}>
           {row.typeTransfert === "COFFRE_VERS_CAISSE" ? row.caisseDestinationNom : row.caisseSourceNom}
         </span>
@@ -520,7 +520,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
       label: 'Montant',
       align: 'right' as const,
       hideOnMobile: true,
-      format: (val: any, row: any) => {
+      format: (val: unknown, row: TransfertCoffreRow) => {
         const isSortie = row.typeTransfert === "COFFRE_VERS_CAISSE";
         return (
           <span className={`font-bold font-mono text-xs whitespace-nowrap tabular-nums ${isSortie ? 'text-status-warning' : 'text-status-success'}`}>
@@ -532,12 +532,12 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
     {
       key: 'requestedByNom',
       label: 'Initié par',
-      format: (_: any, row: any) => (
+      format: (_: unknown, row: TransfertCoffreRow) => (
         <span className="text-xs text-content-muted truncate max-w-[120px] block" title={`${row.requestedByNom} ${row.requestedByPrenom || ''}`}>
             {row.requestedByNom} {row.requestedByPrenom?.charAt(0)}.
         </span>
       ),
-      mobileFormat: (_: any, row: any) => (
+      mobileFormat: (_: unknown, row: TransfertCoffreRow) => (
         <span className="text-[10px] text-content-muted">
           par {row.requestedByNom} {row.requestedByPrenom?.charAt(0)}.
         </span>
@@ -546,7 +546,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
     {
       key: 'statut',
       label: 'Statut',
-      format: (_: any, row: any) => {
+      format: (_: unknown, row: TransfertCoffreRow) => {
         let variant: 'success' | 'warning' | 'danger' | 'neutral' = 'neutral';
         if (row.statut === StatutTransfertCoffre.VALIDATED || row.statut === StatutTransfertCoffre.EXECUTED) variant = 'success';
         if (row.statut === StatutTransfertCoffre.REQUESTED) variant = 'warning';
@@ -558,7 +558,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
   ];
 
   // Fonction d'actions extraite pour être réutilisée dans la prop actions (mobile + desktop)
-  const renderRowActions = (row: any) => {
+  const renderRowActions = (row: TransfertCoffreRow) => {
     const isLoading = actionLoading === row.id;
 
     // Actions pour les transferts en attente de validation
@@ -862,7 +862,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
                   </div>
                 ) : (
                   <div className="divide-y divide-status-warning/10">
-                    {pendingOpeningRequests.map((request: any) => (
+                    {pendingOpeningRequests.map((request: OpeningRequest) => (
                       <div
                         key={request.transfert?.id || request.session?.id}
                         className="p-2 hover:bg-status-warning-bg/50 transition-colors"
@@ -1212,7 +1212,7 @@ function CoffreFortHistorique({ agenceId }: { agenceId: string }) {
     const handleExportCSV = () => {
       if (mouvements.length === 0) return;
       const headers = ['Date', 'Type', 'Sens', 'Description', 'Montant', 'Effectué par'];
-      const rows = mouvements.map((m: any) => [
+      const rows = mouvements.map((m: MouvementCoffreRow) => [
         format(new Date(m.dateOperation), 'dd/MM/yyyy HH:mm', { locale: fr }),
         getMouvementCoffreLabel(m.typePaiement || m.metadata?.type || m.sourceModule),
         m.sens === 'CREDIT' ? 'Entrée' : 'Sortie',
@@ -1233,7 +1233,7 @@ function CoffreFortHistorique({ agenceId }: { agenceId: string }) {
         {
             key: 'dateOperation',
             label: 'Date',
-            format: (_: any, row: any) => (
+            format: (_: unknown, row: TransfertCoffreRow) => (
                 <div className="flex flex-col leading-tight">
                     <span className="text-[11px] text-content-primary font-medium">
                         {format(new Date(row.dateOperation), "dd MMM", { locale: fr })}
@@ -1247,7 +1247,7 @@ function CoffreFortHistorique({ agenceId }: { agenceId: string }) {
         {
             key: 'type',
             label: 'Type',
-            format: (_: any, row: any) => {
+            format: (_: unknown, row: TransfertCoffreRow) => {
                 const isCredit = row.sens === 'CREDIT';
                 return (
                     <div className="flex items-center gap-1.5">
@@ -1267,7 +1267,7 @@ function CoffreFortHistorique({ agenceId }: { agenceId: string }) {
         {
             key: 'description',
             label: 'Description',
-            format: (_: any, row: any) => (
+            format: (_: unknown, row: TransfertCoffreRow) => (
                 <div className="flex flex-col max-w-[200px]">
                     <span className="text-[11px] text-content-secondary truncate leading-tight">
                         {row.metadata?.description || row.metadata?.motif || row.reference}
@@ -1284,7 +1284,7 @@ function CoffreFortHistorique({ agenceId }: { agenceId: string }) {
             key: 'montant',
             label: 'Montant',
             align: 'right' as const,
-            format: (val: any, row: any) => (
+            format: (val: unknown, row: TransfertCoffreRow) => (
                 <span className={`font-bold font-mono text-xs ${row.sens === 'CREDIT' ? 'text-status-success' : 'text-status-warning'}`}>
                     {row.sens === 'CREDIT' ? '+' : '-'} {Number(val).toLocaleString()} {currency.symbol}
                 </span>
@@ -1385,7 +1385,7 @@ function CoffreFortHistorique({ agenceId }: { agenceId: string }) {
 }
 
 /** Slider de détails d'un mouvement coffre */
-function MouvementDetailPanel({ mouvement, onClose }: { mouvement: any; onClose: () => void }) {
+function MouvementDetailPanel({ mouvement, onClose }: { mouvement: MouvementCoffreRow; onClose: () => void }) {
     const { currency } = useCurrency();
     const isCredit = mouvement.sens === 'CREDIT';
 
@@ -1495,7 +1495,7 @@ function MouvementDetailPanel({ mouvement, onClose }: { mouvement: any; onClose:
 }
 
 /** Slider de détails d'un transfert coffre */
-function TransfertDetailPanel({ transfert, onClose }: { transfert: any; onClose: () => void }) {
+function TransfertDetailPanel({ transfert, onClose }: { transfert: TransfertCoffreRow; onClose: () => void }) {
     const { currency } = useCurrency();
     const queryClient = useQueryClient();
     const [cancelReason, setCancelReason] = useState('');
@@ -1544,7 +1544,7 @@ function TransfertDetailPanel({ transfert, onClose }: { transfert: any; onClose:
 
             setShowCancelModal(false);
             onClose();
-        } catch (error: any) {
+        } catch (error: unknown) {
             toast.error(error.message || 'Erreur lors de l\'annulation');
         } finally {
             setIsLoading(false);

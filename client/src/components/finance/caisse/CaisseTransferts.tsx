@@ -36,7 +36,7 @@ interface Transfert {
 
 interface CaisseTransfertsProps {
   onBack: () => void;
-  session: any;
+  session: { id: string; agenceId?: string; agence?: { nom: string }; user?: { nom: string; prenom?: string } } | null;
   soldeActuel: number;
 }
 
@@ -97,8 +97,7 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
     try {
       const data = await agenceApi.getAll();
       setAgences(data || []);
-    } catch (error) {
-      console.error('Error loading agences', error);
+    } catch {
       setAgences([]);
     }
   }, []);
@@ -107,8 +106,7 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
     try {
       const data = await caisseTransfertApi.getAll();
       setTransferts(data || []);
-    } catch (error) {
-      console.error('Erreur:', error);
+    } catch {
       setTransferts([]);
     }
   }, []);
@@ -342,7 +340,7 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
     { 
       key: 'trajet', 
       label: 'Trajet',
-      format: (_: any, t: Transfert) => (
+      format: (_: unknown, t: Transfert) => (
          <div className="flex items-center gap-1.5 text-xs">
             <span className="text-content-muted max-w-[100px] truncate" title={t.agenceSourceNom || t.agenceSource?.nom}>
               {t.agenceSourceNom || t.agenceSource?.nom || 'Source'}
@@ -353,7 +351,7 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
             </span>
          </div>
       ),
-      mobileFormat: (_: any, t: Transfert) => (
+      mobileFormat: (_: unknown, t: Transfert) => (
         <div className="flex items-center gap-2 text-sm text-content-secondary">
            <span className="font-medium text-content-muted">{t.agenceSourceNom || t.agenceSource?.nom}</span>
            <ArrowRight size={14} className="text-content-muted" />
@@ -365,13 +363,13 @@ export default function CaisseTransferts({ onBack, session, soldeActuel }: Caiss
       key: 'montant', 
       label: 'Montant', 
       align: 'right' as const,
-      format: (val: any) => <span className="font-bold text-content-primary">{formatMoney(Number(val))}</span>,
-      mobileFormat: (val: any) => <span className="text-lg font-bold text-content-primary block mt-1">{formatMoney(Number(val))}</span>
+      format: (val: unknown) => <span className="font-bold text-content-primary">{formatMoney(Number(val))}</span>,
+      mobileFormat: (val: unknown) => <span className="text-lg font-bold text-content-primary block mt-1">{formatMoney(Number(val))}</span>
     },
     { 
       key: 'infos', 
       label: 'Date & Initiateur',
-      format: (_: any, t: Transfert) => (
+      format: (_: unknown, t: Transfert) => (
         <div className="flex flex-col">
             <span className="text-content-secondary">{new Date(t.dateCreation).toLocaleDateString('fr-FR')}</span>
             <span className="text-[10px] text-content-muted">

@@ -121,7 +121,6 @@ export default function CaisseHandoverPanel({
   const { data: availableCaissiers } = useQuery<CaissierOption[]>({
     queryKey: ['available-caissiers', caisseId],
     queryFn: async () => {
-      // TODO: Endpoint pour récupérer les caissiers disponibles
       const res = await fetch(`/api/caisses/${caisseId}/available-caissiers`);
       if (!res.ok) return [];
       return res.json();

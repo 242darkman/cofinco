@@ -45,9 +45,9 @@ export interface ClientInfo {
 }
 
 interface OperationResult {
-  transaction: any;
+  transaction: Record<string, unknown>;
   mouvement_id: string;
-  facture: any | null;
+  facture: Record<string, unknown> | null;
   message: string;
 }
 
@@ -261,7 +261,7 @@ export function useCaisseOperation({
       queryClient.invalidateQueries({ queryKey: ['/api/operations-caisse'] });
       queryClient.invalidateQueries({ queryKey: ['/api/sessions-caisse'] });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       // Detect duplicate warning (409 from duplicate-detection middleware)
       if (error?.status === 409 && error?.data?.error === 'POTENTIAL_DUPLICATE') {
         setDuplicateWarning({
@@ -273,7 +273,7 @@ export function useCaisseOperation({
       }
 
       const msg =
-        error?.response?.data?.message ||
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
         error?.message ||
         'Erreur lors de l\'opération';
       toast.error(msg);
@@ -333,7 +333,7 @@ export function useCaisseOperation({
       queryClient.invalidateQueries({ queryKey: ['/api/operations-caisse'] });
       queryClient.invalidateQueries({ queryKey: ['/api/sessions-caisse'] });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       const msg = error?.message || 'Erreur lors de l\'opération';
       toast.error(msg);
     },

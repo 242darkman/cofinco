@@ -47,7 +47,7 @@ const ScopeBadge = ({ type }: { type: 'global' | 'guichet' | 'audit' }) => {
 };
 
 // Section Header
-const SectionHeader = ({ icon: Icon, title, desc }: { icon: any; title: string; desc: string }) => (
+const SectionHeader = ({ icon: Icon, title, desc }: { icon: React.ComponentType<{ className?: string }>; title: string; desc: string }) => (
   <div className="flex items-center gap-2 pb-2 border-b border-edge-subtle mb-2.5">
     <Icon className="h-3.5 w-3.5 text-accent" />
     <span className="text-xs font-bold text-content-primary uppercase tracking-wide">{title}</span>

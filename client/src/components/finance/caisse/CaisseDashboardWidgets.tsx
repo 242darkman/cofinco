@@ -152,12 +152,12 @@ function computeSessionDuration(openedAt: string | Date | undefined): string {
 // CUSTOM CHART TOOLTIP
 // ============================================================================
 
-function ChartTooltip({ active, payload, label }: any) {
+function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) {
   if (!active || !payload?.length) return null;
   return (
     <div className="bg-surface-elevated border border-edge rounded-lg shadow-xl p-2.5 text-xs">
       <div className="font-semibold text-content-primary mb-1">{label}</div>
-      {payload.map((entry: any, i: number) => (
+      {payload.map((entry: { name: string; value: number; color: string }, i: number) => (
         <div key={i} className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full" style={{ background: entry.color }} />
           <span className="text-content-muted">{entry.name}:</span>
@@ -168,7 +168,7 @@ function ChartTooltip({ active, payload, label }: any) {
   );
 }
 
-function PieTooltip({ active, payload }: any) {
+function PieTooltip({ active, payload }: { active?: boolean; payload?: Array<{ name: string; value: number; payload?: { fill: string } }> }) {
   if (!active || !payload?.length) return null;
   const data = payload[0];
   return (

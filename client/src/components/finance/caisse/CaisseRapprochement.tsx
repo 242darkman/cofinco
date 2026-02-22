@@ -194,7 +194,7 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
       await sessionCaisseApi.initiateClose(session.id);
       toast.success('Session gelée - Procédez au comptage');
       setStep('count');
-    } catch (err: any) {
+    } catch (err: unknown) {
       const errorMessage = handleApiError(err, 'Erreur lors du gel de la session');
       setError(errorMessage);
       toast.error(errorMessage);
@@ -237,7 +237,7 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
 
       setCountSubmitted(true);
       setStep('transfer');
-    } catch (err: any) {
+    } catch (err: unknown) {
       const errorMessage = handleApiError(err, 'Erreur lors de la soumission du comptage');
       setError(errorMessage);
       toast.error(errorMessage);
@@ -278,7 +278,7 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
       }
 
       onClose();
-    } catch (err: any) {
+    } catch (err: unknown) {
       const errorMessage = handleApiError(err, 'Erreur lors de la finalisation');
       setError(errorMessage);
       toast.error(errorMessage);
@@ -299,7 +299,7 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
       await sessionCaisseApi.cancelClose(session.id);
       toast.info('Processus de fermeture annulé');
       onClose();
-    } catch (err: any) {
+    } catch (err: unknown) {
       const errorMessage = handleApiError(err, 'Erreur lors de l\'annulation');
       toast.error(errorMessage);
     } finally {
@@ -354,7 +354,7 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
       } else {
         toast.warning(`Écart de vérification: ${formatMoney(Math.abs(result.ecartVerification))}`);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       const errorMessage = handleApiError(err, 'Erreur lors du comptage de vérification');
       toast.error(errorMessage);
     } finally {
@@ -365,7 +365,7 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
   // Fetch existing verification counts on mount in transfer step
   useEffect(() => {
     if (step === 'transfer') {
-      sessionCaisseApi.getCounts(session.id).then((counts: any) => {
+      sessionCaisseApi.getCounts(session.id).then((counts: Record<string, unknown>) => {
         if (counts.verification) {
           setVerificationResult({
             verificationTotal: counts.verification.total,
@@ -390,9 +390,8 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
         const data = await res.json();
         setMmReconciliation(data);
       }
-    } catch (err) {
+    } catch {
       // MM reconciliation is optional, don't block
-      console.warn('MM reconciliation fetch failed:', err);
     } finally {
       setLoadingMmReconciliation(false);
     }
@@ -532,7 +531,7 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
       // Refresh templates
       const templates = await sessionCaisseApi.getDenominationTemplates(session.caisseId);
       setDenominationTemplates(templates || []);
-    } catch (err: any) {
+    } catch (err: unknown) {
       const errorMessage = handleApiError(err, 'Erreur lors de la sauvegarde du modèle');
       toast.error(errorMessage);
     } finally {

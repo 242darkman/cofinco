@@ -73,9 +73,9 @@ export function TransfertCoffreModal({
       reset();
       setStep("form");
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast.error("Erreur lors de la création", {
-        description: error.message || "Une erreur est survenue."
+        description: (error instanceof Error ? error.message : "Une erreur est survenue.")
       });
     },
   });

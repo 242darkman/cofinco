@@ -64,8 +64,8 @@ export default function ClosureReportButton({
     // Calculate totals from operations if available
     let totalEntrees = 0;
     let totalSorties = 0;
-    if ((session as any).operations && Array.isArray((session as any).operations)) {
-      for (const op of (session as any).operations) {
+    if (session.operations && Array.isArray(session.operations)) {
+      for (const op of session.operations) {
         const montant = Number(op.montant || 0);
         const type = (op.typeOperation || '').toLowerCase();
         if (type.includes('retrait') || type.includes('sortie') || type.includes('disbursement')) {

@@ -21,10 +21,10 @@ interface UseOperationInfoProps {
   clientId?: string;
   typeOperation: 'Dépôt' | 'Retrait' | null;
   subType: string | null;
-  selectedClient: any;
-  tontinesActives?: any[];
-  creditsActifs?: any[];
-  comptesClient?: any[];
+  selectedClient: Record<string, unknown> | null;
+  tontinesActives?: Array<Record<string, unknown>>;
+  creditsActifs?: Array<Record<string, unknown>>;
+  comptesClient?: Array<Record<string, unknown>>;
 }
 
 export function useOperationInfo({
@@ -103,7 +103,7 @@ export function useOperationInfo({
             if (subType.includes('Épargne') || subType.includes('Epargne')) targetType = TypeCompte.SAVINGS;
             else if (subType.includes('Bloqué') || subType.includes('Bloque')) targetType = TypeCompte.BLOCKED;
 
-            const compte = comptesClient.find((c: any) => c.typeCompte === targetType);
+            const compte = comptesClient.find((c: Record<string, unknown>) => c.typeCompte === targetType);
 
             if (compte) {
                 amount = parseFloat(compte.soldeCourant || '0');
@@ -154,8 +154,7 @@ export function useOperationInfo({
                     } else {
                         subtitle = 'Aucune échéance due';
                     }
-                } catch (e) {
-                    console.error("Error fetching loan schedule", e);
+                } catch {
                     subtitle = "Erreur chargement échéance";
                 }
             } else {
@@ -176,7 +175,7 @@ export function useOperationInfo({
                 const response = await fetch('/api/credits/pending-disbursements', { credentials: 'include' });
                 if (response.ok) {
                     const data = await response.json();
-                    const pending = data?.data?.find((d: any) =>
+                    const pending = data?.data?.find((d: Record<string, unknown>) =>
                         (d.clientId === clientId) ||
                         (d.client?.id === clientId)
                     );
@@ -189,8 +188,8 @@ export function useOperationInfo({
                         subtitle = 'Aucun décaissement en attente';
                     }
                 }
-             } catch (e) {
-                 console.error("Error fetching pending disbursements", e);
+             } catch {
+                 // disbursement fetch failed silently
              }
              break;
         }
@@ -201,24 +200,21 @@ export function useOperationInfo({
              for (const tontine of tontinesActives) {
                 try {
                   const requests = await tontineApi.getDistributionRequests(tontine.id, { status: 'APPROVED' });
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  const reqAny = requests as any;
-                  const forClient = reqAny.data ? reqAny.data.find((r: any) =>
+                  const reqObj = requests as Record<string, unknown>;
+                  const requestsList = Array.isArray(reqObj?.data) ? reqObj.data : (Array.isArray(requests) ? requests : []);
+                  const forClient = requestsList.find((r: Record<string, unknown>) =>
                     r.beneficiaryClientId === clientId ||
                     r.beneficiary_client_id === clientId
-                  ) : (Array.isArray(requests) ? requests.find((r: any) =>
-                    r.beneficiaryClientId === clientId ||
-                    r.beneficiary_client_id === clientId
-                  ) : null);
+                  );
 
                   if (forClient) {
-                    amount = parseFloat(forClient.amountApproved || forClient.amount_approved || forClient.amount || '0');
+                    amount = parseFloat(String(forClient.amountApproved || forClient.amount_approved || forClient.amount || '0'));
                     subtitle = tontine.nom;
                     suggestion = amount.toString();
                     break;
                   }
-                } catch (err) {
-                  console.error('Erreur chargement distributions:', err);
+                } catch {
+                  // distribution fetch failed, continue to next tontine
                 }
              }
              if (amount === null) {
@@ -238,8 +234,7 @@ export function useOperationInfo({
 
       setSuggestionState({ key: currentKey, value: suggestion });
 
-    } catch (error) {
-      console.error('Error in useOperationInfo:', error);
+    } catch {
       setInfoCardData({
         kind: config.kind as InfoCardKind,
         title: config.title,

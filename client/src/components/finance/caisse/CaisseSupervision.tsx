@@ -35,7 +35,7 @@ function useSupervisionPermissions() {
 }
 
 export interface SupervisionCallbackData {
-  session: any;
+  session: SupervisionSessionData;
   supervisionInfo: SupervisionSession;
 }
 
@@ -44,11 +44,12 @@ export default function CaisseSupervision({
   activeSupervision,
   onSupervisionStart
 }: {
-  onTakeControl?: (session: any, supervisionInfo: SupervisionSession) => void;
+  onTakeControl?: (session: SupervisionSessionData, supervisionInfo: SupervisionSession) => void;
   activeSupervision?: SupervisionSession | null;
   onSupervisionStart?: (data: SupervisionCallbackData) => void;
 }) {
-  const [activeTab, setActiveTab] = useState<'sessions' | 'caissiers' | 'alertes' | 'cloture' | 'audit'>('sessions');
+  type SupervisionTab = 'sessions' | 'caissiers' | 'alertes' | 'cloture' | 'audit';
+  const [activeTab, setActiveTab] = useState<SupervisionTab>('sessions');
   const [sessions, setSessions] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -127,21 +128,21 @@ export default function CaisseSupervision({
       setUsers(usersData || []);
       setRiskAlerts(riskyData || []);
       setEcartAlerts(ecartsData || []);
-    } catch (error) {
-      console.error("Erreur chargement supervision", error);
+    } catch {
+      // Handled by empty state
     } finally {
       setLoading(false);
     }
   };
 
-  const handleViewDetails = async (session: any) => {
+  const handleViewDetails = async (session: SupervisionSessionData) => {
     try {
       setLoading(true);
       const details = await sessionCaisseApi.get(session.id);
       setSelectedSession(details);
       setIsDetailsOpen(true);
-    } catch (error) {
-      console.error("Erreur chargement détails session", error);
+    } catch {
+      // Handled by loading state reset
     } finally {
       setLoading(false);
     }
@@ -163,18 +164,18 @@ export default function CaisseSupervision({
       setIsClosingOpen(false);
       setSelectedSession(null);
       fetchData();
-    } catch (error) {
-      console.error("Erreur lors de la fermeture forcée", error);
+    } catch {
+      // Toast error already shown by API client
     } finally {
       setSubmitting(false);
     }
   };
 
-  const resolveSessionStatus = (session: any) => session.computedStatus || computeSessionStatus(session);
-  const resolveOpenedAt = (session: any) => session.openedAt;
-  const resolveClosedAt = (session: any) => session.closedAt;
+  const resolveSessionStatus = (session: SupervisionSessionData) => session.computedStatus || computeSessionStatus(session);
+  const resolveOpenedAt = (session: SupervisionSessionData) => session.openedAt;
+  const resolveClosedAt = (session: SupervisionSessionData) => session.closedAt;
   // Helper pour récupérer le solde théorique (nom de champ varie selon les routes)
-  const getSoldeTheorique = (session: any) => {
+  const getSoldeTheorique = (session: SupervisionSessionData) => {
     if (!session) return 0;
     return Number(session.montantFermetureTheorique || session.soldeTheorique || 0);
   };
@@ -184,7 +185,7 @@ export default function CaisseSupervision({
 
   // Compter les caisses UNIQUES (pas les sessions) — une même caisse ouverte/fermée
   // plusieurs fois ne doit compter que comme 1
-  const resolveCaisseId = (s: any) => s.caisseId;
+  const resolveCaisseId = (s: SupervisionSessionData) => s.caisseId;
   const uniqueActiveCaisseCount = new Set(activeSessions.map(resolveCaisseId)).size;
   const uniqueClosedTodayCaisseCount = new Set(
     closedSessions
@@ -251,16 +252,16 @@ export default function CaisseSupervision({
   }), [allCaissiers, activeSessions]);
 
   // Tabs conditionnels selon les permissions
-  const tabs = [
+  const tabs: { key: SupervisionTab; label: string; icon: React.ElementType; badge?: number }[] = [
     { key: 'sessions', label: 'Caisses Ouvertes', icon: Wallet, badge: uniqueActiveCaisseCount },
     // L'onglet Caissiers est visible uniquement si l'utilisateur a la permission de voir les users
-    ...(permissions.canViewUsers ? [{ key: 'caissiers', label: 'Caissiers', icon: User }] : []),
+    ...(permissions.canViewUsers ? [{ key: 'caissiers' as const, label: 'Caissiers', icon: User }] : []),
     { key: 'alertes', label: 'Alertes', icon: AlertTriangle, badge: riskAlerts.length + ecartAlerts.length },
-    ...(permissions.canManageCaisse ? [{ key: 'cloture', label: 'Clôture', icon: Calendar }] : []),
-    ...(permissions.canManageCaisse ? [{ key: 'audit', label: 'Audit', icon: Shield }] : [])
+    ...(permissions.canManageCaisse ? [{ key: 'cloture' as const, label: 'Clôture', icon: Calendar }] : []),
+    ...(permissions.canManageCaisse ? [{ key: 'audit' as const, label: 'Audit', icon: Shield }] : [])
   ];
 
-  const handleManageUser = async (user: any) => {
+  const handleManageUser = async (user: SupervisionUser) => {
     setSelectedUser(user);
     setIsUserManagementOpen(true);
     setLoadingHistory(true);
@@ -271,18 +272,18 @@ export default function CaisseSupervision({
 
       // Calculer les statistiques du caissier
       if (history && history.length > 0) {
-        const closedHistory = history.filter((s: any) => resolveSessionStatus(s) === 'CLOSED');
-        const totalEncaisse = closedHistory.reduce((acc: number, s: any) => {
+        const closedHistory = history.filter((s: SupervisionSessionData) => resolveSessionStatus(s) === 'CLOSED');
+        const totalEncaisse = closedHistory.reduce((acc: number, s: SupervisionSessionData) => {
           const ops = s.operations || [];
-          const depots = ops.filter((o: any) => !(o.typeOperation || '').toLowerCase().includes('retrait'));
-          return acc + depots.reduce((sum: number, o: any) => sum + Number(o.montant || 0), 0);
+          const depots = ops.filter((o: SupervisionOperation) => !(o.typeOperation || '').toLowerCase().includes('retrait'));
+          return acc + depots.reduce((sum: number, o: SupervisionOperation) => sum + Number(o.montant || 0), 0);
         }, 0);
 
-        const totalEcarts = closedHistory.reduce((acc: number, s: any) => acc + Math.abs(Number(s.ecart || 0)), 0);
+        const totalEcarts = closedHistory.reduce((acc: number, s: SupervisionSessionData) => acc + Math.abs(Number(s.ecart || 0)), 0);
 
         setUserStats({
           totalSessions: history.length,
-          sessionsThisMonth: history.filter((s: any) => {
+          sessionsThisMonth: history.filter((s: SupervisionSessionData) => {
             const d = new Date(resolveOpenedAt(s));
             const now = new Date();
             return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
@@ -291,8 +292,8 @@ export default function CaisseSupervision({
           ecartMoyen: closedHistory.length > 0 ? totalEcarts / closedHistory.length : 0,
         });
       }
-    } catch (error) {
-      console.error("Erreur chargement historique utilisateur", error);
+    } catch {
+      // Handled by loading state reset
     } finally {
       setLoadingHistory(false);
     }
@@ -312,13 +313,13 @@ export default function CaisseSupervision({
       await userApi.update(selectedUser.id, { statut: newStatus });
       
       // Update local state
-      setUsers((prev: any[]) => prev.map(u => u.id === selectedUser.id ? { ...u, statut: newStatus } : u));
-      setSelectedUser((prev: any) => ({ ...prev, statut: newStatus }));
+      setUsers((prev: SupervisionUser[]) => prev.map(u => u.id === selectedUser.id ? { ...u, statut: newStatus } : u));
+      setSelectedUser((prev: SupervisionUser) => ({ ...prev, statut: newStatus }));
       
       // Refresh global data to ensure consistency (e.g. if status affects session eligibility)
       fetchData();
-    } catch (error) {
-      console.error("Erreur modification statut utilisateur", error);
+    } catch {
+      // Toast error already shown by API client
     } finally {
       setSubmitting(false);
     }
@@ -377,7 +378,7 @@ export default function CaisseSupervision({
   };
 
   // Handle clicking "Prendre la main" - opens confirmation modal
-  const handleRequestSupervision = useCallback((session: any) => {
+  const handleRequestSupervision = useCallback((session: SupervisionSessionData) => {
     // Check if user already has an active supervision
     if (activeSupervision) {
       setPendingSupervisionSession(session);
@@ -514,7 +515,7 @@ export default function CaisseSupervision({
               return (
                 <button
                   key={tab.key}
-                  onClick={() => setActiveTab(tab.key as any)}
+                  onClick={() => setActiveTab(tab.key)}
                   className={`
                     flex-1 flex items-center justify-center gap-2 py-2 px-4
                     text-xs font-medium transition-all relative
@@ -953,7 +954,7 @@ export default function CaisseSupervision({
                   <div className="text-center py-6 text-content-muted text-sm">Aucune session à risque</div>
                 ) : (
                   <div className="space-y-2">
-                    {riskAlerts.map((alert: any) => (
+                    {riskAlerts.map((alert: SupervisionAlert) => (
                       <div
                         key={alert.sessionId}
                         className={`p-3 rounded-lg border ${
@@ -1005,7 +1006,7 @@ export default function CaisseSupervision({
                   <div className="text-center py-6 text-content-muted text-sm">Aucun écart significatif</div>
                 ) : (
                   <div className="space-y-2">
-                    {ecartAlerts.map((alert: any) => (
+                    {ecartAlerts.map((alert: SupervisionAlert) => (
                       <div
                         key={alert.sessionId}
                         className={`p-3 rounded-lg border ${
@@ -1142,7 +1143,7 @@ export default function CaisseSupervision({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-edge">
-                        {selectedSession.operations?.map((op: any) => (
+                        {selectedSession.operations?.map((op: SupervisionOperation) => (
                           <tr key={op.id} className="hover:bg-surface/20 active:bg-surface/30 transition-colors">
                             <td className="p-2 sm:p-3 text-content-muted font-mono text-[10px] sm:text-xs whitespace-nowrap">
                               {op.createdAt ? new Date(op.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'N/A'}
@@ -1417,7 +1418,7 @@ export default function CaisseSupervision({
                 </div>
               ) : (
                 <div className="space-y-2 max-h-[200px] overflow-auto custom-scrollbar pr-1">
-                  {userHistory.slice(0, 10).map((session: any) => (
+                  {userHistory.slice(0, 10).map((session: SupervisionSessionData) => (
                     <div
                       key={session.id}
                       className="flex items-center justify-between p-3 rounded-lg bg-surface/30 border border-edge-subtle"

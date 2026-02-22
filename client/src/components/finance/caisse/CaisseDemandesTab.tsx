@@ -262,8 +262,8 @@ export default function CaisseDemandesTab({
         const data = await agentRes.json();
         setPendingAgentSessions(data.sessions || []);
       }
-    } catch (err) {
-      console.error('[CaisseDemandesTab] Fetch error:', err);
+    } catch {
+      // fetch error handled silently
     } finally {
       setLoading(false);
     }
@@ -450,7 +450,7 @@ export default function CaisseDemandesTab({
       setProcessTarget(null);
       fetchAll();
       onRequestProcessed?.();
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (err?.error?.code === 'INSUFFICIENT_FUNDS') {
         toast.error(`Solde insuffisant. Déficit: ${formatMoney(err.error.deficit)}`, { duration: 6000 });
       } else {
@@ -489,8 +489,8 @@ export default function CaisseDemandesTab({
       setCancelReason('');
       fetchAll();
       onRequestProcessed?.();
-    } catch (err: any) {
-      toast.error(err.message || "Erreur lors de l'annulation");
+    } catch (err: unknown) {
+      toast.error((err instanceof Error ? err.message : "Erreur lors de l'annulation"));
     } finally {
       setActionLoading(null);
     }
@@ -517,7 +517,7 @@ export default function CaisseDemandesTab({
       setShowBatchConfirm(false);
       fetchAll();
       onRequestProcessed?.();
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.error(err.message || 'Erreur décaissement groupé');
     } finally {
       setActionLoading(null);

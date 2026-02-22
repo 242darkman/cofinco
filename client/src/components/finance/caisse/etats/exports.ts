@@ -502,7 +502,7 @@ export function exportSynthesePDF(
   });
 
   // Operation breakdown by type
-  y = (doc as any).lastAutoTable.finalY + 15;
+  y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 15;
 
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');

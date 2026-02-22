@@ -70,9 +70,9 @@ export function ProvisionCoffreModal({
       reset();
       setStep("form");
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast.error("Erreur", {
-        description: error.message || "Une erreur est survenue."
+        description: (error instanceof Error ? error.message : "Une erreur est survenue.")
       });
     },
   });

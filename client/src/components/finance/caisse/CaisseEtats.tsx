@@ -35,8 +35,8 @@ export default function CaisseEtats({ onBack }: { onBack: () => void }) {
       if (!res.ok) throw new Error('Erreur lors du chargement');
       const data = await res.json();
       setSessions(data || []);
-    } catch (error) {
-      console.error('Erreur chargement sessions:', error);
+    } catch {
+      // Session loading failure handled by empty state
     } finally {
       setLoading(false);
     }
@@ -64,8 +64,8 @@ export default function CaisseEtats({ onBack }: { onBack: () => void }) {
       }
 
       setTransactions(allTransactions);
-    } catch (error) {
-      console.error('Erreur chargement transactions:', error);
+    } catch {
+      // Transaction loading failure handled by empty state
     }
   }, [sessions]);
 
@@ -115,8 +115,7 @@ export default function CaisseEtats({ onBack }: { onBack: () => void }) {
         default:
           exportJournalPDF(sessions, transactions, exportConfig);
       }
-    } catch (error) {
-      console.error('Erreur export PDF:', error);
+    } catch {
       alert("Une erreur est survenue lors de l'export PDF.");
     }
   };
@@ -137,8 +136,7 @@ export default function CaisseEtats({ onBack }: { onBack: () => void }) {
         default:
           exportJournalExcel(sessions, transactions, exportConfig);
       }
-    } catch (error) {
-      console.error('Erreur export Excel:', error);
+    } catch {
       alert("Une erreur est survenue lors de l'export Excel.");
     }
   };

@@ -56,11 +56,11 @@ const moneyFormatter = new Intl.NumberFormat('fr-FR');
 
 interface CaisseProps {
   userRole?: string;
-  onModuleChange?: (module: string, subModule?: string, data?: any) => void;
+  onModuleChange?: (module: string, subModule?: string, data?: Record<string, unknown>) => void;
   activeView?: string;
   initialShowPaiement?: boolean;
   onPaiementModalClose?: () => void;
-  initialState?: any;
+  initialState?: Record<string, unknown>;
 }
 
 const toNumber = (value: unknown) => {
@@ -200,7 +200,7 @@ export default function CaisseDashboard({
   });
 
   // Get the first non-occupied caisse for displaying available funds
-  const availableCaisse = myCaisses.find((c: any) => !c.isOccupied);
+  const availableCaisse = myCaisses.find((c: { isOccupied?: boolean }) => !c.isOccupied);
   const availableBalance = availableCaisse?.availableBalance ?? 0;
 
   // Actual session being used (own or supervised)
@@ -421,8 +421,8 @@ export default function CaisseDashboard({
       if (!currentSession?.id) return;
       const data = await caisseSepareeApi.getBySession(currentSession.id);
       setCaissesSeparees(data || []);
-    } catch (error) {
-      console.error('Erreur:', error);
+    } catch {
+      // Silently fail - caisses séparées are optional
     }
   };
 

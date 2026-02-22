@@ -69,6 +69,7 @@ export default function CaisseHistoriqueGlobal({
       client: tx.client,
       agent: tx.agent,
       modePaiement: tx.modePaiement,
+      metadata: tx.metadata,
     });
     setIsDrawerOpen(true);
   }, []);
@@ -141,7 +142,8 @@ export default function CaisseHistoriqueGlobal({
         } : undefined,
         agent: op.caissierNom || undefined,
         mode_paiement: op.modePaiement,
-        created_at: op.createdAt
+        created_at: op.createdAt,
+        metadata: op.metadata || undefined,
       }));
   }, [data?.operations, searchTerm]);
 

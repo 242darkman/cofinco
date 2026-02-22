@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 interface CaisseOuvertureProps {
   onClose: () => void;
   onSuccess: () => void;
-  pendingSession?: any; // Session en attente (REQUESTING_FUNDS ou FUNDS_DISPATCHED)
+  pendingSession?: Record<string, unknown>; // Session en attente (REQUESTING_FUNDS ou FUNDS_DISPATCHED)
 }
 
 interface Caisse {
@@ -162,8 +162,8 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
               setSelectedAgenceId(res.data[0].id);
             }
           }
-        } catch (e) {
-          console.error("Erreur chargement agences", e);
+        } catch {
+          // Silently fail - agences will remain empty
         }
       };
       fetchAgences();
@@ -185,7 +185,7 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
         const res = await api.get<Caisse[]>(`/agences/${selectedAgenceId}/caisses`);
         if (res.data) {
           // Exclure les coffres-forts — uniquement les caisses physiques
-          let availableCaisses = res.data.filter((c: any) => c.type !== 'Coffre-Fort');
+          let availableCaisses = res.data.filter((c: { type?: string }) => c.type !== 'Coffre-Fort');
 
           const normalizedRole = normalizeRole(currentUser?.role);
           const isManager = normalizedRole === SystemRole.CHEF_AGENCE || normalizedRole === SystemRole.ADMIN;
@@ -207,8 +207,7 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
           const firstAvailable = availableCaisses.find(c => !c.isOccupied && c.statut !== 'CLOSED');
           if (firstAvailable) setSelectedCaisseId(firstAvailable.id);
         }
-      } catch (e) {
-        console.error("Erreur chargement caisses", e);
+      } catch {
         setError("Impossible de charger la liste des caisses.");
       } finally {
         setLoadingCaisses(false);
@@ -253,7 +252,7 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
       } else {
         setAccessCodeError(result.error || 'Code invalide ou expiré');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setAccessCodeError(err.message || 'Erreur de validation');
     } finally {
       setAccessCodeLoading(false);
@@ -333,8 +332,8 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
         setSuccessMessage('');
       }, 1500);
 
-    } catch (err: any) {
-      const msg = err.message || "Erreur lors de la soumission de la demande.";
+    } catch (err: unknown) {
+      const msg = (err instanceof Error ? err.message : "Erreur lors de la soumission de la demande.");
       setError(msg);
       if (msg.includes('négatif') || msg.includes('NEGATIVE')) {
         setBackendNegativeBalance(true);
@@ -361,8 +360,8 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
           setError("La demande a été annulée ou rejetée. Veuillez réessayer.");
           setStep('auth');
         }
-      } catch (e) {
-        console.error("Erreur vérification statut:", e);
+      } catch {
+        // Silently fail - status check is non-critical
       }
     };
 
@@ -400,8 +399,8 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
         onSuccess();
       }, 1500);
 
-    } catch (err: any) {
-      setError(err.message || "Erreur lors de la confirmation.");
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : "Erreur lors de la confirmation."));
     } finally {
       setLoading(false);
     }
@@ -421,8 +420,8 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
       setTimeout(() => {
         onClose();
       }, 1000);
-    } catch (err: any) {
-      setError(err.message || "Erreur lors de l'annulation.");
+    } catch (err: unknown) {
+      setError((err instanceof Error ? err.message : "Erreur lors de l'annulation."));
     } finally {
       setLoading(false);
     }
@@ -474,7 +473,7 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
       setBackendNegativeBalance(false);
       setError('');
       setSuccessMessage(`Solde remis à 0 FCFA. Vous pouvez maintenant ouvrir la session.`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError(err.message || 'Erreur lors de la correction du solde');
     } finally {
       setCorrecting(false);
@@ -546,8 +545,8 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
         onSuccess();
       }, 1500);
 
-    } catch (err: any) {
-      const msg = err.message || "Erreur lors de l'ouverture directe.";
+    } catch (err: unknown) {
+      const msg = (err instanceof Error ? err.message : "Erreur lors de l'ouverture directe.");
       setError(msg);
       // Détecter l'erreur de solde négatif du backend
       if (msg.includes('négatif') || msg.includes('NEGATIVE')) {

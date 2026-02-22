@@ -4,7 +4,7 @@ import {
   ArrowRight, RefreshCw, Loader2, Search, Filter, Calendar,
   CheckSquare, XCircle
 } from 'lucide-react';
-import { Button, Badge, FormField, SelectField } from '../../ui';
+import { Button, Badge, type BadgeVariant, FormField, SelectField } from '../../ui';
 import { toast } from '../../../lib/toast';
 import { api } from '../../../lib/api-client';
 import { formatMoney } from '../../../lib/format';
@@ -42,7 +42,7 @@ interface TransferReconciliationPanelProps {
   onReconcile?: () => void;
 }
 
-const STATUS_CONFIG: Record<string, { color: string; icon: React.ElementType; label: string }> = {
+const STATUS_CONFIG: Record<string, { color: BadgeVariant; icon: React.ElementType; label: string }> = {
   PENDING: { color: 'warning', icon: Clock, label: 'En transit' },
   SENT: { color: 'info', icon: ArrowRight, label: 'Envoyé' },
   RECEIVED: { color: 'success', icon: CheckCircle, label: 'Reçu' },
@@ -93,8 +93,7 @@ export default function TransferReconciliationPanel({
 
       setTransfers(response?.transfers || []);
       setStats(response?.stats || null);
-    } catch (error) {
-      console.error('Error fetching transfers for reconciliation:', error);
+    } catch {
       // Try alternative endpoint
       try {
         const response = await api.get<CaisseTransfert[]>(
@@ -116,7 +115,7 @@ export default function TransferReconciliationPanel({
       toast.success('Transfert rapproché');
       fetchTransfers();
       onReconcile?.();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error(error.message || 'Erreur lors du rapprochement');
     } finally {
       setReconciling(null);
@@ -130,7 +129,7 @@ export default function TransferReconciliationPanel({
       toast.success('Réception confirmée');
       fetchTransfers();
       onReconcile?.();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error(error.message || 'Erreur lors de la confirmation');
     } finally {
       setReconciling(null);
@@ -224,7 +223,7 @@ export default function TransferReconciliationPanel({
 
         <select
           value={filterDirection}
-          onChange={(e) => setFilterDirection(e.target.value as any)}
+          onChange={(e) => setFilterDirection(e.target.value as 'sent' | 'received' | 'all')}
           className="px-3 py-2 bg-surface border border-edge rounded-lg text-sm text-content-secondary focus:border-accent focus:outline-none"
         >
           <option value="all">Tous transferts</option>
@@ -316,7 +315,7 @@ export default function TransferReconciliationPanel({
                   {/* Actions */}
                   <div className="flex flex-col items-end gap-2">
                     <Badge
-                      variant={status.color as any}
+                      variant={status.color}
                       value={transfer.reconciled ? 'Rapproché' : status.label}
                       size="xs"
                     />

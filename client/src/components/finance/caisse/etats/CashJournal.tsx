@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowUpRight, ArrowDownLeft, Wallet, Clock, User, CreditCard, Filter, UserCircle } from 'lucide-react';
+import { ArrowUpRight, ArrowDownLeft, Wallet, Clock, User, CreditCard, Filter, UserCircle, ChevronDown, ChevronRight, Users } from 'lucide-react';
 import { Card, ResponsiveTable } from '@/components/ui';
 import { CaisseTransaction, SessionCaisse } from '@/types/finance';
 import { formatMoney } from '@shared/config/currency';
@@ -27,6 +27,7 @@ interface JournalEntry {
   soldeProgressif: number;
   sessionId: string;
   modePaiement?: string;
+  metadata?: Record<string, any>;
 }
 
 type FilterType = 'all' | 'entrees' | 'sorties';
@@ -40,6 +41,16 @@ export function CashJournal({
   onPageChange,
 }: CashJournalProps) {
   const [filter, setFilter] = useState<FilterType>('all');
+  const [expandedSettlements, setExpandedSettlements] = useState<Set<string>>(new Set());
+
+  const toggleSettlement = (id: string) => {
+    setExpandedSettlements(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   // Construire le journal avec solde progressif
   const journalEntries = useMemo(() => {
@@ -115,6 +126,7 @@ export function CashJournal({
           soldeProgressif,
           sessionId: session.id,
           modePaiement: tx.modePaiement,
+          metadata: tx.metadata,
         });
       }
 
@@ -172,7 +184,7 @@ export function CashJournal({
           key: 'date',
           label: 'Date & Heure',
           primary: true,
-          format: (_: any, entry: JournalEntry) => (
+          format: (_: unknown, entry: JournalEntry) => (
             <div className="flex items-center gap-2">
               <Clock size={12} className="text-content-muted" />
               <div>
@@ -188,7 +200,7 @@ export function CashJournal({
               </div>
             </div>
           ),
-          mobileFormat: (_: any, entry: JournalEntry) => (
+          mobileFormat: (_: unknown, entry: JournalEntry) => (
              <div className="flex items-center gap-1.5 text-xs text-content-muted">
                 <Clock size={12} />
                 <span>{entry.date.toLocaleDateString('fr-FR')} {entry.date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
@@ -198,45 +210,78 @@ export function CashJournal({
         {
           key: 'operation',
           label: 'Opération',
-          format: (_: any, entry: JournalEntry) => (
-             <div>
-                <div className="flex items-center gap-1.5 mb-1">
-                   {entry.type === 'OUVERTURE' && (
-                    <span className="px-1.5 py-0.5 bg-status-info-bg text-status-info text-[10px] font-bold rounded border border-status-info/20">
-                      OUVERTURE
-                    </span>
-                   )}
-                   {entry.type === 'FERMETURE' && (
-                    <span className="px-1.5 py-0.5 bg-status-info-bg text-status-info text-[10px] font-bold rounded border border-status-info/20">
-                      FERMETURE
-                    </span>
-                   )}
-                   {entry.type === 'OPERATION' && (
-                    <span
-                      className={`px-1.5 py-0.5 text-[10px] font-bold rounded border ${
-                        entry.sens === 'ENTREE'
-                          ? 'bg-status-success-bg text-status-success border-status-success/20'
-                          : 'bg-status-danger/10 text-status-danger border-status-danger/20'
-                      }`}
-                    >
-                      {entry.sens === 'ENTREE' ? '↓' : '↑'} {getOperationLabel(entry.operationType)}
-                    </span>
-                   )}
-                </div>
-                {entry.description && entry.type === 'OPERATION' && (
-                  <p className="text-content-muted text-[10px] truncate max-w-[180px]">
-                    {entry.description}
-                  </p>
-                )}
-             </div>
-          ),
+          format: (_: unknown, entry: JournalEntry) => {
+             const detailPaiements = entry.metadata?.detailPaiements as Array<{
+               paiementId: string; clientName: string; typePaiementLabel: string; montant: number;
+             }> | undefined;
+             const isSettlementWithDetail = entry.operationType === 'AGENT_SETTLEMENT' && detailPaiements?.length;
+             const isExpanded = expandedSettlements.has(entry.id);
+
+             return (
+               <div>
+                  <div className="flex items-center gap-1.5 mb-1">
+                     {entry.type === 'OUVERTURE' && (
+                      <span className="px-1.5 py-0.5 bg-status-info-bg text-status-info text-[10px] font-bold rounded border border-status-info/20">
+                        OUVERTURE
+                      </span>
+                     )}
+                     {entry.type === 'FERMETURE' && (
+                      <span className="px-1.5 py-0.5 bg-status-info-bg text-status-info text-[10px] font-bold rounded border border-status-info/20">
+                        FERMETURE
+                      </span>
+                     )}
+                     {entry.type === 'OPERATION' && (
+                      <span
+                        className={`px-1.5 py-0.5 text-[10px] font-bold rounded border ${
+                          entry.sens === 'ENTREE'
+                            ? 'bg-status-success-bg text-status-success border-status-success/20'
+                            : 'bg-status-danger/10 text-status-danger border-status-danger/20'
+                        }`}
+                      >
+                        {entry.sens === 'ENTREE' ? '↓' : '↑'} {getOperationLabel(entry.operationType)}
+                      </span>
+                     )}
+                     {isSettlementWithDetail && (
+                       <button
+                         onClick={(e) => { e.stopPropagation(); toggleSettlement(entry.id); }}
+                         className="flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-medium text-accent hover:bg-accent/10 rounded transition-colors"
+                       >
+                         {isExpanded ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
+                         {detailPaiements!.length} opération{detailPaiements!.length > 1 ? 's' : ''}
+                       </button>
+                     )}
+                  </div>
+                  {entry.description && entry.type === 'OPERATION' && (
+                    <p className="text-content-muted text-[10px] truncate max-w-[180px]">
+                      {entry.description}
+                    </p>
+                  )}
+                  {isSettlementWithDetail && isExpanded && (
+                    <div className="mt-1.5 ml-1 border-l-2 border-accent/30 pl-2 space-y-1">
+                      {detailPaiements!.map((p) => (
+                        <div key={p.paiementId} className="flex items-center justify-between gap-2 text-[10px]">
+                          <div className="flex items-center gap-1 min-w-0">
+                            <Users size={9} className="text-content-muted shrink-0" />
+                            <span className="text-content-secondary truncate">{p.clientName}</span>
+                            <span className="text-content-muted shrink-0">· {p.typePaiementLabel}</span>
+                          </div>
+                          <span className="text-status-success font-mono font-medium shrink-0">
+                            {formatMoney(p.montant, { showCurrency: false })}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+               </div>
+             );
+          },
           mobileClassName: 'font-medium text-content-primary mb-1'
         },
         {
           key: 'tier',
           label: 'Client / Caissier',
-          format: (_: any, entry: JournalEntry) => renderClientOrCaissier(entry),
-          mobileFormat: (_: any, entry: JournalEntry) => renderClientOrCaissier(entry)
+          format: (_: unknown, entry: JournalEntry) => renderClientOrCaissier(entry),
+          mobileFormat: (_: unknown, entry: JournalEntry) => renderClientOrCaissier(entry)
         },
         {
           key: 'reference',
@@ -248,7 +293,7 @@ export function CashJournal({
           key: 'entree',
           label: 'Entrée',
           align: 'right' as const,
-          format: (_: any, entry: JournalEntry) => (
+          format: (_: unknown, entry: JournalEntry) => (
              entry.sens === 'ENTREE' ? (
                 <span className="text-status-success font-bold font-mono">+{formatMoney(entry.montant, { showCurrency: false })}</span>
              ) : entry.type === 'OUVERTURE' ? (
@@ -261,7 +306,7 @@ export function CashJournal({
           key: 'sortie',
           label: 'Sortie',
           align: 'right' as const,
-          format: (_: any, entry: JournalEntry) => (
+          format: (_: unknown, entry: JournalEntry) => (
              entry.sens === 'SORTIE' ? (
                 <span className="text-status-danger font-bold font-mono">-{formatMoney(entry.montant, { showCurrency: false })}</span>
              ) : <span className="text-content-muted">—</span>
@@ -399,6 +444,16 @@ function renderClientOrCaissier(entry: JournalEntry) {
     );
   }
 
+  // Agent settlement: show agent name
+  if (entry.operationType === 'AGENT_SETTLEMENT' && entry.metadata?.agentName) {
+    return (
+      <div className="flex items-center gap-2">
+        <Users size={12} className="text-accent" />
+        <span className="text-accent text-xs font-medium">{entry.metadata.agentName}</span>
+      </div>
+    );
+  }
+
   // Client operations: show client if available
   if (entry.client) {
     return (
@@ -433,6 +488,7 @@ function isEntreeOperation(type: string): boolean {
     'VERSEMENT_COMPTE_BLOQUE',
     'ENGAGEMENT_FEE', // Frais de dossier crédit
     'MISC_COLLECTION', // Encaissement divers
+    'AGENT_SETTLEMENT', // Remise agent terrain
   ];
   return entreeTypes.some((t) => type.toUpperCase().includes(t));
 }
@@ -464,6 +520,7 @@ function getOperationLabel(type?: string): string {
     TRANSFER_OUT: 'Transfert Sortant',
     MISC_COLLECTION: 'Encaissement Divers',
     MISC_DISBURSEMENT: 'Décaissement Divers',
+    AGENT_SETTLEMENT: 'Remise Agent',
   };
 
   // Recherche partielle

@@ -93,7 +93,7 @@ export function AccountActivationModal({
       fetch(`/api/clients/${account.client.id}/portfolio`, { credentials: 'include' })
         .then(res => res.ok ? res.json() : { comptes: [] })
         .then(data => {
-          const comptes = (data.comptes || []).filter((c: any) =>
+          const comptes = (data.comptes || []).filter((c: { statut?: string }) =>
             c.id !== account.id &&
             c.statut === 'ACTIVE' &&
             parseFloat(c.soldeCourant || '0') > 0

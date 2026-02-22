@@ -17,7 +17,8 @@ import {
   Building,
   ArrowRight,
   RotateCcw,
-  Loader2
+  Loader2,
+  Users
 } from 'lucide-react';
 import { toast } from '../../../lib/toast';
 import { currencySymbol } from '@shared/config/currency';
@@ -96,7 +97,7 @@ const TYPES_ENTREES = [
   'TONTINE_CONTRIBUTION', 'DEPOSIT_SAVINGS', 'DEPOSIT_CURRENT', 'DEPOSIT_BLOCKED',
   'MISC_COLLECTION', 'LOAN_REPAYMENT', 'CREDIT_REPAYMENT', 'SAFE_SUPPLY',
   'INITIAL_DEPOSIT', 'ENGAGEMENT_FEE', 'FRAIS_ENGAGEMENT', 'DEPOT_ESPECES',
-  'SAVINGS_DEPOSIT', 'TRANSFER_IN', 'BANK_FEE'
+  'SAVINGS_DEPOSIT', 'TRANSFER_IN', 'BANK_FEE', 'AGENT_SETTLEMENT'
 ];
 
 const isEntree = (type: string, description?: string): boolean => {
@@ -371,6 +372,31 @@ const DrawerContent = React.memo(function DrawerContent({
               )}
             </div>
           </section>
+
+          {/* Détail remise agent terrain */}
+          {transaction.metadata?.detailPaiements?.length > 0 && (
+            <section>
+              <h3 className="text-xs font-bold text-content-muted uppercase tracking-wider mb-3 flex items-center gap-2">
+                <Users size={14} /> Détail des paiements ({transaction.metadata.detailPaiements.length})
+              </h3>
+              <div className="bg-surface-muted/50 rounded-xl p-4 space-y-2">
+                {transaction.metadata.detailPaiements.map((p: any) => (
+                  <div key={p.paiementId} className="flex items-center justify-between py-1.5 border-b border-dashed border-edge-subtle last:border-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Users size={12} className="text-content-muted shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-sm text-content-primary font-medium truncate">{p.clientName}</p>
+                        <p className="text-[10px] text-content-muted">{p.typePaiementLabel}</p>
+                      </div>
+                    </div>
+                    <span className="text-sm text-status-success font-bold font-mono shrink-0 ml-2">
+                      +{formatMoney(p.montant, { showCurrency: false })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
           {/* Error message if failed */}
           {showError && (

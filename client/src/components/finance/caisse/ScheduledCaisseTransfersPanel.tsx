@@ -98,8 +98,8 @@ export default function ScheduledCaisseTransfersPanel({
         agenceSourceId: agenceId,
       });
       setTransfers(data || []);
-    } catch (error) {
-      console.error('Error fetching scheduled transfers:', error);
+    } catch {
+      // fetch error handled silently
     } finally {
       setLoading(false);
     }
@@ -136,7 +136,7 @@ export default function ScheduledCaisseTransfersPanel({
       setEditingTransfer(null);
       resetForm();
       fetchTransfers();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error(error.message || 'Erreur lors de la sauvegarde');
     }
   };
@@ -147,7 +147,7 @@ export default function ScheduledCaisseTransfersPanel({
       await scheduledCaisseTransfersApi.cancel(id);
       toast.success('Transfert annulé');
       fetchTransfers();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error(error.message || 'Erreur lors de l\'annulation');
     }
   };
@@ -159,7 +159,7 @@ export default function ScheduledCaisseTransfersPanel({
       toast.success('Transfert exécuté');
       fetchTransfers();
       onTransferExecuted?.();
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error(error.message || 'Erreur lors de l\'exécution');
     } finally {
       setExecuting(null);

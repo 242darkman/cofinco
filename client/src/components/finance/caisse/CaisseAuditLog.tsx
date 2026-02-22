@@ -139,8 +139,8 @@ export default function CaisseAuditLog() {
       const data = await res.json();
       setLogs(data.data || []);
       setPagination(data.pagination || { page: 1, perPage: 10, total: 0, totalPages: 0 });
-    } catch (err) {
-      console.error('Erreur fetch audit logs:', err);
+    } catch {
+      // fetch error handled silently
     } finally {
       setLoading(false);
     }

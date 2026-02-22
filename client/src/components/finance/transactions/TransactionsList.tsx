@@ -37,6 +37,7 @@ export interface TransactionItem {
   agent?: string;
   modePaiement?: string;
   createdAt?: string;
+  metadata?: Record<string, any>;
 }
 
 export interface TransactionsListProps {

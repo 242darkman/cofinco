@@ -417,8 +417,8 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
           clearInterval(pollInterval);
           toast.error(`Paiement ${intent.status === 'FAILED' ? 'échoué' : intent.status === 'EXPIRED' ? 'expiré' : 'annulé'}`);
         }
-      } catch (error) {
-        console.error('Erreur polling paiement:', error);
+      } catch {
+        // Polling failure is non-critical, will retry next interval
       }
     }, 5000);
 
@@ -481,8 +481,8 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
           const data = await res.json();
           setFeeEstimate(data);
         }
-      } catch (err) {
-        console.error('Fee estimate error:', err);
+      } catch {
+        // Fee estimate failure is non-critical
       } finally {
         setLoadingFeeEstimate(false);
       }
@@ -884,8 +884,8 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
       toast.info(isCollection
         ? 'Demande envoyée. Le client doit valider sur son téléphone.'
         : 'Décaissement en cours...');
-    } catch (error: any) {
-      toast.error(error.message || "Erreur lors de l'initiation du paiement");
+    } catch (error: unknown) {
+      toast.error((error instanceof Error ? error.message : "Erreur lors de l'initiation du paiement"));
     } finally {
       setLoading(false);
     }
