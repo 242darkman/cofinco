@@ -277,20 +277,21 @@ export function registerDashboardRoutes(app: Express) {
         // 16. Upcoming Payments
         storage.getUpcomingEcheances({ agence: isAllAgences ? undefined : agenceId }),
 
-        // 17. Enquête Credit KPIs
+        // 17. Enquête Credit KPIs (join through clients for agence filtering — enquetes_credit has no agence_id)
         db.execute(sql`
           SELECT
-            COUNT(*) FILTER (WHERE statut IN ('ASSIGNED', 'IN_PROGRESS')) AS en_cours,
-            COUNT(*) FILTER (WHERE statut = 'SUBMITTED') AS soumises,
-            COUNT(*) FILTER (WHERE statut IN ('APPROVED', 'REJECTED', 'REDUCED')) AS traitees,
-            COUNT(*) FILTER (WHERE statut IN ('APPROVED', 'REJECTED', 'REDUCED') AND agent_recommendation = 'APPROVE') AS favorables,
+            COUNT(*) FILTER (WHERE e.statut IN ('ASSIGNED', 'IN_PROGRESS')) AS en_cours,
+            COUNT(*) FILTER (WHERE e.statut = 'SUBMITTED') AS soumises,
+            COUNT(*) FILTER (WHERE e.statut IN ('APPROVED', 'REJECTED', 'REDUCED')) AS traitees,
+            COUNT(*) FILTER (WHERE e.statut IN ('APPROVED', 'REJECTED', 'REDUCED') AND e.agent_recommendation = 'APPROVE') AS favorables,
             COALESCE(
-              EXTRACT(EPOCH FROM AVG(submitted_at - assigned_at) FILTER (WHERE submitted_at IS NOT NULL AND assigned_at IS NOT NULL)) / 3600,
+              EXTRACT(EPOCH FROM AVG(e.submitted_at - e.assigned_at) FILTER (WHERE e.submitted_at IS NOT NULL AND e.assigned_at IS NOT NULL)) / 3600,
               0
             )::numeric AS temps_moyen_heures
-          FROM enquetes_credit
-          WHERE deleted_at IS NULL
-            AND (${sqlAgenceFilter('enquetes_credit')})
+          FROM enquetes_credit e
+          JOIN clients c ON e.client_id = c.id
+          WHERE e.deleted_at IS NULL
+            AND (${sqlAgenceFilter('c')})
         `),
       ]);
 
