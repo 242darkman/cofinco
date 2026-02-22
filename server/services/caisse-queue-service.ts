@@ -19,6 +19,7 @@ import {
 import { eq, and, or, sql, desc, aliasedTable, isNull } from "drizzle-orm";
 import { createLogger } from "../lib/logger";
 import { getWsInstance } from "../ws-server";
+import { normalizePhone } from "@shared/utils/phone";
 
 const logger = createLogger("CaisseQueue");
 
@@ -404,9 +405,13 @@ async function processFeeRefund(
 
       // 2. For MOBILE_MONEY: trigger automatic payout via MoMo API
       if (paymentMethod === "MOBILE_MONEY") {
-        const momoPhone = refundData.mobileMoneyPhone;
-        if (!momoPhone || !momoProvider) {
+        const rawPhone = refundData.mobileMoneyPhone;
+        if (!rawPhone || !momoProvider) {
           throw new Error("Données Mobile Money manquantes (opérateur ou numéro)");
+        }
+        const momoPhone = normalizePhone(rawPhone);
+        if (!momoPhone) {
+          throw new Error("Numéro de téléphone Mobile Money invalide");
         }
 
         const { paymentService } = await import("./mobile-money/payment-service");
@@ -472,6 +477,9 @@ async function processSalaryPayment(
   const { generateReference } = await import("./ledger");
   const meta = request.metadata as Record<string, unknown> | null;
   const amount = parseFloat(request.montant);
+  if (isNaN(amount) || amount <= 0) {
+    throw new Error(`Montant invalide pour paiement salaire: ${request.montant}`);
+  }
 
   const { mouvement } = await executeWithLedger(
     "RH_PAYROLL",
@@ -546,6 +554,9 @@ async function processAccountActivation(
   const { payerDepotInitialCompte } = await import("./comptes");
   const meta = request.metadata as Record<string, unknown> | null;
   const amount = parseFloat(request.montant);
+  if (isNaN(amount) || amount <= 0) {
+    throw new Error(`Montant invalide pour activation compte: ${request.montant}`);
+  }
   const compteId = meta?.compteId as string || request.sourceId;
   const methodePaiement = (meta?.methodePaiement as string) || "CASH";
 

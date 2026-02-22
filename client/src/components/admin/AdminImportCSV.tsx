@@ -6,6 +6,7 @@ import { auditApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
+import { normalizePhone } from '@shared/utils/phone';
 
 interface AdminImportCSVProps {
   onClose: () => void;
@@ -69,9 +70,9 @@ export default function AdminImportCSV({ onClose, onSuccess }: AdminImportCSVPro
         emailMap.get(email)!.push(lineNum);
       }
 
-      // Check phones
+      // Check phones (normalize for consistent comparison)
       if (row.telephone) {
-        const phone = row.telephone.replace(/\D/g, '');
+        const phone = normalizePhone(row.telephone) || row.telephone.replace(/\D/g, '');
         if (phone.length >= 8) {
           if (!phoneMap.has(phone)) {
             phoneMap.set(phone, []);

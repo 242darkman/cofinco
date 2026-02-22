@@ -4,6 +4,7 @@ import { prospectionApi, arrondissementApi, marcheApi, villeApi } from '../../li
 import { useToast } from '@/hooks/use-toast';
 import SearchableSelect, { type SearchableSelectOption } from '../ui/SearchableSelect';
 import { ANCIENNETE_ACTIVITE_OPTIONS } from '@shared/enum/status-constants';
+import { normalizePhone } from '@shared/utils/phone';
 
 interface ProspectionFormModalProps {
   isOpen: boolean;
@@ -198,7 +199,7 @@ export default function ProspectionFormModal({ isOpen, agentId, onClose, onSucce
       agentId,
       nomProspect: formData.nomProspect.trim(),
       prenomProspect: formData.prenomProspect.trim() || undefined,
-      telephoneProspect: formData.telephoneProspect.replace(/\s/g, ''),
+      telephoneProspect: normalizePhone(formData.telephoneProspect.replace(/\s/g, '')) || formData.telephoneProspect.replace(/\s/g, ''),
       sexe: formData.sexe || undefined,
       adresseProspect: formData.adresseProspect.trim() || undefined,
       arrondissementId: formData.arrondissementId || undefined,

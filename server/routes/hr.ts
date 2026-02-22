@@ -94,6 +94,7 @@ import { generateCampaignEvaluations, computeEvaluationScore, finalizeEvaluation
 import { getTransferPreview, generateTransferFile, generateTransferXlsx, createPaymentBatches } from "../services/payroll-transfer-service";
 import * as hrStorage from "../storage/hr";
 import { scoreCandidature, scoreAllCandidatures } from "../services/candidature-scoring-service";
+import { normalizePhone } from "@shared/utils/phone";
 
 const csvUpload = multer({
   storage: multer.memoryStorage(),
@@ -2017,7 +2018,7 @@ hrRouter.post("/candidatures", getAuthUser, async (req, res) => {
       nom,
       prenom,
       email,
-      telephone,
+      telephone: normalizePhone(telephone),
       posteVise,
       experience,
       formation: formationCand,
@@ -3062,7 +3063,7 @@ hrRouter.patch("/paie/pay", getAuthUser, attachAbility, requireAbility(Actions.M
         salaireNet: Number(b.bulletin.salaireNet),
         employeNom: b.employeNom || undefined,
         employePrenom: b.employePrenom || undefined,
-        msisdn: b.phone || undefined,
+        msisdn: normalizePhone(b.phone) || b.phone || undefined,
       })),
       executionMode: "IMMEDIATE",
       agenceId: agenceId || undefined,
@@ -3236,7 +3237,7 @@ hrRouter.post("/paie/schedule", getAuthUser, attachAbility, requireAbility(Actio
         salaireNet: Number(b.bulletin.salaireNet),
         employeNom: b.employeNom || undefined,
         employePrenom: b.employePrenom || undefined,
-        msisdn: b.phone || undefined,
+        msisdn: normalizePhone(b.phone) || b.phone || undefined,
       })),
       executionMode: "SCHEDULED",
       scheduledAt: scheduledDate,

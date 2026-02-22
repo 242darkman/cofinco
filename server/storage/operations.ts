@@ -5,6 +5,7 @@ import { notDeleted } from "./query-helpers";
 import { eq, desc, asc, and, or, sql, gte, lte } from "drizzle-orm";
 import { StatutOtp, StatutPaiementTerrain } from "@shared/enum/status-constants";
 import { SystemRole } from "@shared/types/roles";
+import { normalizePhone } from "@shared/utils/phone";
 
 async function resolveAgentPrimaryAgenceId(agentId: string): Promise<string | undefined> {
   const [row] = await db
@@ -322,14 +323,22 @@ export async function getProspectionsPaginated(
 }
 
 export async function createProspection(insertProspection: InsertProspection): Promise<Prospection> {
-  const [prospection] = await db.insert(prospections).values(insertProspection).returning();
+  const data = { ...insertProspection };
+  if (data.telephoneProspect) {
+    data.telephoneProspect = normalizePhone(data.telephoneProspect) || data.telephoneProspect;
+  }
+  const [prospection] = await db.insert(prospections).values(data).returning();
   return prospection;
 }
 
 export async function updateProspection(id: string, updateData: Partial<InsertProspection>): Promise<Prospection | undefined> {
+  const data = { ...updateData };
+  if (data.telephoneProspect) {
+    data.telephoneProspect = normalizePhone(data.telephoneProspect) || data.telephoneProspect;
+  }
   const [prospection] = await db
     .update(prospections)
-    .set(updateData)
+    .set(data)
     .where(eq(prospections.id, id))
     .returning();
   return prospection || undefined;

@@ -31,6 +31,7 @@ import {
 import { createLogger } from "../lib/logger";
 import { postEntry } from "./accounting-posting-service";
 import { currencyCode } from "@shared/config/currency";
+import { normalizePhone } from "@shared/utils/phone";
 
 const logger = createLogger("SalaryPaymentService");
 
@@ -233,7 +234,7 @@ async function processMobileMoneyJob(job: SalaryPaymentJob): Promise<void> {
   const { resolveOperatorFromPhone, operatorToCorrespondent } = await import("./mobile-money/providers/pawapay/pawapay-config");
 
   const amount = Number(job.amount);
-  const phone = job.msisdn;
+  const phone = normalizePhone(job.msisdn) || job.msisdn;
 
   if (!phone) {
     await markJobFailed(job.id, "MISSING_MSISDN", "Numéro Mobile Money non renseigné");

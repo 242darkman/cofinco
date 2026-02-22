@@ -7,6 +7,7 @@ import { eq, desc, and, isNull, sql, inArray, aliasedTable } from "drizzle-orm";
 import { z } from "zod";
 import { StorageService } from "../services/storage-service";
 import { normalizeNom, normalizePrenom } from "./name-utils";
+import { normalizePhone } from "@shared/utils/phone";
 import { createLogger } from "../lib/logger";
 
 const logger = createLogger('Clients');
@@ -565,7 +566,7 @@ export async function createClient(input: CreateClientApiInput): Promise<Client>
       nom: normalizeNom(input.nom),
       prenom: normalizePrenom(input.prenom),
       email: input.email,
-      telephone: input.telephone,
+      telephone: normalizePhone(input.telephone),
       photoProfile: input.photoProfile,
       sexe: input.sexe,
       dateNaissance: input.dateNaissance ? new Date(input.dateNaissance) : null,
@@ -742,12 +743,15 @@ export async function updateClient(id: string, updateData: Partial<CreateClientA
     }
   }
 
-  // Normaliser nom et prénom si présents
+  // Normaliser nom, prénom et téléphone si présents
   if (identityData.nom !== undefined) {
     identityData.nom = normalizeNom(identityData.nom);
   }
   if (identityData.prenom !== undefined) {
     identityData.prenom = normalizePrenom(identityData.prenom);
+  }
+  if (identityData.telephone !== undefined) {
+    identityData.telephone = normalizePhone(identityData.telephone);
   }
   if (identityData.dateNaissance !== undefined) {
     identityData.dateNaissance = identityData.dateNaissance ? new Date(identityData.dateNaissance) : null;
@@ -980,7 +984,7 @@ export async function createClientWithUser(
       nom: normalizeNom(userData.nom),
       prenom: normalizePrenom(userData.prenom),
       email: userData.email,
-      telephone: userData.telephone,
+      telephone: normalizePhone(userData.telephone),
       sexe: userData.sexe,
       username: userData.username,
       password: userData.password,

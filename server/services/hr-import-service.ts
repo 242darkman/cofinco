@@ -2,6 +2,7 @@ import { db } from "../db";
 import { users } from "@shared/schema/auth";
 import { employes } from "@shared/schema/employes";
 import { hashPassword } from "../auth";
+import { normalizePhone } from "@shared/utils/phone";
 
 // ============================================================================
 // CSV EMPLOYEE IMPORT SERVICE
@@ -158,7 +159,7 @@ export async function importEmployees(
             nom: data.nom,
             prenom: data.prenom || null,
             email: data.email || null,
-            telephone: data.telephone || null,
+            telephone: normalizePhone(data.telephone) || null,
             sexe: data.sexe || null,
             dateNaissance: data.dateNaissance || null,
             username,

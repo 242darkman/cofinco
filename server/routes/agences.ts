@@ -25,6 +25,7 @@ import { agencyMigrationService, MigrationError } from "../services/agency-migra
 import { getWsInstance } from "../ws-server";
 import { TypeAgence, StatutAgence, StatutUser, StatutClient } from "../../shared/enum/status-constants";
 import { currencyCode } from "@shared/config/currency";
+import { normalizePhone } from "@shared/utils/phone";
 
 export function registerAgencesRoutes(app: Express) {
   // ============================================
@@ -201,11 +202,11 @@ export function registerAgencesRoutes(app: Express) {
             villeId: villeId || null,
             region: regionNom,
             pays: data.pays || "Congo-Brazzaville",
-            telephone: data.telephone,
+            telephone: normalizePhone(data.telephone),
             email: data.email,
             responsableId: data.responsable_id || data.responsableId,
             responsableNom: data.responsable_nom || data.responsableNom,
-            responsablePhone: data.responsable_phone || data.responsablePhone,
+            responsablePhone: normalizePhone(data.responsable_phone || data.responsablePhone),
             statut: data.statut || StatutAgence.ACTIVE,
             dateOuverture: data.date_ouverture || data.dateOuverture,
             latitude: lat,
@@ -314,11 +315,11 @@ export function registerAgencesRoutes(app: Express) {
           villeId: villeId || undefined,
           region: regionNom,
           pays: data.pays,
-          telephone: data.telephone,
+          telephone: data.telephone ? normalizePhone(data.telephone) : data.telephone,
           email: data.email,
           responsableId: data.responsable_id || data.responsableId,
           responsableNom: data.responsable_nom || data.responsableNom,
-          responsablePhone: data.responsable_phone || data.responsablePhone,
+          responsablePhone: normalizePhone(data.responsable_phone || data.responsablePhone),
           statut: data.statut,
           dateOuverture: data.date_ouverture || data.dateOuverture,
           latitude: lat,

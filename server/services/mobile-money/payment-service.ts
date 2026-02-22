@@ -49,6 +49,7 @@ import { createLogger } from "../../lib/logger";
 import { currencyCode } from "@shared/config/currency";
 import { calculateFee, type FeeEstimate } from "./fee-calculator";
 import { allocateOpeningPayment, recomputeAccountStatus, type OpeningSnapshot } from "../comptes";
+import { normalizePhone } from "@shared/utils/phone";
 
 const logger = createLogger('PaymentService');
 
@@ -98,7 +99,7 @@ class PaymentService {
     const {
       provider,
       amount,
-      phone,
+      phone: rawPhone,
       clientId,
       compteId,
       creditId,
@@ -108,6 +109,8 @@ class PaymentService {
       agenceId,
       metadata,
     } = params;
+
+    const phone = normalizePhone(rawPhone) || rawPhone;
 
     // Vérifier l'idempotence
     if (idempotencyKey) {
@@ -216,7 +219,7 @@ class PaymentService {
     const {
       provider,
       amount,
-      phone,
+      phone: rawPhone,
       clientId,
       compteId,
       creditId,
@@ -226,6 +229,8 @@ class PaymentService {
       agenceId,
       metadata,
     } = params;
+
+    const phone = normalizePhone(rawPhone) || rawPhone;
 
     // Vérifier l'idempotence
     if (idempotencyKey) {

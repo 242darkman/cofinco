@@ -6,6 +6,7 @@ import { usePermissions } from '../auth/ProtectedFeature';
 import { toast } from '../../lib/toast';
 import { useEntityUpload } from '../../hooks/useEntityUpload';
 import { StatutUser } from '@shared/enum/status-constants';
+import { normalizePhone } from '@shared/utils/phone';
 import { agenceApi, paysApi, localityApi, villeApi } from '../../lib/api-client';
 import StepIdentite from './employee-wizard/StepIdentite';
 import StepDocuments from './employee-wizard/StepDocuments';
@@ -367,6 +368,7 @@ export default function EmployeeForm({
 
     const enrichedData = {
       ...formData,
+      phone: normalizePhone(formData.phone) || formData.phone,
       userId: selectedUserId,
       agenceId,
       modeCalculPaie,

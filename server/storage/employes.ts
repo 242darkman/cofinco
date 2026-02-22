@@ -21,6 +21,7 @@ import { eq, desc, and, isNull, asc, sql, aliasedTable } from "drizzle-orm";
 import { StorageService } from "../services/storage-service";
 import crypto from "crypto";
 import { createLogger } from "../lib/logger";
+import { normalizePhone } from "@shared/utils/phone";
 
 const logger = createLogger('Employes');
 
@@ -438,7 +439,7 @@ export async function createEmployeWithUser(
       nom: userData.nom,
       prenom: userData.prenom,
       email: userData.email,
-      telephone: userData.telephone,
+      telephone: normalizePhone(userData.telephone),
       sexe: userData.sexe,
       username: userData.username,
       password: userData.password,
@@ -588,8 +589,12 @@ export async function updateEmployeWithUser(
 
     // 1. Mettre à jour le user si des données sont fournies
     if (userData && Object.keys(userData).length > 0) {
+      const normalizedUserData = { ...userData };
+      if (normalizedUserData.telephone !== undefined) {
+        normalizedUserData.telephone = normalizePhone(normalizedUserData.telephone) || normalizedUserData.telephone;
+      }
       await tx.update(users)
-        .set({ ...userData, updatedAt: new Date() } as any)
+        .set({ ...normalizedUserData, updatedAt: new Date() } as any)
         .where(eq(users.id, currentEmploye.userId));
     }
 

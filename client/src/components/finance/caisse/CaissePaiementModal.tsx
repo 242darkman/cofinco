@@ -28,6 +28,7 @@ import {
 } from '@shared/enum/status-constants';
 import { getStatusLabel, ACCOUNT_TYPE_LABELS } from '../../../lib/status-labels';
 import { useClientOperations, type ClientTontineInfo, type ClientCreditInfo } from './hooks/useClientOperations';
+import { normalizePhone } from '@shared/utils/phone';
 
 interface CaissePaiementModalProps {
   sessionId: string;
@@ -551,7 +552,7 @@ export default function CaissePaiementModal({
         // Metadata
         referenceExterne: formData.reference_virement,
         numeroTransaction: formData.numero_transaction,
-        numeroTelephone: formData.numero_telephone,
+        numeroTelephone: normalizePhone(formData.numero_telephone) || formData.numero_telephone,
         mobileProvider: mobileProvider || undefined
       });
       

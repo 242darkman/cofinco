@@ -10,6 +10,7 @@ import {
 } from '@shared/enum/status-constants';
 import type { ReceiptData } from '@/components/ui/printable/ReceiptTemplate';
 import { currencySymbol } from '@shared/config/currency';
+import { normalizePhone } from '@shared/utils/phone';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -237,7 +238,7 @@ export function useCaisseOperation({
       // Add mobile money fields if applicable
       if (paymentMethod === MethodePaiement.MOBILE_MONEY) {
         payload.provider = mobileMoneyProvider;
-        payload.phone = mobileMoneyPhone;
+        payload.phone = normalizePhone(mobileMoneyPhone) || mobileMoneyPhone;
       }
 
       if (operationType === 'DEPOT') {
@@ -309,7 +310,7 @@ export function useCaisseOperation({
       // Add mobile money fields if applicable
       if (paymentMethod === MethodePaiement.MOBILE_MONEY) {
         payload.provider = mobileMoneyProvider;
-        payload.phone = mobileMoneyPhone;
+        payload.phone = normalizePhone(mobileMoneyPhone) || mobileMoneyPhone;
       }
 
       if (operationType === 'DEPOT') {

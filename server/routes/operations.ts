@@ -21,6 +21,7 @@ import { dispatchDomainEvent } from "../services/notifications/domain-events/eve
 import { autoCreateCourantAccount } from "../services/comptes";
 import { recalculateAgentObjectifs } from "../services/objectif-recalculation-service";
 import type { StatutProspectionType } from "@shared/enum/status-constants";
+import { normalizePhone } from "@shared/utils/phone";
 
 export function registerOperationsRoutes(app: Express) {
   // Agents
@@ -823,7 +824,7 @@ export function registerOperationsRoutes(app: Express) {
           montant: data.montant,
           typePaiement: data.typePaiement || 'Paiement Crédit',
           methodePaiement: data.methodePaiement || 'Espèces',
-          numeroTelephone: data.numeroTelephone,
+          numeroTelephone: normalizePhone(data.numeroTelephone),
           numeroTransaction: data.numeroTransaction,
           reference: data.reference || `PAY-${Date.now()}`,
           notes: data.notes,

@@ -35,6 +35,7 @@ import { getComptesByClient, getCreditsByClient, getDemandesByClient } from "../
 import { autoCreateCourantAccount } from "../services/comptes";
 import { dispatchDomainEvent } from "../services/notifications/domain-events/event-registry";
 import { evaluateClientAlerts, resolveClientAlert, resolveAllClientAlerts, snoozeClientAlert, getAlertsSummary, KNOWN_ALERT_TYPES } from "../services/client-alerts";
+import { normalizePhone } from "@shared/utils/phone";
 
 export function registerClientRoutes(app: Express) {
   // ============================================
@@ -1283,7 +1284,7 @@ export function registerClientRoutes(app: Express) {
 
           logger.debug({ phone: telephone, piece: numeroPiece, excludeId: excludeClientId, excludeType: typeof excludeClientId }, 'Check uniqueness params');
 
-          const cleanPhone = telephone?.trim();
+          const cleanPhone = normalizePhone(telephone) || telephone?.trim();
           const cleanEmail = email?.trim();
           const cleanPiece = numeroPiece?.trim();
 

@@ -25,6 +25,7 @@ import { isIncomingOperation } from '@shared/config/caisse-operations';
 import { useOperationInfo } from './hooks/useOperationInfo';
 import { useClientOperations } from './hooks/useClientOperations';
 import { currencySymbol } from '@shared/config/currency';
+import { normalizePhone } from '@shared/utils/phone';
 import type { CaisseTransaction } from '../../../types/finance';
 import airtelLogo from '@/assets/logos/airtel-logo.png';
 import mtnLogo from '@/assets/logos/mtn-logo.png';
@@ -844,7 +845,7 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
       const payload: Record<string, unknown> = {
         provider,
         amount: parseFloat(montant),
-        phone: phoneNumber,
+        phone: normalizePhone(phoneNumber) || phoneNumber,
         clientId: selectedClient.id,
         agenceId: user?.agenceId,
         idempotencyKey,

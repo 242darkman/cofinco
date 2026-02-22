@@ -17,6 +17,7 @@ import {
 import { smsApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { useBranding } from '../../../contexts/BrandingContext';
+import { normalizePhone } from '@shared/utils/phone';
 
 export interface SmsTestPanelProps {
   providers: { id: string; name: string; isActive: boolean }[];
@@ -78,7 +79,7 @@ export default function SmsTestPanel({
     try {
       const response = await smsApi.testSend({
         provider: selectedProvider,
-        phoneNumber: phoneNumber.replace(/\s/g, ''),
+        phoneNumber: normalizePhone(phoneNumber.replace(/\s/g, '')) || phoneNumber.replace(/\s/g, ''),
         message,
       });
 

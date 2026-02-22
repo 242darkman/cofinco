@@ -28,6 +28,7 @@ import { eq, sql, desc, and, gte, lte, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { getWsInstance } from "../ws-server";
 import { setActiveCurrencyByCode, getActiveCurrency } from "@shared/config/currency";
+import { normalizePhone } from "@shared/utils/phone";
 
 // Helper for parsing with schema
 const parseWithSchema = <T extends z.ZodTypeAny>(schema: T, data: unknown): z.infer<T> => {
@@ -99,6 +100,9 @@ export function registerSettingsRoutes(app: Express) {
   app.put("/api/system-settings", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.SETTINGS), async (req, res) => {
     try {
       const settings = parseWithSchema(insertSystemSettingsSchema, req.body);
+      if (settings.telephone) {
+        settings.telephone = normalizePhone(settings.telephone) || settings.telephone;
+      }
 
       await db.insert(systemSettings)
         .values({
