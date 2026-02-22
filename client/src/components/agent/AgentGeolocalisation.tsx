@@ -51,7 +51,7 @@ interface Agent {
   statut: string;
 }
 
-export default function AgentGeolocalisation({ agentId }: { agentId?: string }) {
+export default function AgentGeolocalisation({ agentId, embedded }: { agentId?: string; embedded?: boolean }) {
   const [locations, setLocations] = useState<GeoLocation[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<string>(agentId || '');
@@ -70,7 +70,7 @@ export default function AgentGeolocalisation({ agentId }: { agentId?: string }) 
     if (agentId) setSelectedAgent(agentId);
   }, [agentId]);
 
-  useEffect(() => { loadAgents(); }, []);
+  useEffect(() => { if (!embedded) loadAgents(); }, []);
 
   useEffect(() => {
     if (selectedAgent) loadLocations();
@@ -191,18 +191,20 @@ export default function AgentGeolocalisation({ agentId }: { agentId?: string }) 
 
       {/* Controls */}
       <div className="flex flex-col sm:flex-row gap-2 p-2 bg-surface-base/50 rounded-xl border border-edge shrink-0">
-        <select
-          value={selectedAgent}
-          onChange={(e) => setSelectedAgent(e.target.value)}
-          className="flex-1 px-3 py-1.5 bg-surface border border-edge rounded-lg text-content-primary text-xs focus:ring-1 focus:ring-accent"
-        >
-          <option value="">Sélectionner un agent...</option>
-          {agents.map(agent => (
-            <option key={agent.id} value={agent.id}>
-              {agent.nom} {agent.prenom}
-            </option>
-          ))}
-        </select>
+        {!embedded && (
+          <select
+            value={selectedAgent}
+            onChange={(e) => setSelectedAgent(e.target.value)}
+            className="flex-1 px-3 py-1.5 bg-surface border border-edge rounded-lg text-content-primary text-xs focus:ring-1 focus:ring-accent"
+          >
+            <option value="">Sélectionner un agent...</option>
+            {agents.map(agent => (
+              <option key={agent.id} value={agent.id}>
+                {agent.nom} {agent.prenom}
+              </option>
+            ))}
+          </select>
+        )}
 
         <input
           type="date"

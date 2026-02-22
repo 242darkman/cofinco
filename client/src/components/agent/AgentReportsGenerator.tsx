@@ -11,19 +11,27 @@ interface ReportData {
   depenses: any[];
 }
 
-export default function AgentReportsGenerator() {
+export default function AgentReportsGenerator({ agentId: propAgentId }: { agentId?: string }) {
   const [reportType, setReportType] = useState<'daily' | 'weekly' | 'monthly' | 'custom'>('daily');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [loading, setLoading] = useState(false);
   const [reportData, setReportData] = useState<ReportData | null>(null);
-  const [agentId, setAgentId] = useState('');
+  const [agentId, setAgentId] = useState(propAgentId || '');
+
+  // Sync from parent prop (embedded mode)
+  useEffect(() => {
+    if (propAgentId) setAgentId(propAgentId);
+  }, [propAgentId]);
 
   useEffect(() => {
-    const cofinUserStr = localStorage.getItem('cofin_user');
-    if (cofinUserStr) {
-      const user = JSON.parse(cofinUserStr);
-      setAgentId(user.id);
+    // Fallback to localStorage if no prop provided
+    if (!propAgentId) {
+      const cofinUserStr = localStorage.getItem('cofin_user');
+      if (cofinUserStr) {
+        const user = JSON.parse(cofinUserStr);
+        setAgentId(user.id);
+      }
     }
 
     const today = new Date();
