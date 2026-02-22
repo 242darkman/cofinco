@@ -347,6 +347,32 @@ export interface UserRoleWithAgence extends UserRole {
 }
 
 // ============================================
+// Role Hierarchy (Permission Inheritance)
+// ============================================
+
+/**
+ * Table roleHierarchy - Defines parent→child role relationships.
+ * A parent role automatically inherits all permissions of its child roles.
+ *
+ * Example:
+ * - CHEF_AGENCE (parent) → SUPERVISEUR (child) → AGENT_TERRAIN (child)
+ * - CHEF_AGENCE inherits all permissions from SUPERVISEUR + AGENT_TERRAIN
+ */
+export const roleHierarchy = pgTable("role_hierarchy", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  parentRole: text("parent_role").notNull(),
+  childRole: text("child_role").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  uniqueRelation: unique().on(t.parentRole, t.childRole),
+  idxParentRole: index("idx_role_hierarchy_parent").on(t.parentRole),
+}));
+
+export const insertRoleHierarchySchema = createInsertSchema(roleHierarchy).omit({ id: true, createdAt: true });
+export type InsertRoleHierarchy = z.infer<typeof insertRoleHierarchySchema>;
+export type RoleHierarchy = typeof roleHierarchy.$inferSelect;
+
+// ============================================
 // Agency Feature Locks (Module Lock / Kill Switch)
 // ============================================
 
@@ -474,6 +500,15 @@ export const rbacAuditActionEnum = pgEnum("rbac_audit_action", [
   "GRANT_TEMPORARY",
   "REVOKE_TEMPORARY",
   "EXPIRE_TEMPORARY",
+  "MODULE_CREATE",
+  "MODULE_UPDATE",
+  "MODULE_DELETE",
+  "PERMISSION_CREATE",
+  "PERMISSION_UPDATE",
+  "PERMISSION_DELETE",
+  "REVERT",
+  "REQUEST_APPROVED",
+  "REQUEST_REJECTED",
 ]);
 
 export type RbacAuditAction =
@@ -482,7 +517,16 @@ export type RbacAuditAction =
   | "RESET"
   | "GRANT_TEMPORARY"
   | "REVOKE_TEMPORARY"
-  | "EXPIRE_TEMPORARY";
+  | "EXPIRE_TEMPORARY"
+  | "MODULE_CREATE"
+  | "MODULE_UPDATE"
+  | "MODULE_DELETE"
+  | "PERMISSION_CREATE"
+  | "PERMISSION_UPDATE"
+  | "PERMISSION_DELETE"
+  | "REVERT"
+  | "REQUEST_APPROVED"
+  | "REQUEST_REJECTED";
 
 /**
  * Table rbacAuditLog - Audit trail complet des modifications RBAC
@@ -602,12 +646,13 @@ export const insertCriticalPermissionPatternSchema = createInsertSchema(critical
 export type InsertCriticalPermissionPattern = z.infer<typeof insertCriticalPermissionPatternSchema>;
 export type CriticalPermissionPattern = typeof criticalPermissionPatterns.$inferSelect;
 
-// Default critical permission patterns
+// Default critical permission patterns (fallback when DB is unavailable)
+// Uses SQL LIKE `%` wildcard syntax consistently with DB patterns
 export const DEFAULT_CRITICAL_PATTERNS = [
-  'paiements.',
-  'coffre.',
-  'admin.',
-  'validation.',
+  'paiements.%',
+  'coffre.%',
+  'admin.%',
+  'validation.%',
   'caisse.close',
   'caisse.admin',
   'credits.disburse',
@@ -615,12 +660,26 @@ export const DEFAULT_CRITICAL_PATTERNS = [
 ] as const;
 
 /**
- * Check if a permission code is critical (requires reason)
+ * Match a permission code against a pattern using SQL LIKE `%` wildcard syntax.
+ * - `paiements.%` → matches anything starting with `paiements.`
+ * - `%.delete` → matches anything ending with `.delete`
+ * - `%critical%` → matches anything containing `critical`
+ * - `caisse.close` → exact match only
  */
-export function isCriticalPermission(permissionCode: string): boolean {
-  return DEFAULT_CRITICAL_PATTERNS.some(pattern =>
-    permissionCode.startsWith(pattern) || permissionCode === pattern
-  );
+export function matchesCriticalPattern(code: string, pattern: string): boolean {
+  if (!pattern.includes('%')) return pattern === code;
+  const parts = pattern.split('%');
+  const escaped = parts.map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  return new RegExp(`^${escaped.join('.*')}$`).test(code);
+}
+
+/**
+ * Check if a permission code is critical (requires reason).
+ * When `patterns` is provided (e.g. from DB), uses those; otherwise falls back to DEFAULT_CRITICAL_PATTERNS.
+ */
+export function isCriticalPermission(permissionCode: string, patterns?: readonly string[] | string[]): boolean {
+  const list = patterns ?? DEFAULT_CRITICAL_PATTERNS;
+  return list.some(pattern => matchesCriticalPattern(permissionCode, pattern));
 }
 
 // ============================================
@@ -712,3 +771,48 @@ export const permissionUsageLogs = pgTable("permission_usage_logs", {
 export const insertPermissionUsageLogSchema = createInsertSchema(permissionUsageLogs).omit({ id: true });
 export type InsertPermissionUsageLog = z.infer<typeof insertPermissionUsageLogSchema>;
 export type PermissionUsageLog = typeof permissionUsageLogs.$inferSelect;
+
+// ============================================
+// Permission Request Workflow
+// ============================================
+
+export const permissionRequestStatusEnum = pgEnum("permission_request_status", [
+  "PENDING",
+  "APPROVED",
+  "REJECTED",
+  "CANCELLED",
+]);
+
+export type PermissionRequestStatus = "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
+
+export const permissionRequestTypeEnum = pgEnum("permission_request_type", [
+  "GRANT",
+  "DENY",
+  "TEMPORARY",
+]);
+
+export type PermissionRequestType = "GRANT" | "DENY" | "TEMPORARY";
+
+export const permissionRequests = pgTable("permission_requests", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  requesterId: uuid("requester_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  permissionId: uuid("permission_id").notNull().references(() => permissions.id, { onDelete: "cascade" }),
+  permissionCode: text("permission_code").notNull(),
+  requestType: permissionRequestTypeEnum("request_type").notNull().default("GRANT"),
+  reason: text("reason").notNull(),
+  status: permissionRequestStatusEnum("status").notNull().default("PENDING"),
+  expiresAt: timestamp("expires_at"),
+  reviewerId: uuid("reviewer_id").references(() => users.id),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewReason: text("review_reason"),
+  metadata: jsonb("metadata").default({}),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => ({
+  idxRequester: index("idx_perm_requests_requester").on(t.requesterId),
+  idxStatus: index("idx_perm_requests_status").on(t.status),
+}));
+
+export const insertPermissionRequestSchema = createInsertSchema(permissionRequests).omit({ id: true, createdAt: true, updatedAt: true, reviewedAt: true });
+export type InsertPermissionRequest = z.infer<typeof insertPermissionRequestSchema>;
+export type PermissionRequest = typeof permissionRequests.$inferSelect;

@@ -110,6 +110,10 @@ export interface OperationTerrainMetadata {
   // Informations de remise (pour SETTLEMENT_CASH)
   sessionCaisseId?: string;
   billetage?: Record<string, number>;
+
+  // Informations de clôture de session (pour SESSION_CLOSE)
+  ecart?: string;
+  ecartJustification?: string;
 }
 
 export const operationsTerrain = pgTable(

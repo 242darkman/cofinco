@@ -199,11 +199,14 @@ export interface RolePermissionsSummary {
   role: string;
   roleLabel: string;
   totalPermissions: number;
+  inheritedRoles?: string[];
   permissions: Array<{
     permissionId: string;
     code: string;
     granted: boolean;
     isDefault: boolean;
+    inherited?: boolean;
+    inheritedFrom?: string;
   }>;
 }
 
