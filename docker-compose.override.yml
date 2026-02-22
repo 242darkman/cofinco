@@ -208,8 +208,8 @@ services:
         # Create test database if it doesn't exist
         psql -h db -U ${POSTGRES_USER:?} -tc "SELECT 1 FROM pg_database WHERE datname = 'cofinco_test'" | grep -q 1 \
           || psql -h db -U ${POSTGRES_USER:?} -c "CREATE DATABASE cofinco_test"
-        # Push schema + seed
-        npx drizzle-kit push --force && node --import tsx seeds/seed-prod.ts
+        # Push schema + ensure SQL objects + seed
+        npx drizzle-kit push --force && node --import tsx scripts/ensure-sql.ts && node --import tsx seeds/seed-prod.ts
     depends_on:
       db:
         condition: service_healthy

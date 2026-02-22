@@ -27,7 +27,7 @@ FROM deps AS init
 WORKDIR /app
 COPY . .
 ENTRYPOINT ["sh", "-c"]
-CMD ["npx drizzle-kit push --force && node --import tsx seeds/seed-prod.ts"]
+CMD ["npx drizzle-kit push --force && node --import tsx scripts/ensure-sql.ts && node --import tsx seeds/seed-prod.ts"]
 
 # ============================================
 # Stage: TEST — unit + integration tests
