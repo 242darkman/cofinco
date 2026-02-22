@@ -519,12 +519,12 @@ export interface IStorage {
     getAllJournaux(): Promise<Journal[]>;
     createJournal(journal: InsertJournal): Promise<Journal>;
 
-    getAllEcritures(filter?: { journalId?: string; dateDebut?: string; dateFin?: string }): Promise<any[]>;
+    getAllEcritures(filter?: { journalId?: string; dateDebut?: string; dateFin?: string; agenceId?: string }): Promise<any[]>;
 
     getDeclarationsTva(): Promise<DeclarationTva[]>;
     createDeclarationTva(declaration: InsertDeclarationTva): Promise<DeclarationTva>;
 
-    getBalance(dateDebut: string, dateFin: string): Promise<any[]>;
+    getBalance(dateDebut: string, dateFin: string, agenceId?: string): Promise<any[]>;
     getJournauxStats(): Promise<any[]>;
 
     // HR

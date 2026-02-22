@@ -1012,7 +1012,7 @@ export async function updateSessionHeartbeat(sessionId: string): Promise<boolean
 /**
  * Récupère les sessions à risque (inactives depuis trop longtemps)
  */
-export async function getRiskySessions(): Promise<
+export async function getRiskySessions(agenceId?: string): Promise<
   Array<{
     sessionId: string;
     caisseNom: string;
@@ -1025,6 +1025,15 @@ export async function getRiskySessions(): Promise<
   const warningThreshold = new Date();
   warningThreshold.setHours(warningThreshold.getHours() - WARNING_INACTIVE_HOURS);
 
+  const conditions = [
+    isNotNull(sessionsCaisse.openedAt),
+    isNull(sessionsCaisse.closedAt),
+    lt(sessionsCaisse.lastActivity, warningThreshold),
+  ];
+  if (agenceId) {
+    conditions.push(eq(sessionsCaisse.agenceId, agenceId));
+  }
+
   const sessions = await db
     .select({
       session: sessionsCaisse,
@@ -1035,13 +1044,7 @@ export async function getRiskySessions(): Promise<
     .from(sessionsCaisse)
     .leftJoin(caisses, eq(sessionsCaisse.caisseId, caisses.id))
     .leftJoin(users, eq(sessionsCaisse.caissierId, users.id))
-    .where(
-      and(
-        isNotNull(sessionsCaisse.openedAt),
-        isNull(sessionsCaisse.closedAt),
-        lt(sessionsCaisse.lastActivity, warningThreshold)
-      )
-    );
+    .where(and(...conditions));
 
   const results = [];
 
@@ -1305,7 +1308,8 @@ export async function closeSessionTemporarily(params: TemporaryCloseSessionParam
  * Récupère les sessions avec écarts significatifs (pour monitoring)
  */
 export async function getSessionsWithSignificantEcarts(
-  threshold: number = MAX_ECART_THRESHOLD
+  threshold: number = MAX_ECART_THRESHOLD,
+  agenceId?: string
 ): Promise<
   Array<{
     sessionId: string;
@@ -1316,6 +1320,14 @@ export async function getSessionsWithSignificantEcarts(
     severity: "HIGH" | "MEDIUM";
   }>
 > {
+  const conditions = [
+    isNotNull(sessionsCaisse.closedAt),
+    sql`ABS(CAST(${sessionsCaisse.ecart} AS NUMERIC)) > ${threshold}`,
+  ];
+  if (agenceId) {
+    conditions.push(eq(sessionsCaisse.agenceId, agenceId));
+  }
+
   const sessions = await db
     .select({
       session: sessionsCaisse,
@@ -1326,12 +1338,7 @@ export async function getSessionsWithSignificantEcarts(
     .from(sessionsCaisse)
     .leftJoin(caisses, eq(sessionsCaisse.caisseId, caisses.id))
     .leftJoin(users, eq(sessionsCaisse.caissierId, users.id))
-    .where(
-      and(
-        isNotNull(sessionsCaisse.closedAt),
-        sql`ABS(CAST(${sessionsCaisse.ecart} AS NUMERIC)) > ${threshold}`
-      )
-    )
+    .where(and(...conditions))
     .orderBy(desc(sessionsCaisse.closedAt))
     .limit(50);
 

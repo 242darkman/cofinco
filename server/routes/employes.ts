@@ -299,16 +299,24 @@ export function registerEmployesRoutes(app: Express) {
   // GET - Liste des employés avec données utilisateur
   // Params: ?agenceId={uuid}&role={AGENT_TERRAIN|CAISSIER|etc}
   // ============================================
-  app.get("/api/employes", requireAuth, async (req, res) => {
+  app.get("/api/employes", requireAuth, attachAbility, async (req, res) => {
     try {
-      const { agenceId, role } = req.query;
+      const { role } = req.query;
       const roleFilter = typeof role === 'string' ? role : undefined;
 
+      // Non-admins ne voient que les employés de leur agence
+      const isGlobalAdmin = req.ability?.can(Actions.MANAGE, 'all');
+      const effectiveAgenceId = isGlobalAdmin
+        ? (req.query.agenceId as string | undefined)
+        : req.session.user?.agenceId;
+
       let employesList;
-      if (agenceId && typeof agenceId === 'string') {
-        employesList = await storage.getEmployesByAgence(agenceId, roleFilter);
-      } else {
+      if (effectiveAgenceId) {
+        employesList = await storage.getEmployesByAgence(effectiveAgenceId, roleFilter);
+      } else if (isGlobalAdmin) {
         employesList = await storage.getAllEmployesWithUsers(roleFilter);
+      } else {
+        return res.status(400).json({ message: "Agence non définie" });
       }
 
       res.json(employesList);
@@ -321,12 +329,22 @@ export function registerEmployesRoutes(app: Express) {
   // ============================================
   // GET - Détail d'un employé avec données utilisateur
   // ============================================
-  app.get("/api/employes/:id", requireAuth, async (req, res) => {
+  app.get("/api/employes/:id", requireAuth, attachAbility, async (req, res) => {
     try {
       const employe = await storage.getEmployeWithUser(req.params.id);
       if (!employe) {
         return res.status(404).json({ message: "Employé non trouvé" });
       }
+
+      // Vérifier que l'employé appartient à l'agence de l'utilisateur
+      const isGlobalAdmin = req.ability?.can(Actions.MANAGE, 'all');
+      if (!isGlobalAdmin) {
+        const userAgenceId = req.session.user?.agenceId;
+        if (employe.agenceId && employe.agenceId !== userAgenceId) {
+          return res.status(403).json({ message: "Accès interdit: employé d'une autre agence" });
+        }
+      }
+
       res.json(employe);
     } catch (error) {
       logger.error({ err: error }, 'Error fetching employe');
@@ -337,11 +355,23 @@ export function registerEmployesRoutes(app: Express) {
   // ============================================
   // GET - Récupérer un employé par son userId
   // ============================================
-  app.get("/api/employes/by-user/:userId", requireAuth, async (req, res) => {
+  app.get("/api/employes/by-user/:userId", requireAuth, attachAbility, async (req, res) => {
     try {
       const employe = await storage.getEmployeByUserId(req.params.userId);
       if (!employe) {
         return res.status(404).json({ message: "Employé non trouvé pour cet utilisateur" });
+      }
+
+      // Autoriser l'accès à son propre profil, sinon vérifier l'agence
+      const isSelfAccess = req.params.userId === req.session.user?.id;
+      if (!isSelfAccess) {
+        const isGlobalAdmin = req.ability?.can(Actions.MANAGE, 'all');
+        if (!isGlobalAdmin) {
+          const userAgenceId = req.session.user?.agenceId;
+          if (employe.agenceId && employe.agenceId !== userAgenceId) {
+            return res.status(403).json({ message: "Accès interdit: employé d'une autre agence" });
+          }
+        }
       }
 
       // Récupérer avec les données user
@@ -749,6 +779,15 @@ export function registerEmployesRoutes(app: Express) {
       const employe = await storage.getEmployeWithUser(employeId);
       if (!employe) {
         return res.status(404).json({ message: "Employé non trouvé" });
+      }
+
+      // Vérifier que l'employé appartient à l'agence de l'utilisateur
+      const isGlobalAdmin = req.ability?.can(Actions.MANAGE, 'all');
+      if (!isGlobalAdmin) {
+        const userAgenceId = req.session.user?.agenceId;
+        if (employe.agenceId && employe.agenceId !== userAgenceId) {
+          return res.status(403).json({ message: "Accès interdit: employé d'une autre agence" });
+        }
       }
 
       const success = await storage.deleteEmploye(employeId);

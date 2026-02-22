@@ -179,6 +179,15 @@ export function registerTrackingRoutes(app: Express) {
       }
 
       const conditions = [eq(trackingSessions.agentId, agent_id)];
+
+      // Filtre agence pour les superviseurs non-admin
+      if (canSupervise && userRole !== SystemRole.ADMIN) {
+        const userAgenceId = currentUser?.agenceId;
+        if (userAgenceId) {
+          conditions.push(eq(trackingSessions.agencyId, userAgenceId));
+        }
+      }
+
       if (parsed.data.start) {
         conditions.push(gte(trackingSessions.startedAt, new Date(parsed.data.start)));
       }

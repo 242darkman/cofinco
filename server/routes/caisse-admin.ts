@@ -243,6 +243,19 @@ caisseAdminRouter.get(
     try {
       const caisseId = req.params.id;
 
+      // Vérifier que la caisse appartient à l'agence de l'utilisateur
+      const isGlobalAdmin = req.ability?.can(Actions.MANAGE, 'all');
+      if (!isGlobalAdmin) {
+        const userAgenceId = req.session.user?.agenceId;
+        const [caisseCheck] = await db
+          .select({ agenceId: caisses.agenceId })
+          .from(caisses)
+          .where(eq(caisses.id, caisseId));
+        if (!caisseCheck || caisseCheck.agenceId !== userAgenceId) {
+          return res.status(403).json({ error: "Accès interdit: caisse d'une autre agence" });
+        }
+      }
+
       const parsed = historiqueQuerySchema.safeParse(req.query);
       if (!parsed.success) {
         return res.status(400).json({
@@ -285,6 +298,19 @@ caisseAdminRouter.get(
   async (req, res) => {
     try {
       const caisseId = req.params.id;
+
+      // Vérifier que la caisse appartient à l'agence de l'utilisateur
+      const isGlobalAdmin = req.ability?.can(Actions.MANAGE, 'all');
+      if (!isGlobalAdmin) {
+        const userAgenceId = req.session.user?.agenceId;
+        const [caisseCheck] = await db
+          .select({ agenceId: caisses.agenceId })
+          .from(caisses)
+          .where(eq(caisses.id, caisseId));
+        if (!caisseCheck || caisseCheck.agenceId !== userAgenceId) {
+          return res.status(403).json({ error: "Accès interdit: caisse d'une autre agence" });
+        }
+      }
 
       const summary = await getCaisseHistoriqueSummary(caisseId);
 
@@ -402,11 +428,19 @@ caisseAdminRouter.get(
       if (dateFrom) conditions.push(gte(sessionsCaisseAuditLogs.createdAt, new Date(dateFrom)));
       if (dateTo) conditions.push(lte(sessionsCaisseAuditLogs.createdAt, new Date(dateTo)));
 
+      // Filtre agence (via session → agenceId)
+      const isGlobalAdmin = req.ability?.can(Actions.MANAGE, 'all');
+      const userAgenceId = req.session.user?.agenceId;
+      if (!isGlobalAdmin && userAgenceId) {
+        conditions.push(eq(sessionsCaisse.agenceId, userAgenceId));
+      }
+
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
       const [totalResult] = await db
         .select({ total: count() })
         .from(sessionsCaisseAuditLogs)
+        .innerJoin(sessionsCaisse, eq(sessionsCaisseAuditLogs.sessionId, sessionsCaisse.id))
         .where(whereClause);
 
       const total = totalResult?.total || 0;
@@ -426,6 +460,7 @@ caisseAdminRouter.get(
           userPrenom: users.prenom,
         })
         .from(sessionsCaisseAuditLogs)
+        .innerJoin(sessionsCaisse, eq(sessionsCaisseAuditLogs.sessionId, sessionsCaisse.id))
         .leftJoin(users, eq(sessionsCaisseAuditLogs.userId, users.id))
         .where(whereClause)
         .orderBy(desc(sessionsCaisseAuditLogs.createdAt))
@@ -461,10 +496,18 @@ caisseAdminRouter.get(
   attachAbility, requireAbility(Actions.VIEW, Subjects.CAISSE),
   async (req, res) => {
     try {
-      const { agenceId, caisseId, typeTemplate } = req.query;
+      const { caisseId, typeTemplate } = req.query;
       const conditions = [];
 
-      if (agenceId) conditions.push(eq(denominationTemplates.agenceId, agenceId as string));
+      // Filtre agence : non-admin voit uniquement les templates de son agence
+      const isGlobalAdmin = req.ability?.can(Actions.MANAGE, 'all');
+      const userAgenceId = req.session.user?.agenceId;
+      if (!isGlobalAdmin && userAgenceId) {
+        conditions.push(eq(denominationTemplates.agenceId, userAgenceId));
+      } else if (req.query.agenceId) {
+        conditions.push(eq(denominationTemplates.agenceId, req.query.agenceId as string));
+      }
+
       if (caisseId) conditions.push(eq(denominationTemplates.caisseId, caisseId as string));
       if (typeTemplate) conditions.push(eq(denominationTemplates.typeTemplate, typeTemplate as string));
 
@@ -1903,6 +1946,13 @@ const balanceCorrectionSchema = z.object({
  * POST /api/caisses/:id/balance-correction
  * Corrige le solde d'une caisse (ex: solde négatif suite à une incohérence).
  * Réservé aux admins/supervision. Crée un log d'audit détaillé.
+ *
+ * ⚠️  SECURITY NOTE — Separation of Duties Limitation:
+ * This endpoint does NOT enforce maker-checker separation. A single user with
+ * MANAGE permission can initiate AND execute a balance correction.
+ * Compensating controls: audit trail (sessionsCaisseAuditLogs + mouvement),
+ * MANAGE permission required, agence-level access control, session must be closed.
+ * Future: implement pending approval workflow for corrections above a threshold.
  */
 caisseAdminRouter.post(
   "/:id/balance-correction",

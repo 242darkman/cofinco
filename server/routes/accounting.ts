@@ -129,7 +129,9 @@ export function registerAccountingRoutes(app: Express) {
     const dateFin = `${exercice}-12-31`;
 
     try {
-      const balance = await storage.getBalance(dateDebut, dateFin);
+      const isGlobalAdmin = req.ability?.can(Actions.MANAGE, 'all');
+      const agenceId = isGlobalAdmin ? undefined : ((req as AuthenticatedRequest).user?.agenceId ?? undefined);
+      const balance = await storage.getBalance(dateDebut, dateFin, agenceId);
 
       // Classe 6 = Charges, Classe 7 = Produits (OHADA)
       const charges = balance
@@ -180,11 +182,14 @@ export function registerAccountingRoutes(app: Express) {
       const { journalId } = req.params;
       const dateDebut = req.query.dateDebut as string;
       const dateFin = req.query.dateFin as string;
+      const isGlobalAdmin = req.ability?.can(Actions.MANAGE, 'all');
+      const agenceId = isGlobalAdmin ? undefined : ((req as AuthenticatedRequest).user?.agenceId ?? undefined);
 
       const entries = await storage.getAllEcritures({
         journalId,
         dateDebut,
-        dateFin
+        dateFin,
+        agenceId,
       });
 
       res.json(entries);
@@ -202,7 +207,9 @@ export function registerAccountingRoutes(app: Express) {
 
     try {
       // Calcul basé sur les mouvements des comptes de trésorerie (classe 5)
-      const balance = await storage.getBalance(dateDebut, dateFin);
+      const isGlobalAdmin = req.ability?.can(Actions.MANAGE, 'all');
+      const agenceId = isGlobalAdmin ? undefined : ((req as AuthenticatedRequest).user?.agenceId ?? undefined);
+      const balance = await storage.getBalance(dateDebut, dateFin, agenceId);
 
       // Filtrer par type de compte pour catégoriser les flux
       const tresorerieComptes = balance.filter(c => c.numero_compte.startsWith('5'));
@@ -247,7 +254,11 @@ export function registerAccountingRoutes(app: Express) {
   app.get("/api/comptabilite/tafire", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: AuthenticatedRequest, res) => {
     try {
       const exercice = parseInt(req.query.exercice as string) || new Date().getFullYear();
-      const agenceId = req.query.consolide === 'true' ? null : (req.user?.agenceId || req.query.agenceId as string);
+      const isGlobalAdmin = req.ability?.can(Actions.MANAGE, 'all');
+      // Seuls les admins globaux peuvent voir la vue consolidée (agenceId = null)
+      const agenceId = req.query.consolide === 'true'
+        ? (isGlobalAdmin ? null : (req.user?.agenceId ?? null))
+        : (req.user?.agenceId || req.query.agenceId as string);
 
       if (!agenceId && req.query.consolide !== 'true') {
         return res.status(400).json({ message: "agenceId requis (ou consolide=true)" });
@@ -512,6 +523,15 @@ export function registerAccountingRoutes(app: Express) {
 
       if (!entry) {
         return res.status(404).json({ message: "Écriture non trouvée" });
+      }
+
+      // Vérifier que l'écriture appartient à l'agence de l'utilisateur
+      const isGlobalAdmin = req.ability?.can(Actions.MANAGE, 'all');
+      if (!isGlobalAdmin) {
+        const userAgenceId = (req as AuthenticatedRequest).user?.agenceId;
+        if (entry.agenceId && entry.agenceId !== userAgenceId) {
+          return res.status(403).json({ message: "Accès interdit: écriture d'une autre agence" });
+        }
       }
 
       // Get journal info
@@ -862,14 +882,19 @@ export function registerAccountingRoutes(app: Express) {
    */
   app.get("/api/comptabilite/coverage/report", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTABILITE), async (req: AuthenticatedRequest, res) => {
     try {
+      const isGlobalAdmin = req.ability?.can(Actions.MANAGE, 'all');
+      const userAgenceId = isGlobalAdmin ? undefined : req.user?.agenceId;
+
       // 1. Count mouvements by GL posting status
-      const statusCounts = await db
+      const statusCountsQuery = db
         .select({
           glPostingStatus: mouvementsFinanciers.glPostingStatus,
           count: count(),
         })
-        .from(mouvementsFinanciers)
-        .groupBy(mouvementsFinanciers.glPostingStatus);
+        .from(mouvementsFinanciers);
+      const statusCounts = userAgenceId
+        ? await statusCountsQuery.where(eq(mouvementsFinanciers.agenceId, userAgenceId)).groupBy(mouvementsFinanciers.glPostingStatus)
+        : await statusCountsQuery.groupBy(mouvementsFinanciers.glPostingStatus);
 
       const statusMap: Record<string, number> = {};
       for (const row of statusCounts) {
@@ -886,6 +911,9 @@ export function registerAccountingRoutes(app: Express) {
       const coveragePercent = requiresGl > 0 ? Math.round((posted / requiresGl) * 10000) / 100 : 100;
 
       // 2. Get FAILED mouvements (most recent 50)
+      const failedConditions = [eq(mouvementsFinanciers.glPostingStatus, "FAILED")];
+      if (userAgenceId) failedConditions.push(eq(mouvementsFinanciers.agenceId, userAgenceId));
+
       const failedMouvements = await db
         .select({
           id: mouvementsFinanciers.id,
@@ -898,7 +926,7 @@ export function registerAccountingRoutes(app: Express) {
           createdAt: mouvementsFinanciers.createdAt,
         })
         .from(mouvementsFinanciers)
-        .where(eq(mouvementsFinanciers.glPostingStatus, "FAILED"))
+        .where(and(...failedConditions))
         .orderBy(desc(mouvementsFinanciers.createdAt))
         .limit(50);
 
@@ -918,14 +946,16 @@ export function registerAccountingRoutes(app: Express) {
         .orderBy(asc(accountingRules.code));
 
       // 4. Coverage by source module
-      const moduleBreakdown = await db
+      const moduleQuery = db
         .select({
           sourceModule: mouvementsFinanciers.sourceModule,
           glPostingStatus: mouvementsFinanciers.glPostingStatus,
           count: count(),
         })
-        .from(mouvementsFinanciers)
-        .groupBy(mouvementsFinanciers.sourceModule, mouvementsFinanciers.glPostingStatus);
+        .from(mouvementsFinanciers);
+      const moduleBreakdown = userAgenceId
+        ? await moduleQuery.where(eq(mouvementsFinanciers.agenceId, userAgenceId)).groupBy(mouvementsFinanciers.sourceModule, mouvementsFinanciers.glPostingStatus)
+        : await moduleQuery.groupBy(mouvementsFinanciers.sourceModule, mouvementsFinanciers.glPostingStatus);
 
       const byModule: Record<string, Record<string, number>> = {};
       for (const row of moduleBreakdown) {

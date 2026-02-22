@@ -1636,11 +1636,20 @@ export function registerComptesRoutes(app: Express) {
   /**
    * GET /api/comptes/:id - Détails d'un compte avec permissions et données client
    */
-  app.get("/api/comptes/:id", requireAuth, async (req, res) => {
+  app.get("/api/comptes/:id", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTE), async (req, res) => {
     try {
       const compte = await storage.getCompte(req.params.id);
       if (!compte) {
         return res.status(404).json({ message: "Compte non trouvé" });
+      }
+
+      // Filtre multi-agence : vérifier que le compte appartient à l'agence de l'utilisateur
+      const isGlobalAdmin = req.ability?.can(Actions.MANAGE, 'all');
+      if (!isGlobalAdmin) {
+        const userAgenceId = req.session.user?.agenceId;
+        if (compte.agenceId && userAgenceId && compte.agenceId !== userAgenceId) {
+          return res.status(403).json({ message: "Accès interdit: compte d'une autre agence" });
+        }
       }
 
       // Récupérer les données du client associé (compte peut avoir clientId ou client_id)
@@ -2487,8 +2496,18 @@ export function registerComptesRoutes(app: Express) {
   /**
    * GET /api/comptes/:id/transactions - Transactions du compte
    */
-  app.get("/api/comptes/:id/transactions", requireAuth, async (req, res) => {
+  app.get("/api/comptes/:id/transactions", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTE), async (req, res) => {
     try {
+      // Filtre multi-agence
+      const isGlobalAdmin = req.ability?.can(Actions.MANAGE, 'all');
+      if (!isGlobalAdmin) {
+        const compteCheck = await storage.getCompte(req.params.id);
+        const userAgenceId = req.session.user?.agenceId;
+        if (compteCheck?.agenceId && userAgenceId && compteCheck.agenceId !== userAgenceId) {
+          return res.status(403).json({ message: "Accès interdit: compte d'une autre agence" });
+        }
+      }
+
       const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
       const cursor = req.query.cursor as string | undefined;
       const result = await comptesService.getCompteTransactions(
@@ -2699,8 +2718,18 @@ export function registerComptesRoutes(app: Express) {
    * GET /api/comptes/:id/stats - Statistiques d'évolution du solde
    * Query: period (1M, 3M, 6M, 1Y)
    */
-  app.get("/api/comptes/:id/stats", requireAuth, async (req, res) => {
+  app.get("/api/comptes/:id/stats", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.COMPTE), async (req, res) => {
     try {
+      // Filtre multi-agence
+      const isGlobalAdmin = req.ability?.can(Actions.MANAGE, 'all');
+      if (!isGlobalAdmin) {
+        const compteCheck = await storage.getCompte(req.params.id);
+        const userAgenceId = req.session.user?.agenceId;
+        if (compteCheck?.agenceId && userAgenceId && compteCheck.agenceId !== userAgenceId) {
+          return res.status(403).json({ message: "Accès interdit: compte d'une autre agence" });
+        }
+      }
+
       const period = (req.query.period as '1M' | '3M' | '6M' | '1Y') || '1M';
       // Basic validation of period
       if (!['1M', '3M', '6M', '1Y'].includes(period)) {

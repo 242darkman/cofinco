@@ -3479,7 +3479,9 @@ export function registerFinanceRoutes(app: Express) {
    */
   app.get("/api/sessions-caisse/risky", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE_SESSION), async (req, res) => {
       try {
-          const riskySessions = await sessionService.getRiskySessions();
+          const isGlobalAdmin = req.ability?.can(Actions.MANAGE, 'all');
+          const agenceId = isGlobalAdmin ? undefined : req.session.user?.agenceId;
+          const riskySessions = await sessionService.getRiskySessions(agenceId ?? undefined);
           res.json(riskySessions);
       } catch (error: any) {
           logger.error({ err: error }, 'Erreur récupération sessions à risque');
@@ -3494,7 +3496,9 @@ export function registerFinanceRoutes(app: Express) {
   app.get("/api/sessions-caisse/ecarts", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE_SESSION), async (req, res) => {
       try {
           const threshold = req.query.threshold ? Number(req.query.threshold) : undefined;
-          const sessionsWithEcarts = await sessionService.getSessionsWithSignificantEcarts(threshold);
+          const isGlobalAdmin = req.ability?.can(Actions.MANAGE, 'all');
+          const agenceId = isGlobalAdmin ? undefined : req.session.user?.agenceId;
+          const sessionsWithEcarts = await sessionService.getSessionsWithSignificantEcarts(threshold, agenceId ?? undefined);
           res.json(sessionsWithEcarts);
       } catch (error: any) {
           logger.error({ err: error }, 'Erreur récupération écarts');

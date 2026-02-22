@@ -25,10 +25,10 @@ const service = new TransfertCoffreService();
 coffreRouter.use(requireAuth);
 
 // 1. Créer une demande de transfert
-
-// 1. Créer une demande de transfert
 coffreRouter.post(
   "/transferts",
+  attachAbility,
+  requireAbility(Actions.INIT_TRANSFER, Subjects.COFFRE),
   idempotencyMiddleware("create-transfert"),
   async (req, res) => {
     try {
@@ -94,6 +94,8 @@ coffreRouter.post(
 // 1.b Approvisionnement Externe du Coffre (ADMIN)
 coffreRouter.post(
   "/approvisionnement",
+  attachAbility,
+  requireAbility(Actions.MANAGE, Subjects.COFFRE),
   idempotencyMiddleware("coffre-approvisionnement"),
   async (req, res) => {
     try {
@@ -106,13 +108,6 @@ coffreRouter.post(
       });
 
       const body = validationSchema.parse(req.body);
-
-      // Verify Admin Role (or at least Manager)
-      const userRole = req.user?.role;
-      const normalizedRole = normalizeRole(userRole);
-      if (!(normalizedRole === SystemRole.ADMIN || normalizedRole === SystemRole.CHEF_AGENCE)) {
-         return res.status(403).json({ error: "Action réservée aux administrateurs" });
-      }
 
       const userId = req.user?.id || req.body.userId;
 
@@ -134,6 +129,8 @@ coffreRouter.post(
 // 2. Valider (ou Rejeter) un transfert
 coffreRouter.post(
   "/transferts/:id/validate",
+  attachAbility,
+  requireAbility(Actions.VALIDATE_TRANSFER, Subjects.COFFRE),
   async (req, res) => {
     try {
       const schema = z.object({
@@ -196,6 +193,8 @@ coffreRouter.post(
 // 3. Exécuter un transfert
 coffreRouter.post(
   "/transferts/:id/execute",
+  attachAbility,
+  requireAbility(Actions.EXECUTE_TRANSFER, Subjects.COFFRE),
   idempotencyMiddleware("execute-transfert"),
   async (req, res) => {
     try {
@@ -246,6 +245,8 @@ coffreRouter.post(
 // 4. Annuler un transfert
 coffreRouter.post(
   "/transferts/:id/cancel",
+  attachAbility,
+  requireAbility(Actions.CANCEL, Subjects.COFFRE_TRANSFERT),
   async (req, res) => {
     try {
       const schema = z.object({
@@ -612,7 +613,7 @@ coffreRouter.get("/supervision", attachAbility, requireAbility(Actions.MANAGE, S
 });
 
 // 5. Lister les transferts (Filtres)
-coffreRouter.get("/transferts", async (req, res) => {
+coffreRouter.get("/transferts", attachAbility, requireAbility(Actions.VIEW, Subjects.COFFRE_TRANSFERT), async (req, res) => {
   try {
     const agenceId = req.query.agenceId as string;
     if (!agenceId) return res.status(400).json({ error: "Missing agenceId" });
@@ -635,7 +636,7 @@ coffreRouter.get("/transferts", async (req, res) => {
 });
 
 // 6. Détails d'un transfert
-coffreRouter.get("/transferts/:id", async (req, res) => {
+coffreRouter.get("/transferts/:id", attachAbility, requireAbility(Actions.VIEW, Subjects.COFFRE_TRANSFERT), async (req, res) => {
   try {
     const details = await service.getTransfertDetails(req.params.id);
     if (!details) return res.status(404).json({ error: "Not found" });
@@ -648,7 +649,7 @@ coffreRouter.get("/transferts/:id", async (req, res) => {
   }
 });
 // 9. Lister les mouvements du coffre
-coffreRouter.get("/mouvements", async (req, res) => {
+coffreRouter.get("/mouvements", attachAbility, requireAbility(Actions.VIEW, Subjects.COFFRE), async (req, res) => {
   try {
     const agenceId = req.query.agenceId as string;
     if (!agenceId) return res.status(400).json({ error: "Missing agenceId" });
@@ -730,7 +731,7 @@ coffreRouter.get("/mouvements", async (req, res) => {
 });
 
 // 7. Récupérer le solde (Migré vers coffresForts)
-coffreRouter.get("/stats", async (req, res) => {
+coffreRouter.get("/stats", attachAbility, requireAbility(Actions.VIEW, Subjects.COFFRE), async (req, res) => {
   try {
     const agenceId = req.query.agenceId as string;
     if (!agenceId) return res.status(400).json({ error: "Missing agenceId" });
@@ -759,7 +760,7 @@ coffreRouter.get("/stats", async (req, res) => {
 });
 
 // 8. Récupérer la configuration
-coffreRouter.get("/config", async (req, res) => {
+coffreRouter.get("/config", attachAbility, requireAbility(Actions.VIEW, Subjects.COFFRE), async (req, res) => {
   try {
     const agenceId = req.query.agenceId as string;
     if (!agenceId) return res.status(400).json({ error: "Missing agenceId" });
@@ -787,7 +788,7 @@ coffreRouter.get("/config", async (req, res) => {
 });
 
 // 8. Mettre à jour la configuration (ADMIN ONLY)
-coffreRouter.put("/config", async (req, res) => {
+coffreRouter.put("/config", attachAbility, requireAbility(Actions.MANAGE, Subjects.COFFRE), async (req, res) => {
   try {
     const schema = z.object({
       agenceId: z.string().uuid(),

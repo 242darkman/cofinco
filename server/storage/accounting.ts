@@ -73,11 +73,12 @@ export async function createJournal(journal: InsertJournal): Promise<Journal> {
   return newJournal;
 }
 
-export async function getAllEcritures(filter?: { journalId?: string; dateDebut?: string; dateFin?: string }): Promise<any[]> {
+export async function getAllEcritures(filter?: { journalId?: string; dateDebut?: string; dateFin?: string; agenceId?: string }): Promise<any[]> {
   let conditions = [];
   if (filter?.journalId) conditions.push(eq(ecritures.journalId, filter.journalId));
   if (filter?.dateDebut) conditions.push(gte(ecritures.dateEcriture, filter.dateDebut));
   if (filter?.dateFin) conditions.push(lte(ecritures.dateEcriture, filter.dateFin));
+  if (filter?.agenceId) conditions.push(eq(ecritures.agenceId, filter.agenceId));
 
   const query = db.select({
     id: ecritures.id,
@@ -106,8 +107,16 @@ export async function createDeclarationTva(declaration: InsertDeclarationTva): P
   return newDecl;
 }
 
-export async function getBalance(dateDebut: string, dateFin: string): Promise<any[]> {
+export async function getBalance(dateDebut: string, dateFin: string, agenceId?: string): Promise<any[]> {
   // Aggregate sum by compte
+  const conditions = [
+    gte(ecritures.dateEcriture, dateDebut),
+    lte(ecritures.dateEcriture, dateFin),
+  ];
+  if (agenceId) {
+    conditions.push(eq(ecritures.agenceId, agenceId));
+  }
+
   const mouvements = await db.select({
     compteId: lignesEcritures.compteId,
     totalDebit: sql<number>`sum(${lignesEcritures.debit})`,
@@ -115,10 +124,7 @@ export async function getBalance(dateDebut: string, dateFin: string): Promise<an
   })
   .from(lignesEcritures)
   .leftJoin(ecritures, eq(lignesEcritures.ecritureId, ecritures.id))
-  .where(and(
-    gte(ecritures.dateEcriture, dateDebut),
-    lte(ecritures.dateEcriture, dateFin)
-  ))
+  .where(and(...conditions))
   .groupBy(lignesEcritures.compteId);
 
   // Get all accounts to map names and types

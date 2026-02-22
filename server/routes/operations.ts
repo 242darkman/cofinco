@@ -25,7 +25,7 @@ import { normalizePhone } from "@shared/utils/phone";
 
 export function registerOperationsRoutes(app: Express) {
   // Agents
-  app.get("/api/agents-terrain", requireAuth, async (req, res) => {
+  app.get("/api/agents-terrain", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.AGENT_TERRAIN), async (req, res) => {
       const { page, perPage } = parsePagination(req.query);
       const { data, total } = await storage.getAgentsTerrainPaginated(page, perPage);
       res.json(
@@ -75,7 +75,7 @@ export function registerOperationsRoutes(app: Express) {
       res.json({ data: agent });
   });
 
-  app.get("/api/agents-terrain/:id", requireAuth, async (req, res) => {
+  app.get("/api/agents-terrain/:id", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.AGENT_TERRAIN), async (req, res) => {
       const agent = await storage.getAgentTerrain(req.params.id);
       if (!agent) {
           return res.status(404).json({ error: "Agent non trouvé" });
@@ -83,12 +83,12 @@ export function registerOperationsRoutes(app: Express) {
       res.json(agent);
   });
 
-  app.get("/api/agents-terrain/:id/visites", requireAuth, async (req, res) => {
+  app.get("/api/agents-terrain/:id/visites", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.OPERATION_TERRAIN), async (req, res) => {
       const visites = await storage.getVisitesByAgent(req.params.id);
       res.json(visites);
   });
 
-  app.get("/api/agents-terrain/:id/paiements", requireAuth, async (req, res) => {
+  app.get("/api/agents-terrain/:id/paiements", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.PAIEMENT_TERRAIN), async (req, res) => {
       const paiements = await storage.getPaiementsByAgent(req.params.id);
       res.json(paiements);
   });
@@ -794,7 +794,7 @@ export function registerOperationsRoutes(app: Express) {
   });
 
   // Visites
-  app.get("/api/visites-terrain", requireAuth, async (req, res) => {
+  app.get("/api/visites-terrain", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.OPERATION_TERRAIN), async (req, res) => {
       const { page, perPage } = parsePagination(req.query);
       const { data, total } = await storage.getVisitesTerrainPaginated(page, perPage);
       res.json(
@@ -912,7 +912,7 @@ export function registerOperationsRoutes(app: Express) {
   });
 
   // Paiements
-  app.get("/api/paiements-terrain", requireAuth, async (req, res) => {
+  app.get("/api/paiements-terrain", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.PAIEMENT_TERRAIN), async (req, res) => {
       try {
         const user = req.session.user;
         let agenceId: string | undefined;
@@ -976,7 +976,7 @@ export function registerOperationsRoutes(app: Express) {
   });
 
   // Zones
-  app.get("/api/zones", requireAuth, async (req, res) => {
+  app.get("/api/zones", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.TERRAIN), async (req, res) => {
     const list = await storage.getAllZones();
     res.json(list);
   });
@@ -997,14 +997,14 @@ export function registerOperationsRoutes(app: Express) {
   });
 
   // Objectifs Mensuels
-  app.get("/api/objectifs-mensuels/:agentId", requireAuth, async (req, res) => {
+  app.get("/api/objectifs-mensuels/:agentId", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.TERRAIN), async (req, res) => {
     const { agentId } = req.params;
     const { annee } = req.query;
     const objectifs = await storage.getObjectifsMensuelsByAgent(agentId, annee ? Number(annee) : undefined);
     res.json(objectifs);
   });
 
-  app.get("/api/objectifs-mensuels/:agentId/current", requireAuth, async (req, res) => {
+  app.get("/api/objectifs-mensuels/:agentId/current", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.TERRAIN), async (req, res) => {
     const objectif = await storage.getCurrentObjectifMensuel(req.params.agentId);
     if (!objectif) {
       // Return fallback to agent's default objectifMensuel
@@ -1033,7 +1033,7 @@ export function registerOperationsRoutes(app: Express) {
   // GPS GEOLOCATION — Historical location logs
   // ═══════════════════════════════════════════════════════════════
 
-  app.get("/api/agent-geolocations", requireAuth, async (req, res) => {
+  app.get("/api/agent-geolocations", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.TERRAIN), async (req, res) => {
     try {
       const { agent_id, start, end } = req.query as Record<string, string>;
       if (!agent_id || !start || !end) {

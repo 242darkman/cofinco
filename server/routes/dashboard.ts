@@ -1,6 +1,8 @@
 import type { Express } from "express";
 import { createLogger } from "../lib/logger";
 import { requireAuth } from "../auth";
+import { attachAbility, requireAbility } from "../authorization";
+import { Actions, Subjects } from "@shared/ability";
 
 const logger = createLogger('Routes:Dashboard');
 import { db } from "../db";
@@ -26,14 +28,17 @@ import { getGlobalStats } from "../services/stats/dashboard-stats";
 // ... existing imports
 
 export function registerDashboardRoutes(app: Express) {
-  app.get("/api/dashboard/stats", requireAuth, async (req, res) => {
+  app.get("/api/dashboard/stats", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.DASHBOARD), async (req, res) => {
     try {
       // Cache for 30 seconds with stale-while-revalidate for better UX on slow connections
       res.setHeader('Cache-Control', 'private, max-age=30, stale-while-revalidate=60');
       res.setHeader('Vary', 'X-Agence-Id');
       const userRole = req.session.user?.role || 'agent';
-      const agenceId = req.headers['x-agence-id'] as string;
-      const isAllAgences = !agenceId || agenceId === 'all';
+      // Filtre multi-agence : non-admin forcé sur son agence
+      const isGlobalAdmin = req.ability?.can(Actions.MANAGE, 'all');
+      const headerAgenceId = req.headers['x-agence-id'] as string;
+      const agenceId = isGlobalAdmin ? headerAgenceId : (req.session.user?.agenceId || headerAgenceId);
+      const isAllAgences = isGlobalAdmin ? (!headerAgenceId || headerAgenceId === 'all') : false;
       
       const now = new Date();
       
@@ -468,14 +473,17 @@ export function registerDashboardRoutes(app: Express) {
   // ========== LIGHTWEIGHT STATS ENDPOINT FOR SLOW CONNECTIONS ==========
   // Returns only essential KPIs (~5KB vs ~50KB for full stats)
   // Use this endpoint for initial load on 3G/slow networks
-  app.get("/api/dashboard/stats-light", requireAuth, async (req, res) => {
+  app.get("/api/dashboard/stats-light", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.DASHBOARD), async (req, res) => {
     try {
       // Cache for 60 seconds - lightweight endpoint can be cached longer
       res.setHeader('Cache-Control', 'private, max-age=60, stale-while-revalidate=120');
       res.setHeader('Vary', 'X-Agence-Id');
 
-      const agenceId = req.headers['x-agence-id'] as string;
-      const isAllAgences = !agenceId || agenceId === 'all';
+      // Filtre multi-agence : non-admin forcé sur son agence
+      const isGlobalAdmin = req.ability?.can(Actions.MANAGE, 'all');
+      const headerAgenceId = req.headers['x-agence-id'] as string;
+      const agenceId = isGlobalAdmin ? headerAgenceId : (req.session.user?.agenceId || headerAgenceId);
+      const isAllAgences = isGlobalAdmin ? (!headerAgenceId || headerAgenceId === 'all') : false;
 
       // Helper function to apply agence filter
       const withAgence = (table: any, filter: any = null) => {
@@ -545,11 +553,14 @@ export function registerDashboardRoutes(app: Express) {
   });
 
   // Balance History endpoint for the chart
-  app.get("/api/dashboard/balance-history", requireAuth, async (req, res) => {
+  app.get("/api/dashboard/balance-history", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.DASHBOARD), async (req, res) => {
     try {
       res.setHeader('Vary', 'X-Agence-Id');
-      const agenceId = req.headers['x-agence-id'] as string;
-      const isAllAgences = !agenceId || agenceId === 'all';
+      // Filtre multi-agence : non-admin forcé sur son agence
+      const isGlobalAdmin = req.ability?.can(Actions.MANAGE, 'all');
+      const headerAgenceId = req.headers['x-agence-id'] as string;
+      const agenceId = isGlobalAdmin ? headerAgenceId : (req.session.user?.agenceId || headerAgenceId);
+      const isAllAgences = isGlobalAdmin ? (!headerAgenceId || headerAgenceId === 'all') : false;
       
       const sqlAgenceFilter = (tableAlias: string) => {
         if (isAllAgences) return sql`TRUE`;
@@ -631,7 +642,7 @@ export function registerDashboardRoutes(app: Express) {
   });
 
   // Global Search endpoint
-  app.get("/api/search", requireAuth, async (req, res) => {
+  app.get("/api/search", requireAuth, attachAbility, async (req, res) => {
     try {
       const query = (req.query.q as string || '').trim();
       
@@ -729,9 +740,14 @@ export function registerDashboardRoutes(app: Express) {
    * Compare metrics between two time periods
    * Query: periodA_start, periodA_end, periodB_start, periodB_end, agenceId?
    */
-  app.get("/api/dashboard/comparative", requireAuth, async (req, res) => {
+  app.get("/api/dashboard/comparative", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.DASHBOARD), async (req, res) => {
     try {
-      const { periodA_start, periodA_end, periodB_start, periodB_end, agenceId } = req.query;
+      const { periodA_start, periodA_end, periodB_start, periodB_end } = req.query;
+
+      // Agency enforcement: non-admin forced to own agency
+      const isGlobalAdmin = req.ability?.can(Actions.MANAGE, 'all');
+      const queryAgenceId = req.query.agenceId as string | undefined;
+      const agenceId = isGlobalAdmin ? queryAgenceId : (req.session.user?.agenceId || queryAgenceId);
 
       if (!periodA_start || !periodA_end || !periodB_start || !periodB_end) {
         return res.status(400).json({ error: "Les 4 dates de période sont requises (periodA_start, periodA_end, periodB_start, periodB_end)" });
@@ -777,10 +793,14 @@ export function registerDashboardRoutes(app: Express) {
    * Simple trend-based forecast from historical monthly data
    * Query: months=6 (forecast horizon), agenceId?
    */
-  app.get("/api/dashboard/forecast", requireAuth, async (req, res) => {
+  app.get("/api/dashboard/forecast", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.DASHBOARD), async (req, res) => {
     try {
       const months = parseInt(req.query.months as string) || 6;
-      const agenceId = req.query.agenceId as string | undefined;
+
+      // Agency enforcement: non-admin forced to own agency
+      const isGlobalAdmin = req.ability?.can(Actions.MANAGE, 'all');
+      const queryAgenceId = req.query.agenceId as string | undefined;
+      const agenceId = isGlobalAdmin ? queryAgenceId : (req.session.user?.agenceId || queryAgenceId);
       const lookbackMonths = 12; // Use last 12 months of data
 
       // Get monthly aggregates for the last 12 months
