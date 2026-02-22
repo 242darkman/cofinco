@@ -3739,6 +3739,96 @@ hrRouter.get("/pending-count", getAuthUser, attachAbility, async (req, res) => {
     }
 });
 
+// =============================================================================
+// MON ESPACE — UNREAD COUNT (employee badge)
+// =============================================================================
+
+// GET /api/hr/mon-espace/unread-count — unread bulletins + new completed documents
+hrRouter.get("/mon-espace/unread-count", getAuthUser, async (req, res) => {
+    try {
+        const user = (req as any).user;
+        const [emp] = await db.select({ id: employes.id }).from(employes).where(eq(employes.userId, user.id)).limit(1);
+        if (!emp) return res.json({ unreadBulletins: 0, newDocuments: 0, total: 0 });
+
+        const [bulletinsResult] = await db
+            .select({ count: sql<number>`COUNT(*)::int` })
+            .from(bulletinsPaie)
+            .where(and(
+                eq(bulletinsPaie.employeId, emp.id),
+                sql`${bulletinsPaie.statut} IN ('VALIDATED', 'PAID')`,
+                isNull(bulletinsPaie.viewedAt),
+            ));
+
+        const [docsResult] = await db
+            .select({ count: sql<number>`COUNT(*)::int` })
+            .from(hrDocumentRequests)
+            .where(and(
+                eq(hrDocumentRequests.employeId, emp.id),
+                eq(hrDocumentRequests.statut, "COMPLETED"),
+                isNull(hrDocumentRequests.viewedAt),
+            ));
+
+        const unreadBulletins = bulletinsResult?.count ?? 0;
+        const newDocuments = docsResult?.count ?? 0;
+
+        res.json({ unreadBulletins, newDocuments, total: unreadBulletins + newDocuments });
+    } catch (error) {
+        logger.error({ err: error }, "Erreur récupération unread count Mon Espace");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// POST /api/hr/bulletins/:id/mark-read — employee marks bulletin as viewed
+hrRouter.post("/bulletins/:id/mark-read", getAuthUser, async (req, res) => {
+    try {
+        const user = (req as any).user;
+        const bulletinId = parseInt(req.params.id);
+        if (isNaN(bulletinId)) return res.status(400).json({ error: "ID invalide" });
+
+        const [emp] = await db.select({ id: employes.id }).from(employes).where(eq(employes.userId, user.id)).limit(1);
+        if (!emp) return res.status(403).json({ error: "Profil employé introuvable" });
+
+        // Only mark as read if it belongs to the employee and not already read
+        await db.update(bulletinsPaie)
+            .set({ viewedAt: new Date() })
+            .where(and(
+                eq(bulletinsPaie.id, bulletinId),
+                eq(bulletinsPaie.employeId, emp.id),
+                isNull(bulletinsPaie.viewedAt),
+            ));
+
+        res.json({ ok: true });
+    } catch (error) {
+        logger.error({ err: error }, "Erreur mark-read bulletin");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// POST /api/hr/document-requests/:id/mark-read — employee marks completed document as viewed
+hrRouter.post("/document-requests/:id/mark-read", getAuthUser, async (req, res) => {
+    try {
+        const user = (req as any).user;
+        const docId = req.params.id;
+
+        const [emp] = await db.select({ id: employes.id }).from(employes).where(eq(employes.userId, user.id)).limit(1);
+        if (!emp) return res.status(403).json({ error: "Profil employé introuvable" });
+
+        // Only mark as read if it belongs to the employee and not already read
+        await db.update(hrDocumentRequests)
+            .set({ viewedAt: new Date() })
+            .where(and(
+                eq(hrDocumentRequests.id, docId),
+                eq(hrDocumentRequests.employeId, emp.id),
+                isNull(hrDocumentRequests.viewedAt),
+            ));
+
+        res.json({ ok: true });
+    } catch (error) {
+        logger.error({ err: error }, "Erreur mark-read document request");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
 /**
  * ========================================
  * AUDIT LOG RH

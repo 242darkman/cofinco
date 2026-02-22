@@ -528,6 +528,10 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
       case "CLIENT_UPDATE":
          debounceInvalidate(["clients"]);
          debounceInvalidate(["dashboard-stats"]);
+         if (message.payload?.alertsChanged) {
+           debounceInvalidate(["alerts-summary"]);
+           debounceInvalidate(["alerts-clients"]);
+         }
          window.dispatchEvent(new CustomEvent('client-update', { detail: message.payload }));
          break;
 
@@ -585,8 +589,9 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          // Invalidate generic HR keys
          queryClient.invalidateQueries({ queryKey: ["/api/hr"] });
 
-         // Always invalidate pending count for badge updates
+         // Always invalidate badge counts
          debounceInvalidate(["/api/hr/pending-count"]);
+         debounceInvalidate(["/api/hr/mon-espace/unread-count"]);
 
          // Dispatch custom event for useHrRealtime hook
          window.dispatchEvent(new CustomEvent('hr-update', { detail: message.payload }));

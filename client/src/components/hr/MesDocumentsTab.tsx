@@ -212,7 +212,11 @@ export default function MesDocumentsTab() {
                         variant="success"
                         size="xs"
                         icon={Download}
-                        onClick={() => window.open(`/api/hr/document-requests/${req.id}/download`, '_blank')}
+                        onClick={() => {
+                          window.open(`/api/hr/document-requests/${req.id}/download`, '_blank');
+                          // Mark as read (fire-and-forget)
+                          fetch(`/api/hr/document-requests/${req.id}/mark-read`, { method: 'POST', credentials: 'include' }).catch(() => {});
+                        }}
                       >
                         <span className="hidden sm:inline">Telecharger</span>
                       </Button>

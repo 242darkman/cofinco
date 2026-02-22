@@ -2,6 +2,7 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { LayoutDashboard, CreditCard, Clock, Calendar, FileText, FolderOpen, Star, User } from 'lucide-react';
 import { TabGroup, FeatureHeader } from '../ui';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
+import { useMonEspaceBadge } from '../../hooks/hr/useMonEspaceBadge';
 import MonEspaceDashboard from './MonEspaceDashboard';
 import MonProfilEditor from './MonProfilEditor';
 import MaPresenceTab from './MaPresenceTab';
@@ -24,6 +25,7 @@ type TabKey = typeof TABS[number]['key'];
 
 export default function MonEspace() {
   const { currentSubModule, navigateToModule } = useAppNavigation();
+  const { unreadBulletins, newDocuments } = useMonEspaceBadge();
   const VALID_TABS = TABS.map(t => t.key);
 
   const activeTab = useMemo<TabKey>(() => {
@@ -74,7 +76,11 @@ export default function MonEspace() {
           icon={<User size={24} />}
         />
         <TabGroup
-          tabs={TABS}
+          tabs={TABS.map(tab => ({
+            ...tab,
+            ...(tab.key === 'bulletins' && unreadBulletins > 0 ? { badge: unreadBulletins } : {}),
+            ...(tab.key === 'documents' && newDocuments > 0 ? { badge: newDocuments } : {}),
+          }))}
           activeTab={activeTab}
           onTabChange={(key) => setActiveTab(key as TabKey)}
           variant="underline"

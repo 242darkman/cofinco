@@ -33,7 +33,14 @@ export const PayslipViewer: React.FC<PayslipViewerProps> = ({
           if (!r.ok) throw new Error('Erreur chargement bulletin');
           return r.json();
         })
-        .then(setData)
+        .then((d) => {
+          setData(d);
+          // Mark bulletin as read (fire-and-forget)
+          fetch(`/api/hr/bulletins/${bulletinId}/mark-read`, {
+            method: 'POST',
+            credentials: 'include',
+          }).catch(() => {});
+        })
         .catch(e => setError(e.message))
         .finally(() => setLoading(false));
     } else {

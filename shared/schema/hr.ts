@@ -333,6 +333,8 @@ export const bulletinsPaie = pgTable("bulletins_paie", {
   paiementMouvementId: uuid("paiement_mouvement_id"),
   engagementEcritureId: uuid("engagement_ecriture_id"),
   paiementEcritureId: uuid("paiement_ecriture_id"),
+  // Employee read tracking
+  viewedAt: timestamp("viewed_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -1404,6 +1406,8 @@ export const hrDocumentRequests = pgTable("hr_document_requests", {
   motifRejet: text("motif_rejet"),
   documentUrl: text("document_url"),
   documentFileName: text("document_file_name"),
+  // Employee read tracking
+  viewedAt: timestamp("viewed_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (t) => ({

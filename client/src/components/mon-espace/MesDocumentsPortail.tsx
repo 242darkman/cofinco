@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, Button, Badge, Modal, SelectField } from '../ui';
 import { FileText, Plus, Download } from 'lucide-react';
@@ -10,6 +10,7 @@ interface DocumentRequest {
   motif?: string;
   statut: string;
   documentUrl?: string;
+  viewedAt?: string | null;
   createdAt: string;
 }
 
@@ -47,6 +48,18 @@ export default function MesDocumentsPortail() {
         r.json()
       ),
   });
+
+  // Real-time: refresh when document_request events arrive via WebSocket
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const entity = (event as CustomEvent).detail?.entity;
+      if (!entity || entity === 'document_request') {
+        queryClient.invalidateQueries({ queryKey: ['/api/hr/document-requests/my'] });
+      }
+    };
+    window.addEventListener('hr-update', handler);
+    return () => window.removeEventListener('hr-update', handler);
+  }, [queryClient]);
 
   const createMutation = useMutation({
     mutationFn: (data: { type: string; motif?: string }) =>
@@ -132,6 +145,11 @@ export default function MesDocumentsPortail() {
                         {TYPE_LABELS[doc.type] || doc.type}
                       </span>
                       <Badge value={doc.statut} size="sm" />
+                      {doc.statut === 'COMPLETED' && !doc.viewedAt && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-accent text-white animate-in zoom-in duration-300">
+                          Nouveau
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-3 mt-1 text-xs text-content-muted">
                       <span>{formatDate(doc.createdAt)}</span>
@@ -146,8 +164,11 @@ export default function MesDocumentsPortail() {
                     variant="ghost"
                     size="xs"
                     icon={Download}
-                    onClick={() =>
-                      window.open(`/api/hr/document-requests/${doc.id}/download`, '_blank')
+                    onClick={() => {
+                      window.open(`/api/hr/document-requests/${doc.id}/download`, '_blank');
+                      // Mark as read (fire-and-forget)
+                      fetch(`/api/hr/document-requests/${doc.id}/mark-read`, { method: 'POST', credentials: 'include' }).catch(() => {});
+                    }
                     }
                   >
                     <span className="hidden sm:inline">Telecharger</span>

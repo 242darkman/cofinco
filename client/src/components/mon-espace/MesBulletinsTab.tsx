@@ -10,6 +10,7 @@ interface Bulletin {
   salaireNet: string;     // numeric string
   statut: string;
   pdfUrl?: string;
+  viewedAt?: string | null;
 }
 
 const MOIS_LABELS: Record<number, string> = {
@@ -200,6 +201,11 @@ export default function MesBulletinsTab() {
                     <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${style?.bg || 'bg-surface-muted'} ${style?.text || 'text-content-muted'}`}>
                       {style?.label || bulletin.statut}
                     </span>
+                    {!bulletin.viewedAt && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-accent text-white animate-in zoom-in duration-300">
+                        Nouveau
+                      </span>
+                    )}
                   </div>
                   <p className="text-[11px] font-medium text-content-secondary mt-0.5">
                     {formatFCFA(bulletin.salaireNet)}
@@ -217,7 +223,12 @@ export default function MesBulletinsTab() {
                   </button>
                   {bulletin.pdfUrl && (
                     <button
-                      onClick={(e) => { e.stopPropagation(); window.open(bulletin.pdfUrl, '_blank'); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        window.open(bulletin.pdfUrl, '_blank');
+                        // Mark as read (fire-and-forget)
+                        fetch(`/api/hr/bulletins/${bulletin.id}/mark-read`, { method: 'POST', credentials: 'include' }).catch(() => {});
+                      }}
                       className="p-1.5 rounded-md text-content-muted hover:text-accent hover:bg-accent/10 transition-colors"
                       title="Télécharger"
                     >
