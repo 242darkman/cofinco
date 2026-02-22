@@ -28,16 +28,19 @@ const TABS_BASE = [
 export default function MonEspace() {
   const { currentSubModule, navigateToModule } = useAppNavigation();
   const { unreadBulletins, newDocuments } = useMonEspaceBadge();
-  const { pendingCount: teamPending, isManager } = useTeamPendingCount();
+  const { pendingCount: teamPending, isManager, canApprove } = useTeamPendingCount();
+
+  // Show "Mon Équipe" tab if user has subordinates OR has CASL approve permission on leaves
+  const showEquipeTab = isManager || canApprove;
 
   const tabs = useMemo(() => {
     const t = [...TABS_BASE];
-    if (isManager) {
+    if (showEquipeTab) {
       // Insert "Mon Équipe" after "Congés" (index 3 → insert at 4)
       t.splice(4, 0, { key: 'equipe', label: 'Mon Équipe', icon: Users });
     }
     return t;
-  }, [isManager]);
+  }, [showEquipeTab]);
 
   const VALID_TABS = useMemo(() => tabs.map(t => t.key), [tabs]);
 

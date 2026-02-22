@@ -1359,9 +1359,28 @@ export async function handleHrLeaveRequested(data: HrLeaveRequestedData) {
       : [],
   });
 
-  // Notify HR staff (in-app + email)
+  // Resolve direct manager userId (used for dedup + dedicated notification)
+  let managerUserId: string | null = null;
+  let managerEmail: string | null = null;
+  if (data.employeId) {
+    const [emp] = await db.select({ managerId: employes.managerId })
+      .from(employes).where(eq(employes.id, data.employeId));
+    if (emp?.managerId) {
+      const [managerEmp] = await db.select({ userId: employes.userId })
+        .from(employes).where(eq(employes.id, emp.managerId));
+      if (managerEmp?.userId) {
+        managerUserId = managerEmp.userId;
+        const [managerUser] = await db.select({ email: users.email })
+          .from(users).where(eq(users.id, managerEmp.userId));
+        managerEmail = managerUser?.email || null;
+      }
+    }
+  }
+
+  // Notify HR staff (in-app + email) — exclude manager to avoid duplicate
   const hrStaff = await getHrStaffContacts(data.agenceId);
   for (const hr of hrStaff) {
+    if (managerUserId && hr.userId === managerUserId) continue;
     await emitNotificationEvent("HR_LEAVE_REQUESTED", data, {
       smsRecipients: [],
       emailRecipients: hr.email
@@ -1373,25 +1392,15 @@ export async function handleHrLeaveRequested(data: HrLeaveRequestedData) {
     });
   }
 
-  // Notify direct manager (in-app + email)
-  if (data.employeId) {
-    const [emp] = await db.select({ managerId: employes.managerId })
-      .from(employes).where(eq(employes.id, data.employeId));
-    if (emp?.managerId) {
-      const [managerEmp] = await db.select({ userId: employes.userId })
-        .from(employes).where(eq(employes.id, emp.managerId));
-      if (managerEmp?.userId) {
-        const [managerUser] = await db.select({ email: users.email })
-          .from(users).where(eq(users.id, managerEmp.userId));
-        await emitNotificationEvent("HR_LEAVE_REQUESTED", data, {
-          smsRecipients: [],
-          emailRecipients: managerUser?.email
-            ? [{ email: managerUser.email, templateCode: "HR_LEAVE_REQUESTED_TO_MANAGER", payload, agenceId: data.agenceId }]
-            : [],
-          inAppRecipients: [{ userId: managerEmp.userId, type: "HR_LEAVE_REQUESTED", titre: "Demande de congé — Votre équipe", message: `${data.employeNom} demande un congé (${data.type}) du ${data.dateDebut} au ${data.dateFin}`, priorite: "NORMAL" as const }],
-        });
-      }
-    }
+  // Notify direct manager (in-app + email) with dedicated template
+  if (managerUserId) {
+    await emitNotificationEvent("HR_LEAVE_REQUESTED", data, {
+      smsRecipients: [],
+      emailRecipients: managerEmail
+        ? [{ email: managerEmail, templateCode: "HR_LEAVE_REQUESTED_TO_MANAGER", payload, agenceId: data.agenceId }]
+        : [],
+      inAppRecipients: [{ userId: managerUserId, type: "HR_LEAVE_REQUESTED", titre: "Demande de congé — Votre équipe", message: `${data.employeNom} demande un congé (${data.type}) du ${data.dateDebut} au ${data.dateFin}`, priorite: "NORMAL" as const }],
+    });
   }
 
   logNotificationEvent("info", "Domain event: HR_LEAVE_REQUESTED", {

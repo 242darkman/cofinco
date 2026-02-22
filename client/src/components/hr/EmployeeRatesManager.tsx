@@ -3,6 +3,7 @@ import { DollarSign, Users, Save, History, Calendar, ArrowRight } from 'lucide-r
 import { Card, Button, FormField, SelectField, TabGroup } from '../ui';
 import { toast } from '../../lib/toast';
 import { useCurrency } from '../../contexts/CurrencyContext';
+import { usePermissions } from '../auth/ProtectedFeature';
 
 interface RateHistoryEntry {
   id: string;
@@ -23,6 +24,8 @@ interface EmployeeRatesManagerProps {
 
 export default function EmployeeRatesManager({ employeId }: EmployeeRatesManagerProps) {
   const { currency, label } = useCurrency();
+  const { hasPermission } = usePermissions();
+  const canManage = hasPermission('rh', 'manage');
   const [employees, setEmployees] = useState<any[]>([]);
   const [selectedMode, setSelectedMode] = useState('Mensuel');
   const [tauxHoraire, setTauxHoraire] = useState('');
@@ -399,15 +402,17 @@ export default function EmployeeRatesManager({ employeId }: EmployeeRatesManager
             </div>
           )}
 
-          <Button
-            variant="primary"
-            fullWidth
-            icon={Save}
-            onClick={handleSave}
-            disabled={loading}
-          >
-            {loading ? 'Sauvegarde...' : 'Enregistrer'}
-          </Button>
+          {canManage && (
+            <Button
+              variant="primary"
+              fullWidth
+              icon={Save}
+              onClick={handleSave}
+              disabled={loading}
+            >
+              {loading ? 'Sauvegarde...' : 'Enregistrer'}
+            </Button>
+          )}
           </div>
         </Card>
       )}

@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, Button, Badge } from '../ui';
 import { Settings, Plus, Trash2, Save, RefreshCw, AlertTriangle, Percent, DollarSign, Clock, UserCheck, Smartphone } from 'lucide-react';
 import { toast } from '../../lib/toast';
+import { usePermissions } from '../auth/ProtectedFeature';
 
 interface IprBracket {
   min: number;
@@ -37,6 +38,8 @@ const formatPercent = (val: number) => (val * 100).toFixed(1) + '%';
 
 export default function PayrollConfigPanel() {
   const queryClient = useQueryClient();
+  const { hasPermission } = usePermissions();
+  const canManage = hasPermission('rh', 'manage') || hasPermission('paie', 'manage');
 
   // Fetch current config
   const { data: config, isLoading, error } = useQuery<PayrollConfig>({
@@ -207,16 +210,18 @@ export default function PayrollConfigPanel() {
             <Badge variant="info" size="sm" value={`Depuis ${new Date(config.effectiveFrom).toLocaleDateString('fr-FR')}`} />
           )}
         </div>
-        <Button
-          variant="success"
-          size="sm"
-          icon={Save}
-          onClick={handleSave}
-          isLoading={saveMutation.isPending}
-          className="h-7 text-xs"
-        >
-          Sauvegarder
-        </Button>
+        {canManage && (
+          <Button
+            variant="success"
+            size="sm"
+            icon={Save}
+            onClick={handleSave}
+            isLoading={saveMutation.isPending}
+            className="h-7 text-xs"
+          >
+            Sauvegarder
+          </Button>
+        )}
       </div>
 
       <div className="grid lg:grid-cols-2 gap-4">

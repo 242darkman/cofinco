@@ -4,6 +4,7 @@ import { useIsOnline } from '@/contexts/NetworkContext';
 export function useTeamPendingCount() {
   const [pendingCount, setPendingCount] = useState<number | undefined>(undefined);
   const [isManager, setIsManager] = useState(false);
+  const [canApprove, setCanApprove] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   const loadCount = useCallback(async () => {
@@ -12,6 +13,7 @@ export function useTeamPendingCount() {
       if (res.ok) {
         const data = await res.json();
         setIsManager(!!data.isManager);
+        setCanApprove(!!data.canApprove);
         setPendingCount(data.isManager ? (data.pending ?? 0) : undefined);
       }
     } catch {
@@ -42,7 +44,18 @@ export function useTeamPendingCount() {
     return () => window.removeEventListener('hr-update', handler);
   }, [loadCount]);
 
-  return { pendingCount, isManager, isLoading, refresh: loadCount };
+  // Refresh when RBAC permissions change (real-time via WebSocket)
+  useEffect(() => {
+    const handler = () => { loadCount(); };
+    window.addEventListener('rbac:update', handler);
+    window.addEventListener('rbac-update', handler);
+    return () => {
+      window.removeEventListener('rbac:update', handler);
+      window.removeEventListener('rbac-update', handler);
+    };
+  }, [loadCount]);
+
+  return { pendingCount, isManager, canApprove, isLoading, refresh: loadCount };
 }
 
 export default useTeamPendingCount;

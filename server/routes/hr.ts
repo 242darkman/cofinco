@@ -67,7 +67,6 @@ import {
 import { agentsTerrain, agentPlannings } from "@shared/schema";
 import { systemSettings } from "@shared/schema/settings";
 import { agences } from "@shared/schema/agences";
-import { normalizeRole } from "@shared/types/roles";
 import { StatutCandidature, StatutConge, StatutUser, StatutVisiteTerrain, StatutArchive } from "@shared/enum/status-constants";
 import { eq, desc, and, gte, lte, sql, count, isNull, inArray } from "drizzle-orm";
 import { getAuthUser } from "server/middleware";
@@ -185,22 +184,6 @@ function successResponse<T>(data: T, meta?: any) {
 function errorResponse(code: string, message: string, details?: any) {
   return { success: false, code, message, ...(details && { details }) };
 }
-
-const normalizeRoleToken = (role?: string | null): string | undefined => {
-  if (!role) return undefined;
-  const normalized = normalizeRole(role);
-  if (normalized) return normalized;
-  return role.trim().toLowerCase();
-};
-
-const roleIn = (role: string | null | undefined, allowed: string[]): boolean => {
-  const roleToken = normalizeRoleToken(role);
-  if (!roleToken) return false;
-  const allowedTokens = allowed
-    .map((value) => normalizeRoleToken(value))
-    .filter((value): value is string => !!value);
-  return allowedTokens.includes(roleToken);
-};
 
 // ============================================
 // HELPER: Calculate ancienneté (seniority) from dateEmbauche
@@ -440,7 +423,7 @@ async function generatePdfsAndSendEmails(
  */
 
 // GET /api/hr/analytics - Dashboard analytics data
-hrRouter.get("/analytics", getAuthUser, async (req, res) => {
+hrRouter.get("/analytics", getAuthUser, attachAbility, async (req, res) => {
     try {
         // 1. Effectifs par département (via jobPositions -> departments)
         const deptStats = await db
@@ -553,7 +536,7 @@ hrRouter.get("/analytics", getAuthUser, async (req, res) => {
  */
 
 // GET /api/hr/conges - Liste des demandes de congés
-hrRouter.get("/conges", getAuthUser, async (req, res) => {
+hrRouter.get("/conges", getAuthUser, attachAbility, async (req, res) => {
   try {
     const { statut, employeId, dateDebut, dateFin } = req.query;
 
@@ -563,20 +546,15 @@ hrRouter.get("/conges", getAuthUser, async (req, res) => {
     if (statut) conditions.push(eq(demandesConges.statut, statut as string));
     if (employeId) conditions.push(eq(demandesConges.employeId, employeId as string));
 
-    // RBAC: An employee can only see their own requests unless Admin/RH/Manager/Direction
-    // Note: Manager should ideally see only their subordinates, implemented here for simplicity as "all" for Manager role for now, or filtered via frontend + rigorous check later.
-    // Ideally: if role === 'manager', fetch subordinates IDs and filter.
-    // For now, let's restrict standard 'agent'/'employe'
-    const userRole = req.user?.role;
-    const restrictedRoles = ['agent', 'employe', 'stagiaire'];
+    // CASL scope: users without VIEW on RH can only see their own requests
+    const canViewAll = req.ability?.can(Actions.VIEW, Subjects.RH)
+      || req.ability?.can(Actions.MANAGE, Subjects.RH) || false;
 
-    if (roleIn(userRole, restrictedRoles)) {
-        // Résoudre l'employeId à partir du userId
+    if (!canViewAll) {
         const employe = await storage.getEmployeByUserId(req.user!.id);
         if (employe) {
             conditions.push(eq(demandesConges.employeId, employe.id));
         } else {
-            // Si pas d'employé trouvé, on force une condition impossible pour ne rien retourner
             conditions.push(eq(demandesConges.employeId, '00000000-0000-0000-0000-000000000000'));
         }
     }
@@ -596,7 +574,7 @@ hrRouter.get("/conges", getAuthUser, async (req, res) => {
 });
 
 // POST /api/hr/conges - Créer une demande de congé
-hrRouter.post("/conges", getAuthUser, async (req, res) => {
+hrRouter.post("/conges", getAuthUser, attachAbility, async (req, res) => {
   try {
     const { employeId, employeNom, type, dateDebut, dateFin, motif } = req.body;
 
@@ -623,12 +601,11 @@ hrRouter.post("/conges", getAuthUser, async (req, res) => {
       ));
     }
 
-    // Workflow: Direction (PDG/DG) auto-approves
-    const userRole = req.user?.role;
-    const isDirection = roleIn(userRole, ['direction', 'pdg', 'dg', 'admin']);
-    const initialStatus = isDirection ? LeaveStatus.APPROVED : LeaveStatus.PENDING;
-    const approuvePar = isDirection ? req.user?.id : null;
-    const dateDecision = isDirection ? new Date() : null;
+    // Workflow: users with MANAGE permission on RH auto-approve their own requests
+    const canManageRH = req.ability?.can(Actions.MANAGE, Subjects.RH) || false;
+    const initialStatus = canManageRH ? LeaveStatus.APPROVED : LeaveStatus.PENDING;
+    const approuvePar = canManageRH ? req.user?.id : null;
+    const dateDecision = canManageRH ? new Date() : null;
 
     const [newConge] = await db.insert(demandesConges).values({
       employeId,
@@ -704,21 +681,27 @@ hrRouter.post("/conges", getAuthUser, async (req, res) => {
 });
 
 // PATCH /api/hr/conges/:id/approve - Approuver une demande
-hrRouter.patch("/conges/:id/approve", getAuthUser, async (req, res) => {
+hrRouter.patch("/conges/:id/approve", getAuthUser, attachAbility, async (req, res) => {
   try {
     const { id } = req.params;
     const { commentaire } = req.body;
     const userId = req.user?.id;
-    const userRole = req.user?.role;
 
-    // RBAC Check — admins/chefs/superviseurs can approve any leave
-    const allowedRoles = ['ADMIN', 'CHEF_AGENCE', 'SUPERVISEUR'];
-    let isAuthorized = roleIn(userRole, allowedRoles);
+    // CASL permission check — respects role permissions, user overrides, and temporary permissions
+    let isAuthorized = req.ability?.can(Actions.APPROVE, Subjects.CONGE)
+      || req.ability?.can(Actions.APPROVE, Subjects.RH)
+      || req.ability?.can(Actions.MANAGE, Subjects.RH) || false;
 
     // Get current state for audit
     const [currentConge] = await db.select().from(demandesConges).where(eq(demandesConges.id, parseInt(id)));
     if (!currentConge) {
       return res.status(404).json(errorResponse('NOT_FOUND', 'Demande non trouvée'));
+    }
+
+    // Block self-approval
+    const selfEmploye = await storage.getEmployeByUserId(userId!);
+    if (selfEmploye && currentConge.employeId === selfEmploye.id) {
+      return res.status(403).json(errorResponse('FORBIDDEN', 'Vous ne pouvez pas approuver votre propre demande'));
     }
 
     // Check if already processed
@@ -730,14 +713,11 @@ hrRouter.patch("/conges/:id/approve", getAuthUser, async (req, res) => {
     }
 
     // Manager hierarchy check: direct manager can approve their subordinate's leave
-    if (!isAuthorized) {
-      const managerEmploye = await storage.getEmployeByUserId(userId!);
-      if (managerEmploye) {
-        const [targetEmploye] = await db.select({ managerId: employes.managerId })
-          .from(employes).where(eq(employes.id, currentConge.employeId));
-        if (targetEmploye?.managerId === managerEmploye.id) {
-          isAuthorized = true;
-        }
+    if (!isAuthorized && selfEmploye) {
+      const [targetEmploye] = await db.select({ managerId: employes.managerId })
+        .from(employes).where(eq(employes.id, currentConge.employeId));
+      if (targetEmploye?.managerId === selfEmploye.id) {
+        isAuthorized = true;
       }
     }
 
@@ -810,26 +790,32 @@ hrRouter.patch("/conges/:id/approve", getAuthUser, async (req, res) => {
 });
 
 // PATCH /api/hr/conges/:id/reject - Refuser une demande
-hrRouter.patch("/conges/:id/reject", getAuthUser, async (req, res) => {
+hrRouter.patch("/conges/:id/reject", getAuthUser, attachAbility, async (req, res) => {
   try {
     const { id } = req.params;
     const { commentaire } = req.body;
     const userId = req.user?.id;
-    const userRole = req.user?.role;
 
     // Commentaire obligatoire pour un rejet
     if (!commentaire || commentaire.trim().length === 0) {
       return res.status(400).json(errorResponse('VALIDATION_ERROR', 'Un commentaire est obligatoire pour rejeter une demande'));
     }
 
-    // RBAC Check — admins/chefs/superviseurs can reject any leave
-    const allowedRolesReject = ['ADMIN', 'CHEF_AGENCE', 'SUPERVISEUR'];
-    let isAuthorizedReject = roleIn(userRole, allowedRolesReject);
+    // CASL permission check — respects role permissions, user overrides, and temporary permissions
+    let isAuthorizedReject = req.ability?.can(Actions.APPROVE, Subjects.CONGE)
+      || req.ability?.can(Actions.APPROVE, Subjects.RH)
+      || req.ability?.can(Actions.MANAGE, Subjects.RH) || false;
 
     // Get current state for audit
     const [currentConge] = await db.select().from(demandesConges).where(eq(demandesConges.id, parseInt(id)));
     if (!currentConge) {
       return res.status(404).json(errorResponse('NOT_FOUND', 'Demande non trouvée'));
+    }
+
+    // Block self-rejection
+    const selfEmployeReject = await storage.getEmployeByUserId(userId!);
+    if (selfEmployeReject && currentConge.employeId === selfEmployeReject.id) {
+      return res.status(403).json(errorResponse('FORBIDDEN', 'Vous ne pouvez pas refuser votre propre demande'));
     }
 
     // Check if already processed
@@ -841,14 +827,11 @@ hrRouter.patch("/conges/:id/reject", getAuthUser, async (req, res) => {
     }
 
     // Manager hierarchy check: direct manager can reject their subordinate's leave
-    if (!isAuthorizedReject) {
-      const managerEmploye = await storage.getEmployeByUserId(userId!);
-      if (managerEmploye) {
-        const [targetEmploye] = await db.select({ managerId: employes.managerId })
-          .from(employes).where(eq(employes.id, currentConge.employeId));
-        if (targetEmploye?.managerId === managerEmploye.id) {
-          isAuthorizedReject = true;
-        }
+    if (!isAuthorizedReject && selfEmployeReject) {
+      const [targetEmploye] = await db.select({ managerId: employes.managerId })
+        .from(employes).where(eq(employes.id, currentConge.employeId));
+      if (targetEmploye?.managerId === selfEmployeReject.id) {
+        isAuthorizedReject = true;
       }
     }
 
@@ -922,16 +905,27 @@ hrRouter.patch("/conges/:id/reject", getAuthUser, async (req, res) => {
 
 // GET /api/hr/conges/team - Congés PENDING des subordonnés directs du manager connecté
 // NOTE: Must be declared BEFORE /conges/balance/:employeId to avoid "team" matching as :employeId
-hrRouter.get("/conges/team", getAuthUser, async (req, res) => {
+hrRouter.get("/conges/team", getAuthUser, attachAbility, async (req, res) => {
   try {
     const employe = await storage.getEmployeByUserId(req.user!.id);
     if (!employe) return res.json([]);
+
+    // CASL permission: can this user approve leaves (even without subordinates)?
+    const hasApprovePermission = req.ability?.can(Actions.APPROVE, Subjects.CONGE)
+      || req.ability?.can(Actions.APPROVE, Subjects.RH)
+      || req.ability?.can(Actions.MANAGE, Subjects.RH) || false;
 
     const subordinateIds = await db.select({ id: employes.id })
       .from(employes)
       .where(and(eq(employes.managerId, employe.id), eq(employes.statut, 'ACTIVE')));
 
-    if (subordinateIds.length === 0) return res.json([]);
+    // If no subordinates and no CASL approve permission, nothing to show
+    if (subordinateIds.length === 0 && !hasApprovePermission) return res.json([]);
+
+    if (subordinateIds.length === 0) {
+      // Has permission but no direct subordinates — return empty (they use the HR CongesManager instead)
+      return res.json([]);
+    }
 
     const ids = subordinateIds.map(s => s.id);
     const result = await db.select().from(demandesConges)
@@ -949,16 +943,23 @@ hrRouter.get("/conges/team", getAuthUser, async (req, res) => {
 });
 
 // GET /api/hr/conges/team/count - Nombre de congés PENDING dans l'équipe du manager
-hrRouter.get("/conges/team/count", getAuthUser, async (req, res) => {
+hrRouter.get("/conges/team/count", getAuthUser, attachAbility, async (req, res) => {
   try {
     const employe = await storage.getEmployeByUserId(req.user!.id);
-    if (!employe) return res.json({ pending: 0, isManager: false });
+    if (!employe) return res.json({ pending: 0, isManager: false, canApprove: false });
+
+    // CASL permission check
+    const canApprove = req.ability?.can(Actions.APPROVE, Subjects.CONGE)
+      || req.ability?.can(Actions.APPROVE, Subjects.RH)
+      || req.ability?.can(Actions.MANAGE, Subjects.RH) || false;
 
     const subordinateIds = await db.select({ id: employes.id })
       .from(employes)
       .where(and(eq(employes.managerId, employe.id), eq(employes.statut, 'ACTIVE')));
 
-    if (subordinateIds.length === 0) return res.json({ pending: 0, isManager: false });
+    const hasSubordinates = subordinateIds.length > 0;
+
+    if (!hasSubordinates) return res.json({ pending: 0, isManager: false, canApprove });
 
     const [result] = await db.select({ count: count() }).from(demandesConges)
       .where(and(
@@ -966,7 +967,7 @@ hrRouter.get("/conges/team/count", getAuthUser, async (req, res) => {
         eq(demandesConges.statut, 'PENDING')
       ));
 
-    res.json({ pending: result?.count ?? 0, isManager: true });
+    res.json({ pending: result?.count ?? 0, isManager: true, canApprove });
   } catch (error) {
     logger.error({ err: error }, 'Erreur récupération count congés équipe');
     res.status(500).json(errorResponse('SERVER_ERROR', 'Erreur serveur'));
@@ -974,7 +975,7 @@ hrRouter.get("/conges/team/count", getAuthUser, async (req, res) => {
 });
 
 // GET /api/hr/conges/balance/:employeId - Solde congés d'un employé
-hrRouter.get("/conges/balance/:employeId", getAuthUser, async (req, res) => {
+hrRouter.get("/conges/balance/:employeId", getAuthUser, attachAbility, async (req, res) => {
   try {
     const { employeId } = req.params;
     const { year } = req.query;
@@ -1049,7 +1050,7 @@ hrRouter.get("/conges/balance/:employeId", getAuthUser, async (req, res) => {
  */
 
 // GET /api/hr/formations - Liste des formations avec nombre de participants (FIX N+1)
-hrRouter.get("/formations", getAuthUser, async (req, res) => {
+hrRouter.get("/formations", getAuthUser, attachAbility, async (req, res) => {
   try {
     const { statut, page = '1', limit = '20' } = req.query;
     const pageNum = Math.max(1, parseInt(page as string) || 1);
@@ -1099,7 +1100,7 @@ hrRouter.get("/formations", getAuthUser, async (req, res) => {
 });
 
 // POST /api/hr/formations - Créer une formation
-hrRouter.post("/formations", getAuthUser, async (req, res) => {
+hrRouter.post("/formations", getAuthUser, attachAbility, requireAbility(Actions.EDIT, Subjects.RH), async (req, res) => {
   try {
     const { titre, formateur, dateDebut, duree, lieu, description, capaciteMax } = req.body;
 
@@ -1132,7 +1133,7 @@ hrRouter.post("/formations", getAuthUser, async (req, res) => {
 });
 
 // GET /api/hr/formations/:id/participants - Participants d'une formation
-hrRouter.get("/formations/:id/participants", getAuthUser, async (req, res) => {
+hrRouter.get("/formations/:id/participants", getAuthUser, attachAbility, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -1148,7 +1149,7 @@ hrRouter.get("/formations/:id/participants", getAuthUser, async (req, res) => {
 });
 
 // POST /api/hr/formations/:id/participants - Ajouter un participant
-hrRouter.post("/formations/:id/participants", getAuthUser, async (req, res) => {
+hrRouter.post("/formations/:id/participants", getAuthUser, attachAbility, requireAbility(Actions.EDIT, Subjects.RH), async (req, res) => {
   try {
     const { id } = req.params;
     const { employeId, employeNom } = req.body;
@@ -1222,7 +1223,7 @@ hrRouter.post("/formations/:id/participants", getAuthUser, async (req, res) => {
 });
 
 // DELETE /api/hr/formations/:id/participants/:employeId - Retirer un participant
-hrRouter.delete("/formations/:id/participants/:employeId", getAuthUser, async (req, res) => {
+hrRouter.delete("/formations/:id/participants/:employeId", getAuthUser, attachAbility, requireAbility(Actions.EDIT, Subjects.RH), async (req, res) => {
   try {
     const { id, employeId } = req.params;
 
@@ -1246,7 +1247,7 @@ hrRouter.delete("/formations/:id/participants/:employeId", getAuthUser, async (r
 });
 
 // PATCH /api/hr/formations/:id - Mettre à jour formation (tous champs)
-hrRouter.patch("/formations/:id", getAuthUser, async (req, res) => {
+hrRouter.patch("/formations/:id", getAuthUser, attachAbility, requireAbility(Actions.EDIT, Subjects.RH), async (req, res) => {
   try {
     const { id } = req.params;
     const { statut, titre, formateur, dateDebut, dateFin, duree, lieu, description, programme, capaciteMax } = req.body;
@@ -1289,7 +1290,7 @@ hrRouter.patch("/formations/:id", getAuthUser, async (req, res) => {
 });
 
 // DELETE /api/hr/formations/:id - Supprimer formation (soft delete)
-hrRouter.delete("/formations/:id", getAuthUser, async (req, res) => {
+hrRouter.delete("/formations/:id", getAuthUser, attachAbility, requireAbility(Actions.EDIT, Subjects.RH), async (req, res) => {
   try {
     const { id } = req.params;
     const [updated] = await db.update(formations)
@@ -1361,7 +1362,7 @@ hrRouter.patch("/formations/:id/participants/:employeId/evaluate", getAuthUser, 
 });
 
 // GET /api/hr/formations/:id/certificates - List certificates for a formation
-hrRouter.get("/formations/:id/certificates", getAuthUser, async (req, res) => {
+hrRouter.get("/formations/:id/certificates", getAuthUser, attachAbility, async (req, res) => {
     try {
         const formationId = parseInt(req.params.id);
         const certs = await db.select()
@@ -1530,7 +1531,7 @@ hrRouter.patch("/certificates/:id/revoke", getAuthUser, attachAbility, requireAb
 });
 
 // GET /api/hr/employees/:employeId/certificates - All certificates for an employee
-hrRouter.get("/employees/:employeId/certificates", getAuthUser, async (req, res) => {
+hrRouter.get("/employees/:employeId/certificates", getAuthUser, attachAbility, async (req, res) => {
     try {
         const { employeId } = req.params;
         const certs = await db.select()
@@ -1551,7 +1552,7 @@ hrRouter.get("/employees/:employeId/certificates", getAuthUser, async (req, res)
  */
 
 // GET /api/hr/sanctions - Liste des sanctions
-hrRouter.get("/sanctions", getAuthUser, async (req, res) => {
+hrRouter.get("/sanctions", getAuthUser, attachAbility, async (req, res) => {
   try {
     const { employeId, gravite } = req.query;
 
@@ -1574,7 +1575,7 @@ hrRouter.get("/sanctions", getAuthUser, async (req, res) => {
 });
 
 // POST /api/hr/sanctions - Créer une sanction
-hrRouter.post("/sanctions", getAuthUser, async (req, res) => {
+hrRouter.post("/sanctions", getAuthUser, attachAbility, requireAbility(Actions.EDIT, Subjects.RH), async (req, res) => {
   try {
     const { employeId, employeNom, type, motif, date, gravite } = req.body;
     const userId = req.user?.id;
@@ -1670,7 +1671,7 @@ const SANCTION_WORKFLOW_TRANSITIONS: Record<string, string[]> = {
   APPEALED: ['FINAL'],
 };
 
-hrRouter.patch("/sanctions/:id/status", getAuthUser, async (req, res) => {
+hrRouter.patch("/sanctions/:id/status", getAuthUser, attachAbility, requireAbility(Actions.EDIT, Subjects.RH), async (req, res) => {
   try {
     const sanctionId = parseInt(req.params.id);
     const { newStatus, appealReason } = req.body;
@@ -1764,7 +1765,7 @@ hrRouter.patch("/sanctions/:id/status", getAuthUser, async (req, res) => {
 });
 
 // PATCH /api/hr/sanctions/:id - Edit sanction fields
-hrRouter.patch("/sanctions/:id", getAuthUser, async (req, res) => {
+hrRouter.patch("/sanctions/:id", getAuthUser, attachAbility, requireAbility(Actions.EDIT, Subjects.RH), async (req, res) => {
   try {
     const sanctionId = parseInt(req.params.id);
     const { type, motif, date, gravite, employeNom } = req.body;
@@ -1803,7 +1804,7 @@ hrRouter.patch("/sanctions/:id", getAuthUser, async (req, res) => {
 });
 
 // DELETE /api/hr/sanctions/:id - Delete sanction
-hrRouter.delete("/sanctions/:id", getAuthUser, async (req, res) => {
+hrRouter.delete("/sanctions/:id", getAuthUser, attachAbility, requireAbility(Actions.EDIT, Subjects.RH), async (req, res) => {
   try {
     const sanctionId = parseInt(req.params.id);
 
@@ -1874,7 +1875,7 @@ hrRouter.post("/sanctions/:id/document", getAuthUser, attachAbility, requireAbil
 });
 
 // GET /api/hr/sanctions/:id/documents - Get presigned URLs for sanction documents
-hrRouter.get("/sanctions/:id/documents", getAuthUser, async (req, res) => {
+hrRouter.get("/sanctions/:id/documents", getAuthUser, attachAbility, async (req, res) => {
     try {
         const sanctionId = parseInt(req.params.id);
         const [sanction] = await db.select().from(sanctions).where(eq(sanctions.id, sanctionId));
@@ -1905,7 +1906,7 @@ hrRouter.get("/sanctions/:id/documents", getAuthUser, async (req, res) => {
  */
 
 // GET /api/hr/sanction-escalation-rules - Liste des règles d'escalade
-hrRouter.get("/sanction-escalation-rules", getAuthUser, async (req, res) => {
+hrRouter.get("/sanction-escalation-rules", getAuthUser, attachAbility, async (req, res) => {
   try {
     const { agenceId } = req.query;
     const rules = await sanctionEscalationService.getRules(agenceId as string | undefined);
@@ -1917,7 +1918,7 @@ hrRouter.get("/sanction-escalation-rules", getAuthUser, async (req, res) => {
 });
 
 // POST /api/hr/sanction-escalation-rules - Créer une règle d'escalade
-hrRouter.post("/sanction-escalation-rules", getAuthUser, async (req, res) => {
+hrRouter.post("/sanction-escalation-rules", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.RH), async (req, res) => {
   try {
     const {
       agenceId,
@@ -1956,7 +1957,7 @@ hrRouter.post("/sanction-escalation-rules", getAuthUser, async (req, res) => {
 });
 
 // PUT /api/hr/sanction-escalation-rules/:id - Mettre à jour une règle
-hrRouter.put("/sanction-escalation-rules/:id", getAuthUser, async (req, res) => {
+hrRouter.put("/sanction-escalation-rules/:id", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.RH), async (req, res) => {
   try {
     const { id } = req.params;
     const {
@@ -1990,7 +1991,7 @@ hrRouter.put("/sanction-escalation-rules/:id", getAuthUser, async (req, res) => 
 });
 
 // DELETE /api/hr/sanction-escalation-rules/:id - Désactiver une règle
-hrRouter.delete("/sanction-escalation-rules/:id", getAuthUser, async (req, res) => {
+hrRouter.delete("/sanction-escalation-rules/:id", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.RH), async (req, res) => {
   try {
     const { id } = req.params;
     await sanctionEscalationService.deleteRule(id);
@@ -2002,7 +2003,7 @@ hrRouter.delete("/sanction-escalation-rules/:id", getAuthUser, async (req, res) 
 });
 
 // POST /api/hr/sanctions/:id/apply-escalation - Appliquer manuellement l'escalade
-hrRouter.post("/sanctions/:id/apply-escalation", getAuthUser, async (req, res) => {
+hrRouter.post("/sanctions/:id/apply-escalation", getAuthUser, attachAbility, requireAbility(Actions.EDIT, Subjects.RH), async (req, res) => {
   try {
     const sanctionId = parseInt(req.params.id);
     const { ruleId } = req.body;
@@ -2039,7 +2040,7 @@ hrRouter.post("/sanctions/:id/apply-escalation", getAuthUser, async (req, res) =
 });
 
 // GET /api/hr/sanctions/:id/escalation-history - Historique d'escalade
-hrRouter.get("/sanctions/:id/escalation-history", getAuthUser, async (req, res) => {
+hrRouter.get("/sanctions/:id/escalation-history", getAuthUser, attachAbility, async (req, res) => {
   try {
     const sanctionId = parseInt(req.params.id);
     const history = await sanctionEscalationService.getEscalationHistory(sanctionId);
@@ -2057,7 +2058,7 @@ hrRouter.get("/sanctions/:id/escalation-history", getAuthUser, async (req, res) 
  */
 
 // GET /api/hr/candidatures - Liste des candidatures
-hrRouter.get("/candidatures", getAuthUser, async (req, res) => {
+hrRouter.get("/candidatures", getAuthUser, attachAbility, async (req, res) => {
   try {
     const { statut } = req.query;
 
@@ -2073,7 +2074,7 @@ hrRouter.get("/candidatures", getAuthUser, async (req, res) => {
 });
 
 // POST /api/hr/candidatures - Créer une candidature
-hrRouter.post("/candidatures", getAuthUser, async (req, res) => {
+hrRouter.post("/candidatures", getAuthUser, attachAbility, requireAbility(Actions.EDIT, Subjects.RH), async (req, res) => {
   try {
     const { nom, prenom, email, telephone, posteVise, experience, formation: formationCand } = req.body;
 
@@ -2113,7 +2114,7 @@ hrRouter.post("/candidatures", getAuthUser, async (req, res) => {
 });
 
 // GET /api/hr/candidatures/:id/cv - Get CV download URL
-hrRouter.get("/candidatures/:id/cv", getAuthUser, async (req, res) => {
+hrRouter.get("/candidatures/:id/cv", getAuthUser, attachAbility, async (req, res) => {
   try {
     const { id } = req.params;
     const [candidature] = await db.select().from(candidatures).where(eq(candidatures.id, parseInt(id))).limit(1);
@@ -2165,7 +2166,7 @@ hrRouter.post("/candidatures/:id/cv", getAuthUser, attachAbility, requireAbility
 });
 
 // PATCH /api/hr/candidatures/:id - Mettre à jour une candidature
-hrRouter.patch("/candidatures/:id", getAuthUser, async (req, res) => {
+hrRouter.patch("/candidatures/:id", getAuthUser, attachAbility, requireAbility(Actions.EDIT, Subjects.RH), async (req, res) => {
   try {
     const { id } = req.params;
     const { statut, notes, dateEntretien } = req.body;
@@ -2210,7 +2211,7 @@ hrRouter.patch("/candidatures/:id", getAuthUser, async (req, res) => {
  */
 
 // GET /api/hr/hiring-approval/config - Récupérer la config d'approbation
-hrRouter.get("/hiring-approval/config", getAuthUser, async (req, res) => {
+hrRouter.get("/hiring-approval/config", getAuthUser, attachAbility, async (req, res) => {
   try {
     const { agenceId } = req.query;
     if (!agenceId) {
@@ -2226,7 +2227,7 @@ hrRouter.get("/hiring-approval/config", getAuthUser, async (req, res) => {
 });
 
 // POST /api/hr/hiring-approval/config - Créer/Mettre à jour la config
-hrRouter.post("/hiring-approval/config", getAuthUser, async (req, res) => {
+hrRouter.post("/hiring-approval/config", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.RH), async (req, res) => {
   try {
     const { agenceId, approvalLevels, minSalaryThreshold } = req.body;
     const userId = req.user?.id;
@@ -2250,7 +2251,7 @@ hrRouter.post("/hiring-approval/config", getAuthUser, async (req, res) => {
 });
 
 // POST /api/hr/hiring-approval/initialize/:candidatureId - Initialiser le workflow
-hrRouter.post("/hiring-approval/initialize/:candidatureId", getAuthUser, async (req, res) => {
+hrRouter.post("/hiring-approval/initialize/:candidatureId", getAuthUser, attachAbility, requireAbility(Actions.APPROVE, Subjects.RH), async (req, res) => {
   try {
     const candidatureId = parseInt(req.params.candidatureId);
     const { agenceId } = req.body;
@@ -2275,7 +2276,7 @@ hrRouter.post("/hiring-approval/initialize/:candidatureId", getAuthUser, async (
 });
 
 // POST /api/hr/hiring-approval/submit - Soumettre une décision
-hrRouter.post("/hiring-approval/submit", getAuthUser, async (req, res) => {
+hrRouter.post("/hiring-approval/submit", getAuthUser, attachAbility, requireAbility(Actions.APPROVE, Subjects.RH), async (req, res) => {
   try {
     const { candidatureId, decision, commentaire } = req.body;
     const approverId = req.user?.id;
@@ -2317,7 +2318,7 @@ hrRouter.post("/hiring-approval/submit", getAuthUser, async (req, res) => {
 });
 
 // GET /api/hr/hiring-approval/pending - Approbations en attente pour un rôle
-hrRouter.get("/hiring-approval/pending", getAuthUser, async (req, res) => {
+hrRouter.get("/hiring-approval/pending", getAuthUser, attachAbility, async (req, res) => {
   try {
     const { role, agenceId } = req.query;
 
@@ -2338,7 +2339,7 @@ hrRouter.get("/hiring-approval/pending", getAuthUser, async (req, res) => {
 });
 
 // GET /api/hr/hiring-approval/status/:candidatureId - Statut du workflow
-hrRouter.get("/hiring-approval/status/:candidatureId", getAuthUser, async (req, res) => {
+hrRouter.get("/hiring-approval/status/:candidatureId", getAuthUser, attachAbility, async (req, res) => {
   try {
     const candidatureId = parseInt(req.params.candidatureId);
     const status = await hiringApprovalService.getWorkflowStatus(candidatureId);
@@ -2361,7 +2362,7 @@ hrRouter.get("/hiring-approval/status/:candidatureId", getAuthUser, async (req, 
  */
 
 // GET /api/hr/onboarding/checklists - Liste des checklists d'onboarding
-hrRouter.get("/onboarding/checklists", getAuthUser, async (req, res) => {
+hrRouter.get("/onboarding/checklists", getAuthUser, attachAbility, async (req, res) => {
   try {
     const { agenceId } = req.query;
     const checklists = await onboardingService.getChecklists(agenceId as string | undefined);
@@ -2373,7 +2374,7 @@ hrRouter.get("/onboarding/checklists", getAuthUser, async (req, res) => {
 });
 
 // POST /api/hr/onboarding/checklists - Créer une checklist
-hrRouter.post("/onboarding/checklists", getAuthUser, async (req, res) => {
+hrRouter.post("/onboarding/checklists", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.RH), async (req, res) => {
   try {
     const { agenceId, nom, description, items } = req.body;
 
@@ -2397,7 +2398,7 @@ hrRouter.post("/onboarding/checklists", getAuthUser, async (req, res) => {
 });
 
 // PUT /api/hr/onboarding/checklists/:id - Mettre à jour une checklist
-hrRouter.put("/onboarding/checklists/:id", getAuthUser, async (req, res) => {
+hrRouter.put("/onboarding/checklists/:id", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.RH), async (req, res) => {
   try {
     const { id } = req.params;
     const { nom, description, items } = req.body;
@@ -2417,7 +2418,7 @@ hrRouter.put("/onboarding/checklists/:id", getAuthUser, async (req, res) => {
 });
 
 // DELETE /api/hr/onboarding/checklists/:id - Supprimer une checklist
-hrRouter.delete("/onboarding/checklists/:id", getAuthUser, async (req, res) => {
+hrRouter.delete("/onboarding/checklists/:id", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.RH), async (req, res) => {
   try {
     const { id } = req.params;
     await onboardingService.deleteChecklist(id);
@@ -2429,7 +2430,7 @@ hrRouter.delete("/onboarding/checklists/:id", getAuthUser, async (req, res) => {
 });
 
 // GET /api/hr/onboarding/instances - Liste des instances d'onboarding
-hrRouter.get("/onboarding/instances", getAuthUser, async (req, res) => {
+hrRouter.get("/onboarding/instances", getAuthUser, attachAbility, async (req, res) => {
   try {
     const { candidatureId, employeId, statut, assignedTo } = req.query;
     const instances = await onboardingService.getInstances({
@@ -2446,7 +2447,7 @@ hrRouter.get("/onboarding/instances", getAuthUser, async (req, res) => {
 });
 
 // GET /api/hr/onboarding/instances/:id - Détail d'une instance
-hrRouter.get("/onboarding/instances/:id", getAuthUser, async (req, res) => {
+hrRouter.get("/onboarding/instances/:id", getAuthUser, attachAbility, async (req, res) => {
   try {
     const { id } = req.params;
     const instance = await onboardingService.getInstance(id);
@@ -2463,7 +2464,7 @@ hrRouter.get("/onboarding/instances/:id", getAuthUser, async (req, res) => {
 });
 
 // POST /api/hr/onboarding/start - Démarrer l'onboarding pour une candidature
-hrRouter.post("/onboarding/start", getAuthUser, async (req, res) => {
+hrRouter.post("/onboarding/start", getAuthUser, attachAbility, requireAbility(Actions.CREATE, Subjects.EMPLOYE), async (req, res) => {
   try {
     const { candidatureId, checklistId, assignedTo } = req.body;
 
@@ -2495,7 +2496,7 @@ hrRouter.post("/onboarding/start", getAuthUser, async (req, res) => {
 });
 
 // POST /api/hr/onboarding/instances/:id/complete-item - Compléter un item
-hrRouter.post("/onboarding/instances/:id/complete-item", getAuthUser, async (req, res) => {
+hrRouter.post("/onboarding/instances/:id/complete-item", getAuthUser, attachAbility, requireAbility(Actions.EDIT, Subjects.RH), async (req, res) => {
   try {
     const { id } = req.params;
     const { itemName, notes } = req.body;
@@ -2520,7 +2521,7 @@ hrRouter.post("/onboarding/instances/:id/complete-item", getAuthUser, async (req
 });
 
 // POST /api/hr/onboarding/instances/:id/uncomplete-item - Démarquer un item
-hrRouter.post("/onboarding/instances/:id/uncomplete-item", getAuthUser, async (req, res) => {
+hrRouter.post("/onboarding/instances/:id/uncomplete-item", getAuthUser, attachAbility, requireAbility(Actions.EDIT, Subjects.RH), async (req, res) => {
   try {
     const { id } = req.params;
     const { itemName } = req.body;
@@ -2538,7 +2539,7 @@ hrRouter.post("/onboarding/instances/:id/uncomplete-item", getAuthUser, async (r
 });
 
 // POST /api/hr/onboarding/convert-to-employee - Convertir candidat en employé
-hrRouter.post("/onboarding/convert-to-employee", getAuthUser, async (req, res) => {
+hrRouter.post("/onboarding/convert-to-employee", getAuthUser, attachAbility, requireAbility(Actions.CREATE, Subjects.EMPLOYE), async (req, res) => {
   try {
     const { candidatureId, employeData } = req.body;
 
@@ -2572,7 +2573,7 @@ hrRouter.post("/onboarding/convert-to-employee", getAuthUser, async (req, res) =
 });
 
 // POST /api/hr/onboarding/instances/:id/cancel - Annuler l'onboarding
-hrRouter.post("/onboarding/instances/:id/cancel", getAuthUser, async (req, res) => {
+hrRouter.post("/onboarding/instances/:id/cancel", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.RH), async (req, res) => {
   try {
     const { id } = req.params;
     const { reason } = req.body;
@@ -2592,7 +2593,7 @@ hrRouter.post("/onboarding/instances/:id/cancel", getAuthUser, async (req, res) 
  */
 
 // GET /api/hr/bulletins - Liste des bulletins de paie
-hrRouter.get("/bulletins", getAuthUser, async (req, res) => {
+hrRouter.get("/bulletins", getAuthUser, attachAbility, async (req, res) => {
   try {
     const { employeId, mois, annee } = req.query;
 
@@ -2617,7 +2618,7 @@ hrRouter.get("/bulletins", getAuthUser, async (req, res) => {
 });
 
 // GET /api/hr/bulletins/:id - Détail d'un bulletin avec lignes
-hrRouter.get("/bulletins/:id", getAuthUser, async (req, res) => {
+hrRouter.get("/bulletins/:id", getAuthUser, attachAbility, async (req, res) => {
   try {
     const bulletinId = parseInt(req.params.id);
     if (isNaN(bulletinId)) {
@@ -2844,7 +2845,7 @@ hrRouter.post("/paie/generate", getAuthUser, attachAbility, requireAbility(Actio
 });
 
 // GET /api/hr/paie/config - Configuration de la paie
-hrRouter.get("/paie/config", getAuthUser, async (req, res) => {
+hrRouter.get("/paie/config", getAuthUser, attachAbility, async (req, res) => {
   try {
     const agenceId = req.user?.agenceId;
     // Try agency-specific config first, then global
@@ -3406,7 +3407,7 @@ hrRouter.get("/paie/payment-jobs/:runId", getAuthUser, attachAbility, requireAbi
 });
 
 // GET /api/hr/paie/runs - Lister les runs de paie
-hrRouter.get("/paie/runs", getAuthUser, async (req: Request, res: Response) => {
+hrRouter.get("/paie/runs", getAuthUser, attachAbility, async (req: Request, res: Response) => {
   try {
     const agenceId = req.user?.agenceId;
     const { period } = req.query;
@@ -3433,7 +3434,7 @@ hrRouter.get("/paie/runs", getAuthUser, async (req: Request, res: Response) => {
 });
 
 // GET /api/hr/paie/runs/:id - Détail d'un run avec bulletins
-hrRouter.get("/paie/runs/:id", getAuthUser, async (req: Request, res: Response) => {
+hrRouter.get("/paie/runs/:id", getAuthUser, attachAbility, async (req: Request, res: Response) => {
   try {
     const runId = parseInt(req.params.id);
     const [run] = await db.select().from(payrollRuns).where(eq(payrollRuns.id, runId));
@@ -3530,7 +3531,7 @@ hrRouter.post("/paie/rerun", getAuthUser, attachAbility, requireAbility(Actions.
 });
 
 // GET /api/hr/paie/my - Mes fiches de paie
-hrRouter.get("/paie/my", getAuthUser, async (req, res) => {
+hrRouter.get("/paie/my", getAuthUser, attachAbility, async (req, res) => {
     try {
         const userId = req.user?.id;
         if (!userId) return res.status(401).json({ error: "Non authentifié" });
@@ -3570,7 +3571,7 @@ hrRouter.get("/paie/my", getAuthUser, async (req, res) => {
 });
 
 // GET /api/hr/paie/diagnostic - Diagnostic paie pour l'utilisateur connecté
-hrRouter.get("/paie/diagnostic", getAuthUser, async (req, res) => {
+hrRouter.get("/paie/diagnostic", getAuthUser, attachAbility, async (req, res) => {
     try {
         const userId = req.user?.id;
         if (!userId) return res.status(401).json({ error: "Non authentifié" });
@@ -3649,7 +3650,7 @@ hrRouter.get("/paie/diagnostic", getAuthUser, async (req, res) => {
 });
 
 // POST /api/hr/bulletins - Archiver un bulletin de paie
-hrRouter.post("/bulletins", getAuthUser, async (req, res) => {
+hrRouter.post("/bulletins", getAuthUser, attachAbility, requireAbility(Actions.CREATE, Subjects.PAIE), async (req, res) => {
   try {
     const {
       employeId,
@@ -3726,7 +3727,7 @@ hrRouter.post("/bulletins", getAuthUser, async (req, res) => {
  */
 
 // GET /api/hr/stats - Statistiques globales RH
-hrRouter.get("/stats", getAuthUser, async (req, res) => {
+hrRouter.get("/stats", getAuthUser, attachAbility, async (req, res) => {
   try {
     const stats = await storage.getHrStats();
 
@@ -3811,7 +3812,7 @@ hrRouter.get("/pending-count", getAuthUser, attachAbility, async (req, res) => {
 // =============================================================================
 
 // GET /api/hr/mon-espace/unread-count — unread bulletins + new completed documents
-hrRouter.get("/mon-espace/unread-count", getAuthUser, async (req, res) => {
+hrRouter.get("/mon-espace/unread-count", getAuthUser, attachAbility, async (req, res) => {
     try {
         const user = (req as any).user;
         const [emp] = await db.select({ id: employes.id }).from(employes).where(eq(employes.userId, user.id)).limit(1);
@@ -3846,7 +3847,7 @@ hrRouter.get("/mon-espace/unread-count", getAuthUser, async (req, res) => {
 });
 
 // POST /api/hr/bulletins/:id/mark-read — employee marks bulletin as viewed
-hrRouter.post("/bulletins/:id/mark-read", getAuthUser, async (req, res) => {
+hrRouter.post("/bulletins/:id/mark-read", getAuthUser, attachAbility, async (req, res) => {
     try {
         const user = (req as any).user;
         const bulletinId = parseInt(req.params.id);
@@ -3872,7 +3873,7 @@ hrRouter.post("/bulletins/:id/mark-read", getAuthUser, async (req, res) => {
 });
 
 // POST /api/hr/document-requests/:id/mark-read — employee marks completed document as viewed
-hrRouter.post("/document-requests/:id/mark-read", getAuthUser, async (req, res) => {
+hrRouter.post("/document-requests/:id/mark-read", getAuthUser, attachAbility, async (req, res) => {
     try {
         const user = (req as any).user;
         const docId = req.params.id;
@@ -3903,14 +3904,14 @@ hrRouter.post("/document-requests/:id/mark-read", getAuthUser, async (req, res) 
  */
 
 // GET /api/hr/audit - Historique des actions RH
-hrRouter.get("/audit", getAuthUser, async (req, res) => {
+hrRouter.get("/audit", getAuthUser, attachAbility, async (req, res) => {
   try {
     const { entityType, entityId, limit = '50', page = '1' } = req.query;
-    const userRole = req.user?.role;
 
-    // Only admins, RH, and direction can view audit logs
-    const allowedRoles = ['admin', 'Administrateur', 'rh', 'direction', 'pdg', 'dg'];
-    if (!roleIn(userRole, allowedRoles)) {
+    // CASL: only users with VIEW on HR_AUDIT (or MANAGE on RH) can access audit logs
+    const canViewAudit = req.ability?.can(Actions.VIEW, Subjects.HR_AUDIT)
+      || req.ability?.can(Actions.MANAGE, Subjects.RH) || false;
+    if (!canViewAudit) {
       return res.status(403).json(errorResponse('FORBIDDEN', 'Non autorisé à consulter l\'audit'));
     }
 
@@ -3941,7 +3942,7 @@ hrRouter.get("/audit", getAuthUser, async (req, res) => {
  */
 
 // GET /api/hr/avantages - Liste des avantages disponibles
-hrRouter.get("/avantages", getAuthUser, async (req, res) => {
+hrRouter.get("/avantages", getAuthUser, attachAbility, async (req, res) => {
     try {
         const avantagesList = await storage.getAllAvantages();
         res.json(avantagesList);
@@ -3952,7 +3953,7 @@ hrRouter.get("/avantages", getAuthUser, async (req, res) => {
 });
 
 // GET /api/hr/avantages/employe/:id - Avantages d'un employé
-hrRouter.get("/avantages/employe/:id", getAuthUser, async (req, res) => {
+hrRouter.get("/avantages/employe/:id", getAuthUser, attachAbility, async (req, res) => {
     try {
         const { id } = req.params;
         const result = await storage.getAvantagesEmploye(id);
@@ -3964,7 +3965,7 @@ hrRouter.get("/avantages/employe/:id", getAuthUser, async (req, res) => {
 });
 
 // POST /api/hr/avantages/assign - Assigner un avantage
-hrRouter.post("/avantages/assign", getAuthUser, async (req, res) => {
+hrRouter.post("/avantages/assign", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.RH), async (req, res) => {
     try {
         const { employeId, avantageId, montant } = req.body;
         if (!employeId || !avantageId || !montant) {
@@ -4102,7 +4103,7 @@ hrRouter.delete("/avantages/:id", getAuthUser, attachAbility, requireAbility(Act
  */
 
 // GET /api/hr/presence/today - Stats présence aujourd'hui
-hrRouter.get("/presence/today", getAuthUser, async (req, res) => {
+hrRouter.get("/presence/today", getAuthUser, attachAbility, async (req, res) => {
     try {
         const stats = await storage.getPresenceAujourdhui();
         res.json(stats);
@@ -4113,7 +4114,7 @@ hrRouter.get("/presence/today", getAuthUser, async (req, res) => {
 });
 
 // POST /api/hr/presence/checkin - Pointage Arrivée (avec GPS optionnel)
-hrRouter.post("/presence/checkin", getAuthUser, async (req, res) => {
+hrRouter.post("/presence/checkin", getAuthUser, attachAbility, async (req, res) => {
     try {
         const userId = req.user?.id;
         if (!userId) return res.status(401).json({ error: "Non authentifié" });
@@ -4163,7 +4164,7 @@ hrRouter.post("/presence/checkin", getAuthUser, async (req, res) => {
 });
 
 // POST /api/hr/presence/checkout - Pointage Départ
-hrRouter.post("/presence/checkout", getAuthUser, async (req, res) => {
+hrRouter.post("/presence/checkout", getAuthUser, attachAbility, async (req, res) => {
     try {
         const userId = req.user?.id;
         if (!userId) return res.status(401).json({ error: "Non authentifié" });
@@ -4191,7 +4192,7 @@ hrRouter.post("/presence/checkout", getAuthUser, async (req, res) => {
 });
 
 // POST /api/hr/presence/start-break - Début pause
-hrRouter.post("/presence/start-break", getAuthUser, async (req, res) => {
+hrRouter.post("/presence/start-break", getAuthUser, attachAbility, async (req, res) => {
     try {
         const userId = req.user?.id;
         if (!userId) return res.status(401).json({ error: "Non authentifié" });
@@ -4219,7 +4220,7 @@ hrRouter.post("/presence/start-break", getAuthUser, async (req, res) => {
 });
 
 // POST /api/hr/presence/end-break - Fin pause
-hrRouter.post("/presence/end-break", getAuthUser, async (req, res) => {
+hrRouter.post("/presence/end-break", getAuthUser, attachAbility, async (req, res) => {
     try {
         const userId = req.user?.id;
         if (!userId) return res.status(401).json({ error: "Non authentifié" });
@@ -4292,7 +4293,7 @@ hrRouter.post("/presence/manual", getAuthUser, attachAbility, requireAbility(Act
 });
 
 // GET /api/hr/presence/by-status/:status - Liste employés par statut
-hrRouter.get("/presence/by-status/:status", getAuthUser, async (req, res) => {
+hrRouter.get("/presence/by-status/:status", getAuthUser, attachAbility, async (req, res) => {
     try {
         const { status } = req.params;
         const today = new Date().toISOString().split('T')[0];
@@ -4322,7 +4323,7 @@ hrRouter.get("/presence/by-status/:status", getAuthUser, async (req, res) => {
 });
 
 // GET /api/hr/attendance/analytics/:employeId - Statistiques de présence étendues
-hrRouter.get("/attendance/analytics/:employeId", getAuthUser, async (req, res) => {
+hrRouter.get("/attendance/analytics/:employeId", getAuthUser, attachAbility, async (req, res) => {
   try {
     const { employeId } = req.params;
     const { year, month } = req.query;
@@ -4447,7 +4448,7 @@ hrRouter.get("/attendance/analytics/:employeId", getAuthUser, async (req, res) =
 });
 
 // GET /api/hr/attendance/export/:employeId - Export des données de présence
-hrRouter.get("/attendance/export/:employeId", getAuthUser, async (req, res) => {
+hrRouter.get("/attendance/export/:employeId", getAuthUser, attachAbility, async (req, res) => {
   try {
     const { employeId } = req.params;
     const { year, month, format } = req.query;
@@ -4524,7 +4525,7 @@ hrRouter.get("/attendance/export/:employeId", getAuthUser, async (req, res) => {
  */
 
 // GET /api/hr/organigramme - Structure hiérarchique
-hrRouter.get("/organigramme", getAuthUser, async (req, res) => {
+hrRouter.get("/organigramme", getAuthUser, attachAbility, async (req, res) => {
     try {
         const agenceId = req.user?.agenceId || undefined; // Filter by user's agency
         const orgChart = await storage.getOrganigramme(agenceId);
@@ -4536,11 +4537,14 @@ hrRouter.get("/organigramme", getAuthUser, async (req, res) => {
 });
 
 // PATCH /api/hr/organigramme/reassign - Drag-drop: change employee's manager
-hrRouter.patch("/organigramme/reassign", getAuthUser, async (req, res) => {
+hrRouter.patch("/organigramme/reassign", getAuthUser, attachAbility, async (req, res) => {
     try {
         const userId = req.user?.id;
-        const userRole = normalizeRole(req.user?.role);
-        if (!roleIn(userRole, ['admin', 'rh', 'direction'])) {
+
+        // CASL: only users with MANAGE on EMPLOYE (or MANAGE on RH) can reassign hierarchy
+        const canReassign = req.ability?.can(Actions.MANAGE, Subjects.EMPLOYE)
+          || req.ability?.can(Actions.MANAGE, Subjects.RH) || false;
+        if (!canReassign) {
             return res.status(403).json({ error: "Non autorisé à modifier la hiérarchie" });
         }
 
@@ -4607,7 +4611,7 @@ hrRouter.patch("/organigramme/reassign", getAuthUser, async (req, res) => {
  */
 
 // GET /api/hr/horaires/:employeId - Horaires d'un employé
-hrRouter.get("/horaires/:employeId", getAuthUser, async (req, res) => {
+hrRouter.get("/horaires/:employeId", getAuthUser, attachAbility, async (req, res) => {
     try {
         const { employeId } = req.params;
         const horaires = await db.select().from(horairesTravail)
@@ -4663,7 +4667,7 @@ hrRouter.delete("/horaires/:id", getAuthUser, attachAbility, requireAbility(Acti
  */
 
 // GET /api/hr/shift-templates - Liste des modèles d'horaires
-hrRouter.get("/shift-templates", getAuthUser, async (req, res) => {
+hrRouter.get("/shift-templates", getAuthUser, attachAbility, async (req, res) => {
     try {
         const { agenceId } = req.query;
         let query = db.select().from(shiftTemplates);
@@ -4777,7 +4781,7 @@ hrRouter.delete("/shift-templates/:id", getAuthUser, attachAbility, requireAbili
  */
 
 // GET /api/hr/salary-rates/history/:employeId - Historique des taux d'un employé
-hrRouter.get("/salary-rates/history/:employeId", getAuthUser, async (req, res) => {
+hrRouter.get("/salary-rates/history/:employeId", getAuthUser, attachAbility, async (req, res) => {
     try {
         const { employeId } = req.params;
 
@@ -4856,7 +4860,7 @@ hrRouter.post("/salary-rates/change", getAuthUser, attachAbility, requireAbility
 });
 
 // GET /api/hr/salary-rates/current/:employeId - Taux actuel d'un employé
-hrRouter.get("/salary-rates/current/:employeId", getAuthUser, async (req, res) => {
+hrRouter.get("/salary-rates/current/:employeId", getAuthUser, attachAbility, async (req, res) => {
     try {
         const { employeId } = req.params;
 
@@ -4970,7 +4974,7 @@ hrRouter.get("/avances", getAuthUser, attachAbility, async (req, res) => {
 });
 
 // POST /api/hr/avances - Create a salary advance request
-hrRouter.post("/avances", getAuthUser, attachAbility, async (req, res) => {
+hrRouter.post("/avances", getAuthUser, attachAbility, requireAbility(Actions.CREATE, Subjects.PAIE), async (req, res) => {
     try {
         const parsed = insertAvanceSalaireSchema.safeParse(req.body);
         if (!parsed.success) {
@@ -5399,7 +5403,7 @@ hrRouter.get("/evaluations/templates", getAuthUser, attachAbility, async (req, r
 });
 
 // POST /api/hr/evaluations/templates
-hrRouter.post("/evaluations/templates", getAuthUser, attachAbility, async (req, res) => {
+hrRouter.post("/evaluations/templates", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.RH), async (req, res) => {
     try {
         if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         const { criteria, ...templateData } = req.body;
@@ -5423,7 +5427,7 @@ hrRouter.post("/evaluations/templates", getAuthUser, attachAbility, async (req, 
 });
 
 // PUT /api/hr/evaluations/templates/:id
-hrRouter.put("/evaluations/templates/:id", getAuthUser, attachAbility, async (req, res) => {
+hrRouter.put("/evaluations/templates/:id", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.RH), async (req, res) => {
     try {
         if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         const { criteria, ...templateData } = req.body;
@@ -5443,7 +5447,7 @@ hrRouter.put("/evaluations/templates/:id", getAuthUser, attachAbility, async (re
 });
 
 // DELETE /api/hr/evaluations/templates/:id
-hrRouter.delete("/evaluations/templates/:id", getAuthUser, attachAbility, async (req, res) => {
+hrRouter.delete("/evaluations/templates/:id", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.RH), async (req, res) => {
     try {
         if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         await hrStorage.deleteEvaluationTemplate(req.params.id);
@@ -5472,7 +5476,7 @@ hrRouter.get("/evaluations/campaigns", getAuthUser, attachAbility, async (req, r
 });
 
 // POST /api/hr/evaluations/campaigns
-hrRouter.post("/evaluations/campaigns", getAuthUser, attachAbility, async (req, res) => {
+hrRouter.post("/evaluations/campaigns", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.RH), async (req, res) => {
     try {
         if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         const user = (req as any).user;
@@ -5497,7 +5501,7 @@ hrRouter.post("/evaluations/campaigns", getAuthUser, attachAbility, async (req, 
 });
 
 // PATCH /api/hr/evaluations/campaigns/:id/status
-hrRouter.patch("/evaluations/campaigns/:id/status", getAuthUser, attachAbility, async (req, res) => {
+hrRouter.patch("/evaluations/campaigns/:id/status", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.RH), async (req, res) => {
     try {
         if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         const { statut } = req.body;
@@ -5853,7 +5857,7 @@ hrRouter.get("/alerts/config", getAuthUser, attachAbility, async (req, res) => {
 });
 
 // PUT /api/hr/alerts/config/:type
-hrRouter.put("/alerts/config/:type", getAuthUser, attachAbility, async (req, res) => {
+hrRouter.put("/alerts/config/:type", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.RH), async (req, res) => {
     try {
         if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         const config = await hrStorage.updateAlertConfig(req.params.type, req.body);
@@ -5882,7 +5886,7 @@ hrRouter.get("/paie/runs/:runId/transfer-preview", getAuthUser, attachAbility, a
 });
 
 // POST /api/hr/paie/runs/:runId/generate-transfer
-hrRouter.post("/paie/runs/:runId/generate-transfer", getAuthUser, attachAbility, async (req, res) => {
+hrRouter.post("/paie/runs/:runId/generate-transfer", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.PAIE), async (req, res) => {
     try {
         if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         const user = (req as any).user;
@@ -5973,7 +5977,7 @@ hrRouter.get("/document-requests", getAuthUser, attachAbility, async (req, res) 
 });
 
 // POST /api/hr/document-requests
-hrRouter.post("/document-requests", getAuthUser, async (req, res) => {
+hrRouter.post("/document-requests", getAuthUser, attachAbility, async (req, res) => {
     try {
         const user = (req as any).user;
         const [emp] = await db.select().from(employes).where(eq(employes.userId, user.id));
@@ -6022,7 +6026,7 @@ hrRouter.post("/document-requests", getAuthUser, async (req, res) => {
 });
 
 // PATCH /api/hr/document-requests/:id/process
-hrRouter.patch("/document-requests/:id/process", getAuthUser, attachAbility, async (req, res) => {
+hrRouter.patch("/document-requests/:id/process", getAuthUser, attachAbility, requireAbility(Actions.EDIT, Subjects.RH), async (req, res) => {
     try {
         if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) {
             return res.status(403).json({ error: "Non autorisé" });
@@ -6075,7 +6079,7 @@ hrRouter.patch("/document-requests/:id/process", getAuthUser, attachAbility, asy
 });
 
 // GET /api/hr/document-requests/:id/download
-hrRouter.get("/document-requests/:id/download", getAuthUser, async (req, res) => {
+hrRouter.get("/document-requests/:id/download", getAuthUser, attachAbility, async (req, res) => {
     try {
         const [request] = await db.select().from(hrDocumentRequests).where(eq(hrDocumentRequests.id, req.params.id));
         if (!request) {
@@ -6111,7 +6115,7 @@ hrRouter.get("/job-offers", getAuthUser, attachAbility, async (req, res) => {
 });
 
 // POST /api/hr/job-offers - Créer une offre
-hrRouter.post("/job-offers", getAuthUser, attachAbility, async (req, res) => {
+hrRouter.post("/job-offers", getAuthUser, attachAbility, requireAbility(Actions.CREATE, Subjects.RH), async (req, res) => {
     try {
         if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         const user = (req as any).user;
@@ -6160,7 +6164,7 @@ hrRouter.post("/job-offers", getAuthUser, attachAbility, async (req, res) => {
 });
 
 // GET /api/hr/job-offers/internal - Offres publiées visibles en interne
-hrRouter.get("/job-offers/internal", getAuthUser, async (req, res) => {
+hrRouter.get("/job-offers/internal", getAuthUser, attachAbility, async (req, res) => {
     try {
         const offers = await hrStorage.getInternalJobOffers();
         res.json(offers);
@@ -6184,7 +6188,7 @@ hrRouter.get("/job-offers/:id", getAuthUser, attachAbility, async (req, res) => 
 });
 
 // PATCH /api/hr/job-offers/:id - Modifier une offre
-hrRouter.patch("/job-offers/:id", getAuthUser, attachAbility, async (req, res) => {
+hrRouter.patch("/job-offers/:id", getAuthUser, attachAbility, requireAbility(Actions.EDIT, Subjects.RH), async (req, res) => {
     try {
         if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
 
@@ -6214,7 +6218,7 @@ hrRouter.patch("/job-offers/:id", getAuthUser, attachAbility, async (req, res) =
 });
 
 // POST /api/hr/job-offers/:id/publish - Publier une offre
-hrRouter.post("/job-offers/:id/publish", getAuthUser, attachAbility, async (req, res) => {
+hrRouter.post("/job-offers/:id/publish", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.RH), async (req, res) => {
     try {
         if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
 
@@ -6239,7 +6243,7 @@ hrRouter.post("/job-offers/:id/publish", getAuthUser, attachAbility, async (req,
 });
 
 // POST /api/hr/job-offers/:id/close - Fermer une offre
-hrRouter.post("/job-offers/:id/close", getAuthUser, attachAbility, async (req, res) => {
+hrRouter.post("/job-offers/:id/close", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.RH), async (req, res) => {
     try {
         if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
 
@@ -6270,7 +6274,7 @@ hrRouter.get("/job-offers/:id/candidatures", getAuthUser, attachAbility, async (
 });
 
 // POST /api/hr/job-offers/:id/score-all - Re-scorer toutes les candidatures d'une offre
-hrRouter.post("/job-offers/:id/score-all", getAuthUser, attachAbility, async (req, res) => {
+hrRouter.post("/job-offers/:id/score-all", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.RH), async (req, res) => {
     try {
         if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         const scored = await scoreAllCandidatures(parseInt(req.params.id));
@@ -6282,7 +6286,7 @@ hrRouter.post("/job-offers/:id/score-all", getAuthUser, attachAbility, async (re
 });
 
 // POST /api/hr/job-offers/:id/apply-internal - Postuler en interne
-hrRouter.post("/job-offers/:id/apply-internal", getAuthUser, async (req, res) => {
+hrRouter.post("/job-offers/:id/apply-internal", getAuthUser, attachAbility, async (req, res) => {
     try {
         const user = (req as any).user;
         const offerId = parseInt(req.params.id);
@@ -6346,7 +6350,7 @@ hrRouter.post("/job-offers/:id/apply-internal", getAuthUser, async (req, res) =>
 // =============================================================================
 
 // POST /api/hr/paie/runs/:runId/generate-transfer-xlsx - Générer XLSX
-hrRouter.post("/paie/runs/:runId/generate-transfer-xlsx", getAuthUser, attachAbility, async (req, res) => {
+hrRouter.post("/paie/runs/:runId/generate-transfer-xlsx", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.PAIE), async (req, res) => {
     try {
         if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         const user = (req as any).user;
@@ -6363,7 +6367,7 @@ hrRouter.post("/paie/runs/:runId/generate-transfer-xlsx", getAuthUser, attachAbi
 });
 
 // POST /api/hr/paie/runs/:runId/create-batches - Créer batches (1 par banque)
-hrRouter.post("/paie/runs/:runId/create-batches", getAuthUser, attachAbility, async (req, res) => {
+hrRouter.post("/paie/runs/:runId/create-batches", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.PAIE), async (req, res) => {
     try {
         if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         const user = (req as any).user;
@@ -6402,7 +6406,7 @@ hrRouter.get("/paie/batches/:id", getAuthUser, attachAbility, async (req, res) =
 });
 
 // PATCH /api/hr/paie/batches/:id/status - Changer statut d'un batch
-hrRouter.patch("/paie/batches/:id/status", getAuthUser, attachAbility, async (req, res) => {
+hrRouter.patch("/paie/batches/:id/status", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.PAIE), async (req, res) => {
     try {
         if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         const user = (req as any).user;
@@ -6446,7 +6450,7 @@ hrRouter.patch("/paie/batches/:id/status", getAuthUser, attachAbility, async (re
 });
 
 // PATCH /api/hr/paie/batches/:batchId/items/:itemId - Marquer un item paid/failed
-hrRouter.patch("/paie/batches/:batchId/items/:itemId", getAuthUser, attachAbility, async (req, res) => {
+hrRouter.patch("/paie/batches/:batchId/items/:itemId", getAuthUser, attachAbility, requireAbility(Actions.EDIT, Subjects.PAIE), async (req, res) => {
     try {
         if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         const { statut, failureReason } = req.body;
@@ -6488,7 +6492,7 @@ hrRouter.get("/paie/reconciliation", getAuthUser, attachAbility, async (req, res
 });
 
 // POST /api/hr/paie/reconciliation - Créer une session
-hrRouter.post("/paie/reconciliation", getAuthUser, attachAbility, async (req, res) => {
+hrRouter.post("/paie/reconciliation", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.PAIE), async (req, res) => {
     try {
         if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         const user = (req as any).user;
@@ -6621,7 +6625,7 @@ hrRouter.post("/paie/reconciliation/:id/import", getAuthUser, attachAbility, ban
 });
 
 // POST /api/hr/paie/reconciliation/:id/auto-match - Lancer matching automatique
-hrRouter.post("/paie/reconciliation/:id/auto-match", getAuthUser, attachAbility, async (req, res) => {
+hrRouter.post("/paie/reconciliation/:id/auto-match", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.PAIE), async (req, res) => {
     try {
         if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
 
@@ -6670,7 +6674,7 @@ hrRouter.post("/paie/reconciliation/:id/auto-match", getAuthUser, attachAbility,
 });
 
 // PATCH /api/hr/paie/reconciliation/:id/lines/:lineId - Match/ignore/unmatch manuel
-hrRouter.patch("/paie/reconciliation/:id/lines/:lineId", getAuthUser, attachAbility, async (req, res) => {
+hrRouter.patch("/paie/reconciliation/:id/lines/:lineId", getAuthUser, attachAbility, requireAbility(Actions.EDIT, Subjects.PAIE), async (req, res) => {
     try {
         if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
 
@@ -6717,7 +6721,7 @@ hrRouter.patch("/paie/reconciliation/:id/lines/:lineId", getAuthUser, attachAbil
 });
 
 // POST /api/hr/paie/reconciliation/:id/complete - Clôturer session
-hrRouter.post("/paie/reconciliation/:id/complete", getAuthUser, attachAbility, async (req, res) => {
+hrRouter.post("/paie/reconciliation/:id/complete", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.PAIE), async (req, res) => {
     try {
         if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         const user = (req as any).user;
@@ -6753,7 +6757,7 @@ hrRouter.get("/projects", getAuthUser, attachAbility, async (req, res) => {
 });
 
 // POST /api/hr/projects
-hrRouter.post("/projects", getAuthUser, attachAbility, async (req, res) => {
+hrRouter.post("/projects", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.RH), async (req, res) => {
     try {
         if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         const user = (req as any).user;
@@ -6779,7 +6783,7 @@ hrRouter.get("/projects/:id", getAuthUser, attachAbility, async (req, res) => {
 });
 
 // PUT /api/hr/projects/:id
-hrRouter.put("/projects/:id", getAuthUser, attachAbility, async (req, res) => {
+hrRouter.put("/projects/:id", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.RH), async (req, res) => {
     try {
         if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         const project = await hrStorage.updateProject(req.params.id, req.body);
@@ -6792,7 +6796,7 @@ hrRouter.put("/projects/:id", getAuthUser, attachAbility, async (req, res) => {
 });
 
 // DELETE /api/hr/projects/:id (soft delete - sets status to CANCELLED)
-hrRouter.delete("/projects/:id", getAuthUser, attachAbility, async (req, res) => {
+hrRouter.delete("/projects/:id", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.RH), async (req, res) => {
     try {
         if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         const project = await hrStorage.updateProject(req.params.id, { statut: 'CANCELLED' });
@@ -6805,7 +6809,7 @@ hrRouter.delete("/projects/:id", getAuthUser, attachAbility, async (req, res) =>
 });
 
 // POST /api/hr/projects/:id/members
-hrRouter.post("/projects/:id/members", getAuthUser, attachAbility, async (req, res) => {
+hrRouter.post("/projects/:id/members", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.RH), async (req, res) => {
     try {
         if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         const member = await hrStorage.addProjectMember({
@@ -6820,7 +6824,7 @@ hrRouter.post("/projects/:id/members", getAuthUser, attachAbility, async (req, r
 });
 
 // DELETE /api/hr/projects/:id/members/:employeId
-hrRouter.delete("/projects/:id/members/:employeId", getAuthUser, attachAbility, async (req, res) => {
+hrRouter.delete("/projects/:id/members/:employeId", getAuthUser, attachAbility, requireAbility(Actions.MANAGE, Subjects.RH), async (req, res) => {
     try {
         if (!req.ability?.can(Actions.MANAGE, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         await hrStorage.removeProjectMember(req.params.id, req.params.employeId);
@@ -6950,7 +6954,7 @@ hrRouter.patch("/timesheets/:id/reject", getAuthUser, attachAbility, async (req,
 });
 
 // GET /api/hr/presence/week - Pointages d'un employé pour une semaine (lien feuille de temps)
-hrRouter.get("/presence/week", getAuthUser, async (req, res) => {
+hrRouter.get("/presence/week", getAuthUser, attachAbility, async (req, res) => {
     try {
         const { employeId, dateDebut, dateFin } = req.query as { employeId?: string; dateDebut?: string; dateFin?: string };
         if (!employeId || !dateDebut || !dateFin) {
@@ -6982,7 +6986,7 @@ hrRouter.get("/time-allocation/:employeId", getAuthUser, attachAbility, async (r
 // ================================================
 
 // GET /api/hr/my/dashboard
-hrRouter.get("/my/dashboard", getAuthUser, async (req, res) => {
+hrRouter.get("/my/dashboard", getAuthUser, attachAbility, async (req, res) => {
     try {
         const user = (req as any).user;
         const [emp] = await db.select().from(employes).where(eq(employes.userId, user.id));
@@ -6996,7 +7000,7 @@ hrRouter.get("/my/dashboard", getAuthUser, async (req, res) => {
 });
 
 // GET /api/hr/my/presence
-hrRouter.get("/my/presence", getAuthUser, async (req, res) => {
+hrRouter.get("/my/presence", getAuthUser, attachAbility, async (req, res) => {
     try {
         const user = (req as any).user;
         const [emp] = await db.select().from(employes).where(eq(employes.userId, user.id));
@@ -7011,7 +7015,7 @@ hrRouter.get("/my/presence", getAuthUser, async (req, res) => {
 });
 
 // GET /api/hr/my/evaluations
-hrRouter.get("/my/evaluations", getAuthUser, async (req, res) => {
+hrRouter.get("/my/evaluations", getAuthUser, attachAbility, async (req, res) => {
     try {
         const user = (req as any).user;
         const [emp] = await db.select().from(employes).where(eq(employes.userId, user.id));
@@ -7025,7 +7029,7 @@ hrRouter.get("/my/evaluations", getAuthUser, async (req, res) => {
 });
 
 // GET /api/hr/my/profile
-hrRouter.get("/my/profile", getAuthUser, async (req, res) => {
+hrRouter.get("/my/profile", getAuthUser, attachAbility, async (req, res) => {
     try {
         const user = (req as any).user;
         const [emp] = await db.select({
@@ -7048,7 +7052,7 @@ hrRouter.get("/my/profile", getAuthUser, async (req, res) => {
 });
 
 // PUT /api/hr/my/profile
-hrRouter.put("/my/profile", getAuthUser, async (req, res) => {
+hrRouter.put("/my/profile", getAuthUser, attachAbility, async (req, res) => {
     try {
         const user = (req as any).user;
         const [emp] = await db.select().from(employes).where(eq(employes.userId, user.id));

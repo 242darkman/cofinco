@@ -7,6 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Card, Button, Modal, FormField, SelectField, TextareaField, Badge, StatCard, SearchInput, EmptyState, FilterBar } from '../../ui';
 import { useProjects, useProject, type Project, type ProjectDetail } from '../../../hooks/hr/useProjectTime';
 import { useAgence } from '../../../contexts/AgenceContext';
+import { usePermissions } from '../../auth/ProtectedFeature';
 
 const STATUS_LABELS: Record<string, string> = {
   DRAFT: 'Brouillon',
@@ -83,6 +84,8 @@ export default function ProjetsTab() {
   const [newMemberRole, setNewMemberRole] = useState('MEMBER');
 
   const { agences } = useAgence();
+  const { hasPermission } = usePermissions();
+  const canManage = hasPermission('rh', 'manage');
   const { projects, isLoading, createProject, isCreating, updateProject } = useProjects(
     statusFilter ? { statut: statusFilter } : undefined,
   );
@@ -239,9 +242,11 @@ export default function ProjetsTab() {
           placeholder=""
           containerClassName="lg:w-48"
         />
-        <Button variant="primary" icon={Plus} onClick={openCreateModal}>
-          Nouveau projet
-        </Button>
+        {canManage && (
+          <Button variant="primary" icon={Plus} onClick={openCreateModal}>
+            Nouveau projet
+          </Button>
+        )}
       </FilterBar>
 
       {/* Loading */}
@@ -257,7 +262,7 @@ export default function ProjetsTab() {
           icon={FolderKanban}
           title="Aucun projet"
           description={search ? 'Aucun projet ne correspond à votre recherche.' : 'Commencez par créer votre premier projet.'}
-          action={!search ? { label: 'Créer un projet', onClick: openCreateModal } : undefined}
+          action={!search && canManage ? { label: 'Créer un projet', onClick: openCreateModal } : undefined}
         />
       )}
 
@@ -511,9 +516,11 @@ export default function ProjetsTab() {
                   <Users size={16} className="text-accent" />
                   Membres ({(projectDetail.membres || []).length})
                 </h4>
-                <Button variant="secondary" size="sm" icon={UserPlus} onClick={() => setShowAddMember(!showAddMember)}>
-                  Ajouter membre
-                </Button>
+                {canManage && (
+                  <Button variant="secondary" size="sm" icon={UserPlus} onClick={() => setShowAddMember(!showAddMember)}>
+                    Ajouter membre
+                  </Button>
+                )}
               </div>
 
               {/* Add member sub-form */}
@@ -581,15 +588,17 @@ export default function ProjetsTab() {
                           size="xs"
                           rawValue
                         />
-                        <Button
-                          variant="ghost"
-                          size="xs"
-                          icon={UserMinus}
-                          className="text-status-danger hover:bg-status-danger-bg"
-                          onClick={() => handleRemoveMember(member.employeId)}
-                        >
-                          Retirer
-                        </Button>
+                        {canManage && (
+                          <Button
+                            variant="ghost"
+                            size="xs"
+                            icon={UserMinus}
+                            className="text-status-danger hover:bg-status-danger-bg"
+                            onClick={() => handleRemoveMember(member.employeId)}
+                          >
+                            Retirer
+                          </Button>
+                        )}
                       </div>
                     </div>
                   ))}

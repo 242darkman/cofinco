@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, Save, Plus, Trash2, FileDown, FileUp, ChevronDown } from 'lucide-react';
 import { Card, Button, FormField, SelectField } from '../ui';
 import { toast } from '../../lib/toast';
+import { usePermissions } from '../auth/ProtectedFeature';
 
 const JOURS = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
 
@@ -18,6 +19,8 @@ interface WorkScheduleGridProps {
 }
 
 export default function WorkScheduleGrid({ employeId, agenceId }: WorkScheduleGridProps) {
+  const { hasPermission } = usePermissions();
+  const canManage = hasPermission('rh', 'manage') || hasPermission('horaires', 'manage');
   const [horaires, setHoraires] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [templates, setTemplates] = useState<ShiftTemplate[]>([]);
@@ -246,15 +249,17 @@ export default function WorkScheduleGrid({ employeId, agenceId }: WorkScheduleGr
               ))}
             </select>
           )}
-          <Button
-            variant="ghost"
-            size="sm"
-            icon={FileUp}
-            onClick={() => setShowSaveTemplate(true)}
-            disabled={horaires.length === 0}
-          >
-            <span className="hidden sm:inline">Sauvegarder modèle</span>
-          </Button>
+          {canManage && (
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={FileUp}
+              onClick={() => setShowSaveTemplate(true)}
+              disabled={horaires.length === 0}
+            >
+              <span className="hidden sm:inline">Sauvegarder modèle</span>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -365,15 +370,17 @@ export default function WorkScheduleGrid({ employeId, agenceId }: WorkScheduleGr
             })}
           </div>
 
-          <Button
-            variant="primary"
-            fullWidth
-            icon={Save}
-            onClick={handleSave}
-            disabled={loading}
-          >
-            {loading ? 'Sauvegarde...' : 'Enregistrer l\'emploi du temps'}
-          </Button>
+          {canManage && (
+            <Button
+              variant="primary"
+              fullWidth
+              icon={Save}
+              onClick={handleSave}
+              disabled={loading}
+            >
+              {loading ? 'Sauvegarde...' : 'Enregistrer l\'emploi du temps'}
+            </Button>
+          )}
         </div>
       </Card>
     </div>

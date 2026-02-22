@@ -52,12 +52,17 @@ function timeAgo(dateStr: string): string {
 
 export default function MonEquipeCongesTab() {
   const queryClient = useQueryClient();
+  const [approveTarget, setApproveTarget] = useState<TeamConge | null>(null);
   const [rejectTarget, setRejectTarget] = useState<TeamConge | null>(null);
   const [rejectComment, setRejectComment] = useState('');
 
   const { data: conges = [], isLoading } = useQuery<TeamConge[]>({
     queryKey: ['/api/hr/conges/team'],
-    queryFn: () => fetch('/api/hr/conges/team', { credentials: 'include' }).then(r => r.json()),
+    queryFn: async () => {
+      const r = await fetch('/api/hr/conges/team', { credentials: 'include' });
+      if (!r.ok) throw new Error('Erreur chargement des demandes');
+      return r.json();
+    },
   });
 
   const invalidate = useCallback(() => {
@@ -78,7 +83,8 @@ export default function MonEquipeCongesTab() {
         return r.json();
       }),
     onSuccess: () => {
-      toast.success('Conge approuve');
+      toast.success('Congé approuvé');
+      setApproveTarget(null);
       invalidate();
     },
     onError: (err: Error) => toast.error(err.message),
@@ -96,7 +102,7 @@ export default function MonEquipeCongesTab() {
         return r.json();
       }),
     onSuccess: () => {
-      toast.success('Conge refuse');
+      toast.success('Congé refusé');
       setRejectTarget(null);
       setRejectComment('');
       invalidate();
@@ -197,8 +203,7 @@ export default function MonEquipeCongesTab() {
                     variant="primary"
                     size="xs"
                     icon={Check}
-                    onClick={() => approveMutation.mutate(conge.id)}
-                    isLoading={approveMutation.isPending && approveMutation.variables === conge.id}
+                    onClick={() => setApproveTarget(conge)}
                   >
                     Approuver
                   </Button>
@@ -216,6 +221,40 @@ export default function MonEquipeCongesTab() {
           );
         })}
       </div>
+
+      {/* Approve confirmation modal */}
+      <Modal
+        isOpen={!!approveTarget}
+        onClose={() => setApproveTarget(null)}
+        title="Approuver la demande"
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setApproveTarget(null)}>
+              Annuler
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => approveTarget && approveMutation.mutate(approveTarget.id)}
+              isLoading={approveMutation.isPending}
+            >
+              Confirmer l'approbation
+            </Button>
+          </>
+        }
+      >
+        {approveTarget && (
+          <div className="p-3 rounded-lg bg-surface-subtle">
+            <p className="text-sm font-medium text-content-primary">{approveTarget.employeNom}</p>
+            <p className="text-xs text-content-muted mt-1">
+              {TYPE_LABELS[approveTarget.type] || approveTarget.type} — {formatDate(approveTarget.dateDebut)} au {formatDate(approveTarget.dateFin)}
+            </p>
+            <p className="text-xs font-medium text-content-secondary mt-1">
+              {approveTarget.dureeJours || computeDays(approveTarget.dateDebut, approveTarget.dateFin)} jour(s)
+            </p>
+          </div>
+        )}
+      </Modal>
 
       {/* Reject modal */}
       <Modal
