@@ -104,10 +104,14 @@ export default function MonProfilEditor() {
           <FormField
             label="Nombre d'enfants a charge"
             name="nombreEnfants"
-            type="number"
-            min={0}
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
             value={nombreEnfants}
-            onChange={(e) => setNombreEnfants(parseInt(e.target.value) || 0)}
+            onChange={(e) => {
+              const v = e.target.value.replace(/[^0-9]/g, '');
+              setNombreEnfants(v === '' ? 0 : parseInt(v, 10));
+            }}
           />
         </div>
       </div>
