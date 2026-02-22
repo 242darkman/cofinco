@@ -34,6 +34,8 @@ import {
   operationsCaisse,
   clients,
   users,
+  agentsTerrain,
+  employes,
   remboursements,
   transactionsCompte,
   contributionsTontine,
@@ -234,6 +236,23 @@ export class RemiseSettlementService {
           error: `Impossible de valider: statut actuel ${remise.statut}`,
           errorCode: "INVALID_STATUS",
         };
+      }
+
+      // 3b. SoD: Le créateur de la remise ne peut pas être le validateur
+      // remise.agentId → agentsTerrain.employeId → employes.userId → users.id
+      if (remise.agentId && params.validatedBy) {
+        const [agentUser] = await tx
+          .select({ userId: employes.userId })
+          .from(agentsTerrain)
+          .innerJoin(employes, eq(agentsTerrain.employeId, employes.id))
+          .where(eq(agentsTerrain.id, remise.agentId));
+        if (agentUser?.userId && agentUser.userId === params.validatedBy) {
+          return {
+            success: false,
+            error: "Conflit d'intérêts : le créateur de la remise ne peut pas être le validateur",
+            errorCode: "SOD_VIOLATION",
+          };
+        }
       }
 
       // 4. Récupérer les items et paiements

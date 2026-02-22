@@ -591,8 +591,15 @@ export async function recordCommitteeDecision(
   if (!reevaluation) {
     throw new Error('Réévaluation introuvable');
   }
-  
-  // 2. Determine final status
+
+  // 2. SoD: Le validateur de l'éligibilité ne peut pas être le décideur final
+  if (reevaluation.validePar && reevaluation.validePar === userId) {
+    throw new Error(
+      "Conflit d'intérêts : le validateur de l'éligibilité ne peut pas être le décideur final"
+    );
+  }
+
+  // 3. Determine final status
   const finalStatut = decision === 'REDUCED_AMOUNT' ? StatutReevaluation.APPROVED : decision;
   
   // 3. Validate transition
