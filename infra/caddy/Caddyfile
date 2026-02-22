@@ -10,6 +10,11 @@
 	email {$ACME_EMAIL:admin@cofinco.local}
 }
 
+# Redirect www → apex
+www.{$DOMAIN:localhost} {
+	redir https://{$DOMAIN:localhost}{uri} permanent
+}
+
 {$DOMAIN:localhost} {
 	# Security headers (complement to app-level Helmet)
 	header {
