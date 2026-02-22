@@ -15,6 +15,7 @@ import { useUnreadMessagesCount } from '../../hooks/useUnreadMessagesCount';
 import { useProspectionBadge } from '../../hooks/useProspectionBadge';
 import { useEnqueteBadge } from '../../hooks/useEnqueteBadge';
 import { useCoffreBadge } from '../../hooks/useCoffreBadge';
+import { useHrBadge } from '../../hooks/hr/useHrBadge';
 
 interface PlatformSidebarContentProps {
   sidebarOpen: boolean;
@@ -64,6 +65,9 @@ export default function PlatformSidebarContent({
 
   // Pending coffre transfers badge
   const { pendingCount: pendingCoffreCount } = useCoffreBadge();
+
+  // Pending HR items badge (leave requests + document requests)
+  const { pendingCount: pendingHrCount } = useHrBadge();
 
   // Fetch Pending Refunds Count (Restitutions Frais)
   const fetchPendingRefundsCount = async () => {
@@ -383,6 +387,12 @@ export default function PlatformSidebarContent({
             {pendingCaisseRequestsCount > 99 ? '99+' : pendingCaisseRequestsCount}
           </div>
         )}
+        {/* Real-time Badge for Collapsed Sidebar - RH Pending Items */}
+        {!sidebarOpen && route.key === 'rh' && pendingHrCount > 0 && (
+          <div className="absolute top-1 right-2 bg-status-info text-white text-[9px] font-bold min-w-[16px] h-4 px-0.5 rounded-full flex items-center justify-center animate-in zoom-in duration-300 ring-2 ring-sidebar-bg">
+            {pendingHrCount > 99 ? '99+' : pendingHrCount}
+          </div>
+        )}
         {/* WIP badge for collapsed sidebar - KPI */}
         {!sidebarOpen && route.key === 'kpi' && (
           <div className="absolute top-0.5 right-1.5 bg-status-warning text-white text-[7px] font-bold w-3 h-3 rounded-full flex items-center justify-center ring-2 ring-sidebar-bg">
@@ -423,6 +433,11 @@ export default function PlatformSidebarContent({
             {route.key === 'caisse' && pendingCaisseRequestsCount > 0 && (
               <span className="bg-status-success text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center animate-in zoom-in duration-300">
                 {pendingCaisseRequestsCount > 99 ? '99+' : pendingCaisseRequestsCount}
+              </span>
+            )}
+            {route.key === 'rh' && pendingHrCount > 0 && (
+              <span className="bg-status-info text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center animate-in zoom-in duration-300">
+                {pendingHrCount > 99 ? '99+' : pendingHrCount}
               </span>
             )}
             {route.key === 'kpi' && (

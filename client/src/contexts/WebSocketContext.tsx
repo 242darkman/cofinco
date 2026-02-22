@@ -585,6 +585,9 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          // Invalidate generic HR keys
          queryClient.invalidateQueries({ queryKey: ["/api/hr"] });
 
+         // Always invalidate pending count for badge updates
+         debounceInvalidate(["/api/hr/pending-count"]);
+
          // Dispatch custom event for useHrRealtime hook
          window.dispatchEvent(new CustomEvent('hr-update', { detail: message.payload }));
 
@@ -595,6 +598,9 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
              case 'conge':
                debounceInvalidate(["/api/hr/conges"]);
                debounceInvalidate(["/api/hr/conges/balance"]);
+               break;
+             case 'document_request':
+               debounceInvalidate(["/api/hr/document-requests"]);
                break;
              case 'paie':
              case 'bulletin':

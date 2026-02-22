@@ -52,6 +52,7 @@ import {
   handleHrSanctionCreated,
   handleHrSanctionNotified,
   handleHrSanctionFinalized,
+  handleHrDocumentRequestCreated,
   handleCreditInstallmentLate,
   handleSystemJobFailed,
   handleClientSegmentChanged,
@@ -98,6 +99,7 @@ const handlerRegistry: Record<DomainEventType, EventHandler> = {
   HR_LEAVE_REQUESTED: handleHrLeaveRequested,
   HR_LEAVE_APPROVED: handleHrLeaveApproved,
   HR_LEAVE_REJECTED: handleHrLeaveRejected,
+  HR_DOCUMENT_REQUEST_CREATED: handleHrDocumentRequestCreated,
   ACCOUNT_CREATED: handleAccountCreated,
   ACCOUNT_ACTIVATED: handleAccountActivated,
   ACCOUNT_DEPOSIT: handleAccountDeposit,
@@ -182,6 +184,7 @@ const domainEventToWsType: Record<string, string> = {
   HR_SANCTION_CREATED: "HR_UPDATE",
   HR_SANCTION_NOTIFIED: "HR_UPDATE",
   HR_SANCTION_FINALIZED: "HR_UPDATE",
+  HR_DOCUMENT_REQUEST_CREATED: "HR_UPDATE",
 
   // Client events → CLIENT_UPDATE
   CLIENT_CREATED: "CLIENT_UPDATE",

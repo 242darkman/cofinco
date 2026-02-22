@@ -28,6 +28,7 @@ export type DomainEventType =
   | "HR_LEAVE_REQUESTED"
   | "HR_LEAVE_APPROVED"
   | "HR_LEAVE_REJECTED"
+  | "HR_DOCUMENT_REQUEST_CREATED"
   // HR Sanctions
   | "HR_SANCTION_CREATED"
   | "HR_SANCTION_NOTIFIED"
@@ -388,6 +389,15 @@ export interface HrLeaveRejectedData {
   employeNom: string;
   rejectedByName?: string;
   reason?: string;
+  agenceId?: string;
+}
+
+export interface HrDocumentRequestCreatedData {
+  requestId: string;
+  employeId: string;
+  employeNom: string;
+  type: string;
+  urgence: boolean;
   agenceId?: string;
 }
 

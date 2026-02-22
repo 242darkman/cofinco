@@ -140,7 +140,7 @@ export const hrRouter = Router();
 // HELPER: Standardized HR WebSocket broadcast
 // ============================================
 interface HrEventPayload {
-  entity: 'employe' | 'conge' | 'presence' | 'paie' | 'bulletin' | 'formation' | 'sanction' | 'avantage' | 'candidature' | 'organigramme' | 'payroll_run';
+  entity: 'employe' | 'conge' | 'presence' | 'paie' | 'bulletin' | 'formation' | 'sanction' | 'avantage' | 'candidature' | 'organigramme' | 'payroll_run' | 'document_request';
   action: 'created' | 'updated' | 'approved' | 'rejected' | 'paid' | 'deleted' | 'assigned' | 'generated' | 'validated';
   id: string | number;
   agenceId?: string;
@@ -3704,6 +3704,36 @@ hrRouter.get("/stats", getAuthUser, async (req, res) => {
   }
 });
 
+// =============================================================================
+// PENDING COUNT (for sidebar badge)
+// =============================================================================
+
+hrRouter.get("/pending-count", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        const [congesResult] = await db
+            .select({ count: sql<number>`COUNT(*)::int` })
+            .from(demandesConges)
+            .where(eq(demandesConges.statut, "PENDING"));
+
+        const [docsResult] = await db
+            .select({ count: sql<number>`COUNT(*)::int` })
+            .from(hrDocumentRequests)
+            .where(eq(hrDocumentRequests.statut, "PENDING"));
+
+        const pendingConges = congesResult?.count ?? 0;
+        const pendingDocuments = docsResult?.count ?? 0;
+
+        res.json({
+            pendingConges,
+            pendingDocuments,
+            total: pendingConges + pendingDocuments,
+        });
+    } catch (error) {
+        logger.error({ err: error }, "Erreur récupération pending count RH");
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
 /**
  * ========================================
  * AUDIT LOG RH
@@ -5806,7 +5836,21 @@ hrRouter.post("/document-requests", getAuthUser, async (req, res) => {
 
         const result = await hrStorage.createDocumentRequest(data);
 
-        broadcastHrEvent({ entity: 'employe' as any, action: 'created', id: result.id });
+        broadcastHrEvent({ entity: 'document_request', action: 'created', id: result.id });
+
+        // Notify HR staff + confirm to employee
+        dispatchDomainEvent({
+            type: "HR_DOCUMENT_REQUEST_CREATED",
+            data: {
+                requestId: result.id,
+                employeId: emp.id,
+                employeNom: data.employeNom,
+                type,
+                urgence: urgence || false,
+                agenceId: user.agenceId,
+            },
+            timestamp: new Date(),
+        });
 
         res.status(201).json(result);
     } catch (error) {
@@ -5842,7 +5886,7 @@ hrRouter.patch("/document-requests/:id/process", getAuthUser, attachAbility, asy
             return res.status(404).json({ error: "Demande introuvable" });
         }
 
-        broadcastHrEvent({ entity: 'employe' as any, action: 'updated', id: result.id });
+        broadcastHrEvent({ entity: 'document_request', action: 'updated', id: result.id });
 
         res.json(result);
     } catch (error) {

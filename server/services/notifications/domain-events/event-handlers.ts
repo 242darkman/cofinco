@@ -1,6 +1,6 @@
 import { db } from "../../../db";
-import { clients, users, employes, credits, membresTontine, comptes, virementsProgrammes } from "@shared/schema";
-import { eq, inArray, and, isNull } from "drizzle-orm";
+import { clients, users, employes, credits, membresTontine, comptes, virementsProgrammes, userRoles } from "@shared/schema";
+import { eq, inArray, and, isNull, or } from "drizzle-orm";
 import { emitNotificationEvent } from "../notification-service";
 import { logNotificationEvent } from "../audit/notification-audit";
 import { createLogger } from "../../../lib/logger";
@@ -46,6 +46,7 @@ import type {
   HrLeaveRequestedData,
   HrLeaveApprovedData,
   HrLeaveRejectedData,
+  HrDocumentRequestCreatedData,
   UserPasswordResetData,
   SessionForceClosedData,
   ClientCreatedData,
@@ -135,6 +136,37 @@ async function getEmployeeContact(employeId: string) {
     email: result.email,
     name: `${result.prenom || ""} ${result.nom || ""}`.trim(),
   };
+}
+
+/**
+ * Find HR staff contacts for a given agency (users with role RH).
+ * Falls back to global HR users (agenceId IS NULL) if none found for the specific agency.
+ */
+async function getHrStaffContacts(agenceId?: string) {
+  // First try agency-specific HR staff, then fallback to global
+  const conditions = agenceId
+    ? or(eq(userRoles.agenceId, agenceId), isNull(userRoles.agenceId))
+    : isNull(userRoles.agenceId);
+
+  const results = await db
+    .select({
+      userId: users.id,
+      nom: users.nom,
+      prenom: users.prenom,
+      email: users.email,
+      telephone: users.telephone,
+    })
+    .from(userRoles)
+    .innerJoin(users, eq(userRoles.userId, users.id))
+    .where(and(eq(userRoles.role, 'RH'), conditions))
+    .limit(10);
+
+  return results.map((r) => ({
+    userId: r.userId,
+    email: r.email,
+    phone: r.telephone,
+    name: `${r.prenom || ""} ${r.nom || ""}`.trim(),
+  }));
 }
 
 // ============================================================================
@@ -1327,6 +1359,20 @@ export async function handleHrLeaveRequested(data: HrLeaveRequestedData) {
       : [],
   });
 
+  // Notify HR staff (in-app + email)
+  const hrStaff = await getHrStaffContacts(data.agenceId);
+  for (const hr of hrStaff) {
+    await emitNotificationEvent("HR_LEAVE_REQUESTED", data, {
+      smsRecipients: [],
+      emailRecipients: hr.email
+        ? [{ email: hr.email, templateCode: "HR_LEAVE_REQUESTED_TO_HR", payload, agenceId: data.agenceId }]
+        : [],
+      inAppRecipients: hr.userId
+        ? [{ userId: hr.userId, type: "HR_LEAVE_REQUESTED", titre: "Nouvelle demande de congé", message: `${data.employeNom} a soumis une demande de congé (${data.type}) du ${data.dateDebut} au ${data.dateFin}`, priorite: "NORMAL" as const }]
+        : [],
+    });
+  }
+
   logNotificationEvent("info", "Domain event: HR_LEAVE_REQUESTED", {
     correlationId: `hr-leave-req-${data.congeId}`,
     status: "DISPATCHED",
@@ -1466,6 +1512,46 @@ export async function handleHrSanctionFinalized(data: HrSanctionFinalizedData) {
 
   logNotificationEvent("info", "Domain event: HR_SANCTION_FINALIZED", {
     correlationId: `hr-sanction-finalized-${data.sanctionId}`,
+    status: "DISPATCHED",
+  });
+}
+
+// ============================================================================
+// HR DOCUMENT REQUEST EVENT HANDLERS
+// ============================================================================
+
+export async function handleHrDocumentRequestCreated(data: HrDocumentRequestCreatedData) {
+  // 1) Confirm to employee (in-app)
+  const employee = await getEmployeeContact(data.employeId);
+  if (employee?.userId) {
+    await emitNotificationEvent("HR_DOCUMENT_REQUEST_CREATED", data, {
+      smsRecipients: [],
+      emailRecipients: [],
+      inAppRecipients: [{ userId: employee.userId, type: "HR_DOCUMENT_REQUEST_CREATED", titre: "Demande enregistrée", message: `Votre demande de ${data.type} a été enregistrée` }],
+    });
+  }
+
+  // 2) Notify HR staff (in-app + email)
+  const hrStaff = await getHrStaffContacts(data.agenceId);
+  for (const hr of hrStaff) {
+    const payload = {
+      employeeName: data.employeNom,
+      documentType: data.type,
+      urgence: data.urgence ? "Oui" : "Non",
+    };
+    await emitNotificationEvent("HR_DOCUMENT_REQUEST_CREATED", data, {
+      smsRecipients: [],
+      emailRecipients: hr.email
+        ? [{ email: hr.email, templateCode: "HR_DOCUMENT_REQUEST_TO_HR", payload, agenceId: data.agenceId }]
+        : [],
+      inAppRecipients: hr.userId
+        ? [{ userId: hr.userId, type: "HR_DOCUMENT_REQUEST_CREATED", titre: "Nouvelle demande de document", message: `${data.employeNom} demande un document : ${data.type}${data.urgence ? " (URGENT)" : ""}`, priorite: data.urgence ? "HIGH" as const : "NORMAL" as const }]
+        : [],
+    });
+  }
+
+  logNotificationEvent("info", "Domain event: HR_DOCUMENT_REQUEST_CREATED", {
+    correlationId: `hr-doc-req-${data.requestId}`,
     status: "DISPATCHED",
   });
 }

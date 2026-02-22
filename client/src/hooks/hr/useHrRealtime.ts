@@ -29,7 +29,8 @@ export type HrEntity =
   | 'sanction'
   | 'avantage'
   | 'candidature'
-  | 'organigramme';
+  | 'organigramme'
+  | 'document_request';
 
 // HR Action types
 export type HrAction =
@@ -75,7 +76,7 @@ interface UseHrRealtimeOptions {
 // Query key mappings for each entity
 const QUERY_KEY_MAPPINGS: Record<HrEntity, string[][]> = {
   employe: [['/api/employes'], ['/api/hr/stats'], ['/api/hr/organigramme']],
-  conge: [['/api/hr/conges'], ['/api/hr/stats'], ['/api/hr/conges/balance']],
+  conge: [['/api/hr/conges'], ['/api/hr/stats'], ['/api/hr/conges/balance'], ['/api/hr/pending-count']],
   presence: [['/api/hr/presence'], ['/api/hr/presence/today'], ['/api/hr/stats']],
   paie: [['/api/hr/paie'], ['/api/hr/bulletins'], ['/api/hr/stats']],
   bulletin: [['/api/hr/bulletins'], ['/api/hr/paie/my'], ['/api/hr/stats']],
@@ -85,6 +86,7 @@ const QUERY_KEY_MAPPINGS: Record<HrEntity, string[][]> = {
   candidature: [['/api/hr/candidatures'], ['/api/hr/stats']],
   organigramme: [['/api/hr/organigramme']],
   salary_payment: [['payment-jobs'], ['payroll-run'], ['all-bulletins'], ['my-bulletins'], ['payroll-runs']],
+  document_request: [['/api/hr/document-requests'], ['/api/hr/pending-count'], ['/api/hr/stats']],
 };
 
 // Default toast messages
@@ -113,6 +115,10 @@ const DEFAULT_TOAST_MESSAGES: Partial<Record<HrEntity, Partial<Record<HrAction, 
   salary_payment: {
     SUCCEEDED: 'Paiement salaire réussi',
     FAILED: 'Échec paiement salaire',
+  },
+  document_request: {
+    created: 'Nouvelle demande de document',
+    updated: 'Demande de document mise à jour',
   },
 };
 
