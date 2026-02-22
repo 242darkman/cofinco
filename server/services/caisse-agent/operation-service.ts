@@ -46,7 +46,7 @@ export class OperationService {
    * Crée une opération de collecte cash
    */
   async createCollectCash(
-    params: CreateCollectCashInput & { submittedBy: string }
+    params: CreateCollectCashInput & { submittedBy: string; userAgencyId?: string }
   ): Promise<{
     success: boolean;
     operation?: OperationTerrain;
@@ -125,6 +125,29 @@ export class OperationService {
           error: "Client non trouvé",
           errorCode: "CLIENT_NOT_FOUND",
         };
+      }
+
+      // 3b. Vérifier cohérence agence (agent et client doivent être de la même agence)
+      if (params.userAgencyId) {
+        const [agent] = await tx
+          .select({ currentAgenceId: agentsTerrain.currentAgenceId })
+          .from(agentsTerrain)
+          .where(eq(agentsTerrain.id, params.agentId));
+
+        if (agent?.currentAgenceId && agent.currentAgenceId !== params.userAgencyId) {
+          return {
+            success: false,
+            error: "Agent rattaché à une autre agence",
+            errorCode: "AGENCY_MISMATCH",
+          };
+        }
+        if (client.agenceId && client.agenceId !== params.userAgencyId) {
+          return {
+            success: false,
+            error: "Client rattaché à une autre agence",
+            errorCode: "AGENCY_MISMATCH",
+          };
+        }
       }
 
       // 4. Générer la référence

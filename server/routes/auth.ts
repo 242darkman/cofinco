@@ -2381,19 +2381,11 @@ export function registerAuthRoutes(app: Express) {
   });
 
   // Set/Update caisse PIN for another user (Admin/Chef only)
-  app.put("/api/users/:targetId/caisse-pin", requireAuth, async (req, res) => {
+  app.put("/api/users/:targetId/caisse-pin", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.USER), async (req, res) => {
     try {
       const adminId = req.session.user!.id;
-      const adminRole = req.session.user!.role;
       const targetId = req.params.targetId;
       const { pin } = req.body;
-
-      // Restrict to admins and chefs
-      const normalizedRole = normalizeRole(adminRole);
-      const authorizedRoles = [SystemRole.ADMIN, SystemRole.CHEF_AGENCE];
-      if (!normalizedRole || !authorizedRoles.includes(normalizedRole)) {
-        return res.status(403).json({ message: "Action non autorisée. Rôle insuffisant." });
-      }
 
       if (!pin) {
         return res.status(400).json({ message: "Nouveau PIN requis" });
@@ -2424,17 +2416,14 @@ export function registerAuthRoutes(app: Express) {
   /**
    * GET /api/users/:userId/roles - Récupérer tous les rôles d'un utilisateur
    */
-  app.get("/api/users/:userId/roles", requireAuth, async (req, res) => {
+  app.get("/api/users/:userId/roles", requireAuth, attachAbility, async (req, res) => {
     try {
       const { userId } = req.params;
       const requesterId = req.session.user!.id;
-      const requesterRole = req.session.user!.role;
 
-      // Un utilisateur peut voir ses propres rôles, sinon il faut être admin/chef
+      // Un utilisateur peut voir ses propres rôles, sinon il faut MANAGE_ROLES
       if (userId !== requesterId) {
-        const normalizedRole = normalizeRole(requesterRole);
-        const authorizedRoles = [SystemRole.ADMIN, SystemRole.CHEF_AGENCE, SystemRole.SUPERVISEUR];
-        if (!normalizedRole || !authorizedRoles.includes(normalizedRole)) {
+        if (!req.ability?.can(Actions.MANAGE_ROLES, Subjects.USER)) {
           return res.status(403).json({ error: "Non autorisé à voir les rôles de cet utilisateur" });
         }
       }
@@ -2472,17 +2461,10 @@ export function registerAuthRoutes(app: Express) {
   /**
    * POST /api/users/:userId/roles - Ajouter un rôle à un utilisateur
    */
-  app.post("/api/users/:userId/roles", requireAuth, async (req, res) => {
+  app.post("/api/users/:userId/roles", requireAuth, attachAbility, requireAbility(Actions.MANAGE_ROLES, Subjects.USER), async (req, res) => {
     try {
       const { userId } = req.params;
       const { role, agenceId, isPrimary } = req.body;
-      const adminRole = req.session.user!.role;
-
-      // Seuls les admins peuvent ajouter des rôles
-      const normalizedRole = normalizeRole(adminRole);
-      if (!normalizedRole || !isAdminRole(normalizedRole)) {
-        return res.status(403).json({ error: "Seuls les administrateurs peuvent ajouter des rôles" });
-      }
 
       if (!role || !Object.values(SystemRole).includes(role)) {
         return res.status(400).json({ error: "Rôle invalide" });
@@ -2517,16 +2499,9 @@ export function registerAuthRoutes(app: Express) {
   /**
    * DELETE /api/users/:userId/roles/:roleId - Supprimer un rôle
    */
-  app.delete("/api/users/:userId/roles/:roleId", requireAuth, async (req, res) => {
+  app.delete("/api/users/:userId/roles/:roleId", requireAuth, attachAbility, requireAbility(Actions.MANAGE_ROLES, Subjects.USER), async (req, res) => {
     try {
       const { userId, roleId } = req.params;
-      const adminRole = req.session.user!.role;
-
-      // Seuls les admins peuvent supprimer des rôles
-      const normalizedRole = normalizeRole(adminRole);
-      if (!normalizedRole || !isAdminRole(normalizedRole)) {
-        return res.status(403).json({ error: "Seuls les administrateurs peuvent supprimer des rôles" });
-      }
 
       // Vérifier que le rôle appartient bien à l'utilisateur
       const [existingRole] = await db.select()
@@ -2561,16 +2536,14 @@ export function registerAuthRoutes(app: Express) {
   /**
    * PUT /api/users/:userId/roles/:roleId/primary - Définir un rôle comme principal
    */
-  app.put("/api/users/:userId/roles/:roleId/primary", requireAuth, async (req, res) => {
+  app.put("/api/users/:userId/roles/:roleId/primary", requireAuth, attachAbility, async (req, res) => {
     try {
       const { userId, roleId } = req.params;
       const requesterId = req.session.user!.id;
-      const requesterRole = req.session.user!.role;
 
-      // Un utilisateur peut changer son propre rôle principal, sinon il faut être admin
+      // Un utilisateur peut changer son propre rôle principal, sinon il faut MANAGE_ROLES
       if (userId !== requesterId) {
-        const normalizedRole = normalizeRole(requesterRole);
-        if (!normalizedRole || !isAdminRole(normalizedRole)) {
+        if (!req.ability?.can(Actions.MANAGE_ROLES, Subjects.USER)) {
           return res.status(403).json({ error: "Non autorisé à modifier les rôles de cet utilisateur" });
         }
       }

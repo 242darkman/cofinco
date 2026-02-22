@@ -15,7 +15,7 @@ import { requireAuth } from "../auth";
 import { attachAbility, requireAbility } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
 import { db } from "../db";
-import { sessionsCaisseAuditLogs, denominationTemplates, caisses } from "@shared/schema/finance";
+import { sessionsCaisseAuditLogs, denominationTemplates, caisses, sessionsCaisse } from "@shared/schema/finance";
 import { caisseSecurityCodes } from "@shared/schema/operations";
 import { users, userRoles, coffresForts, agences } from "@shared/schema";
 import { eq, desc, and, gte, lte, sql, count, isNull, isNotNull, or } from "drizzle-orm";
@@ -60,6 +60,18 @@ caisseAdminRouter.post(
 
       if (!userId) {
         return res.status(401).json({ error: "Non authentifié" });
+      }
+
+      // Vérifier accès agence (seul un admin global peut force-close une session d'une autre agence)
+      const isGlobalAdmin = req.ability?.can(Actions.MANAGE, 'all');
+      if (!isGlobalAdmin) {
+        const [sessionCheck] = await db
+          .select({ agenceId: sessionsCaisse.agenceId })
+          .from(sessionsCaisse)
+          .where(eq(sessionsCaisse.id, sessionId));
+        if (sessionCheck && sessionCheck.agenceId !== req.session.user?.agenceId) {
+          return res.status(403).json({ error: "Accès interdit: session d'une autre agence" });
+        }
       }
 
       const parsed = forceCloseSessionSchema.safeParse(req.body);
@@ -334,9 +346,13 @@ caisseAdminRouter.get(
 caisseAdminRouter.get(
   "/coffres-summary",
   attachAbility, requireAbility(Actions.VIEW, Subjects.CAISSE),
-  async (_req, res) => {
+  async (req, res) => {
     try {
-      const allCoffres = await db.select({
+      // Filtrer par agence sauf pour les admins globaux
+      const isGlobalAdmin = req.ability?.can(Actions.MANAGE, 'all');
+      const userAgenceId = req.session.user?.agenceId;
+
+      const query = db.select({
         id: coffresForts.id,
         nom: coffresForts.nom,
         solde: coffresForts.solde,
@@ -347,6 +363,10 @@ caisseAdminRouter.get(
       })
       .from(coffresForts)
       .leftJoin(agences, eq(coffresForts.ownerId, agences.id));
+
+      const allCoffres = !isGlobalAdmin && userAgenceId
+        ? await query.where(eq(coffresForts.ownerId, userAgenceId))
+        : await query;
 
       res.json(allCoffres);
     } catch (error: any) {
@@ -1547,7 +1567,7 @@ caisseAdminRouter.post(
  */
 caisseAdminRouter.post(
   "/security-codes/validate",
-  requireAuth,
+  attachAbility, requireAbility(Actions.VIEW, Subjects.CAISSE),
   async (req, res) => {
     try {
       const validation = validateCodeSchema.safeParse(req.body);
@@ -1916,6 +1936,12 @@ caisseAdminRouter.post(
 
       if (!caisse) {
         return res.status(404).json({ error: "Caisse introuvable" });
+      }
+
+      // Vérifier accès agence (seul un admin global peut corriger une caisse d'une autre agence)
+      const isGlobalAdmin = req.ability?.can(Actions.MANAGE, 'all');
+      if (!isGlobalAdmin && caisse.agenceId !== req.session.user?.agenceId) {
+        return res.status(403).json({ error: "Accès interdit: caisse d'une autre agence" });
       }
 
       const oldBalance = Number(caisse.solde || 0);

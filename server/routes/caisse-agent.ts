@@ -44,9 +44,12 @@ import {
 } from "../services/caisse-agent";
 import { idempotencyMiddleware } from "../middleware/idempotency";
 import { requireAuth, comparePasswords } from "../auth";
+import { attachAbility, requireAbility } from "../authorization";
+import { Actions, Subjects } from "@shared/ability";
 import { SystemRole, normalizeRole } from "@shared/types/roles";
 import { db } from "../db";
 import { users } from "@shared/schema/auth";
+import { operationsTerrain } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { handleInsufficientFundsError } from "../middleware/financial-validation";
 import { getWsInstance } from "../ws-server";
@@ -167,6 +170,7 @@ caisseAgentRouter.post(
         result = await operationService.createCollectCash({
           ...data,
           submittedBy: userId,
+          userAgencyId: req.user?.agenceId ?? undefined,
         });
       } else {
         result = await operationService.createSettlementCash({
@@ -199,7 +203,7 @@ caisseAgentRouter.post(
  * POST /api/caisse-agent/operations-terrain/bulk-approve
  * Approuve plusieurs opérations avec vérification du mot de passe
  */
-caisseAgentRouter.post("/operations-terrain/bulk-approve", async (req, res) => {
+caisseAgentRouter.post("/operations-terrain/bulk-approve", attachAbility, requireAbility(Actions.APPROVE_AGENT_OP, Subjects.OPERATION_TERRAIN), async (req, res) => {
   try {
     const { operationIds, password } = req.body;
     const userId = req.user!.id;
@@ -256,26 +260,16 @@ caisseAgentRouter.post("/operations-terrain/bulk-approve", async (req, res) => {
  */
 caisseAgentRouter.post(
   "/operations-terrain/:id/approve",
+  attachAbility, requireAbility(Actions.APPROVE_AGENT_OP, Subjects.OPERATION_TERRAIN),
   idempotencyMiddleware("approve-operation-terrain"),
   async (req, res) => {
     try {
       const operationId = req.params.id;
       const { password } = req.body;
       const userId = req.user?.id;
-      const userRole = req.user?.role;
 
       if (!userId) {
         return res.status(401).json({ error: "Non authentifié" });
-      }
-
-      // Vérification basique des rôles (à remplacer par RBAC complet)
-      const normalizedRole = normalizeRole(userRole);
-      const allowedRoles = new Set([SystemRole.ADMIN, SystemRole.SUPERVISEUR, SystemRole.CHEF_AGENCE, SystemRole.CAISSIER]);
-      if (!normalizedRole || !allowedRoles.has(normalizedRole)) {
-        return res.status(403).json({
-          error: "Permission refusée",
-          code: "FORBIDDEN",
-        });
       }
 
       // Vérifier le mot de passe de l'utilisateur
@@ -346,24 +340,14 @@ caisseAgentRouter.post(
  */
 caisseAgentRouter.post(
   "/operations-terrain/:id/reject",
+  attachAbility, requireAbility(Actions.REJECT_AGENT_OP, Subjects.OPERATION_TERRAIN),
   async (req, res) => {
     try {
       const operationId = req.params.id;
       const userId = req.user?.id;
-      const userRole = req.user?.role;
 
       if (!userId) {
         return res.status(401).json({ error: "Non authentifié" });
-      }
-
-      // Vérification basique des rôles
-      const normalizedRole = normalizeRole(userRole);
-      const allowedRoles = new Set([SystemRole.ADMIN, SystemRole.SUPERVISEUR, SystemRole.CHEF_AGENCE]);
-      if (!normalizedRole || !allowedRoles.has(normalizedRole)) {
-        return res.status(403).json({
-          error: "Permission refusée",
-          code: "FORBIDDEN",
-        });
       }
 
       const parsed = rejectOperationSchema.safeParse(req.body);
@@ -408,6 +392,7 @@ caisseAgentRouter.post(
  */
 caisseAgentRouter.post(
   "/operations-terrain/:id/cancel",
+  attachAbility,
   async (req, res) => {
     try {
       const operationId = req.params.id;
@@ -415,6 +400,17 @@ caisseAgentRouter.post(
 
       if (!userId) {
         return res.status(401).json({ error: "Non authentifié" });
+      }
+
+      // Vérifier permission CASL ou ownership (un agent peut annuler ses propres opérations)
+      const canCancelAll = req.ability?.can(Actions.CANCEL, Subjects.OPERATION_TERRAIN);
+      if (!canCancelAll) {
+        const [op] = await db.select({ submittedBy: operationsTerrain.submittedBy })
+          .from(operationsTerrain)
+          .where(eq(operationsTerrain.id, operationId));
+        if (!op || op.submittedBy !== userId) {
+          return res.status(403).json({ error: "Permission refusée", code: "FORBIDDEN" });
+        }
       }
 
       const parsed = cancelOperationSchema.safeParse(req.body);

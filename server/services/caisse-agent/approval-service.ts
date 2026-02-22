@@ -164,6 +164,15 @@ export class ApprovalService {
         };
       }
 
+      // 3b. Empêcher l'auto-approbation (séparation des tâches)
+      if (operation.submittedBy === params.approvedBy) {
+        return {
+          success: false,
+          error: "Vous ne pouvez pas approuver vos propres opérations",
+          errorCode: "SELF_APPROVAL_NOT_ALLOWED",
+        };
+      }
+
       // 4. Poster les écritures selon le type
       let mouvements: MouvementFinancier[] = [];
       let paiementTerrainId: string | null = null;
