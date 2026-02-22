@@ -16,7 +16,7 @@ import {
 import { isCriticalPermissionFromDb, invalidateCriticalPatternsCache } from "../authorization/critical-patterns";
 
 const logger = createLogger('Routes:RBAC');
-import { SystemRole, getRoleOptions, isAdminRole, normalizeRole, getRoleLabel, ROLE_LABELS } from "@shared/types/roles";
+import { SystemRole, getRoleOptions, isSystemRole, getRoleLabel, ROLE_LABELS } from "@shared/types/roles";
 import { requireAuth } from "../auth";
 import { attachAbility, requireAbility, requireAnyAbility, invalidateRoleHierarchyCache } from "../authorization";
 import { eq, and, desc, count } from "drizzle-orm";
@@ -59,6 +59,11 @@ import {
   type AuditLogContext,
 } from "../services/rbac-audit-service";
 import { Actions, Subjects, type RbacUpdatePayload } from "@shared/ability";
+import { getPermissionMapping } from "@shared/ability/mappings";
+
+/** Validate and cast a string to SystemRole (no alias mapping) */
+const asSystemRole = (v?: string | null): SystemRole | undefined =>
+  v && isSystemRole(v) ? v : undefined;
 
 /**
  * Helper to extract audit context from request
@@ -203,7 +208,7 @@ export function registerRbacRoutes(app: Express) {
   app.get("/api/role-permissions", requireAuth, async (req, res) => {
     try {
       const { role } = req.query;
-      const normalizedRole = normalizeRole(role as string);
+      const normalizedRole = asSystemRole(role as string);
 
       if (!normalizedRole) {
         return res.status(400).json({ message: "Le paramètre 'role' est requis" });
@@ -275,7 +280,7 @@ export function registerRbacRoutes(app: Express) {
   app.post("/api/role-permissions", requireAuth, attachAbility, requireAbility(Actions.MANAGE, Subjects.RBAC), async (req, res) => {
     try {
       const { role, permission_id, permission_code, granted = true } = req.body;
-      const normalizedRole = normalizeRole(role);
+      const normalizedRole = asSystemRole(role);
 
       if (!normalizedRole) {
         return res.status(400).json({ message: "Le rôle est requis" });
@@ -509,7 +514,7 @@ export function registerRbacRoutes(app: Express) {
       const { role, permissions: permUpdates } = req.body;
       // permUpdates is an array of { permissionId, granted }
 
-      const normalizedRole = normalizeRole(role);
+      const normalizedRole = asSystemRole(role);
       if (!normalizedRole || !Array.isArray(permUpdates)) {
         return res.status(400).json({ message: "role et permissions sont requis" });
       }
@@ -722,7 +727,7 @@ export function registerRbacRoutes(app: Express) {
         }
 
         // Admin has all permissions
-        if (isAdminRole(userRole)) {
+        if (userRole === SystemRole.ADMIN) {
           granted = true;
           source = 'role';
         }
@@ -888,47 +893,21 @@ export function registerRbacRoutes(app: Express) {
     }
   });
 
-  // Check if current user has a specific permission
+  // Check if current user has a specific permission (via CASL ability)
   app.get("/api/rbac/check", requireAuth, attachAbility, async (req, res) => {
     try {
       const { module: moduleName, action } = req.query;
-      const userRole = req.session.user?.role;
 
-      if (!userRole || !moduleName || !action) {
+      if (!moduleName || !action) {
         return res.json({ hasPermission: false });
       }
 
-      // Global admin has all permissions (via CASL)
-      const isGlobalAdmin = req.ability?.can(Actions.MANAGE, 'all');
-      if (isGlobalAdmin) {
-        return res.json({ hasPermission: true });
-      }
+      const mapping = getPermissionMapping(`${moduleName}.${action}`);
+      const hasPermission = mapping
+        ? !!req.ability?.can(mapping.action, mapping.subject)
+        : false;
 
-      // Find the permission
-      const [perm] = await db.select({
-        permissionId: permissions.id,
-      })
-        .from(permissions)
-        .leftJoin(modules, eq(permissions.moduleId, modules.id))
-        .where(and(
-          eq(modules.name, moduleName as string),
-          eq(permissions.code, action as string)
-        ));
-
-      if (!perm) {
-        return res.json({ hasPermission: false });
-      }
-
-      // Check role permission
-      const [rolePerm] = await db.select()
-        .from(rolePermissions)
-        .where(and(
-          eq(rolePermissions.role, userRole),
-          eq(rolePermissions.permissionId, perm.permissionId),
-          eq(rolePermissions.granted, true)
-        ));
-
-      res.json({ hasPermission: !!rolePerm });
+      res.json({ hasPermission });
     } catch (error) {
       logger.error({ err: error }, 'Check RBAC permission error');
       res.status(500).json({ hasPermission: false });
@@ -980,14 +959,11 @@ export function registerRbacRoutes(app: Express) {
    * Full permission catalog with modules - for "Vue Globale" UI
    * Protected: requires rbac.view or admin
    */
-  app.get("/api/rbac/catalog", requireAuth, attachAbility, async (req, res) => {
+  app.get("/api/rbac/catalog", requireAuth, attachAbility, requireAnyAbility([
+    { action: Actions.VIEW, subject: Subjects.RBAC },
+    { action: Actions.MANAGE, subject: Subjects.ALL },
+  ]), async (req, res) => {
     try {
-      // Check permission (admin or rbac.view)
-      const ability = (req as any).ability;
-      if (!ability?.can(Actions.VIEW, Subjects.RBAC) && !ability?.can(Actions.MANAGE, Subjects.ALL)) {
-        return res.status(403).json({ message: "Accès non autorisé" });
-      }
-
       const catalog = await getPermissionCatalog();
       const version = await getRbacVersion();
 
@@ -1020,15 +996,13 @@ export function registerRbacRoutes(app: Express) {
    * Get all permissions for a specific role - for "Par Rôle" UI
    * Protected: requires rbac.view or admin
    */
-  app.get("/api/rbac/roles/:role/permissions", requireAuth, attachAbility, async (req, res) => {
+  app.get("/api/rbac/roles/:role/permissions", requireAuth, attachAbility, requireAnyAbility([
+    { action: Actions.VIEW, subject: Subjects.RBAC },
+    { action: Actions.MANAGE, subject: Subjects.ALL },
+  ]), async (req, res) => {
     try {
-      const ability = (req as any).ability;
-      if (!ability?.can(Actions.VIEW, Subjects.RBAC) && !ability?.can(Actions.MANAGE, Subjects.ALL)) {
-        return res.status(403).json({ message: "Accès non autorisé" });
-      }
-
       const { role } = req.params;
-      const normalizedRole = normalizeRole(role);
+      const normalizedRole = asSystemRole(role);
 
       if (!normalizedRole) {
         return res.status(400).json({ message: "Rôle invalide" });
@@ -1053,16 +1027,14 @@ export function registerRbacRoutes(app: Express) {
    * Protected: requires rbac.manage or admin
    * Body: { permissionId: string, granted: boolean }
    */
-  app.patch("/api/rbac/roles/:role/permissions", requireAuth, attachAbility, async (req, res) => {
+  app.patch("/api/rbac/roles/:role/permissions", requireAuth, attachAbility, requireAnyAbility([
+    { action: Actions.MANAGE, subject: Subjects.RBAC },
+    { action: Actions.MANAGE, subject: Subjects.ALL },
+  ]), async (req, res) => {
     try {
-      const ability = (req as any).ability;
-      if (!ability?.can(Actions.MANAGE, Subjects.RBAC) && !ability?.can(Actions.MANAGE, Subjects.ALL)) {
-        return res.status(403).json({ message: "Accès non autorisé" });
-      }
-
       const { role } = req.params;
       const { permissionId, granted, permissionCode, conditions } = req.body;
-      const normalizedRole = normalizeRole(role);
+      const normalizedRole = asSystemRole(role);
 
       if (!normalizedRole) {
         return res.status(400).json({ message: "Rôle invalide" });
@@ -1134,16 +1106,14 @@ export function registerRbacRoutes(app: Express) {
    * Protected: requires rbac.manage or admin
    * Body: { updates: [{ permissionId: string, granted: boolean }] }
    */
-  app.put("/api/rbac/roles/:role/permissions/bulk", requireAuth, attachAbility, async (req, res) => {
+  app.put("/api/rbac/roles/:role/permissions/bulk", requireAuth, attachAbility, requireAnyAbility([
+    { action: Actions.MANAGE, subject: Subjects.RBAC },
+    { action: Actions.MANAGE, subject: Subjects.ALL },
+  ]), async (req, res) => {
     try {
-      const ability = (req as any).ability;
-      if (!ability?.can(Actions.MANAGE, Subjects.RBAC) && !ability?.can(Actions.MANAGE, Subjects.ALL)) {
-        return res.status(403).json({ message: "Accès non autorisé" });
-      }
-
       const { role } = req.params;
       const { updates } = req.body;
-      const normalizedRole = normalizeRole(role);
+      const normalizedRole = asSystemRole(role);
 
       if (!normalizedRole || !Array.isArray(updates)) {
         return res.status(400).json({ message: "Paramètres invalides" });
@@ -1578,13 +1548,11 @@ export function registerRbacRoutes(app: Express) {
    * Protected: requires rbac.manage or admin
    * Body: { assignments: [{ role: string, permissionId: string, granted: boolean }] }
    */
-  app.post("/api/rbac/permissions/bulk-assign", requireAuth, attachAbility, async (req, res) => {
+  app.post("/api/rbac/permissions/bulk-assign", requireAuth, attachAbility, requireAnyAbility([
+    { action: Actions.MANAGE, subject: Subjects.RBAC },
+    { action: Actions.MANAGE, subject: Subjects.ALL },
+  ]), async (req, res) => {
     try {
-      const ability = (req as any).ability;
-      if (!ability?.can(Actions.MANAGE, Subjects.RBAC) && !ability?.can(Actions.MANAGE, Subjects.ALL)) {
-        return res.status(403).json({ message: "Accès non autorisé" });
-      }
-
       const { assignments } = req.body;
 
       if (!Array.isArray(assignments) || assignments.length === 0) {
@@ -1613,7 +1581,7 @@ export function registerRbacRoutes(app: Express) {
       // Group assignments by role for efficient processing
       const byRole = new Map<string, Array<{ permissionId: string; granted: boolean }>>();
       for (const assignment of assignments) {
-        const normalizedRole = normalizeRole(assignment.role);
+        const normalizedRole = asSystemRole(assignment.role);
         if (!normalizedRole) {
           results.push({ role: assignment.role, permissionId: assignment.permissionId, success: false, error: 'Rôle invalide' });
           continue;
@@ -1718,13 +1686,11 @@ export function registerRbacRoutes(app: Express) {
    * Get all temporary permissions (admin view)
    * Protected: requires rbac.manage or admin
    */
-  app.get("/api/rbac/temp-permissions", requireAuth, attachAbility, async (req, res) => {
+  app.get("/api/rbac/temp-permissions", requireAuth, attachAbility, requireAnyAbility([
+    { action: Actions.MANAGE, subject: Subjects.RBAC },
+    { action: Actions.MANAGE, subject: Subjects.ALL },
+  ]), async (req, res) => {
     try {
-      const ability = (req as any).ability;
-      if (!ability?.can(Actions.MANAGE, Subjects.RBAC) && !ability?.can(Actions.MANAGE, Subjects.ALL)) {
-        return res.status(403).json({ message: "Accès non autorisé" });
-      }
-
       const { activeOnly = 'true', limit = '100' } = req.query;
 
       const { getAllTemporaryPermissions } = await import('../services/temporary-permissions-service');
@@ -1748,13 +1714,12 @@ export function registerRbacRoutes(app: Express) {
   app.get("/api/rbac/users/:userId/temp-permissions", requireAuth, attachAbility, async (req, res) => {
     try {
       const { userId } = req.params;
-      const ability = (req as any).ability;
       const currentUserId = req.session.userId;
 
       // Allow if checking own permissions or has RBAC view access
       if (userId !== currentUserId &&
-          !ability?.can(Actions.VIEW, Subjects.RBAC) &&
-          !ability?.can(Actions.MANAGE, Subjects.ALL)) {
+          !req.ability?.can(Actions.VIEW, Subjects.RBAC) &&
+          !req.ability?.can(Actions.MANAGE, Subjects.ALL)) {
         return res.status(403).json({ message: "Accès non autorisé" });
       }
 
@@ -1774,13 +1739,11 @@ export function registerRbacRoutes(app: Express) {
    * Protected: requires rbac.manage or admin
    * Body: { userId, permissionId?, permissionCode?, expiresAt, reason }
    */
-  app.post("/api/rbac/temp-permissions", requireAuth, attachAbility, async (req, res) => {
+  app.post("/api/rbac/temp-permissions", requireAuth, attachAbility, requireAnyAbility([
+    { action: Actions.MANAGE, subject: Subjects.RBAC },
+    { action: Actions.MANAGE, subject: Subjects.ALL },
+  ]), async (req, res) => {
     try {
-      const ability = (req as any).ability;
-      if (!ability?.can(Actions.MANAGE, Subjects.RBAC) && !ability?.can(Actions.MANAGE, Subjects.ALL)) {
-        return res.status(403).json({ message: "Accès non autorisé" });
-      }
-
       const { userId, permissionId, permissionCode, expiresAt, reason } = req.body;
 
       if (!userId) {
