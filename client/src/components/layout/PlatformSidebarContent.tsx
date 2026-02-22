@@ -7,7 +7,7 @@ import { PLATFORM_MENU_ITEMS } from '../../constants/menuItems';
 import { ROUTES, canAccessRoute, type RouteConfig, getRouteByKey } from '../../lib/routes-config';
 import IconButton from '../ui/IconButton';
 import { useBranding } from '../../contexts/BrandingContext';
-import { usePermissionsContextOptional } from '../../contexts/PermissionsContext';
+import { useAbilityContextOptional } from '../../contexts/AbilityContext';
 import { isAdminRole } from '@shared/types/roles';
 import { useValidationsBadge } from '../../hooks/useValidationsBadge';
 import { useCaisseBadge } from '../../hooks/useCaisseBadge';
@@ -36,7 +36,7 @@ export default function PlatformSidebarContent({
 }: PlatformSidebarContentProps) {
   const { t } = useLanguage();
   const { branding } = useBranding();
-  usePermissionsContextOptional(); // Subscribe to permission changes to force re-render
+  useAbilityContextOptional(); // Subscribe to permission changes to force re-render
   const appName = branding.appName;
 
   // Maintenance Status State

@@ -18,7 +18,9 @@ import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 
 // Constants
 import { ADMIN_TABS, AdminTabId } from '../../constants/admin-constants';
-import { authService } from '../../lib/auth';
+import { useAbility } from '../../contexts/AbilityContext';
+import { Actions, Subjects } from '@/lib/casl';
+import { getPermissionMapping } from '@shared/ability/mappings';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 
 // Sub-components
@@ -58,6 +60,7 @@ interface AdminModuleCompletProps {
 }
 
 export default function AdminModuleComplet({ activeView }: AdminModuleCompletProps) {
+  const ability = useAbility();
   const { currentSubModule, navigateToModule } = useAppNavigation();
 
   // Dérive l'onglet actif depuis l'URL (source de vérité)
@@ -306,7 +309,10 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
                   const parts = tab.permission.split('.');
                   const module = parts[0];
                   const action = parts.slice(1).join('.') || 'view';
-                  return authService.hasPermission(module, action);
+                  if (ability.can(Actions.MANAGE, Subjects.ALL)) return true;
+                  const mapping = getPermissionMapping(`${module}.${action}`);
+                  if (!mapping) return false;
+                  return ability.can(mapping.action, mapping.subject);
                 }).map((tab) => {
                   const Icon = iconMap[tab.icon] || Shield;
                   const isActive = activeTab === tab.id;

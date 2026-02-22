@@ -17,6 +17,7 @@ import ProspectionSupervisionPanel from './ProspectionSupervisionPanel';
 import AgentSessionManager from './sessions/AgentSessionManager';
 import LoadingScreen from '../ui/LoadingScreen';
 import { authService } from '../../lib/auth';
+import { useIsAdmin } from '../../contexts/AbilityContext';
 import { agentTerrainApi } from '../../lib/api-client';
 import { useProspectionBadge } from '../../hooks/useProspectionBadge';
 import { useUserProfile } from '../../hooks/useUserProfile';
@@ -56,7 +57,8 @@ export default function AgentTerrainPortail({ agentId, activeView, onModuleChang
   const { user } = useUserProfile();
 
   // Admin / Supervisor shared state
-  const isAdminOrSupervisor = authService.isAdmin() || authService.hasRole?.('superviseur') || authService.hasRole?.('chef_agence');
+  const _isAdmin = useIsAdmin();
+  const isAdminOrSupervisor = _isAdmin || authService.hasRole?.('superviseur') || authService.hasRole?.('chef_agence');
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(agentId || null);
   const [agentsList, setAgentsList] = useState<AgentOption[]>([]);
   const [loadingAgents, setLoadingAgents] = useState(false);

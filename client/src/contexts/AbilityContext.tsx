@@ -1,14 +1,15 @@
 /**
- * CASL Ability Context
- * ====================
+ * CASL Ability Context (Unified)
+ * ==============================
  *
- * Provides CASL ability to the React component tree.
- * Works alongside the existing PermissionsContext for backwards compatibility.
+ * Source unique de vérité pour les permissions côté frontend.
+ * Gère à la fois :
+ * - La synchronisation en temps réel (WebSocket, polling, focus, kill switch)
+ * - La construction et mise à disposition de l'ability CASL
  *
  * Usage:
  * ------
- *
- * 1. Wrap your app with AbilityProvider (inside PermissionsProvider)
+ * 1. Wrap your app with AbilityProvider (inside WebSocketProvider)
  *
  * 2. Use the useAbility hook in components:
  *    const ability = useAbility();
@@ -18,9 +19,13 @@
  *    const canCreate = useCan('create', 'Credit');
  */
 
-import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode, useMemo } from 'react';
+import { toast } from 'sonner';
 import { authService } from '@/lib/auth';
-import { usePermissionsContext } from './PermissionsContext';
+import { useWebSocketContext } from './WebSocketContext';
+import { hardRedirectToLogin } from '@/lib/navigation';
+import { StatutUser } from '@shared/enum/status-constants';
+import type { RbacUpdatePayload } from '@shared/ability';
 import {
   AppAbility,
   buildAbility,
@@ -31,9 +36,21 @@ import {
   CaslRule,
 } from '@/lib/casl';
 
-/**
- * Context value type
- */
+// ============================================================================
+// SYNC CONSTANTS
+// ============================================================================
+
+// Periodic sync interval (5 minutes as safety net)
+const PERIODIC_SYNC_INTERVAL = 5 * 60 * 1000;
+// Minimum time between focus-based refreshes (10 seconds debounce)
+const FOCUS_DEBOUNCE_MS = 10 * 1000;
+// Consider permissions stale after 10 minutes without sync
+const STALE_THRESHOLD_MS = 10 * 60 * 1000;
+
+// ============================================================================
+// CONTEXT TYPES
+// ============================================================================
+
 interface AbilityContextType {
   ability: AppAbility;
   isAdmin: boolean;
@@ -41,97 +58,339 @@ interface AbilityContextType {
   lockedFeatures: string[];
   agenceIdActive?: string;
   agenceNom?: string;
+  // Sync metadata
+  permissionsVersion: number;
+  refreshPermissions: () => Promise<void>;
+  syncStatus: 'synced' | 'syncing' | 'stale';
 }
 
-/**
- * Default context value (empty ability)
- */
-const defaultValue: AbilityContextType = {
+const defaultAbilityState = {
   ability: createEmptyAbility(),
   isAdmin: false,
-  roles: [],
-  lockedFeatures: [],
+  roles: [] as string[],
+  lockedFeatures: [] as string[],
+};
+
+const defaultValue: AbilityContextType = {
+  ...defaultAbilityState,
+  permissionsVersion: 0,
+  refreshPermissions: async () => {},
+  syncStatus: 'synced' as const,
 };
 
 const AbilityContext = createContext<AbilityContextType>(defaultValue);
 
+// ============================================================================
+// PROVIDER
+// ============================================================================
+
 /**
- * AbilityProvider - Provides CASL ability to the component tree
+ * AbilityProvider - Unified permissions provider
  *
- * IMPORTANT: Must be used inside PermissionsProvider to react to permission updates.
+ * Handles real-time sync (WebSocket, polling, focus) AND CASL ability building.
+ * Must be used inside WebSocketProvider.
  */
 export function AbilityProvider({ children }: { children: ReactNode }) {
-  const [abilityState, setAbilityState] = useState<AbilityContextType>(defaultValue);
+  // Ability state
+  const [abilityState, setAbilityState] = useState(defaultAbilityState);
 
-  // Subscribe to permission updates from PermissionsContext
-  const { permissionsVersion } = usePermissionsContext();
+  // Sync state
+  const [permissionsVersion, setPermissionsVersion] = useState(0);
+  const [rbacServerVersion, setRbacServerVersion] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<number>(Date.now());
+  const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'stale'>('synced');
 
-  // Build ability when permissions change
-  useEffect(() => {
-    async function loadAbility() {
-      try {
-        const user = authService.getCurrentUser();
-        if (!user) {
-          setAbilityState(defaultValue);
-          return;
-        }
+  // Refs for debouncing and tracking
+  const lastFocusRefreshRef = useRef<number>(0);
+  const periodicSyncRef = useRef<NodeJS.Timeout | null>(null);
+  const isRefreshingRef = useRef(false);
 
-        // Fetch permissions with CASL rules from API
-        const response = await fetch('/api/my-permissions', { credentials: 'include' });
+  const { isConnected } = useWebSocketContext();
 
-        if (!response.ok) {
-          console.error('[CASL] Failed to fetch permissions:', response.status);
-          setAbilityState(defaultValue);
-          return;
-        }
+  // ============================================================================
+  // CORE: Load ability from API
+  // ============================================================================
 
-        const data = await response.json();
+  const loadAbility = useCallback(async () => {
+    // Use ref to prevent concurrent refreshes (state may be stale in closures)
+    if (isRefreshingRef.current) return;
+    isRefreshingRef.current = true;
+    setIsRefreshing(true);
+    setSyncStatus('syncing');
 
-        // Check if response includes CASL rules
-        if (data.caslRules && Array.isArray(data.caslRules)) {
-          const ability = buildAbility(data.caslRules as CaslRule[]);
+    try {
+      const user = authService.getCurrentUser();
+      if (!user) {
+        setAbilityState(defaultAbilityState);
+        return;
+      }
 
-          setAbilityState({
-            ability,
-            isAdmin: data.isAdmin || false,
-            roles: data.roles || [data.role],
-            lockedFeatures: data.lockedFeatures || [],
-            agenceIdActive: data.agenceIdActive,
-            agenceNom: data.agenceNom,
+      // Fetch permissions with CASL rules from API
+      const response = await fetch('/api/my-permissions', { credentials: 'include' });
+
+      if (!response.ok) {
+        console.error('[CASL] Failed to fetch permissions:', response.status);
+        return;
+      }
+
+      const data = await response.json();
+
+      // Update server version if returned
+      if (data.permissionsVersion) {
+        setRbacServerVersion(data.permissionsVersion);
+      }
+
+      // Build ability from CASL rules
+      if (data.caslRules && Array.isArray(data.caslRules)) {
+        const ability = buildAbility(data.caslRules as CaslRule[]);
+
+        setAbilityState({
+          ability,
+          isAdmin: data.isAdmin || false,
+          roles: data.roles || [data.role],
+          lockedFeatures: data.lockedFeatures || [],
+          agenceIdActive: data.agenceIdActive,
+          agenceNom: data.agenceNom,
+        });
+
+        if (import.meta.env.DEV) {
+          console.log('[CASL] Ability built from API rules:', {
+            rulesCount: data.caslRules.length,
+            isAdmin: data.isAdmin,
+            roles: data.roles,
           });
-
-          if (import.meta.env.DEV) {
-            console.log('[CASL] Ability built from API rules:', {
-              rulesCount: data.caslRules.length,
-              isAdmin: data.isAdmin,
-              roles: data.roles,
-            });
-          }
-        } else {
-          // Fallback: Admin gets full access, others get empty ability
-          // This handles the transition period before all permissions include CASL rules
-          const ability = data.isAdmin ? createAdminAbility() : createEmptyAbility();
-
-          setAbilityState({
-            ability,
-            isAdmin: data.isAdmin || false,
-            roles: data.roles || [data.role],
-            lockedFeatures: [],
-          });
-
-          console.warn('[CASL] No CASL rules in API response, using fallback');
         }
-      } catch (error) {
-        console.error('[CASL] Error loading ability:', error);
-        setAbilityState(defaultValue);
+      } else {
+        // Fallback: Admin gets full access, others get empty ability
+        const ability = data.isAdmin ? createAdminAbility() : createEmptyAbility();
+
+        setAbilityState({
+          ability,
+          isAdmin: data.isAdmin || false,
+          roles: data.roles || [data.role],
+          lockedFeatures: [],
+        });
+
+        console.warn('[CASL] No CASL rules in API response, using fallback');
+      }
+
+      // Bump version to notify subscribers
+      setPermissionsVersion(prev => prev + 1);
+      setLastSyncTime(Date.now());
+      setSyncStatus('synced');
+    } catch (error) {
+      console.error('[CASL] Error loading ability:', error);
+    } finally {
+      isRefreshingRef.current = false;
+      setIsRefreshing(false);
+    }
+  }, []);
+
+  // ============================================================================
+  // KILL SWITCH: Force logout if user account is suspended/deactivated
+  // ============================================================================
+
+  const handleUserStatusChange = useCallback((payload: any) => {
+    const currentUser = authService.getCurrentUser();
+    if (!currentUser) return;
+
+    if (payload.userId === currentUser.id) {
+      const newStatus = payload.status;
+
+      if (newStatus !== StatutUser.ACTIVE) {
+        console.warn('SECURITY: Account suspended/deactivated, forcing logout...');
+
+        toast.error('Compte suspendu', {
+          description: 'Votre compte a été désactivé par un administrateur. Vous allez être déconnecté.',
+          duration: 3000,
+        });
+
+        setTimeout(async () => {
+          await authService.logout();
+          hardRedirectToLogin('Votre compte a été suspendu');
+        }, 1500);
       }
     }
+  }, []);
 
+  // ============================================================================
+  // WEBSOCKET RECONNECT
+  // ============================================================================
+
+  useEffect(() => {
+    if (isConnected) {
+      if (import.meta.env.DEV) console.log('[CASL] WebSocket Connected/Reconnected, syncing...');
+      loadAbility();
+    }
+  }, [isConnected, loadAbility]);
+
+  // ============================================================================
+  // SOFT REVALIDATION (Fallback when WebSocket is unreliable)
+  // ============================================================================
+
+  useEffect(() => {
+    const handleFocus = () => {
+      const now = Date.now();
+      if (now - lastFocusRefreshRef.current > FOCUS_DEBOUNCE_MS) {
+        if (import.meta.env.DEV) console.log('[CASL] Window focused, checking for permission updates...');
+        lastFocusRefreshRef.current = now;
+        loadAbility();
+      }
+    };
+
+    const handleOnline = () => {
+      if (import.meta.env.DEV) console.log('[CASL] Network reconnected, syncing...');
+      loadAbility();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        const timeSinceSync = Date.now() - lastSyncTime;
+        if (timeSinceSync > STALE_THRESHOLD_MS) {
+          if (import.meta.env.DEV) console.log(`[CASL] Permissions stale (${Math.round(timeSinceSync / 1000)}s since last sync), refreshing...`);
+          setSyncStatus('stale');
+          loadAbility();
+        }
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('online', handleOnline);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('online', handleOnline);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [loadAbility, lastSyncTime]);
+
+  // ============================================================================
+  // PERIODIC SYNC (Safety net for missed WebSocket events)
+  // ============================================================================
+
+  useEffect(() => {
+    periodicSyncRef.current = setInterval(() => {
+      if (import.meta.env.DEV) console.log('[CASL] Periodic permissions sync (safety net)...');
+      loadAbility();
+    }, PERIODIC_SYNC_INTERVAL);
+
+    return () => {
+      if (periodicSyncRef.current) {
+        clearInterval(periodicSyncRef.current);
+      }
+    };
+  }, [loadAbility]);
+
+  // ============================================================================
+  // RBAC WEBSOCKET EVENTS
+  // ============================================================================
+
+  useEffect(() => {
+    /**
+     * Handle new rbac:update events with RbacUpdatePayload format
+     */
+    const handleRbacUpdate = async (event: CustomEvent<RbacUpdatePayload>) => {
+      const payload = event.detail;
+      const currentUser = authService.getCurrentUser();
+      if (!currentUser) return;
+
+      let shouldRefresh = false;
+
+      switch (payload.scope) {
+        case 'user':
+          if (payload.userId === currentUser.id) {
+            shouldRefresh = true;
+          }
+          break;
+        case 'role': {
+          const userRoles = (currentUser as any).roles || [currentUser.role];
+          if (payload.role && userRoles.includes(payload.role)) {
+            shouldRefresh = true;
+          }
+          break;
+        }
+        case 'global':
+          shouldRefresh = true;
+          break;
+        default:
+          shouldRefresh = true;
+      }
+
+      if (payload.version && payload.version > rbacServerVersion) {
+        if (import.meta.env.DEV) console.log(`[CASL] Server version ${payload.version} > local ${rbacServerVersion}, syncing...`);
+        shouldRefresh = true;
+      }
+
+      if (shouldRefresh) {
+        if (import.meta.env.DEV) console.log('[CASL] RBAC update received:', payload);
+        await loadAbility();
+        if (payload.version) {
+          setRbacServerVersion(payload.version);
+        }
+      }
+    };
+
+    /**
+     * Handle legacy RBAC_UPDATE events for backwards compatibility
+     */
+    const handleLegacyRBACUpdate = async (event: CustomEvent) => {
+      const payload = event.detail;
+      const currentUser = authService.getCurrentUser();
+      if (!currentUser) return;
+
+      // Kill Switch: Handle user status changes
+      if (payload.entity === 'user_status') {
+        handleUserStatusChange(payload);
+        return;
+      }
+
+      let shouldRefresh = false;
+
+      if (payload.entity === 'module') {
+        shouldRefresh = true;
+      } else if (payload.entity === 'role_permission') {
+        const userRoles = (currentUser as any).roles || [currentUser.role];
+        if (userRoles.includes(payload.role)) {
+          shouldRefresh = true;
+        }
+      } else if (payload.entity === 'user_permission') {
+        if (payload.userId === currentUser.id) {
+          shouldRefresh = true;
+        }
+      } else if (payload.type === 'reseed') {
+        shouldRefresh = true;
+      } else {
+        shouldRefresh = true;
+      }
+
+      if (shouldRefresh) {
+        if (import.meta.env.DEV) console.log('[CASL] Legacy RBAC update received, refreshing...');
+        await loadAbility();
+      }
+    };
+
+    // Listen to both new and legacy events
+    window.addEventListener('rbac:update', handleRbacUpdate as unknown as EventListener);
+    window.addEventListener('rbac-update', handleLegacyRBACUpdate as unknown as EventListener);
+
+    // Initial load
     loadAbility();
-  }, [permissionsVersion]); // Rebuild when permissions update
+
+    return () => {
+      window.removeEventListener('rbac:update', handleRbacUpdate as unknown as EventListener);
+      window.removeEventListener('rbac-update', handleLegacyRBACUpdate as unknown as EventListener);
+    };
+  }, [rbacServerVersion, loadAbility, handleUserStatusChange]);
 
   // Memoize context value
-  const contextValue = useMemo(() => abilityState, [abilityState]);
+  const contextValue = useMemo<AbilityContextType>(() => ({
+    ...abilityState,
+    permissionsVersion,
+    refreshPermissions: loadAbility,
+    syncStatus,
+  }), [abilityState, permissionsVersion, loadAbility, syncStatus]);
 
   return (
     <AbilityContext.Provider value={contextValue}>
@@ -139,6 +398,10 @@ export function AbilityProvider({ children }: { children: ReactNode }) {
     </AbilityContext.Provider>
   );
 }
+
+// ============================================================================
+// HOOKS
+// ============================================================================
 
 /**
  * Hook to access the CASL ability
@@ -152,7 +415,7 @@ export function useAbility(): AppAbility {
 }
 
 /**
- * Hook to access full ability context (includes metadata)
+ * Hook to access full ability context (includes metadata + sync info)
  */
 export function useAbilityContext(): AbilityContextType {
   const context = useContext(AbilityContext);
@@ -160,6 +423,11 @@ export function useAbilityContext(): AbilityContextType {
     throw new Error('useAbilityContext must be used within an AbilityProvider');
   }
   return context;
+}
+
+/** Optional variant that returns null instead of throwing when outside provider */
+export function useAbilityContextOptional(): AbilityContextType | null {
+  return useContext(AbilityContext) ?? null;
 }
 
 /**

@@ -65,7 +65,7 @@ import MobileBottomNav from './components/layout/MobileBottomNav';
 import { PLATFORM_MENU_ITEMS } from './constants/menuItems';
 import { getRouteByKey, canAccessRoute } from './lib/routes-config';
 import ForcePasswordChange from './components/auth/ForcePasswordChange';
-import { usePermissionsContext } from './contexts/PermissionsContext';
+import { useAbilityContext } from './contexts/AbilityContext';
 import { SystemRole, normalizeRole } from '@shared/types/roles';
 import ActiveSessionsModal from './components/shared/ActiveSessionsModal';
 
@@ -96,7 +96,7 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
     typeof window !== 'undefined' ? !window.matchMedia('(max-width: 1023px)').matches : true
   );
   const [moduleData, setModuleData] = useState<any>(null);
-  const { permissionsVersion } = usePermissionsContext();
+  const { permissionsVersion } = useAbilityContext();
   const normalizedRole = normalizeRole(currentUser?.role) || SystemRole.CLIENT;
   
   // Security: Check if user still has access to current module

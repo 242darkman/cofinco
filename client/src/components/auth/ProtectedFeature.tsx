@@ -1,17 +1,12 @@
 import { ReactNode } from 'react';
 import { authService } from '@/lib/auth';
-import { usePermissionsContext, usePermissionsContextOptional } from '@/contexts/PermissionsContext';
-import { useAbility, useIsFeatureLocked } from '@/contexts/AbilityContext';
+import { useAbility, useAbilityContextOptional, useIsFeatureLocked } from '@/contexts/AbilityContext';
+import { Action, Subject, Actions, Subjects, canAccessModule as caslCanAccessModule } from '@/lib/casl';
+import { getPermissionMapping } from '@shared/ability/mappings';
 import { SystemRole } from '@shared/types/roles';
-import { Action, Subject } from '@/lib/casl';
 
 interface ProtectedFeatureProps {
-  // Legacy props (backwards compatible)
-  requiredRoles?: SystemRole[];
-  requiredPermission?: { module: string; action: string };
-  requireAdmin?: boolean;
-
-  // New CASL props (preferred)
+  // CASL ability check
   requiredAbility?: { action: Action; subject: Subject };
   requiredAnyAbility?: Array<{ action: Action; subject: Subject }>;
   requiredAllAbilities?: Array<{ action: Action; subject: Subject }>;
@@ -24,19 +19,14 @@ interface ProtectedFeatureProps {
 }
 
 /**
- * Composant pour protéger l'affichage de fonctionnalités selon les rôles/permissions
- *
- * Supports both legacy permission checks and new CASL ability checks.
- * CASL checks take priority when provided.
+ * Composant pour protéger l'affichage de fonctionnalités selon les permissions CASL
  *
  * @example
- * // Using CASL (preferred)
  * <ProtectedFeature requiredAbility={{ action: 'create', subject: 'Credit' }}>
  *   <Button>Nouveau Crédit</Button>
  * </ProtectedFeature>
  *
  * @example
- * // Check multiple abilities (any)
  * <ProtectedFeature requiredAnyAbility={[
  *   { action: 'edit', subject: 'Credit' },
  *   { action: 'manage', subject: 'Credit' }
@@ -45,33 +35,11 @@ interface ProtectedFeatureProps {
  * </ProtectedFeature>
  *
  * @example
- * // Legacy: Afficher uniquement pour les admins
- * <ProtectedFeature requireAdmin>
- *   <Button>Supprimer</Button>
- * </ProtectedFeature>
- *
- * @example
- * // Legacy: Afficher pour plusieurs rôles
- * <ProtectedFeature requiredRoles={[SystemRole.ADMIN, SystemRole.GESTIONNAIRE_CREDIT]}>
- *   <Button>Créer Crédit</Button>
- * </ProtectedFeature>
- *
- * @example
- * // Legacy: Vérifier permission spécifique
- * <ProtectedFeature requiredPermission={{ module: 'credits', action: 'create' }}>
- *   <Button>Nouveau Crédit</Button>
- * </ProtectedFeature>
- *
- * @example
- * // With feature lock check
  * <ProtectedFeature featureKey="credits" requiredAbility={{ action: 'view', subject: 'Credit' }}>
  *   <CreditModule />
  * </ProtectedFeature>
  */
 export function ProtectedFeature({
-  requiredRoles,
-  requiredPermission,
-  requireAdmin,
   requiredAbility,
   requiredAnyAbility,
   requiredAllAbilities,
@@ -79,16 +47,8 @@ export function ProtectedFeature({
   children,
   fallback = null,
 }: ProtectedFeatureProps) {
-
-  // Subscribe to permission updates (non-throwing)
-  usePermissionsContextOptional();
-
-  // Get CASL ability
   const ability = useAbility();
-
-  // Check feature lock
   const isFeatureLocked = featureKey ? useIsFeatureLocked(featureKey) : false;
-
   const user = authService.getCurrentUser();
 
   if (!user) {
@@ -100,15 +60,15 @@ export function ProtectedFeature({
     return <>{fallback}</>;
   }
 
-  // Priority 1: CASL ability checks (new system)
+  // Single ability check
   if (requiredAbility) {
     if (!ability.can(requiredAbility.action, requiredAbility.subject)) {
       return <>{fallback}</>;
     }
-    // Passed CASL check - render children
     return <>{children}</>;
   }
 
+  // Any ability check (OR)
   if (requiredAnyAbility && requiredAnyAbility.length > 0) {
     const hasAny = requiredAnyAbility.some(
       ({ action, subject }) => ability.can(action, subject)
@@ -119,6 +79,7 @@ export function ProtectedFeature({
     return <>{children}</>;
   }
 
+  // All abilities check (AND)
   if (requiredAllAbilities && requiredAllAbilities.length > 0) {
     const hasAll = requiredAllAbilities.every(
       ({ action, subject }) => ability.can(action, subject)
@@ -129,41 +90,42 @@ export function ProtectedFeature({
     return <>{children}</>;
   }
 
-  // Priority 2: Legacy checks (backwards compatibility)
-
-  // Vérifier si admin requis
-  if (requireAdmin && !authService.isAdmin()) {
-    return <>{fallback}</>;
-  }
-
-  // Vérifier rôle spécifique
-  if (requiredRoles && requiredRoles.length > 0) {
-    const hasRole = requiredRoles.includes(user.role);
-    if (!hasRole) {
-      return <>{fallback}</>;
-    }
-  }
-
-  // Vérifier permission
-  if (requiredPermission) {
-    const hasPermission = authService.hasPermission(
-      requiredPermission.module,
-      requiredPermission.action
-    );
-    if (!hasPermission) {
-      return <>{fallback}</>;
-    }
-  }
-
+  // No check specified — render children
   return <>{children}</>;
 }
 
 /**
- * Hook pour vérifier les permissions
+ * Bridge function: converts legacy (module, action) to CASL ability.can()
+ * Used internally by usePermissions() for backward compatibility with 68+ components.
+ */
+function hasPermissionViaCasl(
+  ability: import('@/lib/casl').AppAbility,
+  module: string,
+  action: string
+): boolean {
+  // Admin bypass
+  if (ability.can(Actions.MANAGE, Subjects.ALL)) return true;
+
+  const code = `${module}.${action}`;
+  const mapping = getPermissionMapping(code);
+  if (!mapping) {
+    if (import.meta.env.DEV) {
+      console.warn(`[CASL] No mapping found for permission code: ${code}`);
+    }
+    return false;
+  }
+  return ability.can(mapping.action, mapping.subject);
+}
+
+/**
+ * Hook pour vérifier les permissions via CASL
+ *
+ * Fournit `hasPermission(module, action)` qui bridge vers CASL en interne
+ * via les mappings de `shared/ability/mappings.ts`.
  */
 export function usePermissions() {
-  // Subscribe to permission updates (non-throwing: graceful during HMR or provider absence)
-  usePermissionsContextOptional();
+  // Subscribe to ability updates (re-renders on permission changes)
+  useAbilityContextOptional();
 
   const user = authService.getCurrentUser();
   const ability = useAbility();
@@ -171,14 +133,17 @@ export function usePermissions() {
   return {
     user,
     ability,
-    isAdmin: authService.isAdmin(),
+    isAdmin: ability.can(Actions.MANAGE, Subjects.ALL),
     isAgentCaisse: authService.isAgentCaisse(),
     isManager: authService.isManager(),
     hasRole: (role: SystemRole | string) => authService.hasRole(role),
-    hasPermission: (module: string, action: string) =>
-      authService.hasPermission(module, action),
-    canAccessModule: (module: string) => authService.canAccessModule(module),
-    // New CASL methods
+    // Bridge: legacy (module, action) → CASL
+    hasPermission: (module: string, action: string) => {
+      if (!user) return false;
+      return hasPermissionViaCasl(ability, module, action);
+    },
+    canAccessModule: (module: string) => caslCanAccessModule(ability, module),
+    // Direct CASL access
     can: (action: Action, subject: Subject) => ability.can(action, subject),
     cannot: (action: Action, subject: Subject) => ability.cannot(action, subject),
   };
@@ -186,7 +151,6 @@ export function usePermissions() {
 
 /**
  * Component that renders only if user can perform action on subject
- * Simpler alternative to ProtectedFeature for CASL-only checks
  */
 export function Can({
   I: action,

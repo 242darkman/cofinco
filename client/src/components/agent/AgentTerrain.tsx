@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { agentTerrainApi, caisseAgentApi } from '../../lib/api-client';
 import { authService } from '../../lib/auth';
+import { useIsAdmin } from '../../contexts/AbilityContext';
 import AgentTerrainPaiement from './AgentTerrainPaiement';
 import SettlementModal from './SettlementModal';
 import CloseSessionModal from './CloseSessionModal';
@@ -94,7 +95,7 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
 
   // Auth & Role
   const currentUser = authService.getCurrentUser();
-  const isAdmin = authService.isAdmin();
+  const isAdmin = useIsAdmin();
   // Supervision mode: admin, chef d'agence, superviseur (or users with admin permissions)
   const userRole = normalizeRole(currentUser?.role);
   const canSupervise = isAdmin || userRole === SystemRole.CHEF_AGENCE || userRole === SystemRole.SUPERVISEUR;

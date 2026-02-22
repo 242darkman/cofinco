@@ -9,6 +9,7 @@ import { sessionCaisseApi, authApi, userApi } from '../../../lib/api-client';
 import { computeSessionStatus } from '../../../lib/format';
 import { useAgence } from '../../../contexts/AgenceContext';
 import { authService } from '../../../lib/auth';
+import { usePermissions } from '../../auth/ProtectedFeature';
 import SupervisionConfirmModal, { SupervisionSession } from './shared/SupervisionConfirmModal';
 import CaisseAuditLog from './CaisseAuditLog';
 import AgencyClosurePanel from './AgencyClosurePanel';
@@ -17,27 +18,19 @@ import EcartApprovalPanel from './EcartApprovalPanel';
 // Types pour les filtres
 type CaissierStatusFilter = 'all' | 'en_caisse' | 'hors_caisse' | 'inactif';
 
-// Hook pour vérifier les permissions dynamiquement depuis la BDD
+// Hook pour vérifier les permissions via CASL
 function useSupervisionPermissions() {
-  // Les permissions sont chargées dynamiquement depuis /api/my-permissions
-  // et stockées dans authService lors du login
+  const { hasPermission, isAdmin } = usePermissions();
 
   return {
-    // Accès au module caisse
-    canViewCaisse: authService.hasPermission('caisse', 'view'),
-    canManageCaisse: authService.hasPermission('caisse', 'manage'),
-
-    // Gestion des utilisateurs
-    canViewUsers: authService.hasPermission('users', 'view'),
-    canEditUsers: authService.hasPermission('users', 'edit'),
-
-    // Actions spécifiques
-    canTakeControl: authService.hasPermission('caisse', 'manage'),
-    canForceClose: authService.hasPermission('caisse', 'manage'),
-    canToggleUserStatus: authService.hasPermission('users', 'edit'),
-
-    // Admin check
-    isAdmin: authService.isAdmin(),
+    canViewCaisse: hasPermission('caisse', 'view'),
+    canManageCaisse: hasPermission('caisse', 'manage'),
+    canViewUsers: hasPermission('users', 'view'),
+    canEditUsers: hasPermission('users', 'edit'),
+    canTakeControl: hasPermission('caisse', 'manage'),
+    canForceClose: hasPermission('caisse', 'manage'),
+    canToggleUserStatus: hasPermission('users', 'edit'),
+    isAdmin,
   };
 }
 

@@ -13,7 +13,6 @@ import LocationTracker from '@/components/agent/LocationTracker';
 import { FeatureFlagsProvider } from './contexts/FeatureFlagsContext';
 import { WebSocketProvider } from './contexts/WebSocketContext';
 import { AgenceProvider } from './contexts/AgenceContext';
-import { PermissionsProvider } from './contexts/PermissionsContext';
 import { AbilityProvider } from './contexts/AbilityContext';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { SessionProvider } from './contexts/SessionContext';
@@ -310,7 +309,6 @@ function App() {
       <FeatureFlagsProvider>
         <AgenceProvider>
           <WebSocketProvider>
-            <PermissionsProvider>
               <AbilityProvider>
                 <SessionProvider
                   onSessionInvalid={(reason) => {
@@ -348,7 +346,6 @@ function App() {
                   </ErrorBoundary>
                 </SessionProvider>
               </AbilityProvider>
-            </PermissionsProvider>
           </WebSocketProvider>
         </AgenceProvider>
       </FeatureFlagsProvider>

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { ChevronDown, ChevronUp, RefreshCw, Shield, Lock } from 'lucide-react';
 import { Card } from '../../ui';
 import { formatDate } from '../../../lib/format';
-import { authService } from '../../../lib/auth';
+import { useIsAdmin } from '../../../contexts/AbilityContext';
 
 interface AuditLogEntry {
   id: string;
@@ -101,7 +101,7 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export default function CaisseAuditLog() {
-  const isAdmin = authService.isAdmin();
+  const isAdmin = useIsAdmin();
 
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
   const [pagination, setPagination] = useState<AuditLogPagination>({ page: 1, perPage: 8, total: 0, totalPages: 0 });
