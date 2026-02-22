@@ -123,6 +123,8 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
   const [mmPaymentStatus, setMmPaymentStatus] = useState<MMPaymentStatus>('idle');
   const [mmPaymentIntent, setMmPaymentIntent] = useState<PaymentIntent | null>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingCountRef = useRef(0);
+  const MM_POLLING_MAX = 60; // 60 polls × 5s = 5 minutes max
 
   // Mobile Money fee estimation
   const [feeOption, setFeeOption] = useState<'CLIENT_PAYS' | 'FEES_DEDUCTED' | ''>('');
@@ -221,17 +223,31 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
     }
   }, [formData.client_id, formData.type_paiement]);
 
-  // MM Payment status polling
+  // MM Payment status polling (with timeout after MM_POLLING_MAX polls)
   useEffect(() => {
     if (!mmPaymentIntent?.id || mmPaymentStatus !== 'pending') {
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
         pollingIntervalRef.current = null;
       }
+      pollingCountRef.current = 0;
       return;
     }
 
     const pollStatus = async () => {
+      pollingCountRef.current += 1;
+
+      // Auto-expire after max polls (5 minutes)
+      if (pollingCountRef.current > MM_POLLING_MAX) {
+        setMmPaymentStatus('expired');
+        toast.error('Délai d\'attente dépassé. Vérifiez le statut du paiement manuellement.');
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
+        return;
+      }
+
       try {
         const response = await fetch(`/api/payments/${mmPaymentIntent.id}`, { credentials: 'include' });
         if (!response.ok) return;
@@ -242,7 +258,6 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
         if (intent.status === 'SUCCESS') {
           setMmPaymentStatus('success');
           toast.success('Paiement Mobile Money confirmé!');
-          // Process success - create receipt and show success modal
           await handleMmPaymentSuccess(intent);
         } else if (intent.status === 'FAILED') {
           setMmPaymentStatus('failed');
@@ -251,8 +266,8 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
           setMmPaymentStatus('expired');
           toast.error('Le paiement a expiré');
         }
-      } catch (error) {
-        // Error handled silently
+      } catch {
+        // Transient network error — will retry on next poll
       }
     };
 

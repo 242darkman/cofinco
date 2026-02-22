@@ -102,7 +102,8 @@ export default function AgentFormations({ agentId }: { agentId?: string }) {
         const cRes = await fetch(`/api/agent-formations-compliance?agent_id=${agentId}`, { credentials: 'include' });
         if (cRes.ok) setCompliance(await cRes.json());
       }
-    } catch (error) {
+    } catch {
+      // Non-blocking: formations will show empty
     } finally {
       setLoading(false);
     }

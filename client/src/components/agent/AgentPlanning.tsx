@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Calendar, Clock, MapPin, Plus, Check, X, List, Grid3X3, ChevronLeft, ChevronRight, AlertTriangle, Repeat, Eye, Trash2, Edit, ClipboardCheck, Play, Loader2, Banknote } from 'lucide-react';
+import { toast } from 'sonner';
 import { StatutPlanning, STATUT_PLANNING_LABELS } from '@shared/enum/status-constants';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../ui/sheet';
 
@@ -245,7 +246,8 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
       setForceCreate(false);
       setRecurrence({ type: 'none', endDate: '', days: [] });
       fetchPlannings();
-    } catch (error: any) {
+    } catch {
+      toast.error('Erreur lors de la création');
     } finally {
       setLoading(false);
     }
@@ -269,7 +271,8 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
       if (selectedPlanning && selectedPlanning.id === id) {
           setSelectedPlanning({ ...selectedPlanning, statut });
       }
-    } catch (error: any) {
+    } catch {
+      toast.error('Erreur lors de la mise à jour');
     }
   };
 
@@ -292,7 +295,7 @@ export default function AgentPlanning({ agentId, enquetes = [], onStartEnquete, 
       case 'Formation': return 'bg-status-warning';
       case 'Prospection': return 'bg-accent';
       case 'Reunion': return 'bg-accent';
-      default: return 'bg-surface-muted0';
+      default: return 'bg-surface-subtle';
     }
   };
 

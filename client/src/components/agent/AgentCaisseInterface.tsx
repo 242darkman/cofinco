@@ -68,7 +68,8 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
         const data = await response.json();
         if (data) setAgent(data);
       }
-    } catch (error) {
+    } catch {
+      // Non-blocking: agent info is supplementary
     }
   };
 
@@ -79,7 +80,8 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
         const data = await response.json();
         setTransactions(data || []);
       }
-    } catch (error) {
+    } catch {
+      // Non-blocking: transactions list is supplementary
     }
   };
 
@@ -97,7 +99,8 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
         setSearchResults(results);
         setShowSearchResults(results.length > 0);
       }
-    } catch (error) {
+    } catch {
+      // Non-blocking: search results will simply not appear
     }
   }, []);
 

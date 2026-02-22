@@ -84,7 +84,8 @@ export default function AgentTerrainMap() {
       }
 
       setLastUpdate(new Date());
-    } catch (error) {
+    } catch {
+      // Non-blocking: map data will appear empty
     } finally {
       setLoading(false);
     }
@@ -111,7 +112,8 @@ export default function AgentTerrainMap() {
           source: 'gps',
         }),
       });
-    } catch (error) {
+    } catch {
+      // Non-blocking: location send failure is transient
     }
   }, [trackingEnabled, accuracy]);
 

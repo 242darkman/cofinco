@@ -84,7 +84,8 @@ export default function AgentTerrainProfile({ agentId, onClose, onEdit }: AgentT
 
         setStats(calculatedStats);
       }
-    } catch (error) {
+    } catch {
+      // Non-blocking: profile will show loading then empty
     } finally {
       setLoading(false);
     }

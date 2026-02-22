@@ -86,7 +86,8 @@ export default function OfflineDaySession({ agentId, agenceId }: OfflineDaySessi
           });
         }
       }
-    } catch (err) {
+    } catch {
+      // Non-blocking: offline session will show empty
     } finally {
       setLoading(false);
     }

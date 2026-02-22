@@ -61,7 +61,8 @@ export default function AgentCommissions({ agentId }: AgentCommissionsProps) {
       const data = await response.json();
       setCommissions(data || []);
       setCurrentPage(1);
-    } catch (error) {
+    } catch {
+      toast.error('Erreur lors du chargement des commissions');
     } finally {
       setLoading(false);
     }

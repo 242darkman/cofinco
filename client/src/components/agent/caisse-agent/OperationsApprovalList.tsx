@@ -87,6 +87,7 @@ export default function OperationsApprovalList({ onModuleChange }: OperationsApp
   // Modals
   const [selectedOperation, setSelectedOperation] = useState<OperationTerrainWithRelations | null>(null);
   const [operationToReject, setOperationToReject] = useState<OperationTerrainWithRelations | null>(null);
+  const [operationToApprove, setOperationToApprove] = useState<OperationTerrainWithRelations | null>(null);
 
   // Actions en cours
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -138,15 +139,17 @@ export default function OperationsApprovalList({ onModuleChange }: OperationsApp
     loadData(false);
   };
 
-  const handleApprove = async (operation: OperationTerrainWithRelations) => {
-    setProcessingId(operation.id);
+  const confirmApprove = async () => {
+    if (!operationToApprove) return;
+    setProcessingId(operationToApprove.id);
     try {
-      await caisseAgentApi.approveOperation(operation.id, '');
+      await caisseAgentApi.approveOperation(operationToApprove.id, '');
       toast.success('Opération approuvée', {
         description: 'Les écritures comptables ont été postées.'
       });
       loadData(false);
       setSelectedOperation(null);
+      setOperationToApprove(null);
     } catch (error: any) {
       toast.error('Erreur lors de l\'approbation', {
         description: error.message
@@ -439,7 +442,7 @@ export default function OperationsApprovalList({ onModuleChange }: OperationsApp
                         variant="success"
                         size="sm"
                         icon={CheckCircle}
-                        onClick={() => handleApprove(op)}
+                        onClick={() => setOperationToApprove(op)}
                         isLoading={processingId === op.id}
                       >
                         Approuver
@@ -460,7 +463,7 @@ export default function OperationsApprovalList({ onModuleChange }: OperationsApp
           onClose={() => setSelectedOperation(null)}
           onApprove={
             selectedOperation.statut === StatutOperationTerrain.SUBMITTED
-              ? () => handleApprove(selectedOperation)
+              ? () => { setOperationToApprove(selectedOperation); setSelectedOperation(null); }
               : undefined
           }
           onReject={
@@ -481,6 +484,64 @@ export default function OperationsApprovalList({ onModuleChange }: OperationsApp
           onReject={(reason) => handleReject(operationToReject.id, reason)}
           loading={processingId === operationToReject.id}
         />
+      )}
+
+      {/* Confirmation d'approbation */}
+      {operationToApprove && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-surface rounded-xl border border-edge shadow-xl max-w-md w-full mx-4 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-status-success-bg flex items-center justify-center">
+                <CheckCircle size={20} className="text-status-success" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-content-primary">Confirmer l'approbation</h3>
+                <p className="text-sm text-content-muted">Cette action postera les écritures comptables.</p>
+              </div>
+            </div>
+
+            <div className="bg-surface-elevated rounded-lg p-3 mb-4 space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span className="text-content-muted">Opération</span>
+                <span className="text-content-primary font-medium">{getOperationLabel(operationToApprove)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-content-muted">Référence</span>
+                <span className="text-content-primary font-medium">{operationToApprove.reference}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-content-muted">Montant</span>
+                <span className="text-content-primary font-bold">{formatMoney(operationToApprove.montant as unknown as string)} XOF</span>
+              </div>
+              {operationToApprove.client && (
+                <div className="flex justify-between">
+                  <span className="text-content-muted">Client</span>
+                  <span className="text-content-primary font-medium">{formatClientName(operationToApprove.client.nom, operationToApprove.client.prenom)}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              <Button
+                variant="ghost"
+                className="flex-1"
+                onClick={() => setOperationToApprove(null)}
+                disabled={processingId === operationToApprove.id}
+              >
+                Annuler
+              </Button>
+              <Button
+                variant="success"
+                className="flex-1"
+                icon={CheckCircle}
+                onClick={confirmApprove}
+                isLoading={processingId === operationToApprove.id}
+              >
+                Approuver
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

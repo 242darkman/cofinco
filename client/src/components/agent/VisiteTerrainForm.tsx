@@ -58,7 +58,8 @@ export default function VisiteTerrainForm({ onClose, onSuccess, agentId, clientI
     try {
       const data = await agentTerrainApi.getAllList();
       setAgents(data.filter((a: any) => a.statut === StatutUser.ACTIVE));
-    } catch (error) {
+    } catch {
+      // Non-blocking: agent list is supplementary
     }
   };
 
@@ -66,7 +67,8 @@ export default function VisiteTerrainForm({ onClose, onSuccess, agentId, clientI
     try {
       const data = await clientApi.getAllList();
       setClients(data.filter((c: any) => c.statut === StatutClient.ACTIVE).slice(0, 100));
-    } catch (error) {
+    } catch {
+      // Non-blocking: client list is supplementary
     }
   };
 

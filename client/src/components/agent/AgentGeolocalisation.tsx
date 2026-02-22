@@ -3,6 +3,7 @@ import { MapPin, Navigation, Clock, ChevronLeft, ChevronRight, Eye, Gauge } from
 import { MapContainer, TileLayer, Polyline, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { toast } from 'sonner';
 import { agentTerrainApi } from '../../lib/api-client';
 import { StatutUser } from '@shared/enum/status-constants';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../ui/sheet';
@@ -113,7 +114,8 @@ export default function AgentGeolocalisation({ agentId }: { agentId?: string }) 
       if (actifs.length > 0 && !selectedAgent) {
         setSelectedAgent(actifs[0].id);
       }
-    } catch (error) {
+    } catch {
+      toast.error('Erreur lors du chargement des agents');
     }
   };
 
@@ -134,7 +136,8 @@ export default function AgentGeolocalisation({ agentId }: { agentId?: string }) 
         setLocations(data || []);
         setCurrentPage(1);
       }
-    } catch (error) {
+    } catch {
+      toast.error('Erreur lors du chargement des positions');
     } finally {
       setLoading(false);
     }

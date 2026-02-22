@@ -105,7 +105,8 @@ export default function AgentMateriel({ agentId }: { agentId?: string }) {
       if (!response.ok) throw new Error('Erreur lors du chargement');
       const data = await response.json();
       setMateriels(data || []);
-    } catch (error) {
+    } catch {
+      // Non-blocking: materiel list will show empty
     } finally {
       setLoading(false);
     }

@@ -6,6 +6,7 @@ import {
   ClipboardCheck, ChevronLeft, ChevronRight, Loader2,
   ShieldCheck, Printer, ArrowDownLeft, ArrowUpRight, Filter, X
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { agentTerrainApi, caisseAgentApi } from '../../lib/api-client';
 import { authService } from '../../lib/auth';
 import { useIsAdmin } from '../../contexts/AbilityContext';
@@ -303,8 +304,8 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
       }
       setTxTotal(total);
       setTxOffset(offset);
-    } catch (error) {
-      // Error handled silently
+    } catch {
+      toast.error('Erreur lors du chargement des opérations');
     } finally {
       setTxLoading(false);
     }
@@ -318,8 +319,8 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
         valide: parseFloat(summary.soldeValide || '0'),
         pendingIn: parseFloat(summary.pendingIn || '0')
       });
-    } catch (error) {
-      // Error handled silently
+    } catch {
+      toast.error('Erreur lors du chargement du résumé');
     }
   }, []);
 
@@ -382,8 +383,8 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
             setAllAgents([meResponse.data]);
             return;
           }
-        } catch (err) {
-          // Error handled silently
+        } catch {
+          // Fallback to full list below
         }
       }
       const agents = await agentTerrainApi.getAllList();
@@ -394,7 +395,8 @@ export default function AgentTerrain({ activeView }: AgentTerrainProps) {
       } else if (canSupervise) {
         setLoading(false);
       }
-    } catch (error) {
+    } catch {
+      toast.error('Erreur lors du chargement des agents');
       setLoading(false);
     }
   };

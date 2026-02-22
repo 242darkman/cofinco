@@ -74,7 +74,8 @@ export default function ProspectionList({ agentId, onCreateNew }: ProspectionLis
       setProspects(result.data || []);
       setTotalPages(result.meta?.pagination?.totalPages || 1);
       setTotal(result.meta?.pagination?.totalItems || 0);
-    } catch (error) {
+    } catch {
+      // Non-blocking: prospect list will show empty
     } finally {
       setLoading(false);
     }

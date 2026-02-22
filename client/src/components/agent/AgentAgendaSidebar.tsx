@@ -153,7 +153,7 @@ function EnqueteItem({ enq, startingEnquete, onStart, onFill }: {
     enq.priority === 'URGENT' ? 'bg-status-danger' :
     enq.priority === 'HIGH' ? 'bg-status-warning' :
     enq.priority === 'MEDIUM' ? 'bg-status-info' :
-    'bg-surface-muted0';
+    'bg-surface-subtle';
   const priorityConf: Record<string, { label: string; color: string }> = {
     LOW: { label: 'Basse', color: 'bg-surface-subtle/35 text-content-muted' },
     MEDIUM: { label: 'Normale', color: 'bg-status-info-bg text-status-info' },
