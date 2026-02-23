@@ -31,7 +31,7 @@ download_and_extract() {
   fi
 
   echo "[geonames] Downloading ${file}.zip ..."
-  wget -q --show-progress -O "$SEEDS_DIR/${file}.zip" "${GEONAMES_URL}/${file}.zip" || {
+  wget -q -O "$SEEDS_DIR/${file}.zip" "${GEONAMES_URL}/${file}.zip" || {
     echo "[geonames] ERROR: failed to download ${file}.zip" >&2
     rm -f "$SEEDS_DIR/${file}.zip"
     return 1

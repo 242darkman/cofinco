@@ -37,7 +37,15 @@
     "test:security": "vitest run tests/security",
     "test:e2e": "playwright test",
     "docker:test": "docker compose --profile test run --rm test-unit",
-    "docker:test:e2e": "docker compose --profile test run --rm test-e2e"
+    "docker:test:e2e": "docker compose --profile test run --rm test-e2e",
+    "staging:validate": "bash scripts/validate-env.sh .env.staging",
+    "staging:up": "bash scripts/validate-env.sh .env.staging && docker compose --env-file .env.staging -f docker-compose.yml -f docker-compose.staging.yml up -d --build",
+    "staging:down": "docker compose --env-file .env.staging -f docker-compose.yml -f docker-compose.staging.yml down",
+    "staging:logs": "docker compose --env-file .env.staging -f docker-compose.yml -f docker-compose.staging.yml logs -f",
+    "prod:validate": "bash scripts/validate-env.sh .env.production",
+    "prod:up": "bash scripts/validate-env.sh .env.production && docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.prod.yml up -d --build",
+    "prod:down": "docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.prod.yml down",
+    "prod:logs": "docker compose --env-file .env.production -f docker-compose.yml -f docker-compose.prod.yml logs -f"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.969.0",

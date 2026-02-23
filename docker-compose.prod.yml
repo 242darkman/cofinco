@@ -153,6 +153,10 @@ services:
   worker:
     image: ${REGISTRY:-ghcr.io}/${IMAGE_NAME:-cofinco}:${APP_VERSION:-latest}
     container_name: cofinco-worker
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
     restart: unless-stopped
     environment:
       <<: *app-env
@@ -181,6 +185,7 @@ services:
   # ==========================================
   mobile:
     container_name: cofinco-mobile
+    profiles: ["mobile"]
     build:
       context: ./mobile
       dockerfile: Dockerfile
