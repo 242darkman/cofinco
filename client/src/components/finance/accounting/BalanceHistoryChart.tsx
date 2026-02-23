@@ -163,15 +163,15 @@ export default function BalanceHistoryChart({
 
       {/* Metric selector — pill group */}
       <div className="px-4 pt-2 pb-0">
-        <div className="flex gap-0.5 bg-surface-elevated rounded-lg p-0.5">
+        <div className="flex gap-0.5 bg-surface-subtle rounded-lg p-0.5 border border-edge-subtle">
           {(Object.keys(METRIC_CONFIG) as Metric[]).map((metric) => (
             <button
               key={metric}
               onClick={() => setActiveMetric(metric)}
-              className={`flex-1 py-1.5 text-[11px] font-semibold rounded-md transition-colors ${
+              className={`flex-1 py-1.5 text-[11px] font-semibold rounded-md transition-all ${
                 activeMetric === metric
-                  ? 'bg-surface-base text-content-primary shadow-sm'
-                  : 'text-content-muted hover:text-content-secondary'
+                  ? 'bg-accent text-white shadow-sm'
+                  : 'text-content-muted hover:text-content-secondary hover:bg-surface-base/50'
               }`}
             >
               {t(METRIC_CONFIG[metric].labelKey)}
