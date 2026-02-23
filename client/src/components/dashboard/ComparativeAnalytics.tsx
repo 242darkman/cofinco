@@ -133,7 +133,7 @@ const FORECAST_COMP_KEY: Record<string, string> = {
 // COMPONENT
 // ============================================
 
-export default function ComparativeAnalytics() {
+export default function ComparativeAnalytics({ agenceId }: { agenceId?: string }) {
   const { t, language } = useLanguage();
   const [preset, setPreset] = useState<PresetPeriod>('month');
   const [forecastMetric, setForecastMetric] = useState<'clients' | 'credits' | 'deposits'>('clients');
@@ -142,9 +142,10 @@ export default function ComparativeAnalytics() {
 
   // Comparative data
   const { data: comparative, isLoading: compLoading } = useQuery<ComparativeData>({
-    queryKey: ['comparative-analytics', dates],
+    queryKey: ['comparative-analytics', dates, agenceId],
     queryFn: async () => {
       const params = new URLSearchParams(dates);
+      if (agenceId && agenceId !== 'all') params.set('agenceId', agenceId);
       const res = await fetch(`/api/dashboard/comparative?${params}`);
       if (!res.ok) throw new Error(t('erreurChargement'));
       return res.json();
@@ -155,9 +156,11 @@ export default function ComparativeAnalytics() {
 
   // Forecast data
   const { data: forecast, isLoading: forecastLoading } = useQuery<ForecastData>({
-    queryKey: ['forecast-analytics'],
+    queryKey: ['forecast-analytics', agenceId],
     queryFn: async () => {
-      const res = await fetch('/api/dashboard/forecast?months=6');
+      const params = new URLSearchParams({ months: '6' });
+      if (agenceId && agenceId !== 'all') params.set('agenceId', agenceId);
+      const res = await fetch(`/api/dashboard/forecast?${params}`);
       if (!res.ok) throw new Error(t('erreurChargement'));
       return res.json();
     },

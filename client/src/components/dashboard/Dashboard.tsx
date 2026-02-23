@@ -354,7 +354,7 @@ export default function Dashboard({
 
           {/* Comparative Analytics & Forecast */}
           <Suspense fallback={<div className="py-4 text-center text-content-muted text-xs">{t('chargementAnalytique')}</div>}>
-            <ComparativeAnalytics />
+            <ComparativeAnalytics agenceId={selectedAgence?.id} />
           </Suspense>
         </div>
 
@@ -442,7 +442,7 @@ export default function Dashboard({
                         <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-status-warning-bg text-status-warning font-medium">{alertsSummary.breakdown.kycExpired} KYC</span>
                       )}
                       {alertsSummary.breakdown.idExpired > 0 && (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-status-warning-bg text-status-warning font-medium">{alertsSummary.breakdown.idExpired} ID</span>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-status-warning-bg text-status-warning font-medium">{alertsSummary.breakdown.idExpired} pièce id.</span>
                       )}
                     </div>
                   </div>
@@ -615,15 +615,15 @@ export default function Dashboard({
             </div>
 
             {/* Row 3: Scoring compact */}
-            {scoreStats && scoreStats.length > 0 && (() => {
-              const agg = scoreStats.reduce((acc, s) => ({
+            {(() => {
+              const agg = (scoreStats && scoreStats.length > 0) ? scoreStats.reduce((acc, s) => ({
                 totalClients: acc.totalClients + s.totalClients,
                 sumScore: acc.sumScore + s.avgScore * s.totalClients,
                 VIP: acc.VIP + s.segments.VIP,
                 Premium: acc.Premium + s.segments.Premium,
                 Standard: acc.Standard + s.segments.Standard,
                 Risque: acc.Risque + s.segments.Risque,
-              }), { totalClients: 0, sumScore: 0, VIP: 0, Premium: 0, Standard: 0, Risque: 0 });
+              }), { totalClients: 0, sumScore: 0, VIP: 0, Premium: 0, Standard: 0, Risque: 0 }) : { totalClients: 0, sumScore: 0, VIP: 0, Premium: 0, Standard: 0, Risque: 0 };
               const avgScore = agg.totalClients > 0 ? Math.round(agg.sumScore / agg.totalClients) : 0;
               const scoreColor = avgScore >= 80 ? 'text-status-success' : avgScore >= 65 ? 'text-status-info' : avgScore >= 40 ? 'text-status-warning' : 'text-status-danger';
               const segments = [
