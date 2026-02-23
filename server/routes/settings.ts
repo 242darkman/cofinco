@@ -587,9 +587,18 @@ export function registerSettingsRoutes(app: Express) {
         'critical'
       );
 
-      // Helper: safe delete that silently ignores missing tables
+      // Helper: safe delete that silently ignores missing tables.
+      // Uses SAVEPOINT so a failed query doesn't abort the entire PG transaction.
+      let spIdx = 0;
       const safeDel = async (tx: any, query: ReturnType<typeof sql>) => {
-        try { await tx.execute(query); } catch { /* table may not exist */ }
+        const sp = `sd_${++spIdx}`;
+        try {
+          await tx.execute(sql.raw(`SAVEPOINT ${sp}`));
+          await tx.execute(query);
+          await tx.execute(sql.raw(`RELEASE SAVEPOINT ${sp}`));
+        } catch {
+          await tx.execute(sql.raw(`ROLLBACK TO SAVEPOINT ${sp}`));
+        }
       };
 
       // Subquery for agents in this agency
