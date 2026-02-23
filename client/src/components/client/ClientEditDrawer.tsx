@@ -5,7 +5,7 @@ import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
 } from '../ui/sheet';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '../ui/accordion';
-import { FormField, SelectField, Button } from '../ui';
+import { FormField, SelectField, Button, SearchableSelect } from '../ui';
 import SmartDocumentUpload, { type UploadedDocument, type DocumentType } from '../ui/SmartDocumentUpload';
 import FaceLivenessCapture from '../security/FaceLivenessCapture';
 import { useUserProfile } from '../../hooks/useUserProfile';
@@ -335,7 +335,14 @@ export default function ClientEditDrawer({ client, isOpen, onClose, onSave }: Cl
                   <div className="grid grid-cols-2 gap-3">
                     <FormField label="Adresse domicile" name="adresseDomicile" icon={MapPin} value={formData.adresseDomicile || ''} onChange={(e) => handleChange('adresseDomicile', e.target.value)} />
                     <FormField label="Lieu d'activite" name="lieuActivite" icon={MapPin} value={formData.lieuActivite || ''} onChange={(e) => handleChange('lieuActivite', e.target.value)} />
-                    <SelectField label="Ville" name="villeId" value={formData.villeId || ''} onChange={(e) => handleChange('villeId', e.target.value || null)} options={[{ value: '', label: 'Selectionner...' }, ...villesList.map(v => ({ value: v.id, label: v.nom }))]} />
+                    <SearchableSelect
+                      label="Ville"
+                      name="villeId"
+                      value={formData.villeId || ''}
+                      onChange={(val) => handleChange('villeId', val ? String(val) : null)}
+                      options={villesList.map(v => ({ value: v.id, label: v.nom }))}
+                      placeholder="Rechercher une ville..."
+                    />
                     <SelectField label="Logement" name="statutLogement" value={formData.statutLogement || ''} onChange={(e) => handleChange('statutLogement', e.target.value || null)} options={[{ value: '', label: 'Selectionner...' }, ...STATUT_LOGEMENT_OPTIONS]} />
                   </div>
                 </AccordionContent>
