@@ -1,11 +1,11 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { Building2, MapPin, Users, ChevronLeft, ChevronRight, Loader2, Check, Eye } from 'lucide-react';
-import { Modal } from '../ui/Modal';
-import { FormField } from '../ui/FormField';
-import { SelectField } from '../ui/SelectField';
+import Modal from '../ui/Modal';
+import FormField from '../ui/FormField';
+import SelectField from '../ui/SelectField';
 import { CascadingGeoSelect, type GeoSelection } from '../shared/CascadingGeoSelect';
 import { agenceApi } from '../../lib/api-client';
-import { toast } from 'react-hot-toast';
+import { toast } from '../../lib/toast';
 import { TypeAgence } from '@shared/enum/status-constants';
 
 const TYPE_OPTIONS = [
@@ -116,7 +116,6 @@ export function AgencyWizard({ open, onClose, onCreated }: AgencyWizardProps) {
         typeAgence: formData.typeAgence,
         adresse: formData.adresse.trim() || undefined,
         villeId: formData.geo.villeId || undefined,
-        paysId: formData.geo.paysId || undefined,
         telephone: formData.telephone.trim() || undefined,
         email: formData.email.trim() || undefined,
         responsableNom: formData.responsableNom.trim() || undefined,

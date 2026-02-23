@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Globe, MapPin, Building2 } from 'lucide-react';
-import { SearchableSelect, type SearchableSelectOption } from '../ui/SearchableSelect';
+import SearchableSelect, { type SearchableSelectOption } from '../ui/SearchableSelect';
 import { paysApi, regionApi, villeApi } from '../../lib/api-client';
 
 export interface GeoSelection {

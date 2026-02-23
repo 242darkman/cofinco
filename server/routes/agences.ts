@@ -50,9 +50,9 @@ export function registerAgencesRoutes(app: Express) {
           adresse: agences.adresse,
           ville: villes.nom,
           villeId: agences.villeId,
-          paysId: agences.paysId,
           region: regions.nom,
           pays: paysTable.nomFr,
+          paysId: villes.paysId,
           telephone: agences.telephone,
           email: agences.email,
           responsableId: agences.responsableId,
@@ -84,7 +84,7 @@ export function registerAgencesRoutes(app: Express) {
         .from(agences)
         .leftJoin(villes, eq(agences.villeId, villes.id))
         .leftJoin(regions, eq(villes.regionId, regions.id))
-        .leftJoin(paysTable, eq(agences.paysId, paysTable.id));
+        .leftJoin(paysTable, eq(villes.paysId, paysTable.id));
 
       // Filtres
       const conditions = [];
@@ -141,9 +141,9 @@ export function registerAgencesRoutes(app: Express) {
           adresse: agences.adresse,
           ville: villes.nom,
           villeId: agences.villeId,
-          paysId: agences.paysId,
           region: regions.nom,
           pays: paysTable.nomFr,
+          paysId: villes.paysId,
           telephone: agences.telephone,
           email: agences.email,
           responsableId: agences.responsableId,
@@ -165,7 +165,7 @@ export function registerAgencesRoutes(app: Express) {
         .from(agences)
         .leftJoin(villes, eq(agences.villeId, villes.id))
         .leftJoin(regions, eq(villes.regionId, regions.id))
-        .leftJoin(paysTable, eq(agences.paysId, paysTable.id))
+        .leftJoin(paysTable, eq(villes.paysId, paysTable.id))
         .where(eq(agences.id, id));
 
       if (!agence) {
@@ -236,7 +236,6 @@ export function registerAgencesRoutes(app: Express) {
             typeAgence: data.type_agence || data.typeAgence || TypeAgence.SECONDARY,
             adresse: data.adresse,
             villeId: villeId || null,
-            paysId: data.paysId || data.pays_id || null,
             telephone: normalizePhone(data.telephone),
             email: data.email,
             responsableId: data.responsable_id || data.responsableId,
@@ -355,7 +354,6 @@ export function registerAgencesRoutes(app: Express) {
           typeAgence: data.type_agence || data.typeAgence,
           adresse: data.adresse,
           villeId: villeId || undefined,
-          paysId: data.paysId || data.pays_id || undefined,
           telephone: data.telephone ? normalizePhone(data.telephone) : data.telephone,
           email: data.email,
           responsableId: data.responsable_id || data.responsableId,

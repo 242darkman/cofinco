@@ -225,7 +225,6 @@ export default function AdminGestionAgences() {
         typeAgence: editFormData.typeAgence,
         adresse: editFormData.adresse,
         villeId: editFormData.geo.villeId || undefined,
-        paysId: editFormData.geo.paysId || undefined,
         telephone: editFormData.telephone,
         email: editFormData.email,
         responsableNom: editFormData.responsableNom,
@@ -631,7 +630,13 @@ export default function AdminGestionAgences() {
       )}
 
       {/* Detail Sheet with Workflow */}
-      <Sheet open={!!viewingAgence} onOpenChange={(open) => !open && setViewingAgence(null)}>
+      <Sheet
+        open={!!viewingAgence}
+        modal={!reasonDialog && !confirmState.isOpen && !showEditForm}
+        onOpenChange={(open) => {
+          if (!open && !reasonDialog && !confirmState.isOpen && !editingAgence) setViewingAgence(null);
+        }}
+      >
         <SheetContent className="w-full sm:max-w-lg overflow-y-auto bg-surface-base border-l-edge p-0">
           <SheetHeader className="px-6 py-4 border-b border-edge bg-surface-base/50 backdrop-blur sticky top-0 z-10">
             <SheetTitle className="text-content-primary">Détail de l'agence</SheetTitle>

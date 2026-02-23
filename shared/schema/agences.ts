@@ -2,7 +2,6 @@ import { pgTable, text, varchar, boolean, numeric, timestamp, uuid, date, unique
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { users } from "./auth";
-import { pays } from "./pays";
 import { sql } from "drizzle-orm";
 import { typeAgenceEnum } from "../enum/enums";
 import { TypeAgence } from "../enum/status-constants";
@@ -14,8 +13,7 @@ export const agences = pgTable("agences", {
   nom: text("nom").notNull(),
   typeAgence: typeAgenceEnum("type_agence").notNull().default(TypeAgence.SECONDARY),
   adresse: text("adresse"),
-  villeId: uuid("ville_id"), // FK to villes table (no TS ref to avoid circular)
-  paysId: uuid("pays_id").references(() => pays.id),
+  villeId: uuid("ville_id"), // FK to villes table (no TS ref to avoid circular) — pays déduit via villes.paysId
   telephone: text("telephone"),
   email: text("email"),
   responsableId: uuid("responsable_id").references(() => users.id),

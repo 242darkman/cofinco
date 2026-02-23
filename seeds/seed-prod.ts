@@ -2637,15 +2637,11 @@ async function seedGeography(context: SeedContext, dryRun: boolean): Promise<See
   results.push({ table: 'marches', action: 'created', count: marcheCount, details: 'upsert by nom+arrondissementId' });
 
   // ===== Agence Siège =====
-  // Look up Congo paysId for the Siège
-  const [congo] = await db.select().from(pays).where(eq(pays.iso2, 'CG'));
-
   const siegeData = {
     nom: 'Siège',
     codeAgence: 'SIEGE',
     adresse: "1er Etage Immeuble Cofinco, en diagonale de l'hopital congo malembe",
     villeId: villeIdMap['Pointe-Noire'] || undefined,
-    paysId: congo?.id || undefined,
     typeAgence: TypeAgence.MAIN,
     statut: StatutAgence.ACTIVE,
     activatedAt: new Date('2018-01-01'),
@@ -2660,13 +2656,10 @@ async function seedGeography(context: SeedContext, dryRun: boolean): Promise<See
       await db.insert(agences).values(siegeData);
       results.push({ table: 'agences', action: 'created', count: 1 });
     } else {
-      // Backfill paysId and villeId if missing
+      // Backfill villeId if missing
       const backfillSet: Record<string, any> = {};
       if (!existingSiege.villeId && villeIdMap['Pointe-Noire']) {
         backfillSet.villeId = villeIdMap['Pointe-Noire'];
-      }
-      if (!existingSiege.paysId && congo?.id) {
-        backfillSet.paysId = congo.id;
       }
       if (!existingSiege.activatedAt) {
         backfillSet.activatedAt = new Date(existingSiege.dateOuverture || '2018-01-01');
@@ -3145,7 +3138,7 @@ async function seedProductsCatalog(context: SeedContext, dryRun: boolean): Promi
   const results: SeedStepResult[] = [];
 
   if (dryRun) {
-    return [{ table: 'produitsCompte', action: 'skipped', count: 3, details: 'dry-run' }];
+    return [{ table: 'produitsCompte', action: 'skipped', count: 5, details: 'dry-run' }];
   }
 
   // Produits Compte - upsert by code
@@ -3166,6 +3159,18 @@ async function seedProductsCatalog(context: SeedContext, dryRun: boolean): Promi
       code: 'TONTINE_STD', nom: 'Compte Bloqué', typeCompte: 'BLOCKED' as const, tauxInteret: '0',
       frais: { cloture: 1000 },
       regles: { validationOuvertureRequise: true, autoriserSoldeNegatifCloture: true },
+      actif: true,
+    },
+    {
+      code: 'BOMBA_1', nom: 'BOMBA-1 — Placement 90 jours', typeCompte: 'BLOCKED' as const, tauxInteret: '9',
+      frais: { ouverture: 0, cloture: 0 },
+      regles: { depotInitialObligatoire: true, depotInitialMinimum: 500000, montantMax: 1000000, dureeJours: 90, validationOuvertureRequise: true, autoriserSoldeNegatifCloture: false, penaliteRetraitAnticipe: 5 },
+      actif: true,
+    },
+    {
+      code: 'BOMBA_2', nom: 'BOMBA-2 — Placement 365 jours', typeCompte: 'BLOCKED' as const, tauxInteret: '36',
+      frais: { ouverture: 0, cloture: 0 },
+      regles: { depotInitialObligatoire: true, depotInitialMinimum: 1000000, montantMax: 5000000, dureeJours: 365, validationOuvertureRequise: true, autoriserSoldeNegatifCloture: false, penaliteRetraitAnticipe: 10 },
       actif: true,
     },
   ];
