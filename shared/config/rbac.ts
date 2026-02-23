@@ -366,6 +366,9 @@ export const PERMISSIONS_DATA: Partial<Record<AppModule, PermissionSeed[]>> = {
     { name: 'Modifier agence', code: 'agences.edit', description: 'Modifier une agence' },
     { name: 'Supprimer agence', code: 'agences.delete', description: 'Supprimer une agence' },
     { name: 'Gérer agences', code: 'agences.manage', description: 'Gérer les agences' },
+    { name: 'Approuver agence', code: 'agences.approve', description: 'Approuver/rejeter une agence en attente de validation' },
+    { name: 'Activer agence', code: 'agences.activate', description: 'Activer une agence après validation de la checklist' },
+    { name: 'Suspendre agence', code: 'agences.suspend', description: 'Suspendre ou réactiver une agence' },
   ],
 };
 
@@ -430,7 +433,7 @@ export const SEED_ROLE_PERMISSIONS: Record<SystemRole, string[]> = {
     'loyalty.redeem', 'loyalty.award', 'loyalty.adjust', 'loyalty.expire',
     // New CASL modules
     'employes.view', 'employes.create', 'employes.edit',
-    'agences.view',
+    'agences.view', 'agences.create', 'agences.edit', 'agences.approve', 'agences.activate',
     'regularisation.view', 'regularisation.create', 'regularisation.approve',
   ],
   [SystemRole.COMPTABLE]: [

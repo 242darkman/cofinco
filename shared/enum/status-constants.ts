@@ -26,7 +26,10 @@ export type TypeAgenceType = (typeof TypeAgence)[keyof typeof TypeAgence];
 // ============================================
 
 export const StatutAgence = {
+  DRAFT: "DRAFT",
+  PENDING_APPROVAL: "PENDING_APPROVAL",
   ACTIVE: "ACTIVE",
+  SUSPENDED: "SUSPENDED",
   INACTIVE: "INACTIVE",
   CLOSING_PENDING: "CLOSING_PENDING",
   CLOSED: "CLOSED",
@@ -36,11 +39,30 @@ export type StatutAgenceType = (typeof StatutAgence)[keyof typeof StatutAgence];
 
 /** Labels FR pour l'UI des statuts d'agence */
 export const STATUT_AGENCE_LABELS: Record<StatutAgenceType, string> = {
+  [StatutAgence.DRAFT]: "Brouillon",
+  [StatutAgence.PENDING_APPROVAL]: "En attente de validation",
   [StatutAgence.ACTIVE]: "Actif",
+  [StatutAgence.SUSPENDED]: "Suspendu",
   [StatutAgence.INACTIVE]: "Inactif",
   [StatutAgence.CLOSING_PENDING]: "En fermeture",
   [StatutAgence.CLOSED]: "Fermé",
 };
+
+/** Transitions de statut valides pour les agences */
+export const AGENCY_STATUS_TRANSITIONS: Record<StatutAgenceType, StatutAgenceType[]> = {
+  [StatutAgence.DRAFT]: [StatutAgence.PENDING_APPROVAL],
+  [StatutAgence.PENDING_APPROVAL]: [StatutAgence.ACTIVE, StatutAgence.DRAFT],
+  [StatutAgence.ACTIVE]: [StatutAgence.SUSPENDED, StatutAgence.CLOSING_PENDING],
+  [StatutAgence.SUSPENDED]: [StatutAgence.ACTIVE, StatutAgence.CLOSING_PENDING],
+  [StatutAgence.INACTIVE]: [],
+  [StatutAgence.CLOSING_PENDING]: [StatutAgence.CLOSED],
+  [StatutAgence.CLOSED]: [],
+};
+
+/** Options de statut pour les selects de l'UI (agences) */
+export const STATUT_AGENCE_OPTIONS = Object.entries(STATUT_AGENCE_LABELS).map(
+  ([value, label]) => ({ value, label })
+);
 
 // ============================================
 // STATUT PROSPECTION (Prospect workflow)

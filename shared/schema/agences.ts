@@ -1,7 +1,8 @@
-import { pgTable, text, varchar, integer, boolean, numeric, timestamp, uuid, date, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, boolean, numeric, timestamp, uuid, date, uniqueIndex, index, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { users } from "./auth";
+import { pays } from "./pays";
 import { sql } from "drizzle-orm";
 import { typeAgenceEnum } from "../enum/enums";
 import { TypeAgence } from "../enum/status-constants";
@@ -13,19 +14,23 @@ export const agences = pgTable("agences", {
   nom: text("nom").notNull(),
   typeAgence: typeAgenceEnum("type_agence").notNull().default(TypeAgence.SECONDARY),
   adresse: text("adresse"),
-  villeId: uuid("ville_id"), // FK to villes table
-  region: text("region"),
-  pays: text("pays").default("Congo-Brazzaville"),
+  villeId: uuid("ville_id"), // FK to villes table (no TS ref to avoid circular)
+  paysId: uuid("pays_id").references(() => pays.id),
   telephone: text("telephone"),
   email: text("email"),
   responsableId: uuid("responsable_id").references(() => users.id),
   responsableNom: text("responsable_nom"),
   responsablePhone: text("responsable_phone"),
-  statut: text("statut").notNull().default("ACTIVE"), // 'ACTIVE', 'SUSPENDED', 'CLOSED'
+  statut: text("statut").notNull().default("DRAFT"),
   dateOuverture: date("date_ouverture"),
   latitude: numeric("latitude"),
   longitude: numeric("longitude"),
   notes: text("notes"),
+  // Workflow fields
+  activatedAt: timestamp("activated_at"),
+  activatedBy: uuid("activated_by").references(() => users.id),
+  suspendedAt: timestamp("suspended_at"),
+  suspendedReason: text("suspended_reason"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
   deletedAt: timestamp("deleted_at"), // Soft delete
@@ -34,6 +39,25 @@ export const agences = pgTable("agences", {
 export const insertAgenceSchema = createInsertSchema(agences).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertAgence = z.infer<typeof insertAgenceSchema>;
 export type Agence = typeof agences.$inferSelect;
+
+// Agency Status History - Audit trail for all status transitions
+export const agencyStatusHistory = pgTable("agency_status_history", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  agenceId: uuid("agence_id").notNull().references(() => agences.id, { onDelete: "cascade" }),
+  fromStatus: text("from_status"),        // null on creation
+  toStatus: text("to_status").notNull(),
+  changedBy: uuid("changed_by").notNull().references(() => users.id),
+  reason: text("reason"),                 // mandatory for suspend/close/reject
+  checklistSnapshot: jsonb("checklist_snapshot"), // snapshot of checklist at activation
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => ({
+  idxAgence: index("idx_agency_status_history_agence").on(t.agenceId),
+  idxCreatedAt: index("idx_agency_status_history_date").on(t.createdAt),
+}));
+
+export const insertAgencyStatusHistorySchema = createInsertSchema(agencyStatusHistory).omit({ id: true, createdAt: true });
+export type InsertAgencyStatusHistory = z.infer<typeof insertAgencyStatusHistorySchema>;
+export type AgencyStatusHistory = typeof agencyStatusHistory.$inferSelect;
 
 // UserAgences table - Table de liaison pour les utilisateurs multi-agences
 export const userAgences = pgTable(

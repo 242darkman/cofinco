@@ -2212,6 +2212,29 @@ export const agenceApi = {
   delete: (id: string) => request<void>(`/agences/${id}`, {
     method: 'DELETE',
   }),
+  // Workflow transitions
+  submit: (id: string, data?: { comment?: string }) => request<any>(`/agences/${id}/submit`, {
+    method: 'POST',
+    body: JSON.stringify(data || {}),
+  }),
+  activate: (id: string) => request<any>(`/agences/${id}/activate`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  }),
+  reject: (id: string, data: { reason: string }) => request<any>(`/agences/${id}/reject`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  suspend: (id: string, data: { reason: string }) => request<any>(`/agences/${id}/suspend`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  close: (id: string, data: { reason: string }) => request<any>(`/agences/${id}/close`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  getChecklist: (id: string) => request<any>(`/agences/${id}/checklist`),
+  getStatusHistory: (id: string) => request<any[]>(`/agences/${id}/status-history`),
 };
 
 // Transferts Caisse API

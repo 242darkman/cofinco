@@ -351,6 +351,9 @@ export const PERMISSION_MAPPINGS: Record<string, PermissionMapping> = {
   'agences.edit': { action: Actions.EDIT, subject: Subjects.AGENCE },
   'agences.delete': { action: Actions.DELETE, subject: Subjects.AGENCE },
   'agences.manage': { action: Actions.MANAGE, subject: Subjects.AGENCE },
+  'agences.approve': { action: Actions.APPROVE, subject: Subjects.AGENCE },
+  'agences.suspend': { action: Actions.SUSPEND, subject: Subjects.AGENCE },
+  'agences.activate': { action: Actions.ACTIVATE, subject: Subjects.AGENCE },
 
   // Sessions
   'sessions.view': { action: Actions.VIEW, subject: Subjects.SESSION },
@@ -866,6 +869,9 @@ export const MODULE_PERMISSION_BUNDLES: Record<string, string[]> = {
     'agences.edit',
     'agences.delete',
     'agences.manage',
+    'agences.approve',
+    'agences.suspend',
+    'agences.activate',
   ],
 
   'RBAC': [

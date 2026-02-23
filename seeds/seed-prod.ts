@@ -69,6 +69,7 @@ import {
   roleHierarchy,
   rbacVersions,
   tontinePlans,
+  agencyStatusHistory,
 } from '@shared/schema';
 import { pays } from '@shared/schema/pays';
 import { seedRegions, migrateCongoDeptsToRegions, seedDepartementsADM2, cleanupLegacyDepts, loadGeonamesStaging, enrichFromStaging } from './seed-geography-world';
@@ -85,7 +86,7 @@ import { sectors, professions, activityTypes, professionSectors, professionActiv
 import { ACTIVITY_TYPES_DATA, SECTORS_DATA, PROFESSIONS_DATA } from './seed-catalog';
 import { hashPassword } from '../server/auth';
 import { SystemRole } from '@shared/types/roles';
-import { StatutUser, StatutCoffre, TypeAgence, StatutCaisse } from '@shared/enum/status-constants';
+import { StatutUser, StatutCoffre, TypeAgence, StatutCaisse, StatutAgence } from '@shared/enum/status-constants';
 import { MODULES_DATA } from '@shared/config/rbac';
 
 // ============================================================================
@@ -2636,14 +2637,18 @@ async function seedGeography(context: SeedContext, dryRun: boolean): Promise<See
   results.push({ table: 'marches', action: 'created', count: marcheCount, details: 'upsert by nom+arrondissementId' });
 
   // ===== Agence Siège =====
+  // Look up Congo paysId for the Siège
+  const [congo] = await db.select().from(pays).where(eq(pays.iso2, 'CG'));
+
   const siegeData = {
     nom: 'Siège',
     codeAgence: 'SIEGE',
     adresse: "1er Etage Immeuble Cofinco, en diagonale de l'hopital congo malembe",
     villeId: villeIdMap['Pointe-Noire'] || undefined,
-    region: 'Pointe-Noire',
+    paysId: congo?.id || undefined,
     typeAgence: TypeAgence.MAIN,
-    statut: StatutUser.ACTIVE,
+    statut: StatutAgence.ACTIVE,
+    activatedAt: new Date('2018-01-01'),
     telephone: '+242060000100',
     email: 'siege@cofinco-m.com',
     dateOuverture: '2018-01-01',
@@ -2655,14 +2660,22 @@ async function seedGeography(context: SeedContext, dryRun: boolean): Promise<See
       await db.insert(agences).values(siegeData);
       results.push({ table: 'agences', action: 'created', count: 1 });
     } else {
-      // Backfill villeId if missing
-      if (!existingSiege.villeId && villeIdMap['Brazzaville']) {
-        await db.update(agences).set({ villeId: villeIdMap['Brazzaville'] }).where(eq(agences.id, existingSiege.id));
+      // Backfill paysId and villeId if missing
+      const backfillSet: Record<string, any> = {};
+      if (!existingSiege.villeId && villeIdMap['Pointe-Noire']) {
+        backfillSet.villeId = villeIdMap['Pointe-Noire'];
+      }
+      if (!existingSiege.paysId && congo?.id) {
+        backfillSet.paysId = congo.id;
+      }
+      if (!existingSiege.activatedAt) {
+        backfillSet.activatedAt = new Date(existingSiege.dateOuverture || '2018-01-01');
+      }
+      if (Object.keys(backfillSet).length > 0) {
+        await db.update(agences).set(backfillSet).where(eq(agences.id, existingSiege.id));
       }
       results.push({ table: 'agences', action: 'skipped', count: 0, details: 'Siège exists' });
     }
-
-    // NOTE: ville text column removed — villeId migration is complete
   }
 
   return results;
@@ -5477,6 +5490,31 @@ async function seedProd() {
     if (report.context !== 'PRODUCTION' || FORCE_RESET) {
       const adminResults = await seedAdminUser(report.context, DRY_RUN);
       report.steps.push(...adminResults);
+    }
+
+    // Backfill agency status history for existing agencies (requires admin user)
+    if (!DRY_RUN) {
+      const [admin] = await db.select().from(users).where(eq(users.username, 's.administrateur'));
+      if (admin) {
+        const allAgencesForHistory = await db.select().from(agences).where(isNull(agences.deletedAt));
+        let historyCreated = 0;
+        for (const ag of allAgencesForHistory) {
+          const [existingHistory] = await db.select().from(agencyStatusHistory).where(eq(agencyStatusHistory.agenceId, ag.id));
+          if (!existingHistory) {
+            await db.insert(agencyStatusHistory).values({
+              agenceId: ag.id,
+              fromStatus: null,
+              toStatus: ag.statut || StatutAgence.ACTIVE,
+              changedBy: admin.id,
+              reason: 'Backfill initial status history',
+            });
+            historyCreated++;
+          }
+        }
+        if (historyCreated > 0) {
+          report.steps.push({ table: 'agencyStatusHistory', action: 'created', count: historyCreated, details: 'backfill initial status entries' });
+        }
+      }
     }
 
     // 3. Validation

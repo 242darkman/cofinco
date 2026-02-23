@@ -37,7 +37,7 @@ const logger = createLogger('SeedGeoWorld');
 // ============================================================================
 
 const SEEDS_DIR = resolve(process.cwd(), 'seeds');
-const MIN_POPULATION = 5000; // Seuil population pour insertion villes
+const MIN_POPULATION = 1000; // Seuil population pour insertion villes
 
 const DRY_RUN = process.argv.includes('--dry-run');
 const ENRICH_ONLY = process.argv.includes('--enrich-only');
