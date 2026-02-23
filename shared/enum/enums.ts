@@ -316,6 +316,9 @@ export const typePaiementTerrainEnum = pgEnum("type_paiement_terrain_enum", [
   "CREDIT_REPAYMENT",
   "ENGAGEMENT_FEE",
   "CREDIT_DISBURSEMENT",
+  // Aliases crédit (robustesse front/agent)
+  "LOAN_REPAYMENT",
+  "LOAN_DISBURSEMENT",
   // Tontine
   "TONTINE_CONTRIBUTION",
   "TONTINE_WITHDRAWAL",
