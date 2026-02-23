@@ -13,6 +13,7 @@ const Tontines = lazy(() => import('@/components/finance/tontine/Tontines'));
 const Comptabilite = lazy(() => import('@/components/finance/accounting/ComptabiliteSageOHADA'));
 const RessourcesHumaines = lazy(() => import('@/components/hr/RessourcesHumaines'));
 const AgentTerrainPortail = lazy(() => import('@/components/agent/AgentTerrainPortail'));
+const AgentTerrain = lazy(() => import('@/components/agent/AgentTerrain'));
 const ValidationsCenter = lazy(() => import('@/components/validations/ValidationsCenter'));
 const CaisseDashboard = lazy(() => import('@/components/finance/caisse/CaisseDashboard'));
 const CoffreFortDashboard = lazy(() => import('@/components/finance/caisse/CoffreFortDashboard').then(module => ({ default: module.CoffreFortDashboard })));
@@ -175,6 +176,15 @@ export const ROUTES: RouteConfig[] = [
     ],
   },
   {
+    key: 'agentTerrain',
+    path: '/operations-terrain',
+    component: AgentTerrain,
+    requiredModule: 'Agent Terrain',
+    label: 'Agent de Terrain',
+    labelKey: 'menuAgentTerrain',
+    group: 'Opérations',
+  },
+  {
     key: 'agentModules',
     path: '/agent-terrain',
     component: AgentTerrainPortail,
@@ -183,7 +193,6 @@ export const ROUTES: RouteConfig[] = [
     labelKey: 'menuAgentModules',
     group: 'Opérations',
     subRoutes: [
-      { path: '/agent-terrain/operations', subModule: 'operations', label: 'Opérations' },
       { path: '/agent-terrain/dashboard', subModule: 'dashboard', label: 'Tableau de bord' },
       { path: '/agent-terrain/session', subModule: 'session', label: 'Session' },
       { path: '/agent-terrain/reports', subModule: 'reports', label: 'Rapports' },

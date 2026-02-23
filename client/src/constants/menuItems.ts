@@ -21,6 +21,7 @@ import {
 
   BarChart3,
   UserCog,
+  MapPin,
 } from 'lucide-react';
 import { MenuItem } from '../types/layout';
 
@@ -37,6 +38,7 @@ export const PLATFORM_MENU_ITEMS: MenuItem[] = [
 
   // Opérations
   { labelKey: 'menuCaisse', icon: Wallet, key: 'caisse', section: 'operations' },
+  { labelKey: 'menuAgentTerrain', icon: MapPin, key: 'agentTerrain', section: 'operations' },
   { labelKey: 'menuAgentModules', icon: MapPinned, key: 'agentModules', section: 'operations' },
   { labelKey: 'menuValidations', icon: CheckCircle, key: 'validations', section: 'operations' },
   { labelKey: 'menuTransfert', icon: ArrowLeftRight, key: 'transfert', section: 'operations' },

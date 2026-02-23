@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Map, FileText, GraduationCap, Package, AlertTriangle, Target, BarChart3, TrendingUp, Trophy, Download, LayoutDashboard, UserCircle, ChevronDown, Search, X, UserPlus, Eye, Menu, ChevronLeft, ChevronRight, Activity, Locate, Wallet } from 'lucide-react';
+import { Map, FileText, GraduationCap, Package, AlertTriangle, Target, BarChart3, TrendingUp, Trophy, Download, LayoutDashboard, UserCircle, ChevronDown, Search, X, UserPlus, Eye, Menu, ChevronLeft, ChevronRight, Activity, Locate } from 'lucide-react';
 import { Card } from '../ui';
 import AgentCommissions from './AgentCommissions';
 import AgentPlanning from './AgentPlanning';
@@ -15,7 +15,6 @@ import AgentTeamLeaderboard from './AgentTeamLeaderboard';
 import ProspectionList from './ProspectionList';
 import ProspectionSupervisionPanel from './ProspectionSupervisionPanel';
 import TrackingDebugPage from './TrackingDebugPage';
-import AgentTerrain from './AgentTerrain';
 import AgentSessionManager from './sessions/AgentSessionManager';
 import LoadingScreen from '../ui/LoadingScreen';
 import { authService } from '../../lib/auth';
@@ -39,7 +38,7 @@ interface AgentTerrainPortailProps {
 }
 
 export default function AgentTerrainPortail({ agentId, activeView, onModuleChange }: AgentTerrainPortailProps) {
-  const [activeModule, setActiveModule] = useState<string>(activeView || 'operations');
+  const [activeModule, setActiveModule] = useState<string>(activeView || 'dashboard');
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const scroll = (direction: 'left' | 'right') => {
@@ -148,7 +147,6 @@ export default function AgentTerrainPortail({ agentId, activeView, onModuleChang
   }, [user, isAdminOrSupervisor]);
 
   const modules = [
-    { id: 'operations', name: 'Opérations', icon: Wallet, component: AgentTerrain },
     { id: 'dashboard', name: 'Tableau de Bord', icon: LayoutDashboard, component: AgentDashboard },
     { id: 'session', name: 'Session', icon: Activity, component: SessionManagerWrapper },
     { id: 'reports', name: 'Rapports', icon: Download, component: AgentReportsGenerator },

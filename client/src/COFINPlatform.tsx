@@ -31,6 +31,7 @@ const ClientModule = lazy(() => import('./components/client/ClientModule'));
 const RessourcesHumaines = lazy(() => import('./components/hr/RessourcesHumaines'));
 
 // Agent modules
+const AgentTerrain = lazy(() => import('./components/agent/AgentTerrain'));
 const AgentTerrainPortail = lazy(() => import('./components/agent/AgentTerrainPortail'));
 const ValidationsCenter = lazy(() => import('./components/validations/ValidationsCenter'));
 
@@ -339,11 +340,17 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
             <Comptes activeView={currentSubModule} />
           </Suspense>
         );
+      case 'agentTerrain':
+        return (
+          <Suspense fallback={<ModuleLoadingFallback moduleName="Agent de Terrain" />}>
+            <AgentTerrain />
+          </Suspense>
+        );
       case 'agentModules':
         return (
           <Suspense fallback={<ModuleLoadingFallback moduleName="Gestion Agent" />}>
             <AgentTerrainPortail
-              activeView={currentSubModule}
+              activeView={currentSubModule || 'dashboard'}
               onModuleChange={handleModuleChange}
             />
           </Suspense>
