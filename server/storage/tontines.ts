@@ -371,25 +371,38 @@ export async function getContributionsByTontine(tontineId: string): Promise<any[
     .select()
     .from(contributionsTontine)
     .leftJoin(clients, eq(contributionsTontine.clientId, clients.id))
+    .leftJoin(membresTontine, eq(contributionsTontine.membreId, membresTontine.id))
     .where(eq(contributionsTontine.tontineId, tontineId))
     .orderBy(desc(contributionsTontine.createdAt));
 
-  return rows.map(({ contributions_tontine, clients }) => {
-    // Mapping des valeurs pour le frontend
-    // Database stores English enum values (CASH, MOBILE_MONEY, TRANSFER, CHECK)
-    // Display French labels for the UI
+  // If direct clientId join returned null, fetch client via membre's clientId
+  const membreClientIds = rows
+    .filter(r => !r.clients && r.membres_tontine?.clientId)
+    .map(r => r.membres_tontine!.clientId);
+
+  let membreClientsMap: Record<string, typeof rows[0]['clients']> = {};
+  if (membreClientIds.length > 0) {
+    const { inArray } = await import('drizzle-orm');
+    const membreClients = await db.select().from(clients).where(inArray(clients.id, membreClientIds));
+    for (const c of membreClients) {
+      membreClientsMap[c.id] = c;
+    }
+  }
+
+  return rows.map(({ contributions_tontine, clients: directClient, membres_tontine: membre }) => {
     const methodePaiement = contributions_tontine.methodePaiement;
     const mode = METHODE_PAIEMENT_LABELS[methodePaiement as keyof typeof METHODE_PAIEMENT_LABELS] || METHODE_PAIEMENT_LABELS.CASH;
 
+    // Resolve client: direct join first, then via membre's clientId
+    const client = directClient || (membre?.clientId ? membreClientsMap[membre.clientId] : null);
+
     return {
       ...contributions_tontine,
-      client: clients,
-      // Alias for frontend compatibility
+      client,
       date_contribution: contributions_tontine.createdAt,
       mode_paiement: mode,
-      statut: contributions_tontine.statutTransaction, // Return EN enum value directly
+      statut: contributions_tontine.statutTransaction,
       tour_numero: contributions_tontine.tourNumero || 1,
-      // Ensure original fields are also available if needed by other components using snake_case alias middleware
       methode_paiement: contributions_tontine.methodePaiement,
       statut_transaction: contributions_tontine.statutTransaction
     };

@@ -111,7 +111,7 @@ export default function TontineDashboard({
           type: 'contribution',
           montant: Number(c.montant),
           date: c.dateContribution || c.createdAt,
-          nom: c.client?.nom || c.tontineMembres?.clients?.nom || 'Inconnu'
+          nom: c.client ? [c.client.prenom, c.client.nom].filter(Boolean).join(' ') : 'Inconnu'
         }))
         .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setRecentActivity(activities);
@@ -136,6 +136,26 @@ export default function TontineDashboard({
       setGeneratingCycle(false);
     }
   }, [tontineId]);
+
+  // Compute stats
+  const stats = dashboard?.stats || {};
+  const currentCycle = dashboard?.currentCycle;
+  const nextTurn = dashboard?.nextTurn;
+
+  const membresActifs = membres.filter((m: any) =>
+    m.status === StatutClient.ACTIVE || m.statut === StatutClient.ACTIVE
+  ).length;
+
+  const membresAuto = membres.filter((m: any) => m.cotisationAutomatique).length;
+
+  const potCollecte = Number(stats.potCollecte || 0);
+  const potDistribue = Number(stats.potDistribue || 0);
+  const soldeNet = potCollecte - potDistribue;
+
+  // Cycle progress
+  const completedTurns = turns.filter((t: any) => t.status === 'PAID_OUT').length;
+  const totalTurns = turns.length;
+  const progressPercent = totalTurns > 0 ? (completedTurns / totalTurns) * 100 : 0;
 
   const handleCloseCycle = useCallback(() => {
     if (!tontineId || !currentCycle?.id) return;
@@ -162,26 +182,6 @@ export default function TontineDashboard({
       },
     });
   }, [tontineId, currentCycle?.id, totalTurns, completedTurns, progressPercent, openConfirm]);
-
-  // Compute stats
-  const stats = dashboard?.stats || {};
-  const currentCycle = dashboard?.currentCycle;
-  const nextTurn = dashboard?.nextTurn;
-
-  const membresActifs = membres.filter((m: any) =>
-    m.status === StatutClient.ACTIVE || m.statut === StatutClient.ACTIVE
-  ).length;
-
-  const membresAuto = membres.filter((m: any) => m.cotisationAutomatique).length;
-
-  const potCollecte = Number(stats.potCollecte || 0);
-  const potDistribue = Number(stats.potDistribue || 0);
-  const soldeNet = potCollecte - potDistribue;
-
-  // Cycle progress
-  const completedTurns = turns.filter((t: any) => t.status === 'PAID_OUT').length;
-  const totalTurns = turns.length;
-  const progressPercent = totalTurns > 0 ? (completedTurns / totalTurns) * 100 : 0;
 
   // Visible turns (first 5 or all)
   const visibleTurns = showAllTurns ? turns : turns.slice(0, 5);
