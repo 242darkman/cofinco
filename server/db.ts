@@ -1257,12 +1257,18 @@ export async function ensureCustomFunctions(): Promise<void> {
     try {
       await db.execute(sql`
         CREATE OR REPLACE FUNCTION update_cycle_totals_on_contribution() RETURNS TRIGGER AS $$
+        DECLARE
+            v_cycle_id UUID;
         BEGIN
-            IF NEW.cycle_id IS NOT NULL AND NEW.statut_transaction = 'POSTED' THEN
+            -- Derive cycle_id from the tontine's current_cycle_id
+            SELECT current_cycle_id INTO v_cycle_id
+            FROM tontines WHERE id = NEW.tontine_id;
+
+            IF v_cycle_id IS NOT NULL AND NEW.statut_transaction = 'POSTED' THEN
                 UPDATE tontine_cycles
                 SET pot_collected = pot_collected + NEW.montant,
                     updated_at = NOW()
-                WHERE id = NEW.cycle_id;
+                WHERE id = v_cycle_id;
             END IF;
 
             RETURN NEW;
