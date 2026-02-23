@@ -25,6 +25,10 @@ interface CompteBloque {
     prenom?: string;
     phone: string;
   } | null;
+  produit: {
+    code: string;
+    nom: string;
+  } | null;
 }
 
 const ITEMS_PER_PAGE = 10;
@@ -83,7 +87,8 @@ export default function ComptesBloquesSection() {
     return comptes.filter(c => {
       const clientName = c.clients ? `${c.clients.nom || ''} ${c.clients.prenom || ''}`.toLowerCase() : '';
       const numero = (c.numeroCompte || '').toLowerCase();
-      return clientName.includes(searchLower) || numero.includes(searchLower);
+      const produitCode = (c.produit?.code || '').toLowerCase();
+      return clientName.includes(searchLower) || numero.includes(searchLower) || produitCode.includes(searchLower);
     });
   }, [comptes, debouncedSearch]);
 
@@ -125,6 +130,11 @@ export default function ComptesBloquesSection() {
           <div className="text-xs text-content-muted">
             {row.clients ? formatClientName(row.clients.nom, row.clients.prenom) : 'N/A'}
           </div>
+          {row.produit?.code && (
+            <span className="inline-block mt-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-accent/10 text-accent">
+              {row.produit.code}
+            </span>
+          )}
         </div>
       )
     },
