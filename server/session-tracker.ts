@@ -4,8 +4,264 @@ import { activeSessions, users, userAgences, agences, userRoles } from '@shared/
 import { SystemRole } from '@shared/types/roles';
 import { eq, and, lt, desc, sql, isNull } from 'drizzle-orm';
 import { createLogger } from './lib/logger';
+import { getRedisClient, SESSION_CONFIG } from './auth';
 
 const logger = createLogger('SessionTracker');
+
+// ============================================
+// REDIS SESSION MANAGEMENT
+// ============================================
+
+const REDIS_SESSION_PREFIX = 'cofin:sess:';
+const REDIS_USER_SESSIONS_PREFIX = 'cofin:usess:';
+
+/**
+ * Détruit une clé de session Redis immédiatement.
+ * Appelé quand une session est marquée inactive pour éviter les zombies.
+ * Échoue silencieusement — le session guard bloque déjà les sessions invalides.
+ */
+async function destroyRedisSession(sessionId: string): Promise<void> {
+  try {
+    const redis = getRedisClient();
+    if (!redis) return;
+    await redis.del(`${REDIS_SESSION_PREFIX}${sessionId}`);
+    logger.debug({ sessionId: sessionId.slice(0, 8) }, 'Redis session key destroyed');
+  } catch (error) {
+    logger.warn({ err: error, sessionId: sessionId.slice(0, 8) }, 'Failed to destroy Redis session key');
+  }
+}
+
+/**
+ * Détruit plusieurs clés de session Redis en pipeline.
+ */
+async function destroyRedisSessionsBatch(sessionIds: string[]): Promise<void> {
+  if (sessionIds.length === 0) return;
+  try {
+    const redis = getRedisClient();
+    if (!redis) return;
+    const multi = redis.multi();
+    for (const sid of sessionIds) {
+      multi.del(`${REDIS_SESSION_PREFIX}${sid}`);
+    }
+    await multi.exec();
+    logger.debug({ count: sessionIds.length }, 'Redis session keys destroyed (batch)');
+  } catch (error) {
+    logger.warn({ err: error, count: sessionIds.length }, 'Failed to batch-destroy Redis sessions');
+  }
+}
+
+// ============================================
+// REDIS ZSET — INDEX USER SESSIONS
+// ============================================
+
+/**
+ * Script Lua atomique pour ajouter une session au ZSET
+ * et enforcer la limite de sessions simultanées.
+ *
+ * KEYS[1] = user_sessions:{userId}
+ * ARGV[1] = sessionId
+ * ARGV[2] = timestamp (score)
+ * ARGV[3] = maxSessions
+ *
+ * Retourne JSON array des sessionIds prunés (les plus anciens).
+ */
+const SESSION_LIMIT_LUA = `
+local key = KEYS[1]
+local sessionId = ARGV[1]
+local score = tonumber(ARGV[2])
+local maxSessions = tonumber(ARGV[3])
+
+redis.call('ZADD', key, score, sessionId)
+
+local count = redis.call('ZCARD', key)
+
+local pruned = {}
+if count > maxSessions then
+  local excess = count - maxSessions
+  pruned = redis.call('ZRANGE', key, 0, excess - 1)
+  if #pruned > 0 then
+    redis.call('ZREM', key, unpack(pruned))
+  end
+end
+
+return cjson.encode(pruned)
+`;
+
+/**
+ * Ajoute atomiquement une session au ZSET de l'utilisateur
+ * et prune les plus anciennes si la limite est dépassée.
+ *
+ * @returns sessionIds des sessions prunées (à détruire côté Redis + DB)
+ */
+async function atomicSessionAdd(
+  userId: string,
+  sessionId: string,
+  loginTimestamp: number
+): Promise<string[]> {
+  const redis = getRedisClient();
+  if (!redis) return []; // Pas de Redis → fallback SQL
+
+  try {
+    const key = `${REDIS_USER_SESSIONS_PREFIX}${userId}`;
+    const result = await redis.eval(SESSION_LIMIT_LUA, {
+      keys: [key],
+      arguments: [sessionId, String(loginTimestamp), String(MAX_SESSIONS_PER_USER)],
+    });
+
+    const pruned: string[] = JSON.parse(result as string);
+
+    if (pruned.length > 0) {
+      logger.info({
+        userId,
+        newSession: sessionId.slice(0, 8),
+        prunedCount: pruned.length,
+        maxAllowed: MAX_SESSIONS_PER_USER,
+      }, 'Atomic session limit enforced via Redis ZSET');
+    }
+
+    // TTL sur le ZSET : 13h (12h absolu + 1h buffer)
+    await redis.expire(key, 13 * 60 * 60);
+
+    return pruned;
+  } catch (error) {
+    logger.warn({ err: error, userId }, 'ZSET atomic add failed, SQL enforcement remains active');
+    return [];
+  }
+}
+
+/**
+ * Retire une session du ZSET de l'utilisateur.
+ */
+async function removeSessionFromZset(userId: string, sessionId: string): Promise<void> {
+  const redis = getRedisClient();
+  if (!redis) return;
+
+  try {
+    const key = `${REDIS_USER_SESSIONS_PREFIX}${userId}`;
+    await redis.zRem(key, sessionId);
+  } catch (error) {
+    logger.warn({ err: error, userId }, 'Failed to remove session from ZSET');
+  }
+}
+
+// ============================================
+// REDIS SCAN-BASED CLEANUP
+// ============================================
+
+let scanCleanupCounter = 0;
+
+/**
+ * SCAN-based Redis cleanup diagnostique.
+ * Détecte et nettoie :
+ * 1. Clés session sans TTL (zombie, ne devrait jamais arriver avec connect-redis)
+ * 2. Clés session orphelines (pas de record activeSessions correspondant en DB)
+ * 3. Entrées ZSET référençant des sessions Redis inexistantes
+ *
+ * Exécuté toutes les 15 minutes (1 fois sur 3 dans le cycle de 5 min).
+ */
+export async function scanAndCleanupRedisSessions(): Promise<{
+  scannedKeys: number;
+  noTtl: number;
+  orphanKeys: number;
+  orphanZsetEntries: number;
+  cleaned: number;
+} | null> {
+  const redis = getRedisClient();
+  if (!redis) return null;
+
+  const stats = { scannedKeys: 0, noTtl: 0, orphanKeys: 0, orphanZsetEntries: 0, cleaned: 0 };
+
+  try {
+    // ===== PHASE 1: Scan session keys =====
+    const sessionKeys: string[] = [];
+    for await (const key of redis.scanIterator({
+      MATCH: `${REDIS_SESSION_PREFIX}*`,
+      COUNT: 100,
+    })) {
+      sessionKeys.push(key as string);
+    }
+    stats.scannedKeys = sessionKeys.length;
+
+    // Vérifier TTL et cross-ref DB par batch de 50
+    for (let i = 0; i < sessionKeys.length; i += 50) {
+      const batch = sessionKeys.slice(i, i + 50);
+      const multi = redis.multi();
+      for (const key of batch) {
+        multi.ttl(key);
+      }
+      const ttls = await multi.exec();
+
+      for (let j = 0; j < batch.length; j++) {
+        const ttl = ttls[j] as number;
+        const key = batch[j];
+        const sessionId = key.replace(REDIS_SESSION_PREFIX, '');
+
+        if (ttl === -1) {
+          // Pas de TTL → fixer
+          stats.noTtl++;
+          await redis.expire(key, SESSION_CONFIG.INACTIVITY_TIMEOUT_SEC);
+          stats.cleaned++;
+          logger.warn({ key }, 'Fixed Redis session key with no TTL');
+        }
+
+        // Vérifier si la session existe en DB
+        try {
+          const [dbSession] = await db.select({ id: activeSessions.id })
+            .from(activeSessions)
+            .where(and(
+              eq(activeSessions.sessionId, sessionId),
+              eq(activeSessions.isActive, true)
+            ));
+
+          if (!dbSession) {
+            stats.orphanKeys++;
+            await redis.del(key);
+            stats.cleaned++;
+            logger.info({ sessionId: sessionId.slice(0, 8) }, 'Deleted orphan Redis session key');
+          }
+        } catch {
+          // Erreur DB → skip, on réessaiera au prochain cycle
+        }
+      }
+    }
+
+    // ===== PHASE 2: Scan ZSET keys =====
+    const zsetKeys: string[] = [];
+    for await (const key of redis.scanIterator({
+      MATCH: `${REDIS_USER_SESSIONS_PREFIX}*`,
+      COUNT: 100,
+    })) {
+      zsetKeys.push(key as string);
+    }
+
+    for (const zsetKey of zsetKeys) {
+      const members = await redis.zRange(zsetKey, 0, -1);
+      for (const sessionId of members) {
+        const exists = await redis.exists(`${REDIS_SESSION_PREFIX}${sessionId}`);
+        if (!exists) {
+          stats.orphanZsetEntries++;
+          await redis.zRem(zsetKey, sessionId);
+          stats.cleaned++;
+        }
+      }
+
+      // Supprimer les ZSETs vides
+      const remaining = await redis.zCard(zsetKey);
+      if (remaining === 0) {
+        await redis.del(zsetKey);
+      }
+    }
+
+    if (stats.cleaned > 0 || stats.scannedKeys > 0) {
+      logger.info(stats, 'Redis session scan/cleanup completed');
+    }
+
+    return stats;
+  } catch (error) {
+    logger.error({ err: error }, 'Error during Redis session scan/cleanup');
+    return stats;
+  }
+}
 
 // ============================================
 // IP CHANGE DETECTION
@@ -420,6 +676,39 @@ export async function createSessionRecord(
     });
 
     logger.info({ userId, hasFingerprint: !!deviceFingerprint }, 'Created session for user');
+
+    // ===== ZSET: Ajouter au ZSET et enforcer la limite atomiquement =====
+    const prunedSessionIds = await atomicSessionAdd(userId, sessionId, Date.now());
+
+    // Pour chaque session prunée: marquer inactive en DB + détruire Redis + notifier
+    for (const prunedSid of prunedSessionIds) {
+      await db.update(activeSessions)
+        .set({ isActive: false })
+        .where(eq(activeSessions.sessionId, prunedSid));
+
+      await destroyRedisSession(prunedSid);
+
+      // Invalider le cache de validation
+      sessionValidityCache.delete(prunedSid);
+
+      // Notifier via WebSocket
+      try {
+        const { getWsInstance } = await import('./ws-server');
+        const ws = getWsInstance();
+        if (ws) {
+          ws.sendToUser(userId, {
+            type: 'SESSION_INVALID',
+            payload: {
+              reason: 'session_limit_reached',
+              message: 'Vous avez atteint la limite de sessions. Cette session a été fermée car vous vous êtes connecté ailleurs.',
+              sessionId: prunedSid,
+            }
+          });
+        }
+      } catch {
+        // WebSocket notification is best-effort
+      }
+    }
   } catch (error) {
     logger.error({ err: error }, 'Error creating session record');
   }
@@ -438,10 +727,26 @@ export async function updateSessionActivity(sessionId: string): Promise<void> {
 }
 
 // Delete session record on logout
-export async function deleteSessionRecord(sessionId: string): Promise<void> {
+export async function deleteSessionRecord(sessionId: string, userId?: string): Promise<void> {
   try {
+    // Récupérer le userId si pas fourni (pour le ZSET cleanup)
+    let resolvedUserId = userId;
+    if (!resolvedUserId) {
+      const [record] = await db.select({ userId: activeSessions.userId })
+        .from(activeSessions)
+        .where(eq(activeSessions.sessionId, sessionId));
+      resolvedUserId = record?.userId;
+    }
+
     await db.delete(activeSessions).where(eq(activeSessions.sessionId, sessionId));
-    logger.info({ sessionId }, 'Deleted session');
+
+    // Détruire la clé Redis + retirer du ZSET
+    await destroyRedisSession(sessionId);
+    if (resolvedUserId) {
+      await removeSessionFromZset(resolvedUserId, sessionId);
+    }
+
+    logger.info({ sessionId: sessionId.slice(0, 8) }, 'Deleted session');
   } catch (error) {
     logger.error({ err: error }, 'Error deleting session record');
   }
@@ -450,9 +755,24 @@ export async function deleteSessionRecord(sessionId: string): Promise<void> {
 // Delete all sessions for a user (for force logout)
 export async function deleteUserSessions(userId: string): Promise<number> {
   try {
+    // Récupérer les sessionIds avant suppression (pour cleanup Redis)
+    const sessions = await db.select({ sessionId: activeSessions.sessionId })
+      .from(activeSessions)
+      .where(eq(activeSessions.userId, userId));
+    const sessionIds = sessions.map(s => s.sessionId).filter(Boolean) as string[];
+
     const result = await db.delete(activeSessions)
       .where(eq(activeSessions.userId, userId))
       .returning();
+
+    // Détruire les clés Redis + vider le ZSET
+    await destroyRedisSessionsBatch(sessionIds);
+    const redis = getRedisClient();
+    if (redis) {
+      try {
+        await redis.del(`${REDIS_USER_SESSIONS_PREFIX}${userId}`);
+      } catch { /* best-effort */ }
+    }
 
     logger.info({ userId, count: result.length }, 'Deleted sessions for user');
     return result.length;
@@ -553,6 +873,10 @@ export async function enforceSessionLimit(userId: string): Promise<{
       await db.update(activeSessions)
         .set({ isActive: false })
         .where(eq(activeSessions.id, session.id));
+
+      // Détruire la clé Redis + retirer du ZSET
+      await destroyRedisSession(session.sessionId);
+      await removeSessionFromZset(userId, session.sessionId);
 
       terminatedSessions.push({
         sessionId: session.sessionId,
@@ -815,6 +1139,11 @@ setInterval(() => {
 // Mark a session as inactive (soft invalidation)
 export async function markSessionInactive(sessionId: string, reason?: string): Promise<void> {
   try {
+    // Récupérer le userId pour le ZSET cleanup
+    const [record] = await db.select({ userId: activeSessions.userId })
+      .from(activeSessions)
+      .where(eq(activeSessions.sessionId, sessionId));
+
     await db.update(activeSessions)
       .set({ isActive: false })
       .where(eq(activeSessions.sessionId, sessionId));
@@ -822,7 +1151,13 @@ export async function markSessionInactive(sessionId: string, reason?: string): P
     // Invalider le cache
     sessionValidityCache.delete(sessionId);
 
-    logger.info({ sessionId, reason }, 'Marked session as inactive');
+    // Détruire la clé Redis + retirer du ZSET
+    await destroyRedisSession(sessionId);
+    if (record?.userId) {
+      await removeSessionFromZset(record.userId, sessionId);
+    }
+
+    logger.info({ sessionId: sessionId.slice(0, 8), reason }, 'Marked session as inactive');
   } catch (error) {
     logger.error({ err: error }, 'Error marking session inactive');
   }
@@ -834,7 +1169,17 @@ export async function markUserSessionsInactive(userId: string, reason?: string):
     const result = await db.update(activeSessions)
       .set({ isActive: false })
       .where(and(eq(activeSessions.userId, userId), eq(activeSessions.isActive, true)))
-      .returning();
+      .returning({ sessionId: activeSessions.sessionId });
+
+    // Détruire les clés Redis en batch + vider le ZSET
+    const sessionIds = result.map(r => r.sessionId).filter(Boolean) as string[];
+    await destroyRedisSessionsBatch(sessionIds);
+    const redis = getRedisClient();
+    if (redis) {
+      try {
+        await redis.del(`${REDIS_USER_SESSIONS_PREFIX}${userId}`);
+      } catch { /* best-effort */ }
+    }
 
     logger.info({ userId, count: result.length, reason }, 'Marked sessions as inactive for user');
     return result.length;
@@ -1015,6 +1360,16 @@ export function scheduleSessionCleanup(): void {
     } catch {
       // Refresh token service might not be loaded yet
     }
+    // Redis SCAN-based cleanup (toutes les 15 minutes = 1 fois sur 3)
+    scanCleanupCounter++;
+    if (scanCleanupCounter >= 3) {
+      scanCleanupCounter = 0;
+      try {
+        await scanAndCleanupRedisSessions();
+      } catch {
+        // Non-critical
+      }
+    }
   }, 5 * 60 * 1000);
 
   // Run stale session check more frequently (every 2 minutes)
@@ -1030,7 +1385,7 @@ export function scheduleSessionCleanup(): void {
     await markExpiredSessionsInactive();
   }, 30 * 1000);
 
-  logger.info('Cleanup scheduled: full every 5 min, stale detection every 2 min, IP/fingerprint cache cleanup, refresh token cleanup');
+  logger.info('Cleanup scheduled: full every 5 min, stale detection every 2 min, Redis SCAN every 15 min, IP/fingerprint cache cleanup, refresh token cleanup');
 }
 
 // Mark expired sessions as inactive (before deletion)
@@ -1042,9 +1397,13 @@ async function markExpiredSessionsInactive(): Promise<number> {
         lt(activeSessions.expiresAt, new Date()),
         eq(activeSessions.isActive, true)
       ))
-      .returning();
+      .returning({ sessionId: activeSessions.sessionId });
 
     if (result.length > 0) {
+      // Détruire les clés Redis en batch
+      const sessionIds = result.map(r => r.sessionId).filter(Boolean) as string[];
+      await destroyRedisSessionsBatch(sessionIds);
+
       logger.info({ count: result.length }, 'Marked expired sessions as inactive');
     }
     return result.length;
@@ -1091,6 +1450,10 @@ export async function invalidateStaleSessions(): Promise<{ count: number; userId
     await db.update(activeSessions)
       .set({ isActive: false })
       .where(sql`${activeSessions.id} IN ${sessionIds}`);
+
+    // Détruire les clés Redis en batch
+    const staleRedisIds = staleSessions.map(s => s.sessionId);
+    await destroyRedisSessionsBatch(staleRedisIds);
 
     logger.warn({
       count: staleSessions.length,

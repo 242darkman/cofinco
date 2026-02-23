@@ -243,6 +243,14 @@ export async function closeRedisClient(): Promise<void> {
   }
 }
 
+/**
+ * Retourne le client Redis connecté (ou null si PostgreSQL store est utilisé).
+ * Utilisé par session-tracker pour détruire les clés Redis directement.
+ */
+export function getRedisClient(): any | null {
+  return redisClient;
+}
+
 declare module 'express-session' {
   interface SessionData {
     userId: string;

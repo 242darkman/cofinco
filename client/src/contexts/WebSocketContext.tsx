@@ -883,18 +883,44 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
          }
          break;
 
-      case "SESSION_INVALID":
-         // Session invalidated server-side via WebSocket heartbeat - immediate logout
-         toast.error("Session expirée", {
+      case "SESSION_INVALID": {
+         // Session invalidated server-side — message différencié selon la raison
+         const reason = message.payload?.reason;
+         const serverMessage = message.payload?.message;
+
+         let title = "Session expirée";
+         let description = serverMessage || "Veuillez vous reconnecter.";
+
+         switch (reason) {
+           case 'session_limit_reached':
+             title = "Nouvelle connexion détectée";
+             description = serverMessage || "Votre session a été fermée car vous vous êtes connecté(e) depuis un autre appareil.";
+             break;
+           case 'ip_change':
+             title = "Changement de réseau détecté";
+             description = serverMessage || "Votre session a été invalidée suite à un changement d'adresse IP.";
+             break;
+           case 'fingerprint_mismatch':
+             title = "Appareil non reconnu";
+             description = serverMessage || "Votre session a été invalidée car elle semble être utilisée depuis un appareil différent.";
+             break;
+           case 'client_unresponsive':
+             title = "Session inactive";
+             description = serverMessage || "Votre session a expiré suite à une inactivité prolongée.";
+             break;
+         }
+
+         toast.error(title, {
              id: 'session-expired',
-             description: message.payload.message || "Veuillez vous reconnecter.",
+             description,
              duration: 5000,
          });
          setTimeout(() => {
              authService.logout();
-             hardRedirectToLogin('Session expirée');
-         }, 1000);
+             hardRedirectToLogin(title);
+         }, 1500);
          break;
+      }
 
       case "SESSION_HEARTBEAT_RESPONSE":
          // WebSocket heartbeat response - logout if invalid
