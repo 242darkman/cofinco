@@ -2,7 +2,7 @@
 # Cofinco — Caddy Reverse Proxy
 # ==========================================================
 # DEV  : DOMAIN=localhost → self-signed TLS (auto)
-# PROD : DOMAIN=cofin.co  → Let's Encrypt TLS (auto)
+# PROD : DOMAIN=cofinco-m.com  → Let's Encrypt TLS (auto)
 # Same Caddyfile, same behavior, different env var.
 # ==========================================================
 

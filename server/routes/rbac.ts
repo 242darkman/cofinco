@@ -19,7 +19,7 @@ const logger = createLogger('Routes:RBAC');
 import { SystemRole, getRoleOptions, isSystemRole, getRoleLabel, ROLE_LABELS } from "@shared/types/roles";
 import { requireAuth } from "../auth";
 import { attachAbility, requireAbility, requireAnyAbility, invalidateRoleHierarchyCache } from "../authorization";
-import { eq, and, desc, count } from "drizzle-orm";
+import { eq, and, desc, count, inArray } from "drizzle-orm";
 import { db } from "../db";
 import { logAudit } from "../audit";
 import { auditTrailService } from "../services/audit-trail-service";
