@@ -17,7 +17,7 @@ import { normalizePhone } from '@shared/utils/phone';
 // ---------------------------------------------------------------------------
 
 export type OperationType = 'DEPOT' | 'RETRAIT';
-export type OperationPhase = 'INPUT' | 'CONFIRMING' | 'RESULT';
+export type OperationPhase = 'INPUT' | 'CONFIRMING' | 'RESULT' | 'QUEUED_OFFLINE';
 
 export interface AccountInfo {
   id: string;
@@ -248,6 +248,18 @@ export function useCaisseOperation({
       }
     },
     onSuccess: (data) => {
+      // Detect SW offline queue response (202 from Service Worker background sync)
+      if (data?.offline && data?.queued) {
+        setPhase('QUEUED_OFFLINE');
+        toast.info(
+          'Opération mise en file d\'attente (hors ligne). Elle sera synchronisée automatiquement au retour du réseau.',
+          { duration: 6000 }
+        );
+        // Generate new idempotency key for next operation
+        setIdempotencyKey(uuidv4());
+        return;
+      }
+
       setResult(data);
       setPhase('RESULT');
       toast.success(data.message || `${operationType === 'DEPOT' ? 'Dépôt' : 'Retrait'} effectué`);

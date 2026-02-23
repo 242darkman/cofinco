@@ -11,6 +11,7 @@ import { formatMoney } from '../../../lib/format';
 import { sanitizeInput } from '../../../lib/sanitize';
 import ConfirmDialog from '../../ui/ConfirmDialog';
 import { SessionCaisse } from '../../../types/finance';
+import { usePendingSyncCount } from '../../../hooks/finance/usePendingSyncCount';
 
 interface DenominationTemplate {
   id: string;
@@ -70,6 +71,10 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
   const [step, setStep] = useState<ClosingStep>(getInitialStep);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Pending sync guard — prevent closing with unsync'd operations
+  const { pendingCount: pendingSyncCount } = usePendingSyncCount();
+  const [showPendingSyncWarning, setShowPendingSyncWarning] = useState(false);
 
   // Step 1: Freeze state
   const [freezeConfirmed, setFreezeConfirmed] = useState(false);
@@ -187,6 +192,16 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
 
   // ========== STEP 1: INITIATE CLOSE (Freeze) ==========
   const handleInitiateClose = async () => {
+    // Guard: check for pending offline operations before freezing
+    if (pendingSyncCount > 0) {
+      setShowPendingSyncWarning(true);
+      return;
+    }
+    await executeInitiateClose();
+  };
+
+  const executeInitiateClose = async () => {
+    setShowPendingSyncWarning(false);
     setLoading(true);
     setError(null);
 
@@ -1205,6 +1220,30 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
         variant="success"
         confirmText="Confirmer la fermeture"
         cancelText="Annuler"
+      />
+
+      {/* Pending Sync Warning — guard against closing with unsync'd offline operations */}
+      <ConfirmDialog
+        isOpen={showPendingSyncWarning}
+        title="Op\u00e9rations non synchronis\u00e9es"
+        message={
+          <div className="space-y-3">
+            <p>
+              <strong className="text-status-warning">{pendingSyncCount} op\u00e9ration{pendingSyncCount > 1 ? 's' : ''}</strong> n'{pendingSyncCount > 1 ? 'ont' : 'a'} pas encore \u00e9t\u00e9 synchronis\u00e9{pendingSyncCount > 1 ? 'es' : 'e'} avec le serveur.
+            </p>
+            <p className="text-content-muted text-sm">
+              Fermer la session maintenant pourrait cr\u00e9er un \u00e9cart comptable car ces op\u00e9rations ne seront pas prises en compte dans le solde th\u00e9orique.
+            </p>
+            <p className="text-content-muted text-sm font-semibold">
+              Il est recommand\u00e9 d'attendre que la synchronisation soit termin\u00e9e avant de fermer.
+            </p>
+          </div>
+        }
+        onConfirm={executeInitiateClose}
+        onClose={() => setShowPendingSyncWarning(false)}
+        variant="warning"
+        confirmText="Fermer quand m\u00eame"
+        cancelText="Attendre la synchronisation"
       />
 
       {/* Save as Template Modal */}

@@ -31,6 +31,7 @@ import { SupervisionSession } from './shared/SupervisionConfirmModal';
 
 import { useSessionTimeout } from '../../../hooks/finance/useSessionTimeout';
 import { usePendingSessionSync } from '../../../hooks/finance/usePendingSessionSync';
+import { usePendingSyncCount } from '../../../hooks/finance/usePendingSyncCount';
 const CaisseAuditLog = lazy(() => import('./CaisseAuditLog'));
 const WeightVerificationPanel = lazy(() => import('./WeightVerificationPanel'));
 const CaisseAccessControl = lazy(() => import('./CaisseAccessControl'));
@@ -145,6 +146,8 @@ export default function CaisseDashboard({
   const [isTxDrawerOpen, setIsTxDrawerOpen] = useState(false);
 
   // React Query for Real-time Data
+  // refetchOnReconnect/refetchOnWindowFocus: 'always' ensures session recovery
+  // after network loss, browser tab switch, or page visibility change
   const {
     data: sessionActive,
     isLoading: loadingSession,
@@ -164,7 +167,9 @@ export default function CaisseDashboard({
         return data as SessionCaisse;
       }
       return null;
-    }
+    },
+    refetchOnReconnect: 'always',
+    refetchOnWindowFocus: 'always',
   });
 
   // Hybrid sync for pending sessions (WebSocket + Polling)
@@ -282,8 +287,36 @@ export default function CaisseDashboard({
     return () => window.removeEventListener('agent-provisioning-update', handler);
   }, [refetchAgentSessions]);
 
+  // Session recovery on network reconnect (belt-and-suspenders with refetchOnReconnect)
+  useEffect(() => {
+    const handleOnline = () => {
+      refetchSession();
+      refetchPendingSession();
+      if (currentSession) {
+        refetchTransactions();
+      }
+    };
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [refetchSession, refetchPendingSession, refetchTransactions, currentSession]);
+
   // WebSocket listener for real-time loan disbursement updates
   const { socket } = useWebSocket();
+
+  // Session recovery on WebSocket reconnect
+  useEffect(() => {
+    if (!socket) return;
+    const handleOpen = () => {
+      // WebSocket just reconnected — refetch session state from server
+      refetchSession();
+      refetchPendingSession();
+      if (currentSession) {
+        refetchTransactions();
+      }
+    };
+    socket.addEventListener('open', handleOpen);
+    return () => socket.removeEventListener('open', handleOpen);
+  }, [socket, refetchSession, refetchPendingSession, refetchTransactions, currentSession]);
   useEffect(() => {
     if (!socket || !currentSession) return;
     const handleMessage = (event: MessageEvent) => {
@@ -623,6 +656,9 @@ export default function CaisseDashboard({
 
   // Check if session is in closing workflow (frozen - no new transactions allowed)
   const isClosingWorkflow = currentSession?.statut === 'CLOSING_COUNT' || currentSession?.statut === 'CLOSING_VALIDATION';
+
+  // Track pending offline operations (SW background sync queue)
+  const { pendingCount: pendingSyncCount, isSyncing } = usePendingSyncCount();
 
   const tabs = [
     { key: 'dashboard', label: 'Dashboard', icon: Activity, disabled: false },
@@ -1352,6 +1388,19 @@ export default function CaisseDashboard({
                 Les opérations sont enregistrées au nom de <strong>{supervisionInfo.targetCaissierName}</strong> avec mention "Supervisé par {supervisionInfo.supervisorName}"
               </p>
             </div>
+          </div>
+        )}
+
+        {/* Pending Sync Banner — visible when operations are queued offline */}
+        {pendingSyncCount > 0 && (
+          <div className="mx-0 mb-2 px-3 py-2 rounded-lg bg-status-warning-bg border border-status-warning/20 flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
+            <RefreshCw size={14} className={`text-status-warning shrink-0 ${isSyncing ? 'animate-spin' : ''}`} />
+            <span className="text-xs font-semibold text-status-warning">
+              {isSyncing
+                ? `Synchronisation en cours... (${pendingSyncCount} restante${pendingSyncCount > 1 ? 's' : ''})`
+                : `${pendingSyncCount} op\u00e9ration${pendingSyncCount > 1 ? 's' : ''} en attente de synchronisation`
+              }
+            </span>
           </div>
         )}
 

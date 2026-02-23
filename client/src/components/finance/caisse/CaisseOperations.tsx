@@ -687,7 +687,18 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
 
   const executeCashOperation = useCallback(async (operationData: CaisseOperationPayload, loadingId?: string | number) => {
     try {
-      await operationCaisseApi.create(operationData);
+      const result = await operationCaisseApi.create(operationData);
+
+      // Detect SW offline queue response (202 from Service Worker background sync)
+      if (result?.offline && result?.queued) {
+        if (loadingId) toast.dismiss(loadingId);
+        toast.info(
+          'Opération mise en file d\'attente (hors ligne). Elle sera synchronisée automatiquement au retour du réseau.',
+          { duration: 6000 }
+        );
+        // Don't execute secondary ops — they'll be handled on sync
+        return true;
+      }
 
       const montantAjout = typeOperation === 'Dépôt' ? parseFloat(montant) : -parseFloat(montant);
       await sessionCaisseApi.update(sessionId, { montant_ajout: montantAjout });

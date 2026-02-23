@@ -1644,6 +1644,19 @@ export const sessionCaisseApi = {
   get: (id: string) => request<any>(`/sessions-caisse/${id}`),
   getByCaissier: (caissierId: string) => requestListAll<any>(`/sessions-caisse/caissier/${caissierId}`),
   getActive: () => request<any>('/sessions-caisse/active'),
+  /**
+   * Endpoint idempotent get-or-create.
+   * - Retourne session active existante si présente (recovered: true)
+   * - Retourne session en attente si présente (pending: true)
+   * - Crée une nouvelle session si params fournis et aucune session existante
+   * - Retourne null si aucune session et pas de params de création
+   * Résiste à : double-clic, refresh, reconnexion, requêtes dupliquées.
+   */
+  ensureActive: (data?: { caisseId?: string; agenceId?: string; mode?: 'direct' | 'request'; montantDemande?: number; soldeInitial?: string; billetageOuverture?: any; observations?: string }) =>
+    request<{ session: any | null; recovered: boolean; pending: boolean }>('/sessions-caisse/ensure-active', {
+      method: 'POST',
+      body: JSON.stringify(data || {}),
+    }),
   // Récupérer les caisses assignées à l'utilisateur avec leur solde disponible
   getMyCaisses: () => request<any[]>('/sessions-caisse/my-caisses'),
   create: (data: any) => request<any>('/sessions-caisse', {
