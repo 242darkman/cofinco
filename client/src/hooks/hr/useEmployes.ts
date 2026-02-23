@@ -61,6 +61,7 @@ export interface Employe {
   // Dates contrat
   dateFinContrat?: string | null;
   dateFinEssai?: string | null;
+  dureeEssaiMois?: number | null;
   prochaineMedicale?: string | null;
   // Sortie
   typeCompte?: 'employe' | 'client' | 'both';
@@ -127,6 +128,7 @@ export interface EmployeFormData {
   // Dates contrat
   dateFinContrat?: string | null;
   dateFinEssai?: string | null;
+  dureeEssaiMois?: string | null;
   prochaineMedicale?: string | null;
   // Sortie
   dateSortie?: string | null;
@@ -208,6 +210,7 @@ export function useEmployes() {
         // Dates contrat
         dateFinContrat: item.dateFinContrat || null,
         dateFinEssai: item.dateFinEssai || null,
+        dureeEssaiMois: item.dureeEssaiMois ?? null,
         prochaineMedicale: item.prochaineMedicale || null,
         // Sortie
         dateSortie: item.dateSortie || null,

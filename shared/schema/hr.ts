@@ -1812,3 +1812,74 @@ export const insertSalaryPaymentJobSchema = createInsertSchema(salaryPaymentJobs
 });
 export type InsertSalaryPaymentJob = z.infer<typeof insertSalaryPaymentJobSchema>;
 export type SalaryPaymentJob = typeof salaryPaymentJobs.$inferSelect;
+
+// ─── Affectations multi-agences des employés ────────────────────────────────
+export const employeeAgencyAssignments = pgTable("employee_agency_assignments", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  employeId: uuid("employe_id").notNull().references(() => employes.id, { onDelete: "cascade" }),
+  agenceId: uuid("agence_id").notNull().references(() => agences.id, { onDelete: "cascade" }),
+  roleOperationnel: varchar("role_operationnel", { length: 80 }),
+  managerId: uuid("manager_id").references(() => employes.id, { onDelete: "set null" }),
+  isPrimary: boolean("is_primary").default(false),
+  dateDebut: date("date_debut").notNull(),
+  dateFin: date("date_fin"),
+  statut: varchar("statut", { length: 20 }).notNull().default("ACTIVE"),
+  motif: text("motif"),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => [
+  index("idx_eaa_employe").on(t.employeId),
+  index("idx_eaa_agence").on(t.agenceId),
+  index("idx_eaa_active").on(t.employeId, t.agenceId).where(sql`statut = 'ACTIVE'`),
+  uniqueIndex("idx_eaa_primary").on(t.employeId).where(sql`is_primary = true AND statut = 'ACTIVE'`),
+]);
+
+export const insertEmployeeAgencyAssignmentSchema = createInsertSchema(employeeAgencyAssignments).omit({
+  id: true, createdAt: true, updatedAt: true,
+});
+export type InsertEmployeeAgencyAssignment = z.infer<typeof insertEmployeeAgencyAssignmentSchema>;
+export type EmployeeAgencyAssignment = typeof employeeAgencyAssignments.$inferSelect;
+
+// ─── Rôles organisationnels globaux (PDG, DGA, etc.) ────────────────────────
+export const orgGlobalRoles = pgTable("org_global_roles", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  employeId: uuid("employe_id").notNull().references(() => employes.id, { onDelete: "cascade" }),
+  roleType: varchar("role_type", { length: 30 }).notNull(), // PDG, DGA, SECRETAIRE_GENERAL
+  titre: varchar("titre", { length: 120 }),
+  dateDebut: date("date_debut").notNull(),
+  dateFin: date("date_fin"),
+  statut: varchar("statut", { length: 20 }).notNull().default("ACTIVE"),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("idx_ogr_unique_active_role").on(t.roleType).where(sql`statut = 'ACTIVE'`),
+  index("idx_ogr_employe").on(t.employeId),
+]);
+
+export const insertOrgGlobalRoleSchema = createInsertSchema(orgGlobalRoles).omit({
+  id: true, createdAt: true, updatedAt: true,
+});
+export type InsertOrgGlobalRole = z.infer<typeof insertOrgGlobalRoleSchema>;
+export type OrgGlobalRole = typeof orgGlobalRoles.$inferSelect;
+
+// ─── Historique configuration paie ──────────────────────────────────────────
+export const payrollConfigHistory = pgTable("payroll_config_history", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  payrollConfigId: uuid("payroll_config_id").notNull().references(() => payrollConfig.id, { onDelete: "cascade" }),
+  agenceId: uuid("agence_id").references(() => agences.id, { onDelete: "cascade" }),
+  changedBy: uuid("changed_by").references(() => users.id),
+  changeType: varchar("change_type", { length: 20 }).notNull(), // CREATED, UPDATED
+  oldValues: jsonb("old_values"),
+  newValues: jsonb("new_values").notNull(),
+  reason: text("reason"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => [
+  index("idx_pch_config").on(t.payrollConfigId),
+  index("idx_pch_agence").on(t.agenceId),
+]);
+
+export const insertPayrollConfigHistorySchema = createInsertSchema(payrollConfigHistory).omit({ id: true, createdAt: true });
+export type PayrollConfigHistory = typeof payrollConfigHistory.$inferSelect;
+export type InsertPayrollConfigHistory = z.infer<typeof insertPayrollConfigHistorySchema>;

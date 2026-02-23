@@ -63,6 +63,7 @@ export const employes = pgTable("employes", {
   // Contrat & Période d'essai
   dateFinContrat: date("date_fin_contrat"),       // Date fin CDD
   dateFinEssai: date("date_fin_essai"),           // Date fin période d'essai
+  dureeEssaiMois: integer("duree_essai_mois"),    // Durée période essai en mois (auto-calcul dateFinEssai)
   prochaineMedicale: date("prochaine_medicale"),  // Prochaine visite médicale
 
   // Sortie

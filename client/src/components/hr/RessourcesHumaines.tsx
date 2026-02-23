@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { TabGroup, ConfirmDialog, PageHeader, FeatureHeader, FEATURE_DESCRIPTIONS } from '../ui';
-import { Users, Calendar, UserPlus, AlertTriangle, Gift, GraduationCap, ClipboardCheck, Building2, FileText, Upload, BarChart3, Star, Briefcase, FileBarChart, FolderOpen, Clock } from 'lucide-react';
+import { Users, Calendar, UserPlus, AlertTriangle, Gift, GraduationCap, ClipboardCheck, Building2, FileText, Upload, BarChart3, Star, Briefcase, FileBarChart, FolderOpen, Clock, Crown } from 'lucide-react';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { useAppNavigation } from '../../hooks/useAppNavigation';
 
@@ -32,6 +32,7 @@ import PositionManager from './PositionManager';
 import HrReportsTab from './HrReportsTab';
 import MesDocumentsTab from './MesDocumentsTab';
 import TempsProjetManager from './TempsProjetManager';
+import DirectionGeneralePanel from './DirectionGeneralePanel';
 
 const TABS = [
   { key: 'dashboard', label: 'Tableau de bord', icon: BarChart3 },
@@ -48,7 +49,8 @@ const TABS = [
   { key: 'rapports', label: 'Rapports', icon: FileBarChart },
   { key: 'temps-projet', label: 'Temps Projet', icon: Clock },
   { key: 'mes-documents', label: 'Documents', icon: FolderOpen },
-  { key: 'organigramme', label: 'Organigramme', icon: Building2 }
+  { key: 'organigramme', label: 'Organigramme', icon: Building2 },
+  { key: 'direction-generale', label: 'Direction', icon: Crown }
 ];
 
 type TabKey = typeof TABS[number]['key'];
@@ -57,10 +59,17 @@ export default function RessourcesHumaines() {
   // RBAC permissions
   const { hasPermission } = usePermissions();
   const canCreateEmployes = hasPermission('rh', 'create') || hasPermission('employes', 'create');
+  const canManageDirection = hasPermission('rh', 'manage') || hasPermission('admin', 'manage');
+
+  // Filter tabs based on permissions
+  const visibleTabs = useMemo(() =>
+    TABS.filter(t => t.key !== 'direction-generale' || canManageDirection),
+    [canManageDirection]
+  );
 
   // Tab dérivé de l'URL (sous-module) — refresh-safe et deep-linkable
   const { currentSubModule, navigateToModule } = useAppNavigation();
-  const VALID_TABS = TABS.map(t => t.key);
+  const VALID_TABS = visibleTabs.map(t => t.key);
   const activeTab = useMemo<TabKey>(() => {
     if (currentSubModule && VALID_TABS.includes(currentSubModule)) {
       return currentSubModule as TabKey;
@@ -322,6 +331,9 @@ export default function RessourcesHumaines() {
       case 'organigramme':
         return <OrganigrammeView employes={employes} />;
 
+      case 'direction-generale':
+        return <DirectionGeneralePanel />;
+
       default:
         return null;
     }
@@ -371,7 +383,7 @@ export default function RessourcesHumaines() {
         />
 
         <TabGroup
-          tabs={TABS}
+          tabs={visibleTabs}
           activeTab={activeTab}
           onTabChange={(key) => setActiveTab(key as TabKey)}
           variant="underline"
@@ -438,6 +450,7 @@ export default function RessourcesHumaines() {
           // Dates contrat
           dateFinContrat: editingEmploye.dateFinContrat || null,
           dateFinEssai: editingEmploye.dateFinEssai || null,
+          dureeEssaiMois: editingEmploye.dureeEssaiMois ? String(editingEmploye.dureeEssaiMois) : null,
           prochaineMedicale: editingEmploye.prochaineMedicale || null,
           // Situation familiale
           situationFamiliale: editingEmploye.situationFamiliale || undefined,

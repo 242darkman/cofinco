@@ -185,18 +185,38 @@ export default function EmployeeForm({
     return false;
   }, [allEmployes, editingEmploye?.id]);
 
-  const availableManagers = useMemo(() => {
-    return allEmployes
-      .filter(emp =>
-        emp.id !== editingEmploye?.id &&
-        emp.statut === StatutUser.ACTIVE &&
-        !wouldCreateCircularReference(emp.id)
-      )
-      .map(emp => ({
-        value: emp.id,
-        label: `${emp.nom} ${emp.prenom} - ${emp.poste}`,
-      }));
-  }, [allEmployes, editingEmploye?.id, wouldCreateCircularReference]);
+  // Fetch eligible managers filtered by selected agency (includes global roles)
+  const [eligibleManagers, setEligibleManagers] = useState<Array<{ value: string; label: string }>>([]);
+
+  useEffect(() => {
+    const currentAgenceId = agenceId || formData.agenceId;
+    if (!currentAgenceId) {
+      // Fallback: use allEmployes when no agency selected
+      setEligibleManagers(
+        allEmployes
+          .filter(emp => emp.id !== editingEmploye?.id && emp.statut === StatutUser.ACTIVE)
+          .map(emp => ({ value: emp.id, label: `${emp.nom} ${emp.prenom} - ${emp.poste}` }))
+      );
+      return;
+    }
+    fetch(`/api/employes/eligible-managers?agenceId=${currentAgenceId}`, { credentials: 'include' })
+      .then(res => res.ok ? res.json() : [])
+      .then((data: any[]) => {
+        setEligibleManagers(
+          data
+            .filter(m => m.id !== editingEmploye?.id)
+            .map(m => ({ value: m.id, label: `${m.nom} ${m.prenom} - ${m.poste}` }))
+        );
+      })
+      .catch(() => {
+        // Fallback to local list
+        setEligibleManagers(
+          allEmployes
+            .filter(emp => emp.id !== editingEmploye?.id && emp.statut === StatutUser.ACTIVE)
+            .map(emp => ({ value: emp.id, label: `${emp.nom} ${emp.prenom} - ${emp.poste}` }))
+        );
+      });
+  }, [agenceId, formData.agenceId, editingEmploye?.id, allEmployes]);
 
   // --- Update field ---
   const updateField = useCallback((field: string, value: string | null) => {
@@ -742,7 +762,7 @@ export default function EmployeeForm({
             setSelectedDepartmentId={setSelectedDepartmentId}
             selectedJobPositionId={selectedJobPositionId}
             setSelectedJobPositionId={setSelectedJobPositionId}
-            availableManagers={availableManagers}
+            availableManagers={eligibleManagers}
             validationErrors={validationErrors}
           />
         );

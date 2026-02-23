@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Menu, X, Clock } from 'lucide-react';
 import IconButton from '../ui/IconButton';
 import { OfflineIndicator } from '../shared/OfflineIndicator';
+import AgencySwitcher from './AgencySwitcher';
 
 interface AgentHeaderProps {
   agent: {
@@ -45,6 +46,7 @@ export default function AgentHeader({
       </div>
       <div className="flex items-center gap-3">
         <OfflineIndicator />
+        <AgencySwitcher />
         <div className="flex items-center gap-2 px-3 py-2 bg-surface-elevated/50 rounded-lg">
           <Clock size={16} className="text-content-muted" />
           <span className="text-sm text-content-secondary">

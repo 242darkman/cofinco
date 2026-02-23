@@ -64,14 +64,14 @@ export default function TransferAgenceModal({ employee, onClose, onSuccess }: Tr
     })();
   }, [employee.agenceId]);
 
-  // Fetch managers of target agency when it changes (custom mode)
+  // Fetch eligible managers for target agency (includes global roles like PDG/DGA)
   useEffect(() => {
     if (!targetAgenceId || mode !== 'custom') return;
 
     setLoadingManagers(true);
     (async () => {
       try {
-        const res = await fetch(`/api/employes?agenceId=${targetAgenceId}`, { credentials: 'include' });
+        const res = await fetch(`/api/employes/eligible-managers?agenceId=${targetAgenceId}`, { credentials: 'include' });
         if (res.ok) {
           const data: any[] = await res.json();
           setManagers(
@@ -81,7 +81,7 @@ export default function TransferAgenceModal({ employee, onClose, onSuccess }: Tr
                 id: e.id,
                 nom: e.nom,
                 prenom: e.prenom,
-                poste: e.poste || e.jobPosition?.name || '-',
+                poste: e.poste || '-',
               }))
           );
         }

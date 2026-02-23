@@ -12,7 +12,7 @@
  * - deleteEmploye: soft delete user + suppression rôles
  */
 
-import { employes, users, userRoles, jobPositions, departments, agences, agentsTerrain, userAgences, sessionsCaisse, hrAuditLog, pays } from "@shared/schema";
+import { employes, users, userRoles, jobPositions, departments, agences, agentsTerrain, userAgences, sessionsCaisse, hrAuditLog, pays, employeeAgencyAssignments } from "@shared/schema";
 import { type Employe, type InsertEmploye, type User, type EmployeWithUser } from "@shared/schema";
 import { SystemRole } from "@shared/types/roles";
 import { StatutUser } from "@shared/enum/status-constants";
@@ -767,6 +767,29 @@ export async function transferEmployeToAgence(
       isPrimary: true,
       dateAffectation: options?.effectiveDate || new Date().toISOString().slice(0, 10),
       actif: true,
+    });
+
+    // 7b. Sync employee_agency_assignments: end old primary, create new primary
+    const effDate = options?.effectiveDate || new Date().toISOString().slice(0, 10);
+    if (fromAgenceId) {
+      await tx.update(employeeAgencyAssignments)
+        .set({ statut: 'ENDED', dateFin: effDate, isPrimary: false, updatedAt: new Date() })
+        .where(and(
+          eq(employeeAgencyAssignments.employeId, employeId),
+          eq(employeeAgencyAssignments.agenceId, fromAgenceId),
+          eq(employeeAgencyAssignments.statut, 'ACTIVE'),
+          eq(employeeAgencyAssignments.isPrimary, true)
+        ));
+    }
+    await tx.insert(employeeAgencyAssignments).values({
+      employeId,
+      agenceId: targetAgenceId,
+      isPrimary: true,
+      dateDebut: effDate,
+      managerId: options?.managerId || currentEmploye.managerId,
+      statut: 'ACTIVE',
+      motif: options?.reason || 'Transfert inter-agence',
+      createdBy: actorUserId,
     });
 
     // 8. Mettre à jour le rôle principal pour la nouvelle agence

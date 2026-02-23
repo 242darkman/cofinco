@@ -3,13 +3,14 @@ import { z } from "zod";
 import { createLogger } from "../lib/logger";
 
 const logger = createLogger('Routes:Employes');
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { db } from "../db";
-import { users, employes, agentsTerrain, userRoles } from "@shared/schema";
+import { users, employes, agentsTerrain, userRoles, employeeAgencyAssignments } from "@shared/schema";
 import { SystemRole } from "@shared/types/roles"; // Still needed for role enum values
 import { StatutUser } from "@shared/enum/status-constants";
 import { storage } from "../storage";
 import { generateMatricule } from "../storage/employes";
+import { getEmployeeAssignments, createEmployeeAssignment, updateEmployeeAssignment, endEmployeeAssignment, getEligibleManagers } from "../storage/hr";
 import { requireAuth, hashPassword } from "../auth";
 import { attachAbility, requireAbility } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
@@ -102,6 +103,10 @@ const createEmployeWithUserSchema = z.object({
   // Dates clés contrat
   dateFinContrat: z.string().optional().nullable(),
   dateFinEssai: z.string().optional().nullable(),
+  dureeEssaiMois: z.union([z.number(), z.string()]).optional().nullable().transform((val) => {
+    if (val === undefined || val === null || val === '') return undefined;
+    return typeof val === 'number' ? val : parseInt(val) || undefined;
+  }),
   prochaineMedicale: z.string().optional().nullable(),
   // Agent Terrain specific fields (optional, used when role === AGENT_TERRAIN)
   zonesAffectation: z.array(z.string()).optional(),
@@ -165,6 +170,10 @@ const updateEmployeWithUserSchema = z.object({
   // Dates clés contrat
   dateFinContrat: z.string().optional().nullable(),
   dateFinEssai: z.string().optional().nullable(),
+  dureeEssaiMois: z.union([z.number(), z.string()]).optional().nullable().transform((val) => {
+    if (val === undefined || val === null || val === '') return undefined;
+    return typeof val === 'number' ? val : parseInt(val) || undefined;
+  }),
   prochaineMedicale: z.string().optional().nullable(),
   // Sortie
   dateSortie: z.string().optional().nullable(),
@@ -439,7 +448,15 @@ export function registerEmployesRoutes(app: Express) {
           statut: StatutUser.ACTIVE,
         } as any).returning();
 
-        // 2. Créer l'employé lié (sans roleSystem - géré par userRoles)
+        // 2. Auto-calc dateFinEssai si CDD avec dureeEssaiMois
+        let computedDateFinEssai = data.dateFinEssai || null;
+        if (data.typeContrat === 'CDD' && data.dureeEssaiMois && data.dateEmbauche) {
+          const start = new Date(data.dateEmbauche);
+          start.setMonth(start.getMonth() + Number(data.dureeEssaiMois));
+          computedDateFinEssai = start.toISOString().split('T')[0];
+        }
+
+        // 3. Créer l'employé lié (sans roleSystem - géré par userRoles)
         const [employe] = await tx.insert(employes).values({
           userId: user.id,
           matricule,
@@ -468,18 +485,31 @@ export function registerEmployesRoutes(app: Express) {
           nombreEnfantsCharge: data.nombreEnfantsCharge ?? 0,
           niu: data.niu || null,
           dateFinContrat: data.dateFinContrat || null,
-          dateFinEssai: data.dateFinEssai || null,
+          dateFinEssai: computedDateFinEssai,
+          dureeEssaiMois: data.dureeEssaiMois ? Number(data.dureeEssaiMois) : null,
           prochaineMedicale: data.prochaineMedicale || null,
           statut: StatutUser.ACTIVE,
         }).returning();
 
-        // 3. Créer le rôle dans userRoles (Architecture V3)
+        // 4. Créer le rôle dans userRoles (Architecture V3)
         await tx.insert(userRoles).values({
           userId: user.id,
           role: resolvedRole,
           agenceId: data.agenceId || null,
           isPrimary: true,
         });
+
+        // 5. Créer l'affectation agence automatique (multi-agence)
+        if (data.agenceId) {
+          await tx.insert(employeeAgencyAssignments).values({
+            employeId: employe.id,
+            agenceId: data.agenceId,
+            isPrimary: true,
+            dateDebut: data.dateEmbauche || new Date().toISOString().split('T')[0],
+            managerId: data.managerId || null,
+            statut: 'ACTIVE',
+          });
+        }
 
         // 4. Si le rôle est AGENT_TERRAIN, créer l'entrée agents_terrain (synchrone dans la transaction)
         if (resolvedRole === SystemRole.AGENT_TERRAIN) {
@@ -636,6 +666,17 @@ export function registerEmployesRoutes(app: Express) {
       if (data.niu !== undefined) employeData.niu = data.niu || null;
       if (data.dateFinContrat !== undefined) employeData.dateFinContrat = data.dateFinContrat || null;
       if (data.dateFinEssai !== undefined) employeData.dateFinEssai = data.dateFinEssai || null;
+      if (data.dureeEssaiMois !== undefined) {
+        employeData.dureeEssaiMois = data.dureeEssaiMois ?? null;
+        // Auto-calc dateFinEssai if CDD with dureeEssaiMois
+        const typeContrat = data.typeContrat || existingEmploye.typeContrat;
+        const embauche = data.dateEmbauche || existingEmploye.dateEmbauche;
+        if (typeContrat === 'CDD' && data.dureeEssaiMois && embauche) {
+          const start = new Date(embauche);
+          start.setMonth(start.getMonth() + Number(data.dureeEssaiMois));
+          employeData.dateFinEssai = start.toISOString().split('T')[0];
+        }
+      }
       if (data.prochaineMedicale !== undefined) employeData.prochaineMedicale = data.prochaineMedicale || null;
       if (data.dateSortie !== undefined) employeData.dateSortie = data.dateSortie || null;
       if (data.motifSortie !== undefined) employeData.motifSortie = data.motifSortie || null;
@@ -913,6 +954,131 @@ export function registerEmployesRoutes(app: Express) {
     } catch (error) {
       logger.error({ err: error }, 'Error creating employe from user');
       res.status(500).json({ message: "Erreur lors de la création du profil employé" });
+    }
+  });
+
+  // ============================================
+  // GET - Managers éligibles pour une agence
+  // ============================================
+  app.get("/api/employes/eligible-managers", requireAuth, attachAbility, async (req, res) => {
+    try {
+      const agenceId = req.query.agenceId as string;
+      if (!agenceId) return res.status(400).json({ error: "agenceId requis" });
+
+      const managers = await getEligibleManagers(agenceId);
+      res.json(managers);
+    } catch (error) {
+      logger.error({ err: error }, 'Error fetching eligible managers');
+      res.status(500).json({ message: "Erreur lors de la récupération des managers éligibles" });
+    }
+  });
+
+  // ============================================
+  // GET - Affectations d'un employé
+  // ============================================
+  app.get("/api/employes/:id/assignments", requireAuth, attachAbility, async (req, res) => {
+    try {
+      const assignments = await getEmployeeAssignments(req.params.id);
+      res.json(assignments);
+    } catch (error) {
+      logger.error({ err: error }, 'Error fetching assignments');
+      res.status(500).json({ message: "Erreur lors de la récupération des affectations" });
+    }
+  });
+
+  // ============================================
+  // POST - Créer une affectation
+  // ============================================
+  app.post("/api/employes/:id/assignments", attachAbility, requireAbility(Actions.MANAGE, Subjects.EMPLOYE), async (req, res) => {
+    try {
+      const employeId = req.params.id;
+      const existingEmploye = await storage.getEmploye(employeId);
+      if (!existingEmploye) return res.status(404).json({ message: "Employé non trouvé" });
+
+      const schema = z.object({
+        agenceId: z.string().uuid(),
+        roleOperationnel: z.string().optional().nullable(),
+        managerId: z.string().uuid().optional().nullable(),
+        isPrimary: z.boolean().optional().default(false),
+        dateDebut: z.string(),
+        motif: z.string().optional().nullable(),
+      });
+
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ errors: parsed.error.errors });
+
+      // Validate target agency exists and is ACTIVE
+      const { agences: agencesTable } = await import("@shared/schema");
+      const [targetAgence] = await db.select().from(agencesTable).where(eq(agencesTable.id, parsed.data.agenceId));
+      if (!targetAgence) return res.status(404).json({ message: "Agence non trouvée" });
+      if (targetAgence.statut !== 'ACTIVE') return res.status(400).json({ message: "L'agence cible n'est pas active" });
+
+      const assignment = await createEmployeeAssignment({
+        employeId,
+        agenceId: parsed.data.agenceId,
+        roleOperationnel: parsed.data.roleOperationnel || null,
+        managerId: parsed.data.managerId || null,
+        isPrimary: parsed.data.isPrimary,
+        dateDebut: parsed.data.dateDebut,
+        motif: parsed.data.motif || null,
+        statut: 'ACTIVE',
+        createdBy: req.session?.user?.id || null,
+      });
+
+      await logAudit(req, "CREATE_ASSIGNMENT", "employee_agency_assignment", assignment.id,
+        { employeId, agenceId: parsed.data.agenceId }, "success", "medium");
+
+      res.status(201).json(assignment);
+    } catch (error) {
+      logger.error({ err: error }, 'Error creating assignment');
+      res.status(500).json({ message: "Erreur lors de la création de l'affectation" });
+    }
+  });
+
+  // ============================================
+  // PUT - Modifier une affectation
+  // ============================================
+  app.put("/api/employes/:id/assignments/:assignId", attachAbility, requireAbility(Actions.MANAGE, Subjects.EMPLOYE), async (req, res) => {
+    try {
+      const schema = z.object({
+        roleOperationnel: z.string().optional().nullable(),
+        managerId: z.string().uuid().optional().nullable(),
+        isPrimary: z.boolean().optional(),
+        dateFin: z.string().optional().nullable(),
+        motif: z.string().optional().nullable(),
+      });
+
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ errors: parsed.error.errors });
+
+      const updated = await updateEmployeeAssignment(req.params.assignId, parsed.data);
+      if (!updated) return res.status(404).json({ message: "Affectation non trouvée" });
+
+      await logAudit(req, "UPDATE_ASSIGNMENT", "employee_agency_assignment", req.params.assignId,
+        parsed.data, "success", "medium");
+
+      res.json(updated);
+    } catch (error) {
+      logger.error({ err: error }, 'Error updating assignment');
+      res.status(500).json({ message: "Erreur lors de la mise à jour de l'affectation" });
+    }
+  });
+
+  // ============================================
+  // DELETE - Terminer une affectation (soft)
+  // ============================================
+  app.delete("/api/employes/:id/assignments/:assignId", attachAbility, requireAbility(Actions.MANAGE, Subjects.EMPLOYE), async (req, res) => {
+    try {
+      const ended = await endEmployeeAssignment(req.params.assignId);
+      if (!ended) return res.status(404).json({ message: "Affectation non trouvée" });
+
+      await logAudit(req, "END_ASSIGNMENT", "employee_agency_assignment", req.params.assignId,
+        { employeId: req.params.id }, "success", "medium");
+
+      res.json(ended);
+    } catch (error) {
+      logger.error({ err: error }, 'Error ending assignment');
+      res.status(500).json({ message: "Erreur lors de la fin de l'affectation" });
     }
   });
 }

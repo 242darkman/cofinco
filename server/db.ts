@@ -2577,6 +2577,24 @@ export async function ensureCustomFunctions(): Promise<void> {
     console.log('[DB] ✓ Performance indexes on sessions_caisse (7 indexes)');
     objectCount += 7;
 
+    // ─── Backfill employee_agency_assignments depuis employes.agenceId ────────
+    await pool.query(`
+      INSERT INTO employee_agency_assignments (employe_id, agence_id, is_primary, date_debut, manager_id, statut)
+      SELECT e.id, e.agence_id, true,
+             COALESCE(e.date_embauche, CURRENT_DATE),
+             e.manager_id,
+             'ACTIVE'
+      FROM employes e
+      WHERE e.agence_id IS NOT NULL
+        AND e.statut = 'ACTIVE'
+        AND NOT EXISTS (
+          SELECT 1 FROM employee_agency_assignments eaa
+          WHERE eaa.employe_id = e.id AND eaa.agence_id = e.agence_id AND eaa.statut = 'ACTIVE'
+        )
+    `);
+    console.log('[DB] ✓ Backfill employee_agency_assignments (idempotent)');
+    objectCount += 1;
+
     console.log(`[DB] All ${objectCount} custom functions, triggers, and views ensured in ${Date.now() - start}ms`);
   } catch (error) {
     console.error('[DB] Error ensuring custom functions:', error);

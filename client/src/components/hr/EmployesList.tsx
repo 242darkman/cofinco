@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { 
-  Search, Filter, MoreVertical, 
+import React, { useState, useEffect } from 'react';
+import {
+  Search, Filter, MoreVertical,
   Briefcase, Building2, Phone, Eye, EyeOff,
   FileText, UserX, Ban, PenLine
 } from 'lucide-react';
@@ -38,6 +38,21 @@ export default function EmployesList({
   const canEditEmployees = hasPermission('rh', 'edit') || hasPermission('users', 'edit');
   const canDeleteEmployees = hasPermission('rh', 'delete') || hasPermission('users', 'delete');
 
+  // Agency filter
+  const [filterAgence, setFilterAgence] = useState<string>('all');
+  const [agencyOptions, setAgencyOptions] = useState<Array<{ id: string; nom: string }>>([]);
+
+  useEffect(() => {
+    fetch('/api/auth/my-agencies', { credentials: 'include' })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.agencies?.length > 1) {
+          setAgencyOptions(data.agencies.map((a: any) => ({ id: a.agenceId, nom: a.agenceNom })));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   // State
   const [showSalaries, setShowSalaries] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -59,6 +74,7 @@ export default function EmployesList({
   const filteredEmployes = employes.filter(emp => {
     if (filterStatus !== 'all' && emp.statut !== filterStatus) return false;
     if (filterContrat !== 'all' && emp.typeContrat !== filterContrat) return false;
+    if (filterAgence !== 'all' && emp.agenceId !== filterAgence) return false;
     return true;
   });
   
@@ -164,7 +180,7 @@ export default function EmployesList({
              {/* Same Filters Content */}
              <div className="flex-1">
                <label className="text-xs text-content-muted uppercase mb-2 block">Statut</label>
-               <select 
+               <select
                  value={filterStatus}
                  onChange={(e) => setFilterStatus(e.target.value)}
                  className="w-full bg-surface-base border border-edge rounded-lg px-3 py-2 text-content-secondary focus:ring-2 focus:ring-accent focus:outline-none"
@@ -178,7 +194,7 @@ export default function EmployesList({
              </div>
              <div className="flex-1">
                <label className="text-xs text-content-muted uppercase mb-2 block">Type de contrat</label>
-               <select 
+               <select
                  value={filterContrat}
                  onChange={(e) => setFilterContrat(e.target.value)}
                  className="w-full bg-surface-base border border-edge rounded-lg px-3 py-2 text-content-secondary focus:ring-2 focus:ring-accent focus:outline-none"
@@ -191,9 +207,24 @@ export default function EmployesList({
                  <option value="Temporaire">Temporaire</option>
                </select>
              </div>
+             {agencyOptions.length > 1 && (
+               <div className="flex-1">
+                 <label className="text-xs text-content-muted uppercase mb-2 block">Agence</label>
+                 <select
+                   value={filterAgence}
+                   onChange={(e) => setFilterAgence(e.target.value)}
+                   className="w-full bg-surface-base border border-edge rounded-lg px-3 py-2 text-content-secondary focus:ring-2 focus:ring-accent focus:outline-none"
+                 >
+                   <option value="all">Toutes les agences</option>
+                   {agencyOptions.map(a => (
+                     <option key={a.id} value={a.id}>{a.nom}</option>
+                   ))}
+                 </select>
+               </div>
+             )}
              <div className="flex items-end">
                <button
-                 onClick={() => { setFilterStatus('all'); setFilterContrat('all'); }}
+                 onClick={() => { setFilterStatus('all'); setFilterContrat('all'); setFilterAgence('all'); }}
                  className="px-4 py-2 text-content-muted hover:text-content-primary border border-edge rounded-lg bg-surface-base text-sm transition-colors"
                >
                  Réinitialiser
@@ -259,7 +290,12 @@ export default function EmployesList({
                         <div className="font-bold text-content-primary text-xs group-hover:text-accent transition-colors">
                           {emp.nom} {emp.prenom}
                         </div>
-                        <div className="text-[10px] text-content-muted font-mono">{emp.matricule}</div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] text-content-muted font-mono">{emp.matricule}</span>
+                          {emp.agence?.nom && (
+                            <span className="text-[9px] text-content-muted/70 truncate max-w-[100px]">• {emp.agence.nom}</span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </td>

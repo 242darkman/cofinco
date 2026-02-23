@@ -2844,10 +2844,10 @@ hrRouter.post("/paie/generate", getAuthUser, attachAbility, requireAbility(Actio
     }
 });
 
-// GET /api/hr/paie/config - Configuration de la paie
+// GET /api/hr/paie/config - Configuration de la paie (supports ?agenceId=X for multi-agency)
 hrRouter.get("/paie/config", getAuthUser, attachAbility, async (req, res) => {
   try {
-    const agenceId = req.user?.agenceId;
+    const agenceId = (req.query.agenceId as string) || req.user?.agenceId;
     // Try agency-specific config first, then global
     let config = null;
     if (agenceId) {
@@ -2968,6 +2968,16 @@ hrRouter.put("/paie/config", getAuthUser, attachAbility, requireAbility(Actions.
         })
         .returning();
     }
+
+    // Log config change to history
+    await hrStorage.logPayrollConfigChange({
+      payrollConfigId: result.id,
+      agenceId: agenceId || null,
+      changedBy: user.id,
+      changeType: existing ? 'UPDATED' : 'CREATED',
+      oldValues: existing || null,
+      newValues: result,
+    });
 
     // Broadcast update
     broadcastHrUpdate({ entity: 'paie', action: existing ? 'updated' : 'created', id: result.id });
@@ -4524,10 +4534,11 @@ hrRouter.get("/attendance/export/:employeId", getAuthUser, attachAbility, async 
  * ========================================
  */
 
-// GET /api/hr/organigramme - Structure hiérarchique
+// GET /api/hr/organigramme - Structure hiérarchique (supports ?agenceId=X for multi-agency)
 hrRouter.get("/organigramme", getAuthUser, attachAbility, async (req, res) => {
     try {
-        const agenceId = req.user?.agenceId || undefined; // Filter by user's agency
+        // Accept agenceId from query param (for multi-agency users) or fallback to session
+        const agenceId = (req.query.agenceId as string) || req.user?.agenceId || undefined;
         const orgChart = await storage.getOrganigramme(agenceId);
         res.json(orgChart);
     } catch (error) {
@@ -4600,6 +4611,133 @@ hrRouter.patch("/organigramme/reassign", getAuthUser, attachAbility, async (req,
         res.json({ success: true });
     } catch (error) {
         logger.error({ err: error }, 'Erreur reassign organigramme');
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+/**
+ * ========================================
+ * DIRECTION GÉNÉRALE (PDG, DGA - Rôles globaux)
+ * ========================================
+ */
+
+// GET /api/hr/direction-generale - Liste des rôles globaux
+hrRouter.get("/direction-generale", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        const includeHistory = req.query.history === 'true';
+        const roles = includeHistory
+            ? await hrStorage.getGlobalRolesHistory()
+            : await hrStorage.getActiveGlobalRoles();
+        res.json(roles);
+    } catch (error) {
+        logger.error({ err: error }, 'Erreur récupération direction générale');
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// POST /api/hr/direction-generale - Définir un rôle global (PDG, DGA, etc.)
+hrRouter.post("/direction-generale", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        // Only Admin or DirecteurGeneral can manage global roles
+        const canManage = req.ability?.can(Actions.MANAGE, Subjects.RH) || false;
+        if (!canManage) return res.status(403).json({ error: "Non autorisé" });
+
+        const schema = z.object({
+            employeId: z.string().uuid(),
+            roleType: z.enum(['PDG', 'DGA', 'SECRETAIRE_GENERAL', 'DIRECTEUR_FINANCIER']),
+            titre: z.string().optional().nullable(),
+            dateDebut: z.string(),
+        });
+        const parsed = schema.safeParse(req.body);
+        if (!parsed.success) return res.status(400).json({ errors: parsed.error.errors });
+
+        const role = await hrStorage.createGlobalRole({
+            employeId: parsed.data.employeId,
+            roleType: parsed.data.roleType,
+            titre: parsed.data.titre || null,
+            dateDebut: parsed.data.dateDebut,
+            statut: 'ACTIVE',
+            createdBy: req.user?.id || null,
+        });
+
+        await hrService.logAction({
+            entityType: 'org_global_role',
+            entityId: role.id,
+            action: 'created',
+            actorUserId: req.user?.id || null,
+            actorName: req.user?.nom || null,
+            actorRole: req.user?.role || null,
+            newValues: parsed.data,
+            severity: 'critical',
+        });
+
+        res.status(201).json(role);
+    } catch (error: any) {
+        if (error.constraint === 'idx_ogr_unique_active_role') {
+            return res.status(409).json({ error: "Un rôle de ce type est déjà actif. Révoquez-le d'abord." });
+        }
+        logger.error({ err: error }, 'Erreur création rôle global');
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// PUT /api/hr/direction-generale/:id - Modifier un rôle global
+hrRouter.put("/direction-generale/:id", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        const canManage = req.ability?.can(Actions.MANAGE, Subjects.RH) || false;
+        if (!canManage) return res.status(403).json({ error: "Non autorisé" });
+
+        const schema = z.object({
+            titre: z.string().optional().nullable(),
+            dateDebut: z.string().optional(),
+        });
+        const parsed = schema.safeParse(req.body);
+        if (!parsed.success) return res.status(400).json({ errors: parsed.error.errors });
+
+        const updated = await hrStorage.updateGlobalRole(req.params.id, parsed.data);
+        if (!updated) return res.status(404).json({ error: "Rôle non trouvé" });
+
+        await hrService.logAction({
+            entityType: 'org_global_role',
+            entityId: req.params.id,
+            action: 'updated',
+            actorUserId: req.user?.id || null,
+            actorName: req.user?.nom || null,
+            actorRole: req.user?.role || null,
+            newValues: parsed.data,
+            severity: 'critical',
+        });
+
+        res.json(updated);
+    } catch (error) {
+        logger.error({ err: error }, 'Erreur mise à jour rôle global');
+        res.status(500).json({ error: "Erreur serveur" });
+    }
+});
+
+// DELETE /api/hr/direction-generale/:id - Révoquer un rôle global (soft)
+hrRouter.delete("/direction-generale/:id", getAuthUser, attachAbility, async (req, res) => {
+    try {
+        const canManage = req.ability?.can(Actions.MANAGE, Subjects.RH) || false;
+        if (!canManage) return res.status(403).json({ error: "Non autorisé" });
+
+        const revoked = await hrStorage.revokeGlobalRole(req.params.id);
+        if (!revoked) return res.status(404).json({ error: "Rôle non trouvé" });
+
+        await hrService.logAction({
+            entityType: 'org_global_role',
+            entityId: req.params.id,
+            action: 'revoked',
+            actorUserId: req.user?.id || null,
+            actorName: req.user?.nom || null,
+            actorRole: req.user?.role || null,
+            newValues: { statut: 'REVOKED' },
+            severity: 'critical',
+        });
+
+        res.json(revoked);
+    } catch (error) {
+        logger.error({ err: error }, 'Erreur révocation rôle global');
         res.status(500).json({ error: "Erreur serveur" });
     }
 });

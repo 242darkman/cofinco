@@ -17,6 +17,9 @@ import {
   jobOffers, payrollPaymentBatches, payrollBatchItems,
   bankReconciliationSessions, bankReconciliationLines,
   projetsRh, projetMembres, feuillesTemps, tempsImputes,
+  employeeAgencyAssignments, orgGlobalRoles, payrollConfigHistory,
+  type EmployeeAgencyAssignment, type InsertEmployeeAgencyAssignment,
+  type OrgGlobalRole, type InsertOrgGlobalRole,
   type EvaluationTemplate, type InsertEvaluationTemplate,
   type EvaluationCriteria as EvalCriteria, type InsertEvaluationCriteria,
   type EvaluationCampaign, type InsertEvaluationCampaign,
@@ -26,6 +29,7 @@ import {
   type InsertHrDocumentRequest, type HrDocumentRequest,
   type InsertProjetRh, type InsertProjetMembre, type InsertFeuilleTemps, type InsertTempsImpute,
 } from "@shared/schema";
+import { agences } from "@shared/schema";
 import { StatutUser, StatutConge, StatutCandidature, StatutPresence, StatutBulletin, ModeCalculPaie } from "@shared/enum/status-constants";
 
 // Demandes de Congés
@@ -558,7 +562,7 @@ export async function generateMonthlyPaie(mois: string, genereParId?: string): P
 }
 
 // Organigramme Hiérarchique
-interface OrgNode {
+export interface OrgNode {
     id: string;
     nom: string;
     prenom: string;
@@ -566,12 +570,42 @@ interface OrgNode {
     departement: string;
     email?: string;
     photoProfile?: string;
+    isGlobalRole?: boolean;
+    globalRoleType?: string;
     subordinates: OrgNode[];
 }
 
 export async function getOrganigramme(agenceId?: string): Promise<OrgNode[]> {
-    // Fetch all active employees with user data, filtered by agency if provided
-    // Join with jobPositions and departments to get poste and departement names
+    // 1. Load active PDG from org_global_roles
+    const [activePdg] = await db.select({
+        employeId: orgGlobalRoles.employeId,
+        roleType: orgGlobalRoles.roleType,
+        titre: orgGlobalRoles.titre,
+    }).from(orgGlobalRoles)
+      .where(and(eq(orgGlobalRoles.statut, 'ACTIVE'), eq(orgGlobalRoles.roleType, 'PDG')))
+      .limit(1);
+
+    // 2. Fetch employees - if agenceId provided, use assignments table
+    let employeeFilter;
+    if (agenceId) {
+        // Use employee_agency_assignments for multi-agency support
+        const assignedIds = db.select({ employeId: employeeAgencyAssignments.employeId })
+            .from(employeeAgencyAssignments)
+            .where(and(
+                eq(employeeAgencyAssignments.agenceId, agenceId),
+                eq(employeeAgencyAssignments.statut, 'ACTIVE')
+            ));
+        employeeFilter = and(
+            eq(users.statut, StatutUser.ACTIVE),
+            or(
+                inArray(employes.id, assignedIds),
+                eq(employes.agenceId, agenceId) // backward compat
+            )
+        );
+    } else {
+        employeeFilter = eq(users.statut, StatutUser.ACTIVE);
+    }
+
     const employeesData = await db.select({
         employeId: employes.id,
         userId: users.id,
@@ -588,19 +622,62 @@ export async function getOrganigramme(agenceId?: string): Promise<OrgNode[]> {
     .innerJoin(users, eq(employes.userId, users.id))
     .leftJoin(jobPositions, eq(employes.jobPositionId, jobPositions.id))
     .leftJoin(departments, eq(jobPositions.departmentId, departments.id))
-    .where(agenceId
-        ? and(eq(users.statut, StatutUser.ACTIVE), eq(employes.agenceId, agenceId))
-        : eq(users.statut, StatutUser.ACTIVE)
-    );
+    .where(employeeFilter);
 
-    // Build map for quick lookup
-    const employeeMap = new Map<string, any>();
-    employeesData.forEach(emp => employeeMap.set(emp.employeId, { ...emp, subordinates: [] }));
+    // 3. If PDG exists and is not in the employee list, fetch PDG data
+    let pdgNode: OrgNode | null = null;
+    if (activePdg) {
+        const pdgInList = employeesData.find(e => e.employeId === activePdg.employeId);
+        if (pdgInList) {
+            pdgNode = {
+                id: pdgInList.employeId,
+                nom: pdgInList.nom,
+                prenom: pdgInList.prenom || '',
+                poste: activePdg.titre || 'Président Directeur Général',
+                departement: 'Direction Générale',
+                email: pdgInList.email || undefined,
+                photoProfile: pdgInList.photoProfile || undefined,
+                isGlobalRole: true,
+                globalRoleType: activePdg.roleType,
+                subordinates: []
+            };
+        } else {
+            // PDG is not assigned to this agency - fetch separately
+            const [pdgData] = await db.select({
+                employeId: employes.id,
+                nom: users.nom,
+                prenom: users.prenom,
+                email: users.email,
+                photoProfile: users.photoProfile,
+            }).from(employes)
+              .innerJoin(users, eq(employes.userId, users.id))
+              .where(eq(employes.id, activePdg.employeId))
+              .limit(1);
 
-    // Find top-level employees (no manager) and build tree
+            if (pdgData) {
+                pdgNode = {
+                    id: pdgData.employeId,
+                    nom: pdgData.nom,
+                    prenom: pdgData.prenom || '',
+                    poste: activePdg.titre || 'Président Directeur Général',
+                    departement: 'Direction Générale',
+                    email: pdgData.email || undefined,
+                    photoProfile: pdgData.photoProfile || undefined,
+                    isGlobalRole: true,
+                    globalRoleType: activePdg.roleType,
+                    subordinates: []
+                };
+            }
+        }
+    }
+
+    // 4. Build tree from employee data (excluding PDG from normal processing)
+    const employeeMap = new Map<string, OrgNode>();
     const topLevel: OrgNode[] = [];
 
-    employeesData.forEach(emp => {
+    // First pass: create all nodes
+    for (const emp of employeesData) {
+        if (pdgNode && emp.employeId === pdgNode.id) continue; // skip PDG
         const node: OrgNode = {
             id: emp.employeId,
             nom: emp.nom,
@@ -611,23 +688,34 @@ export async function getOrganigramme(agenceId?: string): Promise<OrgNode[]> {
             photoProfile: emp.photoProfile || undefined,
             subordinates: []
         };
+        employeeMap.set(emp.employeId, node);
+    }
 
-        if (!emp.managerId) {
-            // Top-level employee
+    // Second pass: build hierarchy
+    for (const emp of employeesData) {
+        if (pdgNode && emp.employeId === pdgNode.id) continue;
+        const node = employeeMap.get(emp.employeId)!;
+
+        // If manager is the PDG, attach to PDG node
+        if (pdgNode && emp.managerId === pdgNode.id) {
+            pdgNode.subordinates.push(node);
+        } else if (!emp.managerId) {
             topLevel.push(node);
-            employeeMap.set(emp.employeId, node);
         } else {
-            // Has a manager, add to manager's subordinates
             const manager = employeeMap.get(emp.managerId);
             if (manager) {
                 manager.subordinates.push(node);
             } else {
-                // Manager not found (inactive or deleted), treat as top-level
                 topLevel.push(node);
             }
-            employeeMap.set(emp.employeId, node);
         }
-    });
+    }
+
+    // 5. If PDG exists, make it the root with all top-level nodes as subordinates
+    if (pdgNode) {
+        pdgNode.subordinates.push(...topLevel);
+        return [pdgNode];
+    }
 
     return topLevel;
 }
@@ -1697,4 +1785,248 @@ export async function updateMyProfile(employeId: string, data: {
   const [updated] = await db.update(employes).set(allowedFields)
     .where(eq(employes.id, employeId)).returning();
   return updated;
+}
+
+// ─── Employee Agency Assignments ────────────────────────────────────────────
+
+export async function getEmployeeAssignments(employeId: string): Promise<(EmployeeAgencyAssignment & { agenceNom: string; agenceCode: string; managerNom: string | null })[]> {
+  const results = await db.select({
+    assignment: employeeAgencyAssignments,
+    agenceNom: agences.nom,
+    agenceCode: agences.codeAgence,
+    managerNom: sql<string | null>`(
+      SELECT concat(u.nom, ' ', coalesce(u.prenom, ''))
+      FROM employes e INNER JOIN users u ON e.user_id = u.id
+      WHERE e.id = ${employeeAgencyAssignments.managerId}
+    )`,
+  })
+  .from(employeeAgencyAssignments)
+  .innerJoin(agences, eq(employeeAgencyAssignments.agenceId, agences.id))
+  .where(eq(employeeAgencyAssignments.employeId, employeId))
+  .orderBy(desc(employeeAgencyAssignments.isPrimary), desc(employeeAgencyAssignments.dateDebut));
+
+  return results.map(r => ({
+    ...r.assignment,
+    agenceNom: r.agenceNom,
+    agenceCode: r.agenceCode,
+    managerNom: r.managerNom,
+  }));
+}
+
+export async function createEmployeeAssignment(data: InsertEmployeeAgencyAssignment): Promise<EmployeeAgencyAssignment> {
+  // If setting as primary, unset other primaries first
+  if (data.isPrimary) {
+    await db.update(employeeAgencyAssignments)
+      .set({ isPrimary: false, updatedAt: new Date() })
+      .where(and(
+        eq(employeeAgencyAssignments.employeId, data.employeId),
+        eq(employeeAgencyAssignments.statut, 'ACTIVE'),
+        eq(employeeAgencyAssignments.isPrimary, true),
+      ));
+  }
+
+  const [assignment] = await db.insert(employeeAgencyAssignments)
+    .values(data)
+    .returning();
+
+  // Sync employes.agenceId if primary
+  if (data.isPrimary) {
+    await db.update(employes)
+      .set({ agenceId: data.agenceId, updatedAt: new Date() })
+      .where(eq(employes.id, data.employeId));
+  }
+
+  return assignment;
+}
+
+export async function updateEmployeeAssignment(
+  assignId: string,
+  data: Partial<InsertEmployeeAgencyAssignment>
+): Promise<EmployeeAgencyAssignment | null> {
+  // If setting as primary, unset other primaries first
+  if (data.isPrimary) {
+    const [current] = await db.select().from(employeeAgencyAssignments).where(eq(employeeAgencyAssignments.id, assignId));
+    if (current) {
+      await db.update(employeeAgencyAssignments)
+        .set({ isPrimary: false, updatedAt: new Date() })
+        .where(and(
+          eq(employeeAgencyAssignments.employeId, current.employeId),
+          eq(employeeAgencyAssignments.statut, 'ACTIVE'),
+          eq(employeeAgencyAssignments.isPrimary, true),
+          not(eq(employeeAgencyAssignments.id, assignId)),
+        ));
+    }
+  }
+
+  const [updated] = await db.update(employeeAgencyAssignments)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(employeeAgencyAssignments.id, assignId))
+    .returning();
+
+  // Sync employes.agenceId if primary
+  if (updated && data.isPrimary) {
+    await db.update(employes)
+      .set({ agenceId: updated.agenceId, updatedAt: new Date() })
+      .where(eq(employes.id, updated.employeId));
+  }
+
+  return updated || null;
+}
+
+export async function endEmployeeAssignment(assignId: string): Promise<EmployeeAgencyAssignment | null> {
+  const [ended] = await db.update(employeeAgencyAssignments)
+    .set({ statut: 'ENDED', dateFin: new Date().toISOString().split('T')[0], updatedAt: new Date() })
+    .where(eq(employeeAgencyAssignments.id, assignId))
+    .returning();
+  return ended || null;
+}
+
+// ─── Eligible Managers ──────────────────────────────────────────────────────
+
+export async function getEligibleManagers(agenceId: string): Promise<{ id: string; nom: string; prenom: string; poste: string; isGlobal: boolean }[]> {
+  // Employees with active assignment in this agency
+  const assignedManagers = await db.select({
+    id: employes.id,
+    nom: users.nom,
+    prenom: users.prenom,
+    poste: jobPositions.name,
+  })
+  .from(employeeAgencyAssignments)
+  .innerJoin(employes, eq(employeeAgencyAssignments.employeId, employes.id))
+  .innerJoin(users, eq(employes.userId, users.id))
+  .leftJoin(jobPositions, eq(employes.jobPositionId, jobPositions.id))
+  .where(and(
+    eq(employeeAgencyAssignments.agenceId, agenceId),
+    eq(employeeAgencyAssignments.statut, 'ACTIVE'),
+    eq(users.statut, StatutUser.ACTIVE),
+  ));
+
+  // Also include employees from the legacy agenceId field (backward compat)
+  const legacyManagers = await db.select({
+    id: employes.id,
+    nom: users.nom,
+    prenom: users.prenom,
+    poste: jobPositions.name,
+  })
+  .from(employes)
+  .innerJoin(users, eq(employes.userId, users.id))
+  .leftJoin(jobPositions, eq(employes.jobPositionId, jobPositions.id))
+  .where(and(
+    eq(employes.agenceId, agenceId),
+    eq(users.statut, StatutUser.ACTIVE),
+  ));
+
+  // Global roles (PDG, DGA, etc.)
+  const globalManagers = await db.select({
+    id: employes.id,
+    nom: users.nom,
+    prenom: users.prenom,
+    titre: orgGlobalRoles.titre,
+  })
+  .from(orgGlobalRoles)
+  .innerJoin(employes, eq(orgGlobalRoles.employeId, employes.id))
+  .innerJoin(users, eq(employes.userId, users.id))
+  .where(eq(orgGlobalRoles.statut, 'ACTIVE'));
+
+  // Merge and deduplicate
+  const seen = new Set<string>();
+  const result: { id: string; nom: string; prenom: string; poste: string; isGlobal: boolean }[] = [];
+
+  for (const m of globalManagers) {
+    if (!seen.has(m.id)) {
+      seen.add(m.id);
+      result.push({ id: m.id, nom: m.nom, prenom: m.prenom || '', poste: m.titre || 'Direction Générale', isGlobal: true });
+    }
+  }
+  for (const m of [...assignedManagers, ...legacyManagers]) {
+    if (!seen.has(m.id)) {
+      seen.add(m.id);
+      result.push({ id: m.id, nom: m.nom, prenom: m.prenom || '', poste: m.poste || 'Non défini', isGlobal: false });
+    }
+  }
+
+  return result;
+}
+
+// ─── Org Global Roles (PDG, DGA, etc.) ──────────────────────────────────────
+
+export async function getActiveGlobalRoles(): Promise<(OrgGlobalRole & { employeNom: string; employePrenom: string; photoProfile: string | null })[]> {
+  const results = await db.select({
+    role: orgGlobalRoles,
+    employeNom: users.nom,
+    employePrenom: users.prenom,
+    photoProfile: users.photoProfile,
+  })
+  .from(orgGlobalRoles)
+  .innerJoin(employes, eq(orgGlobalRoles.employeId, employes.id))
+  .innerJoin(users, eq(employes.userId, users.id))
+  .orderBy(asc(orgGlobalRoles.roleType));
+
+  return results.map(r => ({
+    ...r.role,
+    employeNom: r.employeNom,
+    employePrenom: r.employePrenom || '',
+    photoProfile: r.photoProfile,
+  }));
+}
+
+export async function getGlobalRolesHistory(): Promise<(OrgGlobalRole & { employeNom: string; employePrenom: string })[]> {
+  const results = await db.select({
+    role: orgGlobalRoles,
+    employeNom: users.nom,
+    employePrenom: users.prenom,
+  })
+  .from(orgGlobalRoles)
+  .innerJoin(employes, eq(orgGlobalRoles.employeId, employes.id))
+  .innerJoin(users, eq(employes.userId, users.id))
+  .orderBy(desc(orgGlobalRoles.createdAt));
+
+  return results.map(r => ({
+    ...r.role,
+    employeNom: r.employeNom,
+    employePrenom: r.employePrenom || '',
+  }));
+}
+
+export async function createGlobalRole(data: InsertOrgGlobalRole): Promise<OrgGlobalRole> {
+  const [role] = await db.insert(orgGlobalRoles).values(data).returning();
+  return role;
+}
+
+export async function updateGlobalRole(id: string, data: Partial<InsertOrgGlobalRole>): Promise<OrgGlobalRole | null> {
+  const [updated] = await db.update(orgGlobalRoles)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(orgGlobalRoles.id, id))
+    .returning();
+  return updated || null;
+}
+
+export async function revokeGlobalRole(id: string): Promise<OrgGlobalRole | null> {
+  const [revoked] = await db.update(orgGlobalRoles)
+    .set({ statut: 'REVOKED', dateFin: new Date().toISOString().split('T')[0], updatedAt: new Date() })
+    .where(eq(orgGlobalRoles.id, id))
+    .returning();
+  return revoked || null;
+}
+
+// ─── Payroll Config History ─────────────────────────────────────────────────
+
+export async function logPayrollConfigChange(data: {
+  payrollConfigId: string;
+  agenceId: string | null;
+  changedBy: string;
+  changeType: string;
+  oldValues: any;
+  newValues: any;
+  reason?: string;
+}): Promise<void> {
+  await db.insert(payrollConfigHistory).values({
+    payrollConfigId: data.payrollConfigId,
+    agenceId: data.agenceId,
+    changedBy: data.changedBy,
+    changeType: data.changeType,
+    oldValues: data.oldValues,
+    newValues: data.newValues,
+    reason: data.reason,
+  });
 }

@@ -54,6 +54,9 @@ function transformApiDataToOrgChart(apiData: any[], appName: string = 'COFIN&CO-
 
   const nodes: OrgChartNode[] = [];
 
+  // Check if the API returned a PDG as root (isGlobalRole=true)
+  const hasPdgRoot = apiData.length === 1 && apiData[0].isGlobalRole;
+
   function flatten(node: any, parentId: string | null = null) {
     if (!node || !node.id) return;
 
@@ -73,18 +76,21 @@ function transformApiDataToOrgChart(apiData: any[], appName: string = 'COFIN&CO-
     }
   }
 
-  // Flatten tous les noeuds - TOUJOURS attacher à la racine virtuelle
-  apiData.forEach(root => flatten(root, VIRTUAL_ROOT_ID));
-
-  // Toujours ajouter un noeud racine virtuel "Entreprise" pour éviter l'erreur "multiple roots"
-  nodes.unshift({
-    id: VIRTUAL_ROOT_ID,
-    parentId: null,
-    name: appName,
-    title: 'Organisation',
-    department: '',
-    statut: 'ACTIVE',
-  });
+  if (hasPdgRoot) {
+    // PDG is the root — no virtual root needed
+    flatten(apiData[0], null);
+  } else {
+    // No PDG — use virtual root "Entreprise" as before
+    apiData.forEach(root => flatten(root, VIRTUAL_ROOT_ID));
+    nodes.unshift({
+      id: VIRTUAL_ROOT_ID,
+      parentId: null,
+      name: appName,
+      title: 'Organisation',
+      department: '',
+      statut: 'ACTIVE',
+    });
+  }
 
   return nodes;
 }
@@ -242,12 +248,23 @@ export default function OrganigrammeView({ employes }: OrganigrammeViewProps) {
   const [reassignData, setReassignData] = useState<ReassignData | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(100);
+  const [selectedAgenceId, setSelectedAgenceId] = useState<string>('');
+  const [agencies, setAgencies] = useState<{ agenceId: string; agenceNom: string }[]>([]);
+
+  // Fetch available agencies for filter
+  useEffect(() => {
+    fetch('/api/auth/my-agencies', { credentials: 'include' })
+      .then(res => res.ok ? res.json() : { agencies: [] })
+      .then(data => setAgencies(data.agencies || []))
+      .catch(() => {});
+  }, []);
 
   // Fetch org chart data
-  const fetchOrgChart = useCallback(async () => {
+  const fetchOrgChart = useCallback(async (agenceId?: string) => {
     setLoading(true);
     try {
-      const res = await fetch('/api/hr/organigramme', { credentials: 'include' });
+      const url = agenceId ? `/api/hr/organigramme?agenceId=${agenceId}` : '/api/hr/organigramme';
+      const res = await fetch(url, { credentials: 'include' });
       if (res.ok) {
         const apiData = await res.json();
         if (import.meta.env.DEV) console.log('API organigramme data:', apiData);
@@ -266,9 +283,9 @@ export default function OrganigrammeView({ employes }: OrganigrammeViewProps) {
 
   useEffect(() => {
     if (canViewOrganigramme) {
-      fetchOrgChart();
+      fetchOrgChart(selectedAgenceId || undefined);
     }
-  }, [canViewOrganigramme, fetchOrgChart]);
+  }, [canViewOrganigramme, fetchOrgChart, selectedAgenceId]);
 
   // Handle node click for reassignment
   const handleNodeClick = useCallback((nodeId: string) => {
@@ -442,7 +459,7 @@ export default function OrganigrammeView({ employes }: OrganigrammeViewProps) {
 
       if (res.ok) {
         toast.success('Hiérarchie mise à jour');
-        await fetchOrgChart();
+        await fetchOrgChart(selectedAgenceId || undefined);
       } else {
         const err = await res.json().catch(() => ({}));
         toast.error(err.error || 'Erreur lors du réassignement');
@@ -797,6 +814,20 @@ export default function OrganigrammeView({ employes }: OrganigrammeViewProps) {
               {stats.total} collab.
             </span>
           </div>
+
+          {/* Agency filter */}
+          {agencies.length > 1 && (
+            <select
+              value={selectedAgenceId}
+              onChange={e => setSelectedAgenceId(e.target.value)}
+              className="bg-surface-base border border-edge rounded-lg px-2 py-1.5 text-xs text-content-primary focus:outline-none focus:border-accent/50 max-w-[160px]"
+            >
+              <option value="">Toutes agences</option>
+              {agencies.map((a: any) => (
+                <option key={a.agenceId} value={a.agenceId}>{a.agenceNom}</option>
+              ))}
+            </select>
+          )}
 
           {/* Search — fills available space */}
           <div className="relative flex-1 max-w-[240px]">

@@ -7,6 +7,7 @@ import IconButton from '../ui/IconButton';
 import Button from '../ui/Button';
 import ThemeToggle from '../ui/ThemeToggle';
 import UserProfileDropdown from './UserProfileDropdown';
+import AgencySwitcher from './AgencySwitcher';
 import { useUnreadMessagesCount } from '../../hooks/useUnreadMessagesCount';
 
 interface PlatformHeaderProps {
@@ -83,6 +84,9 @@ export default function PlatformHeader({
 
       <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full xl:w-auto justify-between xl:justify-end">
         <OfflineIndicator />
+
+        {/* Agency Switcher (multi-agency users) */}
+        <AgencySwitcher />
 
         {/* Theme Toggle */}
         <ThemeToggle />

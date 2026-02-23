@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, Button, Badge } from '../ui';
-import { Settings, Plus, Trash2, Save, RefreshCw, AlertTriangle, Percent, DollarSign, Clock, UserCheck, Smartphone } from 'lucide-react';
+import { Settings, Plus, Trash2, Save, RefreshCw, AlertTriangle, Percent, DollarSign, Clock, UserCheck, Smartphone, Building2 } from 'lucide-react';
 import { toast } from '../../lib/toast';
 import { usePermissions } from '../auth/ProtectedFeature';
 
@@ -41,11 +41,29 @@ export default function PayrollConfigPanel() {
   const { hasPermission } = usePermissions();
   const canManage = hasPermission('rh', 'manage') || hasPermission('paie', 'manage');
 
-  // Fetch current config
+  // Agency selector state
+  const [selectedAgenceId, setSelectedAgenceId] = useState<string>('');
+  const [agencies, setAgencies] = useState<Array<{ id: string; nom: string }>>([]);
+
+  useEffect(() => {
+    fetch('/api/auth/my-agencies', { credentials: 'include' })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.agencies) {
+          setAgencies(data.agencies.map((a: any) => ({ id: a.agenceId, nom: a.agenceNom })));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Fetch current config (with optional agenceId)
   const { data: config, isLoading, error } = useQuery<PayrollConfig>({
-    queryKey: ['payroll-config'],
+    queryKey: ['payroll-config', selectedAgenceId],
     queryFn: async () => {
-      const res = await fetch('/api/hr/paie/config');
+      const url = selectedAgenceId
+        ? `/api/hr/paie/config?agenceId=${selectedAgenceId}`
+        : '/api/hr/paie/config';
+      const res = await fetch(url);
       if (!res.ok) {
         if (res.status === 404) return null;
         throw new Error('Erreur chargement configuration');
@@ -106,7 +124,7 @@ export default function PayrollConfigPanel() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['payroll-config'] });
+      queryClient.invalidateQueries({ queryKey: ['payroll-config', selectedAgenceId] });
       toast.success('Configuration paie sauvegardée');
     },
     onError: (err: Error) => {
@@ -146,8 +164,9 @@ export default function PayrollConfigPanel() {
       defaultHeureFin,
       defaultPauseMinutes: parseInt(defaultPauseMinutes) || 60,
       mmSalaryFeeOption,
+      ...(selectedAgenceId ? { agenceId: selectedAgenceId } : {}),
     });
-  }, [cnssEmployee, cnssEmployer, brackets, transportAllowance, housingAllowance, overtimeRate, nightShiftRate, holidayRate, lateGraceMinutes, allowOvertime, defaultHeureDebut, defaultHeureFin, defaultPauseMinutes, mmSalaryFeeOption, saveMutation]);
+  }, [cnssEmployee, cnssEmployer, brackets, transportAllowance, housingAllowance, overtimeRate, nightShiftRate, holidayRate, lateGraceMinutes, allowOvertime, defaultHeureDebut, defaultHeureFin, defaultPauseMinutes, mmSalaryFeeOption, selectedAgenceId, saveMutation]);
 
   // Bracket helpers
   const addBracket = useCallback(() => {
@@ -202,25 +221,48 @@ export default function PayrollConfigPanel() {
   return (
     <div className="space-y-4 p-3 overflow-y-auto">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Settings size={16} className="text-status-warning" />
-          <h3 className="font-bold text-content-primary text-sm">Configuration Paie</h3>
-          {config && (
-            <Badge variant="info" size="sm" value={`Depuis ${new Date(config.effectiveFrom).toLocaleDateString('fr-FR')}`} />
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Settings size={16} className="text-status-warning" />
+            <h3 className="font-bold text-content-primary text-sm">Configuration Paie</h3>
+            {config && (
+              <Badge variant="info" size="sm" value={`Depuis ${new Date(config.effectiveFrom).toLocaleDateString('fr-FR')}`} />
+            )}
+          </div>
+          {canManage && (
+            <Button
+              variant="success"
+              size="sm"
+              icon={Save}
+              onClick={handleSave}
+              isLoading={saveMutation.isPending}
+              className="h-7 text-xs"
+            >
+              Sauvegarder
+            </Button>
           )}
         </div>
-        {canManage && (
-          <Button
-            variant="success"
-            size="sm"
-            icon={Save}
-            onClick={handleSave}
-            isLoading={saveMutation.isPending}
-            className="h-7 text-xs"
-          >
-            Sauvegarder
-          </Button>
+
+        {agencies.length > 0 && (
+          <div className="flex items-center gap-2">
+            <Building2 size={14} className="text-content-muted" />
+            <select
+              value={selectedAgenceId}
+              onChange={(e) => setSelectedAgenceId(e.target.value)}
+              className="bg-surface-base border border-edge rounded-lg px-3 py-1.5 text-sm text-content-secondary focus:ring-1 focus:ring-accent focus:outline-none"
+            >
+              <option value="">Global (défaut)</option>
+              {agencies.map(a => (
+                <option key={a.id} value={a.id}>{a.nom}</option>
+              ))}
+            </select>
+            {selectedAgenceId && config?.agenceId !== selectedAgenceId && (
+              <span className="text-[10px] text-content-muted bg-surface-subtle px-2 py-0.5 rounded">
+                Utilise les valeurs globales
+              </span>
+            )}
+          </div>
         )}
       </div>
 

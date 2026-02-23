@@ -51,12 +51,22 @@ async function runHrAlertsJob() {
 
     let totalCreated = 0;
 
-    // Scanner chaque type d'alerte activé
+    // Scanner chaque type d'alerte activé avec paliers configurables
     for (const [type, config] of configMap) {
       if (!config.enabled) continue;
 
       const candidates = await scanForAlertType(type);
-      const created = await createAlertsIfNew(candidates);
+      // Tag each candidate with its reminder level based on configurable reminderDays
+      const reminderDays = config.reminderDays || [30, 15, 7, 1];
+      const today = new Date();
+      const taggedCandidates = candidates.map(c => {
+        const eventDate = new Date(c.eventDate);
+        const daysUntil = Math.ceil((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        // Find the nearest reminder threshold
+        const matchedDay = reminderDays.find(d => daysUntil <= d);
+        return { ...c, metadata: { ...c.metadata, reminderLevel: matchedDay || daysUntil, daysUntil } };
+      });
+      const created = await createAlertsIfNew(taggedCandidates);
       totalCreated += created;
     }
 
@@ -91,6 +101,8 @@ async function scanForAlertType(alertType: string): Promise<AlertCandidate[]> {
       return scanAnniversairesTravail(todayStr);
     case "VISITE_MEDICALE":
       return scanVisitesMedicales(todayStr, futureStr);
+    case "PIECE_IDENTITE_EXPIRANTE":
+      return scanPieceIdentiteExpirante(todayStr, futureStr);
     default:
       return [];
   }
@@ -267,6 +279,37 @@ async function scanVisitesMedicales(todayStr: string, futureStr: string): Promis
     eventDate: r.prochaineMedicale!,
     eventLabel: `Visite médicale à planifier - ${r.nom}`,
     metadata: {},
+    agenceId: r.agenceId,
+  }));
+}
+
+async function scanPieceIdentiteExpirante(todayStr: string, futureStr: string): Promise<AlertCandidate[]> {
+  const results = await db
+    .select({
+      id: employes.id,
+      nom: sql<string>`concat(${users.nom}, ' ', coalesce(${users.prenom}, ''))`,
+      dateExpirationPiece: employes.dateExpirationPiece,
+      typePiece: employes.typePiece,
+      agenceId: employes.agenceId,
+    })
+    .from(employes)
+    .innerJoin(users, eq(employes.userId, users.id))
+    .where(
+      and(
+        eq(employes.statut, "ACTIVE"),
+        sql`${employes.dateExpirationPiece} IS NOT NULL`,
+        gte(employes.dateExpirationPiece, todayStr),
+        lte(employes.dateExpirationPiece, futureStr)
+      )
+    );
+
+  return results.map((r) => ({
+    employeId: r.id,
+    employeNom: r.nom,
+    alertType: "PIECE_IDENTITE_EXPIRANTE",
+    eventDate: r.dateExpirationPiece!,
+    eventLabel: `Pièce d'identité expirante (${r.typePiece || 'N/A'}) - ${r.nom}`,
+    metadata: { typePiece: r.typePiece },
     agenceId: r.agenceId,
   }));
 }

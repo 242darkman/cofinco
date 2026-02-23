@@ -6,6 +6,7 @@ export * from "./departments";
 export * from "./catalog";
 // employes is imported by hr.ts, so we export it explicitly to avoid conflicts
 export { employes, insertEmployeSchema, type InsertEmploye, type Employe, type EmployeWithUser } from "./employes";
+// New multi-agency types re-exported from hr.ts via wildcard
 export * from "./clients";
 export * from "./settings";
 export * from "./finance";
