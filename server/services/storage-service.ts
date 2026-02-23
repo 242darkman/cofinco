@@ -36,6 +36,16 @@ const s3Client = new S3Client({
 const PUBLIC_BUCKET = process.env.BUCKET_PUBLIC_NAME || 'public-assets';
 const PRIVATE_BUCKET = process.env.BUCKET_PRIVATE_NAME || 'secure-docs';
 
+// Internal endpoint (Docker service name) vs public endpoint (reachable from browser)
+const INTERNAL_ENDPOINT = process.env.MINIO_ENDPOINT || 'http://localhost:9000';
+const PUBLIC_ENDPOINT = process.env.MINIO_PUBLIC_ENDPOINT || INTERNAL_ENDPOINT;
+
+/** Replace internal MinIO hostname with public one in presigned URLs */
+function toPublicUrl(url: string): string {
+  if (INTERNAL_ENDPOINT === PUBLIC_ENDPOINT) return url;
+  return url.replace(INTERNAL_ENDPOINT, PUBLIC_ENDPOINT);
+}
+
 // Patterns d'URLs MinIO à nettoyer
 const URL_PATTERNS = [
   /^https?:\/\/[^/]+\/public-assets\//,
@@ -283,7 +293,7 @@ export class StorageService {
     const uploadUrl = await getSignedUrl(s3Client, command, { expiresIn: 300 }); // 5 min
 
     return {
-      uploadUrl,
+      uploadUrl: toPublicUrl(uploadUrl),
       objectKey: key
     };
   }
@@ -300,7 +310,7 @@ export class StorageService {
       Key: objectKey,
     });
 
-    return await getSignedUrl(s3Client, command, { expiresIn });
+    return toPublicUrl(await getSignedUrl(s3Client, command, { expiresIn }));
   }
 
   /**

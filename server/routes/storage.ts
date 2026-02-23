@@ -353,6 +353,49 @@ router.post('/entity/presigned-url', requireAuth, attachAbility, async (req, res
 });
 
 /**
+ * POST /api/storage/entity/upload
+ * Proxy upload: client uploads to backend, backend forwards to MinIO.
+ * Avoids browser needing direct access to MinIO (Docker internal hostname + CSP).
+ */
+const proxyUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_UPLOAD_SIZE_MB * 1024 * 1024 },
+});
+router.post('/entity/upload', requireAuth, attachAbility, proxyUpload.single('file'), async (req, res) => {
+  try {
+    const { fileType, entityType, entityId } = req.body;
+    const file = req.file;
+
+    if (!file || !fileType || !entityType || !entityId) {
+      return res.status(400).json({ error: 'Paramètres requis: file, fileType, entityType, entityId' });
+    }
+
+    if (!validFileTypes.includes(fileType)) {
+      return res.status(400).json({ error: 'fileType invalide' });
+    }
+    if (!validEntityTypes.includes(entityType)) {
+      return res.status(400).json({ error: 'entityType invalide' });
+    }
+
+    const objectKey = await StorageService.uploadBufferForEntity(
+      file.buffer,
+      file.originalname,
+      file.mimetype,
+      fileType as StorageFileType,
+      entityType as StorageEntityType,
+      entityId
+    );
+
+    const isPublic = isPublicFileType(fileType as StorageFileType);
+
+    res.json({ key: objectKey, isPublic });
+  } catch (error: any) {
+    logger.error({ err: error }, 'Entity proxy upload error');
+    res.status(500).json({ error: 'Erreur interne du serveur' });
+  }
+});
+
+/**
  * DELETE /api/storage/entity/:entityType/:entityId
  * Supprime TOUS les fichiers d'une entité (cascade)
  * Réservé aux admins

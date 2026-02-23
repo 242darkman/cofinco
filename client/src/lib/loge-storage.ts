@@ -39,7 +39,6 @@ export async function saveToLoge(
   options: SaveToLogeOptions
 ): Promise<LogeDocument | null> {
   try {
-    // Étape 1: Demander une URL de téléchargement signée
     const fileName = options.nom.includes('.') ? options.nom : `${options.nom}.${getExtensionFromMimeType(file.type)}`;
 
     // Map referenceType to valid entity types for structured storage
@@ -50,35 +49,24 @@ export async function saveToLoge(
     const entityType = entityTypeMap[options.referenceType || ''] || 'client';
     const entityId = options.referenceId || 'general';
 
-    const urlResponse = await fetch('/api/storage/entity/presigned-url', {
+    // Upload via backend proxy (avoids browser needing direct MinIO access)
+    const formData = new FormData();
+    formData.append('file', file instanceof Blob ? new File([file], fileName, { type: file.type }) : file);
+    formData.append('fileType', 'misc');
+    formData.append('entityType', entityType);
+    formData.append('entityId', entityId);
+
+    const uploadResponse = await fetch('/api/storage/entity/upload', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({
-        filename: fileName,
-        contentType: file.type || 'application/octet-stream',
-        fileType: 'misc',
-        entityType,
-        entityId,
-      })
-    });
-
-    if (!urlResponse.ok) {
-      throw new Error('Impossible d\'obtenir l\'URL de téléchargement');
-    }
-
-    const { uploadUrl: uploadURL, key: objectPath } = await urlResponse.json();
-
-    // Étape 2: Télécharger le fichier vers le stockage cloud
-    const uploadResponse = await fetch(uploadURL, {
-      method: 'PUT',
-      body: file,
-      headers: { 'Content-Type': file.type || 'application/octet-stream' }
+      body: formData,
     });
 
     if (!uploadResponse.ok) {
       throw new Error('Échec du téléchargement vers le stockage');
     }
+
+    const { key: objectPath } = await uploadResponse.json();
 
     // Étape 3: Créer l'enregistrement du document dans la base de données (route d'archivage automatique)
     const docResponse = await fetch('/api/loge/archive', {

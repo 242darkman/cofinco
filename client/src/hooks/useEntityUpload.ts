@@ -122,42 +122,27 @@ export function useEntityUpload(options: UseEntityUploadOptions) {
     setProgress(0);
 
     try {
-      // Étape 1: Obtenir l'URL présignée
+      // Upload via backend proxy (avoids browser needing direct MinIO access)
       setProgress(10);
-      const presignedResponse = await fetch('/api/storage/entity/presigned-url', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          filename: file.name,
-          contentType: file.type,
-          fileType: options.fileType,
-          entityType: options.entityType,
-          entityId: options.entityId,
-        }),
-      });
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('fileType', options.fileType);
+      formData.append('entityType', options.entityType);
+      formData.append('entityId', options.entityId);
 
-      if (!presignedResponse.ok) {
-        const errorData = await presignedResponse.json();
-        throw new Error(errorData.error || 'Failed to get upload URL');
-      }
-
-      const { uploadUrl, key, isPublic } = await presignedResponse.json();
-
-      // Étape 2: Upload direct vers MinIO
       setProgress(30);
-      const uploadResponse = await fetch(uploadUrl, {
-        method: 'PUT',
-        body: file,
-        headers: {
-          'Content-Type': file.type,
-        },
+      const uploadResponse = await fetch('/api/storage/entity/upload', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
       });
 
       if (!uploadResponse.ok) {
-        throw new Error('Failed to upload file to storage');
+        const errorData = await uploadResponse.json().catch(() => ({ error: 'Upload failed' }));
+        throw new Error(errorData.error || 'Failed to upload file');
       }
 
+      const { key, isPublic } = await uploadResponse.json();
       setProgress(100);
 
       const result: UploadResult = {
