@@ -311,8 +311,9 @@ export function CaisseDashboardWidgets({
     ? formatMoney(Math.round((totalEntrees + totalSorties) / totalOps))
     : '—';
 
-  // Limit utilization (% of PLAFOND_CAISSE)
-  const limitPct = Math.min(100, Math.round((soldeActuel / CAISSE_THRESHOLDS.PLAFOND_CAISSE) * 100));
+  // Limit utilization (% of PLAFOND_CAISSE) — 1 decimal for transparency
+  const limitPctRaw = Math.min(100, (soldeActuel / CAISSE_THRESHOLDS.PLAFOND_CAISSE) * 100);
+  const limitPct = limitPctRaw >= 10 ? Math.round(limitPctRaw) : parseFloat(limitPctRaw.toFixed(1));
 
   // Hourly data
   const hourlyData = useMemo(() => computeHourlyData(transactions), [transactions]);
