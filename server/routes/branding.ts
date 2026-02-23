@@ -198,6 +198,14 @@ export function registerBrandingRoutes(app: Express) {
         theme: ui?.theme || "DARK",
         fontFamily: ui?.fontFamily || "Inter",
         borderRadius: ui?.borderRadius || "lg",
+        // Infos société pour reçus/factures
+        companyInfo: {
+          adresse: settings?.adresse || null,
+          telephone: settings?.telephone || null,
+          email: settings?.email || null,
+          rccm: settings?.rccm || null,
+          nif: (settings as any)?.niu || null,
+        },
       });
     } catch (error) {
       logger.error({ err: error }, "Error fetching branding");
@@ -210,6 +218,7 @@ export function registerBrandingRoutes(app: Express) {
         theme: "DARK",
         fontFamily: "Inter",
         borderRadius: "lg",
+        companyInfo: null,
       });
     }
   });
@@ -225,18 +234,23 @@ export function registerBrandingRoutes(app: Express) {
     requireAbility(Actions.MANAGE, Subjects.SETTINGS),
     async (req, res) => {
       try {
-        const { appName, logoUrl, primaryColor, accentColor, theme, fontFamily, borderRadius } = req.body;
+        const { appName, logoUrl, primaryColor, accentColor, theme, fontFamily, borderRadius, adresse, telephone, email, rccm, nif } = req.body;
 
-        // Update systemSettings (appName, logoUrl)
-        if (appName !== undefined || logoUrl !== undefined) {
+        // Update systemSettings (appName, logoUrl, company info)
+        const hasSettingsUpdate = [appName, logoUrl, adresse, telephone, email, rccm, nif].some(v => v !== undefined);
+        if (hasSettingsUpdate) {
           const settingsUpdate: Record<string, any> = { updatedAt: new Date() };
           if (appName !== undefined) settingsUpdate.appName = appName;
           if (logoUrl !== undefined) settingsUpdate.logoUrl = logoUrl;
+          if (adresse !== undefined) settingsUpdate.adresse = adresse || null;
+          if (telephone !== undefined) settingsUpdate.telephone = telephone || null;
+          if (email !== undefined) settingsUpdate.email = email || null;
+          if (rccm !== undefined) settingsUpdate.rccm = rccm || null;
+          if (nif !== undefined) settingsUpdate.niu = nif || null;
 
           const [existing] = await db.select({ id: systemSettings.id }).from(systemSettings);
           if (existing) {
             await db.update(systemSettings).set(settingsUpdate).where(
-              // Update the single row
               eq(systemSettings.id, existing.id)
             );
           }
@@ -275,6 +289,13 @@ export function registerBrandingRoutes(app: Express) {
             theme: ui?.theme || "DARK",
             fontFamily: ui?.fontFamily || "Inter",
             borderRadius: ui?.borderRadius || "lg",
+            companyInfo: {
+              adresse: settings?.adresse || null,
+              telephone: settings?.telephone || null,
+              email: settings?.email || null,
+              rccm: settings?.rccm || null,
+              nif: (settings as any)?.niu || null,
+            },
           };
           wsInstance.broadcast({ type: "BRANDING_CHANGED" as any, payload });
           res.json(payload);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
-import { Palette, Upload, X, Eye, Sun, Moon, Check, RotateCcw, Type } from 'lucide-react';
+import { Palette, Upload, X, Eye, Sun, Moon, Check, RotateCcw, Type, Building2 } from 'lucide-react';
 import { useBranding, type BrandingConfig } from '../../contexts/BrandingContext';
 import { useCurrency } from '../../contexts/CurrencyContext';
 
@@ -11,6 +11,12 @@ interface BrandingFormData {
   accentColor: string;
   fontFamily: string;
   borderRadius: string;
+  // Infos société
+  adresse: string;
+  telephone: string;
+  email: string;
+  rccm: string;
+  nif: string;
 }
 
 const FONT_OPTIONS = [
@@ -84,6 +90,11 @@ export default function AdminBrandingSettings() {
     accentColor: '#c2410c',
     fontFamily: 'Inter',
     borderRadius: 'lg',
+    adresse: '',
+    telephone: '',
+    email: '',
+    rccm: '',
+    nif: '',
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -103,6 +114,11 @@ export default function AdminBrandingSettings() {
           accentColor: data.accentColor || '#10b981',
           fontFamily: data.fontFamily || 'Inter',
           borderRadius: data.borderRadius || 'lg',
+          adresse: data.companyInfo?.adresse || '',
+          telephone: data.companyInfo?.telephone || '',
+          email: data.companyInfo?.email || '',
+          rccm: data.companyInfo?.rccm || '',
+          nif: data.companyInfo?.nif || '',
         });
       }
     } catch {
@@ -181,6 +197,11 @@ export default function AdminBrandingSettings() {
       accentColor: branding.accentColor,
       fontFamily: branding.fontFamily,
       borderRadius: branding.borderRadius,
+      adresse: branding.companyInfo?.adresse || '',
+      telephone: branding.companyInfo?.telephone || '',
+      email: branding.companyInfo?.email || '',
+      rccm: branding.companyInfo?.rccm || '',
+      nif: branding.companyInfo?.nif || '',
     });
   };
 
@@ -190,7 +211,12 @@ export default function AdminBrandingSettings() {
     form.primaryColor !== branding.primaryColor ||
     form.accentColor !== branding.accentColor ||
     form.fontFamily !== branding.fontFamily ||
-    form.borderRadius !== branding.borderRadius;
+    form.borderRadius !== branding.borderRadius ||
+    form.adresse !== (branding.companyInfo?.adresse || '') ||
+    form.telephone !== (branding.companyInfo?.telephone || '') ||
+    form.email !== (branding.companyInfo?.email || '') ||
+    form.rccm !== (branding.companyInfo?.rccm || '') ||
+    form.nif !== (branding.companyInfo?.nif || '');
 
   const darkBg = '#0f172a';
   const lightBg = '#f8fafc';
@@ -360,6 +386,72 @@ export default function AdminBrandingSettings() {
             <span className="flex items-center gap-1">
               Secondaire <ContrastBadge foreground={form.accentColor} background={lightBg} />
             </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Company Info */}
+      <div className="bg-surface/50 border border-edge rounded-lg p-4 space-y-4">
+        <div className="flex items-center gap-2">
+          <Building2 size={14} className="text-content-muted" />
+          <label className="text-sm font-medium text-content-secondary">
+            Informations de la societe
+          </label>
+        </div>
+        <p className="text-xs text-content-muted -mt-2">
+          Ces informations apparaissent sur les recus, factures et documents officiels.
+        </p>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2 space-y-1">
+            <span className="text-xs text-content-muted">Adresse</span>
+            <input
+              type="text"
+              value={form.adresse}
+              onChange={(e) => setForm(prev => ({ ...prev, adresse: e.target.value }))}
+              placeholder="Brazzaville, Republique du Congo"
+              className="w-full px-3 py-2 bg-surface-base/50 border border-edge-strong rounded-lg text-sm text-content-primary placeholder-content-muted focus:border-accent focus:outline-none"
+            />
+          </div>
+          <div className="space-y-1">
+            <span className="text-xs text-content-muted">Telephone</span>
+            <input
+              type="text"
+              value={form.telephone}
+              onChange={(e) => setForm(prev => ({ ...prev, telephone: e.target.value }))}
+              placeholder="+242 06 123 4567"
+              className="w-full px-3 py-2 bg-surface-base/50 border border-edge-strong rounded-lg text-sm text-content-primary placeholder-content-muted focus:border-accent focus:outline-none"
+            />
+          </div>
+          <div className="space-y-1">
+            <span className="text-xs text-content-muted">Email</span>
+            <input
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm(prev => ({ ...prev, email: e.target.value }))}
+              placeholder="contact@societe.com"
+              className="w-full px-3 py-2 bg-surface-base/50 border border-edge-strong rounded-lg text-sm text-content-primary placeholder-content-muted focus:border-accent focus:outline-none"
+            />
+          </div>
+          <div className="space-y-1">
+            <span className="text-xs text-content-muted">RCCM</span>
+            <input
+              type="text"
+              value={form.rccm}
+              onChange={(e) => setForm(prev => ({ ...prev, rccm: e.target.value }))}
+              placeholder="RCCM-BZV-..."
+              className="w-full px-3 py-2 bg-surface-base/50 border border-edge-strong rounded-lg text-sm font-mono text-content-primary placeholder-content-muted focus:border-accent focus:outline-none"
+            />
+          </div>
+          <div className="space-y-1">
+            <span className="text-xs text-content-muted">NIF / NIU</span>
+            <input
+              type="text"
+              value={form.nif}
+              onChange={(e) => setForm(prev => ({ ...prev, nif: e.target.value }))}
+              placeholder="NIF-..."
+              className="w-full px-3 py-2 bg-surface-base/50 border border-edge-strong rounded-lg text-sm font-mono text-content-primary placeholder-content-muted focus:border-accent focus:outline-none"
+            />
           </div>
         </div>
       </div>

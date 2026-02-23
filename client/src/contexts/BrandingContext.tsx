@@ -1,5 +1,13 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
+export interface CompanyInfo {
+  adresse: string | null;
+  telephone: string | null;
+  email: string | null;
+  rccm: string | null;
+  nif: string | null;
+}
+
 export interface BrandingConfig {
   appName: string;
   logoUrl: string | null;
@@ -8,6 +16,7 @@ export interface BrandingConfig {
   theme: string;
   fontFamily: string;
   borderRadius: string;
+  companyInfo?: CompanyInfo | null;
 }
 
 const DEFAULT_BRANDING: BrandingConfig = {

@@ -101,6 +101,9 @@ export interface ReceiptData {
   modePaiement?: string;
   devise?: string;
 
+  /** Code brut de l'opération (ex: LOAN_REPAYMENT) pour classification entrée/sortie */
+  natureOperation?: string;
+
   // ===== NOUVEAU: Support des transactions internes =====
   /** Indique si c'est une transaction interne (sans client) */
   isInternal?: boolean;
@@ -308,7 +311,7 @@ const normalizeReceiptData = (data: ReceiptData, companyInfo?: ReceiptCompanyInf
     [data.agent?.prenom, data.agent?.nom].filter(Boolean).join(' ').trim() ||
     undefined;
   const clientName = [data.client?.nom, data.client?.prenom].filter(Boolean).join(' ').trim();
-  const clientPhone = data.client?.telephone;
+  const clientPhone = formatPhoneNumber(data.client?.telephone) !== '-' ? formatPhoneNumber(data.client?.telephone) : data.client?.telephone;
   const clientAccount = maskAccountNumber(data.client?.numeroCompte);
   const currency = data.devise || currencySymbol();
   const details: { label: string; value: string; isBold?: boolean }[] =
@@ -572,9 +575,18 @@ export const ReceiptTemplate = React.forwardRef<HTMLDivElement, ReceiptTemplateP
   ({ data, companyInfo, copyType = 'original', showQRCode = true }, ref) => {
     const { branding } = useBranding();
     const normalized = normalizeReceiptData(data, companyInfo);
-    // Override default company name with dynamic branding
-    if (!companyInfo?.name && !companyInfo?.nom && !data.companyInfo?.name) {
+    // Override defaults with dynamic branding when no explicit companyInfo is passed
+    const hasExplicitCompanyInfo = companyInfo || data.companyInfo;
+    if (!hasExplicitCompanyInfo) {
       normalized.resolvedCompany.name = branding.appName;
+      if (branding.companyInfo) {
+        const ci = branding.companyInfo;
+        if (ci.adresse) normalized.resolvedCompany.address = ci.adresse;
+        if (ci.telephone) normalized.resolvedCompany.phone = ci.telephone;
+        if (ci.email) normalized.resolvedCompany.email = ci.email;
+        if (ci.rccm) normalized.resolvedCompany.rccm = ci.rccm;
+        if (ci.nif) normalized.resolvedCompany.nif = ci.nif;
+      }
     }
     const formattedDate = formatDateTime(normalized.date);
 
