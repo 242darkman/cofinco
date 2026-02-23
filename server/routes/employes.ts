@@ -46,7 +46,7 @@ const createEmployeWithUserSchema = z.object({
   // Données utilisateur (identité)
   nom: z.string().min(1, "Le nom est requis"),
   prenom: z.string().optional(),
-  email: z.string().email("Email invalide").optional().nullable(),
+  email: z.union([z.string().email(), z.literal(''), z.null()]).optional().transform(val => val === '' ? null : val),
   telephone: z.string().optional().nullable(),
   sexe: z.enum(['M', 'F']).optional().nullable(),
   dateNaissance: z.string().optional().nullable(), // Format: YYYY-MM-DD
@@ -69,7 +69,7 @@ const createEmployeWithUserSchema = z.object({
   matricule: z.string().optional().nullable(),
   jobPositionId: optionalUuid.optional(),
   dateEmbauche: z.string().optional().nullable(),
-  typeContrat: z.enum(['CDI', 'CDD', 'Stage', 'Intérim']).optional(),
+  typeContrat: z.enum(['CDI', 'CDD', 'Stage', 'Intérim', 'Freelance', 'Temporaire']).optional(),
   agenceId: optionalUuid.optional(),
   managerId: optionalUuid.optional(),
   // Rôle via userRoles table (Architecture V3)
@@ -114,7 +114,7 @@ const updateEmployeWithUserSchema = z.object({
   // Données utilisateur
   nom: z.string().optional(),
   prenom: z.string().optional(),
-  email: z.string().email().optional().nullable(),
+  email: z.union([z.string().email(), z.literal(''), z.null()]).optional().transform(val => val === '' ? null : val),
   telephone: z.string().optional().nullable(),
   sexe: z.enum(['M', 'F']).optional().nullable(),
   dateNaissance: z.string().optional().nullable(),
@@ -132,7 +132,7 @@ const updateEmployeWithUserSchema = z.object({
   matricule: z.string().optional().nullable(),
   jobPositionId: optionalUuid.optional(),
   dateEmbauche: z.string().optional().nullable(),
-  typeContrat: z.enum(['CDI', 'CDD', 'Stage', 'Intérim']).optional(),
+  typeContrat: z.enum(['CDI', 'CDD', 'Stage', 'Intérim', 'Freelance', 'Temporaire']).optional(),
   agenceId: optionalUuid.optional(),
   managerId: optionalUuid.optional(),
   // Rôle géré via userRoles table (Architecture V3) - passé séparément à updateEmployeWithUser

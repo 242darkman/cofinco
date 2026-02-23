@@ -135,7 +135,7 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
   const { data: agences } = useQuery({
     queryKey: ['agences', 'migration', sourceAgence.id],
     queryFn: async () => {
-      const res = await api.get<Agency[]>('/agences?statut=Actif');
+      const res = await api.get<Agency[]>('/agences?statut=ACTIVE');
       return res.filter((a: Agency) => a.id !== sourceAgence.id);
     },
     enabled: isOpen

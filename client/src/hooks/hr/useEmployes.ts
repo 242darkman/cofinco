@@ -308,7 +308,7 @@ export function useEmployes() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Erreur');
+        throw new Error(error.message || error.error || 'Erreur');
       }
 
       await fetchEmployes();
