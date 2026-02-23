@@ -112,8 +112,8 @@ const Modal: React.FC<ModalProps> = ({
       aria-labelledby="modal-title"
     >
       {/* Backdrop */}
-      <div 
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity" 
+      <div
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
         onClick={handleBackdropClick}
         aria-hidden="true"
       />
