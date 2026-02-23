@@ -401,13 +401,14 @@ export default function SearchableSelect({
                      <span className="text-xs font-medium uppercase tracking-wider">Chargement...</span>
                    </div>
                  ) : visibleOptions.length > 0 ? (
-                    <div className="py-1" role="listbox" ref={listRef}>
+                    <div className="py-1" role="listbox" aria-activedescendant={highlightedIndex >= 0 ? `option-${name}-${highlightedIndex}` : undefined} ref={listRef}>
                       {visibleOptions.map((option, idx) => {
                         const isHighlighted = idx === highlightedIndex;
                         const isSelected = String(value) === String(option.value);
                         return (
                          <div
                            key={option.value}
+                           id={`option-${name}-${idx}`}
                            ref={(el) => { if (el) optionRefs.current.set(idx, el); else optionRefs.current.delete(idx); }}
                            onClick={() => handleSelect(option)}
                            onMouseEnter={() => setHighlightedIndex(idx)}
@@ -416,11 +417,11 @@ export default function SearchableSelect({
                            className={`
                              w-full px-4 py-2.5 flex items-center gap-3
                              cursor-pointer transition-colors border-l-2
-                             ${option.disabled ? 'opacity-50 cursor-not-allowed bg-surface-base/50 border-transparent' : 'hover:bg-surface/80'}
+                             ${option.disabled ? 'opacity-50 cursor-not-allowed bg-surface-base/50 border-transparent' : 'hover:bg-accent/10'}
                              ${isSelected
-                               ? 'bg-accent/10 border-accent'
+                               ? 'bg-accent/10 border-accent font-semibold'
                                : isHighlighted
-                                 ? 'bg-surface/60 border-accent/50'
+                                 ? 'bg-accent/15 border-accent ring-1 ring-inset ring-accent/30'
                                  : 'border-transparent'
                              }
                            `}
