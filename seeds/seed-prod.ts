@@ -3971,10 +3971,10 @@ async function seedNotificationSystem(context: SeedContext, dryRun: boolean): Pr
   if (dryRun) {
     return [
       { table: 'emailProviderSettings', action: 'skipped', count: 1, details: 'dry-run' },
-      { table: 'emailTemplates', action: 'skipped', count: 10, details: 'dry-run' },
+      { table: 'emailTemplates', action: 'skipped', count: 11, details: 'dry-run' },
       { table: 'notificationSettings', action: 'skipped', count: 1, details: 'dry-run' },
       { table: 'smsProviderSettings (MTN)', action: 'skipped', count: 1, details: 'dry-run' },
-      { table: 'smsTemplates (new)', action: 'skipped', count: 5, details: 'dry-run' },
+      { table: 'smsTemplates (new)', action: 'skipped', count: 6, details: 'dry-run' },
       { table: 'featureFlags (notif)', action: 'skipped', count: 1, details: 'dry-run' },
     ];
   }
@@ -4455,6 +4455,15 @@ async function seedNotificationSystem(context: SeedContext, dryRun: boolean): Pr
       description: 'Email de bienvenue pour un nouvel utilisateur',
     },
     {
+      code: 'USER_CREDENTIALS',
+      nom: 'Identifiants de connexion',
+      subject: 'Vos identifiants COFIN&CO-M',
+      contenuHtml: emailWrap('<h2 style="color:#1b2d4b;margin:0 0 16px">Bienvenue {{userName}} !</h2><p style="color:#495057;line-height:1.6">Votre compte a ete cree sur la plateforme <strong>COFIN&amp;CO-M</strong>. Voici vos identifiants de connexion :</p><table role="presentation" style="background:#eff6ff;border-radius:8px;padding:20px;width:100%;margin:20px 0" cellpadding="0" cellspacing="0"><tr><td style="padding:8px 20px"><span style="color:#868e96;font-size:13px">Identifiant</span><br><strong style="color:#1b2d4b;font-size:18px">{{username}}</strong></td></tr><tr><td style="padding:8px 20px"><span style="color:#868e96;font-size:13px">Mot de passe</span><br><strong style="color:#1b2d4b;font-size:18px">{{password}}</strong></td></tr></table><div style="background:#fef3f2;border-left:4px solid #ef4444;padding:16px 20px;border-radius:0 8px 8px 0;margin:20px 0"><p style="color:#495057;margin:0;line-height:1.6"><strong>Important :</strong> Vous devrez changer votre mot de passe lors de votre premiere connexion. Ne partagez jamais vos identifiants.</p></div>'),
+      contenuText: 'COFIN&CO-M: {{userName}}, votre compte a ete cree. Identifiant: {{username}} / Mot de passe: {{password}}. Changez votre mot de passe a la premiere connexion.',
+      placeholders: 'userName,username,password',
+      description: 'Email avec identifiants de connexion generes automatiquement',
+    },
+    {
       code: 'USER_PASSWORD_CHANGED',
       nom: 'Mot de passe modifie',
       subject: 'Votre mot de passe a ete modifie - COFIN&CO-M',
@@ -4834,6 +4843,13 @@ async function seedNotificationSystem(context: SeedContext, dryRun: boolean): Pr
       description: 'SMS de bienvenue pour un nouvel employe',
     },
     {
+      code: 'USER_CREDENTIALS',
+      nom: 'Identifiants de connexion SMS',
+      contenu: 'COFIN&CO-M: {{userName}}, votre compte a ete cree. Identifiant: {{username}} / Mot de passe: {{password}}. Changez-le a la premiere connexion.',
+      placeholders: 'userName,username,password',
+      description: 'SMS avec identifiants de connexion generes automatiquement',
+    },
+    {
       code: 'PAIEMENT_TERRAIN_VALIDATED',
       nom: 'Paiement terrain valide SMS',
       contenu: 'COFIN&CO-M: {{clientName}}, paiement de {{amount}} FCFA ({{paymentType}}) confirme. Merci !',
@@ -5145,9 +5161,9 @@ async function seedAdminUser(context: SeedContext, dryRun: boolean): Promise<See
   }
 
   // Password from env or default (WARNING in logs)
-  const adminPassword = process.env.SEED_ADMIN_PASSWORD || 'password123';
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD || 'Cofinco-m@2026';
   if (!process.env.SEED_ADMIN_PASSWORD) {
-    logger.warn('WARNING: Using default password. Set SEED_ADMIN_PASSWORD in production!');
+    logger.info('Using default admin password. Override with SEED_ADMIN_PASSWORD env var.');
   }
 
   const [siege] = await db.select().from(agences).where(eq(agences.codeAgence, 'SIEGE'));
@@ -5169,7 +5185,7 @@ async function seedAdminUser(context: SeedContext, dryRun: boolean): Promise<See
       typeCompte: 'employe',
       canLogin: true,
       statut: StatutUser.ACTIVE,
-      mustChangePassword: true, // Force password change on first login
+      mustChangePassword: false,
     }).returning();
     results.push({ table: 'users', action: 'created', count: 1 });
 
@@ -5585,8 +5601,7 @@ async function seedProd() {
     logger.info('═══════════════════════════════════════════════════════════════');
 
     if (!DRY_RUN) {
-      logger.info('Login: s.administrateur / [SEED_ADMIN_PASSWORD or password123]');
-      logger.warn('IMPORTANT: Change password on first login (mustChangePassword=true)');
+      logger.info('Login: s.administrateur / [SEED_ADMIN_PASSWORD or Cofinco-m@2026]');
     }
 
     if (!report.success) {

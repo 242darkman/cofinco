@@ -513,7 +513,9 @@ export interface UserRegisteredData {
   nom: string;
   prenom?: string;
   email?: string;
+  telephone?: string;
   agenceId?: string;
+  generatedPassword?: string;
 }
 
 export interface UserPasswordChangedData {

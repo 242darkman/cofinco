@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Users, Plus, Edit2, Trash2, Lock, Unlock, Eye, EyeOff, Shield, CheckCircle, XCircle, Search, Filter, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Upload, Image as ImageIcon, Loader2, User, Briefcase, Check, Save, CreditCard, KeyRound } from 'lucide-react';
+import { Users, Plus, Edit2, Trash2, Lock, Unlock, Eye, EyeOff, Shield, CheckCircle, XCircle, Search, Filter, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Upload, Image as ImageIcon, Loader2, User, Briefcase, Check, Save, CreditCard, KeyRound, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, Button, IconButton, ResponsiveTable } from '../ui';
 import ConfirmDialog from '../ui/ConfirmDialog';
@@ -137,6 +137,7 @@ export default function AdminGestionProfils() {
     roles: [] as SystemRole[],
     agenceId: '',
     photoProfile: '',
+    autoGeneratePassword: true,
   });
 
   // Defensive: ensure roles is always an array (HMR may preserve stale state)
@@ -184,7 +185,7 @@ export default function AdminGestionProfils() {
       case 2:
         return selectedRoles.length > 0;
       case 3:
-        return !!(isPasswordSecure && passwordValidation.match);
+        return formData.autoGeneratePassword || !!(isPasswordSecure && passwordValidation.match);
       default:
         return true;
     }
@@ -228,7 +229,7 @@ export default function AdminGestionProfils() {
   const handleCreateUser = useCallback(async (e?: React.FormEvent) => {
     e?.preventDefault();
 
-    if (!isPasswordSecure) {
+    if (!formData.autoGeneratePassword && !isPasswordSecure) {
       toast.warning('Le mot de passe ne respecte pas la politique de sécurité');
       return;
     }
@@ -247,10 +248,12 @@ export default function AdminGestionProfils() {
         prenom: formData.prenom,
         email: formData.email,
         telephone: formData.phone,
-        password: formData.password,
+        ...(formData.autoGeneratePassword
+          ? { autoGeneratePassword: true }
+          : { password: formData.password }),
         username: username,
         photoProfile: formData.photoProfile || undefined,
-        typeCompte: 'employe', // Marqué comme employé potentiel
+        typeCompte: 'employe',
         canLogin: true,
         statut: StatutUser.ACTIVE,
         tempEntityId: tempUserIdRef.current,
@@ -313,6 +316,7 @@ export default function AdminGestionProfils() {
           roles: [],
           agenceId: '',
           photoProfile: '',
+          autoGeneratePassword: true,
         });
         setShowCreateForm(false);
         loadUsers();
@@ -1159,56 +1163,110 @@ export default function AdminGestionProfils() {
                           <h4 className="text-sm font-bold text-content-primary">Mot de Passe & Sécurité</h4>
                         </div>
 
-                        {/* Password fields */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                          <div className="space-y-1.5">
-                            <label className="text-[11px] sm:text-xs font-bold text-content-muted uppercase">Mot de passe <span className="text-status-danger">*</span></label>
-                            <input
-                              type="password"
-                              value={formData.password}
-                              onChange={(e) => setFormData({...formData, password: e.target.value})}
-                              placeholder="Min. 8 caractères"
-                              className="w-full h-10 sm:h-11 px-3 sm:px-4 bg-surface-base border border-edge rounded-xl text-sm text-content-primary placeholder:text-content-muted focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all"
-                            />
-                          </div>
-                          <div className="space-y-1.5">
-                            <label className="text-[11px] sm:text-xs font-bold text-content-muted uppercase">Confirmer <span className="text-status-danger">*</span></label>
-                            <input
-                              type="password"
-                              value={formData.confirmPassword}
-                              onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
-                              placeholder="Retapez le mot de passe"
-                              className={`w-full h-10 sm:h-11 px-3 sm:px-4 bg-surface-base border rounded-xl text-sm text-content-primary placeholder:text-content-muted outline-none transition-all focus:ring-2 ${
-                                formData.confirmPassword && !passwordValidation.match
-                                  ? 'border-status-danger focus:ring-status-danger'
-                                  : 'border-edge focus:ring-accent focus:border-accent'
-                              }`}
-                            />
-                            {formData.confirmPassword && !passwordValidation.match && (
-                              <p className="text-[10px] text-status-danger mt-1 flex items-center gap-1">
-                                <XCircle size={10} /> Les mots de passe ne correspondent pas
-                              </p>
-                            )}
-                          </div>
+                        {/* Password mode toggle */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setFormData({...formData, autoGeneratePassword: true, password: '', confirmPassword: ''})}
+                            className={`p-3 rounded-xl border text-left transition-all ${
+                              formData.autoGeneratePassword
+                                ? 'border-accent bg-accent/5 ring-1 ring-accent'
+                                : 'border-edge bg-surface-base hover:border-accent/40'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 mb-1">
+                              <KeyRound size={14} className={formData.autoGeneratePassword ? 'text-accent' : 'text-content-muted'} />
+                              <span className="text-xs font-bold text-content-primary">Générer automatiquement</span>
+                            </div>
+                            <p className="text-[10px] text-content-muted leading-relaxed">
+                              Un mot de passe sécurisé sera généré et envoyé par email et SMS à l'employé
+                            </p>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFormData({...formData, autoGeneratePassword: false})}
+                            className={`p-3 rounded-xl border text-left transition-all ${
+                              !formData.autoGeneratePassword
+                                ? 'border-accent bg-accent/5 ring-1 ring-accent'
+                                : 'border-edge bg-surface-base hover:border-accent/40'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 mb-1">
+                              <Lock size={14} className={!formData.autoGeneratePassword ? 'text-accent' : 'text-content-muted'} />
+                              <span className="text-xs font-bold text-content-primary">Définir manuellement</span>
+                            </div>
+                            <p className="text-[10px] text-content-muted leading-relaxed">
+                              Saisir un mot de passe personnalisé pour cet employé
+                            </p>
+                          </button>
                         </div>
 
-                        {/* Password Policy */}
-                        <div className="bg-surface-muted/50 rounded-xl p-3 sm:p-4 space-y-2.5 border border-edge/50">
-                          <p className="text-[10px] uppercase tracking-wider font-bold text-content-muted">Politique de sécurité</p>
-                          <div className="grid grid-cols-2 gap-2">
-                            {[
-                              { check: passwordValidation.length, label: 'Min. 8 caractères' },
-                              { check: passwordValidation.uppercase, label: 'Une majuscule' },
-                              { check: passwordValidation.number, label: 'Un chiffre' },
-                              { check: passwordValidation.special, label: 'Caractère spécial (@$!%*?&)' },
-                            ].map((item) => (
-                              <div key={item.label} className={`flex items-center gap-1.5 text-[10px] sm:text-[11px] ${item.check ? 'text-status-success' : 'text-content-muted'}`}>
-                                {item.check ? <CheckCircle size={11} /> : <div className="w-2.5 h-2.5 rounded-full border border-current opacity-30" />}
-                                <span>{item.label}</span>
-                              </div>
-                            ))}
+                        {/* Auto-generate info */}
+                        {formData.autoGeneratePassword && (
+                          <div className="bg-status-info-bg/50 border border-status-info/20 rounded-xl p-3 sm:p-4 flex items-start gap-3">
+                            <Info size={16} className="text-status-info shrink-0 mt-0.5" />
+                            <div className="text-xs text-content-secondary leading-relaxed">
+                              <p className="font-medium text-content-primary mb-1">Mot de passe auto-généré</p>
+                              <p>Un mot de passe conforme à la politique de sécurité sera créé automatiquement et envoyé à l'employé sur son <strong>email</strong>{formData.phone ? ' et par <strong>SMS</strong>' : ''}.</p>
+                              <p className="mt-1 text-content-muted">L'employé devra changer son mot de passe à la première connexion.</p>
+                            </div>
                           </div>
-                        </div>
+                        )}
+
+                        {/* Manual password fields */}
+                        {!formData.autoGeneratePassword && (
+                          <>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                              <div className="space-y-1.5">
+                                <label className="text-[11px] sm:text-xs font-bold text-content-muted uppercase">Mot de passe <span className="text-status-danger">*</span></label>
+                                <input
+                                  type="password"
+                                  value={formData.password}
+                                  onChange={(e) => setFormData({...formData, password: e.target.value})}
+                                  placeholder="Min. 8 caractères"
+                                  className="w-full h-10 sm:h-11 px-3 sm:px-4 bg-surface-base border border-edge rounded-xl text-sm text-content-primary placeholder:text-content-muted focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all"
+                                />
+                              </div>
+                              <div className="space-y-1.5">
+                                <label className="text-[11px] sm:text-xs font-bold text-content-muted uppercase">Confirmer <span className="text-status-danger">*</span></label>
+                                <input
+                                  type="password"
+                                  value={formData.confirmPassword}
+                                  onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
+                                  placeholder="Retapez le mot de passe"
+                                  className={`w-full h-10 sm:h-11 px-3 sm:px-4 bg-surface-base border rounded-xl text-sm text-content-primary placeholder:text-content-muted outline-none transition-all focus:ring-2 ${
+                                    formData.confirmPassword && !passwordValidation.match
+                                      ? 'border-status-danger focus:ring-status-danger'
+                                      : 'border-edge focus:ring-accent focus:border-accent'
+                                  }`}
+                                />
+                                {formData.confirmPassword && !passwordValidation.match && (
+                                  <p className="text-[10px] text-status-danger mt-1 flex items-center gap-1">
+                                    <XCircle size={10} /> Les mots de passe ne correspondent pas
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Password Policy */}
+                            <div className="bg-surface-muted/50 rounded-xl p-3 sm:p-4 space-y-2.5 border border-edge/50">
+                              <p className="text-[10px] uppercase tracking-wider font-bold text-content-muted">Politique de sécurité</p>
+                              <div className="grid grid-cols-2 gap-2">
+                                {[
+                                  { check: passwordValidation.length, label: 'Min. 8 caractères' },
+                                  { check: passwordValidation.uppercase, label: 'Une majuscule' },
+                                  { check: passwordValidation.number, label: 'Un chiffre' },
+                                  { check: passwordValidation.special, label: 'Caractère spécial (@$!%*?&)' },
+                                ].map((item) => (
+                                  <div key={item.label} className={`flex items-center gap-1.5 text-[10px] sm:text-[11px] ${item.check ? 'text-status-success' : 'text-content-muted'}`}>
+                                    {item.check ? <CheckCircle size={11} /> : <div className="w-2.5 h-2.5 rounded-full border border-current opacity-30" />}
+                                    <span>{item.label}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </>
+                        )}
 
                         {/* Recap Card */}
                         <div className="bg-surface-muted/30 border border-edge/50 rounded-xl p-3 sm:p-4 space-y-2.5">

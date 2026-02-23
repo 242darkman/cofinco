@@ -1693,22 +1693,51 @@ export async function handleClientCreated(data: ClientCreatedData) {
 }
 
 export async function handleUserRegistered(data: UserRegisteredData) {
-  // Send welcome email to the new user
-  if (!data.email) return;
+  if (!data.email && !data.telephone) return;
 
-  const payload = {
+  const payload: Record<string, unknown> = {
     userName: [data.nom, data.prenom].filter(Boolean).join(" "),
     username: data.username,
   };
 
+  // Include credentials in notification payload if auto-generated
+  if (data.generatedPassword) {
+    payload.password = data.generatedPassword;
+    payload.hasCredentials = true;
+  }
+
+  const smsRecipients: Array<{ phone: string; templateCode: string; payload: Record<string, unknown>; agenceId?: string }> = [];
+  const emailRecipients: Array<{ email: string; templateCode: string; payload: Record<string, unknown>; agenceId?: string }> = [];
+
+  // Send SMS with credentials if phone available
+  if (data.telephone) {
+    smsRecipients.push({
+      phone: data.telephone,
+      templateCode: data.generatedPassword ? "USER_CREDENTIALS" : "USER_REGISTERED",
+      payload,
+      agenceId: data.agenceId,
+    });
+  }
+
+  // Send email with credentials if email available
+  if (data.email) {
+    emailRecipients.push({
+      email: data.email,
+      templateCode: data.generatedPassword ? "USER_CREDENTIALS" : "USER_REGISTERED",
+      payload,
+      agenceId: data.agenceId,
+    });
+  }
+
   await emitNotificationEvent("USER_REGISTERED", data, {
-    smsRecipients: [],
-    emailRecipients: [{ email: data.email, templateCode: "USER_REGISTERED", payload, agenceId: data.agenceId }],
+    smsRecipients,
+    emailRecipients,
   });
 
   logNotificationEvent("info", "Domain event: USER_REGISTERED", {
     correlationId: `user-registered-${data.userId}`,
     status: "DISPATCHED",
+    hasCredentials: !!data.generatedPassword,
   });
 }
 
