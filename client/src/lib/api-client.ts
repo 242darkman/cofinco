@@ -5,6 +5,8 @@
 // Device fingerprinting for stolen cookie detection
 
 import { getOrCreateFingerprint, clearStoredFingerprint } from './device-fingerprint';
+import { getCriticalOperation } from './criticalOperations';
+import { networkManager } from './networkManager';
 
 const API_BASE = '/api';
 
@@ -305,6 +307,22 @@ async function request<T>(
   endpoint: string,
   options?: RequestInit
 ): Promise<T> {
+  // Block critical operations with 'block' policy when offline/api_down
+  const method = options?.method || 'GET';
+  if (method !== 'GET') {
+    const critOp = getCriticalOperation(endpoint, method);
+    if (critOp?.offlinePolicy === 'block') {
+      const netState = networkManager.getState();
+      if (netState.status === 'offline' || netState.status === 'api_down') {
+        throw new ApiError(
+          0,
+          `${critOp.name} nécessite une connexion active au serveur.`,
+          { blocked: true, offlinePolicy: 'block', operation: critOp.name }
+        );
+      }
+    }
+  }
+
   // Construire les headers avec X-Agence-Id si disponible
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',

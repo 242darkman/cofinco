@@ -9,6 +9,7 @@ import { getAccountBalance, getAccountUiConfig } from '../../../lib/account-conf
 import { toast } from '../../../lib/toast';
 import { currencySymbol, formatMoney } from '@shared/config/currency';
 import { Badge, Button, FormField, SearchableSelect, SelectField, Switch, TabGroup } from '../../ui';
+import OfflineGuard from '../../shared/OfflineGuard';
 
 interface Compte {
   id: string;
@@ -553,18 +554,20 @@ export default function TransactionFlow() {
 
       {/* Fixed bottom: Submit */}
       <div className="shrink-0 px-3 sm:px-4 py-2.5 sm:py-3 border-t border-edge bg-surface">
-        <div>
-          <Button
-            onClick={handleSubmit}
-            disabled={!canSubmit || submitting}
-            className="w-full h-11 sm:h-12 text-sm"
-            variant="primary"
-            icon={Send}
-            isLoading={submitting}
-          >
-            {submitLabel}
-          </Button>
-        </div>
+        <OfflineGuard blockMode="dialog" offlineMessage="Les virements nécessitent une connexion active au serveur.">
+          <div>
+            <Button
+              onClick={handleSubmit}
+              disabled={!canSubmit || submitting}
+              className="w-full h-11 sm:h-12 text-sm"
+              variant="primary"
+              icon={Send}
+              isLoading={submitting}
+            >
+              {submitLabel}
+            </Button>
+          </div>
+        </OfflineGuard>
       </div>
     </div>
   );

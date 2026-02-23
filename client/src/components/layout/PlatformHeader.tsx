@@ -82,9 +82,7 @@ export default function PlatformHeader({
       </div>
 
       <div className="flex flex-wrap items-center gap-2 md:gap-3 w-full xl:w-auto justify-between xl:justify-end">
-        <div className="hidden sm:flex">
-          <OfflineIndicator />
-        </div>
+        <OfflineIndicator />
 
         {/* Theme Toggle */}
         <ThemeToggle />

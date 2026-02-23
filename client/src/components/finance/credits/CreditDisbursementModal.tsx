@@ -14,6 +14,7 @@ import { StatutCoffre, DisbursementChannel, DISBURSEMENT_CHANNEL_LABELS, type Di
 import mtnLogo from '@/assets/logos/mtn-logo.png';
 import airtelLogo from '@/assets/logos/airtel-logo.png';
 import { currencyCode } from '@shared/config/currency';
+import OfflineGuard from '../../shared/OfflineGuard';
 
 const MOBILE_OPERATORS = [
   { id: 'MTN', name: 'MTN Mobile Money', color: 'from-status-warning to-status-warning', logo: mtnLogo },
@@ -651,21 +652,23 @@ export default function CreditDisbursementModal({ demande, onClose, onSuccess }:
                  Annuler
              </Button>
              {canDisburse ? (
+                 <OfflineGuard blockMode="dialog" offlineMessage="Les décaissements nécessitent une connexion active au serveur.">
                  <Button
                     variant="primary"
                     onClick={() => setShowConfirm(true)}
                     disabled={loading || (disbursementChannel === DisbursementChannel.MOBILE_MONEY && !mobileProvider)}
                     className={`flex-1 font-bold shadow-lg ${
-                        disbursementChannel === DisbursementChannel.CASH 
-                        ? 'bg-status-warning hover:bg-status-warning text-white shadow-status-warning/20' 
+                        disbursementChannel === DisbursementChannel.CASH
+                        ? 'bg-status-warning hover:bg-status-warning text-white shadow-status-warning/20'
                         : disbursementChannel === DisbursementChannel.MOBILE_MONEY
                         ? 'bg-status-info hover:bg-status-info text-white shadow-status-info/20'
                         : 'bg-status-success hover:bg-status-success text-white shadow-status-success/20'
                     }`}
                  >
-                    {loading ? <Loader2 className="animate-spin" size={18} /> : 
+                    {loading ? <Loader2 className="animate-spin" size={18} /> :
                      decaissementType === 'programme' ? 'Valider la Programmation' : 'Confirmer le Décaissement'}
                  </Button>
+                 </OfflineGuard>
              ) : (
                  <div className="flex-1 px-4 py-2 bg-surface-elevated text-content-muted rounded-lg text-xs text-center flex items-center justify-center gap-2">
                      <AlertCircle size={14} /> Droit insuffisant

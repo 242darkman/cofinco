@@ -9,6 +9,7 @@ import { sessionCaisseApi, caisseAccessControlApi, authApi } from '../../../lib/
 import { Actions, Subjects } from '@/lib/casl';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import OfflineGuard from '../../shared/OfflineGuard';
 
 interface CaisseOuvertureProps {
   onClose: () => void;
@@ -1065,6 +1066,7 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
            {/* FOOTER ACTION */}
            <div className="mt-auto pt-4 border-t border-edge">
               {step === 'auth' && (
+                <OfflineGuard blockMode="dialog" offlineMessage="L'ouverture de caisse nécessite une connexion active au serveur.">
                 <button
                   onClick={openingMode === 'direct' ? handleDirectOpening : handleRequestOpening}
                   disabled={
@@ -1092,6 +1094,7 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
                      </>
                    )}
                 </button>
+                </OfflineGuard>
               )}
 
               {step === 'confirm' && (

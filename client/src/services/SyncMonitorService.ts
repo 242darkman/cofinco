@@ -10,6 +10,8 @@
  * @module services/SyncMonitorService
  */
 
+import { tabLeader } from '../lib/tabLeader';
+
 // ============================================================================
 // TYPES & INTERFACES
 // ============================================================================
@@ -354,6 +356,13 @@ class SyncMonitorService {
   private minHeartbeatIntervalMs: number = 3000; // 3 seconds minimum between heartbeats
 
   private async sendHeartbeat(): Promise<void> {
+    // Only the leader tab should send heartbeats to the server
+    // Non-leader tabs keep their last known state (updated via BroadcastChannel if needed)
+    if (!tabLeader.isLeader()) {
+      this.log('Skipping heartbeat: not leader tab');
+      return;
+    }
+
     // Prevent overlapping heartbeats
     if (this.heartbeatInProgress) {
       this.log('Heartbeat already in progress, skipping');

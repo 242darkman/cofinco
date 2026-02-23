@@ -3,6 +3,7 @@ import {
   Shield, Users, Key, Settings, BarChart3, Activity, Monitor, Power, Building2, MapPin,
   MessageSquare, KeyRound, Clock, UserPlus, Award, Package, CreditCard, CalendarClock,
   AlertTriangle, Lock, ChevronLeft, ChevronRight, Coins, RotateCcw, Wallet, Percent, Palette,
+  CloudUpload,
 } from 'lucide-react';
 
 // Constants
@@ -37,6 +38,7 @@ import AdminBrandingSettings from './AdminBrandingSettings';
 import AdminAgencyReset from './AdminAgencyReset';
 import AdminScoring from './AdminScoring';
 import AdminPaymentMethodToggles from './AdminPaymentMethodToggles';
+import AdminSyncPanel from './AdminSyncPanel';
 
 
 interface AdminModuleCompletProps {
@@ -134,6 +136,7 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
     'Wallet': Wallet,
     'Percent': Percent,
     'Palette': Palette,
+    'CloudUpload': CloudUpload,
   };
 
   return (
@@ -266,6 +269,7 @@ export default function AdminModuleComplet({ activeView }: AdminModuleCompletPro
                   {activeTab === 'branding' && <AdminBrandingSettings />}
                   {activeTab === 'reset-agence' && <AdminAgencyReset />}
                   {activeTab === 'scoring' && <AdminScoring />}
+                  {activeTab === 'sync' && <AdminSyncPanel />}
 
                   {activeTab === 'roles' && <AccessManagement />}
               </div>

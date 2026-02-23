@@ -134,7 +134,7 @@ function ConflictItem({ conflict, onResolve, isResolving }: ConflictItemProps) {
   };
 
   return (
-    <Card className="mb-4 border-l-4 border-l-orange-500 bg-surface/50">
+    <Card className="mb-4 border-l-4 border-l-status-warning bg-surface/50">
       <div className="flex items-start justify-between">
         <div className="flex items-start gap-3">
           <div className="p-2 bg-status-warning-bg rounded-full">

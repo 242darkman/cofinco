@@ -31,12 +31,14 @@ import {
   getLatencyQualityLabel
 } from '../../hooks/useSyncMonitor';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useConflicts } from '../../contexts/OfflineContext';
 import Button from '../ui/Button';
 import Card from '../ui/Card';
 import SyncQueueDrawer from './SyncQueueDrawer';
 
 export function OfflineIndicator() {
   const { t } = useLanguage();
+  const { conflictCount } = useConflicts();
   const [showDetails, setShowDetails] = useState(false);
   const [showQueueDrawer, setShowQueueDrawer] = useState(false);
 
@@ -111,7 +113,7 @@ export function OfflineIndicator() {
 
       {/* Dropdown Panel */}
       {showDetails && (
-        <div className="absolute left-0 mt-3 z-50 animate-in slide-in-from-top-2 duration-200">
+        <div className="absolute right-0 sm:left-0 sm:right-auto mt-3 z-50 animate-in slide-in-from-top-2 duration-200">
           <Card className="w-80 shadow-2xl border-edge bg-surface-base/95 backdrop-blur-md">
             {/* Header */}
             <div className="flex items-center justify-between mb-4 pb-3 border-b border-edge">
@@ -218,6 +220,21 @@ export function OfflineIndicator() {
                   </span>
                 </div>
               </div>
+
+              {/* Conflict Badge */}
+              {conflictCount > 0 && (
+                <div className="flex items-center gap-3 p-3 bg-status-warning-bg border border-status-warning/20 rounded-xl">
+                  <AlertTriangle className="h-5 w-5 text-status-warning flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-status-warning">
+                      {conflictCount} conflit{conflictCount > 1 ? 's' : ''} à résoudre
+                    </p>
+                    <p className="text-xs text-content-muted">
+                      Allez dans Admin → Synchronisation
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Error Display */}
               {hasError && lastError && (

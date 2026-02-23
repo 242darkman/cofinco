@@ -59,6 +59,7 @@ export const ADMIN_TABS = [
   { id: 'branding', label: 'Branding', icon: 'Palette', permission: 'admin.settings' },
   { id: 'reset-agence', label: 'Reset Agence', icon: 'RotateCcw', permission: 'admin.manage' },
   { id: 'scoring', label: 'Scoring', icon: 'BarChart3', permission: 'loyalty.view' },
+  { id: 'sync', label: 'Synchronisation', icon: 'CloudUpload', permission: 'admin.settings' },
 ] as const;
 
 export type AdminTabId = typeof ADMIN_TABS[number]['id'];
