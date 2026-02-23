@@ -355,6 +355,24 @@ export class SessionOpeningService {
           errorCode: "DB_ERROR",
         };
       }
+      // Contrainte unique DB (race condition — belt-and-suspenders avec SERIALIZABLE)
+      if ((error as { code?: string }).code === "23505") {
+        const constraint = (error as { constraint?: string }).constraint || '';
+        if (constraint.includes("one_active_per_caisse") || constraint.includes("caisse")) {
+          return {
+            success: false,
+            error: "Cette caisse a déjà une session active ou une demande en cours.",
+            errorCode: "CAISSE_OCCUPIED",
+          };
+        }
+        if (constraint.includes("one_active_per_user") || constraint.includes("user")) {
+          return {
+            success: false,
+            error: "Vous avez déjà une session active ou une demande en cours.",
+            errorCode: "USER_HAS_SESSION",
+          };
+        }
+      }
       logger.error({ err: error }, 'Error in requestSessionOpening');
       return {
         success: false,
@@ -1490,6 +1508,24 @@ export class SessionOpeningService {
         };
       });
     } catch (error: unknown) {
+      // Contrainte unique DB (race condition — belt-and-suspenders)
+      if ((error as { code?: string }).code === "23505") {
+        const constraint = (error as { constraint?: string }).constraint || '';
+        if (constraint.includes("one_active_per_caisse") || constraint.includes("caisse")) {
+          return {
+            success: false,
+            error: "Cette caisse a déjà une session active.",
+            errorCode: "CAISSE_OCCUPIED",
+          };
+        }
+        if (constraint.includes("one_active_per_user") || constraint.includes("user")) {
+          return {
+            success: false,
+            error: "Vous avez déjà une session active sur une autre caisse.",
+            errorCode: "USER_HAS_SESSION",
+          };
+        }
+      }
       logger.error({ err: error }, 'Error in openDirectWithExistingFunds');
       return {
         success: false,

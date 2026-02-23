@@ -2540,6 +2540,43 @@ export async function ensureCustomFunctions(): Promise<void> {
       console.warn('[DB] ⚠ Failed data migration "legacy account statuses":', err instanceof Error ? err.message : err);
     }
 
+    // ========================================================================
+    // SESSIONS CAISSE — CONTRAINTES UNIQUES + INDEXES PERFORMANCE
+    // ========================================================================
+
+    // CRITIQUE: Une seule session active par caisse (empêche doubles sessions)
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_sessions_caisse_one_active_per_caisse
+      ON sessions_caisse (caisse_id)
+      WHERE statut NOT IN ('CLOSED', 'RECONCILIATION_PENDING', 'RECONCILIATION_COMPLETE')
+      AND deleted_at IS NULL;
+    `);
+    console.log('[DB] ✓ Unique index: uq_sessions_caisse_one_active_per_caisse');
+    objectCount++;
+
+    // CRITIQUE: Un caissier ne peut avoir qu'une seule session active
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_sessions_caisse_one_active_per_user
+      ON sessions_caisse (caissier_id)
+      WHERE statut NOT IN ('CLOSED', 'RECONCILIATION_PENDING', 'RECONCILIATION_COMPLETE')
+      AND deleted_at IS NULL;
+    `);
+    console.log('[DB] ✓ Unique index: uq_sessions_caisse_one_active_per_user');
+    objectCount++;
+
+    // Performance indexes (la table sessions_caisse n'en avait aucun)
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_sessions_caisse_caisse_id ON sessions_caisse (caisse_id);
+      CREATE INDEX IF NOT EXISTS idx_sessions_caisse_caissier_id ON sessions_caisse (caissier_id);
+      CREATE INDEX IF NOT EXISTS idx_sessions_caisse_agence_id ON sessions_caisse (agence_id);
+      CREATE INDEX IF NOT EXISTS idx_sessions_caisse_statut ON sessions_caisse (statut);
+      CREATE INDEX IF NOT EXISTS idx_sessions_caisse_opened_at ON sessions_caisse (opened_at);
+      CREATE INDEX IF NOT EXISTS idx_sessions_caisse_closed_at ON sessions_caisse (closed_at);
+      CREATE INDEX IF NOT EXISTS idx_sessions_caisse_created_at ON sessions_caisse (created_at);
+    `);
+    console.log('[DB] ✓ Performance indexes on sessions_caisse (7 indexes)');
+    objectCount += 7;
+
     console.log(`[DB] All ${objectCount} custom functions, triggers, and views ensured in ${Date.now() - start}ms`);
   } catch (error) {
     console.error('[DB] Error ensuring custom functions:', error);

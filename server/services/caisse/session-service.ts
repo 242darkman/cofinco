@@ -680,18 +680,18 @@ export async function openSessionAtomic(params: OpenSessionParams): Promise<Open
 
     // Erreur de contrainte unique (race condition attrapée par la DB)
     if ((error as { code?: string }).code === "23505") {
-      // unique_violation
-      if ((error as { constraint?: string }).constraint?.includes("caisse")) {
+      const constraint = (error as { constraint?: string }).constraint || '';
+      if (constraint.includes("one_active_per_caisse") || constraint.includes("caisse")) {
         return {
           success: false,
-          error: "Cette caisse vient d'être ouverte par un autre utilisateur",
+          error: "Cette caisse a déjà une session active. Utilisez la récupération de session.",
           errorCode: "CAISSE_OCCUPIED",
         };
       }
-      if ((error as { constraint?: string }).constraint?.includes("user")) {
+      if (constraint.includes("one_active_per_user") || constraint.includes("user")) {
         return {
           success: false,
-          error: "Vous venez d'ouvrir une session sur une autre caisse",
+          error: "Vous avez déjà une session active sur une autre caisse.",
           errorCode: "USER_HAS_SESSION",
         };
       }
