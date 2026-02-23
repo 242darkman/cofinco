@@ -33,11 +33,11 @@ interface AlertsDrawerProps {
 
 const FLAG_CONFIG: Record<string, { label: string; variant: 'danger' | 'warning' | 'info' }> = {
   blacklisted: { label: 'Liste noire', variant: 'danger' },
-  high_risk: { label: 'Risque eleve', variant: 'danger' },
-  kyc_expired: { label: 'KYC expire', variant: 'danger' },
-  id_expired: { label: 'ID expiree', variant: 'danger' },
-  pep: { label: 'PEP', variant: 'warning' },
-  id_missing: { label: 'ID manquante', variant: 'warning' },
+  high_risk: { label: 'Risque élevé', variant: 'danger' },
+  kyc_expired: { label: 'KYC expiré', variant: 'danger' },
+  id_expired: { label: "Pièce d'identité expirée", variant: 'danger' },
+  pep: { label: 'Personne politiquement exposée', variant: 'warning' },
+  id_missing: { label: "Pièce d'identité manquante", variant: 'warning' },
   low_score: { label: 'Score faible', variant: 'info' },
 };
 
@@ -134,7 +134,7 @@ export function AlertsDrawer({ open, onClose }: AlertsDrawerProps) {
               )}
             </SheetTitle>
             <SheetDescription className="text-content-muted text-xs">
-              Clients necessitant une attention particuliere
+              Clients nécessitant une attention particulière
             </SheetDescription>
           </SheetHeader>
 
