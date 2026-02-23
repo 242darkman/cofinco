@@ -21,6 +21,7 @@ import TontineMembers from './TontineMembers';
 import TontineContributions from './TontineContributions';
 import TontineDistributions from './TontineDistributions';
 import { TontineStatus, type Tontine as SchemaTontine } from '@shared/schema/tontines';
+import { STATUT_TONTINE_LABELS, FREQUENCE_TONTINE_LABELS } from '@shared/enum/status-constants';
 import TontineDashboard from './TontineDashboard';
 import TontineCalendar from './TontineCalendar';
 import TontineConfig from './TontineConfig';
@@ -134,8 +135,8 @@ export default function Tontines() {
     const t = selectedTontine;
     const data = [{
       'Nom': t.nom,
-      'Statut': t.statut,
-      'Fréquence': t.frequence,
+      'Statut': STATUT_TONTINE_LABELS[t.statut] || t.statut,
+      'Fréquence': FREQUENCE_TONTINE_LABELS[t.frequence as keyof typeof FREQUENCE_TONTINE_LABELS] || t.frequence,
       [`Cotisation (${sym})`]: (t.montantCotisation || 0).toLocaleString('fr-FR'),
       'Membres': `${t.nombreMembresActuel || 0} / ${t.nombreMembres || 0}`,
       'Tour actuel': t.tourActuel || 1,
@@ -150,12 +151,12 @@ export default function Tontines() {
   const handleLifecycleAction = useCallback((action: 'activate' | 'pause' | 'resume' | 'complete' | 'cancel') => {
     if (!selectedTontine) return;
 
-    const labels: Record<string, { title: string; message: string; variant: 'warning' | 'danger' | 'default'; confirm: string }> = {
-      activate: { title: 'Activer la tontine ?', message: 'La tontine passera en mode actif. Les cotisations et distributions seront possibles.', variant: 'default', confirm: 'Activer' },
-      pause: { title: 'Suspendre la tontine ?', message: 'Les cycles en cours seront suspendus. Aucune operation ne sera possible.', variant: 'warning', confirm: 'Suspendre' },
-      resume: { title: 'Reprendre la tontine ?', message: 'La tontine reprendra son fonctionnement normal.', variant: 'default', confirm: 'Reprendre' },
-      complete: { title: 'Terminer la tontine ?', message: 'La tontine sera marquee comme terminee. Cette action est irreversible.', variant: 'warning', confirm: 'Terminer' },
-      cancel: { title: 'Annuler la tontine ?', message: 'La tontine sera annulee definitivement. Cette action est irreversible.', variant: 'danger', confirm: 'Annuler' },
+    const labels: Record<string, { title: string; message: string; variant: 'warning' | 'danger' | 'info' | 'success'; confirm: string }> = {
+      activate: { title: 'Activer la tontine ?', message: 'La tontine passera en mode actif. Les cotisations et distributions seront possibles.', variant: 'info', confirm: 'Activer' },
+      pause: { title: 'Suspendre la tontine ?', message: 'Les cycles en cours seront suspendus. Aucune opération ne sera possible.', variant: 'warning', confirm: 'Suspendre' },
+      resume: { title: 'Reprendre la tontine ?', message: 'La tontine reprendra son fonctionnement normal.', variant: 'info', confirm: 'Reprendre' },
+      complete: { title: 'Terminer la tontine ?', message: 'La tontine sera marquée comme terminée. Cette action est irréversible.', variant: 'warning', confirm: 'Terminer' },
+      cancel: { title: 'Annuler la tontine ?', message: 'La tontine sera annulée définitivement. Cette action est irréversible.', variant: 'danger', confirm: 'Annuler' },
     };
 
     const cfg = labels[action];
@@ -209,13 +210,25 @@ export default function Tontines() {
       label: 'Fréquence',
       key: 'frequence',
       format: (value: any) => (
-        <span className="text-xs text-content-secondary">{value}</span>
+        <span className="text-xs text-content-secondary">{FREQUENCE_TONTINE_LABELS[value as keyof typeof FREQUENCE_TONTINE_LABELS] || value}</span>
       )
     },
     {
       label: 'Statut',
       key: 'statut',
-      badge: true
+      format: (value: any) => (
+        <Badge
+          value={STATUT_TONTINE_LABELS[value] || value}
+          variant={
+            value === 'ACTIVE' ? 'success'
+            : value === 'PAUSED' ? 'warning'
+            : value === 'DRAFT' ? 'neutral'
+            : value === 'COMPLETED' ? 'info'
+            : 'danger'
+          }
+          size="sm"
+        />
+      )
     }
   ];
 
@@ -271,11 +284,11 @@ export default function Tontines() {
               <div className="flex items-center gap-2">
                 <span>{selectedTontine.nom}</span>
                 <Badge
-                  value={selectedTontine.statut}
+                  value={STATUT_TONTINE_LABELS[selectedTontine.statut] || selectedTontine.statut}
                   variant={
                     selectedTontine.statut === 'ACTIVE' ? 'success'
                     : selectedTontine.statut === 'PAUSED' ? 'warning'
-                    : selectedTontine.statut === 'DRAFT' ? 'default'
+                    : selectedTontine.statut === 'DRAFT' ? 'neutral'
                     : selectedTontine.statut === 'COMPLETED' ? 'info'
                     : 'danger'
                   }
@@ -307,7 +320,7 @@ export default function Tontines() {
                     Terminer
                   </Button>
                 )}
-                {canEditTontines && (selectedTontine.statut === 'DRAFT' || selectedTontine.statut === 'PAUSED') && (
+                {canEditTontines && (selectedTontine.statut === 'DRAFT' || selectedTontine.statut === 'ACTIVE' || selectedTontine.statut === 'PAUSED') && (
                   <Button variant="ghost" size="sm" icon={Ban} onClick={() => handleLifecycleAction('cancel')} className="text-status-danger">
                     Annuler
                   </Button>
@@ -412,6 +425,17 @@ export default function Tontines() {
                 />
               )}
         </div>
+
+        {/* Confirm Dialog (must be inside early-return branch) */}
+        <ConfirmDialog
+          isOpen={confirmState.isOpen}
+          onClose={closeConfirm}
+          onConfirm={handleConfirm}
+          title={confirmState.title || ''}
+          message={confirmState.message || ''}
+          variant={confirmState.variant}
+          confirmText={confirmState.confirmText}
+        />
       </div>
     );
   }

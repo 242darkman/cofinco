@@ -1734,6 +1734,74 @@ export function registerTontineRoutes(app: Express) {
         } catch (e) { /* non-blocking */ }
       }
 
+      // Auto-completion: check if all members received their distribution (ROTATIVE_SUSU)
+      if (result.status === 'SUCCESS') {
+        try {
+          const tontine = await storage.getTontine(req.params.id);
+          if (tontine && tontine.statut === 'ACTIVE' && tontine.distributionType === 'ROTATIVE_SUSU') {
+            const activeMembers = await storage.getMembresTontine(req.params.id);
+            const allReceived = activeMembers
+              .filter((m: any) => m.statut === 'ACTIVE')
+              .every((m: any) => m.aRecuBenefice === true);
+
+            if (allReceived) {
+              // All members received — close cycle and complete tontine
+              const activeCycle = await storage.getActiveCycle(req.params.id);
+              if (activeCycle) {
+                await storage.closeCycle(req.params.id, activeCycle.id, userId!);
+                logger.info({ tontineId: req.params.id, cycleId: activeCycle.id }, 'Cycle auto-clôturé (tous les membres ont reçu)');
+              }
+
+              await tontineLifecycleService.transitionStatus(
+                req.params.id, 'COMPLETED', userId!, 'Auto-complétée : tous les membres ont reçu leur distribution'
+              );
+              logger.info({ tontineId: req.params.id }, 'Tontine auto-complétée');
+
+              const wsInstance2 = getWsInstance();
+              if (wsInstance2) {
+                wsInstance2.broadcast({ type: "TONTINE_UPDATE", payload: { type: "status_changed", id: req.params.id } });
+              }
+            } else {
+              // Not all received yet — check if current cycle's turns are all distributed, then close cycle + generate next
+              const activeCycle = await storage.getActiveCycle(req.params.id);
+              if (activeCycle) {
+                const cycleTurns = await storage.getTurnsByCycle(req.params.id, activeCycle.id);
+                const allTurnsDone = cycleTurns.length > 0 && cycleTurns.every(
+                  (t: any) => t.status === 'PAID_OUT' || t.status === 'SKIPPED'
+                );
+
+                if (allTurnsDone) {
+                  // Close current cycle
+                  await storage.closeCycle(req.params.id, activeCycle.id, userId!);
+                  logger.info({ tontineId: req.params.id, cycleId: activeCycle.id }, 'Cycle auto-clôturé (tous les tours distribués)');
+
+                  // Generate next cycle
+                  try {
+                    const agenceId = req.user?.agenceId || (req.session.user as any)?.agenceId;
+                    const nextCycle = await tontineProductionService.generateCycle({
+                      tontineId: req.params.id,
+                      agenceId,
+                      userId: userId!,
+                    });
+                    logger.info({ tontineId: req.params.id, newCycleId: nextCycle.cycleId }, 'Nouveau cycle auto-généré');
+
+                    const wsInstance2 = getWsInstance();
+                    if (wsInstance2) {
+                      wsInstance2.broadcast({ type: "TONTINE_UPDATE", payload: { type: "cycle_generated", tontineId: req.params.id } });
+                    }
+                  } catch (cycleErr: any) {
+                    logger.warn({ err: cycleErr, tontineId: req.params.id }, 'Impossible de générer le cycle suivant automatiquement');
+                  }
+                }
+              }
+            }
+          }
+        } catch (autoErr: any) {
+          // Non-blocking: log but don't fail the distribution approval
+          logger.warn({ err: autoErr, tontineId: req.params.id }, 'Erreur lors de la vérification auto-complétion');
+        }
+      }
+
       res.json(result);
     } catch (error: any) {
       logger.error({ err: error }, 'Erreur approbation distribution');

@@ -17,7 +17,7 @@ import {
   TontineCycleStatus,
 } from "@shared/schema/tontines";
 import { eq, and, sql } from "drizzle-orm";
-import { StatutMembreTontine } from "@shared/enum/status-constants";
+import { StatutMembreTontine, STATUT_TONTINE_LABELS } from "@shared/enum/status-constants";
 import { dispatchDomainEvent } from "./notifications/domain-events/event-registry";
 
 const logger = createLogger("TontineLifecycle");
@@ -61,9 +61,10 @@ async function transitionStatus(
   const allowed = VALID_TRANSITIONS[currentStatus] || [];
 
   if (!allowed.includes(targetStatus)) {
+    const label = (s: string) => STATUT_TONTINE_LABELS[s] || s;
     throw new Error(
-      `Transition invalide: ${currentStatus} → ${targetStatus}. ` +
-      `Transitions autorisees: ${allowed.join(", ") || "aucune"}`
+      `Transition invalide : ${label(currentStatus)} → ${label(targetStatus)}. ` +
+      `Transitions autorisées : ${allowed.map(label).join(", ") || "aucune"}`
     );
   }
 
@@ -177,8 +178,8 @@ async function validateTransition(tontine: any, targetStatus: string): Promise<v
 
       if (unpaid.count > 0) {
         throw new Error(
-          `${unpaid.count} membre(s) n'ont pas encore recu leur distribution. ` +
-          `Utilisez CANCELLED si vous voulez terminer sans completer le cycle.`
+          `${unpaid.count} membre(s) n'ont pas encore reçu leur distribution. ` +
+          `Utilisez « Annuler » si vous voulez clôturer sans compléter le cycle.`
         );
       }
     }

@@ -111,7 +111,7 @@ export default function TontineDashboard({
           type: 'contribution',
           montant: Number(c.montant),
           date: c.dateContribution || c.createdAt,
-          nom: c.client ? [c.client.prenom, c.client.nom].filter(Boolean).join(' ') : 'Inconnu'
+          nom: [c.client?.prenom, c.client?.nom].filter(Boolean).join(' ') || 'Inconnu'
         }))
         .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setRecentActivity(activities);
