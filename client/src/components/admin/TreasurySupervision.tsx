@@ -526,37 +526,53 @@ export function TreasurySupervision() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2 overflow-y-auto max-h-[calc(100%-40px)] custom-scrollbar pb-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 overflow-y-auto max-h-[calc(100%-40px)] custom-scrollbar pb-1">
           {paginatedAgencies.map((agency: TreasuryStats['breakdown'][0]) => {
             const isSelected = selectedAgencies.includes(agency.agenceId);
+            const color = getAgencyColor(agency.agenceId);
             return (
               <Card
                 key={agency.agenceId}
                 className={cn(
-                  "cursor-pointer transition-all duration-150 hover:bg-surface/50 relative overflow-hidden border-edge p-2",
-                  isSelected ? "ring-1 ring-accent border-accent bg-accent/[0.05]" : "hover:border-edge"
+                  "cursor-pointer transition-all duration-150 relative overflow-hidden p-3",
+                  isSelected
+                    ? "ring-1 ring-accent border-accent bg-accent/[0.03]"
+                    : "border-edge hover:border-accent/40 hover:shadow-sm"
                 )}
                 onClick={() => toggleAgency(agency.agenceId)}
               >
+                {/* Selection indicator */}
                 {isSelected && (
-                  <div className="absolute top-0 left-0 w-0.5 h-full" style={{ backgroundColor: getAgencyColor(agency.agenceId) }} />
+                  <div className="absolute top-0 left-0 w-1 h-full rounded-r" style={{ backgroundColor: color }} />
                 )}
-                <div className="flex justify-between items-start mb-0.5">
-                  <h4 className="font-semibold text-[11px] truncate text-content-secondary max-w-[70%]">{agency.agenceNom}</h4>
+
+                {/* Header: name + status */}
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <div
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={{ backgroundColor: isSelected ? color : 'var(--color-content-muted)' }}
+                    />
+                    <h4 className="font-semibold text-xs truncate text-content-primary">{agency.agenceNom}</h4>
+                  </div>
                   <Badge
-                    value={agency.solde > 0 ? 'Actif' : '—'}
+                    value={agency.solde > 0 ? 'Actif' : 'Inactif'}
                     variant={agency.solde > 0 ? 'success' : 'neutral'}
                     size="sm"
-                    className="text-[8px] h-4 px-1"
+                    className="text-[9px] shrink-0"
                   />
                 </div>
-                <div className="flex items-end justify-between">
-                  <span className="text-[9px] text-content-muted truncate max-w-[40%]">{agency.ville || '—'}</span>
-                  <div className="text-xs font-bold font-mono text-content-primary">
-                    {formatCurrency(agency.solde)}
-                    <span className="text-[8px] font-sans text-content-muted ml-0.5">{currencySymbol()}</span>
-                  </div>
+
+                {/* Solde - always visible, prominent */}
+                <div className="font-mono font-bold text-sm text-content-primary leading-tight">
+                  {formatCurrency(agency.solde)}
+                  <span className="text-[10px] font-sans font-medium text-content-muted ml-1">{currencySymbol()}</span>
                 </div>
+
+                {/* City */}
+                {agency.ville && (
+                  <p className="text-[10px] text-content-muted mt-1.5 truncate">{agency.ville}</p>
+                )}
               </Card>
             );
           })}
