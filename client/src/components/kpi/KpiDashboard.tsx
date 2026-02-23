@@ -112,9 +112,9 @@ const TAB_COMPONENTS: Record<string, React.FC<TabComponentProps>> = {
 
 function KpiDashboard() {
   // ---- Permissions ----
-  const { ability, isAdmin } = useAbilityContext();
-  const canView = ability.can(Actions.VIEW, Subjects.KPI);
-  const canManage = ability.can(Actions.MANAGE, Subjects.KPI);
+  const { ability, isAdmin, roles } = useAbilityContext();
+  const canView = isAdmin || ability.can(Actions.VIEW, Subjects.KPI);
+  const canManage = isAdmin || ability.can(Actions.MANAGE, Subjects.KPI);
 
   // ---- Agency context (admin can pick an agency) ----
   const { agences, selectedAgence } = useAgence();
@@ -179,8 +179,12 @@ function KpiDashboard() {
     });
   };
 
-  // ---- Access denied state ----
-  if (!canView) {
+  // ---- Wait for permissions to load ----
+  // roles is [] until first /api/my-permissions completes
+  const permissionsLoaded = roles.length > 0;
+
+  // ---- Access denied state (only after permissions are loaded) ----
+  if (permissionsLoaded && !canView) {
     return (
       <div className="flex items-center justify-center min-h-[60vh] p-4">
         <Card className="max-w-md w-full text-center">

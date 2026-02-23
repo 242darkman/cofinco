@@ -5288,11 +5288,11 @@ async function seedAdminUser(context: SeedContext, dryRun: boolean): Promise<See
     }).returning();
     results.push({ table: 'users', action: 'created', count: 1 });
 
-    // Create userRole (V3 architecture)
+    // Create userRole (V3 architecture) — ADMIN is global (no agency scope)
     await db.insert(userRoles).values({
       userId: adminUser.id,
       role: SystemRole.ADMIN,
-      agenceId: siegeId || null,
+      agenceId: null,
       isPrimary: true,
     });
     results.push({ table: 'userRoles', action: 'created', count: 1 });

@@ -185,9 +185,8 @@ export function invalidateRoleHierarchyCache(): void {
  * Includes roles scoped to the active agency and global roles (agenceId = null)
  */
 async function getUserEffectiveRoles(userId: string, agenceIdActive?: string): Promise<UserRoleEntry[]> {
-  const conditions = [eq(userRoles.userId, userId)];
-
-  // If agenceIdActive is provided, get roles for that agency + global roles
+  // If agenceIdActive is provided, get roles for that agency + global roles + ADMIN role
+  // (ADMIN is a system-wide role that must always be found regardless of agency scope)
   // Otherwise, get all roles
   if (agenceIdActive) {
     const roles = await db.select({
@@ -200,7 +199,8 @@ async function getUserEffectiveRoles(userId: string, agenceIdActive?: string): P
       eq(userRoles.userId, userId),
       or(
         eq(userRoles.agenceId, agenceIdActive),
-        isNull(userRoles.agenceId)
+        isNull(userRoles.agenceId),
+        eq(userRoles.role, SystemRole.ADMIN)
       )
     ));
 
