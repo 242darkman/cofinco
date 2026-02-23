@@ -691,9 +691,8 @@ export async function getAlertsSummary(
   const result = await db.execute(sql`
     SELECT
       c.id,
-      c.nom,
-      c.prenom,
-      c.code_client,
+      u.nom,
+      u.prenom,
       c.score,
       c.is_blacklisted,
       c.is_pep,
@@ -703,7 +702,8 @@ export async function getAlertsSummary(
       c.numero_piece,
       c.statut_verification_piece
     FROM clients c
-    WHERE c.statut != 'INACTIF'
+    JOIN users u ON u.id = c.user_id
+    WHERE u.statut != 'INACTIF'
       ${agenceCondition}
       AND (
         c.is_blacklisted = true
@@ -756,7 +756,7 @@ export async function getAlertsSummary(
           id: row.id,
           nom: row.nom || "",
           prenom: row.prenom || "",
-          codeClient: row.code_client || "",
+          codeClient: "",
           flags,
           score: Number(row.score ?? 50),
         });
@@ -820,7 +820,7 @@ export async function getAlertsSummaryPaginated(
     : sql``;
 
   const searchCondition = search
-    ? sql`AND (c.nom ILIKE ${"%" + search + "%"} OR c.prenom ILIKE ${"%" + search + "%"} OR c.code_client ILIKE ${"%" + search + "%"})`
+    ? sql`AND (u.nom ILIKE ${"%" + search + "%"} OR u.prenom ILIKE ${"%" + search + "%"})`
     : sql``;
 
   // Severity-based WHERE filtering
@@ -836,10 +836,9 @@ export async function getAlertsSummaryPaginated(
   const result = await db.execute(sql`
     SELECT
       c.id,
-      c.nom,
-      c.prenom,
-      c.code_client,
-      c.photo_profile,
+      u.nom,
+      u.prenom,
+      u.photo_profile,
       c.score,
       c.is_blacklisted,
       c.is_pep,
@@ -850,7 +849,8 @@ export async function getAlertsSummaryPaginated(
       c.statut_verification_piece,
       COUNT(*) OVER() AS total_count
     FROM clients c
-    WHERE c.statut != 'INACTIF'
+    JOIN users u ON u.id = c.user_id
+    WHERE u.statut != 'INACTIF'
       ${agenceCondition}
       ${searchCondition}
       ${severityCondition}
@@ -895,7 +895,7 @@ export async function getAlertsSummaryPaginated(
       id: row.id,
       nom: row.nom || "",
       prenom: row.prenom || "",
-      codeClient: row.code_client || "",
+      codeClient: "",
       photoProfile: row.photo_profile || null,
       flags,
       flagCount: flags.length,

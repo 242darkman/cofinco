@@ -773,7 +773,7 @@ export async function getScoreTrend(clientId: string, months = 12) {
  * Agency scoring stats: average score, segment distribution, per agency.
  */
 export async function getAgencyScoreStats(agenceId?: string) {
-  const whereClause = agenceId
+  const whereClause = agenceId && agenceId !== 'all'
     ? sql`WHERE ${clientScoreState.agenceId} = ${agenceId}`
     : sql``;
 
