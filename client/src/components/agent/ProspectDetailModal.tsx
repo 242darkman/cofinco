@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Loader2, UserCheck, ArrowRight, Phone, MapPin, Briefcase, AlertTriangle, Activity, FileText, DollarSign, User } from 'lucide-react';
 import { prospectionApi } from '../../lib/api-client';
+import { formatPhoneNumber } from '../../lib/format';
 import { toast } from 'sonner';
 import {
   STATUT_PROSPECTION_LABELS,
@@ -116,7 +117,7 @@ export default function ProspectDetailSheet({ prospectId, onClose, onUpdate, can
                <div className="grid grid-cols-2 gap-3 pt-2">
                   <div className="flex items-center gap-2 text-content-secondary bg-surface-base/50 p-2 rounded-lg border border-edge/50">
                     <Phone size={14} className="text-accent shrink-0" />
-                    <span className="text-xs font-mono">{prospect.telephoneProspect || '-'}</span>
+                    <span className="text-xs font-mono">{formatPhoneNumber(prospect.telephoneProspect)}</span>
                   </div>
                   <div className="flex items-center gap-2 text-content-secondary bg-surface-base/50 p-2 rounded-lg border border-edge/50">
                     <Briefcase size={14} className="text-status-info shrink-0" />

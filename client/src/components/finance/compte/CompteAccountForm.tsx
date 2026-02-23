@@ -9,7 +9,7 @@ import mtnLogo from '@/assets/logos/mtn-logo.png';
 import airtelLogo from '@/assets/logos/airtel-logo.png';
 import { useFeatureFlags, useEnabledPaymentMethods } from '../../../contexts/FeatureFlagsContext';
 import { toast, handleApiError } from '../../../lib/toast';
-import { formatMoney } from '../../../lib/format';
+import { formatMoney, formatPhoneInput, stripPhoneFormat } from '../../../lib/format';
 import { sanitizeInput } from '../../../lib/sanitize';
 import { Button } from '../../ui';
 import { StatutClient, StatutCompte, TypeCompte as TypeCompteEnum, FrequenceVirement, FREQUENCE_VIREMENT_LABELS, type FrequenceVirementType } from '@shared/enum/status-constants';
@@ -1236,9 +1236,9 @@ export default function CompteAccountForm({ onClose, onSuccess, clientId }: Comp
                             <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" size={16} />
                             <input
                                type="tel"
-                               placeholder={selectedOperator === 'MTN' ? '+242 05/06 XX XX XX' : '+242 04 XX XX XX'}
-                               value={mobileMoneyData.numero_telephone}
-                               onChange={(e) => setMobileMoneyData(p => ({ ...p, numero_telephone: e.target.value }))}
+                               placeholder="+242 06 XXX XX XX"
+                               value={formatPhoneInput(mobileMoneyData.numero_telephone || '')}
+                               onChange={(e) => setMobileMoneyData(p => ({ ...p, numero_telephone: stripPhoneFormat(e.target.value) }))}
                                className="w-full h-10 bg-surface-base border border-edge rounded-lg pl-10 pr-4 text-content-primary text-sm focus:border-accent outline-none"
                             />
                          </div>

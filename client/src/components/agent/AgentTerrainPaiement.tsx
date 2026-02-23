@@ -13,6 +13,7 @@ import { useUserProfile } from '@/hooks/useUserProfile';
 import { StatutUser, StatutClient, StatutCredit, StatutOperationTerrain, TypeOperationTerrain, TYPE_OPERATION_TERRAIN_LABELS, TYPE_COMPTE_LABELS, TypeCompteType } from '@shared/enum/status-constants';
 import { currencySymbol, formatMoney } from '@shared/config/currency';
 import { useEnabledPaymentMethods } from '../../contexts/FeatureFlagsContext';
+import { formatPhoneInput, stripPhoneFormat } from '../../lib/format';
 
 // MM Payment status types
 type MMPaymentStatus = 'idle' | 'pending' | 'success' | 'failed' | 'expired';
@@ -1135,9 +1136,9 @@ export default function AgentTerrainPaiement({ onClose, onSuccess, agentId, clie
                     </div>
                     <input
                       type="tel"
-                      value={formData.numero_telephone}
-                      onChange={(e) => setFormData({ ...formData, numero_telephone: e.target.value })}
-                      placeholder="06XXXXXXXX ou 05XXXXXXXX"
+                      value={formatPhoneInput(formData.numero_telephone || '')}
+                      onChange={(e) => setFormData({ ...formData, numero_telephone: stripPhoneFormat(e.target.value) })}
+                      placeholder="06 XXX XX XX"
                       className={`w-full py-3 px-4 rounded-lg text-[15px] font-medium bg-surface-base/80 border text-content-primary placeholder-content-muted focus:outline-none ${
                         errors.numero_telephone
                           ? 'border-status-danger/50'

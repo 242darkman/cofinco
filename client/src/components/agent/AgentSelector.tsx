@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Search, User, ChevronDown, Check, X, MapPin, Phone } from 'lucide-react';
 import { StatutUser } from '@shared/enum/status-constants';
-import { resolveStorageUrl } from '../../lib/format';
+import { resolveStorageUrl, formatPhoneNumber } from '../../lib/format';
 
 interface Agent {
   id: string;
@@ -251,7 +251,7 @@ export default function AgentSelector({
                       {agent.telephone && (
                         <div className="flex items-center gap-1.5 mt-0.5">
                           <Phone size={10} className="text-content-muted flex-shrink-0" />
-                          <span className="text-[10px] text-content-muted">{agent.telephone}</span>
+                          <span className="text-[10px] text-content-muted">{formatPhoneNumber(agent.telephone)}</span>
                         </div>
                       )}
                     </div>

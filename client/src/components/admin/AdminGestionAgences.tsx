@@ -10,6 +10,7 @@ import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { AgencyMigrationWizard } from '../agences/AgencyMigrationWizard';
 import MapViewToggle, { ViewMode } from './shared/MapViewToggle';
 import { TypeAgence, TypeAgenceType, StatutAgence, StatutAgenceType, STATUT_AGENCE_LABELS } from '@shared/enum/status-constants';
+import { formatPhoneNumber, formatPhoneInput, stripPhoneFormat } from '../../lib/format';
 
 // Lazy load map component
 const AdminAgenciesMap = lazy(() => import('./AdminAgenciesMap'));
@@ -472,7 +473,7 @@ export default function AdminGestionAgences() {
                   {agence.telephone && (
                     <div className="flex items-center gap-2 text-content-muted">
                       <Phone size={14} className="flex-shrink-0" />
-                      <span>{agence.telephone}</span>
+                      <span>{formatPhoneNumber(agence.telephone)}</span>
                     </div>
                   )}
                   {agence.responsableNom && (
@@ -669,10 +670,10 @@ export default function AdminGestionAgences() {
                   <Phone size={12} /> Contact
                 </h4>
                 <div className="grid grid-cols-2 gap-3">
-                  <DetailCard label="Téléphone" value={viewingAgence.telephone} />
+                  <DetailCard label="Téléphone" value={formatPhoneNumber(viewingAgence.telephone)} />
                   <DetailCard label="Email" value={viewingAgence.email} />
                   <DetailCard label="Responsable" value={viewingAgence.responsableNom} />
-                  <DetailCard label="Tél. responsable" value={viewingAgence.responsablePhone} />
+                  <DetailCard label="Tél. responsable" value={formatPhoneNumber(viewingAgence.responsablePhone)} />
                 </div>
               </div>
 
@@ -810,9 +811,9 @@ export default function AdminGestionAgences() {
               label="Téléphone"
               name="telephone"
               type="tel"
-              value={formData.telephone}
-              onChange={(e) => setFormData({ ...formData, telephone: e.target.value })}
-              placeholder="+242 XXX XXX XXX"
+              value={formatPhoneInput(formData.telephone || '')}
+              onChange={(e) => setFormData({ ...formData, telephone: stripPhoneFormat(e.target.value) })}
+              placeholder="+242 06 XXX XX XX"
             />
             <FormField
               label="Email"

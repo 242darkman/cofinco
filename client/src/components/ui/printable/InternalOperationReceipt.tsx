@@ -2,6 +2,7 @@ import React from 'react';
 import { useBranding } from '@/contexts/BrandingContext';
 import { InternalTransactionType, InternalTransactionInfo } from './ReceiptTemplate';
 import { currencySymbol } from '@shared/config/currency';
+import { formatPhoneNumber } from '../../../lib/format';
 
 export interface InternalOperationReceiptData {
   companyInfo?: {
@@ -148,7 +149,7 @@ export const InternalOperationReceipt = React.forwardRef<HTMLDivElement, Interna
             {company.name}
           </div>
           <div className="text-[12px]">{company.address}</div>
-          <div className="text-[12px]">{company.phone}</div>
+          <div className="text-[12px]">{formatPhoneNumber(company.phone)}</div>
           {data.agence && (
             <div className="mt-1 text-[11px]">
               Agence: {data.agence.nom}

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useBranding } from '@/contexts/BrandingContext';
 import { LOGO_BASE64 } from '@/lib/pdf-logo';
 import { currencySymbol } from '@shared/config/currency';
+import { formatPhoneNumber } from '@/lib/format';
 
 // Types pour les transactions internes (sans client)
 export type InternalTransactionType =
@@ -360,7 +361,7 @@ const ReceiptContent: React.FC<{
         {normalized.resolvedCompany.name}
       </div>
       <div className="text-[12px]">{normalized.resolvedCompany.address}</div>
-      <div className="text-[12px]">{normalized.resolvedCompany.phone}</div>
+      <div className="text-[12px]">{formatPhoneNumber(normalized.resolvedCompany.phone)}</div>
       {normalized.resolvedCompany.email && (
         <div className="text-[11px]">{normalized.resolvedCompany.email}</div>
       )}

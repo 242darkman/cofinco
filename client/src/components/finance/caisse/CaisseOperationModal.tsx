@@ -4,7 +4,7 @@ import {
   Smartphone, Loader2, CheckCircle2, Lock, AlertTriangle,
   Copy, Printer, ArrowRight,
 } from 'lucide-react';
-import { formatMoney } from '@/lib/format';
+import { formatMoney, formatPhoneInput, stripPhoneFormat } from '@/lib/format';
 import {
   MethodePaiement,
   METHODE_PAIEMENT_LABELS,
@@ -361,9 +361,9 @@ export default function CaisseOperationModal({
                         : 'border-edge focus:border-edge-strong focus:ring-edge-strong/40'
                       }
                     `}
-                    value={mobileMoneyPhone}
-                    onChange={(e) => setMobileMoneyPhone(e.target.value)}
-                    placeholder="Ex: 066123456 ou 055123456"
+                    value={formatPhoneInput(mobileMoneyPhone)}
+                    onChange={(e) => setMobileMoneyPhone(stripPhoneFormat(e.target.value))}
+                    placeholder="+242 06 XXX XX XX"
                   />
                   {validationErrors.phone && (
                     <p className="text-xs text-status-danger mt-1">{validationErrors.phone}</p>

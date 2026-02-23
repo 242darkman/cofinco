@@ -13,7 +13,7 @@ import { SystemRole } from '@shared/types/roles';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { agenceApi, employeApi, villeApi, catalogApi } from '../../lib/api-client';
 import { useEntityUpload } from '../../hooks/useEntityUpload';
-import { resolveStorageUrl } from '../../lib/format';
+import { resolveStorageUrl, formatPhoneInput, stripPhoneFormat } from '../../lib/format';
 import { StatutClient, StatutAgence, SegmentClient, SEGMENT_CLIENT_LABELS } from '@shared/enum/status-constants';
 import { useCurrency } from '../../contexts/CurrencyContext';
 
@@ -527,23 +527,17 @@ export default function ClientForm({ client, onClose, onSave }: ClientFormProps)
             placeholder="email@example.com"
           />
           <div>
-            <label className="block text-[11px] font-semibold text-content-muted mb-1">Téléphone * <span className="text-status-danger">*</span></label>
-            <div className="flex gap-1">
-              <div className="px-2 py-1.5 bg-surface border border-edge-strong rounded-lg text-xs font-semibold text-content-secondary flex items-center">+242</div>
-              <div className="relative flex-1">
-                <Phone className="absolute left-2 top-1/2 -translate-y-1/2 text-content-muted" size={14} />
-                <input
-                  type="tel"
-                  name="telephone-input"
-                  value={(formData.telephone || '').replace('+242', '').trim()}
-                  onChange={(e) => {
-                    const num = e.target.value.replace(/[^\d]/g, '');
-                    handleChange('telephone', '+242' + num);
-                  }}
-                  className="w-full pl-7 pr-2 py-1.5 bg-surface-elevated border border-edge-strong rounded-lg text-content-primary text-sm placeholder:text-content-muted focus:outline-none focus:border-accent transition-colors"
-                  maxLength={9}
-                />
-              </div>
+            <label className="block text-[11px] font-semibold text-content-muted mb-1">Téléphone <span className="text-status-danger">*</span></label>
+            <div className="relative">
+              <Phone className="absolute left-2 top-1/2 -translate-y-1/2 text-content-muted" size={14} />
+              <input
+                type="tel"
+                name="telephone-input"
+                value={formatPhoneInput(formData.telephone || '')}
+                onChange={(e) => handleChange('telephone', stripPhoneFormat(e.target.value))}
+                placeholder="+242 06 XXX XX XX"
+                className="w-full pl-7 pr-2 py-1.5 bg-surface-elevated border border-edge-strong rounded-lg text-content-primary text-sm placeholder:text-content-muted focus:outline-none focus:border-accent transition-colors"
+              />
             </div>
             {errors.telephone && <p className="mt-0.5 text-[10px] text-status-danger">{errors.telephone}</p>}
           </div>

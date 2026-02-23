@@ -18,6 +18,7 @@ import { smsApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
 import { useBranding } from '../../../contexts/BrandingContext';
 import { normalizePhone } from '@shared/utils/phone';
+import { formatPhoneInput, stripPhoneFormat } from '../../../lib/format';
 
 export interface SmsTestPanelProps {
   providers: { id: string; name: string; isActive: boolean }[];
@@ -168,8 +169,8 @@ export default function SmsTestPanel({
             <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" size={18} />
             <input
               type="tel"
-              value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
+              value={formatPhoneInput(phoneNumber)}
+              onChange={(e) => setPhoneNumber(stripPhoneFormat(e.target.value))}
               placeholder="+242 06 XXX XX XX"
               className="w-full pl-10 pr-4 py-2.5 bg-surface-elevated border border-edge-strong rounded-lg text-content-primary focus:outline-none focus:ring-2 focus:ring-accent"
             />

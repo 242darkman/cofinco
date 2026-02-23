@@ -5,7 +5,7 @@ import { fr } from 'date-fns/locale';
 import { Installment, getInstallmentStatusLabel } from '../../../lib/credit-logic';
 import { StatutEcheanceCredit } from '@shared/enum/status-constants';
 import { MapPin, Phone, Mail, QrCode } from 'lucide-react';
-import { formatClientName } from '../../../lib/format';
+import { formatClientName, formatPhoneNumber } from '../../../lib/format';
 import { formatMoney } from '@shared/config/currency';
 
 interface CreditSchedulePDFProps {
@@ -64,7 +64,7 @@ export const CreditSchedulePDF = React.forwardRef<HTMLDivElement, CreditSchedule
               </div>
               <div className="text-xs text-content-muted space-y-1">
                 <p><MapPin size={12} className="inline mr-1" /> {companyInfo.adresse}</p>
-                <p><Phone size={12} className="inline mr-1" /> {companyInfo.telephone}</p>
+                <p><Phone size={12} className="inline mr-1" /> {formatPhoneNumber(companyInfo.telephone)}</p>
                 <p><Mail size={12} className="inline mr-1" /> {companyInfo.email}</p>
                 <p>NIF: {companyInfo.nif} • RCCM: {companyInfo.rccm}</p>
               </div>
@@ -81,7 +81,7 @@ export const CreditSchedulePDF = React.forwardRef<HTMLDivElement, CreditSchedule
             <div className="bg-surface-muted p-4 rounded-lg border border-edge">
               <h3 className="text-xs font-bold text-content-muted uppercase tracking-wider mb-2">Client</h3>
               <p className="font-bold text-lg">{formatClientName(client.nom, client.prenom)}</p>
-              <p className="text-sm">Tél: {client.telephone}</p>
+              <p className="text-sm">Tél: {formatPhoneNumber(client.telephone)}</p>
               <p className="text-sm">Compte: {client.numeroCompte || 'N/A'}</p>
             </div>
             <div className="bg-surface-muted p-4 rounded-lg border border-edge">

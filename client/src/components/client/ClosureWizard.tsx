@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { XCircle, CheckCircle, AlertTriangle, Phone, Banknote, Smartphone, ChevronRight, ChevronLeft, Loader2, Clock, X } from 'lucide-react';
 import Modal from '../ui/Modal';
 import { toast, handleApiError } from '../../lib/toast';
+import { formatPhoneInput, stripPhoneFormat } from '../../lib/format';
 import {
   ClosurePayoutMethod,
   CLOSURE_PAYOUT_METHOD_LABELS,
@@ -515,9 +516,9 @@ export default function ClosureWizard({
                 <Phone size={16} className="absolute left-3 top-3 text-content-muted" />
                 <input
                   type="tel"
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                  placeholder="Ex: 069123456"
+                  value={formatPhoneInput(phoneNumber)}
+                  onChange={(e) => setPhoneNumber(stripPhoneFormat(e.target.value))}
+                  placeholder="+242 06 XXX XX XX"
                   className="w-full bg-surface-base border border-edge rounded-lg pl-10 pr-3 py-2.5 text-content-primary text-sm focus:ring-1 focus:ring-accent outline-none transition"
                 />
               </div>

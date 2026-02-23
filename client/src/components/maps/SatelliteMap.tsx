@@ -6,7 +6,7 @@ import L, { DivIcon } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Navigation, MapPin, Users, Crosshair, Layers, Satellite, Map as MapIcon, Mountain, RefreshCw, LocateFixed, X } from 'lucide-react';
 import useGeolocation from '../../hooks/useGeolocation';
-import { formatClientName } from '../../lib/format';
+import { formatClientName, formatPhoneNumber } from '../../lib/format';
 import { ALL_STATUS_LABELS } from '../../lib/status-labels';
 
 interface Agent {
@@ -384,7 +384,7 @@ export default function SatelliteMap({
                 </div>
                 {client.telephone && (
                   <div className="text-xs text-content-muted mt-1">
-                    {client.telephone}
+                    {formatPhoneNumber(client.telephone)}
                   </div>
                 )}
               </div>

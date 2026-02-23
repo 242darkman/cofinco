@@ -2,6 +2,7 @@ import React from 'react';
 import { X, User, Phone, Calendar, Hash, CreditCard, Wallet, Building2, FileText, Clock, CheckCircle2, XCircle, AlertTriangle, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import { ALL_STATUS_LABELS } from '@/lib/status-labels';
+import { formatPhoneNumber } from '@/lib/format';
 import airtelLogo from '@/assets/logos/airtel-logo.png';
 import mtnLogo from '@/assets/logos/mtn-logo.png';
 
@@ -243,7 +244,7 @@ export function PaymentDetailModal({
               Informations Transaction
             </h4>
             <div className="bg-surface/30 rounded-xl px-4 divide-y divide-edge">
-              <InfoRow icon={Phone} label="Téléphone" value={payment.phone} copyable />
+              <InfoRow icon={Phone} label="Téléphone" value={formatPhoneNumber(payment.phone)} copyable />
               <InfoRow icon={Hash} label="Référence" value={payment.externalRef} copyable />
               {payment.providerTxnId && (
                 <InfoRow icon={FileText} label="ID Provider" value={payment.providerTxnId} copyable />
@@ -270,7 +271,7 @@ export function PaymentDetailModal({
                   value={`${payment.client.nom} ${payment.client.prenom || ''}`}
                 />
                 {payment.client.phone && (
-                  <InfoRow icon={Phone} label="Téléphone" value={payment.client.phone} />
+                  <InfoRow icon={Phone} label="Téléphone" value={formatPhoneNumber(payment.client.phone)} />
                 )}
               </div>
             </div>

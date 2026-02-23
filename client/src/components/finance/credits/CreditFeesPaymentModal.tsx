@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { DollarSign, AlertCircle, CheckCircle, X, Wallet, Shield, CreditCard, Smartphone, ChevronRight, User, FileText, Banknote, Sparkles, ArrowLeft, Loader2, Lock, CheckCircle2, KeyRound, Phone, Clock } from 'lucide-react';
 import { Modal, Button, Badge } from '../../ui';
 import { useDemandes } from '../../../hooks/credits/useDemandes';
-import { computeSessionStatus, formatMoney } from '../../../lib/format';
+import { computeSessionStatus, formatMoney, formatPhoneInput, stripPhoneFormat } from '../../../lib/format';
 import { toast } from 'sonner';
 import { sessionCaisseApi, authApi, caisseAccessControlApi } from '../../../lib/api-client';
 import { UniversalPaymentSuccessModal } from '../caisse/shared/UniversalPaymentSuccessModal';
@@ -745,11 +745,10 @@ export default function CreditFeesPaymentModal({ demande, onClose, onSuccess }: 
                       <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" size={16} />
                       <input
                         type="tel"
-                        value={phoneNumber}
-                        onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
-                        placeholder={method === 'mtn' ? '066 XXX XX XX' : '05X XXX XX XX'}
+                        value={formatPhoneInput(phoneNumber)}
+                        onChange={(e) => setPhoneNumber(stripPhoneFormat(e.target.value))}
+                        placeholder="+242 06 XXX XX XX"
                         className="w-full bg-surface-base border border-edge rounded-lg pl-10 pr-4 py-2.5 text-content-primary text-sm placeholder-content-muted focus:border-status-warning outline-none transition-all"
-                        maxLength={12}
                       />
                     </div>
                     <p className="text-[10px] text-content-muted mt-1">

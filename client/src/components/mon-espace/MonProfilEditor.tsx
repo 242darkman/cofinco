@@ -4,6 +4,7 @@ import { useUpdateMyProfile } from '../../hooks/hr/useMonEspace';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import { Button, FormField, SelectField } from '../ui';
 import { Users, Wallet, Save, Banknote, Smartphone, Building2, FileCheck, Pencil, X } from 'lucide-react';
+import { formatPhoneNumber } from '../../lib/format';
 
 const SITUATION_FAMILIALE_OPTIONS = [
   { value: 'CELIBATAIRE', label: 'Celibataire' },
@@ -275,7 +276,7 @@ export default function MonProfilEditor() {
                   <p className="text-[11px] text-content-secondary mt-0.5">
                     Le virement sera effectue sur le numero de telephone associe a votre profil
                     {user?.telephone ? (
-                      <span className="font-semibold text-content-primary"> ({user.telephone})</span>
+                      <span className="font-semibold text-content-primary"> ({formatPhoneNumber(user.telephone)})</span>
                     ) : (
                       <span className="text-status-warning font-medium"> — aucun numero renseigne, veuillez mettre a jour votre profil</span>
                     )}.

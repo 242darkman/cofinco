@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { formatPhoneNumber } from '../../lib/format';
 import { DollarSign, CheckCircle, AlertCircle, Search, CreditCard, Banknote, ArrowDownCircle, ArrowUpCircle, WifiOff } from 'lucide-react';
 import AppShell from '../layout/AppShell';
 import AgentSidebarContent from '../layout/AgentSidebarContent';
@@ -330,7 +331,7 @@ export default function AgentCaisseInterface({ agentId, onLogout }: AgentCaisseI
                           <p className="text-content-primary font-semibold text-sm">
                             {client.nomComplet || `${client.nom || ''} ${client.prenom || ''}`.trim()}
                           </p>
-                          <p className="text-content-muted text-xs">{client.telephone || ''}</p>
+                          <p className="text-content-muted text-xs">{formatPhoneNumber(client.telephone)}</p>
                         </button>
                       ))}
                     </div>

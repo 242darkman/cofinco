@@ -4,6 +4,7 @@ import { prospectionApi, arrondissementApi } from '../../lib/api-client';
 import { STATUT_PROSPECTION_LABELS, STATUT_PROSPECTION_OPTIONS } from '@shared/enum/status-constants';
 import type { StatutProspectionType } from '@shared/enum/status-constants';
 import { usePermissions } from '../auth/ProtectedFeature';
+import { formatPhoneNumber } from '../../lib/format';
 import ProspectDetailModal from './ProspectDetailModal';
 
 interface ProspectionListProps {
@@ -222,7 +223,7 @@ export default function ProspectionList({ agentId, onCreateNew }: ProspectionLis
                     {getStatusBadge(prospect.statut)}
                   </div>
                   <div className="flex items-center gap-2 text-[10px] text-content-muted">
-                    <span className="font-mono">{prospect.telephoneProspect}</span>
+                    <span className="font-mono">{formatPhoneNumber(prospect.telephoneProspect)}</span>
                     {(prospect.arrondissementNom || prospect.marcheNom) && (
                         <>
                             <span className="w-0.5 h-0.5 rounded-full bg-surface-subtle" />

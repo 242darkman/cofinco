@@ -10,7 +10,7 @@ import LoadingSpinner from '../ui/LoadingSpinner';
 import PasswordChangeModal from './profile/PasswordChangeModal';
 import { authApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
-import { resolveStorageUrl } from '../../lib/format';
+import { resolveStorageUrl, formatPhoneInput, stripPhoneFormat } from '../../lib/format';
 
 // ==================== VALIDATION HELPERS ====================
 const validateEmail = (email: string): string | null => {
@@ -52,14 +52,15 @@ function EditableField({ label, value, icon: Icon, onSave, editable = true, type
 
   // Validate on change
   const handleChange = (newValue: string) => {
-    setTempValue(newValue);
+    const cleaned = validation === 'phone' ? stripPhoneFormat(newValue) : newValue;
+    setTempValue(cleaned);
 
     // Real-time validation
     let error: string | null = null;
     if (validation === 'email') {
-      error = validateEmail(newValue);
+      error = validateEmail(cleaned);
     } else if (validation === 'phone') {
-      error = validatePhone(newValue);
+      error = validatePhone(cleaned);
     }
     setValidationError(error);
   };
@@ -110,7 +111,7 @@ function EditableField({ label, value, icon: Icon, onSave, editable = true, type
                   ? 'border-status-danger focus:ring-status-danger/20'
                   : 'border-accent focus:ring-accent/20'
               }`}
-              value={tempValue}
+              value={validation === 'phone' ? formatPhoneInput(tempValue) : tempValue}
               onChange={e => handleChange(e.target.value)}
               autoFocus
               placeholder={placeholder || `...`}
@@ -155,7 +156,7 @@ function EditableField({ label, value, icon: Icon, onSave, editable = true, type
         </div>
         <div className="min-w-0">
           <div className="text-[10px] text-content-muted font-medium leading-none mb-0.5">{label}</div>
-          <div className="text-xs font-medium text-content-secondary leading-tight break-words">{value || 'Non renseigné'}</div>
+          <div className="text-xs font-medium text-content-secondary leading-tight break-words">{validation === 'phone' && value ? formatPhoneInput(value) : (value || 'Non renseigné')}</div>
         </div>
       </div>
       

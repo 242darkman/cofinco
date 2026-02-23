@@ -5,6 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 import SearchableSelect, { type SearchableSelectOption } from '../ui/SearchableSelect';
 import { ANCIENNETE_ACTIVITE_OPTIONS } from '@shared/enum/status-constants';
 import { normalizePhone } from '@shared/utils/phone';
+import { formatPhoneInput, stripPhoneFormat } from '../../lib/format';
 
 interface ProspectionFormModalProps {
   isOpen: boolean;
@@ -336,8 +337,8 @@ export default function ProspectionFormModal({ isOpen, agentId, onClose, onSucce
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-content-muted uppercase tracking-wider">Téléphone *</label>
-                  <input type="tel" value={formData.telephoneProspect} onChange={e => set('telephoneProspect', e.target.value)}
-                    placeholder="06XXXXXXX" maxLength={12} className={inputCls('telephoneProspect')} />
+                  <input type="tel" value={formatPhoneInput(formData.telephoneProspect || '')} onChange={e => set('telephoneProspect', stripPhoneFormat(e.target.value))}
+                    placeholder="+242 06 XXX XX XX" className={inputCls('telephoneProspect')} />
                 </div>
               </div>
 

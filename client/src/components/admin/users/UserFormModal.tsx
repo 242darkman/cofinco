@@ -12,7 +12,7 @@ import { SystemRole, getRoleOptions } from '@shared/types/roles';
 import { StatutUser } from '@shared/enum/status-constants';
 import PasswordStrengthIndicator from '../../auth/PasswordStrengthIndicator';
 import { useSecuritySettings } from '../../../hooks/settings/useSecuritySettings';
-import { resolveStorageUrl } from '../../../lib/format';
+import { resolveStorageUrl, formatPhoneInput, stripPhoneFormat } from '../../../lib/format';
 import { getRoleBadgeStyle } from '../../../lib/role-utils';
 
 interface User {
@@ -802,9 +802,9 @@ export default function UserFormModal({ isOpen, onClose, onSubmit, initialData, 
                             <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" />
                             <input
                               type="tel"
-                              value={formData.telephone}
-                              onChange={(e) => updateField('telephone', e.target.value)}
-                              placeholder="06 000 0000"
+                              value={formatPhoneInput(formData.telephone || '')}
+                              onChange={(e) => updateField('telephone', stripPhoneFormat(e.target.value))}
+                              placeholder="+242 06 XXX XX XX"
                               className={`${INPUT_CLASS} pl-9 ${errors.telephone ? 'border-status-danger focus:ring-status-danger' : ''}`}
                             />
                           </div>

@@ -2,6 +2,7 @@ import React from 'react';
 import { useBranding } from '@/contexts/BrandingContext';
 import { LOGO_BASE64 } from '@/lib/pdf-logo';
 import { currencySymbol } from '@shared/config/currency';
+import { formatPhoneNumber } from '@/lib/format';
 
 // ── Types ───────────────────────────────────────────────────────
 
@@ -205,7 +206,7 @@ export const PayslipTemplate = React.forwardRef<HTMLDivElement, PayslipTemplateP
                 <div className="text-[9px]"><b>RCCM:</b> {company.rccm}</div>
               )}
               {(company?.telephone || agence?.telephone) && (
-                <div className="text-[9px]"><b>Tel:</b> {company?.telephone || agence?.telephone}</div>
+                <div className="text-[9px]"><b>Tel:</b> {formatPhoneNumber(company?.telephone || agence?.telephone)}</div>
               )}
             </div>
           </div>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { formatPhoneNumber } from '../../lib/format';
 import {
   Users,
   Key,
@@ -325,7 +326,7 @@ export default function AdminClientCredentials() {
                           <p className="text-xs text-content-muted">{client.email}</p>
                         )}
                         {client.telephone && (
-                          <p className="text-xs text-content-muted">{client.telephone}</p>
+                          <p className="text-xs text-content-muted">{formatPhoneNumber(client.telephone)}</p>
                         )}
                       </div>
                     </td>

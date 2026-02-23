@@ -4,6 +4,7 @@ import { StatutPaiementCommission, STATUT_PAIEMENT_COMMISSION_LABELS } from '@sh
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '../ui/sheet';
 import { formatMoney, currencySymbol } from '@shared/config/currency';
 import { toast } from 'sonner';
+import { formatPhoneInput, stripPhoneFormat } from '../../lib/format';
 
 interface Commission {
   id: string;
@@ -468,9 +469,9 @@ export default function AgentCommissions({ agentId }: AgentCommissionsProps) {
                     <label className="text-xs font-semibold text-content-muted">Numéro de téléphone</label>
                     <input
                       type="tel"
-                      value={mmPhone}
-                      onChange={e => setMmPhone(e.target.value)}
-                      placeholder="Ex: 066000000"
+                      value={formatPhoneInput(mmPhone)}
+                      onChange={e => setMmPhone(stripPhoneFormat(e.target.value))}
+                      placeholder="+242 06 XXX XX XX"
                       className="w-full px-3 py-2 bg-input border border-input-border rounded-lg text-content-primary text-sm focus:border-input-focus mt-1"
                     />
                   </div>

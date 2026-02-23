@@ -12,6 +12,7 @@ import DocumentPreviewModal from '../ui/DocumentPreviewModal';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { useBulkSelection, useBulkAction } from '../../hooks/admin/useBulkSelection';
+import { formatPhoneNumber } from '../../lib/format';
 
 interface PaiementTerrain {
   id: string;
@@ -381,7 +382,7 @@ export default function AdminValidationTerrain() {
           )}
           <div className="flex flex-col">
             <span className="font-medium">{item.clients ? `${item.clients.nom} ${item.clients.prenom}` : 'Inconnu'}</span>
-            <span className="text-xs text-content-muted">{item.clients?.telephone || ''}</span>
+            <span className="text-xs text-content-muted">{formatPhoneNumber(item.clients?.telephone)}</span>
           </div>
         </div>
       ),
@@ -654,7 +655,7 @@ export default function AdminValidationTerrain() {
                                   <label className="text-xs text-content-muted uppercase tracking-wider font-semibold">Téléphone</label>
                                   <p className="flex items-center gap-2 text-content-muted">
                                       <Smartphone size={14} />
-                                      {detailPayment.clients?.telephone || 'N/A'}
+                                      {formatPhoneNumber(detailPayment.clients?.telephone) || 'N/A'}
                                   </p>
                               </div>
                           </div>

@@ -6,6 +6,7 @@ import { StatutCandidature, STATUT_CANDIDATURE_LABELS } from '@shared/enum/statu
 import { toast } from '../../lib/toast';
 import { hrApi } from '../../lib/api-client';
 import OnboardingWizard from './OnboardingWizard';
+import { formatPhoneInput, stripPhoneFormat } from '../../lib/format';
 
 interface Candidat {
   id: number;
@@ -425,8 +426,8 @@ export default function CandidaturesTab({
               label="Téléphone"
               name="telephone"
               type="tel"
-              value={formData.telephone}
-              onChange={(e) => setFormData({ ...formData, telephone: e.target.value })}
+              value={formatPhoneInput(formData.telephone || '')}
+              onChange={(e) => setFormData({ ...formData, telephone: stripPhoneFormat(e.target.value) })}
               required
             />
 

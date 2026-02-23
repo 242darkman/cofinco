@@ -3,7 +3,7 @@ import { useBranding } from '@/contexts/BrandingContext';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { MapPin, Phone, Mail } from 'lucide-react';
-import { formatClientName } from '../../../lib/format';
+import { formatClientName, formatPhoneNumber } from '../../../lib/format';
 import { formatMoney } from '@shared/config/currency';
 
 export interface EnqueteReportData {
@@ -146,7 +146,7 @@ export const EnqueteReportTemplate = React.forwardRef<HTMLDivElement, EnqueteRep
               </div>
               <div style={{ fontSize: '10px', color: '#64748b', lineHeight: 1.6 }}>
                 <p><MapPin size={10} style={{ display: 'inline', marginRight: '4px' }} />{DEFAULT_COMPANY_INFO.adresse}</p>
-                <p><Phone size={10} style={{ display: 'inline', marginRight: '4px' }} />{DEFAULT_COMPANY_INFO.telephone}</p>
+                <p><Phone size={10} style={{ display: 'inline', marginRight: '4px' }} />{formatPhoneNumber(DEFAULT_COMPANY_INFO.telephone)}</p>
                 <p><Mail size={10} style={{ display: 'inline', marginRight: '4px' }} />{DEFAULT_COMPANY_INFO.email}</p>
               </div>
             </div>
@@ -164,7 +164,7 @@ export const EnqueteReportTemplate = React.forwardRef<HTMLDivElement, EnqueteRep
             <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', padding: '12px' }}>
               <SectionTitle>Client</SectionTitle>
               <InfoRow label="Nom" value={formatClientName(client.nom, client.prenom)} />
-              <InfoRow label="Téléphone" value={client.telephone} />
+              <InfoRow label="Téléphone" value={formatPhoneNumber(client.telephone)} />
               <InfoRow label="Email" value={client.email} />
               <InfoRow label="Situation" value={e.situationMatrimoniale} />
               <InfoRow label="Pers. à charge" value={e.personnesCharge != null ? String(e.personnesCharge) : null} />

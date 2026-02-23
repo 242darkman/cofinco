@@ -5,6 +5,7 @@ import { Modal, FormField, SelectField, Button } from '../ui';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { userApi, roleApi } from '../../lib/api-client';
 import { toast, handleApiError } from '../../lib/toast';
+import { formatPhoneInput, stripPhoneFormat } from '../../lib/format';
 import { SystemRole, getRoleOptions } from '@shared/types/roles';
 
 interface RoleOption {
@@ -170,13 +171,9 @@ export default function AdminUserForm({ user, onClose, onSuccess }: AdminUserFor
             label="Téléphone"
             name="telephone"
             type="tel"
-            value={(formData.telephone || '').replace('+242', '').trim()}
-            onChange={(e) => {
-              const phoneNumber = e.target.value.replace(/[^\d]/g, '');
-              setFormData({ ...formData, telephone: '+242' + phoneNumber });
-            }}
-            placeholder="05 123 4567"
-            maxLength={11}
+            value={formatPhoneInput(formData.telephone || '')}
+            onChange={(e) => setFormData({ ...formData, telephone: stripPhoneFormat(e.target.value) })}
+            placeholder="+242 06 XXX XX XX"
             icon={Phone}
           />
 

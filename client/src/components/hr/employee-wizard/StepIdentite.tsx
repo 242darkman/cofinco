@@ -3,7 +3,7 @@ import { User, Upload, Link, Building2, AlertTriangle, Globe, MapPin, Heart } fr
 import FormField from '../../ui/FormField';
 import SelectField from '../../ui/SelectField';
 import SearchableSelect from '../../ui/SearchableSelect';
-import { resolveStorageUrl } from '@/lib/format';
+import { resolveStorageUrl, formatPhoneInput, stripPhoneFormat } from '@/lib/format';
 
 const SITUATION_FAMILIALE_OPTIONS = [
   { value: 'CELIBATAIRE', label: 'Célibataire' },
@@ -386,9 +386,9 @@ export default function StepIdentite({
             label="Téléphone"
             name="phone"
             type="tel"
-            value={formData.phone || ''}
-            onChange={(e) => updateField('phone', e.target.value)}
-            placeholder="06 XXX XX XX"
+            value={formatPhoneInput(formData.phone || '')}
+            onChange={(e) => updateField('phone', stripPhoneFormat(e.target.value))}
+            placeholder="+242 06 XXX XX XX"
             readOnly={isFieldReadOnly}
             disabled={isFieldReadOnly}
             error={validationErrors.phone}

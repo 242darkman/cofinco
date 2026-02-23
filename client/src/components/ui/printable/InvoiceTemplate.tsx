@@ -3,6 +3,7 @@ import { useBranding } from '@/contexts/BrandingContext';
 import { ReceiptData } from './ReceiptTemplate';
 import { LOGO_BASE64 } from '@/lib/pdf-logo';
 import { TYPE_OPERATION_TERRAIN_LABELS } from '@shared/enum/status-constants';
+import { formatPhoneNumber } from '@/lib/format';
 import { currencySymbol } from '@shared/config/currency';
 
 // Default Company Info
@@ -141,7 +142,7 @@ export const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateP
                   <div className="text-[10px] text-content-muted mt-1 space-y-0.5">
                     <p>{companyInfo.slogan}</p>
                     <p>{companyInfo.adresse}</p>
-                    <p>{companyInfo.email} &bull; {companyInfo.telephone}</p>
+                    <p>{companyInfo.email} &bull; {formatPhoneNumber(companyInfo.telephone)}</p>
                   </div>
                 </div>
               </div>
@@ -168,7 +169,7 @@ export const InvoiceTemplate = React.forwardRef<HTMLDivElement, InvoiceTemplateP
                   {data.client?.prenom} {data.client?.nom}
                 </div>
                 {data.client?.telephone && (
-                  <div className="font-mono text-xs text-content-muted mt-0.5">{data.client.telephone}</div>
+                  <div className="font-mono text-xs text-content-muted mt-0.5">{formatPhoneNumber(data.client.telephone)}</div>
                 )}
                 {maskedAccount && (
                   <div className="mt-2 text-[10px] text-content-muted">

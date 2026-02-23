@@ -155,6 +155,57 @@ export function formatPhoneNumber(phone: string | null | undefined): string {
   return phone;
 }
 
+/**
+ * Live phone input formatter — formats as the user types.
+ * Congo pattern: +242 XX XXX XX XX (or local XX XXX XX XX).
+ * Non-restrictive: values that don't match Congo format are returned as-is.
+ */
+export function formatPhoneInput(value: string): string {
+  if (!value) return '';
+
+  const hasPlus = value.startsWith('+');
+  const digits = value.replace(/\D/g, '');
+
+  // +242 prefix → +242 XX XXX XX XX
+  if (hasPlus && digits.startsWith('242')) {
+    const local = digits.slice(3);
+    if (local.length === 0) return '+242';
+    if (local.length <= 2) return `+242 ${local}`;
+    if (local.length <= 5) return `+242 ${local.slice(0, 2)} ${local.slice(2)}`;
+    if (local.length <= 7) return `+242 ${local.slice(0, 2)} ${local.slice(2, 5)} ${local.slice(5)}`;
+    if (local.length <= 9) return `+242 ${local.slice(0, 2)} ${local.slice(2, 5)} ${local.slice(5, 7)} ${local.slice(7)}`;
+    return `+242 ${local.slice(0, 2)} ${local.slice(2, 5)} ${local.slice(5, 7)} ${local.slice(7)}`;
+  }
+
+  // 242XXXXXXXXX without + but >9 digits → treat as country-code number
+  if (!hasPlus && digits.startsWith('242') && digits.length > 9) {
+    const local = digits.slice(3);
+    if (local.length <= 2) return `+242 ${local}`;
+    if (local.length <= 5) return `+242 ${local.slice(0, 2)} ${local.slice(2)}`;
+    if (local.length <= 7) return `+242 ${local.slice(0, 2)} ${local.slice(2, 5)} ${local.slice(5)}`;
+    if (local.length <= 9) return `+242 ${local.slice(0, 2)} ${local.slice(2, 5)} ${local.slice(5, 7)} ${local.slice(7)}`;
+    return `+242 ${local.slice(0, 2)} ${local.slice(2, 5)} ${local.slice(5, 7)} ${local.slice(7)}`;
+  }
+
+  // Local 9-digit number → XX XXX XX XX
+  if (!hasPlus && digits.length <= 9) {
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 5) return `${digits.slice(0, 2)} ${digits.slice(2)}`;
+    if (digits.length <= 7) return `${digits.slice(0, 2)} ${digits.slice(2, 5)} ${digits.slice(5)}`;
+    return `${digits.slice(0, 2)} ${digits.slice(2, 5)} ${digits.slice(5, 7)} ${digits.slice(7)}`;
+  }
+
+  return value;
+}
+
+/** Strip formatting from a phone input value, keeping only digits and leading + */
+export function stripPhoneFormat(value: string): string {
+  if (!value) return '';
+  const hasPlus = value.startsWith('+');
+  const digits = value.replace(/\D/g, '');
+  return hasPlus ? `+${digits}` : digits;
+}
+
 // Percentage formatting
 export function formatPercentage(value: number | string | null | undefined, decimals = 1): string {
   const num = typeof value === 'string' ? parseFloat(value) : (value || 0);

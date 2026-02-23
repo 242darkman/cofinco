@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { formatPhoneNumber } from '../../lib/format';
 import {
   ClipboardCheck,
   Clock,
@@ -345,7 +346,7 @@ export default function AgentEnquetes({ agentId }: AgentEnquetesProps) {
                   {investigation.client?.telephone && (
                     <div className="flex items-center gap-1.5 text-content-muted">
                       <User size={12} className="text-status-info shrink-0" />
-                      <span className="truncate">{investigation.client.telephone}</span>
+                      <span className="truncate">{formatPhoneNumber(investigation.client.telephone)}</span>
                     </div>
                   )}
 

@@ -3,7 +3,7 @@ import { useBranding } from '@/contexts/BrandingContext';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Building2, Phone, Mail, MapPin } from 'lucide-react';
-import { formatMoney } from '../../../lib/format';
+import { formatMoney, formatPhoneNumber } from '../../../lib/format';
 import { StatutTransfertCaisse } from '@shared/enum/status-constants';
 import { ALL_STATUS_LABELS } from '../../../lib/status-labels';
 
@@ -98,7 +98,7 @@ export const TransferHistoryPrintTemplate = React.forwardRef<HTMLDivElement, Tra
                   <MapPin size={12} /> {companyInfo.adresse}
                 </div>
                 <div className="flex items-center gap-2">
-                  <Phone size={12} /> {companyInfo.telephone}
+                  <Phone size={12} /> {formatPhoneNumber(companyInfo.telephone)}
                 </div>
                 <div className="flex items-center gap-2">
                   <Mail size={12} /> {companyInfo.email}

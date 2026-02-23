@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { X, Users } from "lucide-react";
 import type { StepComponentProps, MemberEntry } from "../types";
 import { clientApi } from "../../../../lib/api-client";
-import { formatClientName, resolveStorageUrl } from "../../../../lib/format";
+import { formatClientName, formatPhoneNumber, resolveStorageUrl } from "../../../../lib/format";
 import SearchableSelect from "../../../ui/SearchableSelect";
 import { GROUP_ROLE_OPTIONS } from "../../TontinePlanWizard/constants";
 
@@ -64,7 +64,7 @@ export default function StepMembers({ formData, updateField }: StepComponentProp
             .map((c) => ({
               value: c.id,
               label: formatClientName(c.nom, c.prenom),
-              subLabel: `${c.telephone || ""} · ${c.quartier || ""}`.trim(),
+              subLabel: `${formatPhoneNumber(c.telephone) || ""} · ${c.quartier || ""}`.trim(),
               image: c.photoProfile,
             }))}
           value=""
@@ -96,7 +96,7 @@ export default function StepMembers({ formData, updateField }: StepComponentProp
                   <div className="text-sm font-medium text-content-primary truncate">
                     {client ? formatClientName(client.nom, client.prenom) : clientId}
                   </div>
-                  <div className="text-[10px] text-content-muted">{client?.telephone}</div>
+                  <div className="text-[10px] text-content-muted">{formatPhoneNumber(client?.telephone)}</div>
                 </div>
                 {formData.rolesEnabled && (
                   <select

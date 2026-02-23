@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Smartphone, Phone, Hash, CheckCircle, Banknote, Wallet } from 'lucide-react';
 import { toast } from '../../../lib/toast';
+import { formatPhoneInput, stripPhoneFormat } from '../../../lib/format';
 
 const MOBILE_OPERATORS = [
   { id: 'mtn', name: 'MTN Mobile Money', color: 'bg-status-warning-bg0', textColor: 'text-status-warning', prefix: '+242 05/06' },
@@ -162,10 +163,10 @@ export default function PaymentValidationModal({
               </label>
               <input
                 type="tel"
-                value={mobileMoneyData.numero_telephone}
-                onChange={(e) => setMobileMoneyData({ ...mobileMoneyData, numero_telephone: e.target.value })}
+                value={formatPhoneInput(mobileMoneyData.numero_telephone || '')}
+                onChange={(e) => setMobileMoneyData({ ...mobileMoneyData, numero_telephone: stripPhoneFormat(e.target.value) })}
                 className="w-full bg-surface-elevated border border-edge-strong rounded-lg px-4 py-3 text-content-primary"
-                placeholder={MOBILE_OPERATORS.find(op => op.id === selectedOperator)?.prefix || '+242 XX XXX XXXX'}
+                placeholder="+242 06 XXX XX XX"
               />
             </div>
 

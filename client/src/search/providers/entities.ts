@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { Actions, Subjects } from '@shared/ability';
 import type { SearchProvider, SearchResult, SearchContext } from '../types';
+import { formatPhoneNumber } from '../../lib/format';
 
 // ─── API Response Types ─────────────────────────────────────────────────────
 
@@ -75,7 +76,7 @@ export const clientsProvider: SearchProvider = {
     return data.clients.map((c) => ({
       id: `client-${c.id}`,
       title: c.nom,
-      subtitle: c.telephone || c.email,
+      subtitle: c.telephone ? formatPhoneNumber(c.telephone) : c.email,
       keywords: [c.nom, c.telephone || '', c.email || ''],
       group: 'Clients',
       icon: Users,

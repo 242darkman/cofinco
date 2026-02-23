@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { formatPhoneNumber } from '../../lib/format';
 import { toast } from 'sonner';
 import airtelLogo from '@/assets/logos/airtel-logo.png';
 import mtnLogo from '@/assets/logos/mtn-logo.png';
@@ -366,7 +367,7 @@ export default function MobileMoneyTransactionsPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="text-sm text-content-primary font-mono">{payment.phone}</span>
+                      <span className="text-sm text-content-primary font-mono">{formatPhoneNumber(payment.phone)}</span>
                     </td>
                     <td className="px-4 py-3">
                       {payment.client ? (

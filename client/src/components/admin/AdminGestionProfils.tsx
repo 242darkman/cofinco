@@ -10,7 +10,7 @@ import { toast, handleApiError } from '../../lib/toast';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { SystemRole, getRoleOptions } from '@shared/types/roles';
 import { StatutUser } from '@shared/enum/status-constants';
-import { resolveStorageUrl } from '../../lib/format';
+import { resolveStorageUrl, formatPhoneInput, stripPhoneFormat } from '../../lib/format';
 
 // Import hooks and component for permissions
 import { getRoleBadgeStyle, getStatusBadgeStyle } from '../../lib/role-utils';
@@ -1049,9 +1049,9 @@ export default function AdminGestionProfils() {
                             <label className="text-[11px] sm:text-xs font-bold text-content-muted uppercase">Téléphone</label>
                             <input
                               type="tel"
-                              value={formData.phone}
-                              onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                              placeholder="06 000 0000"
+                              value={formatPhoneInput(formData.phone || '')}
+                              onChange={(e) => setFormData({...formData, phone: stripPhoneFormat(e.target.value)})}
+                              placeholder="+242 06 XXX XX XX"
                               className="w-full h-10 sm:h-11 px-3 sm:px-4 bg-surface-base border border-edge rounded-xl text-sm text-content-primary placeholder:text-content-muted focus:ring-2 focus:ring-accent focus:border-accent outline-none transition-all"
                             />
                           </div>

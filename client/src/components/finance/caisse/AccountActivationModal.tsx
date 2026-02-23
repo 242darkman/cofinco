@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { X, Wallet, AlertTriangle, Loader2, UserCheck, Banknote, Building2, Phone, XCircle } from 'lucide-react';
 import { compteEpargneApi, paymentsApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
-import { formatMoney } from '../../../lib/format';
+import { formatMoney, formatPhoneInput, stripPhoneFormat } from '../../../lib/format';
 import { getStatusLabel, ACCOUNT_TYPE_LABELS } from '@/lib/status-labels';
 import { v4 as uuidv4 } from 'uuid';
 import { UniversalPaymentSuccessModal } from './shared/UniversalPaymentSuccessModal';
@@ -642,9 +642,9 @@ export function AccountActivationModal({
                     <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" size={16} />
                     <input
                       type="tel"
-                      value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value)}
-                      placeholder={modePaiement === 'MTN' ? '+242 05/06 XX XX XX' : '+242 04 XX XX XX'}
+                      value={formatPhoneInput(phoneNumber)}
+                      onChange={(e) => setPhoneNumber(stripPhoneFormat(e.target.value))}
+                      placeholder="+242 06 XXX XX XX"
                       className="w-full pl-10 pr-4 py-2.5 bg-surface border border-edge rounded-xl text-sm text-content-primary focus:border-accent focus:ring-1 focus:ring-accent"
                     />
                   </div>

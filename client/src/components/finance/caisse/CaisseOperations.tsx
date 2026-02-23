@@ -12,7 +12,7 @@ import {
   securityConfigApi, SecurityConfigResponse
 } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
-import { formatMoney } from '../../../lib/format';
+import { formatMoney, formatPhoneInput, stripPhoneFormat } from '../../../lib/format';
 import { VALIDATION_LIMITS } from '../../../lib/validation';
 import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import ConfirmDialog from '../../ui/ConfirmDialog';
@@ -1390,9 +1390,9 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
                           <Phone size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-content-muted" />
                           <input
                             type="tel"
-                            value={phoneNumber}
+                            value={formatPhoneInput(phoneNumber)}
                             onChange={(e) => {
-                              const val = e.target.value;
+                              const val = stripPhoneFormat(e.target.value);
                               setPhoneNumber(val);
                               if (val && !isValidPhone(val)) {
                                 setPhoneError('Format invalide (ex: 06XXXXXXX ou +242 06XXXXXXX)');
@@ -1403,7 +1403,7 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
                             className={`w-full bg-surface-base border rounded-lg py-2 pl-8 pr-3 text-sm text-content-primary focus:ring-1 focus:ring-accent/50 outline-none font-mono ${
                               phoneError ? 'border-status-danger/50' : phoneValidation?.warning ? 'border-status-warning/50' : 'border-edge'
                             }`}
-                            placeholder="+242 06..."
+                            placeholder="+242 06 XXX XX XX"
                           />
                           {phoneError && (
                             <p className="text-[9px] text-status-danger mt-0.5">{phoneError}</p>

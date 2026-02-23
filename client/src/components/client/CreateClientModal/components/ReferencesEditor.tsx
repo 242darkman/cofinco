@@ -4,6 +4,7 @@ import { Button, FormField, SelectField } from '../../../ui';
 import { RELATION_REFERENCE_OPTIONS } from '@shared/enum/status-constants';
 import { EMPTY_REFERENCE } from '../constants';
 import type { ReferencePersonne } from '../types';
+import { formatPhoneInput, stripPhoneFormat } from '../../../../lib/format';
 
 function capitalizeWords(str: string): string {
   return str.replace(/(^|\s)\S/g, c => c.toUpperCase());
@@ -110,8 +111,8 @@ export default function ReferencesEditor({ references, onChange, errors }: Refer
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <FormField
-                  label="Téléphone" name={`ref_${idx}_telephone`} type="tel" value={ref.telephone}
-                  onChange={(e) => updateRef(idx, 'telephone', e.target.value)}
+                  label="Téléphone" name={`ref_${idx}_telephone`} type="tel" value={formatPhoneInput(ref.telephone || '')}
+                  onChange={(e) => updateRef(idx, 'telephone', stripPhoneFormat(e.target.value))}
                   error={errors[`ref_${idx}_telephone`]} className="py-1"
                 />
                 <SelectField
