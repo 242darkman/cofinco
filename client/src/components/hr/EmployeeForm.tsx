@@ -347,6 +347,10 @@ export default function EmployeeForm({
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Guard: only submit from the last step (prevents phantom submit when
+    // React reuses the DOM node and "Suivant" becomes "Sauvegarder")
+    if (currentStep !== STEPS.length - 1) return;
+
     const errors = validateAllSteps();
     if (Object.keys(errors).length > 0) {
       // Find the first step with errors and navigate there
@@ -385,7 +389,7 @@ export default function EmployeeForm({
     } else {
       toast.error(result.error || 'Erreur lors de la sauvegarde');
     }
-  }, [formData, onSave, onClose, validateAllSteps, validateStep, selectedUserId, agenceId, modeCalculPaie, selectedJobPositionId, editingEmploye]);
+  }, [currentStep, formData, onSave, onClose, validateAllSteps, validateStep, selectedUserId, agenceId, modeCalculPaie, selectedJobPositionId, editingEmploye]);
 
   // --- Photo upload ---
   const handlePhotoUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -836,11 +840,11 @@ export default function EmployeeForm({
               )}
 
               {currentStep < STEPS.length - 1 ? (
-                <Button type="button" variant="primary" onClick={handleNext}>
+                <Button key="next" type="button" variant="primary" onClick={handleNext}>
                   Suivant <ChevronRight size={16} />
                 </Button>
               ) : (
-                <Button type="submit" variant="primary" disabled={saving || !canSaveEmployees}>
+                <Button key="submit" type="submit" variant="primary" disabled={saving || !canSaveEmployees}>
                   <Save size={18} className="mr-2" />
                   {saving ? '...' : 'Sauvegarder'}
                 </Button>
