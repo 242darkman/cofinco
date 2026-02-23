@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Shield, Loader2, Send } from 'lucide-react';
+import { Loader2, Send } from 'lucide-react';
 import { Button, Modal, SearchableSelect } from '@/components/ui';
 
 interface PermissionOption {
@@ -31,13 +31,13 @@ export default function PermissionRequestForm({ isOpen, onClose, onSubmit }: Per
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch available permissions
+  // Fetch only missing (requestable) permissions
   useEffect(() => {
     if (!isOpen) return;
     setLoadingPerms(true);
-    fetch('/api/permissions', { credentials: 'include' })
+    fetch('/api/rbac/permissions/requestable', { credentials: 'include' })
       .then(res => res.json())
-      .then(data => setPermissions(data))
+      .then(data => setPermissions(data.permissions || []))
       .catch(() => {})
       .finally(() => setLoadingPerms(false));
   }, [isOpen]);
@@ -45,8 +45,9 @@ export default function PermissionRequestForm({ isOpen, onClose, onSubmit }: Per
   const permOptions = useMemo(() =>
     permissions.map(p => ({
       value: p.id,
-      label: `${p.name} (${p.code})`,
-      description: p.moduleName,
+      label: p.name,
+      subLabel: p.moduleName ? `${p.moduleName} — ${p.code}` : p.code,
+      hideAvatar: true,
     })),
     [permissions]
   );
@@ -99,15 +100,19 @@ export default function PermissionRequestForm({ isOpen, onClose, onSubmit }: Per
           {loadingPerms ? (
             <div className="flex items-center gap-2 text-sm text-content-muted py-2">
               <Loader2 size={14} className="animate-spin" />
-              Chargement...
+              Chargement des permissions manquantes...
             </div>
+          ) : permissions.length === 0 ? (
+            <p className="text-sm text-content-muted py-2">
+              Vous disposez déjà de toutes les permissions disponibles.
+            </p>
           ) : (
             <SearchableSelect
+              name="permission"
               options={permOptions}
               value={selectedPermId}
-              onChange={setSelectedPermId}
+              onChange={(v) => setSelectedPermId(String(v))}
               placeholder="Sélectionner une permission..."
-              searchPlaceholder="Rechercher par nom ou code..."
             />
           )}
         </div>

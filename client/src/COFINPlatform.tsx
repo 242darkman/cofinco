@@ -102,7 +102,7 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
     typeof window !== 'undefined' ? !window.matchMedia('(max-width: 1023px)').matches : true
   );
   const [moduleData, setModuleData] = useState<any>(null);
-  const { permissionsVersion, ability } = useAbilityContext();
+  const { permissionsVersion, ability, isAdmin } = useAbilityContext();
   const normalizedRole = (currentUser?.role as string) || SystemRole.CLIENT;
   const { createRequest: createPermRequest } = useMyPermissionRequests();
   
@@ -509,7 +509,7 @@ export default function COFINPlatform({ currentUser, onLogout, onUserUpdate }: C
             onMenuToggle={() => setSidebarOpen(!sidebarOpen)}
             onProfileClick={() => navigateToModule('profil')}
             onSessionsClick={() => setShowSessionsModal(true)}
-            onPermissionRequestClick={() => setShowPermRequestModal(true)}
+            onPermissionRequestClick={isAdmin ? undefined : () => setShowPermRequestModal(true)}
             onLogout={onLogout}
             user={{
               nom: currentUser?.nom,

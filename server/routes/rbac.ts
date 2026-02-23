@@ -9,6 +9,7 @@ import {
   roleHierarchy,
   criticalPermissionPatterns,
   permissionConditionTemplates,
+  permissionRequests,
   bulkUserPermissionUpdateSchema,
   toggleUserPermissionSchema,
   type BulkUserPermissionUpdate,
@@ -3030,6 +3031,114 @@ export function registerRbacRoutes(app: Express) {
       } catch (error) {
         logger.error({ err: error }, 'Revert audit entry error');
         res.status(500).json({ message: "Erreur lors de l'annulation" });
+      }
+    }
+  );
+
+  // ============================================================
+  // REQUESTABLE PERMISSIONS (for permission request form)
+  // ============================================================
+
+  /**
+   * GET /api/rbac/permissions/requestable
+   * Returns permissions the user does NOT already have, grouped by module.
+   * Admin gets empty list (they have all permissions).
+   */
+  app.get("/api/rbac/permissions/requestable",
+    requireAuth,
+    async (req: Request, res: Response) => {
+      try {
+        const userId = req.session?.user?.id || req.session?.userId;
+        const agenceIdActive = req.session?.user?.agenceId;
+        if (!userId) return res.status(401).json({ message: "Non authentifié" });
+
+        const { buildAbilityForUser } = await import("../authorization/ability");
+
+        // Build user's effective permissions
+        const abilityResponse = await buildAbilityForUser({ userId, agenceIdActive });
+
+        // Admin has all permissions — nothing to request
+        if (abilityResponse.isAdmin) {
+          return res.json({ permissions: [], count: 0 });
+        }
+
+        // Get user's effective permission codes
+        const effectiveCodes = new Set<string>();
+        for (const [module, actions] of Object.entries(abilityResponse.permissions)) {
+          for (const action of actions) {
+            effectiveCodes.add(`${module}.${action}`);
+          }
+        }
+
+        // Get permission IDs with a PENDING request from this user (avoid duplicates)
+        const pendingRequests = await db.select({ permissionId: permissionRequests.permissionId })
+          .from(permissionRequests)
+          .where(and(
+            eq(permissionRequests.requesterId, userId),
+            eq(permissionRequests.status, 'PENDING')
+          ));
+        const pendingPermIds = new Set(pendingRequests.map(r => r.permissionId));
+
+        // Get all available permissions from DB
+        const allPermissions = await db.select({
+          id: permissions.id,
+          code: permissions.code,
+          name: permissions.name,
+          description: permissions.description,
+          moduleId: permissions.moduleId,
+          moduleName: modules.name,
+          moduleCategory: modules.category,
+        })
+          .from(permissions)
+          .leftJoin(modules, eq(permissions.moduleId, modules.id))
+          .orderBy(modules.orderIndex, permissions.code);
+
+        // Filter: only permissions the user doesn't have and hasn't already requested
+        const missing = allPermissions.filter(p => {
+          if (pendingPermIds.has(p.id)) return false; // Already requested
+          const normalizedCode = p.code.replace(/[.:]/g, '.').toLowerCase();
+          return !effectiveCodes.has(p.code) && !effectiveCodes.has(normalizedCode);
+        });
+
+        // Group by module
+        const grouped: Record<string, {
+          moduleName: string;
+          moduleCategory: string | null;
+          permissions: { id: string; code: string; name: string; description: string | null }[];
+        }> = {};
+
+        for (const perm of missing) {
+          const key = perm.moduleName || 'Autres';
+          if (!grouped[key]) {
+            grouped[key] = {
+              moduleName: key,
+              moduleCategory: perm.moduleCategory,
+              permissions: [],
+            };
+          }
+          grouped[key].permissions.push({
+            id: perm.id,
+            code: perm.code,
+            name: perm.name,
+            description: perm.description,
+          });
+        }
+
+        res.json({
+          permissions: missing.map(p => ({
+            id: p.id,
+            code: p.code,
+            name: p.name,
+            description: p.description,
+            moduleName: p.moduleName,
+            moduleCategory: p.moduleCategory,
+          })),
+          grouped: Object.values(grouped),
+          count: missing.length,
+        });
+      } catch (error) {
+        logger.error({ err: error }, 'Get requestable permissions error');
+        res.status(500).json({ message: "Erreur lors de la récupération des permissions" });
       }
     }
   );

@@ -258,7 +258,7 @@ export class StorageService {
   ): Promise<string> {
     const bucket = isPublic ? PUBLIC_BUCKET : PRIVATE_BUCKET;
     const sanitizedName = this.sanitizeFilename(filename);
-    const key = `${path}/${sanitizedName}`;
+    const key = `${path}/${Date.now()}-${sanitizedName}`;
 
     await s3Client.send(new PutObjectCommand({
       Bucket: bucket,
