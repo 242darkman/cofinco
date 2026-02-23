@@ -24,10 +24,11 @@ CMD ["npx", "tsx", "watch", "--clear-screen=false", "server/index.ts"]
 # Usage: docker compose service "db-init" (runs once then exits)
 # Needs full source (schema, drizzle config, seed) + all deps (drizzle-kit, tsx)
 FROM deps AS init
+RUN apk add --no-cache unzip
 WORKDIR /app
 COPY . .
 ENTRYPOINT ["sh", "-c"]
-CMD ["npx drizzle-kit push --force && node --import tsx scripts/ensure-sql.ts && node --import tsx seeds/seed-prod.ts"]
+CMD ["sh scripts/download-geonames.sh && npx drizzle-kit push --force && node --import tsx scripts/ensure-sql.ts && node --import tsx seeds/seed-prod.ts"]
 
 # ============================================
 # Stage: TEST — unit + integration tests
