@@ -5,13 +5,14 @@ import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
 } from '../ui/sheet';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '../ui/accordion';
-import { FormField, SelectField, Button, SearchableSelect } from '../ui';
+import { FormField, SelectField, Button } from '../ui';
 import SmartDocumentUpload, { type UploadedDocument, type DocumentType } from '../ui/SmartDocumentUpload';
 import FaceLivenessCapture from '../security/FaceLivenessCapture';
 import { useUserProfile } from '../../hooks/useUserProfile';
 import { SystemRole } from '@shared/types/roles';
 import { usePermissions } from '../auth/ProtectedFeature';
 import { agenceApi, employeApi, villeApi, catalogApi } from '../../lib/api-client';
+import { CascadingGeoSelect, type GeoSelection } from '../shared/CascadingGeoSelect';
 import { useEntityUpload } from '../../hooks/useEntityUpload';
 import { resolveStorageUrl, formatPhoneInput, stripPhoneFormat } from '../../lib/format';
 import {
@@ -69,7 +70,7 @@ export default function ClientEditDrawer({ client, isOpen, onClose, onSave }: Cl
   // Reference data
   const [agences, setAgences] = useState<{ id: string; nom: string }[]>([]);
   const [agentsReferents, setAgentsReferents] = useState<{ id: string; nom: string; prenom: string }[]>([]);
-  const [villesList, setVillesList] = useState<{ id: string; nom: string }[]>([]);
+  const [geo, setGeo] = useState<GeoSelection>({ paysId: '', regionId: '', villeId: '' });
   const [catalogSectors, setCatalogSectors] = useState<{ id: string; nom: string }[]>([]);
 
   // Form state
@@ -114,13 +115,27 @@ export default function ClientEditDrawer({ client, isOpen, onClose, onSave }: Cl
       });
       setReferences(c.referencesPersonnes || []);
       setErrors({});
+
+      // Resolve villeId → regionId + paysId for CascadingGeoSelect
+      if (c.villeId) {
+        villeApi.getById(c.villeId).then((v: any) => {
+          setGeo({
+            paysId: v.paysId || '',
+            regionId: v.regionId || '',
+            villeId: c.villeId,
+          });
+        }).catch(() => {
+          setGeo({ paysId: '', regionId: '', villeId: c.villeId });
+        });
+      } else {
+        setGeo({ paysId: '', regionId: '', villeId: '' });
+      }
     }
   }, [client, isOpen]);
 
   // Load reference data
   useEffect(() => {
     if (!isOpen) return;
-    villeApi.getAll({ actif: true }).then(setVillesList).catch(console.error);
     catalogApi.getOptions().then((data: any) => {
       setCatalogSectors((data.sectors || []).map((s: any) => ({ id: s.id, nom: s.parentNom ? `${s.nom} (${s.parentNom})` : s.nom })));
     }).catch(console.error);
@@ -335,14 +350,15 @@ export default function ClientEditDrawer({ client, isOpen, onClose, onSave }: Cl
                   <div className="grid grid-cols-2 gap-3">
                     <FormField label="Adresse domicile" name="adresseDomicile" icon={MapPin} value={formData.adresseDomicile || ''} onChange={(e) => handleChange('adresseDomicile', e.target.value)} />
                     <FormField label="Lieu d'activite" name="lieuActivite" icon={MapPin} value={formData.lieuActivite || ''} onChange={(e) => handleChange('lieuActivite', e.target.value)} />
-                    <SearchableSelect
-                      label="Ville"
-                      name="villeId"
-                      value={formData.villeId || ''}
-                      onChange={(val) => handleChange('villeId', val ? String(val) : null)}
-                      options={villesList.map(v => ({ value: v.id, label: v.nom }))}
-                      placeholder="Rechercher une ville..."
-                    />
+                  </div>
+                  <CascadingGeoSelect
+                    value={geo}
+                    onChange={(g) => {
+                      setGeo(g);
+                      handleChange('villeId', g.villeId || null);
+                    }}
+                  />
+                  <div className="grid grid-cols-2 gap-3">
                     <SelectField label="Logement" name="statutLogement" value={formData.statutLogement || ''} onChange={(e) => handleChange('statutLogement', e.target.value || null)} options={[{ value: '', label: 'Selectionner...' }, ...STATUT_LOGEMENT_OPTIONS]} />
                   </div>
                 </AccordionContent>
