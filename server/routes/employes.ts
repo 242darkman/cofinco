@@ -423,7 +423,7 @@ export function registerEmployesRoutes(app: Express) {
           email: data.email || null,
           telephone: data.telephone || null,
           sexe: data.sexe || null,
-          dateNaissance: data.dateNaissance || null,
+          dateNaissance: data.dateNaissance ? new Date(data.dateNaissance) : null,
           lieuNaissance: data.lieuNaissance || null,
           lieuNaissanceLocalityId: data.lieuNaissanceLocalityId || null,
           lieuNaissanceLocalityType: data.lieuNaissanceLocalityType || null,
@@ -597,7 +597,7 @@ export function registerEmployesRoutes(app: Express) {
       if (data.email !== undefined) userData.email = data.email || null;
       if (data.telephone !== undefined) userData.telephone = data.telephone || null;
       if (data.sexe !== undefined) userData.sexe = data.sexe;
-      if (data.dateNaissance !== undefined) userData.dateNaissance = data.dateNaissance || null;
+      if (data.dateNaissance !== undefined) userData.dateNaissance = data.dateNaissance ? new Date(data.dateNaissance) : null;
       if (data.lieuNaissance !== undefined) userData.lieuNaissance = data.lieuNaissance || null;
       if (data.lieuNaissanceLocalityId !== undefined) userData.lieuNaissanceLocalityId = data.lieuNaissanceLocalityId || null;
       if (data.lieuNaissanceLocalityType !== undefined) userData.lieuNaissanceLocalityType = data.lieuNaissanceLocalityType || null;
@@ -870,7 +870,7 @@ export function registerEmployesRoutes(app: Express) {
       };
 
       // Ajouter les champs user fournis (ne pas écraser si non fournis)
-      if (dateNaissance !== undefined) userUpdateData.dateNaissance = dateNaissance || null;
+      if (dateNaissance !== undefined) userUpdateData.dateNaissance = dateNaissance ? new Date(dateNaissance) : null;
       if (lieuNaissance !== undefined) userUpdateData.lieuNaissance = lieuNaissance || null;
       if (lieuNaissanceLocalityId !== undefined) userUpdateData.lieuNaissanceLocalityId = lieuNaissanceLocalityId || null;
       if (lieuNaissanceLocalityType !== undefined) userUpdateData.lieuNaissanceLocalityType = lieuNaissanceLocalityType || null;
