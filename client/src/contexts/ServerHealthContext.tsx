@@ -49,6 +49,12 @@ const OFFLINE_FAILURE_THRESHOLD = 2;
 // Minimum time between showing the overlay again (prevents flickering)
 const OFFLINE_DEBOUNCE_MS = 3000;
 
+// Fast probe configuration
+const FAST_PROBE_TIMEOUT_MS = 3000;
+const FAST_PROBE_DEBOUNCE_MS = 300;
+const FAST_PROBE_JITTER_MAX_MS = 200;
+const FAST_BACKOFF_DELAYS = [500, 1000, 2000];
+
 export function ServerHealthProvider({ children }: { children: React.ReactNode }) {
   const [isServerReachable, setIsServerReachable] = useState(true);
   const [isChecking, setIsChecking] = useState(false);
@@ -59,6 +65,11 @@ export function ServerHealthProvider({ children }: { children: React.ReactNode }
   const isMountedRef = useRef(true);
   const consecutiveFailuresRef = useRef(0);
   const lastOfflineTimeRef = useRef(0);
+
+  // Fast probe state
+  const probeInProgressRef = useRef(false);
+  const fastProbeDebounceRef = useRef<number | null>(null);
+  const fastProbeTimeoutRef = useRef<number | null>(null);
 
   const resolvePending = useCallback(() => {
     const resolvers = pendingResolversRef.current;
@@ -79,7 +90,13 @@ export function ServerHealthProvider({ children }: { children: React.ReactNode }
     let reachable = false;
 
     try {
-      const response = await fetch(SERVER_HEALTH_ENDPOINT, { cache: 'no-store' });
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), FAST_PROBE_TIMEOUT_MS);
+      const response = await fetch(SERVER_HEALTH_ENDPOINT, {
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
       reachable = response.ok;
     } catch {
       reachable = false;
@@ -89,33 +106,33 @@ export function ServerHealthProvider({ children }: { children: React.ReactNode }
     setIsChecking(false);
 
     if (reachable) {
-      consecutiveFailuresRef.current = 0; // Reset failure counter on successful health check
+      consecutiveFailuresRef.current = 0;
       backoffIndexRef.current = 0;
       clearPolling();
       resolvePending();
-      // Only update state if it was previously false to avoid unnecessary re-renders
       setIsServerReachable((prev) => (prev ? prev : true));
       return true;
     }
 
-    // Only update state if it was previously true
     setIsServerReachable((prev) => (prev ? false : prev));
     return false;
   }, [clearPolling, resolvePending]);
 
   const scheduleNextCheck = useCallback(() => {
     if (pollTimeoutRef.current !== null) return;
-    const delay =
+    const baseDelay =
       SERVER_HEALTH_BACKOFF_DELAYS[
         Math.min(backoffIndexRef.current, SERVER_HEALTH_BACKOFF_DELAYS.length - 1)
       ];
+    // Add jitter (+-20%) to prevent thundering herd
+    const jitter = baseDelay * (0.8 + Math.random() * 0.4);
     pollTimeoutRef.current = window.setTimeout(async () => {
       pollTimeoutRef.current = null;
       const ok = await runHealthCheck();
       if (!ok) {
         scheduleNextCheck();
       }
-    }, delay);
+    }, jitter);
     backoffIndexRef.current = Math.min(
       backoffIndexRef.current + 1,
       SERVER_HEALTH_BACKOFF_DELAYS.length - 1
@@ -131,16 +148,115 @@ export function ServerHealthProvider({ children }: { children: React.ReactNode }
     return ok;
   }, [clearPolling, runHealthCheck, scheduleNextCheck]);
 
+  // ============================================================
+  // Fast Reconnect Probe
+  // ============================================================
+  // Triggered by browser events (online, focus, visibilitychange, pageshow).
+  // Uses fast backoff (500ms → 1s → 2s) with debounce + jitter + concurrency lock.
+
+  const runFastProbe = useCallback(async () => {
+    if (probeInProgressRef.current || !isMountedRef.current) return;
+    probeInProgressRef.current = true;
+
+    try {
+      // Try with fast backoff: 500ms → 1s → 2s
+      for (let attempt = 0; attempt < FAST_BACKOFF_DELAYS.length; attempt++) {
+        if (!isMountedRef.current) break;
+
+        const ok = await runHealthCheck();
+        if (ok) {
+          if (import.meta.env.DEV) console.log(`[ServerHealth] Fast probe succeeded (attempt ${attempt + 1})`);
+          return;
+        }
+
+        // Wait before next fast attempt (unless last attempt)
+        if (attempt < FAST_BACKOFF_DELAYS.length - 1) {
+          await new Promise((r) => {
+            fastProbeTimeoutRef.current = window.setTimeout(r, FAST_BACKOFF_DELAYS[attempt]);
+          });
+          fastProbeTimeoutRef.current = null;
+        }
+      }
+
+      // Fast probe exhausted — fall back to normal backoff
+      if (import.meta.env.DEV) console.log('[ServerHealth] Fast probe exhausted, falling back to normal backoff');
+      scheduleNextCheck();
+    } finally {
+      probeInProgressRef.current = false;
+    }
+  }, [runHealthCheck, scheduleNextCheck]);
+
+  const triggerFastProbe = useCallback(() => {
+    // Skip if already probing
+    if (probeInProgressRef.current) return;
+
+    // Debounce: coalesce rapid triggers (online + focus + visibility all firing)
+    if (fastProbeDebounceRef.current !== null) {
+      clearTimeout(fastProbeDebounceRef.current);
+    }
+
+    fastProbeDebounceRef.current = window.setTimeout(() => {
+      fastProbeDebounceRef.current = null;
+
+      // Add random jitter (0–200ms) to prevent thundering herd across clients
+      const jitter = Math.random() * FAST_PROBE_JITTER_MAX_MS;
+      window.setTimeout(() => {
+        // Cancel any existing scheduled backoff — the fast probe takes over
+        clearPolling();
+        runFastProbe();
+      }, jitter);
+    }, FAST_PROBE_DEBOUNCE_MS);
+  }, [clearPolling, runFastProbe]);
+
+  // ============================================================
+  // Browser Event Listeners for Fast Reconnect
+  // ============================================================
+
+  useEffect(() => {
+    const handleOnline = () => {
+      if (import.meta.env.DEV) console.log('[ServerHealth] Browser online event — triggering fast probe');
+      triggerFastProbe();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        if (import.meta.env.DEV) console.log('[ServerHealth] Tab visible — triggering fast probe');
+        triggerFastProbe();
+      }
+    };
+
+    const handleFocus = () => {
+      if (import.meta.env.DEV) console.log('[ServerHealth] Window focus — triggering fast probe');
+      triggerFastProbe();
+    };
+
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        if (import.meta.env.DEV) console.log('[ServerHealth] Page restored from bfcache — triggering fast probe');
+        triggerFastProbe();
+      }
+    };
+
+    window.addEventListener('online', handleOnline);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('pageshow', handlePageShow);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('pageshow', handlePageShow);
+    };
+  }, [triggerFastProbe]);
+
   const reportFailure = useCallback(() => {
     consecutiveFailuresRef.current += 1;
 
-    // Only mark as unreachable after multiple consecutive failures
-    // This prevents flickering when a single request fails temporarily
     if (consecutiveFailuresRef.current >= OFFLINE_FAILURE_THRESHOLD) {
       const now = Date.now();
       const timeSinceLastOffline = now - lastOfflineTimeRef.current;
 
-      // Debounce: don't show overlay again if it was shown recently
       if (timeSinceLastOffline > OFFLINE_DEBOUNCE_MS) {
         setIsServerReachable((prev) => {
           if (!prev) return prev;
@@ -154,11 +270,10 @@ export function ServerHealthProvider({ children }: { children: React.ReactNode }
   }, [scheduleNextCheck]);
 
   const reportSuccess = useCallback(() => {
-    consecutiveFailuresRef.current = 0; // Reset failure counter on success
+    consecutiveFailuresRef.current = 0;
     backoffIndexRef.current = 0;
     clearPolling();
     resolvePending();
-    // Only update state if it was previously false to avoid unnecessary re-renders
     setIsServerReachable((prev) => (prev ? prev : true));
   }, [clearPolling, resolvePending]);
 
@@ -211,6 +326,8 @@ export function ServerHealthProvider({ children }: { children: React.ReactNode }
     return () => {
       isMountedRef.current = false;
       clearPolling();
+      if (fastProbeDebounceRef.current !== null) clearTimeout(fastProbeDebounceRef.current);
+      if (fastProbeTimeoutRef.current !== null) clearTimeout(fastProbeTimeoutRef.current);
       pendingResolversRef.current = [];
       consecutiveFailuresRef.current = 0;
     };

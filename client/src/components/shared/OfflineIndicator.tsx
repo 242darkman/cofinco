@@ -33,10 +33,12 @@ import {
 import { useLanguage } from '../../contexts/LanguageContext';
 import Button from '../ui/Button';
 import Card from '../ui/Card';
+import SyncQueueDrawer from './SyncQueueDrawer';
 
 export function OfflineIndicator() {
   const { t } = useLanguage();
   const [showDetails, setShowDetails] = useState(false);
+  const [showQueueDrawer, setShowQueueDrawer] = useState(false);
 
   const {
     connectionState,
@@ -251,10 +253,29 @@ export function OfflineIndicator() {
                   </p>
                 </div>
               )}
+
+              {/* View Queue Button */}
+              <Button
+                onClick={() => {
+                  setShowDetails(false);
+                  setShowQueueDrawer(true);
+                }}
+                variant="ghost"
+                fullWidth
+                className="text-xs text-content-muted hover:text-content-secondary"
+              >
+                Voir la file de synchronisation
+              </Button>
             </div>
           </Card>
         </div>
       )}
+
+      {/* Sync Queue Drawer */}
+      <SyncQueueDrawer
+        isOpen={showQueueDrawer}
+        onClose={() => setShowQueueDrawer(false)}
+      />
     </div>
   );
 }

@@ -287,36 +287,8 @@ export default function CaisseDashboard({
     return () => window.removeEventListener('agent-provisioning-update', handler);
   }, [refetchAgentSessions]);
 
-  // Session recovery on network reconnect (belt-and-suspenders with refetchOnReconnect)
-  useEffect(() => {
-    const handleOnline = () => {
-      refetchSession();
-      refetchPendingSession();
-      if (currentSession) {
-        refetchTransactions();
-      }
-    };
-    window.addEventListener('online', handleOnline);
-    return () => window.removeEventListener('online', handleOnline);
-  }, [refetchSession, refetchPendingSession, refetchTransactions, currentSession]);
-
   // WebSocket listener for real-time loan disbursement updates
   const { socket } = useWebSocket();
-
-  // Session recovery on WebSocket reconnect
-  useEffect(() => {
-    if (!socket) return;
-    const handleOpen = () => {
-      // WebSocket just reconnected — refetch session state from server
-      refetchSession();
-      refetchPendingSession();
-      if (currentSession) {
-        refetchTransactions();
-      }
-    };
-    socket.addEventListener('open', handleOpen);
-    return () => socket.removeEventListener('open', handleOpen);
-  }, [socket, refetchSession, refetchPendingSession, refetchTransactions, currentSession]);
   useEffect(() => {
     if (!socket || !currentSession) return;
     const handleMessage = (event: MessageEvent) => {
@@ -380,6 +352,33 @@ export default function CaisseDashboard({
         refetchTransactions();
     }
   }, [currentSession?.id]);
+
+  // Session recovery on network reconnect (belt-and-suspenders with refetchOnReconnect)
+  useEffect(() => {
+    const handleOnline = () => {
+      refetchSession();
+      refetchPendingSession();
+      if (currentSession) {
+        refetchTransactions();
+      }
+    };
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [refetchSession, refetchPendingSession, refetchTransactions, currentSession]);
+
+  // Session recovery on WebSocket reconnect
+  useEffect(() => {
+    if (!socket) return;
+    const handleOpen = () => {
+      refetchSession();
+      refetchPendingSession();
+      if (currentSession) {
+        refetchTransactions();
+      }
+    };
+    socket.addEventListener('open', handleOpen);
+    return () => socket.removeEventListener('open', handleOpen);
+  }, [socket, refetchSession, refetchPendingSession, refetchTransactions, currentSession]);
 
   // Real-time Updates
   // Enable WebSocket for both active sessions AND pending opening sessions

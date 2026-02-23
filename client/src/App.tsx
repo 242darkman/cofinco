@@ -24,6 +24,7 @@ import NetworkBanner from './components/shared/NetworkBanner';
 import SessionExpirationWarning from './components/shared/SessionExpirationWarning';
 import { useOfflineBus } from './hooks/useOfflineBus';
 import { useBranding } from './contexts/BrandingContext';
+import { OfflineProvider } from './contexts/OfflineContext';
 
 // Lazy load heavy components
 const COFINPlatform = lazy(() => import('./COFINPlatform'));
@@ -313,6 +314,7 @@ function App() {
                 <SessionProvider
                   onSessionInvalid={handleSessionExpired}
                 >
+                <OfflineProvider>
                   <ErrorBoundary>
                     <Toaster position="top-right" richColors closeButton />
                     {/* Network status banner - shows for unstable/offline/api_down */}
@@ -342,6 +344,7 @@ function App() {
                       </Suspense>
                     </div>
                   </ErrorBoundary>
+                </OfflineProvider>
                 </SessionProvider>
               </AbilityProvider>
           </WebSocketProvider>

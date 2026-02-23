@@ -22,6 +22,7 @@ import {
   clearCompletedOperations
 } from './offline-db';
 import { networkManager, isNetworkUsable } from './networkManager';
+import { tabLeader } from './tabLeader';
 import {
   getUnsyncedEntries,
   markEntriesSyncing,
@@ -274,6 +275,12 @@ class SyncService {
   // ========== MAIN SYNC ==========
 
   public async sync(options: SyncOptions = {}): Promise<SyncStats> {
+    // Only the leader tab runs sync to prevent duplicate requests across tabs
+    if (!tabLeader.isLeader()) {
+      if (import.meta.env.DEV) console.log('[Sync Service] Skipping sync: not leader tab');
+      return this.syncStats;
+    }
+
     if (this.isSyncing) {
       if (import.meta.env.DEV) console.log('[Sync Service] Synchronisation déjà en cours');
       return this.syncStats;
@@ -775,6 +782,12 @@ class SyncService {
    * Phase 3: Pull confirmed entry statuses
    */
   public async syncJournal(): Promise<JournalSyncStats> {
+    // Only the leader tab runs journal sync
+    if (!tabLeader.isLeader()) {
+      if (import.meta.env.DEV) console.log('[Sync Service] Skipping journal sync: not leader tab');
+      return { phase: 'idle', uploaded: 0, confirmed: 0, rejected: 0, conflicts: 0, error: null };
+    }
+
     if (this.isJournalSyncing) {
       if (import.meta.env.DEV) console.log('[Sync Service] Journal sync already in progress');
       return { phase: 'idle', uploaded: 0, confirmed: 0, rejected: 0, conflicts: 0, error: null };

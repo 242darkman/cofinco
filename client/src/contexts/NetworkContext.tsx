@@ -109,7 +109,23 @@ export function NetworkProvider({ children }: NetworkProviderProps) {
     }
   }, [isServerReachable]);
 
-  // Note: networkManager already listens to browser online/offline events internally
+  // When NetworkManager transitions to 'unstable' (browser came back online),
+  // trigger a ServerHealth check to verify the server is actually reachable.
+  // This bridges the gap: NetworkManager detects the browser event,
+  // ServerHealthContext verifies actual server connectivity.
+  const prevNetworkStatusRef = useRef<string>(networkState.status);
+  useEffect(() => {
+    const prevStatus = prevNetworkStatusRef.current;
+    prevNetworkStatusRef.current = networkState.status;
+
+    if (
+      networkState.status === 'unstable' &&
+      (prevStatus === 'offline' || prevStatus === 'api_down') &&
+      !isChecking
+    ) {
+      serverCheckHealth();
+    }
+  }, [networkState.status, isChecking, serverCheckHealth]);
 
   // Update lastSyncAt when we get a success
   useEffect(() => {
