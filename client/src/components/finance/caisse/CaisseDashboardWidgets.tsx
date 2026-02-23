@@ -466,6 +466,27 @@ export function CaisseDashboardWidgets({
                   outerRadius={70}
                   paddingAngle={2}
                   dataKey="value"
+                  label={({ cx, cy, midAngle, outerRadius: or, percent, fill }) => {
+                    if (percent < 0.05) return null;
+                    const RADIAN = Math.PI / 180;
+                    const labelR = or + 16;
+                    const x = cx + labelR * Math.cos(-midAngle * RADIAN);
+                    const y = cy + labelR * Math.sin(-midAngle * RADIAN);
+                    return (
+                      <text x={x} y={y} fill={fill} textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize={10} fontWeight={600}>
+                        {`${Math.round(percent * 100)}%`}
+                      </text>
+                    );
+                  }}
+                  labelLine={({ cx, cy, midAngle, outerRadius: or, percent }) => {
+                    if (!percent || percent < 0.05) return <line />;
+                    const RADIAN = Math.PI / 180;
+                    const x1 = cx + (or + 2) * Math.cos(-midAngle * RADIAN);
+                    const y1 = cy + (or + 2) * Math.sin(-midAngle * RADIAN);
+                    const x2 = cx + (or + 12) * Math.cos(-midAngle * RADIAN);
+                    const y2 = cy + (or + 12) * Math.sin(-midAngle * RADIAN);
+                    return <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#64748b" strokeWidth={1} />;
+                  }}
                 >
                   {typeBreakdown.map((_, index) => (
                     <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
@@ -474,14 +495,21 @@ export function CaisseDashboardWidgets({
                 <Tooltip content={<PieTooltip />} />
               </PieChart>
             </ResponsiveContainer>
-            {/* Legend */}
+            {/* Legend with percentages */}
             <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
-              {typeBreakdown.slice(0, 4).map((item, i) => (
-                <span key={i} className="flex items-center gap-1 text-[9px] text-content-muted">
-                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
-                  <span className="truncate max-w-[80px]">{item.name}</span>
-                </span>
-              ))}
+              {(() => {
+                const total = typeBreakdown.reduce((s, d) => s + d.value, 0);
+                return typeBreakdown.slice(0, 4).map((item, i) => {
+                  const pct = total > 0 ? Math.round((item.value / total) * 100) : 0;
+                  return (
+                    <span key={i} className="flex items-center gap-1 text-[9px] text-content-muted">
+                      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
+                      <span className="truncate max-w-[80px]">{item.name}</span>
+                      <span className="font-semibold text-content-secondary">{pct}%</span>
+                    </span>
+                  );
+                });
+              })()}
             </div>
           </div>
         </div>

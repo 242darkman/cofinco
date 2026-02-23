@@ -7,7 +7,8 @@ import { saveToLoge } from '../../../lib/loge-storage';
 import { usePermissions } from '../../auth/ProtectedFeature';
 import { clientApi, transactionApi, echeanceCreditApi, tontineApi } from '../../../lib/api-client';
 import { toast, handleApiError } from '../../../lib/toast';
-import { formatMoney } from '../../../lib/format';
+import { formatMoney, formatPhoneNumber } from '../../../lib/format';
+import { authService } from '../../../lib/auth';
 import { VALIDATION_LIMITS } from '../../../lib/validation';
 import { escapeHtml, sanitizeInput } from '../../../lib/sanitize';
 import { UniversalPaymentSuccessModal } from './shared/UniversalPaymentSuccessModal';
@@ -557,26 +558,46 @@ export default function CaissePaiementModal({
         mobileProvider: mobileProvider || undefined
       });
       
+      const operationLabel = getOperationCaisseLabel(formData.type_operation);
+      const currentUser = authService.getCurrentUser();
+
+      // Construire les items du reçu
+      const receiptItems: ReceiptData['items'] = [
+        { description: formData.description, montant: operationData.amount as number, quantite: 1 },
+        ...(feeEstimate && feeOption ? [{ description: `Frais Mobile Money (${feeEstimate.feeRate}%)`, montant: feeEstimate.feeAmount, quantite: 1 }] : []),
+      ];
+
+      // Ajouter le solde crédit restant pour les remboursements
+      if (response?.result?.nouveauSoldeCredit !== undefined) {
+        receiptItems.push({
+          description: 'Solde crédit restant',
+          montant: Number(response.result.nouveauSoldeCredit),
+          quantite: 1,
+          details: response.result.creditSolde ? 'Crédit soldé' : undefined,
+        });
+      }
+
       const rData: ReceiptData = {
-        title: `Reçu de ${formData.type_operation}`,
+        title: `Reçu — ${operationLabel}`,
         reference: operationData.reference,
         date: new Date(),
-        type: getOperationCaisseLabel(formData.type_operation),
+        type: operationLabel,
+        natureOperation: formData.type_operation,
         client: {
           nom: clients.find(c => c.id === formData.client_id)?.nom || 'Client',
           prenom: clients.find(c => c.id === formData.client_id)?.prenom || '',
-          telephone: formData.numero_telephone
+          telephone: formatPhoneNumber(formData.numero_telephone)
         },
-        items: [
-          { description: formData.description, montant: operationData.amount, quantite: 1 },
-          ...(feeEstimate && feeOption ? [{ description: `Frais Mobile Money (${feeEstimate.feeRate}%)`, montant: feeEstimate.feeAmount, quantite: 1 }] : []),
-        ],
+        items: receiptItems,
         total: Number(formData.montant),
         modePaiement: formData.mode_paiement === MethodePaiement.MOBILE_MONEY && mobileProvider
           ? (mobileProvider === 'MTN' ? 'MTN MoMo' : 'Airtel Money')
           : (METHODE_PAIEMENT_LABELS[formData.mode_paiement as MethodePaiementType] || formData.mode_paiement),
         devise: currencySymbol(),
-        agent: { nom: 'Caissier', prenom: '' }
+        agent: {
+          nom: currentUser?.nom || currentUser?.name || 'Caissier',
+          prenom: currentUser?.prenom || ''
+        }
       };
 
       await saveReceiptToLoge(rData);

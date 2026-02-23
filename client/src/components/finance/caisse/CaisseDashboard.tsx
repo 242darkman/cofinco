@@ -580,14 +580,19 @@ export default function CaisseDashboard({
   };
 
   // Calcul des entrées/sorties en utilisant les helpers centralisés
-  // Exclure les opérations REVERSED (annulées) et classifier les annulations dans le sens inverse
-  const activeTransactions = transactions.filter(t => t.statut !== 'REVERSED');
-  const entreesOps = activeTransactions.filter(t => {
+  // IMPORTANT: Filtrer par session courante pour que entrées/sorties correspondent au solde de session
+  // (getToday retourne les opérations de TOUTES les sessions de la caisse aujourd'hui)
+  const sessionTransactions = currentSession
+    ? transactions.filter(t => t.sessionId === currentSession.id)
+    : transactions;
+  const activeTransactions = sessionTransactions.filter(t => t.statut !== 'REVERSED');
+  const currentSessionOps = activeTransactions;
+  const entreesOps = currentSessionOps.filter(t => {
     const isReversal = t.description?.startsWith('[ANNULATION]');
     // Reversal of incoming = outgoing, Reversal of outgoing = incoming
     return isReversal ? isOutgoingOperation(t.typeOperation) : isIncomingOperation(t.typeOperation);
   });
-  const sortiesOps = activeTransactions.filter(t => {
+  const sortiesOps = currentSessionOps.filter(t => {
     const isReversal = t.description?.startsWith('[ANNULATION]');
     return isReversal ? isIncomingOperation(t.typeOperation) : isOutgoingOperation(t.typeOperation);
   });
@@ -1032,7 +1037,7 @@ export default function CaisseDashboard({
       {/* Dashboard Widgets: Alerts + KPIs + Charts */}
       {currentSession && (
         <CaisseDashboardWidgets
-          transactions={transactions}
+          transactions={sessionTransactions}
           session={currentSession}
           soldeActuel={soldeActuel}
           totalEntrees={totalEntrees}
@@ -1092,9 +1097,9 @@ export default function CaisseDashboard({
           />
       </div>
 
-      {/* Recent Transactions - Using new TransactionsList component */}
+      {/* Recent Transactions - Filtered by current session for consistency */}
       <TransactionsList
-        transactions={transactions.map(tx => ({
+        transactions={sessionTransactions.map(tx => ({
           id: tx.id,
           reference: tx.reference,
           amount: toNumber(tx.montant),

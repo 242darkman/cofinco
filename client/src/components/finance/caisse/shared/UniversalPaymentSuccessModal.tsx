@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { formatClientName } from '@/lib/format';
 import { ReceiptActions } from '../../shared/ReceiptActions';
 import { currencySymbol } from '@shared/config/currency';
+import { isOutgoingOperation } from '@shared/config/caisse-operations';
 
 // Sparkle position configuration
 interface SparkleConfig {
@@ -108,9 +109,12 @@ export const UniversalPaymentSuccessModal: React.FC<UniversalPaymentSuccessModal
   const type = data?.type || '';
   const modePaiement = data?.modePaiement || 'Espèces';
 
-  const isDebit = ['Retrait', 'Décaissement', 'Prêt', 'Versement coffre'].some(
-    t => type.toLowerCase().includes(t.toLowerCase())
-  );
+  // Utiliser le code opération quand disponible (fiable), sinon fallback sur le label français
+  const isDebit = data?.natureOperation
+    ? isOutgoingOperation(data.natureOperation)
+    : ['Retrait', 'Décaissement', 'Versement coffre'].some(
+        t => type.toLowerCase().includes(t.toLowerCase())
+      );
 
   // Generate random sparkle positions (memoized per open state)
   const sparklePositions = useMemo(
@@ -203,7 +207,7 @@ export const UniversalPaymentSuccessModal: React.FC<UniversalPaymentSuccessModal
               transform transition-all duration-500 delay-200
               ${animationComplete ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}
             `}>
-              {isDebit ? 'Décaissement Effectué' : 'Paiement Réussi'}
+              {isDebit ? 'Décaissement Effectué' : 'Encaissement Effectué'}
             </h2>
 
             {/* Reference Badge - Tappable to copy */}

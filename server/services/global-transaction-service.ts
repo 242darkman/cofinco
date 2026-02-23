@@ -390,7 +390,7 @@ export class GlobalTransactionService {
               });
             }
 
-            result = remboursement;
+            result = { ...remboursement, nouveauSoldeCredit, creditSolde };
             additionalData.nouveauSoldeCredit = nouveauSoldeCredit;
             additionalData.creditSolde = creditSolde;
 
