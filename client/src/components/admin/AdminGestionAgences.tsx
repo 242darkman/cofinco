@@ -246,6 +246,11 @@ export default function AdminGestionAgences() {
     });
   }, [agences, searchQuery, filterStatut, filterType, showDeleted]);
 
+  // Count active (non-deleted) agencies — hide delete button when only 1 remains
+  const activeAgencesCount = useMemo(() => {
+    return agences.filter(a => !a.deletedAt).length;
+  }, [agences]);
+
   // Pagination logic
   const totalPages = Math.ceil(filteredAgences.length / pageSize);
   const paginatedAgences = useMemo(() => {
@@ -442,7 +447,7 @@ export default function AdminGestionAgences() {
                           <Edit2 size={16} />
                         </Button>
                       )}
-                      {canDeleteAgences && (
+                      {canDeleteAgences && activeAgencesCount >= 2 && (
                         <Button
                           variant="ghost"
                           size="sm"

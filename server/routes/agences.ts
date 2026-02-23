@@ -355,6 +355,18 @@ export function registerAgencesRoutes(app: Express) {
       const { id } = req.params;
       const userId = req.session?.userId;
 
+      // Vérifier qu'il reste au moins 2 agences actives avant d'en supprimer une
+      const [activeCount] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(agences)
+        .where(and(isNull(agences.deletedAt), eq(agences.statut, StatutAgence.ACTIVE)));
+
+      if (Number(activeCount?.count || 0) <= 1) {
+        return res.status(400).json({
+          error: "Impossible de supprimer la dernière agence active"
+        });
+      }
+
       // Vérifier qu'il n'y a pas d'utilisateurs actifs
       const [countResult] = await db
         .select({ count: sql<number>`count(*)` })

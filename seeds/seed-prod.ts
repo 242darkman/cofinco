@@ -2639,13 +2639,13 @@ async function seedGeography(context: SeedContext, dryRun: boolean): Promise<See
   const siegeData = {
     nom: 'Siège',
     codeAgence: 'SIEGE',
-    adresse: 'Boulevard Denis Sassou, Brazzaville',
-    villeId: villeIdMap['Brazzaville'] || undefined,
-    region: 'Brazzaville',
+    adresse: "1er Etage Immeuble Cofinco, en diagonale de l'hopital congo malembe",
+    villeId: villeIdMap['Pointe-Noire'] || undefined,
+    region: 'Pointe-Noire',
     typeAgence: TypeAgence.MAIN,
     statut: StatutUser.ACTIVE,
     telephone: '+242060000100',
-    email: 'siege@cofin.com',
+    email: 'siege@cofinco-m.com',
     dateOuverture: '2018-01-01',
   };
 
