@@ -56,10 +56,10 @@ function PatternRow({
           />
         </td>
         <td className="px-3 py-2 text-center">
-          <Switch checked={requireReason} onCheckedChange={setRequireReason} />
+          <Switch checked={requireReason} onChange={setRequireReason} />
         </td>
         <td className="px-3 py-2 text-center">
-          <Switch checked={requireApproval} onCheckedChange={setRequireApproval} />
+          <Switch checked={requireApproval} onChange={setRequireApproval} />
         </td>
         <td className="px-3 py-2 text-right">
           <div className="flex items-center gap-1 justify-end">
@@ -203,7 +203,7 @@ function CreatePatternModal({
               <p className="text-xs font-medium text-content-secondary">Raison requise</p>
               <p className="text-[10px] text-content-muted">Exiger une justification lors de modification</p>
             </div>
-            <Switch checked={requireReason} onCheckedChange={setRequireReason} />
+            <Switch checked={requireReason} onChange={setRequireReason} />
           </div>
 
           <div className="flex items-center justify-between">
@@ -211,7 +211,7 @@ function CreatePatternModal({
               <p className="text-xs font-medium text-content-secondary">Approbation superviseur</p>
               <p className="text-[10px] text-content-muted">Nécessite validation d'un superviseur</p>
             </div>
-            <Switch checked={requireApproval} onCheckedChange={setRequireApproval} />
+            <Switch checked={requireApproval} onChange={setRequireApproval} />
           </div>
         </div>
 

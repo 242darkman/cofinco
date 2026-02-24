@@ -272,7 +272,7 @@ export default function ModulePermissionsEditor({ modules, permissions, onRefres
   }, [editingModule, updateModule, toast, onRefresh]);
 
   const handleDeleteModule = useCallback(async (mod: Module) => {
-    confirmDialog.open({
+    confirmDialog.openConfirm({
       title: `Supprimer "${mod.name}" ?`,
       message: 'Cette action est irréversible. Le module et toutes ses permissions seront supprimés.',
       variant: 'danger',
@@ -316,7 +316,7 @@ export default function ModulePermissionsEditor({ modules, permissions, onRefres
   }, [editingPerm, updatePermission, toast, onRefresh]);
 
   const handleDeletePermission = useCallback(async (perm: Permission) => {
-    confirmDialog.open({
+    confirmDialog.openConfirm({
       title: `Supprimer "${perm.name}" ?`,
       message: `La permission "${perm.code}" sera supprimée. Les assignations actives doivent d'abord être retirées.`,
       variant: 'danger',
@@ -339,7 +339,7 @@ export default function ModulePermissionsEditor({ modules, permissions, onRefres
         <div className="flex items-center gap-2">
           <Package size={18} className="text-accent" />
           <h3 className="font-semibold text-content-primary">Modules & Permissions</h3>
-          <Badge variant="secondary" className="text-[10px]">{modules.length} modules</Badge>
+          <Badge variant="neutral" className="text-[10px]">{modules.length} modules</Badge>
         </div>
         <Button
           size="sm"
@@ -365,7 +365,7 @@ export default function ModulePermissionsEditor({ modules, permissions, onRefres
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-medium text-content-primary truncate">{mod.name}</div>
                 <div className="flex items-center gap-1.5 mt-0.5">
-                  <Badge variant="secondary" className="text-[9px]">{mod.category}</Badge>
+                  <Badge variant="neutral" className="text-[9px]">{mod.category}</Badge>
                   <span className="text-[10px] text-content-muted">{permCountByModule.get(mod.id) || 0} perms</span>
                 </div>
               </div>
@@ -494,7 +494,15 @@ export default function ModulePermissionsEditor({ modules, permissions, onRefres
         />
       )}
 
-      <ConfirmDialog {...confirmDialog.props} />
+      <ConfirmDialog
+        isOpen={confirmDialog.confirmState.isOpen}
+        onClose={confirmDialog.closeConfirm}
+        onConfirm={confirmDialog.handleConfirm}
+        title={confirmDialog.confirmState.title || "Confirmer"}
+        message={confirmDialog.confirmState.message || "Êtes-vous sûr ?"}
+        variant={confirmDialog.confirmState.variant}
+        confirmText={confirmDialog.confirmState.confirmText}
+      />
     </div>
   );
 }

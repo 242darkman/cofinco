@@ -74,7 +74,7 @@ function ReviewModal({
           <Button variant="ghost" size="sm" onClick={onClose}>Annuler</Button>
           <Button
             size="sm"
-            variant={isReject ? 'destructive' : 'default'}
+            variant={isReject ? 'danger' : 'primary'}
             onClick={() => onSubmit(reason)}
             disabled={loading || (isReject && !reason.trim())}
           >
