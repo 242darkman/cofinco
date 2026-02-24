@@ -1331,6 +1331,7 @@ export class SessionOpeningService {
     session?: SessionRow;
     error?: string;
     errorCode?: string;
+    recovered?: boolean;
   }> {
     const { caissierId, caisseId, agenceId, observations, ipAddress, userAgent } = params;
 
@@ -1382,6 +1383,29 @@ export class SessionOpeningService {
           .limit(1);
 
         if (existingCaisseSession.length > 0) {
+          const existing = existingCaisseSession[0];
+
+          // Same user, same caisse → recover the existing session
+          if (existing.caissierId === caissierId && existing.statut === "OPEN") {
+            // Update last activity and return the existing session
+            await tx
+              .update(sessionsCaisse)
+              .set({ lastActivity: new Date() })
+              .where(eq(sessionsCaisse.id, existing.id));
+
+            // Ensure caisse is marked OPEN
+            await tx
+              .update(caisses)
+              .set({ statut: StatutCaisse.OPEN, updatedAt: new Date() })
+              .where(eq(caisses.id, caisseId));
+
+            return {
+              success: true,
+              session: { ...existing, lastActivity: new Date() },
+              recovered: true,
+            };
+          }
+
           return {
             success: false,
             error: "Cette caisse a déjà une session active",
@@ -1409,9 +1433,25 @@ export class SessionOpeningService {
           .limit(1);
 
         if (existingUserSession.length > 0) {
+          const existingOnOtherCaisse = existingUserSession[0];
+
+          // Same user has a session on THIS caisse → recover it
+          if (existingOnOtherCaisse.caisseId === caisseId && existingOnOtherCaisse.statut === "OPEN") {
+            await tx
+              .update(sessionsCaisse)
+              .set({ lastActivity: new Date() })
+              .where(eq(sessionsCaisse.id, existingOnOtherCaisse.id));
+
+            return {
+              success: true,
+              session: { ...existingOnOtherCaisse, lastActivity: new Date() },
+              recovered: true,
+            };
+          }
+
           return {
             success: false,
-            error: "Vous avez déjà une session active",
+            error: "Vous avez déjà une session active sur une autre caisse",
             errorCode: "USER_HAS_SESSION",
           };
         }

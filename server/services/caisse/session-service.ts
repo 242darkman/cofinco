@@ -465,6 +465,14 @@ export async function openSessionAtomic(params: OpenSessionParams): Promise<Open
           .where(and(eq(sessionsCaisse.caisseId, caisseId), isNull(sessionsCaisse.closedAt)));
 
         if (existingCaisseSession) {
+          // Same user, same caisse, OPEN → recover the existing session
+          if (existingCaisseSession.caissierId === caissierId && existingCaisseSession.statut === "OPEN") {
+            await tx
+              .update(sessionsCaisse)
+              .set({ lastActivity: new Date() })
+              .where(eq(sessionsCaisse.id, existingCaisseSession.id));
+            return existingCaisseSession;
+          }
           throw new Error("CAISSE_OCCUPIED:Cette caisse est déjà occupée par une autre session");
         }
 
@@ -475,6 +483,14 @@ export async function openSessionAtomic(params: OpenSessionParams): Promise<Open
           .where(and(eq(sessionsCaisse.caissierId, caissierId), isNull(sessionsCaisse.closedAt)));
 
         if (existingUserSession) {
+          // Same caisse → recover
+          if (existingUserSession.caisseId === caisseId && existingUserSession.statut === "OPEN") {
+            await tx
+              .update(sessionsCaisse)
+              .set({ lastActivity: new Date() })
+              .where(eq(sessionsCaisse.id, existingUserSession.id));
+            return existingUserSession;
+          }
           throw new Error("USER_HAS_SESSION:Vous avez déjà une session ouverte sur une autre caisse");
         }
 
