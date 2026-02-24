@@ -140,7 +140,7 @@ async function processNotificationJobs(): Promise<number> {
 
           processedCount++;
         } else {
-          await handleJobFailure(job, result.error || "Unknown error", result.rawResponse);
+          await handleJobFailure(job, result.error || "Unknown error", result.rawResponse, result.permanent);
         }
       } catch (error: any) {
         // Unexpected error processing this job
@@ -169,14 +169,22 @@ async function processSmsJob(job: {
   payload: Record<string, unknown>;
   correlation_id: string;
 }): Promise<SendResult> {
-  const rendered = await renderSmsTemplate(
-    job.template_code,
-    job.payload
-  );
-  const provider = getSmsProvider();
-  return provider.send(job.recipient, rendered, {
-    correlationId: job.correlation_id,
-  });
+  try {
+    const rendered = await renderSmsTemplate(
+      job.template_code,
+      job.payload
+    );
+    const provider = getSmsProvider();
+    return provider.send(job.recipient, rendered, {
+      correlationId: job.correlation_id,
+    });
+  } catch (err: any) {
+    // "not configured" / "settings incomplete" → permanent, no point retrying
+    if (err.message?.includes("not configured") || err.message?.includes("settings incomplete")) {
+      return { success: false, error: err.message, permanent: true };
+    }
+    throw err;
+  }
 }
 
 async function processEmailJob(job: {
@@ -247,8 +255,28 @@ async function markJobSent(jobId: string, result: SendResult): Promise<void> {
 async function handleJobFailure(
   job: { id: string; attempts: number; max_attempts: number },
   errorMsg: string,
-  rawResponse?: unknown
+  rawResponse?: unknown,
+  permanent?: boolean
 ): Promise<void> {
+  // Permanent errors (provider not configured) → FAILED immediately, no retries
+  if (permanent) {
+    await db
+      .update(notificationJobs)
+      .set({
+        status: "FAILED",
+        attempts: (job.attempts || 0) + 1,
+        lastError: errorMsg.substring(0, 2000),
+        nextAttemptAt: null,
+        lockedAt: null,
+        lockedUntil: null,
+        providerResponse: rawResponse ?? undefined,
+      })
+      .where(eq(notificationJobs.id, job.id));
+
+    logger.warn({ jobId: job.id, error: errorMsg.substring(0, 200) }, 'Job failed permanently (provider not configured)');
+    return;
+  }
+
   const newAttempts = (job.attempts || 0) + 1;
   const isDeadLetter = newAttempts >= (job.max_attempts || MAX_ATTEMPTS);
 

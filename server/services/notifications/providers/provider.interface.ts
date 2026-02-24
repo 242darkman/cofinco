@@ -9,6 +9,8 @@ export interface SendResult {
   requestId?: string;
   error?: string;
   rawResponse?: unknown;
+  /** If true, this error is permanent (e.g. provider not configured) — skip retries */
+  permanent?: boolean;
 }
 
 export interface SmsProvider {

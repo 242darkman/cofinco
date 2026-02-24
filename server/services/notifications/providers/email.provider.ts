@@ -83,7 +83,7 @@ export class SmtpEmailProvider implements EmailProvider {
     const config = await this.resolveConfig();
 
     if (!config) {
-      return { success: false, error: "No email provider configured (DB or env)" };
+      return { success: false, error: "No email provider configured (DB or env)", permanent: true };
     }
 
     try {
