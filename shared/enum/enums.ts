@@ -628,6 +628,9 @@ export const statutSessionCaisseEnum = pgEnum("statut_session_caisse_enum", [
   "CLOSING_COUNT",      // Session gelée, caissier compte ses billets (blind count)
   "CLOSING_VALIDATION", // Comptage fait, décision de transfert vers coffre
   "CLOSED",             // Session définitivement fermée
+  // === RECONCILIATION (post-clôture) ===
+  "RECONCILIATION_PENDING",  // Réconciliation en attente (écart détecté)
+  "RECONCILIATION_COMPLETE", // Réconciliation terminée
 ]);
 
 // ============================================

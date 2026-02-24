@@ -2544,6 +2544,44 @@ export async function ensureCustomFunctions(): Promise<void> {
     // SESSIONS CAISSE — CONTRAINTES UNIQUES + INDEXES PERFORMANCE
     // ========================================================================
 
+    // DATA CLEANUP: Close duplicate active sessions before creating unique indexes.
+    // Keeps only the most recent active session per caisse/caissier.
+    try {
+      const cleaned = await pool.query(`
+        WITH ranked AS (
+          SELECT id, caisse_id,
+                 ROW_NUMBER() OVER (PARTITION BY caisse_id ORDER BY opened_at DESC NULLS LAST, created_at DESC) AS rn
+          FROM sessions_caisse
+          WHERE statut NOT IN ('CLOSED', 'RECONCILIATION_PENDING', 'RECONCILIATION_COMPLETE')
+            AND deleted_at IS NULL
+        )
+        UPDATE sessions_caisse SET statut = 'CLOSED', closed_at = NOW()
+        WHERE id IN (SELECT id FROM ranked WHERE rn > 1)
+        RETURNING id;
+      `);
+      if (cleaned.rowCount && cleaned.rowCount > 0) {
+        console.log(`[DB] ✓ Closed ${cleaned.rowCount} duplicate active session(s) per caisse`);
+      }
+
+      const cleanedUser = await pool.query(`
+        WITH ranked AS (
+          SELECT id, caissier_id,
+                 ROW_NUMBER() OVER (PARTITION BY caissier_id ORDER BY opened_at DESC NULLS LAST, created_at DESC) AS rn
+          FROM sessions_caisse
+          WHERE statut NOT IN ('CLOSED', 'RECONCILIATION_PENDING', 'RECONCILIATION_COMPLETE')
+            AND deleted_at IS NULL
+        )
+        UPDATE sessions_caisse SET statut = 'CLOSED', closed_at = NOW()
+        WHERE id IN (SELECT id FROM ranked WHERE rn > 1)
+        RETURNING id;
+      `);
+      if (cleanedUser.rowCount && cleanedUser.rowCount > 0) {
+        console.log(`[DB] ✓ Closed ${cleanedUser.rowCount} duplicate active session(s) per caissier`);
+      }
+    } catch (err) {
+      console.warn('[DB] ⚠ Session cleanup failed:', err instanceof Error ? err.message : err);
+    }
+
     // CRITIQUE: Une seule session active par caisse (empêche doubles sessions)
     await db.execute(sql`
       CREATE UNIQUE INDEX IF NOT EXISTS uq_sessions_caisse_one_active_per_caisse
