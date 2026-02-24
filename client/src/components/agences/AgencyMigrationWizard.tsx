@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Building2, Users, Receipt, AlertTriangle, CheckCircle,
   ArrowRight, Loader2, Shield, Calendar, Play, X, AlertCircle,
-  FileText, Clock, Ban, RefreshCw, Download, Eye, RotateCcw
+  FileText, Ban, RefreshCw, Download, Eye, RotateCcw, Info, Pencil
 } from 'lucide-react';
 import { Modal, Button, SearchableSelect, ProgressBar, Badge } from '../ui';
 import { api } from '../../lib/api-client';
@@ -12,7 +12,7 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { addPdfLogoHeader, addPdfLogoFooter } from '@/lib/pdf-logo';
 import { useBranding } from '@/contexts/BrandingContext';
-import { formatMoney as formatCurrency, currencyCode } from '@shared/config/currency';
+import { formatMoney as formatCurrency } from '@shared/config/currency';
 // P4.1: Lazy-load heavy export libraries
 import { loadPDFLibraries } from '@/lib/lazy-export';
 
@@ -75,6 +75,10 @@ interface MigrationStatus {
   report?: any;
   scheduledAt?: string;
   completedAt?: string;
+  targetClientsAgencyId?: string;
+  targetEmployeesAgencyId?: string;
+  targetTreasuryAgencyId?: string;
+  dryRunResult?: DryRunResult;
 }
 
 interface MigrationWizardProps {
@@ -96,6 +100,8 @@ const STEPS = [
   { id: 'analysis', title: 'Analyse', icon: Eye },
   { id: 'confirm', title: 'Confirmation', icon: Shield }
 ];
+
+const ACTIVE_MIGRATION_STATUSES = ['DRAFT', 'PENDING', 'SCHEDULED', 'PRE_FLIGHT_CHECK', 'PROCESSING', 'FAILED'];
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   DRAFT: { label: 'Brouillon', color: 'bg-surface-muted0' },
@@ -130,6 +136,66 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
   const [showCancelPrompt, setShowCancelPrompt] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [pollCount, setPollCount] = useState(0);
+  const [isResuming, setIsResuming] = useState(false);
+  const resumeHandled = useRef(false);
+
+  // Fetch existing active migration for this agency (to resume instead of restarting)
+  const { data: existingMigrations } = useQuery({
+    queryKey: ['agency-migrations', sourceAgence.id],
+    queryFn: async () => {
+      const res = await api.get<MigrationStatus[]>(`/agences/${sourceAgence.id}/migrations`);
+      return res;
+    },
+    enabled: isOpen,
+  });
+
+  // Auto-resume: restore wizard state from existing active migration
+  useEffect(() => {
+    if (!isOpen || !existingMigrations || resumeHandled.current) return;
+    const active = existingMigrations.find(m => ACTIVE_MIGRATION_STATUSES.includes(m.statut));
+    if (!active) return;
+
+    resumeHandled.current = true;
+    setIsResuming(true);
+    setMigrationId(active.id);
+
+    // Restore target selections
+    if (active.targetClientsAgencyId) setTargetClients(active.targetClientsAgencyId);
+    if (active.targetEmployeesAgencyId) setTargetEmployees(active.targetEmployeesAgencyId);
+    if (active.targetTreasuryAgencyId) setTargetTreasury(active.targetTreasuryAgencyId);
+    if (active.scheduledAt) {
+      setScheduledAt(new Date(active.scheduledAt).toISOString().slice(0, 16));
+      setExecuteNow(false);
+    }
+
+    // Restore dry run result if available
+    if (active.dryRunResult) {
+      setDryRunResult(active.dryRunResult);
+    }
+
+    // Jump to the appropriate step based on status
+    const st = active.statut;
+    if (st === 'PENDING' || st === 'SCHEDULED' || st === 'PRE_FLIGHT_CHECK' || st === 'PROCESSING' || st === 'FAILED') {
+      // Live states — the existing UI handles these via migrationStatus polling
+    } else if (st === 'DRAFT') {
+      // Has dry run result → go to analysis step, otherwise go to schedule step
+      if (active.dryRunResult) {
+        setCurrentStep(4); // Analysis
+      } else {
+        setCurrentStep(3); // Schedule (ready to create/re-run dry run)
+      }
+    }
+
+    toast.info('Migration en cours reprise');
+  }, [isOpen, existingMigrations]);
+
+  // Reset resumeHandled when wizard closes
+  useEffect(() => {
+    if (!isOpen) {
+      resumeHandled.current = false;
+      setIsResuming(false);
+    }
+  }, [isOpen]);
 
   // Fetch available agencies (excluding source)
   const { data: agences } = useQuery({
@@ -287,24 +353,41 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
     }
   };
 
-  const formatMoney = (amount: number) => {
-    return formatCurrency(amount);
-  };
+  const formatMoney = formatCurrency;
 
   // Navigation
   const handleNext = async () => {
     if (currentStep === 3) {
-      // Créer la migration et lancer le dry run
+      // Créer la migration (ou réutiliser l'existante) et lancer le dry run
       setIsAnalyzing(true);
       setDryRunFailed(false);
       try {
-        const migration = await createMigrationMutation.mutateAsync({
-          targetAgenceClients: targetClients as string,
-          targetAgenceEmployes: targetEmployees as string,
-          targetAgenceCoffre: targetTreasury as string,
-          scheduledAt: !executeNow && scheduledAt ? new Date(scheduledAt).toISOString() : undefined
-        });
-        await dryRunMutation.mutateAsync(migration.id);
+        let id = migrationId;
+        // If the user edited targets, cancel old migration and create a fresh one
+        if (id && isResuming) {
+          const existing = existingMigrations?.find((m: MigrationStatus) => m.id === id);
+          const targetsChanged = existing && (
+            existing.targetClientsAgencyId !== targetClients ||
+            existing.targetEmployeesAgencyId !== targetEmployees ||
+            existing.targetTreasuryAgencyId !== targetTreasury
+          );
+          if (targetsChanged && existing?.statut === 'DRAFT') {
+            // Cancel silently via API (bypass mutation onSuccess which resets wizard state)
+            await api.post(`/agences/migrations/${id}/cancel`, { reason: 'Modification des agences cibles' });
+            id = null;
+            setMigrationId(null);
+          }
+        }
+        if (!id) {
+          const migration = await createMigrationMutation.mutateAsync({
+            targetAgenceClients: targetClients as string,
+            targetAgenceEmployes: targetEmployees as string,
+            targetAgenceCoffre: targetTreasury as string,
+            scheduledAt: !executeNow && scheduledAt ? new Date(scheduledAt).toISOString() : undefined
+          });
+          id = migration.id;
+        }
+        await dryRunMutation.mutateAsync(id!);
         setCurrentStep(4);
       } catch (error) {
         setIsAnalyzing(false);
@@ -338,9 +421,12 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
   };
 
   const handleBack = () => {
-    if (currentStep === 4 && migrationId) {
-      setShowCancelPrompt(true);
-    } else if (currentStep > 0) {
+    if (currentStep > 0) {
+      // Going back from analysis/confirm invalidates dry run (will re-run on next pass)
+      if (currentStep >= 4) {
+        setDryRunResult(null);
+        setDryRunFailed(false);
+      }
       setCurrentStep(prev => prev - 1);
     }
   };
@@ -580,23 +666,50 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
               const Icon = step.icon;
               const isActive = idx === currentStep;
               const isDone = idx < currentStep;
+              // Allow clicking on completed steps to go back and edit
+              const canClick = isDone && !createMigrationMutation.isPending && !dryRunMutation.isPending;
 
               return (
-                <div key={step.id} className="flex flex-col items-center bg-surface px-1.5 min-w-[60px]">
+                <button
+                  key={step.id}
+                  type="button"
+                  disabled={!canClick}
+                  onClick={() => {
+                    if (!canClick) return;
+                    // Going back to a step before analysis invalidates the dry run
+                    if (idx < 4 && currentStep >= 4 && migrationId) {
+                      setDryRunResult(null);
+                      setDryRunFailed(false);
+                    }
+                    setCurrentStep(idx);
+                  }}
+                  className={`flex flex-col items-center bg-surface px-1.5 min-w-[60px] ${canClick ? 'cursor-pointer group' : 'cursor-default'}`}
+                >
                   <div className={`
                     w-8 h-8 rounded-full flex items-center justify-center border-2 transition-colors
                     ${isActive ? 'border-status-info bg-status-info-bg text-status-info' :
-                      isDone ? 'border-status-success bg-status-success-bg text-status-success' :
+                      isDone ? 'border-status-success bg-status-success-bg text-status-success group-hover:border-status-info group-hover:bg-status-info-bg group-hover:text-status-info' :
                         'border-edge-strong bg-surface text-content-muted'}
                   `}>
-                    <Icon size={14} />
+                    {isDone ? <CheckCircle size={14} /> : <Icon size={14} />}
                   </div>
-                  <span className={`text-[10px] mt-1 font-medium text-center ${isActive ? 'text-content-primary' : 'text-content-muted'}`}>
+                  <span className={`text-[10px] mt-1 font-medium text-center ${isActive ? 'text-content-primary' : isDone ? 'text-status-success group-hover:text-status-info' : 'text-content-muted'}`}>
                     {step.title}
                   </span>
-                </div>
+                  {isDone && canClick && (
+                    <Pencil size={8} className="text-content-muted opacity-0 group-hover:opacity-100 transition-opacity" />
+                  )}
+                </button>
               );
             })}
+          </div>
+        )}
+
+        {/* Resume banner */}
+        {isResuming && !isLiveState && migrationId && (
+          <div className="flex items-center gap-2 px-3 py-2 bg-status-info-bg/50 rounded-lg border border-status-info/20 text-xs text-status-info">
+            <Info size={14} className="shrink-0" />
+            <span>Migration en cours reprise. Vous pouvez modifier les choix en cliquant sur les étapes précédentes.</span>
           </div>
         )}
 
