@@ -1,7 +1,7 @@
 /**
  * Admin Product Rates Management
  * Manage interest rates and fees for account products
- * Compact, responsive design matching app theme
+ * SaaS-style responsive UI with create, edit (name + rates), pagination
  */
 
 import React, { useState, useCallback, useMemo } from 'react';
@@ -10,9 +10,7 @@ import {
   Save,
   Edit2,
   X,
-  Check,
-  TrendingUp,
-  DollarSign,
+  Plus,
   RefreshCw,
   Loader2,
   Info,
@@ -20,9 +18,10 @@ import {
   Wallet,
   PiggyBank,
   Lock,
-  ArrowUpDown,
   Search,
   HelpCircle,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import ConfirmDialog from '../ui/ConfirmDialog';
@@ -81,6 +80,23 @@ const TYPE_CONFIG: Record<string, { label: string; badge: string; icon: React.El
   },
 };
 
+const ITEMS_PER_PAGE = 9;
+
+const EMPTY_EDIT = {
+  nom: '',
+  tauxInteret: '',
+  fraisOuverture: '',
+  fraisTenue: '',
+  fraisCloture: '',
+  fraisRetrait: '',
+  soldeMinimum: '',
+  plafondDepot: '',
+  depotInitialObligatoire: false,
+  depotInitialMinimum: '',
+  validationOuvertureRequise: false,
+  autoriserSoldeNegatifCloture: false,
+};
+
 export default function AdminProductRates() {
   const { hasPermission } = usePermissions();
   const canManageRates = hasPermission('admin', 'manage') || hasPermission('settings', 'edit');
@@ -90,31 +106,29 @@ export default function AdminProductRates() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<string | null>(null);
-  const [editValues, setEditValues] = useState({
+  const [page, setPage] = useState(1);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editValues, setEditValues] = useState(EMPTY_EDIT);
+
+  // Create form state
+  const [createValues, setCreateValues] = useState({
+    code: '',
+    nom: '',
+    typeCompte: 'SAVINGS' as 'SAVINGS' | 'CURRENT' | 'BLOCKED',
     tauxInteret: '',
-    fraisOuverture: '',
-    fraisTenue: '',
-    fraisCloture: '',
-    fraisRetrait: '',
-    soldeMinimum: '',
-    plafondDepot: '',
-    depotInitialObligatoire: false,
-    depotInitialMinimum: '',
-    validationOuvertureRequise: false,
-    autoriserSoldeNegatifCloture: false,
   });
 
-  // Fetch products
+  // ---------- Queries / Mutations ----------
+
   const { data: products = [], isLoading, refetch } = useQuery<ProduitCompte[]>({
     queryKey: ['/api/produits-compte'],
     queryFn: async () => {
-      const res = await fetch('/api/produits-compte', { credentials: 'include' });
+      const res = await fetch('/api/produits-compte?actif=false', { credentials: 'include' });
       if (!res.ok) throw new Error('Erreur lors du chargement');
       return res.json();
     },
   });
 
-  // Update mutation
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
       const res = await fetch(`/api/produits-compte/${id}`, {
@@ -131,7 +145,7 @@ export default function AdminProductRates() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/produits-compte'] });
-      toast.success('Taux mis à jour');
+      toast.success('Produit mis à jour');
       setEditingId(null);
     },
     onError: (error: Error) => {
@@ -139,17 +153,46 @@ export default function AdminProductRates() {
     },
   });
 
-  // Filtered products
+  const createMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await fetch('/api/produits-compte', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Erreur lors de la création');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/produits-compte'] });
+      toast.success('Produit créé');
+      setShowCreateModal(false);
+      setCreateValues({ code: '', nom: '', typeCompte: 'SAVINGS', tauxInteret: '' });
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+
+  // ---------- Derived ----------
+
   const filteredProducts = useMemo(() => {
-    return products.filter(p => {
+    const list = products.filter(p => {
       const matchesSearch = p.nom.toLowerCase().includes(searchQuery.toLowerCase()) ||
         p.code.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesType = !filterType || p.typeCompte === filterType;
       return matchesSearch && matchesType;
     });
+    return list;
   }, [products, searchQuery, filterType]);
 
-  // Stats
+  const totalPages = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE);
+  const paginated = filteredProducts.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+
   const stats = useMemo(() => {
     const active = products.filter(p => p.actif);
     const avgRate = active.reduce((sum, p) => sum + (parseFloat(p.tauxInteret || '0') || 0), 0) / (active.length || 1);
@@ -161,9 +204,12 @@ export default function AdminProductRates() {
     };
   }, [products]);
 
+  // ---------- Handlers ----------
+
   const startEditing = useCallback((product: ProduitCompte) => {
     setEditingId(product.id);
     setEditValues({
+      nom: product.nom,
       tauxInteret: product.tauxInteret || '',
       fraisOuverture: product.frais?.ouverture?.toString() || '',
       fraisTenue: product.frais?.tenue?.toString() || '',
@@ -185,11 +231,11 @@ export default function AdminProductRates() {
   const saveChanges = useCallback((product: ProduitCompte) => {
     openConfirm({
       title: 'Confirmer les modifications',
-      message: `Modifier les taux du produit "${product.nom}" ?`,
+      message: `Modifier le produit "${editValues.nom || product.nom}" ?`,
       variant: 'warning',
       confirmText: 'Confirmer',
       onConfirm: () => {
-        const data = {
+        const data: any = {
           tauxInteret: editValues.tauxInteret ? parseFloat(editValues.tauxInteret) : null,
           frais: {
             ouverture: editValues.fraisOuverture ? parseFloat(editValues.fraisOuverture) : undefined,
@@ -207,10 +253,44 @@ export default function AdminProductRates() {
             autoriserSoldeNegatifCloture: editValues.autoriserSoldeNegatifCloture,
           },
         };
+        // Include nom if changed
+        if (editValues.nom !== product.nom) {
+          data.nom = editValues.nom;
+        }
         updateMutation.mutate({ id: product.id, data });
       },
     });
   }, [editValues, openConfirm, updateMutation]);
+
+  const handleCreate = useCallback(() => {
+    if (!createValues.code.trim() || !createValues.nom.trim()) {
+      toast.error('Le code et le nom sont requis');
+      return;
+    }
+    const payload: any = {
+      code: createValues.code.trim().toUpperCase().replace(/\s+/g, '_'),
+      nom: createValues.nom.trim(),
+      typeCompte: createValues.typeCompte,
+      actif: true,
+    };
+    if (createValues.tauxInteret) {
+      payload.tauxInteret = parseFloat(createValues.tauxInteret);
+    }
+    createMutation.mutate(payload);
+  }, [createValues, createMutation]);
+
+  // Reset page when filter changes
+  const setSearchAndResetPage = useCallback((v: string) => {
+    setSearchQuery(v);
+    setPage(1);
+  }, []);
+
+  const setFilterAndResetPage = useCallback((v: string | null) => {
+    setFilterType(v);
+    setPage(1);
+  }, []);
+
+  // ---------- Render ----------
 
   if (!canManageRates) {
     return (
@@ -225,17 +305,17 @@ export default function AdminProductRates() {
   }
 
   return (
-    <div className="space-y-4">
-      {/* Compact Header with Stats */}
-      <div className="bg-linear-to-r from-accent via-cyan-600/90 to-status-info rounded-xl p-4">
-        <div className="flex items-center justify-between">
+    <div className="flex flex-col gap-4 h-full">
+      {/* Header with Stats */}
+      <div className="shrink-0 bg-linear-to-r from-accent via-accent/80 to-accent/60 rounded-xl p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-white/20 rounded-lg">
               <Percent size={20} className="text-white" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-white">Gestion des Taux</h2>
-              <p className="text-[11px] text-white/70">Configuration produits</p>
+              <h2 className="text-base font-bold text-white">Gestion des Produits</h2>
+              <p className="text-[11px] text-white/70">Taux, frais & configuration</p>
             </div>
           </div>
 
@@ -252,7 +332,7 @@ export default function AdminProductRates() {
             </div>
             <div className="w-px h-8 bg-white/20" />
             <div className="text-center px-3">
-              <p className="text-lg font-bold text-yellow-200">{stats.avgRate}%</p>
+              <p className="text-lg font-bold text-white/90">{stats.avgRate}%</p>
               <p className="text-[9px] text-white/60 uppercase">Taux Moy.</p>
             </div>
             <div className="w-px h-8 bg-white/20" />
@@ -262,32 +342,41 @@ export default function AdminProductRates() {
             </div>
           </div>
 
-          <button
-            onClick={() => refetch()}
-            disabled={isLoading}
-            className="p-2 bg-white/10 hover:bg-white/20 rounded-lg transition"
-          >
-            <RefreshCw size={16} className={cn("text-white", isLoading && "animate-spin")} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="flex items-center gap-1.5 px-3 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-white text-[11px] font-semibold transition"
+            >
+              <Plus size={14} />
+              <span className="hidden sm:inline">Nouveau Produit</span>
+            </button>
+            <button
+              onClick={() => refetch()}
+              disabled={isLoading}
+              className="p-2 bg-white/10 hover:bg-white/20 rounded-lg transition"
+            >
+              <RefreshCw size={16} className={cn("text-white", isLoading && "animate-spin")} />
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Toolbar: Search + Type Filter */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="shrink-0 flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-content-muted" />
           <input
             type="text"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => setSearchAndResetPage(e.target.value)}
             placeholder="Rechercher un produit..."
             className="w-full h-9 pl-9 pr-3 bg-surface/50 border border-edge rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-accent"
           />
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
-            onClick={() => setFilterType(null)}
+            onClick={() => setFilterAndResetPage(null)}
             className={cn(
               "h-9 px-3 text-[11px] font-medium rounded-lg border transition-colors",
               !filterType
@@ -300,7 +389,7 @@ export default function AdminProductRates() {
           {Object.entries(TYPE_CONFIG).map(([type, config]) => (
             <button
               key={type}
-              onClick={() => setFilterType(filterType === type ? null : type)}
+              onClick={() => setFilterAndResetPage(filterType === type ? null : type)}
               className={cn(
                 "h-9 px-3 text-[11px] font-medium rounded-lg border transition-colors flex items-center gap-1.5",
                 filterType === type
@@ -316,241 +405,429 @@ export default function AdminProductRates() {
       </div>
 
       {/* Products Grid */}
-      {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="animate-spin text-accent" size={32} />
-        </div>
-      ) : filteredProducts.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-12 text-content-muted">
-          <Info size={32} className="mb-2 opacity-50" />
-          <p className="text-sm">Aucun produit trouvé</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-          {filteredProducts.map((product) => {
-            const isEditing = editingId === product.id;
-            const config = TYPE_CONFIG[product.typeCompte] || TYPE_CONFIG.CURRENT;
-            const TypeIcon = config.icon;
+      <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="animate-spin text-accent" size={32} />
+          </div>
+        ) : filteredProducts.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-content-muted">
+            <Info size={32} className="mb-2 opacity-50" />
+            <p className="text-sm">Aucun produit trouvé</p>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="mt-3 flex items-center gap-1.5 px-3 py-1.5 bg-accent text-white rounded-lg text-xs font-medium hover:bg-accent/90 transition"
+            >
+              <Plus size={12} /> Créer un produit
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+            {paginated.map((product) => {
+              const isEditing = editingId === product.id;
+              const config = TYPE_CONFIG[product.typeCompte] || TYPE_CONFIG.CURRENT;
+              const TypeIcon = config.icon;
 
-            return (
-              <div
-                key={product.id}
-                className={cn(
-                  "bg-surface-base/50 border rounded-xl transition-all",
-                  isEditing
-                    ? "border-accent ring-1 ring-accent/30"
-                    : "border-edge hover:border-edge"
-                )}
-              >
-                {/* Product Header - Compact */}
-                <div className={cn("p-3 bg-linear-to-r border-b border-edge rounded-t-xl", config.gradient)}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="p-1.5 bg-white/10 rounded-lg shrink-0">
-                        <TypeIcon size={14} className="text-content-primary" />
+              return (
+                <div
+                  key={product.id}
+                  className={cn(
+                    "bg-surface-base/50 border rounded-xl transition-all flex flex-col",
+                    isEditing
+                      ? "border-accent ring-1 ring-accent/30"
+                      : "border-edge hover:border-accent/30 hover:shadow-sm"
+                  )}
+                >
+                  {/* Product Header */}
+                  <div className={cn("p-3 bg-linear-to-r border-b border-edge rounded-t-xl", config.gradient)}>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <div className="p-1.5 bg-white/10 rounded-lg shrink-0">
+                          <TypeIcon size={14} className="text-content-primary" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          {isEditing ? (
+                            <input
+                              type="text"
+                              value={editValues.nom}
+                              onChange={(e) => setEditValues({ ...editValues, nom: e.target.value })}
+                              className="w-full text-sm font-semibold bg-white/20 border border-white/30 rounded px-2 py-0.5 text-content-primary placeholder:text-content-muted focus:outline-none focus:border-accent"
+                              placeholder="Nom du produit"
+                            />
+                          ) : (
+                            <div className="flex items-center gap-2 min-w-0">
+                              <h3 className="text-sm font-semibold text-content-primary truncate">{product.nom}</h3>
+                              {!product.actif && (
+                                <span className="px-1.5 py-0.5 text-[8px] bg-status-danger/30 text-status-danger rounded shrink-0">
+                                  INACTIF
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          <p className="text-[9px] text-content-muted mt-0.5 font-mono">{product.code}</p>
+                        </div>
                       </div>
-                      <div className="min-w-0 flex items-center gap-2">
-                        <h3 className="text-sm font-semibold text-content-primary truncate">{product.nom}</h3>
-                        {!product.actif && (
-                          <span className="px-1.5 py-0.5 text-[8px] bg-status-danger/30 text-status-danger rounded">
-                            INACTIF
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <span className="px-2 py-0.5 text-[9px] font-bold bg-black/20 text-content-primary/80 rounded">
-                      {config.badge}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Rate Display - Prominent */}
-                <div className="px-3 py-2.5 bg-surface/30 border-b border-edge/50">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] text-content-muted flex items-center gap-1">
-                      <Percent size={10} />
-                      Taux d'intérêt
-                    </span>
-                    {isEditing ? (
-                      <div className="flex items-center gap-1">
-                        <input
-                          inputMode="decimal"
-                          value={editValues.tauxInteret}
-                          onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); setEditValues({ ...editValues, tauxInteret: v }); }}
-                          className="w-16 px-2 py-0.5 text-right text-sm bg-surface-elevated border border-edge-strong rounded focus:border-accent outline-none text-content-primary"
-                        />
-                        <span className="text-content-muted text-xs">%</span>
-                      </div>
-                    ) : (
-                      <span className={cn(
-                        "text-lg font-bold",
-                        product.tauxInteret && parseFloat(product.tauxInteret) > 0
-                          ? "text-status-success"
-                          : "text-content-muted"
-                      )}>
-                        {product.tauxInteret ? `${parseFloat(product.tauxInteret).toFixed(2)}%` : '0.00%'}
+                      <span className="px-2 py-0.5 text-[9px] font-bold bg-black/20 text-content-primary/80 rounded shrink-0">
+                        {config.badge}
                       </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Fees Grid - Compact */}
-                <div className="p-3">
-                  <div className="grid grid-cols-2 gap-2">
-                    <FeeField
-                      label="Ouverture"
-                      tooltipField="ouverture"
-                      value={product.frais?.ouverture}
-                      editValue={editValues.fraisOuverture}
-                      isEditing={isEditing}
-                      onChange={(v) => setEditValues({ ...editValues, fraisOuverture: v })}
-                    />
-                    <FeeField
-                      label="Tenue/mois"
-                      tooltipField="tenue"
-                      value={product.frais?.tenue}
-                      editValue={editValues.fraisTenue}
-                      isEditing={isEditing}
-                      onChange={(v) => setEditValues({ ...editValues, fraisTenue: v })}
-                    />
-                    <FeeField
-                      label="Retrait"
-                      tooltipField="retrait"
-                      value={product.frais?.retrait}
-                      editValue={editValues.fraisRetrait}
-                      isEditing={isEditing}
-                      onChange={(v) => setEditValues({ ...editValues, fraisRetrait: v })}
-                    />
-                    <FeeField
-                      label="Clôture"
-                      tooltipField="cloture"
-                      value={product.frais?.cloture}
-                      editValue={editValues.fraisCloture}
-                      isEditing={isEditing}
-                      onChange={(v) => setEditValues({ ...editValues, fraisCloture: v })}
-                    />
-                  </div>
-
-                  {/* Rules - Inline */}
-                  <div className="mt-2 pt-2 border-t border-edge/50 grid grid-cols-2 gap-2">
-                    <div className="text-[10px]">
-                      <span className="text-content-muted inline-flex items-center">Min:<InfoTooltip field="soldeMinimum" /> </span>
-                      {isEditing ? (
-                        <input
-                          inputMode="decimal"
-                          value={editValues.soldeMinimum}
-                          onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); setEditValues({ ...editValues, soldeMinimum: v }); }}
-                          className="w-16 px-1 py-0.5 bg-surface-elevated border border-edge-strong rounded text-content-primary text-[10px]"
-                        />
-                      ) : (
-                        <span className="text-content-secondary">
-                          {product.regles?.soldeMinimum?.toLocaleString() || '-'} F
-                        </span>
-                      )}
                     </div>
-                    <div className="text-[10px]">
-                      <span className="text-content-muted inline-flex items-center">Plafond:<InfoTooltip field="plafondDepot" /> </span>
+                  </div>
+
+                  {/* Rate Display */}
+                  <div className="px-3 py-2.5 bg-surface/30 border-b border-edge/50">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-content-muted flex items-center gap-1">
+                        <Percent size={10} />
+                        Taux d'intérêt
+                      </span>
                       {isEditing ? (
-                        <input
-                          inputMode="decimal"
-                          value={editValues.plafondDepot}
-                          onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); setEditValues({ ...editValues, plafondDepot: v }); }}
-                          className="w-16 px-1 py-0.5 bg-surface-elevated border border-edge-strong rounded text-content-primary text-[10px]"
-                        />
+                        <div className="flex items-center gap-1">
+                          <input
+                            inputMode="decimal"
+                            value={editValues.tauxInteret}
+                            onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); setEditValues({ ...editValues, tauxInteret: v }); }}
+                            className="w-16 px-2 py-0.5 text-right text-sm bg-surface-elevated border border-edge-strong rounded focus:border-accent outline-none text-content-primary"
+                          />
+                          <span className="text-content-muted text-xs">%</span>
+                        </div>
                       ) : (
-                        <span className="text-content-secondary">
-                          {product.regles?.plafondDepot?.toLocaleString() || '∞'}
+                        <span className={cn(
+                          "text-lg font-bold",
+                          product.tauxInteret && parseFloat(product.tauxInteret) > 0
+                            ? "text-status-success"
+                            : "text-content-muted"
+                        )}>
+                          {product.tauxInteret ? `${parseFloat(product.tauxInteret).toFixed(2)}%` : '0.00%'}
                         </span>
                       )}
                     </div>
                   </div>
 
-                  {/* Policy toggles */}
-                  <div className="mt-2 pt-2 border-t border-edge/50 space-y-1.5">
-                    <p className="text-[9px] text-content-muted uppercase tracking-wide">Politique</p>
-                    <PolicyToggle
-                      label="Dépôt initial obligatoire"
-                      tooltipField="depotInitialObligatoire"
-                      checked={isEditing ? editValues.depotInitialObligatoire : (product.regles?.depotInitialObligatoire ?? false)}
-                      isEditing={isEditing}
-                      onChange={(v) => setEditValues({ ...editValues, depotInitialObligatoire: v })}
-                    />
-                    {(isEditing ? editValues.depotInitialObligatoire : product.regles?.depotInitialObligatoire) && (
-                      <div className="text-[10px] pl-5">
-                        <span className="text-content-muted inline-flex items-center">Dépôt min: <InfoTooltip field="depotInitialMinimum" /></span>
+                  {/* Fees Grid */}
+                  <div className="p-3 flex-1">
+                    <div className="grid grid-cols-2 gap-2">
+                      <FeeField
+                        label="Ouverture"
+                        tooltipField="ouverture"
+                        value={product.frais?.ouverture}
+                        editValue={editValues.fraisOuverture}
+                        isEditing={isEditing}
+                        onChange={(v) => setEditValues({ ...editValues, fraisOuverture: v })}
+                      />
+                      <FeeField
+                        label="Tenue/mois"
+                        tooltipField="tenue"
+                        value={product.frais?.tenue}
+                        editValue={editValues.fraisTenue}
+                        isEditing={isEditing}
+                        onChange={(v) => setEditValues({ ...editValues, fraisTenue: v })}
+                      />
+                      <FeeField
+                        label="Retrait"
+                        tooltipField="retrait"
+                        value={product.frais?.retrait}
+                        editValue={editValues.fraisRetrait}
+                        isEditing={isEditing}
+                        onChange={(v) => setEditValues({ ...editValues, fraisRetrait: v })}
+                      />
+                      <FeeField
+                        label="Clôture"
+                        tooltipField="cloture"
+                        value={product.frais?.cloture}
+                        editValue={editValues.fraisCloture}
+                        isEditing={isEditing}
+                        onChange={(v) => setEditValues({ ...editValues, fraisCloture: v })}
+                      />
+                    </div>
+
+                    {/* Rules */}
+                    <div className="mt-2 pt-2 border-t border-edge/50 grid grid-cols-2 gap-2">
+                      <div className="text-[10px]">
+                        <span className="text-content-muted inline-flex items-center">Min:<InfoTooltip field="soldeMinimum" /> </span>
                         {isEditing ? (
                           <input
                             inputMode="decimal"
-                            value={editValues.depotInitialMinimum}
-                            onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); setEditValues({ ...editValues, depotInitialMinimum: v }); }}
+                            value={editValues.soldeMinimum}
+                            onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); setEditValues({ ...editValues, soldeMinimum: v }); }}
                             className="w-16 px-1 py-0.5 bg-surface-elevated border border-edge-strong rounded text-content-primary text-[10px]"
-                            placeholder="0"
                           />
                         ) : (
                           <span className="text-content-secondary">
-                            {product.regles?.depotInitialMinimum?.toLocaleString() || '-'} F
+                            {product.regles?.soldeMinimum?.toLocaleString() || '-'} F
                           </span>
                         )}
                       </div>
+                      <div className="text-[10px]">
+                        <span className="text-content-muted inline-flex items-center">Plafond:<InfoTooltip field="plafondDepot" /> </span>
+                        {isEditing ? (
+                          <input
+                            inputMode="decimal"
+                            value={editValues.plafondDepot}
+                            onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); setEditValues({ ...editValues, plafondDepot: v }); }}
+                            className="w-16 px-1 py-0.5 bg-surface-elevated border border-edge-strong rounded text-content-primary text-[10px]"
+                          />
+                        ) : (
+                          <span className="text-content-secondary">
+                            {product.regles?.plafondDepot?.toLocaleString() || '∞'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Policy toggles */}
+                    <div className="mt-2 pt-2 border-t border-edge/50 space-y-1.5">
+                      <p className="text-[9px] text-content-muted uppercase tracking-wide">Politique</p>
+                      <PolicyToggle
+                        label="Dépôt initial obligatoire"
+                        tooltipField="depotInitialObligatoire"
+                        checked={isEditing ? editValues.depotInitialObligatoire : (product.regles?.depotInitialObligatoire ?? false)}
+                        isEditing={isEditing}
+                        onChange={(v) => setEditValues({ ...editValues, depotInitialObligatoire: v })}
+                      />
+                      {(isEditing ? editValues.depotInitialObligatoire : product.regles?.depotInitialObligatoire) && (
+                        <div className="text-[10px] pl-5">
+                          <span className="text-content-muted inline-flex items-center">Dépôt min: <InfoTooltip field="depotInitialMinimum" /></span>
+                          {isEditing ? (
+                            <input
+                              inputMode="decimal"
+                              value={editValues.depotInitialMinimum}
+                              onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); setEditValues({ ...editValues, depotInitialMinimum: v }); }}
+                              className="w-16 px-1 py-0.5 bg-surface-elevated border border-edge-strong rounded text-content-primary text-[10px]"
+                              placeholder="0"
+                            />
+                          ) : (
+                            <span className="text-content-secondary">
+                              {product.regles?.depotInitialMinimum?.toLocaleString() || '-'} F
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      <PolicyToggle
+                        label="Validation ouverture requise"
+                        tooltipField="validationOuvertureRequise"
+                        checked={isEditing ? editValues.validationOuvertureRequise : (product.regles?.validationOuvertureRequise ?? false)}
+                        isEditing={isEditing}
+                        onChange={(v) => setEditValues({ ...editValues, validationOuvertureRequise: v })}
+                      />
+                      <PolicyToggle
+                        label="Autoriser clôture solde < frais"
+                        tooltipField="autoriserSoldeNegatifCloture"
+                        checked={isEditing ? editValues.autoriserSoldeNegatifCloture : (product.regles?.autoriserSoldeNegatifCloture ?? false)}
+                        isEditing={isEditing}
+                        onChange={(v) => setEditValues({ ...editValues, autoriserSoldeNegatifCloture: v })}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Actions Footer */}
+                  <div className="px-3 py-2 bg-surface-base/50 border-t border-edge rounded-b-xl flex items-center justify-between">
+                    <span className="text-[9px] text-content-muted">
+                      {format(new Date(product.createdAt), 'dd/MM/yy', { locale: fr })}
+                    </span>
+
+                    {isEditing ? (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={cancelEditing}
+                          className="p-1.5 text-content-muted hover:text-content-primary hover:bg-surface-elevated rounded transition"
+                        >
+                          <X size={14} />
+                        </button>
+                        <button
+                          onClick={() => saveChanges(product)}
+                          disabled={updateMutation.isPending}
+                          className="flex items-center gap-1 px-2.5 py-1 bg-accent hover:bg-accent/90 text-white rounded text-[11px] font-medium transition disabled:opacity-50"
+                        >
+                          {updateMutation.isPending ? (
+                            <Loader2 size={12} className="animate-spin" />
+                          ) : (
+                            <Save size={12} />
+                          )}
+                          Sauver
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => startEditing(product)}
+                        className="flex items-center gap-1 px-2.5 py-1 text-content-muted hover:text-content-primary hover:bg-surface-elevated rounded text-[11px] transition"
+                      >
+                        <Edit2 size={12} />
+                        Modifier
+                      </button>
                     )}
-                    <PolicyToggle
-                      label="Validation ouverture requise"
-                      tooltipField="validationOuvertureRequise"
-                      checked={isEditing ? editValues.validationOuvertureRequise : (product.regles?.validationOuvertureRequise ?? false)}
-                      isEditing={isEditing}
-                      onChange={(v) => setEditValues({ ...editValues, validationOuvertureRequise: v })}
-                    />
-                    <PolicyToggle
-                      label="Autoriser clôture solde < frais"
-                      tooltipField="autoriserSoldeNegatifCloture"
-                      checked={isEditing ? editValues.autoriserSoldeNegatifCloture : (product.regles?.autoriserSoldeNegatifCloture ?? false)}
-                      isEditing={isEditing}
-                      onChange={(v) => setEditValues({ ...editValues, autoriserSoldeNegatifCloture: v })}
-                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="shrink-0 flex items-center justify-between px-1 py-2 border-t border-edge/50">
+          <span className="text-[10px] text-content-muted">
+            {filteredProducts.length} produit{filteredProducts.length > 1 ? 's' : ''}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="p-1 rounded hover:bg-surface-subtle disabled:opacity-30 text-content-muted transition"
+            >
+              <ChevronLeft size={14} />
+            </button>
+            <div className="flex items-center gap-1">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                <button
+                  key={p}
+                  onClick={() => setPage(p)}
+                  className={cn(
+                    "w-6 h-6 rounded text-[10px] font-medium transition",
+                    p === page
+                      ? "bg-accent text-white"
+                      : "text-content-muted hover:bg-surface-subtle"
+                  )}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="p-1 rounded hover:bg-surface-subtle disabled:opacity-30 text-content-muted transition"
+            >
+              <ChevronRight size={14} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Create Product Modal */}
+      {showCreateModal && (
+        <>
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowCreateModal(false)}>
+            <div
+              className="bg-card border border-edge rounded-2xl shadow-2xl w-full max-w-md animate-in fade-in zoom-in-95 duration-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between p-4 border-b border-edge">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-accent/10 rounded-lg">
+                    <Plus size={16} className="text-accent" />
+                  </div>
+                  <h3 className="text-sm font-bold text-content-primary">Nouveau Produit</h3>
+                </div>
+                <button
+                  onClick={() => setShowCreateModal(false)}
+                  className="p-1 hover:bg-surface-subtle rounded transition text-content-muted"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-4 space-y-4">
+                {/* Type selector */}
+                <div>
+                  <label className="text-[10px] font-semibold text-content-muted uppercase tracking-wider mb-1.5 block">
+                    Type de compte
+                  </label>
+                  <div className="flex gap-2">
+                    {Object.entries(TYPE_CONFIG).map(([type, config]) => {
+                      const Icon = config.icon;
+                      return (
+                        <button
+                          key={type}
+                          onClick={() => setCreateValues({ ...createValues, typeCompte: type as any })}
+                          className={cn(
+                            "flex-1 flex flex-col items-center gap-1 p-3 rounded-xl border transition-all",
+                            createValues.typeCompte === type
+                              ? `bg-linear-to-b ${config.gradient} ring-1 ring-accent/30`
+                              : "border-edge hover:border-accent/30"
+                          )}
+                        >
+                          <Icon size={18} className="text-content-primary" />
+                          <span className="text-[10px] font-semibold text-content-primary">{config.label}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
-                {/* Actions Footer */}
-                <div className="px-3 py-2 bg-surface-base/50 border-t border-edge rounded-b-xl flex items-center justify-between">
-                  <span className="text-[9px] text-content-muted">
-                    {format(new Date(product.createdAt), 'dd/MM/yy', { locale: fr })}
-                  </span>
+                {/* Code */}
+                <div>
+                  <label className="text-[10px] font-semibold text-content-muted uppercase tracking-wider mb-1.5 block">
+                    Code unique
+                  </label>
+                  <input
+                    type="text"
+                    value={createValues.code}
+                    onChange={(e) => setCreateValues({ ...createValues, code: e.target.value })}
+                    placeholder="EPARGNE_PREMIUM"
+                    className="w-full h-9 px-3 bg-surface/50 border border-edge rounded-lg text-xs font-mono text-content-primary placeholder:text-content-muted focus:outline-none focus:border-accent"
+                  />
+                  <p className="text-[9px] text-content-muted mt-1">Identifiant technique, auto-converti en MAJUSCULES</p>
+                </div>
 
-                  {isEditing ? (
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={cancelEditing}
-                        className="p-1.5 text-content-muted hover:text-content-primary hover:bg-surface-elevated rounded transition"
-                      >
-                        <X size={14} />
-                      </button>
-                      <button
-                        onClick={() => saveChanges(product)}
-                        disabled={updateMutation.isPending}
-                        className="flex items-center gap-1 px-2.5 py-1 bg-accent hover:bg-accent-primary-hover text-white rounded text-[11px] font-medium transition disabled:opacity-50"
-                      >
-                        {updateMutation.isPending ? (
-                          <Loader2 size={12} className="animate-spin" />
-                        ) : (
-                          <Save size={12} />
-                        )}
-                        Sauver
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => startEditing(product)}
-                      className="flex items-center gap-1 px-2.5 py-1 text-content-muted hover:text-content-primary hover:bg-surface-elevated rounded text-[11px] transition"
-                    >
-                      <Edit2 size={12} />
-                      Modifier
-                    </button>
-                  )}
+                {/* Name */}
+                <div>
+                  <label className="text-[10px] font-semibold text-content-muted uppercase tracking-wider mb-1.5 block">
+                    Nom du produit
+                  </label>
+                  <input
+                    type="text"
+                    value={createValues.nom}
+                    onChange={(e) => setCreateValues({ ...createValues, nom: e.target.value })}
+                    placeholder="Épargne Premium"
+                    className="w-full h-9 px-3 bg-surface/50 border border-edge rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-accent"
+                  />
+                </div>
+
+                {/* Rate */}
+                <div>
+                  <label className="text-[10px] font-semibold text-content-muted uppercase tracking-wider mb-1.5 block">
+                    Taux d'intérêt (optionnel)
+                  </label>
+                  <div className="relative">
+                    <input
+                      inputMode="decimal"
+                      value={createValues.tauxInteret}
+                      onChange={(e) => { const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); setCreateValues({ ...createValues, tauxInteret: v }); }}
+                      placeholder="0.00"
+                      className="w-full h-9 px-3 pr-8 bg-surface/50 border border-edge rounded-lg text-xs text-content-primary placeholder:text-content-muted focus:outline-none focus:border-accent"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-content-muted text-xs">%</span>
+                  </div>
                 </div>
               </div>
-            );
-          })}
-        </div>
+
+              {/* Modal Footer */}
+              <div className="flex items-center justify-end gap-2 p-4 border-t border-edge">
+                <button
+                  onClick={() => setShowCreateModal(false)}
+                  className="px-4 py-2 text-xs font-medium text-content-muted hover:text-content-primary rounded-lg border border-edge hover:bg-surface-subtle transition"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={handleCreate}
+                  disabled={createMutation.isPending || !createValues.code.trim() || !createValues.nom.trim()}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-accent hover:bg-accent/90 text-white rounded-lg text-xs font-semibold transition disabled:opacity-50"
+                >
+                  {createMutation.isPending ? (
+                    <Loader2 size={12} className="animate-spin" />
+                  ) : (
+                    <Plus size={12} />
+                  )}
+                  Créer le produit
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
       )}
 
       <ConfirmDialog
@@ -580,7 +857,6 @@ const FIELD_TOOLTIPS: Record<string, string> = {
   plafondDepot: "Montant maximum de dépôt autorisé (∞ = illimité).",
 };
 
-// Inline tooltip component using shared Tooltip
 function InfoTooltip({ field }: { field: string }) {
   const tip = FIELD_TOOLTIPS[field];
   if (!tip) return null;
@@ -591,7 +867,6 @@ function InfoTooltip({ field }: { field: string }) {
   );
 }
 
-// Policy Toggle Component
 function PolicyToggle({
   label,
   checked,
@@ -634,7 +909,6 @@ function PolicyToggle({
   );
 }
 
-// Compact Fee Field Component
 function FeeField({
   label,
   value,

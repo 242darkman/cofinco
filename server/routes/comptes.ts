@@ -51,7 +51,7 @@ import { mouvementsFinanciers, operationsCaisse, transactionsCompte } from "@sha
 import { storage } from "../storage";
 import { aliasedTable, and, desc, eq, gte, ilike, inArray, lte, or, sql } from "drizzle-orm";
 import { db } from "../db";
-import { comptes, produitsCompte, clients, users, virementsProgrammes } from "@shared/schema";
+import { comptes, produitsCompte, insertProduitCompteSchema, clients, users, virementsProgrammes } from "@shared/schema";
 import { getWsInstance } from "../ws-server";
 import { StatutCompte, TypeCompte, MethodePaiement, MotifBlocage, SuspensionReason } from "@shared/enum/status-constants";
 import type {
@@ -760,6 +760,7 @@ export function registerComptesRoutes(app: Express) {
 
         // Build update object
         const updateData: any = {};
+        if (data.nom !== undefined) updateData.nom = data.nom;
         if (data.tauxInteret !== undefined) updateData.tauxInteret = data.tauxInteret?.toString() || null;
         if (data.frais !== undefined) updateData.frais = data.frais;
         if (data.regles !== undefined) updateData.regles = data.regles;
@@ -784,6 +785,42 @@ export function registerComptesRoutes(app: Express) {
         res.json(updated);
       } catch (error: any) {
         logger.error({ err: error }, 'Error updating produit compte');
+        res.status(500).json({ error: error.message });
+      }
+    }
+  );
+
+  /**
+   * POST /api/produits-compte - Create a new product (Admin only)
+   */
+  app.post(
+    "/api/produits-compte",
+    requireAuth,
+    attachAbility,
+    requireAbility(Actions.MANAGE, Subjects.SETTINGS),
+    async (req, res) => {
+      try {
+        const data = normalizeKeysDeep(req.body) as any;
+        const parsed = insertProduitCompteSchema.parse(data);
+
+        const [created] = await db
+          .insert(produitsCompte)
+          .values(parsed)
+          .returning();
+
+        await logAudit(req, 'CREATE', 'produit_compte', created.id, {
+          after: { code: created.code, nom: created.nom, typeCompte: created.typeCompte },
+        }, 'success', 'high');
+
+        res.status(201).json(created);
+      } catch (error: any) {
+        if (error.code === '23505') {
+          return res.status(409).json({ error: "Un produit avec ce code existe déjà" });
+        }
+        if (error.name === 'ZodError') {
+          return res.status(400).json({ error: "Données invalides", details: error.errors });
+        }
+        logger.error({ err: error }, 'Error creating produit compte');
         res.status(500).json({ error: error.message });
       }
     }
