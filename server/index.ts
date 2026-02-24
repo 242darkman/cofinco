@@ -53,6 +53,7 @@ import { startAmortissementCron } from "./cron/amortissement-scheduler";
 import { startCobacReportingCron } from "./cron/cobac-reporting-scheduler";
 import { startLogCleanupCron } from "./cron/log-cleanup";
 import { startStorageOrphanCleanupCron } from "./cron/storage-orphan-cleanup";
+import { startCoffreBalanceSnapshotsCron } from "./cron/coffre-balance-snapshots";
 import { StorageService } from "./services/storage-service";
 
 const app = express();
@@ -425,7 +426,10 @@ app.get("/api/health", async (_req, res) => {
     // Start Storage Orphan Cleanup Cron (monthly — removes unreferenced MinIO files)
     startStorageOrphanCleanupCron();
 
-    logger.info('All cron jobs started: disbursements, repayments, credit-status, migrations, reconciliation, temp-permissions, balance-reconciliation, mm-reconciliation-report, treasury-reconciliation, gl-reconciliation-monitor, gl-auto-fix, late-installments, daily-integrity-audit, auto-lift-suspension, log-cleanup, storage-orphan-cleanup');
+    // Start Coffre Balance Snapshots Cron (daily 23:55 + on startup — captures treasury balances)
+    startCoffreBalanceSnapshotsCron();
+
+    logger.info('All cron jobs started: disbursements, repayments, credit-status, migrations, reconciliation, temp-permissions, balance-reconciliation, mm-reconciliation-report, treasury-reconciliation, gl-reconciliation-monitor, gl-auto-fix, late-installments, daily-integrity-audit, auto-lift-suspension, log-cleanup, storage-orphan-cleanup, coffre-balance-snapshots');
 
     // Start Account Cleanup Cron
     const { accountCleanup } = await import("./services/account-cleanup");

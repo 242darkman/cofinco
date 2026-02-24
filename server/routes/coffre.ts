@@ -16,6 +16,7 @@ import { attachAbility, requireAbility } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
 import { dispatchDomainEvent } from "../services/notifications/domain-events/event-registry";
 import { handleInsufficientFundsError } from "../middleware/financial-validation";
+import { getSnapshotHistory, getSnapshotDateRange } from "../services/coffre/snapshot-service";
 
 export const coffreRouter = Router();
 const service = new TransfertCoffreService();
@@ -465,6 +466,8 @@ coffreRouter.get("/supervision", attachAbility, requireAbility(Actions.MANAGE, S
     // Supports "historyFor" query param to fetch history for specific agencies (comma separated IDs)
     const historyFor = (req.query.historyFor as string)?.split(',').filter(Boolean);
     const period = (req.query.period as string) || '30d';
+    const includeRanking = req.query.includeRanking === 'true';
+    const includePreviousPeriod = req.query.includePreviousPeriod === 'true';
 
     // Calculate date range based on period
     const sinceDate = new Date();
@@ -502,108 +505,179 @@ coffreRouter.get("/supervision", attachAbility, requireAbility(Actions.MANAGE, S
 
     // Safety check: if no coffres, return empty history
     let history: any[] = [];
+    let historySource: 'snapshots' | 'movements' = 'movements';
 
     if (targetCoffreIds.length > 0) {
-        const movements = await db.select({
-            date: schema.mouvementsFinanciers.dateOperation,
-            montant: schema.mouvementsFinanciers.montant,
-            sens: schema.mouvementsFinanciers.sens,
-            sourceId: schema.mouvementsFinanciers.sourceId,
-            metadata: schema.mouvementsFinanciers.metadata
-        })
-        .from(schema.mouvementsFinanciers)
-        .where(
-            and(
-                sql`${schema.mouvementsFinanciers.dateOperation} >= ${sinceDate}`,
-                // Check if sourceId OR metadata->destinationId matches any TARGET coffre
-                sql`(${schema.mouvementsFinanciers.sourceId} IN ${targetCoffreIds} OR ${schema.mouvementsFinanciers.metadata}->>'destinationId' IN ${targetCoffreIds})`
-            )
-        )
-        .orderBy(desc(schema.mouvementsFinanciers.dateOperation));
+        // ── Strategy: prefer snapshots for day/month buckets ──────────────
+        // For 'today' (hourly), always use movement reconstruction.
+        // For 7d/30d/1y, try snapshots first, fall back to movements.
 
-        // Map coffreId to agenceId for grouping
-        const coffreToAgence = allCoffres.reduce((acc, c) => {
-            acc[c.id] = c.agenceId!;
-            return acc;
-        }, {} as Record<string, string>);
+        const targetAgencyIds = historyFor && historyFor.length > 0
+          ? historyFor
+          : [...new Set(allCoffres.map(c => c.agenceId!).filter(Boolean))];
 
-        // Helper to get bucket key from a Date
-        const getBucketKey = (d: Date): string => {
-            if (bucketType === 'hour') return d.toISOString().slice(0, 13); // "2026-01-26T14"
-            if (bucketType === 'month') return d.toISOString().slice(0, 7);  // "2026-01"
-            return d.toISOString().split('T')[0]; // "2026-01-26"
-        };
+        let snapshotHistory: any[] | null = null;
 
-        // Net change by bucket AND agence
-        const bucketAgencyChange: Record<string, Record<string, number>> = {};
+        if (bucketType !== 'hour') {
+          try {
+            const fromDate = sinceDate.toISOString().split('T')[0];
+            const toDate = new Date().toISOString().split('T')[0];
+            const snapshots = await getSnapshotHistory(fromDate, toDate, targetAgencyIds);
 
-        movements.forEach(m => {
-            const bucketKey = getBucketKey(new Date(m.date!));
-            const amount = Number(m.montant);
-
-            if (!bucketAgencyChange[bucketKey]) bucketAgencyChange[bucketKey] = {};
-
-            const destId = (m.metadata as any)?.destinationId;
-            const srcId = m.sourceId;
-
-            if (targetCoffreIds.includes(destId)) {
-                const agId = coffreToAgence[destId];
-                bucketAgencyChange[bucketKey][agId] = (bucketAgencyChange[bucketKey][agId] || 0) + amount;
+            // Use snapshots only if we have enough coverage (at least 50% of expected buckets)
+            const minRequired = Math.floor(bucketCount * 0.5);
+            if (snapshots.length >= minRequired) {
+              // For monthly buckets, group snapshots by month (take last day of each month)
+              if (bucketType === 'month') {
+                const byMonth: Record<string, any> = {};
+                for (const sp of snapshots) {
+                  const monthKey = sp.date.slice(0, 7); // "2026-02"
+                  byMonth[monthKey] = sp; // last snapshot of the month wins
+                }
+                snapshotHistory = Object.entries(byMonth)
+                  .map(([monthKey, data]) => ({ ...data, date: monthKey }))
+                  .sort((a, b) => a.date.localeCompare(b.date));
+              } else {
+                snapshotHistory = snapshots;
+              }
+              historySource = 'snapshots';
             }
-            if (targetCoffreIds.includes(srcId as string)) {
-                const agId = coffreToAgence[srcId as string];
-                bucketAgencyChange[bucketKey][agId] = (bucketAgencyChange[bucketKey][agId] || 0) - amount;
-            }
-        });
-
-        // Current totals for the TARGETED agencies
-        const currentBalances = allCoffres
-            .filter(c => targetCoffreIds.includes(c.id))
-            .reduce((acc, c) => {
-                acc[c.agenceId!] = (acc[c.agenceId!] || 0) + Number(c.solde);
-                return acc;
-            }, {} as Record<string, number>);
-
-        // Reconstruct history going backwards from now
-        const now = new Date();
-        const runningBalances = { ...currentBalances };
-        const relevantAgIds = Object.keys(currentBalances);
-
-        for (let i = 0; i < bucketCount; i++) {
-            const bucketDate = new Date(now);
-            if (bucketType === 'hour') {
-                bucketDate.setHours(now.getHours() - i, 0, 0, 0);
-            } else if (bucketType === 'month') {
-                bucketDate.setMonth(now.getMonth() - i);
-                bucketDate.setDate(1);
-            } else {
-                bucketDate.setDate(now.getDate() - i);
-            }
-            const bucketKey = getBucketKey(bucketDate);
-
-            const totalBalance = Object.values(runningBalances).reduce((a, b) => a + b, 0);
-
-            history.push({
-                date: bucketType === 'hour' ? bucketDate.toISOString() : bucketKey,
-                balance: totalBalance,
-                ...runningBalances
-            });
-
-            // Go back in time: subtract this bucket's net change
-            const changes = bucketAgencyChange[bucketKey] || {};
-            relevantAgIds.forEach(id => {
-                runningBalances[id] -= (changes[id] || 0);
-            });
+          } catch (snapErr) {
+            logger.warn({ err: snapErr }, 'Snapshot query failed, falling back to movements');
+          }
         }
 
-        history.reverse();
+        if (snapshotHistory) {
+          history = snapshotHistory;
+        } else {
+          // ── Fallback: reconstruct from movements (original algorithm) ───
+          const movements = await db.select({
+              date: schema.mouvementsFinanciers.dateOperation,
+              montant: schema.mouvementsFinanciers.montant,
+              sens: schema.mouvementsFinanciers.sens,
+              sourceId: schema.mouvementsFinanciers.sourceId,
+              metadata: schema.mouvementsFinanciers.metadata
+          })
+          .from(schema.mouvementsFinanciers)
+          .where(
+              and(
+                  sql`${schema.mouvementsFinanciers.dateOperation} >= ${sinceDate}`,
+                  sql`(${schema.mouvementsFinanciers.sourceId} IN ${targetCoffreIds} OR ${schema.mouvementsFinanciers.metadata}->>'destinationId' IN ${targetCoffreIds})`
+              )
+          )
+          .orderBy(desc(schema.mouvementsFinanciers.dateOperation));
+
+          const coffreToAgence = allCoffres.reduce((acc, c) => {
+              acc[c.id] = c.agenceId!;
+              return acc;
+          }, {} as Record<string, string>);
+
+          const getBucketKey = (d: Date): string => {
+              if (bucketType === 'hour') return d.toISOString().slice(0, 13);
+              if (bucketType === 'month') return d.toISOString().slice(0, 7);
+              return d.toISOString().split('T')[0];
+          };
+
+          const bucketAgencyChange: Record<string, Record<string, number>> = {};
+
+          movements.forEach(m => {
+              const bucketKey = getBucketKey(new Date(m.date!));
+              const amount = Number(m.montant);
+              if (!bucketAgencyChange[bucketKey]) bucketAgencyChange[bucketKey] = {};
+              const destId = (m.metadata as any)?.destinationId;
+              const srcId = m.sourceId;
+              if (targetCoffreIds.includes(destId)) {
+                  const agId = coffreToAgence[destId];
+                  bucketAgencyChange[bucketKey][agId] = (bucketAgencyChange[bucketKey][agId] || 0) + amount;
+              }
+              if (targetCoffreIds.includes(srcId as string)) {
+                  const agId = coffreToAgence[srcId as string];
+                  bucketAgencyChange[bucketKey][agId] = (bucketAgencyChange[bucketKey][agId] || 0) - amount;
+              }
+          });
+
+          const currentBalances = allCoffres
+              .filter(c => targetCoffreIds.includes(c.id))
+              .reduce((acc, c) => {
+                  acc[c.agenceId!] = (acc[c.agenceId!] || 0) + Number(c.solde);
+                  return acc;
+              }, {} as Record<string, number>);
+
+          const now = new Date();
+          const runningBalances = { ...currentBalances };
+          const relevantAgIds = Object.keys(currentBalances);
+
+          for (let i = 0; i < bucketCount; i++) {
+              const bucketDate = new Date(now);
+              if (bucketType === 'hour') {
+                  bucketDate.setHours(now.getHours() - i, 0, 0, 0);
+              } else if (bucketType === 'month') {
+                  bucketDate.setMonth(now.getMonth() - i);
+                  bucketDate.setDate(1);
+              } else {
+                  bucketDate.setDate(now.getDate() - i);
+              }
+              const bucketKey = getBucketKey(bucketDate);
+              const totalBalance = Object.values(runningBalances).reduce((a, b) => a + b, 0);
+
+              history.push({
+                  date: bucketType === 'hour' ? bucketDate.toISOString() : bucketKey,
+                  balance: totalBalance,
+                  ...runningBalances
+              });
+
+              const changes = bucketAgencyChange[bucketKey] || {};
+              relevantAgIds.forEach(id => {
+                  runningBalances[id] -= (changes[id] || 0);
+              });
+          }
+
+          history.reverse();
+        }
     }
 
-    res.json({
-        globalBalance: totalSolde, // Always return global current balance
-        breakdown, // Always return full breakdown
-        history // Returns history for the requested agencies (or all if none specified)
-    });
+    // Build response (backward-compatible: new fields only added when requested)
+    const response: Record<string, any> = {
+        globalBalance: totalSolde,
+        breakdown,
+        history,
+        historySource,
+    };
+
+    // Ranking: enriched breakdown with rank, share, delta, deltaPercent
+    if (includeRanking && history.length > 0) {
+      const startPoint = history[0]; // earliest bucket = start of period
+      const sorted = [...breakdown].sort((a, b) => b.solde - a.solde);
+      response.ranking = sorted.map((agency, idx) => {
+        const prevSolde = Number(startPoint[agency.agenceId!] ?? agency.solde);
+        const delta = agency.solde - prevSolde;
+        const deltaPercent = prevSolde !== 0 ? (delta / Math.abs(prevSolde)) * 100 : 0;
+        return {
+          agenceId: agency.agenceId,
+          agenceNom: agency.agenceNom,
+          ville: agency.ville,
+          solde: agency.solde,
+          rank: idx + 1,
+          share: totalSolde > 0 ? Math.round((agency.solde / totalSolde) * 10000) / 100 : 0,
+          delta: Math.round(delta),
+          deltaPercent: Math.round(deltaPercent * 100) / 100,
+        };
+      });
+    }
+
+    // Previous period: balances at start of current period
+    if (includePreviousPeriod && history.length > 0) {
+      const startPoint = history[0];
+      response.previousPeriod = {
+        globalBalance: Number(startPoint.balance) || 0,
+        breakdown: breakdown.map(a => ({
+          agenceId: a.agenceId,
+          solde: Number(startPoint[a.agenceId!] ?? 0),
+        })),
+      };
+    }
+
+    res.json(response);
 
   } catch (e: any) {
     logger.error({ err: e }, 'Supervision Error');

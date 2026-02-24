@@ -335,3 +335,56 @@ export const insertConfigTransfertInterCoffreSchema = createInsertSchema(configT
 });
 export type InsertConfigTransfertInterCoffre = z.infer<typeof insertConfigTransfertInterCoffreSchema>;
 export type ConfigTransfertInterCoffre = typeof configTransfertInterCoffres.$inferSelect;
+
+// ========== SNAPSHOTS SOLDE COFFRES (daily + event-driven) ==========
+
+export interface CoffreSnapshotPayload {
+  /** Solde total (coffre ou somme agence ou global) */
+  balance: number;
+  /** Nombre de mouvements entrants sur la période */
+  movementsIn: number;
+  /** Nombre de mouvements sortants sur la période */
+  movementsOut: number;
+  /** Montant total entrant */
+  amountIn: number;
+  /** Montant total sortant */
+  amountOut: number;
+}
+
+export const coffreBalanceSnapshots = pgTable("coffre_balance_snapshots", {
+  id: uuid("id").primaryKey().defaultRandom(),
+
+  /** Date du snapshot (YYYY-MM-DD) — un seul snapshot par date/scope/entité */
+  snapshotDate: date("snapshot_date").notNull(),
+
+  /** Scope : COFFRE (un coffre précis), AGENCY (somme agence), CONSOLIDATED (global) */
+  scopeType: text("scope_type").notNull(), // 'COFFRE' | 'AGENCY' | 'CONSOLIDATED'
+
+  /** ID du coffre — null si AGENCY ou CONSOLIDATED */
+  coffreId: uuid("coffre_id").references(() => coffresForts.id, { onDelete: "cascade" }),
+
+  /** ID de l'agence — null si CONSOLIDATED */
+  agencyId: uuid("agency_id").references(() => agences.id, { onDelete: "cascade" }),
+
+  /** Solde capturé */
+  balance: numeric("balance", { precision: 15, scale: 2 }).notNull(),
+
+  /** Données complémentaires (mouvements in/out, montants) */
+  payload: json("payload").$type<CoffreSnapshotPayload>(),
+
+  /** Source : scheduled (cron quotidien) ou event (déclenché par mouvement) */
+  source: text("source").notNull().default("scheduled"), // 'scheduled' | 'event'
+
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  /** Un seul snapshot par combinaison date/scope/entité */
+  uqSnapshotDateScope: uniqueIndex("uq_coffre_snapshot_date_scope").on(
+    t.snapshotDate, t.scopeType, t.coffreId, t.agencyId,
+  ),
+  idxSnapshotDate: index("idx_coffre_snapshot_date").on(t.snapshotDate),
+  idxSnapshotAgency: index("idx_coffre_snapshot_agency").on(t.agencyId),
+  idxSnapshotScope: index("idx_coffre_snapshot_scope").on(t.scopeType),
+}));
+
+export type CoffreBalanceSnapshot = typeof coffreBalanceSnapshots.$inferSelect;
+export type InsertCoffreBalanceSnapshot = typeof coffreBalanceSnapshots.$inferInsert;
