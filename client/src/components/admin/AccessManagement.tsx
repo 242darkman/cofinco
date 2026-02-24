@@ -326,7 +326,7 @@ export default function AccessManagement() {
         {accessViewMode === 'hierarchy' && <RoleHierarchyTree />}
         {accessViewMode === 'patterns' && <CriticalPatternsManager />}
         {accessViewMode === 'conditions' && <ConditionTemplatesManager />}
-        {accessViewMode === 'simulation' && <PermissionSimulator users={users} />}
+        {accessViewMode === 'simulation' && <PermissionSimulator users={users.map(u => ({ ...u, nom: u.nom || '' }))} />}
         {accessViewMode === 'demandes' && <PermissionRequestsManager />}
       </div>
 

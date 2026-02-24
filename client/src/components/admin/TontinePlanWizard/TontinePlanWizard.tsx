@@ -126,8 +126,8 @@ export default function TontinePlanWizard({ isOpen, onClose, onSave, editPlan }:
         agenceId: formData.agenceId || null,
       };
 
-      if (isEditMode && editPlan?.version != null) {
-        payload.expectedVersion = editPlan.version;
+      if (isEditMode && (editPlan as any)?.version != null) {
+        (payload as any).expectedVersion = (editPlan as any).version;
       }
 
       await onSave(payload);

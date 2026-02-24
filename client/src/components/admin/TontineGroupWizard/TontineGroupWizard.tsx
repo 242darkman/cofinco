@@ -88,8 +88,8 @@ export default function TontineGroupWizard({ isOpen, onClose, onSave, editTontin
         planId: formData.planId || null,
 
         statut: formData.statut || "DRAFT",
-        dateDebut: formData.dateDebut ? new Date(formData.dateDebut).toISOString() : null,
-        dateFin: formData.dateFin ? new Date(formData.dateFin).toISOString() : null,
+        dateDebut: formData.dateDebut ? new Date(formData.dateDebut) : undefined,
+        dateFin: formData.dateFin ? new Date(formData.dateFin) : null,
         endRule: formData.endRule,
         roundCount: formData.roundCount ? parseInt(formData.roundCount) : null,
         minMembersToStart: parseInt(formData.minMembersToStart) || 3,

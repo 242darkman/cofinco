@@ -164,7 +164,7 @@ export default function AdminTontinesGestion() {
   const handleWizardClose = () => {
     setShowWizard(false);
     setEditTontine(null);
-    setPreSelectedPlanId(null);
+    setPreSelectedPlanId(undefined);
   };
 
   const handleDeleteTontine = useCallback((tontineId: string) => {
@@ -204,7 +204,7 @@ export default function AdminTontinesGestion() {
       await tontineApi.addMembre(selectedTontine.id, membreData);
 
       await tontineApi.update(selectedTontine.id, {
-        membres_actuels: selectedTontine.membresActuels + 1
+        membres_actuels: (selectedTontine.membresActuels ?? 0) + 1
       });
 
       toast.success('Membre ajouté');
@@ -232,7 +232,7 @@ export default function AdminTontinesGestion() {
           await tontineApi.deleteMembre(selectedTontine.id, membreId);
 
           await tontineApi.update(selectedTontine.id, {
-            membres_actuels: Math.max(0, selectedTontine.membresActuels - 1)
+            membres_actuels: Math.max(0, (selectedTontine.membresActuels ?? 0) - 1)
           });
 
           toast.success('Membre retiré');

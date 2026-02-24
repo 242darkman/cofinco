@@ -604,6 +604,7 @@ export default function AdminGestionProfils() {
                     roles: [],
                     agenceId: (contextAgence && contextAgence.id !== 'all') ? contextAgence.id : '',
                     photoProfile: '',
+                    autoGeneratePassword: true,
                   });
                   setCreateStep(1);
                   setShowCreateSuccess(false);

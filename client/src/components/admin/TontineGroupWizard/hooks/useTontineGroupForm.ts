@@ -19,8 +19,8 @@ function mapTontineToFormData(t: Tontine): TontineGroupFormData {
     gestionnaireId: t.gestionnaireId || "",
 
     statut: t.statut || "DRAFT",
-    dateDebut: t.dateDebut?.split("T")[0] || new Date().toISOString().split("T")[0],
-    dateFin: t.dateFin ? t.dateFin.split("T")[0] : "",
+    dateDebut: t.dateDebut ? (t.dateDebut instanceof Date ? t.dateDebut.toISOString() : String(t.dateDebut)).split("T")[0] : new Date().toISOString().split("T")[0],
+    dateFin: t.dateFin ? (t.dateFin instanceof Date ? t.dateFin.toISOString() : String(t.dateFin)).split("T")[0] : "",
     endRule: t.endRule || "WHEN_ALL_RECEIVED",
     roundCount: t.roundCount?.toString() || "",
     minMembersToStart: t.minMembersToStart?.toString() || "3",
