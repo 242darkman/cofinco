@@ -2107,9 +2107,13 @@ export class AgencyMigrationService {
       throw new MigrationError("Migration non trouvée", "NOT_FOUND");
     }
 
-    const submittableStatuses = [MIGRATION_STATUS.DRAFT, MIGRATION_STATUS.SCHEDULED];
-    if (!submittableStatuses.includes(migration.statut as any)) {
-      throw new MigrationError("Seuls les brouillons ou migrations planifiées peuvent être soumis", "INVALID_STATUS");
+    // Idempotent: if already submitted (PENDING/SCHEDULED), return silently
+    if (migration.statut === MIGRATION_STATUS.PENDING || migration.statut === MIGRATION_STATUS.SCHEDULED) {
+      return;
+    }
+
+    if (migration.statut !== MIGRATION_STATUS.DRAFT) {
+      throw new MigrationError("Seuls les brouillons peuvent être soumis", "INVALID_STATUS");
     }
 
     const previousStatus = migration.statut;

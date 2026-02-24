@@ -218,6 +218,7 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
     },
     onSuccess: () => {
       toast.success('Migration soumise');
+      queryClient.invalidateQueries({ queryKey: ['migration-status', migrationId] });
     },
     onError: (error: any) => {
       toast.error(error.message || 'Erreur lors de la soumission');
