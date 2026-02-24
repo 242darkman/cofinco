@@ -390,9 +390,10 @@ caisseAdminRouter.get(
       .from(coffresForts)
       .leftJoin(agences, eq(coffresForts.ownerId, agences.id));
 
+      // Filter out coffres from closed/migrated agencies
       const allCoffres = !isGlobalAdmin && userAgenceId
-        ? await query.where(eq(coffresForts.ownerId, userAgenceId))
-        : await query;
+        ? await query.where(and(eq(coffresForts.ownerId, userAgenceId), eq(agences.statut, 'ACTIVE')))
+        : await query.where(eq(agences.statut, 'ACTIVE'));
 
       res.json(allCoffres);
     } catch (error: any) {

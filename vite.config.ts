@@ -203,6 +203,7 @@ export default defineConfig({
       "@shared": path.resolve(import.meta.dirname, "shared"),
       "server": path.resolve(import.meta.dirname, "server"),
     },
+    dedupe: ['react', 'react-dom'],
   },
   root: path.resolve(import.meta.dirname, "client"),
 

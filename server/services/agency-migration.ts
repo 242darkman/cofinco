@@ -1613,13 +1613,92 @@ export class AgencyMigrationService {
           } else {
             logStep("Transfert trésorerie", true, undefined, { message: "Pas de fonds à transférer" });
           }
+
+          // 7b. Transfer caisse balances to target coffre and close source caisses
+          const sourceCaisses = await tx
+            .select()
+            .from(caisses)
+            .where(eq(caisses.agenceId, migration.sourceAgencyId));
+
+          if (sourceCaisses.length > 0) {
+            const [targetCoffre7b] = await tx
+              .select()
+              .from(coffresForts)
+              .where(eq(coffresForts.ownerId, migration.targetTreasuryAgencyId))
+              .limit(1);
+
+            let totalCaisseBalance = 0;
+            for (const caisse of sourceCaisses) {
+              const soldeCaisse = Number(caisse.solde || 0);
+              if (soldeCaisse > 0 && targetCoffre7b) {
+                totalCaisseBalance += soldeCaisse;
+                // Debit caisse balance → zero
+                await tx
+                  .update(caisses)
+                  .set({ solde: "0", updatedAt: new Date() })
+                  .where(eq(caisses.id, caisse.id));
+              }
+              // Close the caisse
+              await tx
+                .update(caisses)
+                .set({ statut: "CLOSED", updatedAt: new Date() })
+                .where(eq(caisses.id, caisse.id));
+            }
+
+            if (totalCaisseBalance > 0 && targetCoffre7b) {
+              // Credit target coffre with total caisse balances
+              await tx.execute(sql`SELECT set_config('app.balance_guard_bypass', 'true', true)`);
+              await updateCoffreBalance(tx, targetCoffre7b.id, +totalCaisseBalance);
+
+              // Record mouvement for caisse→coffre transfer
+              const refCaisse = `MIG-CAISSE-${Date.now()}`;
+              await tx.insert(mouvementsFinanciers).values({
+                reference: refCaisse,
+                dateOperation: new Date(),
+                montant: totalCaisseBalance.toString(),
+                sens: "CREDIT",
+                statut: StatutTransaction.POSTED,
+                sourceModule: "SYSTEME",
+                agenceId: migration.targetTreasuryAgencyId,
+                createdBy: ctx?.userId,
+                metadata: {
+                  type: "MIGRATION_AGENCE_CAISSE",
+                  migrationId,
+                  coffreId: targetCoffre7b.id,
+                  sourceAgencyId: migration.sourceAgencyId,
+                  targetAgencyId: migration.targetTreasuryAgencyId,
+                  caissesCount: sourceCaisses.length,
+                },
+              });
+
+              financials.soldesCoffresTransferes = (financials.soldesCoffresTransferes || 0) + totalCaisseBalance;
+            }
+
+            logStep("Transfert soldes caisses", true, sourceCaisses.length, { totalCaisseBalance });
+          }
+        }
+
+        // 7c. Close source agency coffre-fort
+        if (migration.targetTreasuryAgencyId) {
+          const [sourceCoffreToClose] = await tx
+            .select()
+            .from(coffresForts)
+            .where(eq(coffresForts.ownerId, migration.sourceAgencyId))
+            .limit(1);
+
+          if (sourceCoffreToClose) {
+            await tx
+              .update(coffresForts)
+              .set({ statut: "CLOSED", updatedAt: new Date() })
+              .where(eq(coffresForts.id, sourceCoffreToClose.id));
+          }
         }
 
         // ============================================
         // ÉTAPE 8: ARCHIVAGE DE L'AGENCE SOURCE (90-100%)
         // ============================================
         const stepStartArchive = Date.now();
-        await this.updateMigrationStatus(migrationId, MIGRATION_STATUS.PROCESSING, 90, logs, "Archivage agence");
+        await this.updateMigrationStatus(migrationId, MIGRATION_STATUS.PROCESSING, 90, logs, "Archivage agence source");
 
         await tx
           .update(agences)

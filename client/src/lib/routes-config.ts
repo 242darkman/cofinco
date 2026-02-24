@@ -329,6 +329,7 @@ export const ROUTES: RouteConfig[] = [
       { path: '/ressources-humaines/evaluations', subModule: 'evaluations', label: 'Évaluations' },
       { path: '/ressources-humaines/temps-projet', subModule: 'temps-projet', label: 'Temps Projet' },
       { path: '/ressources-humaines/organigramme', subModule: 'organigramme', label: 'Organigramme' },
+      { path: '/ressources-humaines/direction', subModule: 'direction-generale', label: 'Direction' },
     ],
   },
   // --- Système ---

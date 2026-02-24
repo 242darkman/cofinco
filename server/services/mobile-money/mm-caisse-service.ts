@@ -166,9 +166,13 @@ export async function getDigitalCaisseSummary(
   const conditions = agenceId
     ? and(
         eq(caisses.agenceId, agenceId),
-        inArray(caisses.type, digitalCaisseTypes)
+        inArray(caisses.type, digitalCaisseTypes),
+        eq(agences.statut, 'ACTIVE')
       )
-    : inArray(caisses.type, digitalCaisseTypes);
+    : and(
+        inArray(caisses.type, digitalCaisseTypes),
+        eq(agences.statut, 'ACTIVE')
+      );
 
   // Exécuter la requête
   const digitalCaisses = await db

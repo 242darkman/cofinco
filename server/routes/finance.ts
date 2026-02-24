@@ -3299,11 +3299,15 @@ export function registerFinanceRoutes(app: Express) {
       const caisses = await storage.getAllCaisses();
       const activeSessions = await storage.getActiveSessions();
 
-      // Build agence name map for enrichment
+      // Build agence name map for enrichment (active agencies only)
       const allAgences = await storage.getAllAgences();
       const agenceMap = new Map(allAgences.map(a => [a.id, a.nom]));
+      const activeAgenceIds = new Set(allAgences.filter(a => a.statut === 'ACTIVE').map(a => a.id));
 
-      const enrichedCaisses = await Promise.all(caisses.map(async (c) => {
+      // Filter out caisses from closed/migrated agencies
+      const activeCaisses = caisses.filter(c => activeAgenceIds.has(c.agenceId));
+
+      const enrichedCaisses = await Promise.all(activeCaisses.map(async (c) => {
          const activeSession = activeSessions.find(s => s.caisseId === c.id && !s.closedAt);
          let currentSolde = "0";
 
