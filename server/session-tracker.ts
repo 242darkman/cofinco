@@ -84,6 +84,9 @@ if count > maxSessions then
   end
 end
 
+if #pruned == 0 then
+  return "[]"
+end
 return cjson.encode(pruned)
 `;
 
@@ -108,7 +111,8 @@ async function atomicSessionAdd(
       arguments: [sessionId, String(loginTimestamp), String(MAX_SESSIONS_PER_USER)],
     });
 
-    const pruned: string[] = JSON.parse(result as string);
+    const parsed = JSON.parse(result as string);
+    const pruned: string[] = Array.isArray(parsed) ? parsed : [];
 
     if (pruned.length > 0) {
       logger.info({
