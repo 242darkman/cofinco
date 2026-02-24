@@ -1468,6 +1468,8 @@ export class AgencyMigrationService {
             );
 
             // 3. Atomic balance updates (rows already locked by guards)
+            // Bypass BALANCE_GUARD: mouvements are created right after, within the same tx
+            await tx.execute(sql`SELECT set_config('app.balance_guard_bypass', 'true', true)`);
             const sourceAfter = await updateCoffreBalance(tx, sourceCoffre.id, -amount);
             const targetAfter = await updateCoffreBalance(tx, targetCoffre.id, +amount);
 
@@ -1811,6 +1813,8 @@ export class AgencyMigrationService {
           await assertCoffreCanCredit(tx, snapshot.sourceCoffreId, snapshot.amount, guardCtx);
 
           // Updates atomiques inversés
+          // Bypass BALANCE_GUARD: mouvements are created right after, within the same tx
+          await tx.execute(sql`SELECT set_config('app.balance_guard_bypass', 'true', true)`);
           await updateCoffreBalance(tx, snapshot.targetCoffreId, -snapshot.amount);
           await updateCoffreBalance(tx, snapshot.sourceCoffreId, +snapshot.amount);
 

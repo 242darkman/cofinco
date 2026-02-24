@@ -138,6 +138,8 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
   const [pollCount, setPollCount] = useState(0);
   const [isResuming, setIsResuming] = useState(false);
   const resumeHandled = useRef(false);
+  const lastToastedStatus = useRef<string | null>(null);
+  const isTerminal = useRef(false);
 
   // Fetch existing active migration for this agency (to resume instead of restarting)
   const { data: existingMigrations } = useQuery({
@@ -186,6 +188,11 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
       }
     }
 
+    // Suppress toast for already-known terminal states on resume
+    if (st === 'FAILED' || st === 'COMPLETED') {
+      lastToastedStatus.current = st;
+    }
+
     toast.info('Migration en cours reprise');
   }, [isOpen, existingMigrations]);
 
@@ -193,6 +200,8 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
   useEffect(() => {
     if (!isOpen) {
       resumeHandled.current = false;
+      lastToastedStatus.current = null;
+      isTerminal.current = false;
       setIsResuming(false);
     }
   }, [isOpen]);
@@ -208,10 +217,10 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
   });
 
   // Exponential backoff: 2s, 4s, 8s, 16s, capped at 30s
-  const getPollingInterval = useCallback(() => {
-    if (!migrationId) return false;
-    const interval = Math.min(2000 * Math.pow(2, pollCount), 30000);
-    return interval;
+  // Stop polling on terminal states (via isTerminal ref)
+  const getPollingInterval = useCallback((): number | false => {
+    if (!migrationId || isTerminal.current) return false;
+    return Math.min(2000 * Math.pow(2, pollCount), 30000);
   }, [migrationId, pollCount]);
 
   // Poll migration status with exponential backoff
@@ -227,21 +236,33 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
   });
 
   // Reset poll count on status change (back to fast polling on transitions)
+  // Also reset toast guard so retries can show new errors
+  // Track terminal states to stop polling
   useEffect(() => {
-    if (migrationStatus?.statut === 'PROCESSING' || migrationStatus?.statut === 'PRE_FLIGHT_CHECK') {
+    const st = migrationStatus?.statut;
+    if (st === 'PROCESSING' || st === 'PRE_FLIGHT_CHECK') {
       setPollCount(0);
+      lastToastedStatus.current = null;
+      isTerminal.current = false;
+    } else if (st === 'COMPLETED' || st === 'FAILED' || st === 'CANCELLED' || st === 'ROLLED_BACK') {
+      isTerminal.current = true;
     }
   }, [migrationStatus?.statut]);
 
-  // Handle migration completion
+  // Handle migration completion (fire toast only once per status transition)
   useEffect(() => {
-    if (migrationStatus?.statut === 'COMPLETED') {
+    const st = migrationStatus?.statut;
+    if (!st || st === lastToastedStatus.current) return;
+
+    if (st === 'COMPLETED') {
+      lastToastedStatus.current = st;
       toast.success('Migration terminée');
       onSuccess();
-    } else if (migrationStatus?.statut === 'FAILED') {
+    } else if (st === 'FAILED') {
+      lastToastedStatus.current = st;
       toast.error(`Erreur: ${migrationStatus.error}`);
     }
-  }, [migrationStatus?.statut, onSuccess]);
+  }, [migrationStatus?.statut, migrationStatus?.error, onSuccess]);
 
   // Mutations
   const createMigrationMutation = useMutation({
