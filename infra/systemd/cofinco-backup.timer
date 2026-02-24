@@ -1,0 +1,11 @@
+[Unit]
+Description=Cofinco Daily PostgreSQL Backup Timer
+
+[Timer]
+# Daily at 02:00 UTC with random delay up to 5 minutes
+OnCalendar=*-*-* 02:00:00
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

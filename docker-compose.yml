@@ -1,17 +1,18 @@
 # ==========================================================
-# Cofinco — BASE INFRASTRUCTURE
+# Cofinco — BASE INFRASTRUCTURE (DEV)
 # ==========================================================
-# Ce fichier contient UNIQUEMENT l'infrastructure partagée
-# par les 3 environnements (DEV, STAGING, PROD).
+# Infrastructure partagée pour le développement local.
+# L'application est définie dans l'overlay auto-chargé :
+#   docker-compose.override.yml → DEV (hot reload, ports debug)
 #
-# L'application (app, worker, caddy) est définie dans les overlays :
-#   docker-compose.override.yml → DEV  (auto-chargé)
-#   docker-compose.staging.yml  → STAGING / PRE-PROD
-#   docker-compose.prod.yml     → PROD
+# DEV :
+#   docker compose up -d
+#   docker compose --profile admin up -d   (avec pgAdmin, Mailpit, RedisInsight)
 #
-# DEV     : docker compose up -d
-# STAGING : docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d
-# PROD    : docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# PREPROD / PROD :
+#   Déploiement via tags Git → GitHub Actions (release.yml)
+#   rc-v* → preprod VPS | v* → production VPS
+#   Voir docker-compose.vps.yml + DEPLOY.md
 # ==========================================================
 
 # Shared environment variables for the application
@@ -294,11 +295,7 @@ volumes:
   prometheus_data:
   alertmanager_data:
   grafana_data:
-  caddy_data:
-  caddy_config:
 
 networks:
-  cofinco_public:
-    driver: bridge
   cofinco_internal:
     driver: bridge

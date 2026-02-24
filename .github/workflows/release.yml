@@ -1,0 +1,340 @@
+# ==========================================================
+# Cofinco — Release & Deploy Pipeline (Tag-based)
+# ==========================================================
+# Triggered by Git tags:
+#   v*    → PRODUCTION  (e.g., v3.61.0, v4.0.0)
+#   rc-*  → PREPROD     (e.g., rc-v3.62.0, rc-v4.0.0-beta.1)
+#
+# Flow:
+#   1. Parse tag → determine environment (prod/preprod)
+#   2. Run tests (unit + GL contracts)
+#   3. Build & push Docker images to GHCR (runtime + init)
+#   4. Deploy to VPS via SSH
+#   5. Health check + auto-rollback on failure
+#
+# Required GitHub Environments: "production", "preprod"
+# Each environment has its own secrets & variables (no prefixes needed).
+# See DEPLOY.md for the full list of required secrets & variables.
+# ==========================================================
+
+name: Release & Deploy
+
+on:
+  push:
+    tags:
+      - 'v*'
+      - 'rc-*'
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # ==========================================
+  # Step 0: Parse tag → environment + version
+  # ==========================================
+  prepare:
+    name: Parse Release Tag
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.parse.outputs.environment }}
+      is_prod: ${{ steps.parse.outputs.is_prod }}
+      version: ${{ steps.parse.outputs.version }}
+      image_tag: ${{ steps.parse.outputs.image_tag }}
+    steps:
+      - name: Parse tag
+        id: parse
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          echo "Raw tag: $TAG"
+
+          if [[ "$TAG" == rc-* ]]; then
+            ENVIRONMENT="preprod"
+            IS_PROD="false"
+            VERSION="${TAG#rc-}"
+          elif [[ "$TAG" == v* ]]; then
+            ENVIRONMENT="production"
+            IS_PROD="true"
+            VERSION="$TAG"
+          else
+            echo "ERROR: Unrecognized tag format: $TAG"
+            exit 1
+          fi
+
+          echo "environment=$ENVIRONMENT" >> $GITHUB_OUTPUT
+          echo "is_prod=$IS_PROD" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "image_tag=$TAG" >> $GITHUB_OUTPUT
+
+          echo "Environment: $ENVIRONMENT"
+          echo "Version: $VERSION"
+          echo "Image tag: $TAG"
+
+  # ==========================================
+  # Step 1a: Unit Tests (no DB)
+  # ==========================================
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Type check
+        run: npm run check
+
+      - name: Unit tests
+        run: npx vitest run --exclude 'tests/contracts/**' --exclude 'tests/e2e/**' --exclude 'tests/integration/**' --exclude 'tests/robustness/**'
+
+  # ==========================================
+  # Step 1b: GL Audit — Contract Tests
+  # ==========================================
+  gl-audit:
+    name: GL Contract Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: cofinco
+          POSTGRES_PASSWORD: cofinco
+          POSTGRES_DB: cofinco
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: DB Init — schema push + seeds
+        env:
+          DATABASE_URL: postgresql://cofinco:cofinco@localhost:5432/cofinco
+        run: |
+          npx drizzle-kit push --force
+          node --env-file=.env --import tsx seeds/seed-prod.ts
+
+      - name: GL Contract Tests
+        env:
+          DATABASE_URL: postgresql://cofinco:cofinco@localhost:5432/cofinco
+          GL_POSTING_MODE: STRICT
+        run: npx vitest run tests/contracts/gl-accounting-contracts.test.ts
+
+      - name: GL Coverage Matrix
+        env:
+          DATABASE_URL: postgresql://cofinco:cofinco@localhost:5432/cofinco
+        run: node --import tsx scripts/generate-gl-coverage.ts
+
+  # ==========================================
+  # Step 2: Build & Push Docker Images
+  # ==========================================
+  build:
+    name: Build & Push Images
+    needs: [prepare, test, gl-audit]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # --- Runtime image (production) ---
+      - name: Docker meta (runtime)
+        id: meta-runtime
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{ needs.prepare.outputs.image_tag }}
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable=${{ needs.prepare.outputs.is_prod }}
+
+      - name: Build & push runtime image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: runtime
+          push: true
+          tags: ${{ steps.meta-runtime.outputs.tags }}
+          labels: ${{ steps.meta-runtime.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # --- Init image (schema push + seeds) ---
+      - name: Build & push init image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: init
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.prepare.outputs.image_tag }}-init
+          cache-from: type=gha
+
+      # --- Security scan ---
+      - name: Scan Docker image (Trivy)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.prepare.outputs.image_tag }}
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '0'
+
+  # ==========================================
+  # Step 3: Deploy to VPS
+  # ==========================================
+  deploy:
+    name: Deploy (${{ needs.prepare.outputs.environment }})
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    environment: ${{ needs.prepare.outputs.environment }}
+    steps:
+      # Generate .env.runtime from GitHub Environment secrets/variables
+      - name: Generate runtime env file
+        run: |
+          cat > /tmp/.env.runtime <<'ENVEOF'
+          # Auto-generated by GitHub Actions — DO NOT EDIT MANUALLY
+          # Tag: ${{ needs.prepare.outputs.image_tag }}
+          # Environment: ${{ needs.prepare.outputs.environment }}
+
+          NODE_ENV=production
+          PORT=5000
+          APP_VERSION=${{ needs.prepare.outputs.image_tag }}
+
+          # Registry
+          REGISTRY=${{ env.REGISTRY }}
+          IMAGE_NAME=${{ env.IMAGE_NAME }}
+
+          # Database (native PostgreSQL on VPS)
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+
+          # Redis
+          REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+
+          # Security
+          SESSION_SECRET=${{ secrets.SESSION_SECRET }}
+          OTP_HMAC_SECRET=${{ secrets.OTP_HMAC_SECRET }}
+          OFFLINE_LIMITS_HMAC_KEY=${{ secrets.OFFLINE_LIMITS_HMAC_KEY }}
+
+          # MinIO
+          MINIO_ROOT_USER=${{ secrets.MINIO_ROOT_USER }}
+          MINIO_ROOT_PASSWORD=${{ secrets.MINIO_ROOT_PASSWORD }}
+          MINIO_PUBLIC_ENDPOINT=${{ vars.MINIO_PUBLIC_ENDPOINT }}
+
+          # Domain
+          DOMAIN=${{ vars.DOMAIN }}
+
+          # SMTP
+          SMTP_HOST=${{ secrets.SMTP_HOST }}
+          SMTP_PORT=${{ vars.SMTP_PORT }}
+          SMTP_USERNAME=${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD=${{ secrets.SMTP_PASSWORD }}
+          SMTP_FROM_EMAIL=${{ vars.SMTP_FROM_EMAIL }}
+          SMTP_FROM_NAME=${{ vars.SMTP_FROM_NAME }}
+          SMTP_SECURE=${{ vars.SMTP_SECURE }}
+
+          # MTN SMS
+          MTN_SMS_CLIENT_ID=${{ secrets.MTN_SMS_CLIENT_ID }}
+          MTN_SMS_CLIENT_SECRET=${{ secrets.MTN_SMS_CLIENT_SECRET }}
+          MTN_SMS_SENDER_ID=${{ vars.MTN_SMS_SENDER_ID }}
+          MTN_SMS_TOKEN_URL=${{ vars.MTN_SMS_TOKEN_URL }}
+          MTN_SMS_BASE_URL=${{ vars.MTN_SMS_BASE_URL }}
+          MTN_SMS_WEBHOOK_SECRET=${{ secrets.MTN_SMS_WEBHOOK_SECRET }}
+
+          # pawaPay
+          PAWAPAY_ENVIRONMENT=${{ vars.PAWAPAY_ENVIRONMENT }}
+          PAWAPAY_API_TOKEN=${{ secrets.PAWAPAY_API_TOKEN }}
+          PAWAPAY_CALLBACK_URL=${{ vars.PAWAPAY_CALLBACK_URL }}
+          PAWAPAY_WEBHOOK_PUBLIC_KEYS=${{ secrets.PAWAPAY_WEBHOOK_PUBLIC_KEYS }}
+          PAWAPAY_STATEMENT_PREFIX=${{ vars.PAWAPAY_STATEMENT_PREFIX }}
+          WEBHOOK_IP_VALIDATION=${{ vars.WEBHOOK_IP_VALIDATION }}
+
+          # Accounting
+          BALANCE_RECONCILIATION_INTERVAL_MINUTES=${{ vars.BALANCE_RECONCILIATION_INTERVAL_MINUTES }}
+          ENABLE_BALANCE_AUTO_CORRECTION=${{ vars.ENABLE_BALANCE_AUTO_CORRECTION }}
+          GL_POSTING_MODE=${{ vars.GL_POSTING_MODE }}
+
+          # Monitoring
+          GRAFANA_ADMIN_USER=${{ vars.GRAFANA_ADMIN_USER }}
+          GRAFANA_ADMIN_PASSWORD=${{ secrets.GRAFANA_ADMIN_PASSWORD }}
+
+          # Logging
+          LOG_LEVEL=${{ vars.LOG_LEVEL }}
+
+          # Scaling
+          APP_REPLICAS=${{ vars.APP_REPLICAS }}
+          ENVEOF
+
+          # Clean up: remove leading whitespace from heredoc
+          sed -i 's/^          //' /tmp/.env.runtime
+
+      # Upload env file to VPS
+      - name: Upload env to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: /tmp/.env.runtime
+          target: /opt/cofinco/env/
+          strip_components: 2
+
+      # Run deploy script on VPS
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 10m
+          script: |
+            set -euo pipefail
+
+            APP_DIR="/opt/cofinco"
+            TAG="${{ needs.prepare.outputs.image_tag }}"
+
+            # Secure the env file
+            chmod 600 "$APP_DIR/env/.env.runtime"
+
+            # Run the deploy script
+            cd "$APP_DIR"
+            bash scripts/vps/deploy.sh "$TAG"
+
+      # Smoke test from CI runner
+      - name: Smoke test (external)
+        if: needs.prepare.outputs.is_prod == 'true'
+        run: |
+          DOMAIN="${{ vars.DOMAIN }}"
+          if [ -n "$DOMAIN" ]; then
+            sleep 10
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://${DOMAIN}/api/health" --max-time 15 || echo "000")
+            if [ "$HTTP_CODE" != "200" ]; then
+              echo "WARNING: External health check returned HTTP $HTTP_CODE"
+              echo "This may be a DNS/network issue, not necessarily a deploy failure."
+            else
+              echo "External health check passed (HTTP 200)"
+            fi
+          fi

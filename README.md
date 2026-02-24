@@ -1,6 +1,6 @@
 # Cofinco — Plateforme de Microfinance
 
-Application de microfinance complète (Node.js / React / PostgreSQL / Drizzle / MinIO) conteneurisee avec 3 environnements Docker.
+Application de microfinance complète (Node.js / React / PostgreSQL / Drizzle / MinIO).
 
 ## Modules fonctionnels
 
@@ -22,27 +22,24 @@ Application de microfinance complète (Node.js / React / PostgreSQL / Drizzle / 
 ## Architecture
 
 ```
-db-init (one-shot)                <- schema push + seed (s'execute puis quitte)
-  | service_completed_successfully
-Caddy (TLS auto, L7 LB)          <- staging + prod uniquement
-  |-- app  xN  (API + WebSocket + SPA)   DISABLE_CRON_JOBS=true
-  +-- worker x1 (cron jobs financiers)    DISABLE_CRON_JOBS=false
+DEV (Docker local) :
+  docker compose up -d
+  db-init (one-shot) → schema push + seed
+  app (API + WebSocket + SPA, hot reload)
+  db (PostgreSQL 16) + pgbouncer + redis + minio
+  monitoring (prometheus, grafana, loki, alertmanager)
 
-db (PostgreSQL 16) -- pgbouncer (connection pooling)
-redis (sessions, cache)
-minio (stockage documents S3-compatible)
-pg-backup (backups automatiques quotidiens)
-
-Observabilite :
-  loki + promtail (logs centralises, live tail)
-  prometheus + alertmanager (metriques, alertes)
-  grafana (dashboards, exploration)
-  postgres-exporter, redis-exporter
+PROD / PREPROD (VPS OVH) :
+  PostgreSQL 16 (natif sur VPS)
+  Nginx + Certbot (natif sur VPS)
+  Docker : app + worker + redis + minio
+  Backups : pg_dump quotidien (systemd timer)
+  Deploy : tags Git → GitHub Actions → SSH
 ```
 
 **Image unique** : `app` et `worker` utilisent la meme image Docker. Seule la variable `DISABLE_CRON_JOBS` determine le role.
 
-**Initialisation automatique** : Le conteneur `db-init` execute `drizzle-kit push` (sync schema) puis les seeds de production avant que l'app ne demarre. Connexion directe a PostgreSQL (pas pgbouncer) pour les DDL. Les deux operations sont idempotentes.
+**Initialisation automatique** : `db-init` execute `drizzle-kit push` (sync schema) puis les seeds de production. Connexion directe a PostgreSQL (pas pgbouncer) pour les DDL. Operations idempotentes.
 
 ## Stack technique
 
@@ -50,36 +47,32 @@ Observabilite :
 | --- | --- |
 | **Backend** | Node.js, Express, TypeScript, WebSocket |
 | **Frontend** | React 18, Vite, TypeScript, Tailwind CSS v4, Recharts |
-| **Base de donnees** | PostgreSQL 16, Drizzle ORM (35 modules schema), PgBouncer |
+| **Base de donnees** | PostgreSQL 16, Drizzle ORM (35 modules schema) |
 | **Autorisation** | CASL (RBAC/ABAC), 23 modules, 70+ sujets |
 | **Stockage** | MinIO (S3-compatible) |
 | **Cache/Sessions** | Redis |
 | **Monitoring** | Prometheus, Grafana, Loki, Alertmanager |
-| **CI/CD** | GitHub Actions, GHCR, Trivy |
-| **Reverse proxy** | Caddy (TLS auto, L7 LB, WebSocket sticky) |
+| **CI/CD** | GitHub Actions (tags), GHCR, Trivy |
+| **Reverse proxy** | Nginx + Certbot (VPS natif) |
 
-## 3 Environnements
+## Environnements
 
-| Aspect | DEV | STAGING | PROD |
+| Aspect | DEV | PREPROD | PROD |
 | --- | --- | --- | --- |
-| **Commande** | `docker compose up -d` | `docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d` | `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d` |
+| **Declencheur** | `docker compose up -d` | Tag `rc-v*` | Tag `v*` |
+| **Compose** | `docker-compose.yml` + override | `docker-compose.vps.yml` | `docker-compose.vps.yml` |
+| **Images** | Build local (dev target) | GHCR `rc-vX.Y.Z` | GHCR `vX.Y.Z` + `latest` |
+| **Env source** | `.env` local | GitHub Environment `preprod` | GitHub Environment `production` |
+| **Database** | Docker (postgres:16-alpine + pgbouncer) | VPS natif PostgreSQL 16 | VPS natif PostgreSQL 16 |
+| **Reverse proxy** | Acces direct :5000 | Nginx natif + Certbot | Nginx natif + Certbot |
 | **Hot reload** | tsx watch + Vite HMR | Non | Non |
-| **Separation app/worker** | Non (instance unique) | Oui | Oui |
-| **Caddy (reverse proxy)** | Non (acces direct :5000) | Oui (localhost) | Oui (public) |
-| **TLS** | Non | Self-signed (localhost) | Let's Encrypt (auto) |
 | **NODE_ENV** | development | production | production |
-| **Ports** | `127.0.0.1:*` | `127.0.0.1:*` | 80/443 publics |
-| **Resource limits** | Non | Non | Oui (CPU, RAM) |
-| **Retention metriques** | 3 jours | 7 jours | 30 jours |
-| **Reseau interne** | bridge | bridge | `internal: true` |
-| **Outils admin** | Profile `admin` | Non | Non |
-| **Image** | Build `dev` target | Build `runtime` local | Registry (GHCR) |
-| **Init DB auto** | Oui (`db-init`) | Oui (`db-init`) | Oui (`db-init`) |
 
 ## Prerequis
 
-- Docker + Docker Compose v2
-- Un nom de domaine pointe sur le VPS (production)
+- Docker + Docker Compose v2 (dev)
+- VPS OVH Ubuntu 22.04/24.04 LTS (prod/preprod)
+- Nom de domaine pointe sur le VPS
 
 ## Demarrage rapide
 
@@ -88,9 +81,6 @@ Observabilite :
 ```bash
 # DEV — copier les defaults pre-remplis
 cp .env.dev .env
-
-# STAGING/PROD — partir du template et remplir les valeurs
-cp .env.production.example .env
 ```
 
 ### 2. Developpement (hot reload)
@@ -104,7 +94,6 @@ docker compose up -d
 #   2. seed-prod.ts (donnees de reference)
 # Puis l'app demarre une fois db-init termine.
 
-# L'app rebuild automatiquement sur chaque modification de fichier.
 # Backend : tsx watch (restart auto)
 # Frontend : Vite HMR (mise a jour sans rechargement)
 
@@ -129,59 +118,61 @@ docker compose exec app npm run db:push
 # Lancer les tests
 docker compose --profile test run --rm test-unit
 
-# Lancer l'application
-docker compose up -d --build app
-
 # Voir les logs de db-init
 docker compose logs db-init
 ```
 
-### 3. Staging (pre-production)
+### 3. Preprod / Production (VPS)
+
+Le deploiement se fait via tags Git. Voir [DEPLOY.md](DEPLOY.md) pour le guide complet.
 
 ```bash
-STAGING="docker compose -f docker-compose.yml -f docker-compose.staging.yml"
+# Setup initial du VPS (une seule fois)
+sudo DOMAIN=cofinco-m.com ACME_EMAIL=admin@cofinco-m.com bash scripts/vps/setup.sh
 
-# Build et demarrage (topologie identique a la prod)
-$STAGING up -d --build
+# Deployer en preprod (release candidate)
+git tag rc-v3.62.0
+git push origin rc-v3.62.0
 
-# Scaling horizontal (API uniquement)
-$STAGING up -d --scale app=2
+# Deployer en production
+git tag v3.62.0
+git push origin v3.62.0
 
-# Acces via Caddy :
-#   App        -> https://localhost (TLS self-signed)
-#   Grafana    -> http://localhost:3001
-#   Prometheus -> http://localhost:9090
-```
-
-### 4. Production
-
-```bash
-PROD="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
-
-# Demarrage
-$PROD up -d
-
-# Scaling horizontal (API uniquement)
-$PROD up -d --scale app=3
+# Rollback (SSH sur le VPS)
+bash /opt/cofinco/scripts/vps/rollback.sh          # tag precedent
+bash /opt/cofinco/scripts/vps/rollback.sh v3.61.0  # tag specifique
 
 # Verification sante
-curl -sf https://cofin.co/api/health | jq .
+curl -sf https://cofinco-m.com/api/health | jq .
 ```
 
 ## Structure des fichiers
 
 ```
-docker-compose.yml              <- base infrastructure (DB, Redis, MinIO, monitoring)
-docker-compose.override.yml     <- DEV (auto-charge, hot reload, ports debug)
-docker-compose.staging.yml      <- STAGING (Caddy + app/worker, localhost)
-docker-compose.prod.yml         <- PROD (Caddy + app/worker, public, resource limits)
-Dockerfile                      <- multi-stage (deps -> dev -> init -> test -> test-e2e -> build -> runtime)
+docker-compose.yml              <- infrastructure DEV (DB, Redis, MinIO, monitoring)
+docker-compose.override.yml     <- DEV overlay (auto-charge, hot reload, ports debug)
+docker-compose.vps.yml          <- VPS PROD/PREPROD (app + worker + redis + minio)
+Dockerfile                      <- multi-stage (deps -> dev -> init -> test -> build -> runtime)
 .dockerignore                   <- exclut .env, node_modules, .git
 
 .env.dev                        <- defaults DEV pre-remplis
-.env.production.example         <- template STAGING/PROD
+.env.production.example         <- template secrets (documentation)
+.env.vps.example                <- template VPS (documentation)
 
-infra/caddy/Caddyfile           <- reverse proxy L7, TLS auto, WebSocket sticky
+.github/workflows/
+|-- ci.yml                      <- PR checks (lint, tests, GL audit, build)
++-- release.yml                 <- tag-based deploy (build + push GHCR + SSH deploy)
+
+infra/
+|-- nginx/cofinco.conf          <- reverse proxy Nginx (VPS natif)
++-- systemd/                    <- backup timer + service
+
+scripts/vps/
+|-- setup.sh                    <- setup initial VPS (PG, Nginx, Docker, UFW)
+|-- deploy.sh                   <- deploiement idempotent + healthcheck + auto-rollback
+|-- rollback.sh                 <- rollback au tag precedent
+|-- backup-db.sh                <- pg_dump quotidien + rotation + chiffrement
++-- restore-db.sh               <- restauration interactive
 
 monitoring/
 |-- prometheus.yml              <- scrape configs (app, worker, exporters)
@@ -199,7 +190,7 @@ seeds/
 +-- seed-prod.ts                <- donnees de reference production (idempotent)
 
 scripts/
-|-- backup.sh                   <- sauvegarde manuelle (DB + MinIO)
+|-- backup.sh                   <- sauvegarde DEV (DB Docker + MinIO)
 |-- audit-integrity.ts          <- audit d'integrite comptable
 |-- validate-seed.ts            <- validation seeds
 |-- diagnose-balance-issues.ts  <- diagnostic soldes
@@ -253,7 +244,6 @@ Tous les tests sont dans `tests/` et s'executent via Docker (aucun Node.js local
 
 ```bash
 # ===== Tests unitaires + integration + securite + robustesse =====
-# (Vitest, execution rapide, mocks complets)
 docker compose --profile test run --rm test-unit
 
 # Filtrer par categorie :
@@ -266,7 +256,6 @@ docker compose --profile test run --rm test-unit npx vitest run tests/robustness
 docker compose --profile test run --rm test-unit npx vitest run -t "coffre"
 
 # ===== Tests E2E (navigateur) =====
-# Requiert l'app en cours d'execution (docker compose up -d)
 docker compose --profile test run --rm test-e2e
 
 # Filtrer par fichier :
@@ -297,8 +286,6 @@ docker compose --profile test run --rm test-e2e npx playwright test tests/e2e/cr
 
 ## Observabilite
 
-Accessible dans les 3 environnements (meme stack) :
-
 - **Logs live** : Grafana -> Explore -> Loki -> `{service="app"}` -> Live
 - **Metriques** : Grafana -> Dashboards -> COFINCO Overview
 - **Alertes** : 15+ regles (AppDown, DBDown, HighErrorRate, GLDiscrepancy...)
@@ -306,25 +293,36 @@ Accessible dans les 3 environnements (meme stack) :
 
 ## Backups
 
-Backups automatiques via `pg-backup` (conteneur dedie) :
+**DEV** : `scripts/backup.sh` (sauvegarde DB Docker + MinIO)
 
-- Quotidiens, retention 7 jours / 4 semaines / 6 mois
-- Volume Docker `pg_backups`
-
-```bash
-# Backup manuel via le conteneur
-docker compose exec pg-backup /backup.sh
-```
+**VPS** : `scripts/vps/backup-db.sh` (pg_dump natif, quotidien via systemd timer)
+- Rotation : 7 jours daily, 4 semaines weekly
+- Chiffrement GPG optionnel
+- Upload S3 optionnel (offsite)
+- Voir [DEPLOY.md](DEPLOY.md) pour la configuration
 
 ## CI/CD
 
-Pipeline GitHub Actions ([.github/workflows/deploy.yml](.github/workflows/deploy.yml)), declenche sur `master` :
+Deux workflows GitHub Actions :
 
-1. **Test** : `tsc` + `vitest run` + `audit:integrity` + `npm audit`
-2. **Build** : Docker build + push GHCR + scan Trivy
-3. **Deploy** : SSH -> pull + rolling restart + health check
+**[ci.yml](.github/workflows/ci.yml)** — sur chaque PR :
+1. Type check (`tsc`) + unit tests + `npm audit`
+2. GL contract tests (14 tests, 100% coverage)
+3. Docker build verification
 
-Secrets requis : `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`
+**[release.yml](.github/workflows/release.yml)** — sur tags Git :
+1. Tests (unit + GL contracts)
+2. Build & push images Docker vers GHCR (runtime + init)
+3. Scan securite Trivy
+4. Deploy VPS via SSH (generate .env.runtime, db-init, compose up, healthcheck)
+5. Auto-rollback si healthcheck echoue
+
+| Tag | Environnement | GitHub Environment |
+| --- | --- | --- |
+| `v*` (ex: v3.62.0) | Production | `production` |
+| `rc-*` (ex: rc-v3.62.0) | Preprod | `preprod` |
+
+Secrets requis par environnement : `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `DATABASE_URL`, `SESSION_SECRET`, ...
 
 ## Securite
 
@@ -334,7 +332,7 @@ Secrets requis : `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`
 - Sessions Redis (HttpOnly, Secure, SameSite=lax)
 - RBAC/ABAC via CASL (23 modules, 70+ sujets, separation des taches)
 - Non-root dans Docker, tini PID 1
-- Reseau interne isole (DB/Redis/MinIO non exposes en prod)
+- PostgreSQL scram-sha-256, UFW restrictif
 - Backups chiffrables (GPG)
 
 ## Initialisation de la base de donnees
@@ -364,4 +362,5 @@ docker compose restart db-init
 - Ne jamais exposer PostgreSQL, Redis ou MinIO publiquement
 - Le fichier `.env` ne doit jamais etre commite
 - Le `worker` ne doit **jamais** etre scale (replicas: 1)
-- Ajuster `APP_REPLICAS` dans `.env` selon la charge
+- Deploiement uniquement via tags Git (pas de push direct sur le VPS)
+- Voir [DEPLOY.md](DEPLOY.md) pour le guide complet de deploiement VPS

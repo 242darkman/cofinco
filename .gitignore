@@ -3,6 +3,7 @@ dist
 .env
 .env.*
 !.env.production.example
+!.env.vps.example
 .DS_Store
 server/public
 vite.config.ts.*

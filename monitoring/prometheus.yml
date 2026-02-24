@@ -46,8 +46,8 @@ scrape_configs:
       - targets: ['redis-exporter:9121']
     scrape_interval: 30s
 
-  # Caddy reverse proxy metrics
-  - job_name: 'caddy'
-    static_configs:
-      - targets: ['caddy:2019']
-    scrape_interval: 30s
+  # Nginx metrics (if nginx-exporter is deployed)
+  # - job_name: 'nginx'
+  #   static_configs:
+  #     - targets: ['nginx-exporter:9113']
+  #   scrape_interval: 30s
