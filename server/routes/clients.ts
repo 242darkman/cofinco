@@ -952,6 +952,40 @@ export function registerClientRoutes(app: Express) {
         // Architecture V3: Utiliser le nouveau schema API qui sépare identité et métier
         const parsed = createClientApiSchema.parse(data);
 
+        // ── Duplicate guard ──────────────────────────────────────────────
+        {
+          const dupChecks = [];
+          const cleanPhone = normalizePhone(parsed.telephone) || parsed.telephone?.trim();
+          const cleanEmail = parsed.email?.trim();
+          if (cleanPhone) dupChecks.push(eq(users.telephone, cleanPhone));
+          if (cleanEmail) dupChecks.push(eq(users.email, cleanEmail));
+          if (parsed.nom && parsed.prenom) {
+            dupChecks.push(
+              and(
+                sql`lower(${users.nom}) = lower(${parsed.nom.trim()})`,
+                sql`lower(${users.prenom}) = lower(${parsed.prenom.trim()})`,
+              )!
+            );
+          }
+          if (dupChecks.length > 0) {
+            const existing = await db
+              .select({ id: clients.id, nom: users.nom, prenom: users.prenom, telephone: users.telephone, email: users.email })
+              .from(clients)
+              .leftJoin(users, eq(clients.userId, users.id))
+              .where(or(...dupChecks))
+              .limit(1);
+            if (existing.length > 0) {
+              const dup = existing[0];
+              const dupName = `${dup.nom} ${dup.prenom || ''}`.trim();
+              let field = '';
+              if (parsed.nom && parsed.prenom && dup.nom?.toLowerCase() === parsed.nom.trim().toLowerCase() && dup.prenom?.toLowerCase() === parsed.prenom.trim().toLowerCase()) field = 'nom';
+              else if (cleanPhone && dup.telephone === cleanPhone) field = 'telephone';
+              else if (cleanEmail && dup.email?.toLowerCase() === cleanEmail.toLowerCase()) field = 'email';
+              return res.status(409).json({ message: `Un client avec ce ${field || 'identifiant'} existe déjà : ${dupName}`, field });
+            }
+          }
+        }
+
         // Use validated documents if available, otherwise use parsed
         const clientData = validatedDocuments
           ? { ...parsed, documents: validatedDocuments }
@@ -1158,6 +1192,44 @@ export function registerClientRoutes(app: Express) {
 
         const client = await storage.updateClient(req.params.id, updateData);
 
+        // ====== SYNC: Auto-update statutVerificationPiece from document statuses ======
+        if (validatedDocuments && client) {
+          const ID_DOC_TYPES = ['ID_CARD_FRONT', 'ID_CARD_BACK', 'PASSPORT', 'DRIVING_LICENSE', 'RESIDENT_CARD'];
+          const idDocs = validatedDocuments.filter(d => ID_DOC_TYPES.includes(d.documentType));
+
+          if (idDocs.length > 0) {
+            const allVerified = idDocs.every(d => d.status === 'verified');
+            const anyRejected = idDocs.some(d => d.status === 'rejected');
+
+            const newPieceStatus = anyRejected ? 'REJECTED' : allVerified ? 'VERIFIED' : 'PENDING';
+
+            if (newPieceStatus !== existing.statutVerificationPiece) {
+              await db.update(clients).set({
+                statutVerificationPiece: newPieceStatus,
+                ...(newPieceStatus === 'VERIFIED' ? {
+                  verificationPieceBy: req.session.user?.id || null,
+                  verificationPieceDate: new Date(),
+                } : {}),
+              }).where(eq(clients.id, req.params.id));
+
+              // Refresh client to include the updated field in the response
+              Object.assign(client, {
+                statutVerificationPiece: newPieceStatus,
+                ...(newPieceStatus === 'VERIFIED' ? {
+                  verificationPieceDate: new Date(),
+                } : {}),
+              });
+
+              logger.info({
+                clientId: req.params.id,
+                oldStatus: existing.statutVerificationPiece,
+                newStatus: newPieceStatus,
+                docCount: idDocs.length,
+              }, 'Auto-synced statutVerificationPiece from document statuses');
+            }
+          }
+        }
+
         // ====== BUSINESS LOGIC: Account Freezing on Client Status Change ======
         const INACTIVE_STATUSES = [StatutClient.INACTIVE, StatutClient.SUSPENDED] as string[];
         const wasActive = !INACTIVE_STATUSES.includes(existing.statut || '');
@@ -1183,10 +1255,12 @@ export function registerClientRoutes(app: Express) {
         // Score events: KYC_VERIFIED and PROFILE_COMPLETED
         try {
           if (client) {
-            // KYC_VERIFIED: when KYC status changes to VERIFIED/COMPLETE
+            // KYC_VERIFIED: when KYC status or piece verification changes to VERIFIED
             const kycVerified = ['VERIFIED', 'COMPLETE'].includes(client.kycStatus || '');
             const wasKycVerified = ['VERIFIED', 'COMPLETE'].includes(existing.kycStatus || '');
-            if (kycVerified && !wasKycVerified) {
+            const pieceNowVerified = client.statutVerificationPiece === 'VERIFIED';
+            const pieceWasVerified = existing.statutVerificationPiece === 'VERIFIED';
+            if ((kycVerified && !wasKycVerified) || (pieceNowVerified && !pieceWasVerified)) {
               await recordScoreEvent({
                 clientId: client.id,
                 agenceId: client.agenceId || undefined,
@@ -1280,18 +1354,30 @@ export function registerClientRoutes(app: Express) {
   // Architecture V3: telephone/email sont dans users, numeroPiece dans clients
   app.post("/api/clients/check-uniqueness", requireAuth, async (req, res) => {
       try {
-          const { telephone, email, numeroPiece, excludeClientId } = req.body;
+          const { telephone, email, numeroPiece, nom, prenom, excludeClientId } = req.body;
 
-          logger.debug({ phone: telephone, piece: numeroPiece, excludeId: excludeClientId, excludeType: typeof excludeClientId }, 'Check uniqueness params');
+          logger.debug({ phone: telephone, piece: numeroPiece, nom, prenom, excludeId: excludeClientId }, 'Check uniqueness params');
 
           const cleanPhone = normalizePhone(telephone) || telephone?.trim();
           const cleanEmail = email?.trim();
           const cleanPiece = numeroPiece?.trim();
+          const cleanNom = nom?.trim();
+          const cleanPrenom = prenom?.trim();
 
-          // Build conditions - telephone/email are in users table, numeroPiece in clients
+          // Build conditions - telephone/email/nom+prenom are in users table, numeroPiece in clients
           const userChecks = [];
           if (cleanPhone) userChecks.push(eq(users.telephone, cleanPhone));
           if (cleanEmail) userChecks.push(eq(users.email, cleanEmail));
+
+          // Nom + prénom combo check (case-insensitive)
+          if (cleanNom && cleanPrenom) {
+            userChecks.push(
+              and(
+                sql`lower(${users.nom}) = lower(${cleanNom})`,
+                sql`lower(${users.prenom}) = lower(${cleanPrenom})`,
+              )!
+            );
+          }
 
           const clientChecks = [];
           if (cleanPiece) clientChecks.push(eq(clients.numeroPiece, cleanPiece));
@@ -1316,32 +1402,41 @@ export function registerClientRoutes(app: Express) {
             .leftJoin(users, eq(clients.userId, users.id))
             .where(or(...allChecks));
 
-          logger.debug({ conflicts: conflicts.map(c => ({ id: c.id, idType: typeof c.id, nom: c.nom, piece: c.numeroPiece })) }, 'Raw conflicts found');
-
           // Filter out excluded client
           const realConflicts = conflicts.filter(c => {
              if (!excludeClientId) return true;
-
-             const isSame = String(c.id) === String(excludeClientId);
-             logger.debug({ dbId: c.id, excludeId: excludeClientId, isSame }, 'Comparing DB ID vs Exclude ID');
-
-             return !isSame;
+             return String(c.id) !== String(excludeClientId);
           });
-
-          logger.debug({ count: realConflicts.length }, 'Final conflicts count');
-
 
           if (realConflicts.length > 0) {
               const conflict = realConflicts[0];
               let field = '';
-              if (telephone && conflict.telephone === telephone) field = 'telephone';
-              else if (email && conflict.email === email) field = 'email';
-              else if (numeroPiece && conflict.numeroPiece === numeroPiece) field = 'numeroPiece';
+              const conflictDisplay = `${conflict.nom} ${conflict.prenom || ''}`.trim();
+
+              // Determine which field caused the conflict (priority: nom > phone > email > piece)
+              if (cleanNom && cleanPrenom
+                  && conflict.nom?.toLowerCase() === cleanNom.toLowerCase()
+                  && conflict.prenom?.toLowerCase() === cleanPrenom.toLowerCase()) {
+                field = 'nom';
+              } else if (cleanPhone && conflict.telephone === cleanPhone) {
+                field = 'telephone';
+              } else if (cleanEmail && conflict.email?.toLowerCase() === cleanEmail.toLowerCase()) {
+                field = 'email';
+              } else if (cleanPiece && conflict.numeroPiece === cleanPiece) {
+                field = 'numeroPiece';
+              }
+
+              const labels: Record<string, string> = {
+                nom: 'Ce nom et prénom sont',
+                telephone: 'Ce téléphone est',
+                email: 'Cet email est',
+                numeroPiece: 'Ce numéro de pièce est',
+              };
 
               return res.json({
                   available: false,
                   field,
-                  message: `Ce ${field === 'numeroPiece' ? 'numéro de pièce' : field} est déjà associé à ${conflict.nom} ${conflict.prenom || ''}`
+                  message: `${labels[field] || 'Cette valeur est'} déjà associé(e) au client ${conflictDisplay}`
               });
           }
 

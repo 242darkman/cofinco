@@ -106,6 +106,8 @@ export default function CreateClientModal({ isOpen, onClose, onSave, fromEmploye
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
+          nom: formData.nom || undefined,
+          prenom: formData.prenom || undefined,
           telephone: formData.telephone || undefined,
           email: formData.email || undefined,
           numeroPiece: formData.numeroPiece || undefined,
@@ -117,7 +119,10 @@ export default function CreateClientModal({ isOpen, onClose, onSave, fromEmploye
         handleAsyncError(errorField, uniqueData.message);
         toast.error(uniqueData.message);
         // Navigate to the step containing the conflicting field
-        if (uniqueData.field === 'telephone' || uniqueData.field === 'email') {
+        if (uniqueData.field === 'nom') {
+          setDirection('backward');
+          setStep(1);
+        } else if (uniqueData.field === 'telephone' || uniqueData.field === 'email') {
           setDirection('backward');
           setStep(2);
         } else if (uniqueData.field === 'numeroPiece') {
@@ -350,6 +355,7 @@ export default function CreateClientModal({ isOpen, onClose, onSave, fromEmploye
             isFormValid={isFormValid && !hasAsyncErrors}
             isSubmitting={isSubmitting}
             isConversion={isConversion}
+            hasAsyncErrors={hasAsyncErrors}
             onSave={handleSave}
             onCancel={handleClose}
           />

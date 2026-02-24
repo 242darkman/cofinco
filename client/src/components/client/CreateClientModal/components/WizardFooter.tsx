@@ -11,12 +11,13 @@ interface WizardFooterProps {
   isFormValid: boolean;
   isSubmitting: boolean;
   isConversion: boolean;
+  hasAsyncErrors?: boolean;
   onSave: () => void;
   onCancel: () => void;
 }
 
 export default function WizardFooter({
-  step, setStep, setDirection, isStepValid, isFormValid, isSubmitting, isConversion, onSave, onCancel,
+  step, setStep, setDirection, isStepValid, isFormValid, isSubmitting, isConversion, hasAsyncErrors, onSave, onCancel,
 }: WizardFooterProps) {
   const isFirst = isConversion ? step <= 3 : step === 1;
   const isLast = step === TOTAL_STEPS;
@@ -70,7 +71,7 @@ export default function WizardFooter({
             icon={ChevronRight}
             iconPosition="right"
             onClick={goNext}
-            disabled={!isStepValid(step)}
+            disabled={!isStepValid(step) || hasAsyncErrors}
             className="min-w-[140px] w-full sm:w-auto"
           >
             Suivant

@@ -96,6 +96,7 @@ export const ROUTES: RouteConfig[] = [
       { path: '/clients/:id/kyc', subModule: 'kyc', label: 'Documents KYC' },
       { path: '/clients/:id/notes', subModule: 'notes', label: 'Notes' },
       { path: '/clients/:id/transactions', subModule: 'transactions', label: 'Transactions' },
+      { path: '/clients/:id/enquetes', subModule: 'enquetes', label: 'Enquêtes' },
       { path: '/clients/:id/alertes', subModule: 'alertes', label: 'Alertes' },
       { path: '/clients/:id/score', subModule: 'score', label: 'Score' },
     ],

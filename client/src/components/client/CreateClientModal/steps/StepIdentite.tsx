@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useCallback } from 'react';
 import { FormField, SelectField, SearchableSelect } from '../../../ui';
 import PhotoCapture from '../components/PhotoCapture';
 import type { StepComponentProps } from '../types';
@@ -9,6 +9,7 @@ function capitalizeWords(str: string): string {
 
 export default function StepIdentite({
   formData, updateField, errors, markTouched, isConversion, referenceData, files, setFiles,
+  onAsyncError, clearAsyncError,
 }: StepComponentProps) {
   const paysOptions = referenceData.paysList.map(p => ({
     value: p.id,
@@ -64,6 +65,50 @@ export default function StepIdentite({
     }
   };
 
+  // Clear nom async error when user modifies nom or prenom
+  const prevNomRef = useRef(formData.nom);
+  const prevPrenomRef = useRef(formData.prenom);
+  useEffect(() => {
+    if (formData.nom !== prevNomRef.current || formData.prenom !== prevPrenomRef.current) {
+      prevNomRef.current = formData.nom;
+      prevPrenomRef.current = formData.prenom;
+      clearAsyncError?.('nom');
+    }
+  }, [formData.nom, formData.prenom, clearAsyncError]);
+
+  // Real-time uniqueness check for nom + prenom on blur
+  const checkingNomRef = useRef(false);
+  const checkNomUniqueness = useCallback(async () => {
+    const nom = formData.nom.trim();
+    const prenom = formData.prenom.trim();
+    if (nom.length < 2 || prenom.length < 2 || !onAsyncError) return;
+    if (checkingNomRef.current) return;
+    checkingNomRef.current = true;
+    try {
+      const res = await fetch('/api/clients/check-uniqueness', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ nom, prenom }),
+      });
+      const data = await res.json();
+      if (!data.available && data.field === 'nom') {
+        onAsyncError('nom', data.message);
+      }
+    } catch { /* ignore network errors */ }
+    finally { checkingNomRef.current = false; }
+  }, [formData.nom, formData.prenom, onAsyncError]);
+
+  const handleNomBlur = useCallback(() => {
+    markTouched('nom');
+    checkNomUniqueness();
+  }, [markTouched, checkNomUniqueness]);
+
+  const handlePrenomBlur = useCallback(() => {
+    markTouched('prenom');
+    checkNomUniqueness();
+  }, [markTouched, checkNomUniqueness]);
+
   return (
     <div className="space-y-5">
       {/* Photo centered at top */}
@@ -81,14 +126,14 @@ export default function StepIdentite({
         <FormField
           label="Nom" name="nom" value={formData.nom}
           onChange={(e) => updateField('nom', e.target.value.toUpperCase())}
-          onBlur={() => markTouched('nom')}
+          onBlur={handleNomBlur}
           error={errors.nom} required readOnly={isConversion} className="py-1"
           placeholder="MALONGA"
         />
         <FormField
           label="Prénom" name="prenom" value={formData.prenom}
           onChange={(e) => updateField('prenom', capitalizeWords(e.target.value))}
-          onBlur={() => markTouched('prenom')}
+          onBlur={handlePrenomBlur}
           error={errors.prenom} required readOnly={isConversion} className="py-1"
           placeholder="Jean"
         />
