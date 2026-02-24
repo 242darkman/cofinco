@@ -9,6 +9,12 @@
 #   docker compose up -d
 #   docker compose --profile admin up -d   (avec pgAdmin, Mailpit, RedisInsight)
 #
+# PROD-LOCAL (miroir de la production, 100% Docker) :
+#   bash scripts/generate-local-certs.sh
+#   docker compose -f docker-compose.yml -f docker-compose.prod-local.yml build
+#   docker compose -f docker-compose.yml -f docker-compose.prod-local.yml up -d
+#   → https://localhost (3 replicas + worker + Nginx + TLS)
+#
 # PREPROD / PROD :
 #   Déploiement via tags Git → GitHub Actions (release.yml)
 #   rc-v* → preprod VPS | v* → production VPS
