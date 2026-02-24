@@ -42,7 +42,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         return saved;
       }
     }
-    return 'dark';
+    return 'system';
   });
 
   const [theme, setResolvedTheme] = useState<ResolvedTheme>(() => resolveTheme(mode));
