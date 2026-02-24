@@ -100,6 +100,8 @@ export interface CoffreGuardResult {
 export interface GuardContext {
   userId: string;
   operationType: string;
+  /** Skip soldeMinimum + plafond checks (e.g. migration closing an agency) */
+  skipLimits?: boolean;
 }
 
 /**
@@ -142,15 +144,17 @@ export async function assertCoffreCanDebit(
     throw new CoffreInsufficientFundsError(coffreId, solde, amount);
   }
 
-  // 4. Vérifier solde minimum
-  const soldeMinimum = parseFloat(coffre.soldeMinimum || "0");
-  const soldeApres = solde - amount;
-  if (soldeApres < soldeMinimum) {
-    throw new CoffreSoldeMinimumError(coffreId, soldeApres, soldeMinimum, solde, amount);
+  // 4. Vérifier solde minimum (skipped for migration/closing operations)
+  if (!ctx.skipLimits) {
+    const soldeMinimum = parseFloat(coffre.soldeMinimum || "0");
+    const soldeApres = solde - amount;
+    if (soldeApres < soldeMinimum) {
+      throw new CoffreSoldeMinimumError(coffreId, soldeApres, soldeMinimum, solde, amount);
+    }
   }
 
-  // 5. Vérifier plafond journalier sortant (si configuré)
-  if (coffre.ownerId) {
+  // 5. Vérifier plafond journalier sortant (skipped for migration/closing operations)
+  if (!ctx.skipLimits && coffre.ownerId) {
     const [config] = await tx
       .select()
       .from(configCoffreFort)

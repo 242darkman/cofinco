@@ -1454,6 +1454,7 @@ export class AgencyMigrationService {
             const guardCtx: GuardContext = {
               userId: ctx?.userId || "SYSTEM",
               operationType: "MIGRATION_TREASURY_TRANSFER",
+              skipLimits: true, // Migration: allow draining coffre to 0
             };
 
             // 1. Guard source (SELECT FOR UPDATE + active + solde + minimum + plafond)
