@@ -67,7 +67,7 @@ interface DryRunResult {
 interface MigrationStatus {
   id: string;
   reference: string;
-  status: string;
+  statut: string;
   progress: number;
   currentStep?: string;
   error?: string;
@@ -162,20 +162,20 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
 
   // Reset poll count on status change (back to fast polling on transitions)
   useEffect(() => {
-    if (migrationStatus?.status === 'PROCESSING' || migrationStatus?.status === 'PRE_FLIGHT_CHECK') {
+    if (migrationStatus?.statut === 'PROCESSING' || migrationStatus?.statut === 'PRE_FLIGHT_CHECK') {
       setPollCount(0);
     }
-  }, [migrationStatus?.status]);
+  }, [migrationStatus?.statut]);
 
   // Handle migration completion
   useEffect(() => {
-    if (migrationStatus?.status === 'COMPLETED') {
+    if (migrationStatus?.statut === 'COMPLETED') {
       toast.success('Migration terminée');
       onSuccess();
-    } else if (migrationStatus?.status === 'FAILED') {
+    } else if (migrationStatus?.statut === 'FAILED') {
       toast.error(`Erreur: ${migrationStatus.error}`);
     }
-  }, [migrationStatus?.status, onSuccess]);
+  }, [migrationStatus?.statut, onSuccess]);
 
   // Mutations
   const createMigrationMutation = useMutation({
@@ -309,9 +309,13 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
         setIsAnalyzing(false);
       }
     } else if (currentStep === 5) {
-      // Confirmer et lancer
+      // Confirmer et lancer — idempotent : skip submit si déjà soumis
       if (migrationId) {
-        await submitMigrationMutation.mutateAsync(migrationId);
+        const currentStatut = migrationStatus?.statut;
+        const alreadySubmitted = currentStatut === 'PENDING' || currentStatut === 'SCHEDULED';
+        if (!alreadySubmitted) {
+          await submitMigrationMutation.mutateAsync(migrationId);
+        }
         if (executeNow) {
           await executeMigrationMutation.mutateAsync(migrationId);
         }
@@ -346,11 +350,13 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
   };
 
   // Derived state (must be before keyboard effect)
-  const isProcessing = migrationStatus?.status === 'PROCESSING' ||
-    migrationStatus?.status === 'PRE_FLIGHT_CHECK';
-  const isCompleted = migrationStatus?.status === 'COMPLETED';
-  const isFailed = migrationStatus?.status === 'FAILED';
-  const isScheduled = migrationStatus?.status === 'SCHEDULED';
+  const isPending = migrationStatus?.statut === 'PENDING';
+  const isProcessing = migrationStatus?.statut === 'PROCESSING' ||
+    migrationStatus?.statut === 'PRE_FLIGHT_CHECK';
+  const isCompleted = migrationStatus?.statut === 'COMPLETED';
+  const isFailed = migrationStatus?.statut === 'FAILED';
+  const isScheduled = migrationStatus?.statut === 'SCHEDULED';
+  const isLiveState = isPending || isProcessing || isCompleted || isFailed || isScheduled;
 
   // Rollback eligibility: within 24h of completion
   const canRollback = isCompleted && migrationStatus?.completedAt &&
@@ -379,7 +385,7 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
         : undefined;
       let y = addPdfLogoHeader(doc, {
         title: "Rapport de Migration d'Agence",
-        subtitle: `Réf: ${migrationStatus.reference} — Statut: ${migrationStatus.status}`,
+        subtitle: `Réf: ${migrationStatus.reference} — Statut: ${migrationStatus.statut}`,
         dateRight: completedDate ? `Terminée le: ${completedDate}` : undefined,
         appName: branding.appName,
       });
@@ -515,7 +521,7 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
 
       // Don't intercept during async states
-      if (isProcessing || isCompleted || isFailed || isScheduled) return;
+      if (isLiveState) return;
 
       switch (e.key) {
         case 'ArrowRight':
@@ -536,11 +542,11 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, currentStep, isProcessing, isCompleted, isFailed, isScheduled]);
+  }, [isOpen, currentStep, isLiveState]);
 
   // Reset on close
   const handleClose = () => {
-    if (!isProcessing) {
+    if (!isProcessing && !isPending) {
       setCurrentStep(0);
       setTargetClients('');
       setTargetEmployees('');
@@ -564,136 +570,161 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
       title={`Fermeture et Migration : ${sourceAgence.nom}`}
       size="xl"
     >
-      <div className="space-y-6">
-        {/* Stepper Header */}
-        <div className="flex justify-between relative overflow-x-auto pb-2">
-          <div className="absolute top-5 left-0 w-full h-0.5 bg-surface-elevated -z-10" />
-          {STEPS.map((step, idx) => {
-            const Icon = step.icon;
-            const isActive = idx === currentStep;
-            const isCompleted = idx < currentStep;
+      <div className="space-y-4">
+        {/* Stepper Header — hidden during live states */}
+        {!isLiveState && (
+          <div className="flex justify-between relative overflow-x-auto pb-1">
+            <div className="absolute top-4 left-0 w-full h-0.5 bg-surface-elevated -z-10" />
+            {STEPS.map((step, idx) => {
+              const Icon = step.icon;
+              const isActive = idx === currentStep;
+              const isDone = idx < currentStep;
 
-            return (
-              <div key={step.id} className="flex flex-col items-center bg-surface px-2 min-w-[70px]">
-                <div className={`
-                  w-10 h-10 rounded-full flex items-center justify-center border-2 transition-colors
-                  ${isActive ? 'border-status-info bg-status-info-bg text-status-info' :
-                    isCompleted ? 'border-status-success bg-status-success-bg text-status-success' :
-                      'border-edge-strong bg-surface text-content-muted'}
-                `}>
-                  <Icon size={18} />
+              return (
+                <div key={step.id} className="flex flex-col items-center bg-surface px-1.5 min-w-[60px]">
+                  <div className={`
+                    w-8 h-8 rounded-full flex items-center justify-center border-2 transition-colors
+                    ${isActive ? 'border-status-info bg-status-info-bg text-status-info' :
+                      isDone ? 'border-status-success bg-status-success-bg text-status-success' :
+                        'border-edge-strong bg-surface text-content-muted'}
+                  `}>
+                    <Icon size={14} />
+                  </div>
+                  <span className={`text-[10px] mt-1 font-medium text-center ${isActive ? 'text-content-primary' : 'text-content-muted'}`}>
+                    {step.title}
+                  </span>
                 </div>
-                <span className={`text-xs mt-2 font-medium text-center ${isActive ? 'text-content-primary' : 'text-content-muted'}`}>
-                  {step.title}
-                </span>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Status badge when in live state */}
+        {isLiveState && migrationStatus && (
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-content-muted font-mono">Réf: {migrationStatus.reference}</span>
+            <Badge className={STATUS_LABELS[migrationStatus.statut]?.color || 'bg-surface-muted0'}>
+              {STATUS_LABELS[migrationStatus.statut]?.label || migrationStatus.statut}
+            </Badge>
+          </div>
+        )}
 
         {/* Content */}
-        <div className="min-h-[350px] py-4">
+        <div className={isLiveState ? 'py-2' : 'min-h-[320px] py-2'}>
+
+          {/* Pending State */}
+          {isPending && (
+            <div className="flex flex-col items-center justify-center py-10 space-y-3">
+              <Loader2 className="animate-spin text-status-info" size={36} />
+              <h3 className="text-lg font-bold text-content-primary">Migration soumise</h3>
+              <p className="text-content-muted text-sm text-center">
+                En attente de démarrage du traitement...
+              </p>
+            </div>
+          )}
+
           {/* Processing State */}
           {isProcessing && (
-            <div className="flex flex-col items-center justify-center p-8 space-y-4">
-              <Loader2 className="animate-spin text-status-info" size={48} />
-              <h3 className="text-xl font-bold text-content-primary">Migration en cours...</h3>
-              <p className="text-content-muted text-sm">{migrationStatus?.currentStep || 'Initialisation'}</p>
-              <div className="w-full max-w-md">
-                <ProgressBar value={migrationStatus?.progress || 0} max={100} color="primary" size="md" />
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <Loader2 className="animate-spin text-status-info shrink-0" size={20} />
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-bold text-content-primary truncate">
+                    {migrationStatus?.currentStep || 'Initialisation...'}
+                  </h3>
+                  <ProgressBar value={migrationStatus?.progress || 0} max={100} color="primary" size="sm" />
+                </div>
+                <span className="text-xs font-mono text-content-muted shrink-0">{migrationStatus?.progress || 0}%</span>
               </div>
-              <p className="text-content-muted text-center">
-                Ne fermez pas cette fenêtre. Progression: {migrationStatus?.progress || 0}%
-              </p>
 
               {/* Steps Log */}
-              {migrationStatus?.logs && migrationStatus.logs.length > 0 && (
-                <div className="w-full max-w-md mt-4 bg-surface-base rounded-lg p-4 max-h-40 overflow-y-auto">
-                  {migrationStatus.logs.map((log, idx) => (
-                    <div key={idx} className="flex items-center gap-2 text-sm py-1">
+              <div className="bg-surface-base rounded-lg border border-edge divide-y divide-edge max-h-48 overflow-y-auto">
+                {migrationStatus?.logs && migrationStatus.logs.length > 0 ? (
+                  migrationStatus.logs.map((log, idx) => (
+                    <div key={idx} className="flex items-center gap-2 px-3 py-1.5 text-xs">
                       {log.success ? (
-                        <CheckCircle className="text-status-success shrink-0" size={14} />
+                        <CheckCircle className="text-status-success shrink-0" size={12} />
                       ) : (
-                        <X className="text-status-danger shrink-0" size={14} />
+                        <X className="text-status-danger shrink-0" size={12} />
                       )}
-                      <span className="text-content-secondary">{log.step}</span>
+                      <span className="text-content-secondary flex-1 truncate">{log.step}</span>
                       {log.count !== undefined && (
-                        <span className="text-content-muted">({log.count})</span>
+                        <span className="text-content-muted font-mono">{log.count}</span>
                       )}
                     </div>
-                  ))}
-                </div>
-              )}
+                  ))
+                ) : null}
+                {/* Current step pulsing indicator */}
+                {migrationStatus?.currentStep && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 text-xs bg-status-info-bg/30">
+                    <span className="relative flex h-2 w-2 shrink-0">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-status-info opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-status-info" />
+                    </span>
+                    <span className="text-status-info flex-1 truncate">{migrationStatus.currentStep}</span>
+                  </div>
+                )}
+              </div>
+
+              <p className="text-[10px] text-content-muted text-center">
+                Ne fermez pas cette fenêtre pendant le traitement
+              </p>
             </div>
           )}
 
           {/* Completed State */}
           {isCompleted && (
-            <div className="flex flex-col items-center justify-center p-8 space-y-4">
-              <div className="w-20 h-20 rounded-full bg-status-success-bg flex items-center justify-center">
-                <CheckCircle className="text-status-success" size={48} />
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 p-3 bg-status-success-bg/50 rounded-lg border border-status-success/20">
+                <CheckCircle className="text-status-success shrink-0" size={24} />
+                <div>
+                  <h3 className="text-sm font-bold text-content-primary">Migration terminée</h3>
+                  <p className="text-xs text-content-muted">
+                    L'agence {sourceAgence.nom} a été fermée. Toutes les données ont été transférées.
+                  </p>
+                </div>
               </div>
-              <h3 className="text-xl font-bold text-content-primary">Migration Terminée !</h3>
-              <p className="text-content-muted text-center">
-                L'agence {sourceAgence.nom} a été fermée<br />
-                Toutes les données ont été transférées.
-              </p>
 
               {migrationStatus?.report && (
-                <div className="w-full max-w-md bg-surface-base rounded-lg p-4 mt-4">
-                  <h4 className="font-medium text-content-primary mb-3">Résumé de la Migration</h4>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <span className="text-content-muted">Clients migrés:</span>
-                    <span className="text-content-primary">{migrationStatus.report.volumetry?.clients || 0}</span>
-                    <span className="text-content-muted">Comptes migrés:</span>
-                    <span className="text-content-primary">{migrationStatus.report.volumetry?.comptes || 0}</span>
-                    <span className="text-content-muted">Crédits migrés:</span>
-                    <span className="text-content-primary">{migrationStatus.report.volumetry?.credits || 0}</span>
-                    <span className="text-content-muted">Fonds transférés:</span>
-                    <span className="text-content-primary">{formatMoney(migrationStatus.report.financials?.soldesCoffresTransferes || 0)}</span>
-                  </div>
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    { label: 'Clients', value: migrationStatus.report.volumetry?.clients || 0 },
+                    { label: 'Comptes', value: migrationStatus.report.volumetry?.comptes || 0 },
+                    { label: 'Crédits', value: migrationStatus.report.volumetry?.credits || 0 },
+                    { label: 'Fonds', value: formatMoney(migrationStatus.report.financials?.soldesCoffresTransferes || 0) },
+                  ].map((item) => (
+                    <div key={item.label} className="bg-surface-base rounded-lg p-2 text-center border border-edge">
+                      <div className="text-sm font-bold text-content-primary">{item.value}</div>
+                      <div className="text-[10px] text-content-muted">{item.label}</div>
+                    </div>
+                  ))}
                 </div>
               )}
 
               {canRollback && (
-                <div className="w-full max-w-md bg-status-warning-bg rounded-lg p-4 border border-status-warning/20">
-                  <div className="flex items-start gap-3">
-                    <AlertTriangle className="text-status-warning shrink-0 mt-0.5" size={18} />
-                    <div className="flex-1">
-                      <h4 className="font-medium text-status-warning text-sm">Rollback disponible</h4>
-                      <p className="text-xs text-content-muted mt-1">
-                        Vous pouvez annuler cette migration dans les {Math.floor(rollbackHoursLeft)}h{Math.round((rollbackHoursLeft % 1) * 60).toString().padStart(2, '0')} restantes.
-                        Cette action restaurera toutes les données à leur état d'origine.
-                      </p>
-                      <Button
-                        variant="danger"
-                        size="sm"
-                        className="mt-3"
-                        onClick={() => migrationId && rollbackMigrationMutation.mutate(migrationId)}
-                        disabled={rollbackMigrationMutation.isPending}
-                        icon={RotateCcw}
-                      >
-                        {rollbackMigrationMutation.isPending ? (
-                          <Loader2 className="animate-spin" size={14} />
-                        ) : (
-                          'Annuler la Migration (Rollback)'
-                        )}
-                      </Button>
-                    </div>
-                  </div>
+                <div className="flex items-center gap-3 p-3 bg-status-warning-bg rounded-lg border border-status-warning/20">
+                  <AlertTriangle className="text-status-warning shrink-0" size={16} />
+                  <p className="text-xs text-content-muted flex-1">
+                    Rollback possible pendant encore {Math.floor(rollbackHoursLeft)}h{Math.round((rollbackHoursLeft % 1) * 60).toString().padStart(2, '0')}
+                  </p>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={() => migrationId && rollbackMigrationMutation.mutate(migrationId)}
+                    disabled={rollbackMigrationMutation.isPending}
+                    icon={RotateCcw}
+                  >
+                    {rollbackMigrationMutation.isPending ? <Loader2 className="animate-spin" size={12} /> : 'Rollback'}
+                  </Button>
                 </div>
               )}
 
-              <div className="flex gap-3 mt-4">
-                <Button variant="outline" onClick={handleClose} icon={X}>
+              <div className="flex justify-end gap-2 pt-1">
+                <Button variant="outline" size="sm" onClick={handleClose} icon={X}>
                   Fermer
                 </Button>
-                <Button
-                  variant="primary"
-                  onClick={handleDownloadReport}
-                  icon={Download}
-                >
-                  Télécharger le Rapport
+                <Button variant="primary" size="sm" onClick={handleDownloadReport} icon={Download}>
+                  Rapport PDF
                 </Button>
               </div>
             </div>
@@ -701,26 +732,27 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
 
           {/* Failed State */}
           {isFailed && (
-            <div className="flex flex-col items-center justify-center p-8 space-y-4">
-              <div className="w-20 h-20 rounded-full bg-status-danger-bg flex items-center justify-center">
-                <X className="text-status-danger" size={48} />
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 p-3 bg-status-danger-bg/50 rounded-lg border border-status-danger/20">
+                <AlertCircle className="text-status-danger shrink-0" size={24} />
+                <div className="min-w-0">
+                  <h3 className="text-sm font-bold text-content-primary">Migration Échouée</h3>
+                  <p className="text-xs text-status-danger truncate">{migrationStatus?.error}</p>
+                </div>
               </div>
-              <h3 className="text-xl font-bold text-content-primary">Migration Échouée</h3>
-              <p className="text-status-danger text-center">{migrationStatus?.error}</p>
-              <p className="text-content-muted text-sm text-center">
-                La migration a été annulée. Aucune donnée n'a été modifiée.
+
+              <p className="text-xs text-content-muted text-center">
+                La transaction a été annulée. Aucune donnée n'a été modifiée.
               </p>
-              <div className="flex gap-3 mt-4">
-                <Button variant="outline" onClick={handleClose} icon={X}>
+
+              <div className="flex justify-end gap-2 pt-1">
+                <Button variant="outline" size="sm" onClick={handleClose} icon={X}>
                   Fermer
                 </Button>
                 <Button
                   variant="primary"
-                  onClick={() => {
-                    if (migrationId) {
-                      executeMigrationMutation.mutate(migrationId);
-                    }
-                  }}
+                  size="sm"
+                  onClick={() => migrationId && executeMigrationMutation.mutate(migrationId)}
                   icon={RefreshCw}
                 >
                   Réessayer
@@ -731,31 +763,31 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
 
           {/* Scheduled State */}
           {isScheduled && (
-            <div className="flex flex-col items-center justify-center p-8 space-y-4">
-              <div className="w-20 h-20 rounded-full bg-status-info-bg flex items-center justify-center">
-                <Calendar className="text-status-info" size={48} />
+            <div className="space-y-3">
+              <div className="flex items-center gap-3 p-3 bg-status-info-bg/50 rounded-lg border border-status-info/20">
+                <Calendar className="text-status-info shrink-0" size={24} />
+                <div>
+                  <h3 className="text-sm font-bold text-content-primary">Migration planifiée</h3>
+                  <p className="text-xs text-content-muted">
+                    Exécution le{' '}
+                    <span className="text-content-primary font-medium">
+                      {migrationStatus?.scheduledAt &&
+                        format(new Date(migrationStatus.scheduledAt), "EEEE d MMMM yyyy 'à' HH:mm", { locale: fr })}
+                    </span>
+                  </p>
+                </div>
               </div>
-              <h3 className="text-xl font-bold text-content-primary">Migration Planifiée</h3>
-              <p className="text-content-muted text-center">
-                La migration sera exécutée automatiquement le:<br />
-                <span className="text-content-primary font-medium">
-                  {migrationStatus?.scheduledAt &&
-                    format(new Date(migrationStatus.scheduledAt), "EEEE d MMMM yyyy 'à' HH:mm", { locale: fr })}
-                </span>
-              </p>
-              <p className="text-status-warning text-sm text-center flex items-center gap-2">
-                <AlertCircle size={16} />
-                L'agence est maintenant en mode "Lecture seule"
-              </p>
-              <div className="flex gap-3 mt-4">
-                <Button
-                  variant="danger"
-                  onClick={() => setShowCancelPrompt(true)}
-                  icon={Ban}
-                >
-                  Annuler la Planification
+
+              <div className="flex items-center gap-2 px-3 py-2 bg-status-warning-bg/50 rounded-lg text-xs text-status-warning">
+                <AlertCircle size={14} className="shrink-0" />
+                L'agence est en mode "Lecture seule" jusqu'à l'exécution
+              </div>
+
+              <div className="flex justify-end gap-2 pt-1">
+                <Button variant="danger" size="sm" onClick={() => setShowCancelPrompt(true)} icon={Ban}>
+                  Annuler
                 </Button>
-                <Button variant="outline" onClick={handleClose} icon={X}>
+                <Button variant="outline" size="sm" onClick={handleClose} icon={X}>
                   Fermer
                 </Button>
               </div>
@@ -763,7 +795,7 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
           )}
 
           {/* Wizard Steps */}
-          {!isProcessing && !isCompleted && !isFailed && !isScheduled && (
+          {!isLiveState && (
             <>
               {/* Step 0: Clients */}
               {currentStep === 0 && (
@@ -1106,7 +1138,7 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
         </div>
 
         {/* Footer */}
-        {!isProcessing && !isCompleted && !isFailed && !isScheduled && (
+        {!isLiveState && (
           <div className="space-y-2 pt-4 border-t border-edge">
             <div className="flex justify-between">
               <Button

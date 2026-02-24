@@ -42,7 +42,7 @@ import {
 import { transfertsInterCoffres } from "@shared/schema/coffres-forts";
 import { eq, sql, and, isNull, ne, inArray, or, desc } from "drizzle-orm";
 import { StatutAgence, StatutCompte, StatutCredit, StatutDemande, StatutTransaction, StatutTransfertInterCoffre } from "@shared/enum/status-constants";
-import { createHash } from "crypto";
+import { createHash, randomBytes } from "crypto";
 import {
   assertCoffreCanDebit,
   assertCoffreCanCredit,
@@ -108,7 +108,6 @@ export class AgencyMigrationService {
    * Génère une référence unique pour la migration
    */
   private generateReference(): string {
-    const { randomBytes } = require('crypto');
     const year = new Date().getFullYear();
     const random = randomBytes(4).toString('hex').slice(0, 6).toUpperCase();
     return `MIG-${year}-${random}`;
@@ -417,7 +416,7 @@ export class AgencyMigrationService {
     if (targetClientsAgencyId) {
       const duplicateEmails = await db
         .select({
-          email: users.email,
+          email: sql<string>`su.email`,
           sourceClientId: sql<string>`sc.id`,
           targetClientId: sql<string>`tc.id`,
         })
@@ -441,7 +440,7 @@ export class AgencyMigrationService {
       // 4. Doublons telephones
       const duplicatePhones = await db
         .select({
-          telephone: users.telephone,
+          telephone: sql<string>`su.telephone`,
           sourceClientId: sql<string>`sc.id`,
           targetClientId: sql<string>`tc.id`,
         })
@@ -2108,10 +2107,12 @@ export class AgencyMigrationService {
       throw new MigrationError("Migration non trouvée", "NOT_FOUND");
     }
 
-    if (migration.statut !== MIGRATION_STATUS.DRAFT) {
-      throw new MigrationError("Seuls les brouillons peuvent être soumis", "INVALID_STATUS");
+    const submittableStatuses = [MIGRATION_STATUS.DRAFT, MIGRATION_STATUS.SCHEDULED];
+    if (!submittableStatuses.includes(migration.statut as any)) {
+      throw new MigrationError("Seuls les brouillons ou migrations planifiées peuvent être soumis", "INVALID_STATUS");
     }
 
+    const previousStatus = migration.statut;
     const newStatus = migration.scheduledAt ? MIGRATION_STATUS.SCHEDULED : MIGRATION_STATUS.PENDING;
 
     await db
@@ -2126,7 +2127,7 @@ export class AgencyMigrationService {
     await db.insert(migrationAuditLogs).values({
       migrationId,
       action: "SUBMITTED",
-      statutAvant: MIGRATION_STATUS.DRAFT,
+      statutAvant: previousStatus,
       statutApres: newStatus,
       details: { executedBy: userId },
       userId,
