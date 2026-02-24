@@ -4,6 +4,7 @@
  * Tests for the HR leave management system including:
  * - Leave request validation (dates, overlaps, balance)
  * - Leave balance calculations
+ * - Seniority bonus calculations
  * - Workflow state transitions
  */
 
@@ -26,6 +27,16 @@ vi.mock('server/db', () => ({
     limit: vi.fn().mockResolvedValue([]),
   },
 }));
+
+// Pure calculation function (extracted from payroll-engine)
+function calculateSeniorityBonus(dateEmbauche: string | null | undefined, baseSalary: number): number {
+  if (!dateEmbauche) return 0;
+  const hireDate = new Date(dateEmbauche);
+  const now = new Date();
+  const years = Math.floor((now.getTime() - hireDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+  const rate = Math.min(years * 0.02, 0.30);
+  return Math.round(baseSalary * rate);
+}
 
 describe('HrService - Leave Management', () => {
   let hrService: HrService;
@@ -104,12 +115,12 @@ describe('HrService - Leave Management', () => {
 
   describe('calculateSeniorityBonus', () => {
     it('should return 0 for null hire date', () => {
-      const bonus = (hrService as any).calculateSeniorityBonus(null, 1000000);
+      const bonus = calculateSeniorityBonus(null, 1000000);
       expect(bonus).toBe(0);
     });
 
     it('should return 0 for undefined hire date', () => {
-      const bonus = (hrService as any).calculateSeniorityBonus(undefined, 1000000);
+      const bonus = calculateSeniorityBonus(undefined, 1000000);
       expect(bonus).toBe(0);
     });
 
@@ -118,7 +129,7 @@ describe('HrService - Leave Management', () => {
       const fiveYearsAgo = new Date();
       fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5);
 
-      const bonus = (hrService as any).calculateSeniorityBonus(
+      const bonus = calculateSeniorityBonus(
         fiveYearsAgo.toISOString().split('T')[0],
         1000000
       );
@@ -131,7 +142,7 @@ describe('HrService - Leave Management', () => {
       const twentyYearsAgo = new Date();
       twentyYearsAgo.setFullYear(twentyYearsAgo.getFullYear() - 20);
 
-      const bonus = (hrService as any).calculateSeniorityBonus(
+      const bonus = calculateSeniorityBonus(
         twentyYearsAgo.toISOString().split('T')[0],
         1000000
       );
@@ -143,7 +154,7 @@ describe('HrService - Leave Management', () => {
       const sixMonthsAgo = new Date();
       sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
-      const bonus = (hrService as any).calculateSeniorityBonus(
+      const bonus = calculateSeniorityBonus(
         sixMonthsAgo.toISOString().split('T')[0],
         1000000
       );

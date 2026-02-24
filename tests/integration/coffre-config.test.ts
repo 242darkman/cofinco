@@ -37,8 +37,17 @@ vi.mock('server/auth', () => ({
 
 // MOCK AUTHORIZATION (routes use attachAbility/requireAbility)
 vi.mock('server/authorization', () => ({
-  attachAbility: (req: any, res: any, next: any) => next(),
-  requireAbility: () => (req: any, res: any, next: any) => next()
+  attachAbility: (req: any, res: any, next: any) => {
+    req.ability = { can: () => true };
+    next();
+  },
+  requireAbility: (action: string) => (req: any, res: any, next: any) => {
+    // For 'manage' actions, require admin role
+    if (action === 'manage' && req.user?.role !== 'Administrateur') {
+      return res.status(403).json({ error: 'Accès interdit' });
+    }
+    next();
+  }
 }));
 
 // MOCK domain events

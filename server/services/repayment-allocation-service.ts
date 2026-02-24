@@ -567,7 +567,7 @@ export function calculateInstallmentStatus(
     return StatutEcheanceCredit.LATE;
   } else if (echeance.dateEcheance <= new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)) {
     // Due dans les 7 prochains jours
-    return StatutEcheanceCredit.UPCOMING;
+    return StatutEcheanceCredit.DUE;
   } else {
     return StatutEcheanceCredit.UPCOMING;
   }

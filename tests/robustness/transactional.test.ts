@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { executeWithLedger, updateCompteSolde } from 'server/services/ledger';
 import { db } from 'server/db';
-import { comptes, mouvementsFinanciers, users, clients } from '@shared/schema';
+import { comptes, mouvementsFinanciers, users, clients, agences } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { faker } from '@faker-js/faker';
 
@@ -15,6 +15,10 @@ describe('Robustesse Transactionnelle', () => {
 
   // Helper to create required entities
   async function createTestClientAndAccount() {
+    // 0. Get an agence for GL posting
+    const [agence] = await db.select({ id: agences.id }).from(agences).limit(1);
+    testAgenceId = agence.id;
+
     // 1. Create User (with ACTIVE status since status is on users table)
     const [user] = await db.insert(users).values({
       nom: `TestUser_${faker.string.alphanumeric(5)}`,
@@ -30,7 +34,6 @@ describe('Robustesse Transactionnelle', () => {
       userId: user.id
     }).returning();
     testClientId = client.id;
-    testAgenceId = client.agenceId || undefined;
 
     // 3. Create Compte (using standardized EN enum values)
     const [compte] = await db.insert(comptes).values({
@@ -38,7 +41,8 @@ describe('Robustesse Transactionnelle', () => {
       numeroCompte: `CPT-${faker.string.numeric(10)}`,
       typeCompte: 'CURRENT',
       soldeCourant: '100000', // Start with 100k
-      statut: 'ACTIVE'
+      statut: 'ACTIVE',
+      agenceId: testAgenceId
     }).returning();
     testCompteId = compte.id;
   }
@@ -71,7 +75,9 @@ describe('Robustesse Transactionnelle', () => {
           sens: 'DEBIT',
           clientId: testClientId,
           compteId: testCompteId,
+          agenceId: testAgenceId,
           typePaiement: 'WITHDRAWAL_CURRENT',
+          methodePaiement: 'CASH',
           idempotencyKey
         },
         async (tx: any, mouvement: any) => {
@@ -90,7 +96,9 @@ describe('Robustesse Transactionnelle', () => {
           sens: 'DEBIT',
           clientId: testClientId,
           compteId: testCompteId,
+          agenceId: testAgenceId,
           typePaiement: 'WITHDRAWAL_CURRENT',
+          methodePaiement: 'CASH',
           idempotencyKey
         },
         async (tx: any, mouvement: any) => {
@@ -110,7 +118,9 @@ describe('Robustesse Transactionnelle', () => {
              sens: 'DEBIT',
              clientId: testClientId,
              compteId: testCompteId,
-             typePaiement: 'WITHDRAWAL_CURRENT'
+             agenceId: testAgenceId,
+             typePaiement: 'WITHDRAWAL_CURRENT',
+             methodePaiement: 'CASH'
           },
           async (tx: any, mouvement: any) => {
              // 1. Simulate balance update (this logic is usually inside services like retraitESpeces)
@@ -161,7 +171,9 @@ describe('Robustesse Transactionnelle', () => {
               sens: 'DEBIT',
               clientId: testClientId,
               compteId: testCompteId,
+              agenceId: testAgenceId,
               typePaiement: 'WITHDRAWAL_CURRENT',
+              methodePaiement: 'CASH',
               referenceExterne: `conc-test-${faker.string.uuid()}-${idx}`
             },
             async (tx: any, mouvement: any) => {

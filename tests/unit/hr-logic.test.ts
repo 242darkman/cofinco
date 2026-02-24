@@ -21,6 +21,7 @@ const mockQueryBuilder = (result: any) => {
     leftJoin: vi.fn().mockReturnThis(),
     where: vi.fn().mockReturnThis(),
     orderBy: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockImplementation(() => ({ then: (resolve: any) => resolve(result) })),
     set: vi.fn().mockReturnThis(),
     returning: vi.fn().mockResolvedValue(result),
     then: (resolve: any) => resolve(result),
@@ -85,14 +86,14 @@ describe('HR Logic Unit Tests', () => {
       // Base: 500000
       // Transport: 50000
       // Brut: 550000
-      // CNSS (5%): 27500
-      // IPR (15%): 82500
+      // CNSS (5%): 27500 (stored as totalChargesSalariales)
+      // IRPP (15%): 82500 (stored as irpp)
       // Total Retenues: 110000
       // Net: 440000
-      
+
       expect(insertCall.salaireBrut).toBe('550000');
-      expect(insertCall.cnssEmploye).toBe('27500');
-      expect(insertCall.ipr).toBe('82500');
+      expect(insertCall.totalChargesSalariales).toBe('27500');
+      expect(insertCall.irpp).toBe('82500');
       expect(insertCall.salaireNet).toBe('440000');
     });
 

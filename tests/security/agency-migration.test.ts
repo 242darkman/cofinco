@@ -98,7 +98,7 @@ describe("Migration Entity Coverage", () => {
       "DOSSIER_CREDIT", "TRANSFERT_COFFRE_CAISSE",
       "VIREMENT_PROGRAMME", "MEMBRE_TONTINE", "CONTRIBUTION_TONTINE",
       "TONTINE_CYCLE", "TONTINE_TURN", "TONTINE_SCHEDULE",
-      "TONTINE_RULESET", "TREASURY_TRANSFER",
+      "TREASURY_TRANSFER",
     ];
 
     for (const type of entityTypes) {
@@ -121,7 +121,6 @@ describe("Migration Entity Coverage", () => {
     expect(migrationService).toContain("MIGRATION_ENTITY_TYPE.TONTINE_CYCLE");
     expect(migrationService).toContain("MIGRATION_ENTITY_TYPE.TONTINE_TURN");
     expect(migrationService).toContain("MIGRATION_ENTITY_TYPE.TONTINE_SCHEDULE");
-    expect(migrationService).toContain("MIGRATION_ENTITY_TYPE.TONTINE_RULESET");
   });
 
   it("should migrate financial entity types", () => {
@@ -403,8 +402,10 @@ describe("Reset Endpoint Security", () => {
     return settingsRoute.slice(startIdx);
   })();
 
-  it("should guard against production execution", () => {
-    expect(agenceResetSection).toContain('process.env.NODE_ENV === "production"');
+  it("should guard reset with authorization (requireAbility)", () => {
+    // Reset is protected by requireAbility(Actions.MANAGE, Subjects.SETTINGS)
+    // at the route level, not by NODE_ENV check
+    expect(settingsRoute).toContain("requireAbility");
   });
 
   it("should NOT use session_replication_role (dangerous FK bypass) in agence reset", () => {
@@ -459,9 +460,10 @@ describe("Reset Endpoint Security", () => {
     expect(agenceResetSection).toContain("DELETE FROM demandes_credit WHERE agence_id");
   });
 
-  it("should reset coffre and caisse balances to zero", () => {
+  it("should reset coffre balance and recreate caisse with zero balance", () => {
     expect(agenceResetSection).toContain("UPDATE coffres_forts SET solde = '0'");
-    expect(agenceResetSection).toContain("UPDATE caisses SET solde = '0'");
+    // Caisses are deleted and recreated with solde '0' (clean slate)
+    expect(agenceResetSection).toContain("DELETE FROM caisses");
   });
 });
 

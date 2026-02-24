@@ -23,7 +23,10 @@ vi.mock('server/db', () => ({
 
 // MOCK AUTHORIZATION
 vi.mock('server/authorization', () => ({
-  attachAbility: (req: any, res: any, next: any) => next(),
+  attachAbility: (req: any, res: any, next: any) => {
+    req.ability = { can: () => true };
+    next();
+  },
   requireAbility: () => (req: any, res: any, next: any) => next()
 }));
 

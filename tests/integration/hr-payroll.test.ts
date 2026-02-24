@@ -63,10 +63,13 @@ vi.mock('server/services/hr-import-service', () => ({ importEmployees: vi.fn(), 
 vi.mock('server/services/storage-service', () => ({
   StorageService: { getPresignedDownloadUrl: vi.fn(), uploadFile: vi.fn() }
 }));
+vi.mock('server/services/payroll-engine', () => ({
+  generatePayrollRun: vi.fn(),
+}));
 
 import { hrRouter } from 'server/routes/hr';
 import { db } from 'server/db';
-import { hrService } from 'server/services/hr-service';
+import { generatePayrollRun } from 'server/services/payroll-engine';
 
 const app = express();
 app.use(express.json());
@@ -91,17 +94,19 @@ describe('HR Payroll Integration', () => {
     });
 
     it('POST /api/hr/paie/generate should trigger payroll generation', async () => {
-        // hrService.generateMonthlyPayroll returns { generated, skipped, bulletins }
-        (hrService as any).generateMonthlyPayroll.mockResolvedValue({
+        // generatePayrollRun returns { run, generated, skipped, issues, bulletins }
+        vi.mocked(generatePayrollRun).mockResolvedValue({
+            run: { id: 'run-1', mois: '2026-01', statut: 'COMPLETED' },
             generated: 1,
             skipped: 0,
+            issues: [],
             bulletins: [{ id: 1, salaireNet: 1000 }]
-        });
+        } as any);
 
         const res = await request(app).post('/api/hr/paie/generate').send({ mois: '2026-01' });
 
         expect(res.status).toBe(201);
-        expect((hrService as any).generateMonthlyPayroll).toHaveBeenCalledWith('2026-01', 'test-user', undefined);
+        expect(generatePayrollRun).toHaveBeenCalledWith('2026-01', 'test-user', undefined);
         // Response wrapped in successResponse: { success: true, data: { bulletins: [...] } }
         expect(res.body.data.bulletins).toHaveLength(1);
     });

@@ -12,6 +12,7 @@ import {
   agences,
   users,
   caisses,
+  sessionsCaisse,
   factures,
   lignesFactures,
   mouvementsFinanciers,
@@ -21,6 +22,7 @@ import {
   type InsertUser
 } from '@shared/schema';
 import { remboursementEcheances, clientCreditBalances, remboursementAllocationAudit } from '@shared/schema/remboursement-allocations';
+import { glPostingLinks, ecritures, glPeriods } from '@shared/schema/accounting';
 import { 
   allocateRepaymentToSchedule,
   reverseRepaymentAllocations,
@@ -34,32 +36,43 @@ import { StatutEcheanceCredit, StatutCredit } from '@shared/enum/status-constant
 // Mock WebSocket
 vi.mock('server/ws-server', () => ({
   getWsInstance: () => ({
-    broadcast: vi.fn()
+    broadcast: vi.fn(),
+    broadcastToAgency: vi.fn(),
+    broadcastToAggregate: vi.fn()
   })
 }));
 
 describe('Repayment FIFO Allocation', () => {
   let testUserId: string;
+  let testUsername: string;
   let testClientId: string;
   let testAgenceId: string;
   let testCreditId: string;
+  let testSessionId: string;
+  let testCaisseId: string;
   let testEcheanceIds: string[] = [];
 
   beforeEach(async () => {
-    // Nettoyer les données de test
-    await cleanupTestData();
-
     // Créer les données de test
     const setupResult = await setupTestData();
     testUserId = setupResult.userId;
+    testUsername = setupResult.username;
     testClientId = setupResult.clientId;
     testAgenceId = setupResult.agenceId;
     testCreditId = setupResult.creditId;
+    testSessionId = setupResult.sessionId;
+    testCaisseId = setupResult.caisseId;
     testEcheanceIds = setupResult.echeanceIds;
   });
 
   afterEach(async () => {
-    await cleanupTestData();
+    await cleanupTestData({
+      userId: testUserId,
+      clientId: testClientId,
+      creditId: testCreditId,
+      sessionId: testSessionId,
+      caisseId: testCaisseId,
+    });
   });
 
   describe('Allocation FIFO basique', () => {
@@ -365,7 +378,8 @@ describe('Repayment FIFO Allocation', () => {
         {
           creditId: testCreditId,
           montant: '1500',
-          methodePaiement: 'TRANSFER',
+          methodePaiement: 'CASH',
+          sessionCaisseId: testSessionId,
           observations: 'Test payment',
           idempotencyKey: `test-complete-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
         },
@@ -401,19 +415,17 @@ describe('Repayment FIFO Allocation', () => {
 // Fonctions helper pour les tests
 async function setupTestData() {
   // Créer une agence
-  const [agence] = await db.insert(agences).values({
-    nom: 'Test Agency',
-    codeAgence: 'TEST001',
-    adresse: 'Test Address'
-  }).returning();
+  // Use existing seeded agence (avoids complex FK cascade on cleanup)
+  const [agence] = await db.select({ id: agences.id }).from(agences).limit(1);
 
   // Créer un utilisateur
+  const testUsername = `testuser_repay_${Date.now()}`;
   const [user] = await db.insert(users).values({
-    username: 'testuser',
+    username: testUsername,
     password: 'hashed',
     nom: 'Test',
     prenom: 'User',
-    email: 'test@example.com',
+    email: `${testUsername}@example.com`,
   } as any).returning();
 
   // Créer un client
@@ -425,7 +437,7 @@ async function setupTestData() {
   // Créer un crédit
   const [credit] = await db.insert(credits).values({
     clientId: client.id,
-    numeroCredit: 'CRED001',
+    numeroCredit: `CRED-${Date.now()}`,
     montant: '3000',
     taux: '10',
     duree: 3,
@@ -434,6 +446,19 @@ async function setupTestData() {
     dateDebut: new Date(),
     statut: StatutCredit.ACTIVE as any,
     agenceId: agence.id
+  }).returning();
+
+  // Créer une caisse + session pour paiements en espèces
+  const [caisse] = await db.insert(caisses).values({
+    nom: 'Caisse Test',
+    agenceId: agence.id
+  }).returning();
+
+  const [session] = await db.insert(sessionsCaisse).values({
+    caissierId: user.id,
+    caisseId: caisse.id,
+    agenceId: agence.id,
+    statut: 'OPEN' as any
   }).returning();
 
   // Créer 3 échéances de 1000 chacune
@@ -460,51 +485,60 @@ async function setupTestData() {
   return {
     agenceId: agence.id,
     userId: user.id,
+    username: testUsername,
     clientId: client.id,
     creditId: credit.id,
+    sessionId: session.id,
+    caisseId: caisse.id,
     echeanceIds
   };
 }
 
-async function cleanupTestData() {
+async function cleanupTestData(ids: {
+  userId?: string; clientId?: string; creditId?: string;
+  sessionId?: string; caisseId?: string;
+}) {
+  if (!ids.userId) return; // Nothing to clean up
+  const { userId, clientId, creditId, sessionId, caisseId } = ids;
+
   // Nettoyer dans l'ordre inverse des dépendances
-  // Scope to test data only to avoid FK violations with seeded data
-  const testUserRows = await db.select({ id: users.id }).from(users).where(eq(users.username, 'testuser'));
-
-  for (const u of testUserRows) {
-    const testClientRows = await db.select({ id: clients.id }).from(clients).where(eq(clients.userId, u.id));
-
-    for (const c of testClientRows) {
-      const testCreditRows = await db.select({ id: credits.id }).from(credits).where(eq(credits.clientId, c.id));
-
-      for (const cr of testCreditRows) {
-        const rembRows = await db.select({ id: remboursements.id }).from(remboursements).where(eq(remboursements.creditId, cr.id));
-        for (const r of rembRows) {
-          await db.delete(remboursementAllocationAudit).where(eq(remboursementAllocationAudit.remboursementId, r.id));
-          await db.delete(remboursementEcheances).where(eq(remboursementEcheances.remboursementId, r.id));
-        }
-        await db.delete(remboursements).where(eq(remboursements.creditId, cr.id));
-        await db.delete(echeancesCredits).where(eq(echeancesCredits.creditId, cr.id));
+  if (clientId) {
+    if (creditId) {
+      const rembRows = await db.select({ id: remboursements.id }).from(remboursements).where(eq(remboursements.creditId, creditId));
+      for (const r of rembRows) {
+        await db.delete(remboursementAllocationAudit).where(eq(remboursementAllocationAudit.remboursementId, r.id));
+        await db.delete(remboursementEcheances).where(eq(remboursementEcheances.remboursementId, r.id));
       }
-
-      await db.delete(clientCreditBalances).where(eq(clientCreditBalances.clientId, c.id));
-      await db.delete(credits).where(eq(credits.clientId, c.id));
-      // Delete lignes_factures -> factures -> mouvements that reference this client
-      const factureRows = await db.select({ id: factures.id }).from(factures).where(eq(factures.clientId, c.id));
-      for (const f of factureRows) {
-        await db.delete(lignesFactures).where(eq(lignesFactures.factureId, f.id));
-      }
-      await db.delete(factures).where(eq(factures.clientId, c.id));
-      await db.delete(mouvementsFinanciers).where(eq(mouvementsFinanciers.clientId, c.id));
-      await db.delete(clients).where(eq(clients.id, c.id));
+      await db.delete(remboursements).where(eq(remboursements.creditId, creditId));
+      await db.delete(echeancesCredits).where(eq(echeancesCredits.creditId, creditId));
     }
+    await db.delete(clientCreditBalances).where(eq(clientCreditBalances.clientId, clientId));
+    await db.delete(credits).where(eq(credits.clientId, clientId));
+
+    // Delete lignes_factures -> factures -> GL -> mouvements
+    const factureRows = await db.select({ id: factures.id }).from(factures).where(eq(factures.clientId, clientId));
+    for (const f of factureRows) {
+      await db.delete(lignesFactures).where(eq(lignesFactures.factureId, f.id));
+    }
+    await db.delete(factures).where(eq(factures.clientId, clientId));
+
+    const mouvRows = await db.select({ id: mouvementsFinanciers.id }).from(mouvementsFinanciers).where(eq(mouvementsFinanciers.clientId, clientId));
+    for (const m of mouvRows) {
+      await db.delete(ecritures).where(eq(ecritures.mouvementId, m.id));
+      await db.delete(glPostingLinks).where(eq(glPostingLinks.mouvementId, m.id));
+    }
+    await db.delete(mouvementsFinanciers).where(eq(mouvementsFinanciers.clientId, clientId));
+    await db.delete(clients).where(eq(clients.id, clientId));
   }
 
-  await db.delete(users).where(eq(users.username, 'testuser'));
-  // Delete caisses for test agence (seed creates coffre-fort for all agences)
-  const testAgenceRows = await db.select({ id: agences.id }).from(agences).where(eq(agences.codeAgence, 'TEST001'));
-  for (const a of testAgenceRows) {
-    await db.delete(caisses).where(eq(caisses.agenceId, a.id));
+  // Delete session -> caisse (before user, since session references user via caissierId)
+  if (sessionId) {
+    await db.delete(sessionsCaisse).where(eq(sessionsCaisse.id, sessionId));
   }
-  await db.delete(agences).where(eq(agences.codeAgence, 'TEST001'));
+  if (caisseId) {
+    await db.delete(caisses).where(eq(caisses.id, caisseId));
+  }
+
+  // Delete user (no agence deletion — we use seeded agence)
+  await db.delete(users).where(eq(users.id, userId));
 }

@@ -260,7 +260,7 @@ describe('Automatic Transfers Service', () => {
       versementAutoJour: 28,
       soldeCourant: '0',
       numeroCompte: 'DST-001',
-      agenceId: null,
+      agenceId: 'agency-1',
     };
 
     const mockSource = {

@@ -190,7 +190,7 @@ describe('Caisse Reversal Integration', () => {
         .mockReturnValueOnce(mockChain([mockOriginalOperation]))
         .mockReturnValueOnce(mockChain([]))  // no existing reversal
         .mockReturnValueOnce(mockChain([mockOriginalMouvement]))  // mouvement found
-        .mockReturnValueOnce(mockChain([{ id: 'session-789', statut: 'CLOSED' }]));  // session is closed
+        .mockReturnValueOnce(mockChain([{ id: 'session-789', statut: 'PENDING_CLOSE' }]));  // session not open
 
       await expect(reverseOperation(validRequest)).rejects.toThrow('session de caisse doit etre ouverte');
     });
@@ -200,12 +200,13 @@ describe('Caisse Reversal Integration', () => {
       const reversalOp = { ...mockOriginalOperation, id: 'op-rev-001', statut: 'POSTED' };
       const updatedOriginal = { ...mockOriginalOperation, statut: 'REVERSED' };
 
-      // Main DB selects
+      // Main DB selects (5 calls before transaction)
       (db.select as any)
         .mockReturnValueOnce(mockChain([mockOriginalOperation]))
         .mockReturnValueOnce(mockChain([]))  // no existing reversal
         .mockReturnValueOnce(mockChain([mockOriginalMouvement]))
-        .mockReturnValueOnce(mockChain([{ id: 'session-789', statut: 'OPEN' }]));
+        .mockReturnValueOnce(mockChain([{ id: 'session-789', statut: 'OPEN' }]))  // original session check (CLOSED?)
+        .mockReturnValueOnce(mockChain([{ id: 'session-789', statut: 'OPEN' }]));  // reversal session check (must be OPEN)
 
       // Transaction mocks
       mockTx.insert.mockReturnValue({

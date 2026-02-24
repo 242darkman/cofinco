@@ -113,7 +113,9 @@ describe("Contract 1: No Direct Balance Update", () => {
         sens: "DEBIT",
         clientId: testClientId,
         compteId: testCompteId,
+        agenceId: testAgenceId,
         typePaiement: "WITHDRAWAL_CURRENT",
+        methodePaiement: "CASH",
       },
       async (tx, mouvement) => {
         // Balance update inside a transaction that has a mouvement → should pass
@@ -332,7 +334,9 @@ describe("Contract 4: GL Idempotence", () => {
         sens: "DEBIT",
         clientId: testClientId,
         compteId: testCompteId,
+        agenceId: testAgenceId,
         typePaiement: "WITHDRAWAL_CURRENT",
+        methodePaiement: "CASH",
         idempotencyKey,
       },
       async () => ({ result: { ok: true } })
@@ -347,7 +351,9 @@ describe("Contract 4: GL Idempotence", () => {
           sens: "DEBIT",
           clientId: testClientId,
           compteId: testCompteId,
+          agenceId: testAgenceId,
           typePaiement: "WITHDRAWAL_CURRENT",
+          methodePaiement: "CASH",
           idempotencyKey,
         },
         async () => ({ result: { ok: true } })

@@ -90,10 +90,10 @@ describe('isCriticalPermission', () => {
 
 describe('DEFAULT_CRITICAL_PATTERNS', () => {
   it('should contain expected critical patterns', () => {
-    expect(DEFAULT_CRITICAL_PATTERNS).toContain('paiements.');
-    expect(DEFAULT_CRITICAL_PATTERNS).toContain('coffre.');
-    expect(DEFAULT_CRITICAL_PATTERNS).toContain('admin.');
-    expect(DEFAULT_CRITICAL_PATTERNS).toContain('validation.');
+    expect(DEFAULT_CRITICAL_PATTERNS).toContain('paiements.%');
+    expect(DEFAULT_CRITICAL_PATTERNS).toContain('coffre.%');
+    expect(DEFAULT_CRITICAL_PATTERNS).toContain('admin.%');
+    expect(DEFAULT_CRITICAL_PATTERNS).toContain('validation.%');
     expect(DEFAULT_CRITICAL_PATTERNS).toContain('caisse.close');
     expect(DEFAULT_CRITICAL_PATTERNS).toContain('caisse.admin');
     expect(DEFAULT_CRITICAL_PATTERNS).toContain('credits.disburse');
