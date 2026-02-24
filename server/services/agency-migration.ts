@@ -975,7 +975,7 @@ export class AgencyMigrationService {
     const startTime = Date.now();
 
     // Récupérer la migration
-    const [migration] = await db
+    let [migration] = await db
       .select()
       .from(agencyMigrations)
       .where(eq(agencyMigrations.id, migrationId))
@@ -985,7 +985,26 @@ export class AgencyMigrationService {
       throw new MigrationError("Migration non trouvée", "NOT_FOUND");
     }
 
-    if (migration.statut !== MIGRATION_STATUS.PENDING && migration.statut !== MIGRATION_STATUS.SCHEDULED) {
+    // Allow retry of FAILED migrations: reset status, then proceed
+    if (migration.statut === MIGRATION_STATUS.FAILED) {
+      if (!migration.canRetry) {
+        throw new MigrationError(
+          "Migration échouée définitivement (nombre max de tentatives atteint)",
+          "MAX_RETRIES_EXCEEDED"
+        );
+      }
+      await db
+        .update(agencyMigrations)
+        .set({
+          statut: MIGRATION_STATUS.PENDING,
+          error: null,
+          errorDetails: null,
+          completedAt: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(agencyMigrations.id, migrationId));
+      [migration] = await db.select().from(agencyMigrations).where(eq(agencyMigrations.id, migrationId)).limit(1);
+    } else if (migration.statut !== MIGRATION_STATUS.PENDING && migration.statut !== MIGRATION_STATUS.SCHEDULED) {
       throw new MigrationError(
         `Migration ne peut pas être exécutée (statut actuel: ${migration.statut})`,
         "INVALID_STATUS"

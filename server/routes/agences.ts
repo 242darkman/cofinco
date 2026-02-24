@@ -1264,7 +1264,8 @@ export function registerAgencesRoutes(app: Express) {
         return res.status(404).json({ error: "Migration non trouvée" });
       }
 
-      if (migration.statut !== MIGRATION_STATUS.PENDING && migration.statut !== MIGRATION_STATUS.SCHEDULED) {
+      const executableStatuses = [MIGRATION_STATUS.PENDING, MIGRATION_STATUS.SCHEDULED, MIGRATION_STATUS.FAILED];
+      if (!executableStatuses.includes(migration.statut)) {
         return res.status(400).json({
           error: `La migration ne peut pas être exécutée (statut actuel: ${migration.statut})`,
           code: "INVALID_STATUS"

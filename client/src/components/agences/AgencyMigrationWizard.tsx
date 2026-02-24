@@ -114,6 +114,51 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   CANCELLED: { label: 'Annulé', color: 'bg-surface-muted0' },
 };
 
+// Phases for real-time progress display during PROCESSING
+const MIGRATION_PHASES = [
+  {
+    id: 'preflight',
+    label: 'Vérifications',
+    icon: Shield,
+    steps: ['Pre-flight checks'],
+  },
+  {
+    id: 'clients',
+    label: 'Clients & Données',
+    icon: Users,
+    steps: [
+      'Migration clients',
+      'Migration comptes',
+      'Migration crédits',
+      'Migration demandes crédit',
+      'Migration dossiers crédit',
+      'Migration tontines + sub-tables',
+      'Migration mouvements financiers',
+      'Migration sessions caisse',
+      'Migration transferts coffre-caisse',
+      'Migration virements programmés',
+    ],
+  },
+  {
+    id: 'employees',
+    label: 'Personnel',
+    icon: Building2,
+    steps: ['Migration employés'],
+  },
+  {
+    id: 'treasury',
+    label: 'Trésorerie',
+    icon: Receipt,
+    steps: ['Transfert trésorerie'],
+  },
+  {
+    id: 'finalize',
+    label: 'Finalisation',
+    icon: CheckCircle,
+    steps: ['Archivage agence source'],
+  },
+];
+
 // ============================================
 // COMPONENT
 // ============================================
@@ -140,6 +185,7 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
   const resumeHandled = useRef(false);
   const lastToastedStatus = useRef<string | null>(null);
   const isTerminal = useRef(false);
+  const isActiveProcessing = useRef(false);
 
   // Fetch existing active migration for this agency (to resume instead of restarting)
   const { data: existingMigrations } = useQuery({
@@ -202,6 +248,7 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
       resumeHandled.current = false;
       lastToastedStatus.current = null;
       isTerminal.current = false;
+      isActiveProcessing.current = false;
       setIsResuming(false);
     }
   }, [isOpen]);
@@ -216,10 +263,11 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
     enabled: isOpen
   });
 
-  // Exponential backoff: 2s, 4s, 8s, 16s, capped at 30s
+  // Fast polling (2s) during active processing, exponential backoff otherwise
   // Stop polling on terminal states (via isTerminal ref)
   const getPollingInterval = useCallback((): number | false => {
     if (!migrationId || isTerminal.current) return false;
+    if (isActiveProcessing.current) return 2000;
     return Math.min(2000 * Math.pow(2, pollCount), 30000);
   }, [migrationId, pollCount]);
 
@@ -240,12 +288,14 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
   // Track terminal states to stop polling
   useEffect(() => {
     const st = migrationStatus?.statut;
-    if (st === 'PROCESSING' || st === 'PRE_FLIGHT_CHECK') {
+    if (st === 'PENDING' || st === 'PROCESSING' || st === 'PRE_FLIGHT_CHECK') {
       setPollCount(0);
       lastToastedStatus.current = null;
       isTerminal.current = false;
+      isActiveProcessing.current = st === 'PROCESSING' || st === 'PRE_FLIGHT_CHECK';
     } else if (st === 'COMPLETED' || st === 'FAILED' || st === 'CANCELLED' || st === 'ROLLED_BACK') {
       isTerminal.current = true;
+      isActiveProcessing.current = false;
     }
   }, [migrationStatus?.statut]);
 
@@ -318,6 +368,11 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
     },
     onSuccess: () => {
       toast.success('Migration démarrée');
+      // Resume polling: reset terminal flag, poll count, and toast guard
+      isTerminal.current = false;
+      setPollCount(0);
+      lastToastedStatus.current = null;
+      queryClient.invalidateQueries({ queryKey: ['migration-status', migrationId] });
     },
     onError: (error: any) => {
       toast.error(error.message || 'Erreur lors du lancement');
@@ -761,6 +816,7 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
           {/* Processing State */}
           {isProcessing && (
             <div className="space-y-3">
+              {/* Global progress */}
               <div className="flex items-center gap-3">
                 <Loader2 className="animate-spin text-status-info shrink-0" size={20} />
                 <div className="flex-1 min-w-0">
@@ -772,33 +828,97 @@ export function AgencyMigrationWizard({ isOpen, onClose, sourceAgence, onSuccess
                 <span className="text-xs font-mono text-content-muted shrink-0">{migrationStatus?.progress || 0}%</span>
               </div>
 
-              {/* Steps Log */}
-              <div className="bg-surface-base rounded-lg border border-edge divide-y divide-edge max-h-48 overflow-y-auto">
-                {migrationStatus?.logs && migrationStatus.logs.length > 0 ? (
-                  migrationStatus.logs.map((log, idx) => (
-                    <div key={idx} className="flex items-center gap-2 px-3 py-1.5 text-xs">
-                      {log.success ? (
-                        <CheckCircle className="text-status-success shrink-0" size={12} />
-                      ) : (
-                        <X className="text-status-danger shrink-0" size={12} />
-                      )}
-                      <span className="text-content-secondary flex-1 truncate">{log.step}</span>
-                      {log.count !== undefined && (
-                        <span className="text-content-muted font-mono">{log.count}</span>
+              {/* Phase-based progress */}
+              <div className="space-y-2">
+                {MIGRATION_PHASES.map((phase) => {
+                  type LogEntry = { step: string; timestamp: string; success: boolean; count?: number };
+                  const logs: LogEntry[] = migrationStatus?.logs || [];
+                  const currentStep = migrationStatus?.currentStep || '';
+                  const completedSteps = phase.steps.filter(s => logs.some(l => l.step === s && l.success));
+                  const failedSteps = phase.steps.filter(s => logs.some(l => l.step === s && !l.success));
+                  const isPhaseActive = phase.steps.some(s =>
+                    currentStep.includes(s.replace('Migration ', '').replace('Transfert ', ''))
+                  ) && completedSteps.length < phase.steps.length;
+                  const isPhaseComplete = completedSteps.length === phase.steps.length;
+                  const isPhaseError = failedSteps.length > 0;
+                  const PhaseIcon = phase.icon;
+
+                  return (
+                    <div key={phase.id} className={`rounded-lg border transition-colors ${
+                      isPhaseComplete ? 'border-status-success/30 bg-status-success-bg/30' :
+                      isPhaseError ? 'border-status-danger/30 bg-status-danger-bg/30' :
+                      isPhaseActive ? 'border-status-info/30 bg-status-info-bg/20' :
+                      'border-edge bg-surface-base'
+                    }`}>
+                      {/* Phase header */}
+                      <div className="flex items-center gap-2.5 px-3 py-2">
+                        {isPhaseComplete ? (
+                          <CheckCircle className="text-status-success shrink-0" size={16} />
+                        ) : isPhaseError ? (
+                          <AlertCircle className="text-status-danger shrink-0" size={16} />
+                        ) : isPhaseActive ? (
+                          <Loader2 className="animate-spin text-status-info shrink-0" size={16} />
+                        ) : (
+                          <PhaseIcon className="text-content-muted shrink-0" size={16} />
+                        )}
+                        <span className={`text-xs font-semibold flex-1 ${
+                          isPhaseComplete ? 'text-status-success' :
+                          isPhaseError ? 'text-status-danger' :
+                          isPhaseActive ? 'text-status-info' :
+                          'text-content-muted'
+                        }`}>
+                          {phase.label}
+                        </span>
+                        {isPhaseComplete && (
+                          <span className="text-[10px] text-status-success font-mono">OK</span>
+                        )}
+                        {isPhaseActive && completedSteps.length > 0 && (
+                          <span className="text-[10px] text-content-muted font-mono">
+                            {completedSteps.length}/{phase.steps.length}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Sub-steps (shown when active or complete with multiple steps) */}
+                      {(isPhaseActive || isPhaseComplete) && phase.steps.length > 1 && (
+                        <div className="border-t border-edge/50 divide-y divide-edge/30">
+                          {phase.steps.map((stepName) => {
+                            const log = logs.find(l => l.step === stepName);
+                            const isStepActive = !log && currentStep.includes(
+                              stepName.replace('Migration ', '').replace('Transfert ', '')
+                            );
+                            return (
+                              <div key={stepName} className="flex items-center gap-2 px-3 py-1 text-[11px]">
+                                {log?.success ? (
+                                  <CheckCircle className="text-status-success shrink-0" size={10} />
+                                ) : log && !log.success ? (
+                                  <X className="text-status-danger shrink-0" size={10} />
+                                ) : isStepActive ? (
+                                  <span className="relative flex h-2 w-2 shrink-0">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-status-info opacity-75" />
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-status-info" />
+                                  </span>
+                                ) : (
+                                  <span className="w-2.5 h-2.5 rounded-full border border-edge shrink-0" />
+                                )}
+                                <span className={`flex-1 truncate ${
+                                  log?.success ? 'text-content-secondary' :
+                                  isStepActive ? 'text-status-info' :
+                                  'text-content-muted'
+                                }`}>
+                                  {stepName.replace('Migration ', '')}
+                                </span>
+                                {log?.count !== undefined && (
+                                  <span className="text-content-muted font-mono text-[10px]">{log.count}</span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
                       )}
                     </div>
-                  ))
-                ) : null}
-                {/* Current step pulsing indicator */}
-                {migrationStatus?.currentStep && (
-                  <div className="flex items-center gap-2 px-3 py-1.5 text-xs bg-status-info-bg/30">
-                    <span className="relative flex h-2 w-2 shrink-0">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-status-info opacity-75" />
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-status-info" />
-                    </span>
-                    <span className="text-status-info flex-1 truncate">{migrationStatus.currentStep}</span>
-                  </div>
-                )}
+                  );
+                })}
               </div>
 
               <p className="text-[10px] text-content-muted text-center">
