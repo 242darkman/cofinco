@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { StatutDemande } from '@shared/enum/status-constants';
 import type { Facture } from '@shared/schema/operations';
 import { creditKeys } from '../../lib/query-keys';
+import { formatMoney } from '../../lib/format';
 
 export interface DemandeCredit {
   id: string;
@@ -95,7 +96,7 @@ export function useDemandes() {
     onSuccess: (montantApprouve) => {
       invalidateAll();
       toast.success('Demande approuvée', {
-        description: `Montant approuvé: ${montantApprouve.toLocaleString()} FCFA`,
+        description: `Montant approuvé : ${formatMoney(montantApprouve)}`,
       });
     },
     onError: (err: Error) => {

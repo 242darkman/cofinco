@@ -2570,7 +2570,7 @@ export function registerFinanceRoutes(app: Express) {
                   type: 'DECISION',
                   date: demande.dateRejet || demande.updatedAt || new Date(),
                   titre: isRejected ? 'Demande Rejetée' : 'Approbation Comité',
-                  description: isRejected ? (demande.motifRejet || 'Dossier rejeté') : `Montant approuvé: ${demande.montantApprouve || demande.montantDemande}`,
+                  description: isRejected ? (demande.motifRejet || 'Dossier rejeté') : `Montant approuvé: ${Number(demande.montantApprouve || demande.montantDemande).toLocaleString('fr-FR')} ${currencySymbol()}`,
                   statut: demande.statut
               });
           }

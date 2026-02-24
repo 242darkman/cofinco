@@ -169,6 +169,8 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                        demande.statut.toLowerCase() === 'annulée' ||
                        demande.statut.toLowerCase() === 'cancelled');
 
+  const isDeleted = demande.statut === StatutDemande.DELETED || !!demande.deletedAt;
+
   // Check if refund was already made (paid or in progress)
   const hasRefundInProgress = existingRefund && ['SUBMITTED', 'APPROVED', 'PENDING_CAISSE'].includes(existingRefund.statut);
   const hasRefundPaid = existingRefund?.statut === 'PAID';
@@ -192,7 +194,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                             !hasAnyRefund;
 
   const isPendingFees = demande.statut === StatutDemande.PENDING_FEES;
-  const showActions = ((!isFinished && !isRejected && !isCancelled && !isPendingFees) || isReevaluating);
+  const showActions = ((!isFinished && !isRejected && !isCancelled && !isDeleted && !isPendingFees) || isReevaluating);
 
   // Helper: convert V2 duration to days
   const convertDureeEnJours = (valeur: number, unite: string): number => {
@@ -1209,7 +1211,7 @@ export default function CreditApprovalModal({ demande, onClose, onSuccess, onMan
                         )}
                         <button
                             onClick={onClose}
-                            className={`${canRequestReevaluation || canInitiateRefund ? 'px-6' : 'flex-1'} py-2.5 bg-surface-elevated hover:bg-surface-subtle text-content-primary rounded-lg font-medium transition`}
+                            className={`${canRequestReevaluation || canInitiateRefund ? 'px-6' : 'flex-1'} py-2.5 bg-surface-elevated hover:bg-status-danger hover:text-white text-content-primary rounded-lg font-medium transition`}
                         >
                             {canRequestReevaluation || canInitiateRefund ? 'Fermer' : 'Fermer le dossier'}
                         </button>
