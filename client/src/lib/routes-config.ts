@@ -208,7 +208,7 @@ export const ROUTES: RouteConfig[] = [
       { path: '/agent-terrain/incidents', subModule: 'incidents', label: 'Incidents' },
       { path: '/agent-terrain/objectifs', subModule: 'objectifs', label: 'Objectifs' },
       { path: '/agent-terrain/supervision-prospection', subModule: 'supervision-prospection', label: 'Supervision' },
-      { path: '/agent-terrain/tracking-debug', subModule: 'tracking-debug', label: 'Tracking Debug' },
+      ...(import.meta.env.DEV ? [{ path: '/agent-terrain/tracking-debug', subModule: 'tracking-debug', label: 'Tracking Debug' }] : []),
     ],
   },
   {

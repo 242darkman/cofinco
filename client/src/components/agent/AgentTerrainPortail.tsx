@@ -161,7 +161,7 @@ export default function AgentTerrainPortail({ agentId, activeView, onModuleChang
     { id: 'incidents', name: 'Incidents', icon: AlertTriangle, component: AgentIncidents },
     { id: 'objectifs', name: 'Objectifs', icon: Target, component: AgentObjectifs },
     { id: 'supervision-prospection', name: 'Supervision', icon: Eye, component: ProspectionSupervisionPanel },
-    { id: 'tracking-debug', name: 'Tracking Debug', icon: Locate, component: TrackingDebugPage },
+    ...(import.meta.env.DEV ? [{ id: 'tracking-debug', name: 'Tracking Debug', icon: Locate, component: TrackingDebugPage }] : []),
   ];
 
   const ActiveComponent = modules.find(m => m.id === activeModule)?.component;

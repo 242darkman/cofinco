@@ -2108,4 +2108,97 @@ caisseAdminRouter.post(
   }
 );
 
+// ============================================================================
+// AUTO-CLOSE EXPIRED SESSIONS (via SQL function close_expired_sessions)
+// ============================================================================
+
+/**
+ * POST /api/caisses/sessions/auto-close-expired
+ * Ferme automatiquement les sessions inactives au-delà du timeout.
+ * Appelle la fonction SQL close_expired_sessions() qui calcule le solde théorique
+ * et ferme les sessions avec closed_reason = 'timeout'.
+ */
+caisseAdminRouter.post(
+  "/sessions/auto-close-expired",
+  attachAbility, requireAbility(Actions.MANAGE, Subjects.CAISSE),
+  async (req, res) => {
+    try {
+      const timeoutHours = req.body.timeoutHours ?? 12;
+
+      if (typeof timeoutHours !== 'number' || timeoutHours < 1 || timeoutHours > 72) {
+        return res.status(400).json({ error: "timeoutHours doit être entre 1 et 72" });
+      }
+
+      const result = await db.execute(
+        sql`SELECT * FROM close_expired_sessions(${timeoutHours})`
+      );
+
+      const closedSessions = result.rows || [];
+
+      logger.info(
+        { count: closedSessions.length, timeoutHours },
+        `Auto-fermeture: ${closedSessions.length} session(s) expirée(s) fermée(s)`
+      );
+
+      res.json({
+        success: true,
+        closedCount: closedSessions.length,
+        sessions: closedSessions,
+      });
+    } catch (error: any) {
+      logger.error({ err: error }, "Erreur auto-fermeture sessions expirées");
+      res.status(500).json({ error: error.message || "Erreur lors de l'auto-fermeture" });
+    }
+  }
+);
+
+// ============================================================================
+// GET RISKY SESSIONS (via SQL function get_risky_sessions)
+// ============================================================================
+
+/**
+ * GET /api/caisses/sessions/risky
+ * Retourne les sessions ouvertes à risque (inactives depuis warning_hours).
+ * Classifie chaque session comme WARNING ou CRITICAL et calcule le solde courant.
+ */
+caisseAdminRouter.get(
+  "/sessions/risky",
+  attachAbility, requireAbility(Actions.VIEW, Subjects.CAISSE),
+  async (req, res) => {
+    try {
+      const warningHours = parseInt(req.query.warningHours as string) || 6;
+      const criticalHours = parseInt(req.query.criticalHours as string) || 10;
+
+      if (warningHours < 1 || criticalHours < warningHours) {
+        return res.status(400).json({
+          error: "warningHours doit être >= 1 et criticalHours >= warningHours"
+        });
+      }
+
+      const result = await db.execute(
+        sql`SELECT * FROM get_risky_sessions(${warningHours}, ${criticalHours})`
+      );
+
+      const sessions = (result.rows || []).map((row: any) => ({
+        sessionId: row.session_id,
+        caisseNom: row.caisse_nom,
+        caissierNom: row.caissier_nom,
+        hoursInactive: parseFloat(row.hours_inactive),
+        riskLevel: row.risk_level,
+        soldeCurrent: parseFloat(row.solde_current),
+      }));
+
+      res.json({
+        total: sessions.length,
+        warning: sessions.filter((s: any) => s.riskLevel === 'WARNING').length,
+        critical: sessions.filter((s: any) => s.riskLevel === 'CRITICAL').length,
+        sessions,
+      });
+    } catch (error: any) {
+      logger.error({ err: error }, "Erreur récupération sessions à risque");
+      res.status(500).json({ error: error.message || "Erreur lors de la récupération" });
+    }
+  }
+);
+
 export default caisseAdminRouter;

@@ -2,7 +2,6 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
-import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 import { metaImagesPlugin } from "./vite-plugin-meta-images";
 import { VitePWA } from "vite-plugin-pwa";
 
@@ -16,7 +15,6 @@ export default defineConfig({
   },
   plugins: [
     react(),
-    runtimeErrorOverlay(),
     tailwindcss(),
     metaImagesPlugin(),
     VitePWA({
@@ -198,28 +196,12 @@ export default defineConfig({
         type: 'module'
       }
     }),
-    ...(process.env.NODE_ENV !== "production" &&
-    process.env.REPL_ID !== undefined
-      ? [
-          await import("@replit/vite-plugin-cartographer").then((m) =>
-            m.cartographer(),
-          ),
-          await import("@replit/vite-plugin-dev-banner").then((m) =>
-            m.devBanner(),
-          ),
-        ]
-      : []),
   ],
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "client", "src"),
       "@shared": path.resolve(import.meta.dirname, "shared"),
       "server": path.resolve(import.meta.dirname, "server"),
-    },
-  },
-  css: {
-    postcss: {
-      plugins: [],
     },
   },
   root: path.resolve(import.meta.dirname, "client"),
@@ -259,7 +241,7 @@ export default defineConfig({
             return true;
           }
           // Don't preload heavy optional chunks (will be loaded on demand)
-          const heavyChunks = ['charts', 'maps', 'face-recognition', 'export-tools', 'animations'];
+          const heavyChunks = ['charts', 'maps', 'export-tools', 'animations'];
           if (heavyChunks.some(chunk => dep.includes(chunk))) {
             return false;
           }
@@ -310,11 +292,6 @@ export default defineConfig({
           // PDF/Excel generation (lazy loaded on export only)
           if (id.includes('jspdf') || id.includes('xlsx') || id.includes('html2canvas')) {
             return 'export-tools';
-          }
-
-          // Face recognition (heavy, rarely used)
-          if (id.includes('@vladmandic/face-api') || id.includes('face-api')) {
-            return 'face-recognition';
           }
 
           // Dexie (IndexedDB wrapper - defer loading)

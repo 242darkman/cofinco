@@ -357,33 +357,6 @@ export async function ensureCustomFunctions(): Promise<void> {
     console.log('[DB] ✓ Trigger: trg_ensure_single_primary');
     objectCount++;
 
-    // Get effective role for user (used in authentication)
-    await db.execute(sql`
-      CREATE OR REPLACE FUNCTION get_effective_role(p_user_id UUID)
-      RETURNS user_role AS $$
-      DECLARE
-        v_role user_role;
-      BEGIN
-        SELECT role INTO v_role
-        FROM user_roles
-        WHERE user_id = p_user_id AND is_primary = true
-        LIMIT 1;
-
-        IF v_role IS NULL THEN
-          SELECT role INTO v_role
-          FROM user_roles
-          WHERE user_id = p_user_id
-          ORDER BY created_at ASC
-          LIMIT 1;
-        END IF;
-
-        RETURN COALESCE(v_role, 'CLIENT'::user_role);
-      END;
-      $$ LANGUAGE plpgsql STABLE;
-    `);
-    console.log('[DB] ✓ get_effective_role()');
-    objectCount++;
-
     // RBAC version management for cache invalidation
     await db.execute(sql`
       CREATE OR REPLACE FUNCTION increment_rbac_version(
@@ -688,52 +661,6 @@ export async function ensureCustomFunctions(): Promise<void> {
     // 4. MICROFINANCE & ACCOUNTS FUNCTIONS
     // ========================================================================
 
-    // Check withdrawal eligibility (business rules)
-    await db.execute(sql`
-      CREATE OR REPLACE FUNCTION check_withdrawal_eligibility(p_compte_id UUID)
-      RETURNS TABLE (
-          allowed BOOLEAN,
-          reason TEXT
-      ) AS $$
-      DECLARE
-          v_compte RECORD;
-      BEGIN
-          SELECT * INTO v_compte FROM comptes WHERE id = p_compte_id;
-
-          IF NOT FOUND THEN
-              RETURN QUERY SELECT FALSE, 'Compte non trouvé'::TEXT;
-              RETURN;
-          END IF;
-
-          IF v_compte.statut = 'SUSPENDED' THEN
-              RETURN QUERY SELECT FALSE, 'Compte suspendu'::TEXT;
-              RETURN;
-          END IF;
-
-          IF v_compte.statut = 'CLOSED' THEN
-              RETURN QUERY SELECT FALSE, 'Compte clôturé'::TEXT;
-              RETURN;
-          END IF;
-
-          IF v_compte.type_compte = 'BLOCKED' AND v_compte.blocage_actif = TRUE THEN
-              RETURN QUERY SELECT FALSE, ('Compte bloqué: ' || COALESCE(v_compte.blocage_motif::TEXT, 'Raison non spécifiée'))::TEXT;
-              RETURN;
-          END IF;
-
-          IF v_compte.blocage_actif = TRUE AND v_compte.blocage_fin IS NOT NULL THEN
-              IF NOW() < v_compte.blocage_fin THEN
-                  RETURN QUERY SELECT FALSE, ('Compte bloqué jusqu''au ' || TO_CHAR(v_compte.blocage_fin, 'DD/MM/YYYY'))::TEXT;
-                  RETURN;
-              END IF;
-          END IF;
-
-          RETURN QUERY SELECT TRUE, NULL::TEXT;
-      END;
-      $$ LANGUAGE plpgsql;
-    `);
-    console.log('[DB] ✓ check_withdrawal_eligibility()');
-    objectCount++;
-
     // Auto-update timestamp when balance changes
     await db.execute(sql`
       CREATE OR REPLACE FUNCTION update_compte_timestamp()
@@ -761,54 +688,9 @@ export async function ensureCustomFunctions(): Promise<void> {
     // 5. CREDIT & REPAYMENT FUNCTIONS
     // ========================================================================
 
-    // Calculate installment status based on payment state
-    await db.execute(sql`
-      CREATE OR REPLACE FUNCTION calculate_echeance_status(
-          p_date_echeance TIMESTAMP,
-          p_montant_total NUMERIC,
-          p_montant_paye NUMERIC
-      ) RETURNS VARCHAR AS $$
-      DECLARE
-          v_status VARCHAR;
-      BEGIN
-          IF p_montant_paye >= p_montant_total THEN
-              v_status := 'PAID';
-          ELSIF p_montant_paye > 0 AND p_montant_paye < p_montant_total THEN
-              v_status := 'PARTIALLY_PAID';
-          ELSIF p_date_echeance < CURRENT_DATE AND p_montant_paye < p_montant_total THEN
-              v_status := 'LATE';
-          ELSIF p_date_echeance <= CURRENT_DATE + INTERVAL '7 days' THEN
-              v_status := 'DUE';
-          ELSE
-              v_status := 'UPCOMING';
-          END IF;
-
-          RETURN v_status;
-      END;
-      $$ LANGUAGE plpgsql IMMUTABLE;
-    `);
-    console.log('[DB] ✓ calculate_echeance_status()');
-    objectCount++;
-
     // ========================================================================
     // 6. SESSIONS & CAISSE FUNCTIONS (from 0003, 0011)
     // ========================================================================
-
-    // Cleanup expired sessions (from 0003_add_active_sessions)
-    try {
-      await db.execute(sql`
-        CREATE OR REPLACE FUNCTION cleanup_expired_sessions()
-        RETURNS void AS $$
-        BEGIN
-          DELETE FROM "active_sessions" WHERE "expires_at" < NOW();
-        END;
-        $$ LANGUAGE plpgsql;
-      `);
-      console.log('[DB] ✓ cleanup_expired_sessions()');
-      objectCount++;
-    } catch (err) {
-      console.warn('[DB] ⚠ Failed to create "cleanup_expired_sessions":', err instanceof Error ? err.message : err);
-    }
 
     // Update session heartbeat (from 0011_robust_caisse_sessions)
     try {
@@ -890,7 +772,7 @@ export async function ensureCustomFunctions(): Promise<void> {
             session_id := expired_session.id;
             caisse_id := expired_session.caisse_id;
             caissier_id := expired_session.caissier_id;
-            opened_at := expired_session.date_ouverture;
+            opened_at := expired_session.opened_at;
             last_activity := expired_session.last_activity;
             hours_inactive := EXTRACT(EPOCH FROM (NOW() - expired_session.last_activity)) / 3600;
 
@@ -1025,203 +907,8 @@ export async function ensureCustomFunctions(): Promise<void> {
     // 7. TONTINES FUNCTIONS (from 0031_tontine_production_ready)
     // ========================================================================
 
-    // Generate tontine calendar
-    try {
-      await db.execute(sql`
-        CREATE OR REPLACE FUNCTION generate_tontine_calendar(
-            p_tontine_id UUID,
-            p_cycle_id UUID,
-            p_user_id UUID,
-            p_random_seed INTEGER DEFAULT NULL
-        ) RETURNS TABLE (
-            schedules_created INTEGER,
-            turns_created INTEGER,
-            audit_id UUID
-        ) AS $$
-        DECLARE
-            v_tontine RECORD;
-            v_members UUID[];
-            v_member_count INTEGER;
-            v_current_date DATE;
-            v_due_date DATE;
-            v_interval INTERVAL;
-            v_turn_order JSONB;
-            v_audit_id UUID;
-            v_schedules_count INTEGER := 0;
-            v_turns_count INTEGER := 0;
-            v_seed INTEGER;
-            i INTEGER;
-        BEGIN
-            SELECT t.*, tc.start_date AS cycle_start
-            INTO v_tontine
-            FROM tontines t
-            JOIN tontine_cycles tc ON tc.id = p_cycle_id
-            WHERE t.id = p_tontine_id;
-
-            IF v_tontine IS NULL THEN
-                RAISE EXCEPTION 'Tontine ou cycle non trouvé';
-            END IF;
-
-            SELECT ARRAY_AGG(id ORDER BY position NULLS LAST, date_adhesion)
-            INTO v_members
-            FROM membres_tontine
-            WHERE tontine_id = p_tontine_id AND statut = 'ACTIVE' AND deleted_at IS NULL;
-
-            v_member_count := COALESCE(array_length(v_members, 1), 0);
-
-            IF v_member_count = 0 THEN
-                RAISE EXCEPTION 'Aucun membre actif dans la tontine';
-            END IF;
-
-            v_interval := CASE v_tontine.frequence
-                WHEN 'DAILY' THEN INTERVAL '1 day' * v_tontine.intervalle_cotisation
-                WHEN 'WEEKLY' THEN INTERVAL '1 week' * v_tontine.intervalle_cotisation
-                WHEN 'BIWEEKLY' THEN INTERVAL '2 weeks' * v_tontine.intervalle_cotisation
-                WHEN 'MONTHLY' THEN INTERVAL '1 month' * v_tontine.intervalle_cotisation
-                WHEN 'BIMONTHLY' THEN INTERVAL '2 months' * v_tontine.intervalle_cotisation
-                WHEN 'QUARTERLY' THEN INTERVAL '3 months' * v_tontine.intervalle_cotisation
-                ELSE INTERVAL '1 month'
-            END;
-
-            v_current_date := v_tontine.cycle_start;
-
-            FOR i IN 1..v_member_count LOOP
-                v_due_date := v_current_date + (v_interval * (i - 1));
-
-                INSERT INTO tontine_schedules (
-                    agence_id, tontine_id, cycle_id, period_number, due_date,
-                    amount_expected_per_member, status
-                ) VALUES (
-                    v_tontine.agence_id, p_tontine_id, p_cycle_id, i, v_due_date,
-                    v_tontine.montant_cotisation, 'UPCOMING'
-                );
-                v_schedules_count := v_schedules_count + 1;
-
-                INSERT INTO tontine_turns (
-                    agence_id, tontine_id, cycle_id, turn_number,
-                    beneficiary_member_id, due_date, amount_expected, status
-                ) VALUES (
-                    v_tontine.agence_id, p_tontine_id, p_cycle_id, i,
-                    v_members[i], v_due_date,
-                    v_tontine.montant_cotisation * v_member_count,
-                    'SCHEDULED'
-                );
-                v_turns_count := v_turns_count + 1;
-            END LOOP;
-
-            IF v_tontine.type_distribution = 'RANDOM' THEN
-                v_seed := COALESCE(p_random_seed, (EXTRACT(EPOCH FROM NOW()) * 1000)::INTEGER);
-
-                UPDATE tontine_turns tt
-                SET beneficiary_member_id = (
-                    SELECT m.id
-                    FROM membres_tontine m
-                    WHERE m.tontine_id = p_tontine_id AND m.statut = 'ACTIVE' AND m.deleted_at IS NULL
-                    ORDER BY md5(m.id::text || v_seed::text)
-                    OFFSET tt.turn_number - 1 LIMIT 1
-                )
-                WHERE tt.cycle_id = p_cycle_id;
-            END IF;
-
-            v_turn_order := (
-                SELECT jsonb_agg(jsonb_build_object('turn_number', turn_number, 'member_id', beneficiary_member_id))
-                FROM tontine_turns WHERE cycle_id = p_cycle_id ORDER BY turn_number
-            );
-
-            INSERT INTO tontine_turn_audit (
-                agence_id, tontine_id, cycle_id, action_type, new_order,
-                reason, changed_by, metadata
-            ) VALUES (
-                v_tontine.agence_id, p_tontine_id, p_cycle_id, 'INITIAL_GENERATION',
-                v_turn_order, 'Génération initiale du calendrier',
-                p_user_id, jsonb_build_object('seed', v_seed, 'distribution_type', v_tontine.type_distribution)
-            ) RETURNING id INTO v_audit_id;
-
-            RETURN QUERY SELECT v_schedules_count, v_turns_count, v_audit_id;
-        END;
-        $$ LANGUAGE plpgsql;
-      `);
-      console.log('[DB] ✓ generate_tontine_calendar()');
-      objectCount++;
-    } catch (err) {
-      console.warn('[DB] ⚠ Failed to create "generate_tontine_calendar":', err instanceof Error ? err.message : err);
-    }
-
-    // Calculate tontine retirable amount
-    try {
-      await db.execute(sql`
-        CREATE OR REPLACE FUNCTION calculate_tontine_retirable(
-            p_tontine_id UUID,
-            p_member_id UUID
-        ) RETURNS TABLE (
-            pot_disponible NUMERIC,
-            droits_membre NUMERIC,
-            penalites_deduire NUMERIC,
-            montant_retirable NUMERIC,
-            peut_retirer BOOLEAN,
-            raison TEXT
-        ) AS $$
-        DECLARE
-            v_tontine RECORD;
-            v_member RECORD;
-            v_pot NUMERIC;
-            v_droits NUMERIC;
-            v_penalites NUMERIC;
-            v_retirable NUMERIC;
-            v_can_withdraw BOOLEAN;
-            v_reason TEXT;
-            v_member_count INTEGER;
-        BEGIN
-            SELECT * INTO v_tontine FROM tontines WHERE id = p_tontine_id AND deleted_at IS NULL;
-            IF v_tontine IS NULL THEN
-                RETURN QUERY SELECT 0::NUMERIC, 0::NUMERIC, 0::NUMERIC, 0::NUMERIC, FALSE, 'Tontine non trouvée'::TEXT;
-                RETURN;
-            END IF;
-
-            SELECT * INTO v_member FROM membres_tontine WHERE id = p_member_id AND deleted_at IS NULL;
-            IF v_member IS NULL THEN
-                RETURN QUERY SELECT 0::NUMERIC, 0::NUMERIC, 0::NUMERIC, 0::NUMERIC, FALSE, 'Membre non trouvé'::TEXT;
-                RETURN;
-            END IF;
-
-            IF v_member.statut != 'ACTIVE' THEN
-                v_can_withdraw := FALSE;
-                v_reason := 'Membre non actif';
-            ELSIF v_member.a_recu_benefice THEN
-                v_can_withdraw := FALSE;
-                v_reason := 'Bénéfice déjà reçu pour ce cycle';
-            ELSE
-                v_can_withdraw := TRUE;
-                v_reason := NULL;
-            END IF;
-
-            v_pot := COALESCE(v_tontine.solde, 0);
-
-            SELECT COUNT(*) INTO v_member_count
-            FROM membres_tontine WHERE tontine_id = p_tontine_id AND statut = 'ACTIVE' AND deleted_at IS NULL;
-
-            v_droits := v_tontine.montant_cotisation * v_member_count;
-
-            SELECT COALESCE(SUM(montant), 0) INTO v_penalites
-            FROM tontine_penalites
-            WHERE membre_id = p_member_id AND statut = 'PENDING' AND deleted_at IS NULL;
-
-            v_retirable := LEAST(v_pot, v_droits - v_penalites);
-            IF v_retirable < 0 THEN v_retirable := 0; END IF;
-
-            IF v_can_withdraw AND v_retirable < v_droits THEN
-                v_reason := 'Pot insuffisant (distribution partielle possible)';
-            END IF;
-
-            RETURN QUERY SELECT v_pot, v_droits, v_penalites, v_retirable, v_can_withdraw, v_reason;
-        END;
-        $$ LANGUAGE plpgsql;
-      `);
-      console.log('[DB] ✓ calculate_tontine_retirable()');
-      objectCount++;
-    } catch (err) {
-      console.warn('[DB] ⚠ Failed to create "calculate_tontine_retirable":', err instanceof Error ? err.message : err);
-    }
+    // NOTE: generate_tontine_calendar() removed — logic lives in tontineProductionService.generateCycle()
+    // NOTE: calculate_tontine_retirable() removed — logic lives in tontineProductionService.calculateRetirable()
 
     // Auto-lock turn when distribution starts
     try {
@@ -1291,42 +978,7 @@ export async function ensureCustomFunctions(): Promise<void> {
     }
 
     // ========================================================================
-    // 8. AGENT TERRAIN FUNCTIONS (from 0032_agent_terrain_production)
-    // ========================================================================
-
-    try {
-      await db.execute(sql`
-        CREATE OR REPLACE FUNCTION calculate_remise_totals(p_remise_id UUID)
-        RETURNS TABLE(
-          total_items INTEGER,
-          montant_calcule NUMERIC,
-          by_type JSONB
-        ) AS $$
-        BEGIN
-          RETURN QUERY
-          SELECT
-            COUNT(*)::INTEGER AS total_items,
-            COALESCE(SUM(ri.montant), 0) AS montant_calcule,
-            jsonb_object_agg(ri.type_paiement, item_totals.total) AS by_type
-          FROM remise_items ri
-          LEFT JOIN LATERAL (
-            SELECT ri2.type_paiement, SUM(ri2.montant) AS total
-            FROM remise_items ri2
-            WHERE ri2.remise_id = p_remise_id
-            GROUP BY ri2.type_paiement
-          ) item_totals ON true
-          WHERE ri.remise_id = p_remise_id;
-        END;
-        $$ LANGUAGE plpgsql STABLE;
-      `);
-      console.log('[DB] ✓ calculate_remise_totals()');
-      objectCount++;
-    } catch (err) {
-      console.warn('[DB] ⚠ Failed to create "calculate_remise_totals":', err instanceof Error ? err.message : err);
-    }
-
-    // ========================================================================
-    // 9. AGENCY MANAGEMENT FUNCTIONS (from 0033_agency_feature_locks)
+    // 8. AGENCY MANAGEMENT FUNCTIONS (from 0033_agency_feature_locks)
     // ========================================================================
 
     try {
@@ -1356,110 +1008,6 @@ export async function ensureCustomFunctions(): Promise<void> {
     // ========================================================================
     // 10. HR MODULE FUNCTIONS (from 0035_hr_production_ready)
     // ========================================================================
-
-    // Calculate business days (excluding weekends)
-    try {
-      await db.execute(sql`
-        CREATE OR REPLACE FUNCTION calculate_business_days(start_date DATE, end_date DATE)
-        RETURNS INTEGER AS $$
-        DECLARE
-          total_days INTEGER;
-          full_weeks INTEGER;
-          remaining_days INTEGER;
-          start_dow INTEGER;
-          end_dow INTEGER;
-          weekend_days INTEGER;
-        BEGIN
-          IF start_date > end_date THEN
-            RETURN 0;
-          END IF;
-
-          total_days := end_date - start_date + 1;
-          full_weeks := total_days / 7;
-          remaining_days := total_days % 7;
-          weekend_days := full_weeks * 2;
-
-          start_dow := EXTRACT(DOW FROM start_date);
-          end_dow := EXTRACT(DOW FROM end_date);
-
-          IF remaining_days > 0 THEN
-            IF start_dow = 0 THEN
-              weekend_days := weekend_days + 1;
-            ELSIF start_dow = 6 THEN
-              weekend_days := weekend_days + 2;
-            ELSIF start_dow + remaining_days > 6 THEN
-              weekend_days := weekend_days + LEAST(2, start_dow + remaining_days - 6);
-            END IF;
-          END IF;
-
-          RETURN GREATEST(0, total_days - weekend_days);
-        END;
-        $$ LANGUAGE plpgsql IMMUTABLE;
-      `);
-      console.log('[DB] ✓ calculate_business_days()');
-      objectCount++;
-    } catch (err) {
-      console.warn('[DB] ⚠ Failed to create "calculate_business_days":', err instanceof Error ? err.message : err);
-    }
-
-    // Check leave overlap
-    try {
-      await db.execute(sql`
-        CREATE OR REPLACE FUNCTION check_leave_overlap(
-          p_employe_id UUID,
-          p_date_debut DATE,
-          p_date_fin DATE,
-          p_exclude_id INTEGER DEFAULT NULL
-        )
-        RETURNS BOOLEAN AS $$
-        BEGIN
-          RETURN EXISTS (
-            SELECT 1 FROM demandes_conges dc
-            WHERE dc.employe_id = p_employe_id
-              AND dc.statut IN ('PENDING', 'APPROVED')
-              AND dc.id != COALESCE(p_exclude_id, -1)
-              AND (
-                (p_date_debut BETWEEN dc.date_debut AND dc.date_fin)
-                OR (p_date_fin BETWEEN dc.date_debut AND dc.date_fin)
-                OR (dc.date_debut BETWEEN p_date_debut AND p_date_fin)
-              )
-          );
-        END;
-        $$ LANGUAGE plpgsql STABLE;
-      `);
-      console.log('[DB] ✓ check_leave_overlap()');
-      objectCount++;
-    } catch (err) {
-      console.warn('[DB] ⚠ Failed to create "check_leave_overlap":', err instanceof Error ? err.message : err);
-    }
-
-    // Get leave balance
-    try {
-      await db.execute(sql`
-        CREATE OR REPLACE FUNCTION get_leave_balance(
-          p_employe_id UUID,
-          p_leave_type VARCHAR DEFAULT 'Congé Annuel'
-        )
-        RETURNS INTEGER AS $$
-        DECLARE
-          v_balance INTEGER;
-        BEGIN
-          SELECT (lb.acquired + lb.carry_over - lb.used - lb.pending)
-          INTO v_balance
-          FROM leave_balances lb
-          WHERE lb.employe_id = p_employe_id
-            AND lb.year = EXTRACT(YEAR FROM CURRENT_DATE)
-            AND lb.leave_type = p_leave_type;
-
-          RETURN COALESCE(v_balance, 0);
-        END;
-        $$ LANGUAGE plpgsql STABLE;
-      `);
-      console.log('[DB] ✓ get_leave_balance()');
-      objectCount++;
-    } catch (err) {
-      console.warn('[DB] ⚠ Failed to create "get_leave_balance":', err instanceof Error ? err.message : err);
-    }
 
     // HR audit trigger function
     try {
@@ -1519,51 +1067,7 @@ export async function ensureCustomFunctions(): Promise<void> {
     }
 
     // ========================================================================
-    // 11. SCHEDULED TRANSFERS FUNCTIONS (from 0036_scheduled_transfers_production_ready)
-    // ========================================================================
-
-    try {
-      await db.execute(sql`
-        CREATE OR REPLACE FUNCTION compute_next_execution(
-            p_base_date TIMESTAMP,
-            p_frequence TEXT,
-            p_timezone TEXT DEFAULT 'Africa/Brazzaville',
-            p_jour_execution INTEGER DEFAULT NULL
-        ) RETURNS TIMESTAMP AS $$
-        DECLARE
-            v_next TIMESTAMP;
-            v_day_of_month INTEGER;
-        BEGIN
-            v_next := p_base_date AT TIME ZONE p_timezone;
-
-            CASE p_frequence
-                WHEN 'ONCE' THEN
-                    RETURN NULL;
-                WHEN 'DAILY' THEN
-                    v_next := v_next + INTERVAL '1 day';
-                WHEN 'WEEKLY' THEN
-                    v_next := v_next + INTERVAL '7 days';
-                WHEN 'MONTHLY' THEN
-                    v_day_of_month := COALESCE(p_jour_execution, EXTRACT(DAY FROM v_next)::INTEGER);
-                    v_next := DATE_TRUNC('month', v_next) + INTERVAL '1 month';
-                    v_day_of_month := LEAST(v_day_of_month, 28);
-                    v_next := v_next + (v_day_of_month - 1) * INTERVAL '1 day';
-                ELSE
-                    RETURN NULL;
-            END CASE;
-
-            RETURN v_next AT TIME ZONE p_timezone AT TIME ZONE 'UTC';
-        END;
-        $$ LANGUAGE plpgsql IMMUTABLE;
-      `);
-      console.log('[DB] ✓ compute_next_execution()');
-      objectCount++;
-    } catch (err) {
-      console.warn('[DB] ⚠ Failed to create "compute_next_execution":', err instanceof Error ? err.message : err);
-    }
-
-    // ========================================================================
-    // 12. AUDIT & SETTINGS FUNCTIONS (from 0048, 0049, 0051)
+    // 11. AUDIT & SETTINGS FUNCTIONS (from 0048, 0049, 0051)
     // ========================================================================
 
     // Get next settings version (from 0048_audit_trail_snapshots)
@@ -1874,29 +1378,6 @@ export async function ensureCustomFunctions(): Promise<void> {
       objectCount++;
     } catch (err) {
       console.warn('[DB] ⚠ Failed to create VIEW "v_sessions_caisse_stats":', err instanceof Error ? err.message : err);
-    }
-
-    // VIEW: v_user_primary_roles (from 0021_auth_v3_clean_architecture)
-    try {
-      await db.execute(sql`
-        CREATE OR REPLACE VIEW v_user_primary_roles AS
-        SELECT
-          ur.user_id,
-          ur.role,
-          ur.agence_id,
-          u.nom,
-          u.prenom,
-          u.username,
-          a.nom as agence_nom
-        FROM user_roles ur
-        JOIN users u ON ur.user_id = u.id
-        LEFT JOIN agences a ON ur.agence_id = a.id
-        WHERE ur.is_primary = true;
-      `);
-      console.log('[DB] ✓ VIEW: v_user_primary_roles');
-      objectCount++;
-    } catch (err) {
-      console.warn('[DB] ⚠ Failed to create VIEW "v_user_primary_roles":', err instanceof Error ? err.message : err);
     }
 
     // VIEW: v_tontine_dashboard (from 0031_tontine_production_ready)

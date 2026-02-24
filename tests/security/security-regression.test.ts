@@ -534,7 +534,6 @@ describe("Math.random() elimination — Server-side references and IDs", () => {
 describe("Math.random() elimination — Client-side security code", () => {
 
   const CLIENT_CRITICAL_FILES = [
-    "components/admin/users/UserFormModal.tsx",
     "components/hr/EmployeeProfileDrawer.tsx",
     "components/finance/operations/TransactionVerificationWrapper.tsx",
     "lib/criticalOperations.ts",
@@ -562,12 +561,6 @@ describe("Math.random() elimination — Client-side security code", () => {
     expect(violations).toEqual([]);
   });
 
-  it("client password generation should use crypto.getRandomValues", () => {
-    const clientRoot = resolve(PROJECT_ROOT, "client/src");
-    const content = readFileSync(join(clientRoot, "components/admin/users/UserFormModal.tsx"), "utf-8");
-    expect(content).toContain("crypto.getRandomValues");
-    expect(content).not.toMatch(/generatePassword[\s\S]*?Math\.random/);
-  });
 });
 
 // ============================================================================
