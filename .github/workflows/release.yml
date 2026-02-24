@@ -94,6 +94,8 @@ jobs:
         run: npm run check
 
       - name: Unit tests
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/test
         run: npx vitest run --exclude 'tests/contracts/**' --exclude 'tests/e2e/**' --exclude 'tests/integration/**' --exclude 'tests/robustness/**'
 
   # ==========================================
