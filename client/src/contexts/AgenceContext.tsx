@@ -70,7 +70,7 @@ export function AgenceProvider({ children }: { children: ReactNode }) {
         const allAgencesRes = await fetch('/api/agences', { credentials: 'include' });
         if (allAgencesRes.ok) {
           const allAgences: Agence[] = await allAgencesRes.json();
-          data = allAgences.map(a => ({
+          data = allAgences.filter(a => a.statut === 'ACTIVE').map(a => ({
             id: `admin-${a.id}`,
             agenceId: a.id,
             isPrimary: a.typeAgence === TypeAgence.MAIN,
