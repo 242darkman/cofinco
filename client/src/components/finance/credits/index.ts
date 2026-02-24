@@ -9,5 +9,5 @@ export { EnqueteWizard } from './EnqueteWizard';
 export { ReevaluationEligibilityCheck } from './ReevaluationEligibilityCheck';
 export { ReevaluationModal } from './ReevaluationModal';
 export { ReevaluationList } from './ReevaluationList';
-export { ReevaluationDetailPanel } from './ReevaluationDetailPanel';
+export { ReevaluationCockpit } from './ReevaluationCockpit';
 export { ReevaluationWorkflowPage } from './ReevaluationWorkflowPage';

@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { RefreshCw, ArrowLeft, List, Eye } from 'lucide-react';
 import { ReevaluationList } from './ReevaluationList';
-import { ReevaluationDetailPanel } from './ReevaluationDetailPanel';
+import { ReevaluationCockpit } from './ReevaluationCockpit';
 
 interface Reevaluation {
   id: string;
@@ -52,7 +52,7 @@ export function ReevaluationWorkflowPage({ demandeId, onClose, embedded = false,
           showFilters={!demandeId}
         />
       ) : selectedReevaluation ? (
-        <ReevaluationDetailPanel
+        <ReevaluationCockpit
           reevaluationId={selectedReevaluation.id}
           onBack={handleBack}
           onStatusChange={handleStatusChange}
@@ -67,7 +67,7 @@ export function ReevaluationWorkflowPage({ demandeId, onClose, embedded = false,
 
   return (
     <div className="min-h-screen bg-surface-base p-6">
-      <div className="max-w-4xl mx-auto">
+      <div className={`mx-auto ${viewMode === 'detail' ? 'max-w-7xl' : 'max-w-4xl'}`}>
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
