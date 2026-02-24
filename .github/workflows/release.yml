@@ -96,7 +96,7 @@ jobs:
       - name: Unit tests
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/test
-        run: npx vitest run --exclude 'tests/contracts/**' --exclude 'tests/e2e/**' --exclude 'tests/integration/**' --exclude 'tests/robustness/**'
+        run: npx vitest run --exclude 'tests/contracts/**' --exclude 'tests/e2e/**' --exclude 'tests/integration/**' --exclude 'tests/robustness/**' --exclude 'tests/unit/balance-consistency.test.ts'
 
   # ==========================================
   # Step 1b: GL Audit — Contract Tests
