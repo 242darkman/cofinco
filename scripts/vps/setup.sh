@@ -359,8 +359,9 @@ ufw allow ssh
 ufw allow 80/tcp
 ufw allow 443/tcp
 
-# Deny PostgreSQL from external (it should NOT be exposed)
-ufw deny 5432/tcp
+# Allow PostgreSQL from Docker subnet only (containers → host PG)
+# Default "deny incoming" blocks external access, no explicit deny needed
+ufw allow from 172.16.0.0/12 to any port 5432 proto tcp comment 'PostgreSQL from Docker'
 
 # Enable firewall
 ufw --force enable
