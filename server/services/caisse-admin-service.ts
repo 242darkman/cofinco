@@ -12,7 +12,9 @@ import {
   type SessionCaisse,
   type Caisse,
 } from "@shared/schema";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, notInArray } from "drizzle-orm";
+
+const SESSION_TERMINAL_STATUSES = ["CLOSED", "RECONCILIATION_PENDING", "RECONCILIATION_COMPLETE"] as const;
 import { ForcedCloseReason } from "@shared/enums";
 import { createLogger } from "../lib/logger";
 
@@ -155,7 +157,7 @@ export class CaisseAdminService {
       .from(sessionsCaisse)
       .where(and(
         eq(sessionsCaisse.caissierId, userId),
-        isNull(sessionsCaisse.closedAt),
+        notInArray(sessionsCaisse.statut, [...SESSION_TERMINAL_STATUSES]),
         isNull(sessionsCaisse.deletedAt)
       ));
 
@@ -267,7 +269,7 @@ export class CaisseAdminService {
         .from(sessionsCaisse)
         .where(and(
           eq(sessionsCaisse.caisseId, caisseId),
-          isNull(sessionsCaisse.closedAt),
+          notInArray(sessionsCaisse.statut, [...SESSION_TERMINAL_STATUSES]),
           isNull(sessionsCaisse.deletedAt)
         ));
 

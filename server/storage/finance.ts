@@ -84,7 +84,10 @@ export { DecaissementInsufficientFundsError, InsufficientFundsError, type Insuff
     echeancesCredits, type EcheanceCredit, type InsertEcheanceCredit
   } from "@shared/schema";
   import { db } from "../db";
-import { eq, desc, and, or, gte, lte, lt, gt, count, inArray, sql, getTableColumns, aliasedTable, isNull, isNotNull, asc, ne } from "drizzle-orm";
+import { eq, desc, and, or, gte, lte, lt, gt, count, inArray, notInArray, sql, getTableColumns, aliasedTable, isNull, isNotNull, asc, ne } from "drizzle-orm";
+
+// Statuts terminaux — alignés avec les contraintes uniques DB sur sessions_caisse
+const SESSION_TERMINAL_STATUSES = ["CLOSED", "RECONCILIATION_PENDING", "RECONCILIATION_COMPLETE"] as const;
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import { computeSessionStatus } from "../services/caisse/session-status";
 
@@ -1113,9 +1116,8 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     .leftJoin(users, eq(sessionsCaisse.caissierId, users.id))
     .where(and(
       eq(sessionsCaisse.caissierId, userId),
-      isNull(sessionsCaisse.closedAt),
-      // Seules les sessions dont l'ouverture est finalisée sont considérées actives
-      inArray(sessionsCaisse.statut, ["OPEN", "CLOSING_COUNT", "CLOSING_VALIDATION"] as StatutSessionCaisseDz[])
+      inArray(sessionsCaisse.statut, ["OPEN", "CLOSING_COUNT", "CLOSING_VALIDATION"] as StatutSessionCaisseDz[]),
+      isNull(sessionsCaisse.deletedAt)
     ));
 
     if (results.length === 0) return undefined;
@@ -1130,7 +1132,9 @@ import { computeSessionStatus } from "../services/caisse/session-status";
   }
 
   export async function getActiveSessions(): Promise<SessionCaisse[]> {
-    return db.select().from(sessionsCaisse).where(isNull(sessionsCaisse.closedAt));
+    return db.select().from(sessionsCaisse).where(
+      and(notInArray(sessionsCaisse.statut, [...SESSION_TERMINAL_STATUSES]), isNull(sessionsCaisse.deletedAt))
+    );
   }
 
   export async function getAllSessionsCaisse(filter: { agence?: string; statut?: string } = {}): Promise<any[]> {
@@ -1159,14 +1163,15 @@ import { computeSessionStatus } from "../services/caisse/session-status";
       if (normalized === StatutCaisseAgent.OPEN) {
         conditions.push(
           and(
-            isNull(sessionsCaisse.closedAt),
+            notInArray(sessionsCaisse.statut, [...SESSION_TERMINAL_STATUSES]),
+            isNull(sessionsCaisse.deletedAt),
             or(isNull(sessionsCaisse.timeoutAt), gte(sessionsCaisse.timeoutAt, now))
           )
         );
       } else if (normalized === "TIMED_OUT" || normalized === "TIMEOUT") {
-        conditions.push(and(isNull(sessionsCaisse.closedAt), lt(sessionsCaisse.timeoutAt, now)));
+        conditions.push(and(notInArray(sessionsCaisse.statut, [...SESSION_TERMINAL_STATUSES]), isNull(sessionsCaisse.deletedAt), lt(sessionsCaisse.timeoutAt, now)));
       } else if (normalized === StatutCaisseAgent.CLOSED) {
-        conditions.push(isNotNull(sessionsCaisse.closedAt));
+        conditions.push(inArray(sessionsCaisse.statut, [...SESSION_TERMINAL_STATUSES]));
       }
     }
 
@@ -1202,7 +1207,8 @@ import { computeSessionStatus } from "../services/caisse/session-status";
       .set({ connectionStatus: status })
       .where(and(
         eq(sessionsCaisse.caissierId, userId),
-        isNull(sessionsCaisse.closedAt)
+        notInArray(sessionsCaisse.statut, [...SESSION_TERMINAL_STATUSES]),
+        isNull(sessionsCaisse.deletedAt)
       ));
   }
 
@@ -1305,7 +1311,7 @@ import { computeSessionStatus } from "../services/caisse/session-status";
       .from(sessionsCaisse)
       .where(and(
         eq(sessionsCaisse.caisseId, caisseId),
-        isNotNull(sessionsCaisse.closedAt)
+        eq(sessionsCaisse.statut, "CLOSED")
       ))
       .orderBy(desc(sessionsCaisse.closedAt))
       .limit(1);
@@ -1511,7 +1517,8 @@ import { computeSessionStatus } from "../services/caisse/session-status";
     .from(caisses)
     .leftJoin(sessionsCaisse, and(
       eq(caisses.id, sessionsCaisse.caisseId),
-      isNull(sessionsCaisse.closedAt)
+      notInArray(sessionsCaisse.statut, [...SESSION_TERMINAL_STATUSES]),
+      isNull(sessionsCaisse.deletedAt)
     ))
     .leftJoin(users, eq(sessionsCaisse.caissierId, users.id));
 
@@ -1599,7 +1606,8 @@ import { computeSessionStatus } from "../services/caisse/session-status";
         .from(sessionsCaisse)
         .where(and(
           eq(sessionsCaisse.caisseId, caisse.id),
-          isNull(sessionsCaisse.closedAt)
+          notInArray(sessionsCaisse.statut, [...SESSION_TERMINAL_STATUSES]),
+          isNull(sessionsCaisse.deletedAt)
         ));
 
       // Get last closed session for balance info

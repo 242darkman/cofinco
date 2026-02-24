@@ -41,7 +41,9 @@ import {
   contributionsTontine,
 } from "@shared/schema";
 import { StatutTransaction, TypeOperationCaisse, StatutRemiseTerrain } from "@shared/enum/status-constants";
-import { eq, sql, and, inArray, isNull, desc } from "drizzle-orm";
+import { eq, sql, and, inArray, notInArray, isNull, desc } from "drizzle-orm";
+
+const SESSION_TERMINAL_STATUSES = ["CLOSED", "RECONCILIATION_PENDING", "RECONCILIATION_COMPLETE"] as const;
 import { generateReference, updateCreditSolde, updateSessionSolde, type MouvementFinancier } from "../ledger";
 import { postFromMouvement } from "../accounting-posting-service";
 import type { PgTransaction } from "drizzle-orm/pg-core";
@@ -394,7 +396,8 @@ export class RemiseSettlementService {
           .from(sessionsCaisse)
           .where(and(
             eq(sessionsCaisse.caisseId, remise.caisseDestinationId!),
-            isNull(sessionsCaisse.closedAt)
+            notInArray(sessionsCaisse.statut, [...SESSION_TERMINAL_STATUSES]),
+            isNull(sessionsCaisse.deletedAt)
           ))
           .limit(1);
         if (activeCaisseSession) targetSessionId = activeCaisseSession.id;

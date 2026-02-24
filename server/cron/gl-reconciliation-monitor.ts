@@ -106,7 +106,7 @@ export async function runGlReconciliationCheck(): Promise<ReconciliationResult> 
             0
           ) as solde_reel
         FROM caisses c
-        LEFT JOIN sessions_caisse s ON s.caisse_id = c.id AND s.closed_at IS NULL
+        LEFT JOIN sessions_caisse s ON s.caisse_id = c.id AND s.statut NOT IN ('CLOSED', 'RECONCILIATION_PENDING', 'RECONCILIATION_COMPLETE') AND s.deleted_at IS NULL
       ) sub
     `);
 

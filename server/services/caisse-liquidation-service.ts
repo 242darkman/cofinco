@@ -17,7 +17,9 @@ import {
 } from "@shared/schema";
 import { coffresForts } from "@shared/schema/coffres-forts";
 import { StatutTransaction, MethodePaiement } from "@shared/enum/status-constants";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, notInArray } from "drizzle-orm";
+
+const SESSION_TERMINAL_STATUSES = ["CLOSED", "RECONCILIATION_PENDING", "RECONCILIATION_COMPLETE"] as const;
 import {
   assertCaisseCanDebit,
   assertCaisseCanCredit,
@@ -96,7 +98,7 @@ export class CaisseLiquidationService {
         .from(sessionsCaisse)
         .where(and(
           eq(sessionsCaisse.caisseId, caisseId),
-          isNull(sessionsCaisse.closedAt),
+          notInArray(sessionsCaisse.statut, [...SESSION_TERMINAL_STATUSES]),
           isNull(sessionsCaisse.deletedAt)
         ));
 
@@ -163,7 +165,7 @@ export class CaisseLiquidationService {
           .from(sessionsCaisse)
           .where(and(
             eq(sessionsCaisse.caisseId, autreCaisse.id),
-            isNull(sessionsCaisse.closedAt),
+            notInArray(sessionsCaisse.statut, [...SESSION_TERMINAL_STATUSES]),
             isNull(sessionsCaisse.deletedAt)
           ));
 
@@ -285,7 +287,7 @@ export class CaisseLiquidationService {
           .from(sessionsCaisse)
           .where(and(
             eq(sessionsCaisse.caisseId, params.destinationId),
-            isNull(sessionsCaisse.closedAt),
+            notInArray(sessionsCaisse.statut, [...SESSION_TERMINAL_STATUSES]),
             isNull(sessionsCaisse.deletedAt)
           ));
 

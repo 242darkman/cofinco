@@ -19,7 +19,7 @@ import { sessionsCaisseAuditLogs, denominationTemplates, caisses, sessionsCaisse
 import { caisseSecurityCodes } from "@shared/schema/operations";
 import { users, userRoles, coffresForts, agences } from "@shared/schema";
 import { SystemRole } from "@shared/types/roles";
-import { eq, desc, and, gte, lte, sql, count, isNull, isNotNull, or } from "drizzle-orm";
+import { eq, desc, and, gte, lte, sql, count, isNull, isNotNull, notInArray, or } from "drizzle-orm";
 import { createMouvementFinancier } from "../services/ledger";
 
 export const caisseAdminRouter = Router();
@@ -2004,8 +2004,8 @@ caisseAdminRouter.post(
         .where(
           and(
             eq(sessionsCaisse.caisseId, caisseId),
-            isNull(sessionsCaisse.closedAt),
-            sql`${sessionsCaisse.statut} IN ('OPEN', 'CLOSING_COUNT', 'CLOSING_VALIDATION')`
+            notInArray(sessionsCaisse.statut, ["CLOSED", "RECONCILIATION_PENDING", "RECONCILIATION_COMPLETE"]),
+            isNull(sessionsCaisse.deletedAt)
           )
         )
         .limit(1);

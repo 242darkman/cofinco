@@ -21,7 +21,7 @@ import {
   sessionsCaisse,
   operationsCaisse,
 } from "@shared/schema";
-import { eq, sql, desc, isNull, and, gte, lte, ne } from "drizzle-orm";
+import { eq, sql, desc, isNull, notInArray, and, gte, lte, ne } from "drizzle-orm";
 import { deriveSensFromType } from "@shared/config/transaction-labels";
 import { createLogger } from "../lib/logger";
 
@@ -337,7 +337,7 @@ async function checkSessionBalances(options: ReconciliationOptions): Promise<Rec
       caisseId: sessionsCaisse.caisseId,
     })
     .from(sessionsCaisse)
-    .where(isNull(sessionsCaisse.closedAt))
+    .where(and(notInArray(sessionsCaisse.statut, ["CLOSED", "RECONCILIATION_PENDING", "RECONCILIATION_COMPLETE"]), isNull(sessionsCaisse.deletedAt)))
     .limit(options.limit || 50);
 
   for (const session of sessions) {

@@ -20,7 +20,7 @@ import {
   transactionsCompte,
 } from "@shared/schema";
 import { StatutTransaction, StatutCompte } from "@shared/enum/status-constants";
-import { eq, sql, and, isNull, isNotNull, gte, inArray } from "drizzle-orm";
+import { eq, sql, and, isNull, isNotNull, gte, inArray, notInArray } from "drizzle-orm";
 import { createLogger } from "../../lib/logger";
 
 const logger = createLogger('Reconciliation');
@@ -213,7 +213,12 @@ export async function reconcileOpenSessions(autoFix: boolean = false): Promise<R
     })
     .from(sessionsCaisse)
     .leftJoin(caisses, eq(sessionsCaisse.caisseId, caisses.id))
-    .where(isNull(sessionsCaisse.closedAt));
+    .where(
+      and(
+        notInArray(sessionsCaisse.statut, ["CLOSED", "RECONCILIATION_PENDING", "RECONCILIATION_COMPLETE"]),
+        isNull(sessionsCaisse.deletedAt)
+      )
+    );
 
   for (const { session, caisseNom } of openSessions) {
     const soldeCached = parseFloat(session.montantFermetureTheorique || "0");

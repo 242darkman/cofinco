@@ -21,7 +21,7 @@ import {
   StatutParticipationTontine
 } from "@shared/enum/status-constants";
 import { storage } from "../storage";
-import { count, sql, and, gte, eq, desc, sum, ilike, or, isNull } from "drizzle-orm";
+import { count, sql, and, gte, eq, desc, sum, ilike, or, isNull, notInArray } from "drizzle-orm";
 
 import { getGlobalStats } from "../services/stats/dashboard-stats";
 
@@ -154,7 +154,7 @@ export function registerDashboardRoutes(app: Express) {
         // 6. Caisse sessions ouvertes
         db.select({
           ouvertes: count()
-        }).from(sessionsCaisse).where(withAgence(sessionsCaisse, isNull(sessionsCaisse.closedAt))),
+        }).from(sessionsCaisse).where(withAgence(sessionsCaisse, and(notInArray(sessionsCaisse.statut, ["CLOSED", "RECONCILIATION_PENDING", "RECONCILIATION_COMPLETE"]), isNull(sessionsCaisse.deletedAt)))),
 
         // 7. Weekly clients (last 7 days)
         db.select({
@@ -520,7 +520,7 @@ export function registerDashboardRoutes(app: Express) {
         // Open sessions count
         db.select({
           ouvertes: count()
-        }).from(sessionsCaisse).where(withAgence(sessionsCaisse, isNull(sessionsCaisse.closedAt)))
+        }).from(sessionsCaisse).where(withAgence(sessionsCaisse, and(notInArray(sessionsCaisse.statut, ["CLOSED", "RECONCILIATION_PENDING", "RECONCILIATION_COMPLETE"]), isNull(sessionsCaisse.deletedAt))))
       ]);
 
       // Minimal response payload (~5KB instead of ~50KB)

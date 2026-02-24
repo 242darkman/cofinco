@@ -25,7 +25,9 @@ import {
   transfertsInterCoffres,
   operationsTerrain,
 } from "@shared/schema";
-import { eq, sql, and, or, isNull, desc, sum } from "drizzle-orm";
+import { eq, sql, and, or, isNull, notInArray, desc, sum } from "drizzle-orm";
+
+const SESSION_TERMINAL_STATUSES = ["CLOSED", "RECONCILIATION_PENDING", "RECONCILIATION_COMPLETE"] as const;
 import type {
   Balance,
   BalanceEntityType,
@@ -108,7 +110,8 @@ class BalanceService {
     .from(sessionsCaisse)
     .where(and(
       eq(sessionsCaisse.caisseId, caisseId),
-      isNull(sessionsCaisse.closedAt)
+      notInArray(sessionsCaisse.statut, [...SESSION_TERMINAL_STATUSES]),
+      isNull(sessionsCaisse.deletedAt)
     ))
     .orderBy(desc(sessionsCaisse.openedAt))
     .limit(1);
@@ -722,7 +725,7 @@ class BalanceService {
     // 2. Toutes les sessions actives
     const activeSessions = await db.select({ id: sessionsCaisse.id })
       .from(sessionsCaisse)
-      .where(isNull(sessionsCaisse.closedAt));
+      .where(and(notInArray(sessionsCaisse.statut, [...SESSION_TERMINAL_STATUSES]), isNull(sessionsCaisse.deletedAt)));
 
     for (const session of activeSessions) {
       try {

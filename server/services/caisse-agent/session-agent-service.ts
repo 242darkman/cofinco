@@ -14,7 +14,9 @@
  */
 
 import { db } from "../../db";
-import { eq, and, or, isNull, sql, desc, ne } from "drizzle-orm";
+import { eq, and, or, isNull, notInArray, sql, desc, ne } from "drizzle-orm";
+
+const SESSION_TERMINAL_STATUSES = ["CLOSED", "RECONCILIATION_PENDING", "RECONCILIATION_COMPLETE"] as const;
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import {
   sessionsAgent,
@@ -364,7 +366,8 @@ export class SessionAgentService {
           .from(sessionsCaisse)
           .where(and(
             eq(sessionsCaisse.caisseId, params.sourceCaisseId),
-            isNull(sessionsCaisse.closedAt),
+            notInArray(sessionsCaisse.statut, [...SESSION_TERMINAL_STATUSES]),
+            isNull(sessionsCaisse.deletedAt),
           ))
           .for("update");
 
@@ -762,7 +765,8 @@ export class SessionAgentService {
             .from(sessionsCaisse)
             .where(and(
               eq(sessionsCaisse.caisseId, session.destinationCaisseId),
-              isNull(sessionsCaisse.closedAt)
+              notInArray(sessionsCaisse.statut, [...SESSION_TERMINAL_STATUSES]),
+              isNull(sessionsCaisse.deletedAt)
             ))
             .limit(1);
 
@@ -1237,7 +1241,8 @@ export class SessionAgentService {
             .from(sessionsCaisse)
             .where(and(
               eq(sessionsCaisse.caisseId, params.destinationCaisseId),
-              isNull(sessionsCaisse.closedAt)
+              notInArray(sessionsCaisse.statut, [...SESSION_TERMINAL_STATUSES]),
+              isNull(sessionsCaisse.deletedAt)
             ))
             .limit(1);
 

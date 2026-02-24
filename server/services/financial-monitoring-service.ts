@@ -16,7 +16,7 @@ import {
   operationsCaisse,
   virementsProgrammes,
 } from "@shared/schema";
-import { eq, sql, and, gte, lte, isNull, desc, lt } from "drizzle-orm";
+import { eq, sql, and, gte, lte, isNull, notInArray, desc, lt } from "drizzle-orm";
 import { createLogger } from "../lib/logger";
 import { getWsInstance } from "../ws-server";
 import { runReconciliation, type ReconciliationAnomaly } from "./transaction-integrity-service";
@@ -393,7 +393,7 @@ export async function getDashboard(): Promise<MonitoringDashboard> {
       count: sql<number>`count(*)`,
       volume: sql<string>`COALESCE(SUM(montant::numeric), 0)`,
     }).from(transactionsCompte).where(gte(transactionsCompte.createdAt, today)),
-    db.select({ count: sql<number>`count(*)` }).from(sessionsCaisse).where(isNull(sessionsCaisse.closedAt)),
+    db.select({ count: sql<number>`count(*)` }).from(sessionsCaisse).where(and(notInArray(sessionsCaisse.statut, ["CLOSED", "RECONCILIATION_PENDING", "RECONCILIATION_COMPLETE"]), isNull(sessionsCaisse.deletedAt))),
     db.select({ count: sql<number>`count(*)` }).from(virementsProgrammes).where(eq(virementsProgrammes.actif, true)),
   ]);
 

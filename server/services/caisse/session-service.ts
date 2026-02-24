@@ -10,10 +10,10 @@
  */
 
 import { db } from "../../db";
-import { sessionsCaisse, sessionsCaisseAuditLogs, operationsCaisse, caisses, users, mouvementsFinanciers, clients, cashOpeningDiscrepancies } from "@shared/schema";
-import { eq, and, sql, desc, lt, gte, lte, or, isNull, isNotNull } from "drizzle-orm";
+import { sessionsCaisse, sessionsCaisseAuditLogs, operationsCaisse, caisses, users, mouvementsFinanciers, clients } from "@shared/schema";
+import { eq, and, sql, desc, lt, gte, lte, or, isNull, isNotNull, notInArray } from "drizzle-orm";
 import { ForcedCloseReason, SessionComputedStatus } from "@shared/enums";
-import { StatutTransaction, StatutSessionCaisse, StatutCaisse, CaisseOpeningStrictness, type CaisseOpeningStrictnessType } from "@shared/enum/status-constants";
+import { StatutTransaction, StatutSessionCaisse, StatutCaisse } from "@shared/enum/status-constants";
 import type { TypeOperationCaisseDz, MethodePaiementDz } from "@shared/enum/enums";
 import {
   getOperationDelta,
@@ -23,9 +23,6 @@ import {
 } from "@shared/config/caisse-operations";
 import { postGlForMouvement } from "../accounting-posting-service";
 import { createLogger } from "../../lib/logger";
-import { glBalanceReader } from "../treasury/gl-balance-reader";
-import { getWsInstance } from "../../ws-server";
-import { recordGlGuardEvent } from "../../lib/metrics";
 
 const logger = createLogger('SessionService');
 
@@ -60,6 +57,9 @@ const WARNING_INACTIVE_HOURS = CAISSE_THRESHOLDS.INACTIVITE_WARNING_HOURS;
 const CRITICAL_INACTIVE_HOURS = CAISSE_THRESHOLDS.INACTIVITE_CRITICAL_HOURS;
 const MAX_ECART_THRESHOLD = CAISSE_THRESHOLDS.MAX_ECART_SANS_ALERTE;
 
+// Statuts terminaux — alignés avec le prédicat des contraintes uniques DB
+const TERMINAL_STATUSES = ["CLOSED", "RECONCILIATION_PENDING", "RECONCILIATION_COMPLETE"] as const;
+
 // ============================================================================
 // GL RECONCILIATION GUARD
 // ============================================================================
@@ -82,7 +82,7 @@ async function checkCaisseGlReconciliation(): Promise<GlReconciliationCheck> {
       COALESCE(CAST(s.montant_fermeture_theorique AS DECIMAL), CAST(s.montant_ouverture AS DECIMAL), 0)
     ), 0) as total
     FROM caisses c
-    LEFT JOIN sessions_caisse s ON s.caisse_id = c.id AND s.closed_at IS NULL
+    LEFT JOIN sessions_caisse s ON s.caisse_id = c.id AND s.statut NOT IN ('CLOSED', 'RECONCILIATION_PENDING', 'RECONCILIATION_COMPLETE') AND s.deleted_at IS NULL
   `);
   const operationalBalance = parseFloat((operationalResult.rows[0] as { total?: string })?.total || '0');
 
@@ -264,467 +264,10 @@ export function validateBilletage(
 }
 
 // ============================================================================
-// OUVERTURE DE SESSION (ATOMIQUE)
-// ============================================================================
-
-interface OpenSessionParams {
-  caissierId: string;
-  caisseId: string;
-  agenceId: string;
-  soldeInitial: string;
-  billetageOuverture: Record<string, number>;
-  ipAddress?: string;
-  userAgent?: string;
-  // GL Guard parameters
-  strictnessMode?: CaisseOpeningStrictnessType;
-  discrepancyJustification?: string; // Required if strictness is WARNING_WITH_JUSTIFICATION and there's a discrepancy
-  discrepancyApprovedBy?: string; // User who approved the discrepancy (supervisor)
-}
-
-type SessionRow = typeof sessionsCaisse.$inferSelect;
-
-interface OpenSessionResult {
-  success: boolean;
-  session?: SessionRow;
-  error?: string;
-  errorCode?:
-    | "CAISSE_OCCUPIED"
-    | "USER_HAS_SESSION"
-    | "INVALID_BILLETAGE"
-    | "CAISSE_NOT_FOUND"
-    | "CAISSE_AGENCE_MISMATCH"
-    | "GL_DISCREPANCY_BLOCKED"       // STRICT_BLOCK mode with discrepancy
-    | "GL_DISCREPANCY_NO_JUSTIFICATION" // WARNING mode but no justification provided
-    | "GL_READ_ERROR"                 // Error reading GL balance
-    | "NEGATIVE_OPENING_BALANCE"      // Billetage total is negative
-    | "DB_ERROR";
-  // GL Guard info in result
-  glGuardInfo?: {
-    glBalance: number;
-    billetageTotal: number;
-    ecart: number;
-    strictnessApplied: CaisseOpeningStrictnessType;
-    action: "BLOCKED" | "APPROVED_WITH_JUSTIFICATION" | "LOGGED_ONLY";
-  };
-}
-
-/**
- * Ouvre une session de caisse de manière atomique
- * - Vérifie qu'aucune session n'est déjà ouverte sur cette caisse
- * - Vérifie que l'utilisateur n'a pas déjà une session ouverte
- * - Valide le billetage côté serveur
- * - **GL GUARD**: Vérifie la cohérence billetage vs GL (strictness configurable)
- * - Utilise une transaction SERIALIZABLE pour éviter les race conditions
- */
-export async function openSessionAtomic(params: OpenSessionParams): Promise<OpenSessionResult> {
-  const {
-    caissierId,
-    caisseId,
-    agenceId,
-    soldeInitial,
-    billetageOuverture,
-    ipAddress,
-    userAgent,
-    strictnessMode = CaisseOpeningStrictness.LOG_ONLY, // Default: log only
-    discrepancyJustification,
-    discrepancyApprovedBy,
-  } = params;
-
-  // 1. Validation du billetage côté serveur
-  const billetageValidation = validateBilletage(billetageOuverture, Number(soldeInitial));
-
-  if (!billetageValidation.isValid) {
-    return {
-      success: false,
-      error: billetageValidation.errors.join("; "),
-      errorCode: "INVALID_BILLETAGE",
-    };
-  }
-
-  // GUARD: Le montant calculé du billetage ne doit jamais être négatif
-  if (billetageValidation.calculatedTotal < 0) {
-    return {
-      success: false,
-      error: `Le total du billetage est négatif (${billetageValidation.calculatedTotal.toLocaleString('fr-FR')} FCFA). Vérifiez les quantités saisies.`,
-      errorCode: "NEGATIVE_OPENING_BALANCE",
-    };
-  }
-
-  // 2. Lecture du solde GL pour cette caisse (avant transaction pour ne pas bloquer)
-  const glResult = await glBalanceReader.getGlBalanceForCaisseIsolated(caisseId);
-
-  if (!glResult.success || !glResult.balance) {
-    logger.error({ caisseId, error: glResult.error }, '[GL GUARD] Erreur lecture solde GL');
-    // En mode LOG_ONLY, on continue malgré l'erreur de lecture GL
-    if (strictnessMode !== CaisseOpeningStrictness.LOG_ONLY) {
-      return {
-        success: false,
-        error: `Impossible de lire le solde GL: ${glResult.error}`,
-        errorCode: "GL_READ_ERROR",
-      };
-    }
-  }
-
-  const glBalance = glResult.balance?.glBalance ?? 0;
-  const billetageTotal = billetageValidation.calculatedTotal;
-  const ecartGl = billetageTotal - glBalance;
-  const hasDiscrepancy = Math.abs(ecartGl) > MAX_ECART_THRESHOLD;
-
-  // 3. Application de la logique GL Guard selon le mode de strictness
-  let glGuardAction: "BLOCKED" | "APPROVED_WITH_JUSTIFICATION" | "LOGGED_ONLY" = "LOGGED_ONLY";
-
-  if (hasDiscrepancy) {
-    logger.warn({
-      caisseId,
-      billetageTotal,
-      glBalance,
-      ecart: ecartGl,
-      strictnessMode,
-    }, '[GL GUARD] Écart détecté entre billetage et GL');
-
-    switch (strictnessMode) {
-      case CaisseOpeningStrictness.STRICT_BLOCK:
-        // Mode strict: bloquer l'ouverture
-        // Record metrics
-        recordGlGuardEvent({
-          action: 'BLOCKED',
-          agenceId,
-          strictnessMode,
-          discrepancyAmount: Math.abs(ecartGl),
-        });
-
-        // Broadcast WebSocket event
-        const wsBlocked = getWsInstance();
-        if (wsBlocked) {
-          wsBlocked.broadcast({
-            type: 'CAISSE_OPENING_BLOCKED',
-            payload: {
-              caisseId,
-              agenceId,
-              caissierId,
-              glBalance,
-              billetageTotal,
-              ecart: ecartGl,
-              strictnessMode,
-              timestamp: new Date().toISOString(),
-            },
-          });
-        }
-
-        return {
-          success: false,
-          error: `Écart de ${ecartGl.toLocaleString('fr-FR')} FCFA détecté entre le billetage (${billetageTotal.toLocaleString('fr-FR')}) et le solde GL (${glBalance.toLocaleString('fr-FR')}). L'ouverture est bloquée en mode strict.`,
-          errorCode: "GL_DISCREPANCY_BLOCKED",
-          glGuardInfo: {
-            glBalance,
-            billetageTotal,
-            ecart: ecartGl,
-            strictnessApplied: strictnessMode,
-            action: "BLOCKED",
-          },
-        };
-
-      case CaisseOpeningStrictness.WARNING_WITH_JUSTIFICATION:
-        // Mode warning: exiger une justification
-        if (!discrepancyJustification || discrepancyJustification.trim().length < 10) {
-          return {
-            success: false,
-            error: `Écart de ${ecartGl.toLocaleString('fr-FR')} FCFA détecté. Une justification d'au moins 10 caractères est requise pour continuer.`,
-            errorCode: "GL_DISCREPANCY_NO_JUSTIFICATION",
-            glGuardInfo: {
-              glBalance,
-              billetageTotal,
-              ecart: ecartGl,
-              strictnessApplied: strictnessMode,
-              action: "BLOCKED",
-            },
-          };
-        }
-        glGuardAction = "APPROVED_WITH_JUSTIFICATION";
-        break;
-
-      case CaisseOpeningStrictness.LOG_ONLY:
-      default:
-        // Mode log only: on continue avec log
-        glGuardAction = "LOGGED_ONLY";
-        break;
-    }
-  }
-
-  // 4. Vérification GL avant ouverture (logging global)
-  await logGlReconciliationStatus('SESSION_OPEN_PRE', undefined);
-
-  try {
-    // 5. Transaction atomique avec niveau d'isolation SERIALIZABLE
-    const result = await db.transaction(
-      async (tx) => {
-        // Vérifier si la caisse est déjà occupée (avec lock implicite via la contrainte unique)
-        const [existingCaisseSession] = await tx
-          .select()
-          .from(sessionsCaisse)
-          .where(and(eq(sessionsCaisse.caisseId, caisseId), isNull(sessionsCaisse.closedAt)));
-
-        if (existingCaisseSession) {
-          // Same user, same caisse, OPEN → recover the existing session
-          if (existingCaisseSession.caissierId === caissierId && existingCaisseSession.statut === "OPEN") {
-            await tx
-              .update(sessionsCaisse)
-              .set({ lastActivity: new Date() })
-              .where(eq(sessionsCaisse.id, existingCaisseSession.id));
-            return existingCaisseSession;
-          }
-          throw new Error("CAISSE_OCCUPIED:Cette caisse est déjà occupée par une autre session");
-        }
-
-        // Vérifier si l'utilisateur a déjà une session ouverte
-        const [existingUserSession] = await tx
-          .select()
-          .from(sessionsCaisse)
-          .where(and(eq(sessionsCaisse.caissierId, caissierId), isNull(sessionsCaisse.closedAt)));
-
-        if (existingUserSession) {
-          // Same caisse → recover
-          if (existingUserSession.caisseId === caisseId && existingUserSession.statut === "OPEN") {
-            await tx
-              .update(sessionsCaisse)
-              .set({ lastActivity: new Date() })
-              .where(eq(sessionsCaisse.id, existingUserSession.id));
-            return existingUserSession;
-          }
-          throw new Error("USER_HAS_SESSION:Vous avez déjà une session ouverte sur une autre caisse");
-        }
-
-        const [caisse] = await tx.select().from(caisses).where(eq(caisses.id, caisseId));
-        if (!caisse) {
-          throw new Error("CAISSE_NOT_FOUND:Caisse introuvable");
-        }
-
-        if (agenceId && caisse.agenceId && caisse.agenceId !== agenceId) {
-          throw new Error("CAISSE_AGENCE_MISMATCH:La caisse ne correspond pas à l'agence sélectionnée");
-        }
-
-        const sessionAgenceId = caisse.agenceId || agenceId;
-        const caisseSoldeAvant = Number(caisse.solde || 0);
-        const openingEcart = billetageValidation.calculatedTotal - caisseSoldeAvant;
-
-        // Calculer le timeout (12h par défaut)
-        const timeoutAt = new Date();
-        timeoutAt.setHours(timeoutAt.getHours() + DEFAULT_SESSION_TIMEOUT_HOURS);
-
-        // Récupérer la session précédente (pour traçabilité)
-        const [previousSession] = await tx
-          .select({
-            id: sessionsCaisse.id,
-            closedAt: sessionsCaisse.closedAt,
-            ecart: sessionsCaisse.ecart,
-          })
-          .from(sessionsCaisse)
-          .where(eq(sessionsCaisse.caisseId, caisseId))
-          .orderBy(desc(sessionsCaisse.closedAt))
-          .limit(1);
-
-        // Créer la session avec le solde recalculé côté serveur + champs GL Guard
-        const [newSession] = await tx
-          .insert(sessionsCaisse)
-          .values({
-            caissierId,
-            caisseId,
-            agenceId: sessionAgenceId,
-            montantOuverture: billetageValidation.calculatedTotal.toString(),
-            montantFermetureTheorique: billetageValidation.calculatedTotal.toString(),
-            billetageOuverture,
-            openedAt: new Date(),
-            lastActivity: new Date(),
-            timeoutAt,
-            // GL Guard fields
-            openingGlBalance: glBalance.toString(),
-            openingBilletageTotal: billetageTotal.toString(),
-            openingEcart: ecartGl.toString(),
-            openingStrictnessApplied: strictnessMode,
-            hasOpeningDiscrepancy: hasDiscrepancy,
-            openingDiscrepancyJustification: hasDiscrepancy ? discrepancyJustification : null,
-            openingDiscrepancyApprovedBy: hasDiscrepancy && discrepancyApprovedBy ? discrepancyApprovedBy : null,
-            openingDiscrepancyApprovedAt: hasDiscrepancy && discrepancyApprovedBy ? new Date() : null,
-          })
-          .returning();
-
-        // Si écart, enregistrer dans la table de traçabilité
-        if (hasDiscrepancy) {
-          await tx.insert(cashOpeningDiscrepancies).values({
-            sessionId: newSession.id,
-            agenceId: sessionAgenceId,
-            caisseId,
-            userId: caissierId,
-            glBalance: glBalance.toString(),
-            billetageTotal: billetageTotal.toString(),
-            ecart: ecartGl.toString(),
-            ecartPercent: glBalance !== 0 ? ((ecartGl / glBalance) * 100).toString() : null,
-            strictnessMode,
-            action: glGuardAction,
-            justification: discrepancyJustification || null,
-            approvedBy: discrepancyApprovedBy || null,
-            approvedAt: discrepancyApprovedBy ? new Date() : null,
-            billetageDetail: billetageOuverture,
-            previousSessionId: previousSession?.id || null,
-            previousSessionClosedAt: previousSession?.closedAt || null,
-            previousSessionEcart: previousSession?.ecart || null,
-            ipAddress: ipAddress || null,
-            userAgent: userAgent || null,
-          });
-
-          logger.warn({
-            sessionId: newSession.id,
-            caisseId,
-            ecart: ecartGl,
-            action: glGuardAction,
-            strictnessMode,
-          }, '[GL GUARD] Écart enregistré dans cash_opening_discrepancies');
-        }
-
-        // Log d'audit
-        await tx.insert(sessionsCaisseAuditLogs).values({
-          sessionId: newSession.id,
-          action: "OPENED",
-          statutApres: SessionComputedStatus.OPEN,
-          details: {
-            soldeInitial: billetageValidation.calculatedTotal,
-            soldeInitialFourni: Number(soldeInitial),
-            billetageOuverture,
-            caisseId,
-            agenceId: sessionAgenceId,
-            validationBilletage: billetageValidation,
-            caisseSoldeAvant,
-            openingEcart,
-            // GL Guard details
-            glGuard: {
-              glBalance,
-              billetageTotal,
-              ecartGl,
-              strictnessMode,
-              action: glGuardAction,
-              hasDiscrepancy,
-              justification: discrepancyJustification,
-            },
-          },
-          userId: caissierId,
-          ipAddress,
-          userAgent,
-        });
-
-        return newSession;
-      },
-      {
-        isolationLevel: "serializable",
-      }
-    );
-
-    // Vérification GL après ouverture réussie
-    await logGlReconciliationStatus('SESSION_OPEN_POST', result.id);
-
-    // Record metrics and broadcast WebSocket if discrepancy was recorded
-    if (hasDiscrepancy) {
-      recordGlGuardEvent({
-        action: glGuardAction,
-        agenceId,
-        strictnessMode,
-        discrepancyAmount: Math.abs(ecartGl),
-      });
-
-      // Broadcast WebSocket event for discrepancy (not blocked)
-      const ws = getWsInstance();
-      if (ws) {
-        ws.broadcast({
-          type: 'CAISSE_OPENING_WITH_ECART',
-          payload: {
-            sessionId: result.id,
-            caisseId,
-            agenceId,
-            caissierId,
-            glBalance,
-            billetageTotal,
-            ecart: ecartGl,
-            strictnessMode,
-            action: glGuardAction,
-            justification: discrepancyJustification || null,
-            timestamp: new Date().toISOString(),
-          },
-        });
-      }
-    }
-
-    return {
-      success: true,
-      session: result,
-      glGuardInfo: {
-        glBalance,
-        billetageTotal,
-        ecart: ecartGl,
-        strictnessApplied: strictnessMode,
-        action: glGuardAction,
-      },
-    };
-  } catch (error: unknown) {
-    // Parser les erreurs personnalisées
-    if ((error instanceof Error ? error.message : "").startsWith("CAISSE_OCCUPIED:")) {
-      return {
-        success: false,
-        error: (error instanceof Error ? error.message : "").replace("CAISSE_OCCUPIED:", ""),
-        errorCode: "CAISSE_OCCUPIED",
-      };
-    }
-    if ((error instanceof Error ? error.message : "").startsWith("USER_HAS_SESSION:")) {
-      return {
-        success: false,
-        error: (error instanceof Error ? error.message : "").replace("USER_HAS_SESSION:", ""),
-        errorCode: "USER_HAS_SESSION",
-      };
-    }
-    if ((error instanceof Error ? error.message : "").startsWith("CAISSE_NOT_FOUND:")) {
-      return {
-        success: false,
-        error: (error instanceof Error ? error.message : "").replace("CAISSE_NOT_FOUND:", ""),
-        errorCode: "CAISSE_NOT_FOUND",
-      };
-    }
-    if ((error instanceof Error ? error.message : "").startsWith("CAISSE_AGENCE_MISMATCH:")) {
-      return {
-        success: false,
-        error: (error instanceof Error ? error.message : "").replace("CAISSE_AGENCE_MISMATCH:", ""),
-        errorCode: "CAISSE_AGENCE_MISMATCH",
-      };
-    }
-
-    // Erreur de contrainte unique (race condition attrapée par la DB)
-    if ((error as { code?: string }).code === "23505") {
-      const constraint = (error as { constraint?: string }).constraint || '';
-      if (constraint.includes("one_active_per_caisse") || constraint.includes("caisse")) {
-        return {
-          success: false,
-          error: "Cette caisse a déjà une session active. Utilisez la récupération de session.",
-          errorCode: "CAISSE_OCCUPIED",
-        };
-      }
-      if (constraint.includes("one_active_per_user") || constraint.includes("user")) {
-        return {
-          success: false,
-          error: "Vous avez déjà une session active sur une autre caisse.",
-          errorCode: "USER_HAS_SESSION",
-        };
-      }
-    }
-
-    logger.error({ err: error }, 'Error opening session');
-    return {
-      success: false,
-      error: (error instanceof Error ? error.message : "Erreur lors de l'ouverture de la session"),
-      errorCode: "DB_ERROR",
-    };
-  }
-}
-
-// ============================================================================
 // FERMETURE DE SESSION (ATOMIQUE)
 // ============================================================================
+
+type SessionRow = typeof sessionsCaisse.$inferSelect;
 
 interface CloseSessionParams {
   sessionId: string;
@@ -925,6 +468,7 @@ export async function closeSessionAtomic(params: CloseSessionParams): Promise<Cl
         const [updatedSession] = await tx
           .update(sessionsCaisse)
           .set({
+            statut: "CLOSED",
             closedAt: new Date(),
             montantFermetureTheorique: soldeTheorique.toString(),
             montantFermetureDeclare: soldeReelNum.toString(),
@@ -1015,7 +559,7 @@ export async function updateSessionHeartbeat(sessionId: string): Promise<boolean
     const [updated] = await db
       .update(sessionsCaisse)
       .set({ lastActivity: new Date() })
-      .where(and(eq(sessionsCaisse.id, sessionId), isNull(sessionsCaisse.closedAt)))
+      .where(and(eq(sessionsCaisse.id, sessionId), notInArray(sessionsCaisse.statut, [...TERMINAL_STATUSES])))
       .returning();
 
     return !!updated;
@@ -1043,7 +587,7 @@ export async function getRiskySessions(agenceId?: string): Promise<
 
   const conditions = [
     isNotNull(sessionsCaisse.openedAt),
-    isNull(sessionsCaisse.closedAt),
+    notInArray(sessionsCaisse.statut, [...TERMINAL_STATUSES]),
     lt(sessionsCaisse.lastActivity, warningThreshold),
   ];
   if (agenceId) {
@@ -1119,7 +663,8 @@ export async function closeExpiredSessions(
     .from(sessionsCaisse)
     .where(
       and(
-        isNull(sessionsCaisse.closedAt),
+        notInArray(sessionsCaisse.statut, [...TERMINAL_STATUSES]),
+        isNull(sessionsCaisse.deletedAt),
         or(
           lt(sessionsCaisse.timeoutAt, now),
           and(isNull(sessionsCaisse.timeoutAt), lt(sessionsCaisse.lastActivity, threshold))
@@ -1152,6 +697,7 @@ export async function closeExpiredSessions(
     await db
       .update(sessionsCaisse)
       .set({
+        statut: "CLOSED",
         closedAt: now,
         montantFermetureTheorique: soldeTheorique.toString(),
         montantFermetureDeclare: soldeTheorique.toString(), // Égal au théorique pour éviter faux écarts
@@ -1337,7 +883,7 @@ export async function getSessionsWithSignificantEcarts(
   }>
 > {
   const conditions = [
-    isNotNull(sessionsCaisse.closedAt),
+    eq(sessionsCaisse.statut, "CLOSED"),
     sql`ABS(CAST(${sessionsCaisse.ecart} AS NUMERIC)) > ${threshold}`,
   ];
   if (agenceId) {

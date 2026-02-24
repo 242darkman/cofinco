@@ -24,7 +24,7 @@ import {
   mouvementsFinanciers,
   operationsCaisse,
 } from "@shared/schema";
-import { eq, and, isNull, inArray, desc } from "drizzle-orm";
+import { eq, and, isNull, inArray, notInArray, desc } from "drizzle-orm";
 import { StatutTransfertCoffre, StatutCaisse, StatutTransaction, STATUT_SESSION_CAISSE_LABELS, type StatutSessionCaisseType } from "@shared/enum/status-constants";
 import { TransfertCoffreService } from "../coffre/transfert-service";
 import { calculateBilletageTotal } from "./session-service";
@@ -36,6 +36,10 @@ import { postGlForMouvement, AccountingRuleNotFoundError } from "../accounting-p
 import type { SessionRow, TransfertRow } from "./types";
 
 const logger = createLogger('SessionOpening');
+
+// Statuts terminaux — alignés avec le prédicat des contraintes uniques DB :
+// uq_sessions_caisse_one_active_per_caisse / uq_sessions_caisse_one_active_per_user
+const TERMINAL_STATUSES = ["CLOSED", "RECONCILIATION_PENDING", "RECONCILIATION_COMPLETE"] as const;
 
 // ============================================================================
 // TYPES
@@ -150,18 +154,15 @@ export class SessionOpeningService {
     try {
       return await db.transaction(async (tx) => {
         // 1. Vérifier qu'aucune session n'est ouverte sur cette caisse
+        // Prédicat aligné avec la contrainte unique uq_sessions_caisse_one_active_per_caisse
         const existingCaisseSession = await tx
           .select()
           .from(sessionsCaisse)
           .where(
             and(
               eq(sessionsCaisse.caisseId, caisseId),
-              isNull(sessionsCaisse.closedAt),
-              inArray(sessionsCaisse.statut, [
-                "REQUESTING_FUNDS",
-                "FUNDS_DISPATCHED",
-                "OPEN",
-              ] as const)
+              notInArray(sessionsCaisse.statut, [...TERMINAL_STATUSES]),
+              isNull(sessionsCaisse.deletedAt)
             )
           )
           .limit(1);
@@ -171,18 +172,15 @@ export class SessionOpeningService {
         }
 
         // 2. Vérifier que le caissier n'a pas d'autre session active
+        // Prédicat aligné avec la contrainte unique uq_sessions_caisse_one_active_per_user
         const existingUserSession = await tx
           .select()
           .from(sessionsCaisse)
           .where(
             and(
               eq(sessionsCaisse.caissierId, caissierId),
-              isNull(sessionsCaisse.closedAt),
-              inArray(sessionsCaisse.statut, [
-                "REQUESTING_FUNDS",
-                "FUNDS_DISPATCHED",
-                "OPEN",
-              ] as const)
+              notInArray(sessionsCaisse.statut, [...TERMINAL_STATUSES]),
+              isNull(sessionsCaisse.deletedAt)
             )
           )
           .limit(1);
@@ -519,6 +517,7 @@ export class SessionOpeningService {
           [updatedSession] = await tx
             .update(sessionsCaisse)
             .set({
+              statut: "CLOSED",
               closedAt: new Date(),
               observations: `Demande rejetée: ${reasonRejection || "Non spécifié"}`,
               updatedAt: new Date(),
@@ -1228,11 +1227,11 @@ export class SessionOpeningService {
       .where(
         and(
           eq(sessionsCaisse.caissierId, userId),
-          isNull(sessionsCaisse.closedAt),
           inArray(sessionsCaisse.statut, [
             "REQUESTING_FUNDS",
             "FUNDS_DISPATCHED",
-          ] as const)
+          ] as const),
+          isNull(sessionsCaisse.deletedAt)
         )
       )
       .limit(1);
@@ -1364,20 +1363,15 @@ export class SessionOpeningService {
         }
 
         // 2. Vérifier qu'aucune session n'est ouverte sur cette caisse
+        // Prédicat aligné avec la contrainte unique uq_sessions_caisse_one_active_per_caisse
         const existingCaisseSession = await tx
           .select()
           .from(sessionsCaisse)
           .where(
             and(
               eq(sessionsCaisse.caisseId, caisseId),
-              isNull(sessionsCaisse.closedAt),
-              inArray(sessionsCaisse.statut, [
-                "REQUESTING_FUNDS",
-                "FUNDS_DISPATCHED",
-                "OPEN",
-                "CLOSING_COUNT",
-                "CLOSING_VALIDATION",
-              ] as const)
+              notInArray(sessionsCaisse.statut, [...TERMINAL_STATUSES]),
+              isNull(sessionsCaisse.deletedAt)
             )
           )
           .limit(1);
@@ -1385,32 +1379,48 @@ export class SessionOpeningService {
         if (existingCaisseSession.length > 0) {
           const existing = existingCaisseSession[0];
 
-          // Same user, same caisse → recover the existing session
-          if (existing.caissierId === caissierId && existing.statut === "OPEN") {
-            // Update last activity and return the existing session
+          if (existing.caissierId === caissierId) {
+            // Same user, same caisse → recover or force-close stale session
+            if (existing.statut === "OPEN") {
+              // Already OPEN → recover it (ensure statut + closedAt are consistent)
+              await tx
+                .update(sessionsCaisse)
+                .set({ statut: "OPEN", lastActivity: new Date(), closedAt: null })
+                .where(eq(sessionsCaisse.id, existing.id));
+
+              await tx
+                .update(caisses)
+                .set({ statut: StatutCaisse.OPEN, updatedAt: new Date() })
+                .where(eq(caisses.id, caisseId));
+
+              return {
+                success: true,
+                session: { ...existing, statut: "OPEN", lastActivity: new Date(), closedAt: null },
+                recovered: true,
+              };
+            }
+
+            // Stale intermediate state (REQUESTING_FUNDS, FUNDS_DISPATCHED,
+            // CLOSING_COUNT, CLOSING_VALIDATION) → force-close and let a new session be created
             await tx
               .update(sessionsCaisse)
-              .set({ lastActivity: new Date() })
+              .set({
+                statut: "CLOSED",
+                closedAt: new Date(),
+                openedAt: null,
+                montantOuverture: "0",
+                montantFermetureTheorique: "0",
+                observations: `[Auto-fermée] Session bloquée en état ${existing.statut}, fermée pour permettre une nouvelle ouverture`,
+              })
               .where(eq(sessionsCaisse.id, existing.id));
-
-            // Ensure caisse is marked OPEN
-            await tx
-              .update(caisses)
-              .set({ statut: StatutCaisse.OPEN, updatedAt: new Date() })
-              .where(eq(caisses.id, caisseId));
-
+            // Fall through to create a new session below
+          } else {
             return {
-              success: true,
-              session: { ...existing, lastActivity: new Date() },
-              recovered: true,
+              success: false,
+              error: "Cette caisse a déjà une session active",
+              errorCode: "CAISSE_OCCUPIED",
             };
           }
-
-          return {
-            success: false,
-            error: "Cette caisse a déjà une session active",
-            errorCode: "CAISSE_OCCUPIED",
-          };
         }
 
         // 3. Vérifier que le caissier n'a pas d'autre session active
@@ -1420,14 +1430,8 @@ export class SessionOpeningService {
           .where(
             and(
               eq(sessionsCaisse.caissierId, caissierId),
-              isNull(sessionsCaisse.closedAt),
-              inArray(sessionsCaisse.statut, [
-                "REQUESTING_FUNDS",
-                "FUNDS_DISPATCHED",
-                "OPEN",
-                "CLOSING_COUNT",
-                "CLOSING_VALIDATION",
-              ] as const)
+              notInArray(sessionsCaisse.statut, [...TERMINAL_STATUSES]),
+              isNull(sessionsCaisse.deletedAt)
             )
           )
           .limit(1);
@@ -1435,25 +1439,42 @@ export class SessionOpeningService {
         if (existingUserSession.length > 0) {
           const existingOnOtherCaisse = existingUserSession[0];
 
-          // Same user has a session on THIS caisse → recover it
-          if (existingOnOtherCaisse.caisseId === caisseId && existingOnOtherCaisse.statut === "OPEN") {
+          if (existingOnOtherCaisse.caisseId === caisseId) {
+            // Same user, same caisse → recover or force-close
+            if (existingOnOtherCaisse.statut === "OPEN") {
+              // Recover — ensure statut + closedAt are consistent
+              await tx
+                .update(sessionsCaisse)
+                .set({ statut: "OPEN", lastActivity: new Date(), closedAt: null })
+                .where(eq(sessionsCaisse.id, existingOnOtherCaisse.id));
+
+              return {
+                success: true,
+                session: { ...existingOnOtherCaisse, statut: "OPEN", lastActivity: new Date(), closedAt: null },
+                recovered: true,
+              };
+            }
+
+            // Stale intermediate state → force-close + clear stale fields
             await tx
               .update(sessionsCaisse)
-              .set({ lastActivity: new Date() })
+              .set({
+                statut: "CLOSED",
+                closedAt: new Date(),
+                openedAt: null,
+                montantOuverture: "0",
+                montantFermetureTheorique: "0",
+                observations: `[Auto-fermée] Session bloquée en état ${existingOnOtherCaisse.statut}, fermée pour permettre une nouvelle ouverture`,
+              })
               .where(eq(sessionsCaisse.id, existingOnOtherCaisse.id));
-
+            // Fall through to create new session
+          } else {
             return {
-              success: true,
-              session: { ...existingOnOtherCaisse, lastActivity: new Date() },
-              recovered: true,
+              success: false,
+              error: "Vous avez déjà une session active sur une autre caisse",
+              errorCode: "USER_HAS_SESSION",
             };
           }
-
-          return {
-            success: false,
-            error: "Vous avez déjà une session active sur une autre caisse",
-            errorCode: "USER_HAS_SESSION",
-          };
         }
 
         // 4. Calculer le timeout

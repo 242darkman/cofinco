@@ -53,7 +53,9 @@ import type {
   TypeOperationCaisseDz,
   TypeEvenementDz,
 } from "@shared/enum/enums";
-import { eq, sql, and, isNull, asc, desc } from "drizzle-orm";
+import { eq, sql, and, isNull, notInArray, asc, desc } from "drizzle-orm";
+
+const SESSION_TERMINAL_STATUSES = ["CLOSED", "RECONCILIATION_PENDING", "RECONCILIATION_COMPLETE"] as const;
 import { generateReference, updateCreditSolde, updateSessionSolde, type MouvementFinancier } from "../ledger";
 import { postGlForMouvement } from "../accounting-posting-service";
 import { recalculateAgentObjectifs } from "../objectif-recalculation-service";
@@ -1035,7 +1037,8 @@ export class ApprovalService {
       .where(
         and(
           eq(sessionsCaisse.caisseId, operation.destinationCaisseId!),
-          isNull(sessionsCaisse.closedAt)
+          notInArray(sessionsCaisse.statut, [...SESSION_TERMINAL_STATUSES]),
+          isNull(sessionsCaisse.deletedAt)
         )
       )
       .limit(1);

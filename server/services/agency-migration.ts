@@ -40,7 +40,7 @@ import {
   configCoffreFort,
 } from "@shared/schema";
 import { transfertsInterCoffres } from "@shared/schema/coffres-forts";
-import { eq, sql, and, isNull, ne, inArray, or, desc } from "drizzle-orm";
+import { eq, sql, and, isNull, notInArray, ne, inArray, or, desc } from "drizzle-orm";
 import { StatutAgence, StatutCompte, StatutCredit, StatutDemande, StatutTransaction, StatutTransfertInterCoffre } from "@shared/enum/status-constants";
 import { createHash, randomBytes } from "crypto";
 import {
@@ -279,7 +279,7 @@ export class AgencyMigrationService {
       .where(
         and(
           eq(sessionsCaisse.agenceId, sourceAgencyId),
-          isNull(sessionsCaisse.closedAt),
+          notInArray(sessionsCaisse.statut, ["CLOSED", "RECONCILIATION_PENDING", "RECONCILIATION_COMPLETE"]),
           isNull(sessionsCaisse.deletedAt)
         )
       );

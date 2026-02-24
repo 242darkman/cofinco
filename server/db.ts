@@ -2633,6 +2633,52 @@ export async function ensureCustomFunctions(): Promise<void> {
     console.log('[DB] ✓ Backfill employee_agency_assignments (idempotent)');
     objectCount += 1;
 
+    // ── Session statut/closedAt auto-heal trigger ──────────────────────
+    // Guarantees: terminal statut → closedAt set, active statut → closedAt null
+    await pool.query(`
+      CREATE OR REPLACE FUNCTION fn_session_statut_closed_sync()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        -- Terminal statut but closedAt missing → auto-set
+        IF NEW.statut IN ('CLOSED', 'RECONCILIATION_PENDING', 'RECONCILIATION_COMPLETE')
+           AND NEW.closed_at IS NULL THEN
+          NEW.closed_at = NOW();
+        END IF;
+        -- Active statut but closedAt still set → clear it
+        IF NEW.statut NOT IN ('CLOSED', 'RECONCILIATION_PENDING', 'RECONCILIATION_COMPLETE')
+           AND NEW.closed_at IS NOT NULL THEN
+          NEW.closed_at = NULL;
+        END IF;
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql
+    `);
+    await pool.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_trigger WHERE tgname = 'trigger_session_statut_closed_sync'
+        ) THEN
+          CREATE TRIGGER trigger_session_statut_closed_sync
+            BEFORE INSERT OR UPDATE ON sessions_caisse
+            FOR EACH ROW EXECUTE FUNCTION fn_session_statut_closed_sync();
+        END IF;
+      END $$
+    `);
+    console.log('[DB] ✓ Trigger: session statut/closedAt auto-heal');
+    objectCount += 2;
+
+    // ── One-time data cleanup: fix orphaned sessions ──────────────────
+    const fixResult = await pool.query(`
+      UPDATE sessions_caisse
+      SET statut = 'CLOSED'
+      WHERE statut NOT IN ('CLOSED', 'RECONCILIATION_PENDING', 'RECONCILIATION_COMPLETE')
+        AND closed_at IS NOT NULL
+        AND deleted_at IS NULL
+    `);
+    if (fixResult.rowCount && fixResult.rowCount > 0) {
+      console.log(`[DB] ⚠ Fixed ${fixResult.rowCount} orphaned sessions (statut active but closedAt set)`);
+    }
+
     console.log(`[DB] All ${objectCount} custom functions, triggers, and views ensured in ${Date.now() - start}ms`);
   } catch (error) {
     console.error('[DB] Error ensuring custom functions:', error);
