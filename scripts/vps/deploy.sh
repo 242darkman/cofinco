@@ -102,12 +102,19 @@ DB_URL=$(grep "^DATABASE_URL=" "$ENV_FILE" | cut -d= -f2-)
 # Replace host.docker.internal with localhost for db-init.
 DB_URL_LOCAL=$(echo "$DB_URL" | sed 's/host\.docker\.internal/localhost/g')
 
+# Remove leftover init container from a previous failed deploy
+docker rm -f cofinco-db-init 2>/dev/null || true
+
+# Persist GeoNames data (~1.6 GB) across deploys to avoid re-downloading
+mkdir -p "$APP_DIR/data/geonames"
+
 docker run --rm \
   --name cofinco-db-init \
   --network host \
   -e "DATABASE_URL=$DB_URL_LOCAL" \
+  -v "$APP_DIR/data/geonames:/geonames_cache" \
   "$INIT_IMAGE" \
-  "npx drizzle-kit push --force && node --import tsx scripts/ensure-sql.ts && node --import tsx seeds/seed-prod.ts" \
+  "cp /geonames_cache/*.txt /app/seeds/ 2>/dev/null || true; sh scripts/download-geonames.sh; cp /app/seeds/allCountries.txt /app/seeds/cities5000.txt /geonames_cache/ 2>/dev/null || true; npx drizzle-kit push --force && node --import tsx scripts/ensure-sql.ts && node --import tsx seeds/seed-prod.ts" \
   2>&1 | while read -r line; do log "  [db-init] $line"; done
 
 INIT_EXIT=$?
