@@ -198,7 +198,7 @@ export class SecurityCodeRotationService {
       logger.error({ err: error }, 'Erreur génération code sécurité');
       return {
         success: false,
-        error: error.message || 'Erreur lors de la génération du code',
+        error: (error as Error).message || 'Erreur lors de la génération du code',
       };
     }
   }
@@ -312,7 +312,7 @@ export class SecurityCodeRotationService {
       logger.error({ err: error }, 'Erreur validation code');
       return {
         success: false,
-        error: error.message || 'Erreur lors de la validation',
+        error: (error as Error).message || 'Erreur lors de la validation',
       };
     }
   }

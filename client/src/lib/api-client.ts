@@ -315,8 +315,8 @@ async function request<T>(
       const netState = networkManager.getState();
       if (netState.status === 'offline' || netState.status === 'api_down') {
         throw new ApiError(
-          0,
           `${critOp.name} nécessite une connexion active au serveur.`,
+          0,
           { blocked: true, offlinePolicy: 'block', operation: critOp.name }
         );
       }

@@ -158,7 +158,7 @@ async function getHrStaffContacts(agenceId?: string) {
     })
     .from(userRoles)
     .innerJoin(users, eq(userRoles.userId, users.id))
-    .where(and(eq(userRoles.role, 'RH'), conditions))
+    .where(and(eq(userRoles.role, 'RH' as any), conditions))
     .limit(10);
 
   return results.map((r) => ({
@@ -475,7 +475,7 @@ export async function handleCreditInvestigationSubmitted(
     correlationId: `credit-investigation-submitted-${data.enqueteId}`,
     status: "DISPATCHED",
     payload,
-  });
+  } as any);
 }
 
 export async function handleCreditPaidOff(data: CreditPaidOffData) {
@@ -1738,7 +1738,7 @@ export async function handleUserRegistered(data: UserRegisteredData) {
     correlationId: `user-registered-${data.userId}`,
     status: "DISPATCHED",
     hasCredentials: !!data.generatedPassword,
-  });
+  } as any);
 }
 
 export async function handleUserPasswordChanged(data: UserPasswordChangedData) {

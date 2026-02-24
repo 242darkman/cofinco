@@ -920,7 +920,7 @@ export function registerAgencesRoutes(app: Express) {
         fromStatus: agency.statut,
         toStatus: targetStatus,
         checklistSnapshot: checklist,
-      }, "SUCCESS", "HIGH");
+      }, "success", "high");
 
       const wsInstance = getWsInstance();
       if (wsInstance) {
@@ -1029,7 +1029,7 @@ export function registerAgencesRoutes(app: Express) {
         fromStatus: agency.statut,
         toStatus: StatutAgence.SUSPENDED,
         reason: reason.trim(),
-      }, "SUCCESS", "HIGH");
+      }, "success", "high");
 
       const wsInstance = getWsInstance();
       if (wsInstance) {
@@ -1102,7 +1102,7 @@ export function registerAgencesRoutes(app: Express) {
         fromStatus: agency.statut,
         toStatus: targetStatus,
         reason: reason.trim(),
-      }, "SUCCESS", "HIGH");
+      }, "success", "high");
 
       const wsInstance = getWsInstance();
       if (wsInstance) {
@@ -1264,8 +1264,8 @@ export function registerAgencesRoutes(app: Express) {
         return res.status(404).json({ error: "Migration non trouvée" });
       }
 
-      const executableStatuses = [MIGRATION_STATUS.PENDING, MIGRATION_STATUS.SCHEDULED, MIGRATION_STATUS.FAILED];
-      if (!executableStatuses.includes(migration.statut)) {
+      const executableStatuses = [MIGRATION_STATUS.PENDING, MIGRATION_STATUS.SCHEDULED, MIGRATION_STATUS.FAILED] as const;
+      if (!executableStatuses.includes(migration.statut as typeof executableStatuses[number])) {
         return res.status(400).json({
           error: `La migration ne peut pas être exécutée (statut actuel: ${migration.statut})`,
           code: "INVALID_STATUS"

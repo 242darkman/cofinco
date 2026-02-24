@@ -10,7 +10,6 @@ import {
 } from 'lucide-react';
 import {
   useEvaluations,
-  useEvaluationDetail,
   type Evaluation,
 } from '../../../hooks/hr/useEvaluations';
 import EvaluationFormModal from './EvaluationFormModal';
@@ -178,15 +177,11 @@ function EvaluationCard({
 // ---------------------------------------------------------------------------
 
 export default function MesEvaluationsTab() {
-  const { evaluations, loading, submitSelfEval } = useEvaluations();
+  const { evaluations, loading } = useEvaluations();
 
   // Modal states
   const [autoEvalId, setAutoEvalId] = useState<string | null>(null);
   const [resultsId, setResultsId] = useState<string | null>(null);
-
-  // Fetch detail for auto-eval modal
-  const { data: evalDetail, isLoading: detailLoading } =
-    useEvaluationDetail(autoEvalId);
 
   // Derive campaign info per evaluation (campaign data embedded in detail,
   // but for the list we build a lightweight map from the evaluations array).
@@ -285,9 +280,8 @@ export default function MesEvaluationsTab() {
           isOpen={!!autoEvalId}
           onClose={handleCloseAutoEval}
           evaluationId={autoEvalId}
-          detail={evalDetail ?? null}
-          detailLoading={detailLoading}
-          onSubmit={submitSelfEval}
+          type="SELF"
+          onSubmitted={handleCloseAutoEval}
         />
       )}
 

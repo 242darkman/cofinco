@@ -3873,7 +3873,7 @@ export function registerFinanceRoutes(app: Express) {
                 }
                 // Check sufficient balance for withdrawals
                 if (targetAccount) {
-                    const solde = parseFloat(targetAccount.solde || '0');
+                    const solde = parseFloat(targetAccount.soldeCourant || '0');
                     if (montantNum > solde) {
                         return res.status(400).json({
                             message: `Solde insuffisant. Solde disponible: ${solde.toLocaleString('fr-FR')} FCFA, montant demandé: ${montantNum.toLocaleString('fr-FR')} FCFA.`
@@ -5104,7 +5104,7 @@ export function registerFinanceRoutes(app: Express) {
       req,
       "SESSION_OPENING_REQUESTED",
       "session_caisse",
-      result.session.id,
+      result.session!.id,
       { caisseId: data.caisseId, montantDemande: data.montantDemande },
       "success",
       "low"
@@ -5184,7 +5184,7 @@ export function registerFinanceRoutes(app: Express) {
       req,
       "SESSION_DIRECT_OPEN",
       "session_caisse",
-      result.session.id,
+      result.session!.id,
       { caisseId: data.caisseId, type: "FONDS_REPORTE" },
       "success",
       "low"
@@ -5234,7 +5234,7 @@ export function registerFinanceRoutes(app: Express) {
     // Notifier via WebSocket
     const wsInstance = getWsInstance();
     if (wsInstance) {
-      wsInstance.broadcast({ type: "CAISSE_UPDATE", payload: { caisseId: result.session.caisseId } });
+      wsInstance.broadcast({ type: "CAISSE_UPDATE", payload: { caisseId: result.session!.caisseId } });
       wsInstance.broadcast({ type: "DASHBOARD_UPDATE", payload: {} });
     }
 
@@ -5243,7 +5243,7 @@ export function registerFinanceRoutes(app: Express) {
       "SESSION_OPENED_WITH_FUNDS",
       "session_caisse",
       id,
-      { soldeOuverture: result.session.montantOuverture },
+      { soldeOuverture: result.session!.montantOuverture },
       "success",
       "low"
     );

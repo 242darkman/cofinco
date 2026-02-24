@@ -124,10 +124,11 @@ export default function PendingDisbursements({
       onDisbursementComplete?.();
     },
     onError: (error: unknown) => {
-      if (error?.error?.code === 'INSUFFICIENT_FUNDS') {
-        toast.error(`Solde insuffisant. Déficit: ${formatMoney(error.error.deficit)}`, { duration: 6000 });
+      const errObj = error as Record<string, any>;
+      if (errObj?.error?.code === 'INSUFFICIENT_FUNDS') {
+        toast.error(`Solde insuffisant. Déficit: ${formatMoney(errObj.error.deficit)}`, { duration: 6000 });
       } else {
-        toast.error(error.message || 'Erreur lors du décaissement');
+        toast.error((error as Error).message || 'Erreur lors du décaissement');
       }
     }
   });
@@ -146,7 +147,7 @@ export default function PendingDisbursements({
       setCreditToCancel(null);
     },
     onError: (error: unknown) => {
-      toast.error(error.message || 'Erreur lors de l\'annulation');
+      toast.error((error as Error).message || 'Erreur lors de l\'annulation');
     }
   });
 
@@ -171,7 +172,7 @@ export default function PendingDisbursements({
       onDisbursementComplete?.();
     },
     onError: (error: unknown) => {
-      toast.error(error.message || 'Erreur décaissement groupé');
+      toast.error((error as Error).message || 'Erreur décaissement groupé');
     }
   });
 

@@ -807,12 +807,12 @@ export const TontineStatus = {
 } as const;
 export type TontineStatus = typeof TontineStatus[keyof typeof TontineStatus];
 
-export const KycLevel = {
+export const TontineKycLevel = {
   NONE: 'NONE',
   BASIC: 'BASIC',
   FULL: 'FULL',
 } as const;
-export type KycLevel = typeof KycLevel[keyof typeof KycLevel];
+export type TontineKycLevel = typeof TontineKycLevel[keyof typeof TontineKycLevel];
 
 export const TontinePaymentMethod = {
   CASH: 'CASH',

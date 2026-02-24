@@ -419,12 +419,12 @@ async function computeAmortissements(agenceId: string, exerciceId: string): Prom
 }
 
 async function computeProvisions(agenceId: string, dateFin: string): Promise<DsfTableau> {
-  const summary = await getProvisionSummary(agenceId, new Date(dateFin));
+  const summary = await getProvisionSummary(agenceId, dateFin);
 
-  const lignes: DsfLigne[] = summary.map((cat, i) => ({
+  const lignes: DsfLigne[] = summary.categories.map((cat, i) => ({
     ref: `PR${String.fromCharCode(65 + i)}`,
     intitule: cat.categorie,
-    net: cat.totalProvision,
+    net: cat.provisionTotal,
   }));
 
   const total = lignes.reduce((s, l) => s + l.net, 0);

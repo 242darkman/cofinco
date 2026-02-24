@@ -1056,7 +1056,7 @@ export function registerTontineRoutes(app: Express) {
 
       const planValues = copyPlanToTontineValues(plan);
       const overrides = normalizeKeysDeep(req.body);
-      const merged = { ...planValues, ...overrides };
+      const merged = { ...(planValues as Record<string, unknown>), ...(overrides as Record<string, unknown>) };
 
       const parsed = insertTontineSchema.parse(merged);
       const tontine = await storage.createTontine(parsed);
@@ -1308,7 +1308,7 @@ export function registerTontineRoutes(app: Express) {
         actionType: isLock ? TontineTurnAuditActionType.LOCK : TontineTurnAuditActionType.UNLOCK,
         performedBy: req.session.user!.id,
         details: { turnId: turn.id, turnNumber: turn.turnNumber, reason },
-      });
+      } as any);
 
       const wsInstance = getWsInstance();
       if (wsInstance) {
@@ -1443,7 +1443,7 @@ export function registerTontineRoutes(app: Express) {
         .update(tontineTurnAudit)
         .set({
           status: 'REJECTED',
-          details: sql`COALESCE(${tontineTurnAudit.details}, '{}'::jsonb) || jsonb_build_object('rejectedBy', ${userId}, 'rejectedAt', ${new Date().toISOString()}, 'rejectReason', ${reason || 'Rejeté manuellement'})`,
+          metadata: sql`COALESCE(${tontineTurnAudit.metadata}, '{}'::jsonb) || jsonb_build_object('rejectedBy', ${userId}, 'rejectedAt', ${new Date().toISOString()}, 'rejectReason', ${reason || 'Rejeté manuellement'})`,
         } as any)
         .where(eq(tontineTurnAudit.id, req.params.auditId))
         .returning();

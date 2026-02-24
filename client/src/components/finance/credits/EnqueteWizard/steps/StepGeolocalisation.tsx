@@ -64,15 +64,15 @@ export default function StepGeolocalisation({
       const blob = await fetch(imageDataUrl).then(r => r.blob());
       const file = new File([blob], `enquete-photo-${Date.now()}.jpg`, { type: 'image/jpeg' });
       const result = await uploadFile(file);
-      if (result?.url) {
+      if (result) {
         const newPhoto = {
-          url: result.url,
+          url: result,
           latitude: formData.geoLatitude ?? undefined,
           longitude: formData.geoLongitude ?? undefined,
           accuracy: formData.geoAccuracy ?? undefined,
           timestamp: new Date().toISOString(),
         };
-        updateField('photos_activite', [...formData.photos_activite, result.url]);
+        updateField('photos_activite', [...formData.photos_activite, result]);
         updateField('photos_geotagged', [...formData.photos_geotagged, newPhoto]);
       }
     } catch { /* handled by upload hook */ }
@@ -83,8 +83,8 @@ export default function StepGeolocalisation({
     if (!file) return;
     try {
       const result = await uploadFile(file);
-      if (result?.url) {
-        updateField('photos_activite', [...formData.photos_activite, result.url]);
+      if (result) {
+        updateField('photos_activite', [...formData.photos_activite, result]);
       }
     } catch { /* handled by upload hook */ }
     e.target.value = '';
@@ -118,7 +118,7 @@ export default function StepGeolocalisation({
                 {distanceFromClient > 200 && ' — Alerte : vous êtes loin de l\'adresse du client'}
               </div>
             )}
-            {geoAddress && <LocationDisplay address={geoAddress} />}
+            {geoAddress && <LocationDisplay latitude={formData.geoLatitude} longitude={formData.geoLongitude} />}
           </div>
         ) : (
           !readOnly && (

@@ -18,6 +18,58 @@ import EcartApprovalPanel from './EcartApprovalPanel';
 // Types pour les filtres
 type CaissierStatusFilter = 'all' | 'en_caisse' | 'hors_caisse' | 'inactif';
 
+// Types pour la supervision
+interface SupervisionSessionData {
+  id: string;
+  caisseId: string;
+  caissier_id: string;
+  caissierNom?: string;
+  caisseNom?: string;
+  agenceNom?: string;
+  agenceCode?: string;
+  openedAt: string;
+  closedAt?: string;
+  computedStatus?: string;
+  soldeTheorique?: number | string;
+  montantFermetureTheorique?: number | string;
+  montantFermetureDeclare?: number | string;
+  soldeReel?: number | string;
+  ecart?: number | string;
+  operations?: SupervisionOperation[];
+  [key: string]: unknown;
+}
+
+interface SupervisionUser {
+  id: string;
+  nom: string;
+  prenom: string;
+  email: string;
+  role: string;
+  statut: string;
+  [key: string]: unknown;
+}
+
+interface SupervisionOperation {
+  id: string;
+  typeOperation: string;
+  montant: number | string;
+  createdAt?: string;
+  [key: string]: unknown;
+}
+
+interface SupervisionAlert {
+  sessionId: string;
+  caisseNom: string;
+  caissierNom: string;
+  riskLevel?: string;
+  hoursInactive?: number;
+  soldeCurrent?: number | string;
+  severity?: string;
+  ecart?: number | string;
+  closedAt?: string;
+  [key: string]: unknown;
+}
+
 // Hook pour vérifier les permissions via CASL
 function useSupervisionPermissions() {
   const { hasPermission, isAdmin } = usePermissions();
@@ -980,7 +1032,7 @@ export default function CaisseSupervision({
                               {alert.riskLevel}
                             </div>
                             <div className="text-[10px] text-content-muted">
-                              {Math.round(alert.hoursInactive)}h inactive
+                              {Math.round(alert.hoursInactive ?? 0)}h inactive
                             </div>
                           </div>
                         </div>

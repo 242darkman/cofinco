@@ -69,6 +69,8 @@ const defaultAbilityState = {
   isAdmin: false,
   roles: [] as string[],
   lockedFeatures: [] as string[],
+  agenceIdActive: undefined as string | undefined,
+  agenceNom: undefined as string | undefined,
 };
 
 const defaultValue: AbilityContextType = {
@@ -170,6 +172,8 @@ export function AbilityProvider({ children }: { children: ReactNode }) {
           isAdmin: data.isAdmin || false,
           roles: data.roles || [data.role],
           lockedFeatures: [],
+          agenceIdActive: data.agenceIdActive,
+          agenceNom: data.agenceNom,
         });
 
         console.warn('[CASL] No CASL rules in API response, using fallback');

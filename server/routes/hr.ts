@@ -3110,7 +3110,7 @@ hrRouter.patch("/paie/pay", getAuthUser, attachAbility, requireAbility(Actions.M
       .select({
         bulletin: bulletinsPaie,
         paymentMethod: employes.paymentMethod,
-        phone: employes.phone,
+        phone: users.telephone,
         employeNom: users.nom,
         employePrenom: users.prenom,
       })
@@ -3289,7 +3289,7 @@ hrRouter.post("/paie/schedule", getAuthUser, attachAbility, requireAbility(Actio
       .select({
         bulletin: bulletinsPaie,
         paymentMethod: employes.paymentMethod,
-        phone: employes.phone,
+        phone: users.telephone,
         employeNom: users.nom,
         employePrenom: users.prenom,
       })
@@ -3328,7 +3328,7 @@ hrRouter.post("/paie/schedule", getAuthUser, attachAbility, requireAbility(Actio
       { userId: req.user?.id, userName: req.user?.nom, userRole: req.user?.role },
       { statut: PayrollRunStatus.VALIDATED },
       { scheduledAt: scheduledDate, totalJobs: jobsResult.total },
-      undefined, 'medium'
+      undefined, 'warning'
     );
 
     res.json(successResponse({
@@ -3789,7 +3789,7 @@ hrRouter.get("/stats", getAuthUser, attachAbility, async (req, res) => {
 hrRouter.get("/pending-count", getAuthUser, attachAbility, async (req, res) => {
     try {
         // Only return counts for users who can access HR module
-        if (!req.ability?.can(Actions.READ, Subjects.RH)) {
+        if (!req.ability?.can(Actions.VIEW, Subjects.RH)) {
             return res.json({ pendingConges: 0, pendingDocuments: 0, total: 0 });
         }
 
@@ -4279,7 +4279,7 @@ hrRouter.post("/presence/manual", getAuthUser, attachAbility, requireAbility(Act
 
         const targetDate = date || new Date().toISOString().split('T')[0];
 
-        const result = await storage.manualPresenceEntry({
+        const result = await hrStorage.manualPresenceEntry({
             employeId,
             date: targetDate,
             heureArrivee,
@@ -4599,7 +4599,7 @@ hrRouter.patch("/organigramme/reassign", getAuthUser, attachAbility, async (req,
             entityId: employeId,
             actorUserId: userId!,
             actorName: req.user?.nom || '',
-            actorRole: userRole || '',
+            actorRole: req.user?.role || '',
             newValues: { managerId: newManagerId },
         });
 
@@ -4660,16 +4660,11 @@ hrRouter.post("/direction-generale", getAuthUser, attachAbility, async (req, res
             createdBy: req.user?.id || null,
         });
 
-        await hrService.logAction({
-            entityType: 'org_global_role',
-            entityId: role.id,
-            action: 'created',
-            actorUserId: req.user?.id || null,
-            actorName: req.user?.nom || null,
-            actorRole: req.user?.role || null,
-            newValues: parsed.data,
-            severity: 'critical',
-        });
+        await hrService.logAction(
+            'org_global_role', role.id, 'created',
+            { userId: req.user?.id, userName: req.user?.nom, userRole: req.user?.role },
+            undefined, parsed.data, undefined, 'critical'
+        );
 
         res.status(201).json(role);
     } catch (error: any) {
@@ -4697,16 +4692,11 @@ hrRouter.put("/direction-generale/:id", getAuthUser, attachAbility, async (req, 
         const updated = await hrStorage.updateGlobalRole(req.params.id, parsed.data);
         if (!updated) return res.status(404).json({ error: "Rôle non trouvé" });
 
-        await hrService.logAction({
-            entityType: 'org_global_role',
-            entityId: req.params.id,
-            action: 'updated',
-            actorUserId: req.user?.id || null,
-            actorName: req.user?.nom || null,
-            actorRole: req.user?.role || null,
-            newValues: parsed.data,
-            severity: 'critical',
-        });
+        await hrService.logAction(
+            'org_global_role', req.params.id, 'updated',
+            { userId: req.user?.id, userName: req.user?.nom, userRole: req.user?.role },
+            undefined, parsed.data, undefined, 'critical'
+        );
 
         res.json(updated);
     } catch (error) {
@@ -4724,16 +4714,11 @@ hrRouter.delete("/direction-generale/:id", getAuthUser, attachAbility, async (re
         const revoked = await hrStorage.revokeGlobalRole(req.params.id);
         if (!revoked) return res.status(404).json({ error: "Rôle non trouvé" });
 
-        await hrService.logAction({
-            entityType: 'org_global_role',
-            entityId: req.params.id,
-            action: 'revoked',
-            actorUserId: req.user?.id || null,
-            actorName: req.user?.nom || null,
-            actorRole: req.user?.role || null,
-            newValues: { statut: 'REVOKED' },
-            severity: 'critical',
-        });
+        await hrService.logAction(
+            'org_global_role', req.params.id, 'revoked',
+            { userId: req.user?.id, userName: req.user?.nom, userRole: req.user?.role },
+            undefined, { statut: 'REVOKED' }, undefined, 'critical'
+        );
 
         res.json(revoked);
     } catch (error) {
@@ -5531,7 +5516,7 @@ hrRouter.delete("/documents/:id", getAuthUser, attachAbility, requireAbility(Act
 // GET /api/hr/evaluations/templates
 hrRouter.get("/evaluations/templates", getAuthUser, attachAbility, async (req, res) => {
     try {
-        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        if (!req.ability?.can(Actions.VIEW, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         const templates = await hrStorage.getEvaluationTemplates({ actif: true });
         res.json(templates);
     } catch (error) {
@@ -5603,7 +5588,7 @@ hrRouter.delete("/evaluations/templates/:id", getAuthUser, attachAbility, requir
 // GET /api/hr/evaluations/campaigns
 hrRouter.get("/evaluations/campaigns", getAuthUser, attachAbility, async (req, res) => {
     try {
-        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        if (!req.ability?.can(Actions.VIEW, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         const { statut } = req.query;
         const campaigns = await hrStorage.getEvaluationCampaigns({ statut: statut as string });
         res.json(campaigns);
@@ -5899,7 +5884,7 @@ hrRouter.get("/evaluations/analytics/history", getAuthUser, attachAbility, async
 // GET /api/hr/evaluations/analytics/campaign-summary
 hrRouter.get("/evaluations/analytics/campaign-summary", getAuthUser, attachAbility, async (req, res) => {
     try {
-        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        if (!req.ability?.can(Actions.VIEW, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         const { campaignId } = req.query;
         if (!campaignId) return res.status(400).json({ error: "campaignId requis" });
 
@@ -5930,7 +5915,7 @@ hrRouter.get("/evaluations/analytics/campaign-summary", getAuthUser, attachAbili
 // GET /api/hr/alerts
 hrRouter.get("/alerts", getAuthUser, attachAbility, async (req, res) => {
     try {
-        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        if (!req.ability?.can(Actions.VIEW, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         const user = (req as any).user;
         const alerts = await hrStorage.getUpcomingAlerts(30, user.agenceId);
         res.json(alerts);
@@ -5943,7 +5928,7 @@ hrRouter.get("/alerts", getAuthUser, attachAbility, async (req, res) => {
 // GET /api/hr/alerts/stats
 hrRouter.get("/alerts/stats", getAuthUser, attachAbility, async (req, res) => {
     try {
-        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        if (!req.ability?.can(Actions.VIEW, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         const user = (req as any).user;
         const stats = await hrStorage.getAlertStats(user.agenceId);
         res.json(stats);
@@ -6039,7 +6024,7 @@ hrRouter.post("/paie/runs/:runId/generate-transfer", getAuthUser, attachAbility,
 // GET /api/hr/paie/runs/:runId/transfer-files
 hrRouter.get("/paie/runs/:runId/transfer-files", getAuthUser, attachAbility, async (req, res) => {
     try {
-        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        if (!req.ability?.can(Actions.VIEW, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         const files = await hrStorage.getTransferFiles(parseInt(req.params.runId));
         res.json(files);
     } catch (error) {
@@ -6055,7 +6040,7 @@ hrRouter.get("/paie/runs/:runId/transfer-files", getAuthUser, attachAbility, asy
 // GET /api/hr/reports/registre-personnel
 hrRouter.get("/reports/registre-personnel", getAuthUser, attachAbility, async (req, res) => {
     try {
-        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        if (!req.ability?.can(Actions.VIEW, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         const filters: { statut?: string; departmentId?: string; agenceId?: string } = {};
         if (req.query.statut) filters.statut = req.query.statut as string;
         if (req.query.departmentId) filters.departmentId = req.query.departmentId as string;
@@ -6071,7 +6056,7 @@ hrRouter.get("/reports/registre-personnel", getAuthUser, attachAbility, async (r
 // GET /api/hr/reports/bilan-social
 hrRouter.get("/reports/bilan-social", getAuthUser, attachAbility, async (req, res) => {
     try {
-        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        if (!req.ability?.can(Actions.VIEW, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         const year = req.query.year ? parseInt(req.query.year as string) : new Date().getFullYear();
         const data = await hrStorage.getBilanSocial(year);
         res.json(data);
@@ -6240,7 +6225,7 @@ hrRouter.get("/document-requests/:id/download", getAuthUser, attachAbility, asyn
 // GET /api/hr/job-offers - Liste des offres
 hrRouter.get("/job-offers", getAuthUser, attachAbility, async (req, res) => {
     try {
-        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        if (!req.ability?.can(Actions.VIEW, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         const filter: { statut?: string; visibilite?: string } = {};
         if (req.query.statut) filter.statut = req.query.statut as string;
         if (req.query.visibilite) filter.visibilite = req.query.visibilite as string;
@@ -6315,7 +6300,7 @@ hrRouter.get("/job-offers/internal", getAuthUser, attachAbility, async (req, res
 // GET /api/hr/job-offers/:id - Détail d'une offre
 hrRouter.get("/job-offers/:id", getAuthUser, attachAbility, async (req, res) => {
     try {
-        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        if (!req.ability?.can(Actions.VIEW, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         const offer = await hrStorage.getJobOfferById(parseInt(req.params.id));
         if (!offer) return res.status(404).json({ error: "Offre introuvable" });
         res.json(offer);
@@ -6402,7 +6387,7 @@ hrRouter.post("/job-offers/:id/close", getAuthUser, attachAbility, requireAbilit
 // GET /api/hr/job-offers/:id/candidatures - Candidatures d'une offre (triées par score)
 hrRouter.get("/job-offers/:id/candidatures", getAuthUser, attachAbility, async (req, res) => {
     try {
-        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        if (!req.ability?.can(Actions.VIEW, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         const candidaturesList = await hrStorage.getJobOfferCandidatures(parseInt(req.params.id));
         res.json(candidaturesList);
     } catch (error) {
@@ -6458,7 +6443,7 @@ hrRouter.post("/job-offers/:id/apply-internal", getAuthUser, attachAbility, asyn
             nom: user.nom || '',
             prenom: user.prenom || '',
             email: user.email || '',
-            telephone: emp.phone || undefined,
+            telephone: user.telephone || undefined,
             posteVise: offer.titre,
             experience: req.body.experience || null,
             formation: req.body.formation || null,
@@ -6521,7 +6506,7 @@ hrRouter.post("/paie/runs/:runId/create-batches", getAuthUser, attachAbility, re
 // GET /api/hr/paie/runs/:runId/batches - Liste batches d'un run
 hrRouter.get("/paie/runs/:runId/batches", getAuthUser, attachAbility, async (req, res) => {
     try {
-        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        if (!req.ability?.can(Actions.VIEW, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         const batches = await hrStorage.getPaymentBatches(parseInt(req.params.runId));
         res.json(batches);
     } catch (error) {
@@ -6533,7 +6518,7 @@ hrRouter.get("/paie/runs/:runId/batches", getAuthUser, attachAbility, async (req
 // GET /api/hr/paie/batches/:id - Détail d'un batch
 hrRouter.get("/paie/batches/:id", getAuthUser, attachAbility, async (req, res) => {
     try {
-        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        if (!req.ability?.can(Actions.VIEW, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         const batch = await hrStorage.getPaymentBatchById(req.params.id);
         if (!batch) return res.status(404).json({ error: "Batch introuvable" });
         res.json(batch);
@@ -6617,7 +6602,7 @@ hrRouter.patch("/paie/batches/:batchId/items/:itemId", getAuthUser, attachAbilit
 // GET /api/hr/paie/reconciliation - Liste des sessions
 hrRouter.get("/paie/reconciliation", getAuthUser, attachAbility, async (req, res) => {
     try {
-        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        if (!req.ability?.can(Actions.VIEW, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         const filter: { period?: string; bankName?: string } = {};
         if (req.query.period) filter.period = req.query.period as string;
         if (req.query.bankName) filter.bankName = req.query.bankName as string;
@@ -6682,7 +6667,7 @@ hrRouter.post("/paie/reconciliation", getAuthUser, attachAbility, requireAbility
 // GET /api/hr/paie/reconciliation/:id - Détail d'une session
 hrRouter.get("/paie/reconciliation/:id", getAuthUser, attachAbility, async (req, res) => {
     try {
-        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        if (!req.ability?.can(Actions.VIEW, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         const session = await hrStorage.getReconciliationSessionById(req.params.id);
         if (!session) return res.status(404).json({ error: "Session introuvable" });
         res.json(session);
@@ -6884,7 +6869,7 @@ hrRouter.post("/paie/reconciliation/:id/complete", getAuthUser, attachAbility, r
 // GET /api/hr/projects
 hrRouter.get("/projects", getAuthUser, attachAbility, async (req, res) => {
     try {
-        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        if (!req.ability?.can(Actions.VIEW, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         const { statut, agenceId } = req.query as { statut?: string; agenceId?: string };
         const projects = await hrStorage.getProjects({ statut, agenceId });
         res.json(projects);
@@ -6910,7 +6895,7 @@ hrRouter.post("/projects", getAuthUser, attachAbility, requireAbility(Actions.MA
 // GET /api/hr/projects/:id
 hrRouter.get("/projects/:id", getAuthUser, attachAbility, async (req, res) => {
     try {
-        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        if (!req.ability?.can(Actions.VIEW, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         const project = await hrStorage.getProjectById(req.params.id);
         if (!project) return res.status(404).json({ error: "Projet introuvable" });
         res.json(project);
@@ -6976,7 +6961,7 @@ hrRouter.delete("/projects/:id/members/:employeId", getAuthUser, attachAbility, 
 // GET /api/hr/projects/:id/cost-summary
 hrRouter.get("/projects/:id/cost-summary", getAuthUser, attachAbility, async (req, res) => {
     try {
-        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        if (!req.ability?.can(Actions.VIEW, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         const summary = await hrStorage.getProjectCostSummary(req.params.id);
         res.json(summary);
     } catch (error) {
@@ -6992,7 +6977,7 @@ hrRouter.get("/projects/:id/cost-summary", getAuthUser, attachAbility, async (re
 // GET /api/hr/timesheets
 hrRouter.get("/timesheets", getAuthUser, attachAbility, async (req, res) => {
     try {
-        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        if (!req.ability?.can(Actions.VIEW, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         const { employeId, statut, semaine } = req.query as { employeId?: string; statut?: string; semaine?: string };
         const sheets = await hrStorage.getTimesheets({ employeId, statut, semaine });
         res.json(sheets);
@@ -7005,7 +6990,7 @@ hrRouter.get("/timesheets", getAuthUser, attachAbility, async (req, res) => {
 // GET /api/hr/timesheets/:id
 hrRouter.get("/timesheets/:id", getAuthUser, attachAbility, async (req, res) => {
     try {
-        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        if (!req.ability?.can(Actions.VIEW, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         const sheet = await hrStorage.getTimesheetById(req.params.id);
         if (!sheet) return res.status(404).json({ error: "Feuille de temps introuvable" });
         res.json(sheet);
@@ -7109,7 +7094,7 @@ hrRouter.get("/presence/week", getAuthUser, attachAbility, async (req, res) => {
 // GET /api/hr/time-allocation/:employeId
 hrRouter.get("/time-allocation/:employeId", getAuthUser, attachAbility, async (req, res) => {
     try {
-        if (!req.ability?.can(Actions.READ, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
+        if (!req.ability?.can(Actions.VIEW, Subjects.RH)) return res.status(403).json({ error: "Non autorisé" });
         const { from, to } = req.query as { from?: string; to?: string };
         const allocation = await hrStorage.getEmployeeTimeAllocation(req.params.employeId, from, to);
         res.json(allocation);

@@ -120,7 +120,7 @@ export default function TransferReconciliationPanel({
       fetchTransfers();
       onReconcile?.();
     } catch (error: unknown) {
-      toast.error(error.message || 'Erreur lors du rapprochement');
+      toast.error((error as Error).message || 'Erreur lors du rapprochement');
     } finally {
       setReconciling(null);
     }
@@ -134,7 +134,7 @@ export default function TransferReconciliationPanel({
       fetchTransfers();
       onReconcile?.();
     } catch (error: unknown) {
-      toast.error(error.message || 'Erreur lors de la confirmation');
+      toast.error((error as Error).message || 'Erreur lors de la confirmation');
     } finally {
       setReconciling(null);
     }

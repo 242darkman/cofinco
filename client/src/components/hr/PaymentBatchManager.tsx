@@ -190,15 +190,11 @@ export default function PaymentBatchManager({ runId, onGenerateXlsx }: PaymentBa
                statusModal?.targetStatus === 'CONFIRMED' ? 'Confirmer la réception' : 'Changer le statut'} size="sm">
         <div className="p-4 space-y-4">
           {statusModal?.targetStatus === 'CONFIRMED' && (
-            <FormField label="Référence bancaire">
-              <input className="w-full px-3 py-2 rounded-lg bg-input border border-input-border focus:border-input-focus text-sm text-content-primary"
-                value={referenceExterne} onChange={e => setReferenceExterne(e.target.value)} placeholder="Référence de la banque" />
-            </FormField>
+            <FormField label="Référence bancaire" name="referenceExterne"
+              value={referenceExterne} onChange={e => setReferenceExterne(e.target.value)} placeholder="Référence de la banque" />
           )}
-          <FormField label="Notes">
-            <input className="w-full px-3 py-2 rounded-lg bg-input border border-input-border focus:border-input-focus text-sm text-content-primary"
-              value={statusNotes} onChange={e => setStatusNotes(e.target.value)} placeholder="Notes optionnelles" />
-          </FormField>
+          <FormField label="Notes" name="statusNotes"
+            value={statusNotes} onChange={e => setStatusNotes(e.target.value)} placeholder="Notes optionnelles" />
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setStatusModal(null)}>Annuler</Button>
             <Button onClick={handleStatusChange}>Confirmer</Button>

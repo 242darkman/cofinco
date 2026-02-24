@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import {
   Plus, ArrowLeft, Play, Square, Archive, Users, Star,
   CheckCircle2, BarChart3, Eye,
+  type LucideIcon,
 } from 'lucide-react';
 import {
   Card, Button, Modal, Badge, StatCard, FormField, SelectField,
@@ -72,7 +73,7 @@ const STATUS_ACTION_LABEL: Record<string, string> = {
   CLOSED: 'Archiver',
 };
 
-const STATUS_ACTION_ICON: Record<string, React.ElementType> = {
+const STATUS_ACTION_ICON: Record<string, LucideIcon> = {
   DRAFT: Play,
   ACTIVE: Square,
   CLOSED: Archive,

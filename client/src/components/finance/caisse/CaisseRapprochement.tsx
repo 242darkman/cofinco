@@ -380,7 +380,7 @@ export default function CaisseRapprochement({ session, onClose, soldeTheoriqueCa
   // Fetch existing verification counts on mount in transfer step
   useEffect(() => {
     if (step === 'transfer') {
-      sessionCaisseApi.getCounts(session.id).then((counts: Record<string, unknown>) => {
+      sessionCaisseApi.getCounts(session.id).then((counts: any) => {
         if (counts.verification) {
           setVerificationResult({
             verificationTotal: counts.verification.total,

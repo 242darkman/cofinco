@@ -903,7 +903,7 @@ export default function OrganigrammeView({ employes }: OrganigrammeViewProps) {
 
             {/* Refresh */}
             <button
-              onClick={fetchOrgChart}
+              onClick={() => fetchOrgChart()}
               disabled={loading}
               className="p-1.5 bg-accent hover:bg-accent-primary-hover text-white rounded-lg transition disabled:opacity-50"
               title="Actualiser"

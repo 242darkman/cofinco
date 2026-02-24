@@ -15,6 +15,7 @@ import {
   sessionsCaisse,
   caisses,
   users,
+  userRoles,
   type CaisseHandover,
 } from "@shared/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
@@ -224,7 +225,7 @@ export class HandoverService {
       logger.error({ err: error, sessionId }, 'Erreur initiation handover');
       return {
         success: false,
-        error: error.message || 'Erreur lors de l\'initiation du transfert',
+        error: (error as Error).message || 'Erreur lors de l\'initiation du transfert',
       };
     }
   }
@@ -272,7 +273,7 @@ export class HandoverService {
       return { success: true };
     } catch (error: unknown) {
       logger.error({ err: error, handoverId }, 'Erreur démarrage comptage');
-      return { success: false, error: error.message };
+      return { success: false, error: (error as Error).message };
     }
   }
 
@@ -336,7 +337,7 @@ export class HandoverService {
 
         // 4. Si confirmé (sans écart majeur), transférer la session
         if (!requiresApproval) {
-          await this.transferSessionOwnership(tx, handover.sessionId, toCaissierId, handoverId);
+          await this.transferSessionOwnership(tx as any, handover.sessionId, toCaissierId, handoverId);
         }
 
         // 5. Log audit
@@ -375,7 +376,7 @@ export class HandoverService {
       logger.error({ err: error, handoverId }, 'Erreur confirmation handover');
       return {
         success: false,
-        error: error.message || 'Erreur lors de la confirmation',
+        error: (error as Error).message || 'Erreur lors de la confirmation',
       };
     }
   }
@@ -417,7 +418,7 @@ export class HandoverService {
           .returning();
 
         // Transférer la session
-        await this.transferSessionOwnership(tx, handover.sessionId, handover.toCaissierId, handoverId);
+        await this.transferSessionOwnership(tx as any, handover.sessionId, handover.toCaissierId, handoverId);
 
         // Log
         await tx.insert(caisseHandoverAuditLogs).values({
@@ -439,7 +440,7 @@ export class HandoverService {
       });
     } catch (error: unknown) {
       logger.error({ err: error, handoverId }, 'Erreur approbation handover');
-      return { success: false, error: error.message };
+      return { success: false, error: (error as Error).message };
     }
   }
 
@@ -464,9 +465,9 @@ export class HandoverService {
 
       // Vérifier que c'est un des participants ou un superviseur
       if (handover.fromCaissierId !== cancelledBy && handover.toCaissierId !== cancelledBy) {
-        const [user] = await db.select({ role: users.role })
-          .from(users)
-          .where(eq(users.id, cancelledBy));
+        const [user] = await db.select({ role: userRoles.role })
+          .from(userRoles)
+          .where(eq(userRoles.userId, cancelledBy));
         const supervisorRoles = ['ADMIN', 'CHEF_AGENCE', 'SUPERVISEUR'];
         if (!user || !supervisorRoles.includes(user.role)) {
           return { success: false, error: 'Seuls les participants ou un superviseur peuvent annuler ce transfert' };
@@ -502,7 +503,7 @@ export class HandoverService {
       };
     } catch (error: unknown) {
       logger.error({ err: error, handoverId }, 'Erreur annulation handover');
-      return { success: false, error: error.message };
+      return { success: false, error: (error as Error).message };
     }
   }
 

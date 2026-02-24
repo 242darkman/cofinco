@@ -17,6 +17,7 @@ import {
   EntryStatus,
 } from "@shared/schema";
 import { clients } from "@shared/schema/clients";
+import { users } from "@shared/schema/auth";
 import { createLogger } from "../lib/logger";
 
 const logger = createLogger('FecExport');
@@ -134,8 +135,9 @@ export async function fetchFecData(
   const clientNameMap = new Map<string, string>();
   if (clientIds.size > 0) {
     const clientRows = await db
-      .select({ id: clients.id, nom: clients.nom, prenom: clients.prenom })
+      .select({ id: clients.id, nom: users.nom, prenom: users.prenom })
       .from(clients)
+      .leftJoin(users, eq(clients.userId, users.id))
       .where(sql`${clients.id} IN (${sql.join([...clientIds].map(id => sql`${id}::uuid`), sql`, `)})`);
 
     for (const c of clientRows) {

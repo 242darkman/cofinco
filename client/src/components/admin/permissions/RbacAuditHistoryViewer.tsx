@@ -463,7 +463,7 @@ export default function RbacAuditHistoryViewer({
               <Button variant="ghost" size="sm" onClick={() => { setRevertTarget(null); setRevertReason(''); }}>
                 Fermer
               </Button>
-              <Button size="sm" variant="destructive" onClick={handleRevert} disabled={revertLoading}>
+              <Button size="sm" variant="danger" onClick={handleRevert} disabled={revertLoading}>
                 {revertLoading && <Loader2 size={14} className="animate-spin mr-1" />}
                 Confirmer l'annulation
               </Button>

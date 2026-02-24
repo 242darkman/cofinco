@@ -39,7 +39,7 @@ function ModuleAccordion({ module }: { module: SimulatedModule }) {
         <div className="flex items-center gap-3">
           {expanded ? <ChevronDown size={16} className="text-content-muted" /> : <ChevronRight size={16} className="text-content-muted" />}
           <span className="font-medium text-content-primary">{module.name}</span>
-          <Badge variant="secondary" className="text-[10px]">{module.category}</Badge>
+          <Badge variant="neutral" className="text-[10px]">{module.category}</Badge>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-content-muted">{grantedCount}/{totalCount}</span>
@@ -139,11 +139,11 @@ export default function PermissionSimulator({ users: usersList }: PermissionSimu
         <div className="flex items-center gap-3">
           <div className="flex-1 max-w-sm">
             <SearchableSelect
+              name="targetUser"
               options={userOptions}
               value={targetUserId}
-              onChange={setTargetUserId}
+              onChange={(value) => setTargetUserId(String(value))}
               placeholder="Sélectionner un utilisateur..."
-              searchPlaceholder="Rechercher..."
             />
           </div>
           <Button
@@ -191,7 +191,7 @@ export default function PermissionSimulator({ users: usersList }: PermissionSimu
                 </span>
                 <div className="flex items-center gap-2 mt-0.5">
                   {simulation.roles.map(r => (
-                    <Badge key={r} variant="secondary" className="text-[10px]">{r}</Badge>
+                    <Badge key={r} variant="neutral" className="text-[10px]">{r}</Badge>
                   ))}
                   {simulation.isAdmin && <Badge className="text-[10px] bg-status-warning-bg text-status-warning">Admin</Badge>}
                 </div>

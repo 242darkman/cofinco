@@ -137,7 +137,7 @@ export default function ScheduledCaisseTransfersPanel({
       resetForm();
       fetchTransfers();
     } catch (error: unknown) {
-      toast.error(error.message || 'Erreur lors de la sauvegarde');
+      toast.error((error as Error).message || 'Erreur lors de la sauvegarde');
     }
   };
 
@@ -148,7 +148,7 @@ export default function ScheduledCaisseTransfersPanel({
       toast.success('Transfert annulé');
       fetchTransfers();
     } catch (error: unknown) {
-      toast.error(error.message || 'Erreur lors de l\'annulation');
+      toast.error((error as Error).message || 'Erreur lors de l\'annulation');
     }
   };
 
@@ -160,7 +160,7 @@ export default function ScheduledCaisseTransfersPanel({
       fetchTransfers();
       onTransferExecuted?.();
     } catch (error: unknown) {
-      toast.error(error.message || 'Erreur lors de l\'exécution');
+      toast.error((error as Error).message || 'Erreur lors de l\'exécution');
     } finally {
       setExecuting(null);
     }

@@ -197,7 +197,7 @@ export async function getRolePermissions(role: SystemRole): Promise<RolePermissi
       })
       .from(rolePermissions)
       .where(and(
-        inArray(rolePermissions.role, inheritedRoleNames),
+        inArray(rolePermissions.role, inheritedRoleNames as any),
         eq(rolePermissions.granted, true)
       ));
 
@@ -675,7 +675,7 @@ export async function detectUserPermissionConflicts(
       granted: rolePermissions.granted,
     })
     .from(rolePermissions)
-    .where(inArray(rolePermissions.role, expandedRoles));
+    .where(inArray(rolePermissions.role, expandedRoles as any));
 
   // Build a map: permissionId -> { granted, sourceRoles[] }
   const rolePermMap = new Map<string, { granted: boolean; sourceRoles: string[] }>();

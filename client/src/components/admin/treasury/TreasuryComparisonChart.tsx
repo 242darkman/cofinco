@@ -234,7 +234,7 @@ function SingleAreaChart({
           axisLine={false}
           tickFormatter={(v) => formatAxisDate(v, period)}
           interval="preserveStartEnd"
-          maxTickGap={40}
+          minTickGap={40}
         />
         <YAxis
           tick={{ fontSize: 10, fill: 'var(--text-muted)' }}
@@ -311,7 +311,7 @@ function MultiLineChart({
           axisLine={false}
           tickFormatter={(v) => formatAxisDate(v, period)}
           interval="preserveStartEnd"
-          maxTickGap={40}
+          minTickGap={40}
         />
         <YAxis
           tick={{ fontSize: 10, fill: 'var(--text-muted)' }}

@@ -106,9 +106,9 @@ export function useOperationInfo({
             const compte = comptesClient.find((c: Record<string, unknown>) => c.typeCompte === targetType);
 
             if (compte) {
-                amount = parseFloat(compte.soldeCourant || '0');
+                amount = parseFloat(String(compte.soldeCourant || '0'));
                 if (config.kind === 'balance') {
-                     subtitle = `Compte ${compte.numeroCompte || ''}`;
+                     subtitle = `Compte ${String(compte.numeroCompte || '')}`;
                 } else {
                      // For withdrawals, maybe check withdrawal limits?
                      subtitle = `Max: ${amount}`;
@@ -130,8 +130,8 @@ export function useOperationInfo({
                 // If specific tontine selection logic exists in parent, it might be better to pass selectedTontine.
                 // But simplified: take the first one for now as per previous code logic
                 const tontine = tontinesActives[0];
-                amount = parseFloat(tontine.montantCotisation || '0');
-                subtitle = tontine.nom || 'Tontine';
+                amount = parseFloat(String(tontine.montantCotisation || '0'));
+                subtitle = String(tontine.nom || 'Tontine');
                 suggestion = amount.toString();
             } else {
                 subtitle = 'Aucune tontine active';
@@ -146,7 +146,7 @@ export function useOperationInfo({
             if (creditsActifs.length > 0) {
                 const credit = creditsActifs[0];
                 try {
-                    const echeance = await echeanceCreditApi.getProchaine(credit.id);
+                    const echeance = await echeanceCreditApi.getProchaine(credit.id as string);
                     if (echeance) {
                         amount = parseFloat(echeance.montantTotal || '0');
                         suggestion = amount.toString();
@@ -175,7 +175,7 @@ export function useOperationInfo({
                 const response = await fetch('/api/credits/pending-disbursements', { credentials: 'include' });
                 if (response.ok) {
                     const data = await response.json();
-                    const pending = data?.data?.find((d: Record<string, unknown>) =>
+                    const pending = data?.data?.find((d: any) =>
                         (d.clientId === clientId) ||
                         (d.client?.id === clientId)
                     );
@@ -199,8 +199,8 @@ export function useOperationInfo({
              // Need to check APPROVED distribution requests
              for (const tontine of tontinesActives) {
                 try {
-                  const requests = await tontineApi.getDistributionRequests(tontine.id, { status: 'APPROVED' });
-                  const reqObj = requests as Record<string, unknown>;
+                  const requests = await tontineApi.getDistributionRequests(tontine.id as string, { status: 'APPROVED' });
+                  const reqObj = requests as unknown as Record<string, unknown>;
                   const requestsList = Array.isArray(reqObj?.data) ? reqObj.data : (Array.isArray(requests) ? requests : []);
                   const forClient = requestsList.find((r: Record<string, unknown>) =>
                     r.beneficiaryClientId === clientId ||
@@ -209,7 +209,7 @@ export function useOperationInfo({
 
                   if (forClient) {
                     amount = parseFloat(String(forClient.amountApproved || forClient.amount_approved || forClient.amount || '0'));
-                    subtitle = tontine.nom;
+                    subtitle = String(tontine.nom || '');
                     suggestion = amount.toString();
                     break;
                   }

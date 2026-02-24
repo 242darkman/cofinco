@@ -824,7 +824,7 @@ export function registerOperationsRoutes(app: Express) {
           montant: data.montant,
           typePaiement: data.typePaiement || 'Paiement Crédit',
           methodePaiement: data.methodePaiement || 'Espèces',
-          numeroTelephone: normalizePhone(data.numeroTelephone),
+          numeroTelephone: normalizePhone(data.numeroTelephone) ?? undefined,
           numeroTransaction: data.numeroTransaction,
           reference: data.reference || `PAY-${Date.now()}`,
           notes: data.notes,

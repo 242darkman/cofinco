@@ -47,7 +47,6 @@ async function runSnapshotCapture(): Promise<void> {
 export function startCoffreBalanceSnapshotsCron(): void {
   // Daily at 23:55
   cronJob = cron.schedule("55 23 * * *", runSnapshotCapture, {
-    scheduled: true,
     timezone: "Africa/Brazzaville",
   });
 

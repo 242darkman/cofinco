@@ -252,7 +252,7 @@ export function registerRbacRoutes(app: Express) {
           .leftJoin(permissions, eq(rolePermissions.permissionId, permissions.id))
           .leftJoin(modules, eq(permissions.moduleId, modules.id))
           .where(and(
-            inArray(rolePermissions.role, inheritedRoleNames),
+            inArray(rolePermissions.role, inheritedRoleNames as SystemRole[]),
             eq(rolePermissions.granted, true)
           ));
 
@@ -2228,11 +2228,7 @@ export function registerRbacRoutes(app: Express) {
 
         invalidateRoleHierarchyCache();
 
-        logAudit(req, {
-          action: 'create',
-          entity: 'role_hierarchy',
-          details: { parentRole, childRole },
-        });
+        logAudit(req, 'create', 'role_hierarchy', created.id, { parentRole, childRole });
 
         res.status(201).json(created);
       } catch (error) {
@@ -2272,11 +2268,7 @@ export function registerRbacRoutes(app: Express) {
 
         invalidateRoleHierarchyCache();
 
-        logAudit(req, {
-          action: 'delete',
-          entity: 'role_hierarchy',
-          details: { id, parentRole: existing.parentRole, childRole: existing.childRole },
-        });
+        logAudit(req, 'delete', 'role_hierarchy', id, { parentRole: existing.parentRole, childRole: existing.childRole });
 
         res.status(204).send();
       } catch (error) {
@@ -2357,11 +2349,7 @@ export function registerRbacRoutes(app: Express) {
 
         invalidateCriticalPatternsCache();
 
-        logAudit(req, {
-          action: 'create',
-          entity: 'critical_pattern',
-          details: { pattern: pattern.trim() },
-        });
+        logAudit(req, 'create', 'critical_pattern', created.id, { pattern: pattern.trim() });
 
         res.status(201).json(created);
       } catch (error) {
@@ -2409,11 +2397,7 @@ export function registerRbacRoutes(app: Express) {
 
         invalidateCriticalPatternsCache();
 
-        logAudit(req, {
-          action: 'update',
-          entity: 'critical_pattern',
-          details: { id, pattern: updated.pattern },
-        });
+        logAudit(req, 'update', 'critical_pattern', id, { pattern: updated.pattern });
 
         res.json(updated);
       } catch (error) {
@@ -2453,11 +2437,7 @@ export function registerRbacRoutes(app: Express) {
 
         invalidateCriticalPatternsCache();
 
-        logAudit(req, {
-          action: 'delete',
-          entity: 'critical_pattern',
-          details: { id, pattern: existing.pattern },
-        });
+        logAudit(req, 'delete', 'critical_pattern', id, { pattern: existing.pattern });
 
         res.status(204).send();
       } catch (error) {
@@ -2572,11 +2552,7 @@ export function registerRbacRoutes(app: Express) {
           })
           .returning();
 
-        logAudit(req, {
-          action: 'create',
-          entity: 'condition_template',
-          details: { id: created.id, name: created.name },
-        });
+        logAudit(req, 'create', 'condition_template', created.id, { name: created.name });
 
         res.status(201).json(created);
       } catch (error) {
@@ -2643,11 +2619,7 @@ export function registerRbacRoutes(app: Express) {
           .where(eq(permissionConditionTemplates.id, id))
           .returning();
 
-        logAudit(req, {
-          action: 'update',
-          entity: 'condition_template',
-          details: { id, name: updated.name },
-        });
+        logAudit(req, 'update', 'condition_template', id, { name: updated.name });
 
         res.json(updated);
       } catch (error) {
@@ -2689,11 +2661,7 @@ export function registerRbacRoutes(app: Express) {
           .delete(permissionConditionTemplates)
           .where(eq(permissionConditionTemplates.id, id));
 
-        logAudit(req, {
-          action: 'delete',
-          entity: 'condition_template',
-          details: { id, name: existing.name },
-        });
+        logAudit(req, 'delete', 'condition_template', id, { name: existing.name });
 
         res.status(204).send();
       } catch (error) {

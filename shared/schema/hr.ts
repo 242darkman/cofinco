@@ -1547,7 +1547,7 @@ export type InsertPayrollBatchItem = z.infer<typeof insertPayrollBatchItemSchema
 // RAPPROCHEMENT BANCAIRE
 // =============================================================================
 
-export const ReconciliationStatus = {
+export const BankReconciliationStatus = {
   DRAFT: 'DRAFT',
   IN_PROGRESS: 'IN_PROGRESS',
   COMPLETED: 'COMPLETED',

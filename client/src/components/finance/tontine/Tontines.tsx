@@ -119,7 +119,7 @@ export default function Tontines() {
       total: tontines.length,
       active: tontines.filter(t => t.statut === TontineStatus.ACTIVE).length,
       membres: tontines.reduce((sum, t) => sum + (t.nombreMembresActuel || 0), 0),
-      volume: tontines.reduce((sum, t) => sum + ((t.montantCotisation || 0) * (t.nombreMembresActuel || 0)), 0),
+      volume: tontines.reduce((sum, t) => sum + (Number(t.montantCotisation || 0) * (t.nombreMembresActuel || 0)), 0),
       tauxReussite,
     };
   }, [tontines]);
@@ -142,7 +142,7 @@ export default function Tontines() {
       'Tour actuel': t.tourActuel || 1,
       [`Total collecté (${sym})`]: (t.totalCollecte || 0).toLocaleString('fr-FR'),
       'Date début': new Date(t.dateDebut).toLocaleDateString('fr-FR'),
-      'Créé le': new Date(t.createdAt).toLocaleDateString('fr-FR'),
+      'Créé le': t.createdAt ? new Date(t.createdAt).toLocaleDateString('fr-FR') : '',
     }];
     const date = new Date().toISOString().slice(0, 10);
     exportToPDF(data, `tontine-resume-${date}`, `Résumé - ${t.nom}`);
@@ -280,9 +280,10 @@ export default function Tontines() {
       <div className="flex flex-col h-full overflow-hidden gap-2">
         <div className="shrink-0 flex flex-col gap-2 p-1">
           <PageHeader
-            title={
-              <div className="flex items-center gap-2">
-                <span>{selectedTontine.nom}</span>
+            title={selectedTontine.nom}
+            description={selectedTontine.description ?? undefined}
+            actions={
+              <div className="flex items-center gap-1.5 flex-wrap">
                 <Badge
                   value={STATUT_TONTINE_LABELS[selectedTontine.statut] || selectedTontine.statut}
                   variant={
@@ -294,11 +295,6 @@ export default function Tontines() {
                   }
                   size="sm"
                 />
-              </div>
-            }
-            description={selectedTontine.description}
-            actions={
-              <div className="flex items-center gap-1.5 flex-wrap">
                 {/* Lifecycle actions */}
                 {canEditTontines && selectedTontine.statut === 'DRAFT' && (
                   <Button variant="primary" size="sm" icon={Play} onClick={() => handleLifecycleAction('activate')}>
@@ -377,9 +373,9 @@ export default function Tontines() {
              {activeTab === 'dashboard' && (
                 <TontineDashboard
                   tontineId={selectedTontine.id}
-                  montantContribution={selectedTontine.montantCotisation}
+                  montantContribution={Number(selectedTontine.montantCotisation || 0)}
                   nombreMembres={selectedTontine.nombreMembres}
-                  tourActuel={selectedTontine.tourActuel}
+                  tourActuel={selectedTontine.tourActuel || 1}
                 />
               )}
               {activeTab === 'config' && (
@@ -397,8 +393,8 @@ export default function Tontines() {
               {activeTab === 'distributions' && (
                 <TontineDistributions
                   tontineId={selectedTontine.id}
-                  tourActuel={selectedTontine.tourActuel}
-                  montantContribution={selectedTontine.montantCotisation}
+                  tourActuel={selectedTontine.tourActuel || 1}
+                  montantContribution={Number(selectedTontine.montantCotisation || 0)}
                   nombreMembres={selectedTontine.nombreMembres}
                   onUpdate={fetchTontines}
                 />
@@ -418,9 +414,9 @@ export default function Tontines() {
               {activeTab === 'calendar' && (
                 <TontineCalendar
                   tontineId={selectedTontine.id}
-                  dateDebut={selectedTontine.dateDebut}
+                  dateDebut={selectedTontine.dateDebut instanceof Date ? selectedTontine.dateDebut.toISOString() : String(selectedTontine.dateDebut)}
                   frequence={selectedTontine.frequence}
-                  tourActuel={selectedTontine.tourActuel}
+                  tourActuel={selectedTontine.tourActuel || 1}
                   nombreMembres={selectedTontine.nombreMembres}
                 />
               )}

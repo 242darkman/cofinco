@@ -85,7 +85,7 @@ export default function OperationDetailModal({
 }: OperationDetailModalProps) {
   const statutInfo = getStatutInfo(operation.statut);
   const StatutIcon = statutInfo.icon;
-  const metadata = operation.metadata as Record<string, unknown>;
+  const metadata = operation.metadata as Record<string, any>;
   const isWithdrawal = metadata?.typePaiementClient === TypeOperationTerrain.WITHDRAWAL_CURRENT
     || metadata?.typePaiementClient === TypeOperationTerrain.WITHDRAWAL_SAVINGS;
   const isCollect = operation.type === 'COLLECT_CASH' && !isWithdrawal;
@@ -126,7 +126,7 @@ export default function OperationDetailModal({
           <p className={`text-3xl font-bold ${
             isCollect ? 'text-accent' : isWithdrawal ? 'text-status-danger' : 'text-status-success'
           }`}>
-            {isCollect ? '+' : '-'}{formatMoney(operation.montant as unknown as string)} {operation.devise}
+            {isCollect ? '+' : '-'}{formatMoney(String(operation.montant))} {String(operation.devise)}
           </p>
         </div>
 
@@ -140,7 +140,7 @@ export default function OperationDetailModal({
                 <p className="text-xs text-content-muted">Client</p>
               </div>
               <p className="text-sm font-medium text-content-primary">
-                {formatClientName(operation.client.nom, operation.client.prenom)}
+                {formatClientName(String(operation.client.nom), String(operation.client.prenom))}
               </p>
             </div>
           )}
@@ -153,7 +153,7 @@ export default function OperationDetailModal({
                 <p className="text-xs text-content-muted">Caisse destination</p>
               </div>
               <p className="text-sm font-medium text-content-primary">
-                {operation.destinationCaisse.nom}
+                {String(operation.destinationCaisse.nom)}
               </p>
             </div>
           )}

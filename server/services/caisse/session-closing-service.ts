@@ -299,7 +299,7 @@ export class SessionClosingService {
         }
       } catch (error: unknown) {
         balanceApiFailed = true;
-        balanceApiError = error.message;
+        balanceApiError = (error as Error).message;
         logger.warn({ err: error }, 'Erreur récupération balances pawaPay');
       }
 
@@ -1193,7 +1193,7 @@ export class SessionClosingService {
         return { success: true, session: updatedSession };
       });
     } catch (error: unknown) {
-      return { success: false, error: error.message, errorCode: "DB_ERROR" };
+      return { success: false, error: (error as Error).message, errorCode: "DB_ERROR" };
     }
   }
 

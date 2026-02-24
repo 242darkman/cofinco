@@ -48,8 +48,8 @@ export default function StepGarantiesDocuments({
     if (!file) return;
     try {
       const result = await uploadFile(file);
-      if (result?.url) {
-        updateField('documents_justificatifs', [...formData.documents_justificatifs, result.url]);
+      if (result) {
+        updateField('documents_justificatifs', [...formData.documents_justificatifs, result]);
       }
     } catch { /* handled by upload hook */ }
     e.target.value = '';

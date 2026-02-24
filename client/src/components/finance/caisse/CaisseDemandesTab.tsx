@@ -454,10 +454,11 @@ export default function CaisseDemandesTab({
       fetchAll();
       onRequestProcessed?.();
     } catch (err: unknown) {
-      if (err?.error?.code === 'INSUFFICIENT_FUNDS') {
-        toast.error(`Solde insuffisant. Déficit: ${formatMoney(err.error.deficit)}`, { duration: 6000 });
+      const errObj = err as Record<string, any>;
+      if (errObj?.error?.code === 'INSUFFICIENT_FUNDS') {
+        toast.error(`Solde insuffisant. Déficit: ${formatMoney(errObj.error.deficit)}`, { duration: 6000 });
       } else {
-        toast.error(err.message || 'Erreur lors du traitement');
+        toast.error((err as Error).message || 'Erreur lors du traitement');
       }
     } finally {
       setActionLoading(null);
@@ -521,7 +522,7 @@ export default function CaisseDemandesTab({
       fetchAll();
       onRequestProcessed?.();
     } catch (err: unknown) {
-      toast.error(err.message || 'Erreur décaissement groupé');
+      toast.error((err as Error).message || 'Erreur décaissement groupé');
     } finally {
       setActionLoading(null);
     }

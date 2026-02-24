@@ -252,7 +252,7 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
         setAccessCodeError(result.error || 'Code invalide ou expiré');
       }
     } catch (err: unknown) {
-      setAccessCodeError(err.message || 'Erreur de validation');
+      setAccessCodeError((err as Error).message || 'Erreur de validation');
     } finally {
       setAccessCodeLoading(false);
     }
@@ -473,7 +473,7 @@ export default function CaisseOuverture({ onClose, onSuccess, pendingSession }: 
       setError('');
       setSuccessMessage(`Solde remis à 0 FCFA. Vous pouvez maintenant ouvrir la session.`);
     } catch (err: unknown) {
-      setError(err.message || 'Erreur lors de la correction du solde');
+      setError((err as Error).message || 'Erreur lors de la correction du solde');
     } finally {
       setCorrecting(false);
     }

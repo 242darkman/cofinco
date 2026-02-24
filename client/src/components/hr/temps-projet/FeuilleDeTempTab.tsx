@@ -195,7 +195,7 @@ export default function FeuilleDeTempTab() {
     try {
       const ts = await createTimesheet({
         employeId: user.employeId ?? user.id?.toString() ?? '',
-        employeNom: user.fullName ?? user.username ?? '',
+        employeNom: (user.prenom && user.nom ? `${user.prenom} ${user.nom}` : user.username) ?? '',
         semaine: selectedWeek,
         dateDebut: dates[0],
         dateFin: dates[6],

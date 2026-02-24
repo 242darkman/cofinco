@@ -171,6 +171,7 @@ export default function MesOffresInternesTab() {
 
           <TextareaField
             label="Motivation / Experience pertinente"
+            name="motivation"
             value={motivation}
             onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setMotivation(e.target.value)}
             placeholder="Decrivez votre motivation et votre experience pertinente pour ce poste..."

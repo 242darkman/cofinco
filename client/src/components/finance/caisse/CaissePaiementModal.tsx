@@ -579,7 +579,7 @@ export default function CaissePaiementModal({
 
       const rData: ReceiptData = {
         title: `Reçu — ${operationLabel}`,
-        reference: operationData.reference,
+        reference: operationData.reference as string | undefined,
         date: new Date(),
         type: operationLabel,
         natureOperation: formData.type_operation,
@@ -882,7 +882,7 @@ export default function CaissePaiementModal({
                         <option value="">Sélectionner un compte...</option>
                         {filteredAccounts.map(acc => (
                             <option key={acc.id} value={acc.id}>
-                                {acc.numeroCompte} - {getStatusLabel(acc.typeCompte, ACCOUNT_TYPE_LABELS)} ({formatMoney(acc.solde || acc.soldeCourant || 0)})
+                                {acc.numeroCompte} - {getStatusLabel(acc.typeCompte, ACCOUNT_TYPE_LABELS)} ({formatMoney(String(acc.soldeCourant || 0))})
                             </option>
                         ))}
                     </select>

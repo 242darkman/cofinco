@@ -140,7 +140,7 @@ const StepDocuments: React.FC<StepDocumentsProps> = ({
               label="Pays d'Émission"
               name="paysEmissionId"
               value={formData.paysEmissionId || ''}
-              onChange={(value) => updateField('paysEmissionId', value)}
+              onChange={(value) => updateField('paysEmissionId', String(value))}
               options={paysOptions}
               placeholder="Sélectionner le pays d'émission"
             />

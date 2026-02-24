@@ -186,7 +186,7 @@ export default function PermissionRequestsManager() {
                         <span className="font-medium text-sm text-content-primary">
                           {req.requesterPrenom} {req.requesterNom}
                         </span>
-                        <Badge variant="secondary" className="text-[9px]">{TYPE_LABELS[req.requestType]}</Badge>
+                        <Badge variant="neutral" className="text-[9px]">{TYPE_LABELS[req.requestType]}</Badge>
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium border ${statusCfg.className}`}>
                           <StatusIcon size={10} />
                           {statusCfg.label}

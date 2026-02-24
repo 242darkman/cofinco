@@ -377,10 +377,10 @@ const DrawerContent = React.memo(function DrawerContent({
           {transaction.metadata?.detailPaiements?.length > 0 && (
             <section>
               <h3 className="text-xs font-bold text-content-muted uppercase tracking-wider mb-3 flex items-center gap-2">
-                <Users size={14} /> Détail des paiements ({transaction.metadata.detailPaiements.length})
+                <Users size={14} /> Détail des paiements ({transaction.metadata?.detailPaiements?.length})
               </h3>
               <div className="bg-surface-muted/50 rounded-xl p-4 space-y-2">
-                {transaction.metadata.detailPaiements.map((p: any) => (
+                {transaction.metadata?.detailPaiements?.map((p: any) => (
                   <div key={p.paiementId} className="flex items-center justify-between py-1.5 border-b border-dashed border-edge-subtle last:border-0">
                     <div className="flex items-center gap-2 min-w-0">
                       <Users size={12} className="text-content-muted shrink-0" />

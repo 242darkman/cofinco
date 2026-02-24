@@ -128,26 +128,30 @@ export async function calculateCobacRatios(
   // 6. Compare against thresholds
   const alerts = await evaluateAlerts(ratios);
 
+  // Convert to strings for DB numeric columns
+  const ratiosStr = Object.fromEntries(Object.entries(ratios).map(([k, v]) => [k, String(v)]));
+  const underlyingStr = Object.fromEntries(Object.entries(underlyingValues).map(([k, v]) => [k, String(v)]));
+
   // 7. Store snapshot
   await db
     .insert(ratiosPrudentiels)
     .values({
       agenceId,
       periodeDate: periodeDateStr,
-      ...ratios,
-      ...underlyingValues,
+      ...ratiosStr,
+      ...underlyingStr,
       alerts,
       generatedBy: userId,
-    })
+    } as any)
     .onConflictDoUpdate({
       target: [ratiosPrudentiels.agenceId, ratiosPrudentiels.periodeDate],
       set: {
-        ...ratios,
-        ...underlyingValues,
+        ...ratiosStr,
+        ...underlyingStr,
         alerts,
         generatedAt: new Date(),
         generatedBy: userId,
-      },
+      } as any,
     });
 
   logger.info({ agenceId, periodeDate: periodeDateStr, roe: ratios.roe, roa: ratios.roa, alerts: alerts.length }, 'COBAC ratios calculated');

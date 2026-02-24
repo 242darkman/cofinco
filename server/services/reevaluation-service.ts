@@ -377,7 +377,7 @@ export async function startEnqueteComplementaire(
   pointsAVerifier: string[],
   enqueteurId: string,
   userId: string
-): Promise<{ success: boolean; enquete?: any }> {
+): Promise<{ success: boolean; enquete?: any; creditPlanId?: string | null }> {
   // 1. Get reevaluation
   const [reevaluation] = await db
     .select()
@@ -455,7 +455,7 @@ export async function startEnqueteComplementaire(
   return {
     success: true,
     enquete,
-    creditPlanId: demande?.creditPlanId || null,
+    creditPlanId: (demande as any)?.creditPlanId || null,
   };
 }
 

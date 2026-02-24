@@ -819,7 +819,7 @@ transfertsInterCoffresRouter.post("/transferts/bulk-approve", async (req, res) =
       try {
         const result = await transfertService.approveTransfert({
           transfertId: tid,
-          level,
+          level: level as 1 | 2,
           approved: true,
           commentaire,
           userId,
@@ -861,7 +861,7 @@ transfertsInterCoffresRouter.post("/transferts/bulk-reject", async (req, res) =>
       try {
         const result = await transfertService.approveTransfert({
           transfertId: tid,
-          level,
+          level: level as 1 | 2,
           approved: false,
           rejectionReason: reason,
           userId,

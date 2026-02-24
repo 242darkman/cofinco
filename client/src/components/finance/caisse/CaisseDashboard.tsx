@@ -433,7 +433,7 @@ export default function CaisseDashboard({
     // If we have a supervised session update, we might need to manually set it?
     // Actually, forcing a refetch is better.
     if (initialState?.supervisedSession) {
-       setSupervisedSession(initialState.supervisedSession);
+       setSupervisedSession(initialState.supervisedSession as SessionCaisse);
        // We don't refetch sessionActive here because sessionActive query handles the "supervisedSession" logic
     }
   }, [initialState]);
@@ -801,7 +801,7 @@ export default function CaisseDashboard({
         );
 
       case 'transferts':
-        return <div className="animate-in fade-in slide-in-from-bottom-4 duration-300"><CaisseTransferts session={currentSession} soldeActuel={soldeActuel} onBack={() => handleTabChange('dashboard')} /></div>;
+        return <div className="animate-in fade-in slide-in-from-bottom-4 duration-300"><CaisseTransferts session={currentSession ?? null} soldeActuel={soldeActuel} onBack={() => handleTabChange('dashboard')} /></div>;
       case 'etats':
         return <div className="h-full animate-in fade-in slide-in-from-bottom-4 duration-300"><CaisseEtats onBack={() => handleTabChange('dashboard')} /></div>;
 
@@ -814,7 +814,7 @@ export default function CaisseDashboard({
                  </div>
                  <CaisseSupervision
                     activeSupervision={supervisionInfo}
-                    onTakeControl={handleSupervisionStart}
+                    onTakeControl={handleSupervisionStart as (session: any, info: any) => void}
                  />
             </div>
         );
@@ -1434,7 +1434,7 @@ export default function CaisseDashboard({
             refetchPendingSession();
           }}
           onSuccess={handleOuvertureCaisse}
-          pendingSession={pendingSession || undefined}
+          pendingSession={(pendingSession as unknown as Record<string, unknown>) || undefined}
         />
       )}
 

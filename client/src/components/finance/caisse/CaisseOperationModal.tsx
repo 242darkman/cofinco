@@ -167,7 +167,7 @@ export default function CaisseOperationModal({
   };
 
   const handleCopyRef = async () => {
-    const ref = result?.transaction?.reference || result?.transaction?.id;
+    const ref = (result?.transaction?.reference || result?.transaction?.id) as string | undefined;
     if (ref) {
       await navigator.clipboard.writeText(ref);
       toast.success('Copié', { duration: 1500 });
@@ -553,13 +553,13 @@ export default function CaisseOperationModal({
               <p className={`text-2xl font-black font-mono ${isDepot ? 'text-status-success' : 'text-status-danger'}`}>
                 {isDepot ? '+' : '-'}{formatMoney(parseFloat(amount))}
               </p>
-              {result.transaction?.reference && (
+              {!!result.transaction?.reference && (
                 <button
                   onClick={handleCopyRef}
                   className="inline-flex items-center gap-1.5 text-xs text-content-muted hover:text-content-primary transition-colors font-mono"
                 >
                   <Copy size={12} />
-                  {result.transaction.reference}
+                  {String(result.transaction.reference)}
                 </button>
               )}
             </div>
@@ -581,7 +581,7 @@ export default function CaisseOperationModal({
                 showPreview={false}
                 variant="compact"
                 showReference={false}
-                factureId={factureId || undefined}
+                factureId={(factureId as string) || undefined}
               />
             )}
 

@@ -102,7 +102,7 @@ class CountSuggestionService {
 
     if (openingCount) {
       // Si on a un billetage d'ouverture, on l'utilise comme base
-      billetage = this.adjustFromOpening(openingCount, operations, soldeTheorique);
+      billetage = this.adjustFromOpening(openingCount as unknown as Record<string, number>, operations, soldeTheorique);
       reasoning.push("Suggestion basée sur le billetage d'ouverture ajusté");
       confidence = 'HIGH';
     } else {

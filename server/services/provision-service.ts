@@ -328,7 +328,7 @@ async function getCreditsForProvision(agenceId: string): Promise<CreditForProvis
       AND solde_restant > 0
     ORDER BY prochaine_echeance ASC
   `);
-  return rows.rows as CreditForProvision[];
+  return rows.rows as unknown as CreditForProvision[];
 }
 
 async function getPreviousProvision(creditId: string) {

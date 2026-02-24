@@ -138,7 +138,7 @@ export default function InternalPortalTab() {
             Vous pouvez ajouter une note de motivation ci-dessous.
           </p>
 
-          <TextareaField label="Motivation / Expérience pertinente" value={motivation}
+          <TextareaField label="Motivation / Expérience pertinente" name="motivation" value={motivation}
             onChange={e => setMotivation(e.target.value)} rows={4}
             placeholder="Décrivez votre motivation et votre expérience pertinente pour ce poste..." />
 

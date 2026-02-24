@@ -118,7 +118,7 @@ export function PendingActivationDrawer({ open, onClose, sessionId, onActivate }
       queryClient.invalidateQueries({ queryKey: ['comptes', 'pending-activation'] });
       refetch();
     } catch (error: unknown) {
-      toast.error(error.message || 'Erreur lors de l\'activation batch');
+      toast.error((error as Error).message || 'Erreur lors de l\'activation batch');
     } finally {
       setBatchActivating(false);
     }

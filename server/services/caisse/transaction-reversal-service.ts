@@ -280,7 +280,7 @@ export async function reverseOperation(req: ReversalRequest): Promise<ReversalRe
         // Using the live balance is correct even if other transactions happened
         // between the original and this reversal.
         const [currentCompte] = await tx
-          .select({ solde: comptes.solde })
+          .select({ solde: comptes.soldeCourant })
           .from(comptes)
           .where(eq(comptes.id, linkedTx.compteId));
         const newSolde = currentCompte?.solde ?? null;

@@ -337,7 +337,7 @@ export class AgencyClosureService {
       logger.error({ err: error, agenceId }, 'Erreur finalisation clôture');
       return {
         success: false,
-        error: error.message || 'Erreur lors de la finalisation',
+        error: (error as Error).message || 'Erreur lors de la finalisation',
       };
     }
   }
@@ -412,7 +412,7 @@ export class AgencyClosureService {
       return { success: true, closure: updated };
     } catch (error: unknown) {
       logger.error({ err: error, closureId }, 'Erreur réouverture clôture');
-      return { success: false, error: error.message };
+      return { success: false, error: (error as Error).message };
     }
   }
 }

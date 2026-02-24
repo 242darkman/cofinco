@@ -266,7 +266,7 @@ export class EcartApprovalService {
       logger.error({ err: error, sessionId }, 'Erreur création demande approbation');
       return {
         success: false,
-        error: error.message || 'Erreur lors de la création de la demande',
+        error: (error as Error).message || 'Erreur lors de la création de la demande',
       };
     }
   }
@@ -357,7 +357,7 @@ export class EcartApprovalService {
       logger.error({ err: error, requestId }, 'Erreur approbation écart');
       return {
         success: false,
-        error: error.message || 'Erreur lors du traitement',
+        error: (error as Error).message || 'Erreur lors du traitement',
       };
     }
   }

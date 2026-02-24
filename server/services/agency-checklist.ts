@@ -76,7 +76,7 @@ export async function getAgencyActivationChecklist(agencyId: string): Promise<Ch
       .where(
         and(
           eq(userRoles.userId, agency.responsableId),
-          eq(userRoles.role, "CHEF_AGENCE"),
+          eq(userRoles.role, "CHEF_AGENCE" as any),
         ),
       );
     if (managerRole) {
@@ -116,7 +116,7 @@ export async function getAgencyActivationChecklist(agencyId: string): Promise<Ch
       userRoles,
       and(
         eq(userRoles.userId, userAgences.userId),
-        or(eq(userRoles.role, "CAISSIER"), eq(userRoles.role, "CHEF_AGENCE")),
+        or(eq(userRoles.role, "CAISSIER" as any), eq(userRoles.role, "CHEF_AGENCE" as any)),
       ),
     )
     .where(

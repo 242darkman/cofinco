@@ -275,18 +275,19 @@ export function useCaisseOperation({
     },
     onError: (error: unknown) => {
       // Detect duplicate warning (409 from duplicate-detection middleware)
-      if (error?.status === 409 && error?.data?.error === 'POTENTIAL_DUPLICATE') {
+      const errObj = error as Record<string, any>;
+      if (errObj?.status === 409 && errObj?.data?.error === 'POTENTIAL_DUPLICATE') {
         setDuplicateWarning({
-          message: error.data.message,
-          duplicates: error.data.duplicates || [],
-          canOverride: error.data.canOverride ?? false,
+          message: errObj.data.message,
+          duplicates: errObj.data.duplicates || [],
+          canOverride: errObj.data.canOverride ?? false,
         });
         return;
       }
 
       const msg =
         (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        error?.message ||
+        (error as Error)?.message ||
         'Erreur lors de l\'opération';
       toast.error(msg);
     },
@@ -346,7 +347,7 @@ export function useCaisseOperation({
       queryClient.invalidateQueries({ queryKey: ['/api/sessions-caisse'] });
     },
     onError: (error: unknown) => {
-      const msg = error?.message || 'Erreur lors de l\'opération';
+      const msg = (error as Error)?.message || 'Erreur lors de l\'opération';
       toast.error(msg);
     },
   });
@@ -384,7 +385,7 @@ export function useCaisseOperation({
 
     return {
       title: operationType === 'DEPOT' ? 'Reçu de Dépôt' : 'Reçu de Retrait',
-      reference: result.transaction?.reference || result.transaction?.id || '',
+      reference: String(result.transaction?.reference || result.transaction?.id || ''),
       date: new Date(),
       type: operationType,
       client: {
@@ -404,7 +405,7 @@ export function useCaisseOperation({
       ],
       notes: observations.trim() || undefined,
       transaction: {
-        id: result.transaction?.id || '',
+        id: String(result.transaction?.id || ''),
         date: new Date(),
         type: operationType,
         amount: parsedAmount,

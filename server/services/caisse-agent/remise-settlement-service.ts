@@ -419,8 +419,9 @@ export class RemiseSettlementService {
         const detailPaiements = [];
         for (const paiement of paiements) {
           const [clientData] = await tx
-            .select({ nom: clients.nom, prenom: clients.prenom })
+            .select({ nom: users.nom, prenom: users.prenom })
             .from(clients)
+            .leftJoin(users, eq(clients.userId, users.id))
             .where(eq(clients.id, paiement.clientId));
 
           const clientName = clientData

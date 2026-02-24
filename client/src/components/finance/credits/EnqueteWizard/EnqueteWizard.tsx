@@ -74,7 +74,7 @@ export default function EnqueteWizard({ clientId, clientNom, initialData, onClos
       };
 
       if (!navigator.onLine) {
-        await saveEnqueteOffline(payload);
+        await saveEnqueteOffline(payload.clientId, payload);
         toast.success('Enquête sauvegardée hors-ligne', { description: 'Elle sera synchronisée automatiquement.' });
       } else {
         await onSave(payload);
@@ -210,11 +210,11 @@ export default function EnqueteWizard({ clientId, clientNom, initialData, onClos
             reviewedAt: initialData.reviewedAt,
             createdByName: initialData.createdByName,
             situationMatrimoniale: formData.situationMatrimoniale,
-            personnesCharge: formData.personnesCharge,
+            personnesCharge: parseInt(formData.personnesCharge) || null,
             typeHabitation: formData.typeHabitation,
             categorieActivite: formData.categorie_activite,
             typeActivite: formData.type_activite,
-            ancienneteActivite: formData.anciennete_activite,
+            ancienneteActivite: parseInt(formData.anciennete_activite) || null,
             evaluationActivite: initialData.evaluationActivite,
             revenuMensuel: formData.revenu_mensuel_declare,
             revenuJournalier: formData.revenu_journalier,

@@ -174,7 +174,7 @@ function PieTooltip({ active, payload }: { active?: boolean; payload?: Array<{ n
   return (
     <div className="bg-surface-elevated border border-edge rounded-lg shadow-xl p-2.5 text-xs">
       <div className="font-semibold text-content-primary">{data.name}</div>
-      <div className="text-content-muted">{formatMoney(data.value)} ({data.payload.count} op.)</div>
+      <div className="text-content-muted">{formatMoney(data.value)} ({String((data.payload as Record<string, unknown>)?.count ?? 0)} op.)</div>
     </div>
   );
 }

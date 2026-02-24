@@ -684,7 +684,7 @@ export async function calculateRetirable(
   } else if (!member.joinFeePaid) {
     peutRetirer = false;
     raison = "Frais d'adhésion non payés";
-  } else if (member.statut === "SUSPENDED") {
+  } else if ((member.statut as string) === "SUSPENDED") {
     peutRetirer = false;
     raison = "Membre suspendu";
   }

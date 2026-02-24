@@ -250,14 +250,10 @@ export default function BankReconciliationPanel() {
       {/* Create session modal */}
       <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} title="Nouvelle session de rapprochement" size="sm">
         <div className="p-4 space-y-4">
-          <FormField label="Période" required>
-            <input type="month" className="w-full px-3 py-2 rounded-lg bg-input border border-input-border focus:border-input-focus text-sm text-content-primary"
-              value={newPeriod} onChange={e => setNewPeriod(e.target.value)} />
-          </FormField>
-          <FormField label="Banque" required>
-            <input className="w-full px-3 py-2 rounded-lg bg-input border border-input-border focus:border-input-focus text-sm text-content-primary"
-              value={newBankName} onChange={e => setNewBankName(e.target.value)} placeholder="Nom de la banque" />
-          </FormField>
+          <FormField label="Période" name="periode" type="month" required
+            value={newPeriod} onChange={e => setNewPeriod(e.target.value)} />
+          <FormField label="Banque" name="bankName" required
+            value={newBankName} onChange={e => setNewBankName(e.target.value)} placeholder="Nom de la banque" />
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={() => setShowCreateModal(false)}>Annuler</Button>
             <Button onClick={handleCreate} disabled={isCreating || !newPeriod || !newBankName}>

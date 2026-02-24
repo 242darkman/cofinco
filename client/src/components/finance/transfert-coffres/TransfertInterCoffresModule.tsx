@@ -1109,7 +1109,7 @@ export default function TransfertInterCoffresModule({
 
         {/* Bulk Reject Modal */}
         {showBulkRejectModal && (
-          <Modal onClose={() => { setShowBulkRejectModal(false); setBulkRejectReason(''); }} title="Rejet groupé">
+          <Modal isOpen={true} onClose={() => { setShowBulkRejectModal(false); setBulkRejectReason(''); }} title="Rejet groupé">
             <div className="space-y-4 p-4">
               <p className="text-sm text-content-secondary">
                 Rejeter {selectedIds.size} transfert{selectedIds.size > 1 ? 's' : ''} sélectionné{selectedIds.size > 1 ? 's' : ''}.

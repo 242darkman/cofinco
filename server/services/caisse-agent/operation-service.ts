@@ -725,7 +725,7 @@ export class OperationService {
           const [caisseData] = await db
             .select({ id: caisses.id, nom: caisses.nom })
             .from(caisses)
-            .where(eq(caisses.id, metaSessionCaisseId));
+            .where(eq(caisses.id, metaSessionCaisseId as string));
           sourceCaisse = caisseData || null;
         }
 

@@ -1,5 +1,5 @@
 import { db } from './db';
-import { auditLogs, loginAttempts, InsertAuditLog, InsertLoginAttempt, securitySettings } from '@shared/schema';
+import { auditLogs, loginAttempts, InsertAuditLog, InsertLoginAttempt, securitySettings, type AuditLog } from '@shared/schema';
 import { Request } from 'express';
 import { eq, and, gte, lte, desc, asc, sql, count } from 'drizzle-orm';
 import { createLogger } from './lib/logger';
@@ -335,7 +335,7 @@ export async function purgeOldAuditLogs(): Promise<{ archivedCount: number; dele
     let lastId: string | null = null;
 
     while (true) {
-      const batch = lastId
+      const batch: AuditLog[] = lastId
         ? await db.select().from(auditLogs)
             .where(and(lte(auditLogs.createdAt, cutoffDate), sql`${auditLogs.id} > ${lastId}`))
             .orderBy(asc(auditLogs.id))

@@ -32,7 +32,7 @@ export default function StepClientSituation({
 
   useEffect(() => {
     if (!clientId && !formData.client_id) {
-      clientApi.getAll({ statut: StatutClient.ACTIF }).then((data: any) => {
+      clientApi.getAll({ statut: StatutClient.ACTIVE }).then((data: any) => {
         const list = (data.data || data || []).map((c: any) => ({
           id: c.id,
           nom: c.user?.nom || c.nom || '',

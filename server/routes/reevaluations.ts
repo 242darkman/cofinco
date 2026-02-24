@@ -498,7 +498,7 @@ export function registerReevaluationRoutes(app: Express) {
       res.status(201).json({
         success: true,
         enquete: result.enquete,
-        creditPlanId: result.creditPlanId,
+        creditPlanId: (result as any).creditPlanId,
       });
     } catch (error: any) {
       logger.error({ err: error }, 'Error starting enquete');

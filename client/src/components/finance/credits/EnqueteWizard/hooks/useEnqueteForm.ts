@@ -76,7 +76,7 @@ function buildInitialForm(opts: UseEnqueteFormOptions): EnqueteFormData {
 
 export function useEnqueteForm(opts: UseEnqueteFormOptions) {
   const [formData, setFormData] = useState<EnqueteFormData>(() => buildInitialForm(opts));
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const updateField = useCallback(<K extends keyof EnqueteFormData>(key: K, value: EnqueteFormData[K]) => {
     setFormData(prev => ({ ...prev, [key]: value }));

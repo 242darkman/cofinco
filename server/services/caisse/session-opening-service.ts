@@ -95,8 +95,6 @@ interface ReceiveFundsParams {
   userAgent?: string;
 }
 
-type SessionRow = typeof sessionsCaisse.$inferSelect;
-
 interface ReceiveFundsResult {
   success: boolean;
   session?: SessionRow;
@@ -332,21 +330,21 @@ export class SessionOpeningService {
         };
       });
     } catch (error: unknown) {
-      if (error.message === "CAISSE_OCCUPIED") {
+      if ((error as Error).message === "CAISSE_OCCUPIED") {
         return {
           success: false,
           error: "Cette caisse est déjà occupée ou a une demande en cours",
           errorCode: "CAISSE_OCCUPIED",
         };
       }
-      if (error.message === "USER_HAS_SESSION") {
+      if ((error as Error).message === "USER_HAS_SESSION") {
         return {
           success: false,
           error: "Vous avez déjà une session ouverte ou une demande en cours",
           errorCode: "USER_HAS_SESSION",
         };
       }
-      if (error.message === "CAISSE_NOT_FOUND") {
+      if ((error as Error).message === "CAISSE_NOT_FOUND") {
         return {
           success: false,
           error: "Caisse non trouvée",

@@ -528,7 +528,6 @@ const translations: Translations = {
   clientsARisque: { fr: 'clients à risque', en: 'at-risk clients' },
   paiementsAVenir: { fr: 'paiements à venir', en: 'upcoming payments' },
   enquetesEnCours: { fr: 'enquêtes en cours', en: 'ongoing investigations' },
-  details: { fr: 'Détails', en: 'Details' },
   precedent: { fr: 'Précédent', en: 'Previous' },
   suivant: { fr: 'Suivant', en: 'Next' },
   toutEstAJour: { fr: 'Tout est à jour !', en: 'Everything is up to date!' },

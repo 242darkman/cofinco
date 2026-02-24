@@ -48,6 +48,65 @@ interface CoffreFortDashboardProps {
   agenceId: string;
 }
 
+/** Row returned by coffreApi.listTransferts — transferts coffre ↔ caisse */
+interface TransfertCoffreRow {
+  id: string;
+  statut: string;
+  createdAt: string;
+  montant: string | number;
+  typeTransfert: string;
+  caisseDestinationNom?: string;
+  caisseSourceNom?: string;
+  requestedByNom?: string;
+  requestedByPrenom?: string;
+  verrouille?: boolean;
+  executedAt?: string;
+  /** Present on mouvement-style rows rendered in the historique columns */
+  dateOperation?: string;
+  sens?: string;
+  typePaiement?: string;
+  metadata?: Record<string, any>;
+  reference?: string;
+  initiator?: { nom?: string; prenom?: string };
+  sourceModule?: string;
+  soldeApres?: string | number;
+  caissierNom?: string;
+  [key: string]: any;
+}
+
+/** Row returned by coffreApi.getMouvements */
+interface MouvementCoffreRow {
+  id: string;
+  dateOperation: string;
+  sens: string;
+  montant: string | number;
+  typePaiement?: string;
+  metadata?: Record<string, any>;
+  reference?: string;
+  initiator?: { nom?: string; prenom?: string };
+  sourceModule?: string;
+  soldeApres?: string | number;
+  [key: string]: any;
+}
+
+/** Row returned by coffreApi.getPendingOpeningRequests */
+interface OpeningRequest {
+  transfert?: {
+    id: string;
+    montant?: string | number;
+    caisseDestinationNom?: string;
+    requestedByNom?: string;
+    [key: string]: any;
+  };
+  session?: { id: string; [key: string]: any };
+  caissierNom?: string;
+  caisseNom?: string;
+  montantDemande?: string | number;
+  soldeVeille?: number;
+  fundsRequestedAt?: string;
+  [key: string]: any;
+}
+
 // Types pour le dialogue de confirmation
 interface ConfirmAction {
   type: 'validate' | 'reject' | 'execute' | 'validate-opening' | 'reject-opening';
@@ -256,7 +315,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
       setTransfertToCancel(null);
       setCancelReason('');
     } catch (error: unknown) {
-      toast.error(error.message || 'Erreur lors de l\'annulation');
+      toast.error((error as Error).message || 'Erreur lors de l\'annulation');
     } finally {
       setIsCancelling(false);
     }
@@ -886,7 +945,7 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
                                 <span className="text-status-warning font-bold">
                                   {Number(request.montantDemande || request.transfert?.montant || 0).toLocaleString()} {currency.symbol}
                                 </span>
-                                {request.soldeVeille > 0 && (
+                                {(request.soldeVeille ?? 0) > 0 && (
                                   <span className="text-content-muted hidden xs:inline">
                                     (+{Number(request.soldeVeille).toLocaleString()} veille)
                                   </span>
@@ -910,12 +969,12 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
                                     onClick={() => setConfirmAction({
                                       type: 'validate-opening',
                                       transfert: {
-                                        id: request.transfert?.id,
-                                        montant: request.montantDemande || request.transfert?.montant,
-                                        caisseDestinationNom: request.caisseNom || request.transfert?.caisseDestinationNom,
-                                        caissierNom: request.caissierNom || request.transfert?.requestedByNom,
+                                        id: request.transfert?.id ?? '',
+                                        montant: (request.montantDemande || request.transfert?.montant) ?? 0,
+                                        caisseDestinationNom: request.caisseNom || request.transfert?.caisseDestinationNom || '',
+                                        caissierNom: request.caissierNom || request.transfert?.requestedByNom || '',
                                         requestedByNom: request.transfert?.requestedByNom
-                                      }
+                                      } as TransfertCoffreRow
                                     })}
                                     disabled={actionLoading === request.transfert?.id}
                                   >
@@ -935,12 +994,12 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
                                     onClick={() => setConfirmAction({
                                       type: 'reject-opening',
                                       transfert: {
-                                        id: request.transfert?.id,
-                                        montant: request.montantDemande || request.transfert?.montant,
-                                        caisseDestinationNom: request.caisseNom || request.transfert?.caisseDestinationNom,
-                                        caissierNom: request.caissierNom || request.transfert?.requestedByNom,
+                                        id: request.transfert?.id ?? '',
+                                        montant: (request.montantDemande || request.transfert?.montant) ?? 0,
+                                        caisseDestinationNom: request.caisseNom || request.transfert?.caisseDestinationNom || '',
+                                        caissierNom: request.caissierNom || request.transfert?.requestedByNom || '',
                                         requestedByNom: request.transfert?.requestedByNom
-                                      }
+                                      } as TransfertCoffreRow
                                     })}
                                     disabled={actionLoading === request.transfert?.id}
                                   >
@@ -968,12 +1027,12 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
                                 onClick={() => setConfirmAction({
                                   type: 'validate-opening',
                                   transfert: {
-                                    id: request.transfert?.id,
-                                    montant: request.montantDemande || request.transfert?.montant,
-                                    caisseDestinationNom: request.caisseNom || request.transfert?.caisseDestinationNom,
-                                    caissierNom: request.caissierNom || request.transfert?.requestedByNom,
+                                    id: request.transfert?.id ?? '',
+                                    montant: (request.montantDemande || request.transfert?.montant) ?? 0,
+                                    caisseDestinationNom: request.caisseNom || request.transfert?.caisseDestinationNom || '',
+                                    caissierNom: request.caissierNom || request.transfert?.requestedByNom || '',
                                     requestedByNom: request.transfert?.requestedByNom
-                                  }
+                                  } as TransfertCoffreRow
                                 })}
                                 disabled={actionLoading === request.transfert?.id}
                               >
@@ -987,12 +1046,12 @@ export function CoffreFortDashboard({ agenceId }: CoffreFortDashboardProps) {
                                 onClick={() => setConfirmAction({
                                   type: 'reject-opening',
                                   transfert: {
-                                    id: request.transfert?.id,
-                                    montant: request.montantDemande || request.transfert?.montant,
-                                    caisseDestinationNom: request.caisseNom || request.transfert?.caisseDestinationNom,
-                                    caissierNom: request.caissierNom || request.transfert?.requestedByNom,
+                                    id: request.transfert?.id ?? '',
+                                    montant: (request.montantDemande || request.transfert?.montant) ?? 0,
+                                    caisseDestinationNom: request.caisseNom || request.transfert?.caisseDestinationNom || '',
+                                    caissierNom: request.caissierNom || request.transfert?.requestedByNom || '',
                                     requestedByNom: request.transfert?.requestedByNom
-                                  }
+                                  } as TransfertCoffreRow
                                 })}
                                 disabled={actionLoading === request.transfert?.id}
                               >
@@ -1236,10 +1295,10 @@ function CoffreFortHistorique({ agenceId }: { agenceId: string }) {
             format: (_: unknown, row: TransfertCoffreRow) => (
                 <div className="flex flex-col leading-tight">
                     <span className="text-[11px] text-content-primary font-medium">
-                        {format(new Date(row.dateOperation), "dd MMM", { locale: fr })}
+                        {format(new Date(row.dateOperation ?? row.createdAt), "dd MMM", { locale: fr })}
                     </span>
                     <span className="text-[9px] text-content-muted">
-                        {format(new Date(row.dateOperation), "HH:mm", { locale: fr })}
+                        {format(new Date(row.dateOperation ?? row.createdAt), "HH:mm", { locale: fr })}
                     </span>
                 </div>
             )
@@ -1513,7 +1572,7 @@ function TransfertDetailPanel({ transfert, onClose }: { transfert: TransfertCoff
     const statusVariant = statusMap[transfert.statut as string] || { color: 'text-content-muted', bg: 'bg-surface-subtle/30', label: transfert.statut };
 
     // Déterminer si le transfert peut être annulé
-    const canBeCancelled = [StatutTransfertCoffre.REQUESTED, StatutTransfertCoffre.VALIDATED].includes(transfert.statut);
+    const canBeCancelled = [StatutTransfertCoffre.REQUESTED, StatutTransfertCoffre.VALIDATED].includes(transfert.statut as "REQUESTED" | "VALIDATED");
     const canBeReversed = transfert.statut === StatutTransfertCoffre.EXECUTED && !transfert.verrouille;
 
     // Vérifier si l'annulation est possible dans les 24h pour les transferts exécutés
@@ -1545,7 +1604,7 @@ function TransfertDetailPanel({ transfert, onClose }: { transfert: TransfertCoff
             setShowCancelModal(false);
             onClose();
         } catch (error: unknown) {
-            toast.error(error.message || 'Erreur lors de l\'annulation');
+            toast.error((error as Error).message || 'Erreur lors de l\'annulation');
         } finally {
             setIsLoading(false);
         }
@@ -1612,7 +1671,7 @@ function TransfertDetailPanel({ transfert, onClose }: { transfert: TransfertCoff
 
                         <DetailRow
                             label="Caisse"
-                            value={isSortie ? transfert.caisseDestinationNom : transfert.caisseSourceNom}
+                            value={(isSortie ? transfert.caisseDestinationNom : transfert.caisseSourceNom) ?? ''}
                         />
 
                         <DetailRow

@@ -166,7 +166,7 @@ export default function TontineDashboard({
       message: isEarly
         ? `Il reste ${remaining} tour${remaining > 1 ? 's' : ''} non distribué${remaining > 1 ? 's' : ''} (${Math.round(progressPercent)}% complété). Cette action est irréversible.`
         : 'Tous les tours ont été distribués. Clôturer ce cycle ?',
-      variant: isEarly ? 'warning' : 'default',
+      variant: isEarly ? 'warning' : 'info',
       confirmText: 'Clôturer',
       onConfirm: async () => {
         setClosingCycle(true);

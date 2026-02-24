@@ -1123,7 +1123,7 @@ export async function getCaisseHistorique(
           openedAt: sess.openedAt!,
           closedAt: sess.closedAt,
         },
-        metadata: op.metadata,
+        metadata: op.metadata as Record<string, any> | null,
       };
     })
   );

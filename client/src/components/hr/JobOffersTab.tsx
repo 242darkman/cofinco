@@ -336,82 +336,60 @@ export default function JobOffersTab({ positions, departments }: JobOffersTabPro
       <Modal isOpen={showForm} onClose={() => { setShowForm(false); resetForm(); }} title={editingOffer ? 'Modifier l\'offre' : 'Nouvelle offre d\'emploi'} size="lg">
         <div className="space-y-4 p-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FormField label="Titre de l'offre" required>
-              <input className="w-full px-3 py-2 rounded-lg bg-input border border-input-border focus:border-input-focus text-sm text-content-primary"
-                value={formData.titre} onChange={e => setFormData(p => ({ ...p, titre: e.target.value }))} placeholder="Ex: Analyste financier senior" />
-            </FormField>
-            <SelectField label="Poste" required value={formData.jobPositionId}
-              onChange={e => setFormData(p => ({ ...p, jobPositionId: e.target.value }))}>
-              <option value="">Sélectionner un poste</option>
-              {positions.map(p => (
-                <option key={p.id} value={p.id}>{p.nom} ({p.code})</option>
-              ))}
-            </SelectField>
+            <FormField label="Titre de l'offre" name="titre" required
+              value={formData.titre} onChange={e => setFormData(p => ({ ...p, titre: e.target.value }))} placeholder="Ex: Analyste financier senior" />
+            <SelectField label="Poste" name="jobPositionId" required value={formData.jobPositionId}
+              onChange={e => setFormData(p => ({ ...p, jobPositionId: e.target.value }))}
+              options={[{ value: '', label: 'Sélectionner un poste' }, ...positions.map(p => ({ value: p.id, label: `${p.nom} (${p.code})` }))]}
+              placeholder="" />
           </div>
 
-          <TextareaField label="Description" value={formData.description}
+          <TextareaField label="Description" name="description" value={formData.description}
             onChange={e => setFormData(p => ({ ...p, description: e.target.value }))} rows={3} />
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <SelectField label="Type de contrat" value={formData.typeContrat}
-              onChange={e => setFormData(p => ({ ...p, typeContrat: e.target.value }))}>
-              <option value="CDI">CDI</option>
-              <option value="CDD">CDD</option>
-              <option value="Stage">Stage</option>
-              <option value="Intérim">Intérim</option>
-            </SelectField>
-            <FormField label="Lieu">
-              <input className="w-full px-3 py-2 rounded-lg bg-input border border-input-border focus:border-input-focus text-sm text-content-primary"
-                value={formData.lieu} onChange={e => setFormData(p => ({ ...p, lieu: e.target.value }))} />
-            </FormField>
-            <FormField label="Salaire proposé">
-              <input className="w-full px-3 py-2 rounded-lg bg-input border border-input-border focus:border-input-focus text-sm text-content-primary"
-                value={formData.salairePropose} onChange={e => setFormData(p => ({ ...p, salairePropose: e.target.value }))} placeholder="Ex: 300,000 - 500,000 FCFA" />
-            </FormField>
+            <SelectField label="Type de contrat" name="typeContrat" value={formData.typeContrat}
+              onChange={e => setFormData(p => ({ ...p, typeContrat: e.target.value }))}
+              options={[{ value: 'CDI', label: 'CDI' }, { value: 'CDD', label: 'CDD' }, { value: 'Stage', label: 'Stage' }, { value: 'Intérim', label: 'Intérim' }]}
+              placeholder="" />
+            <FormField label="Lieu" name="lieu"
+              value={formData.lieu} onChange={e => setFormData(p => ({ ...p, lieu: e.target.value }))} />
+            <FormField label="Salaire proposé" name="salairePropose"
+              value={formData.salairePropose} onChange={e => setFormData(p => ({ ...p, salairePropose: e.target.value }))} placeholder="Ex: 300,000 - 500,000 FCFA" />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <SelectField label="Visibilité" value={formData.visibilite}
-              onChange={e => setFormData(p => ({ ...p, visibilite: e.target.value }))}>
-              <option value="BOTH">Interne & Externe</option>
-              <option value="INTERNAL">Interne uniquement</option>
-              <option value="EXTERNAL">Externe uniquement</option>
-            </SelectField>
-            <FormField label="Date limite">
-              <input type="date" className="w-full px-3 py-2 rounded-lg bg-input border border-input-border focus:border-input-focus text-sm text-content-primary"
-                value={formData.dateLimite} onChange={e => setFormData(p => ({ ...p, dateLimite: e.target.value }))} />
-            </FormField>
-            <FormField label="Postes ouverts">
-              <input type="number" min={1} className="w-full px-3 py-2 rounded-lg bg-input border border-input-border focus:border-input-focus text-sm text-content-primary"
-                value={formData.postesOuverts} onChange={e => setFormData(p => ({ ...p, postesOuverts: parseInt(e.target.value) || 1 }))} />
-            </FormField>
+            <SelectField label="Visibilité" name="visibilite" value={formData.visibilite}
+              onChange={e => setFormData(p => ({ ...p, visibilite: e.target.value }))}
+              options={[{ value: 'BOTH', label: 'Interne & Externe' }, { value: 'INTERNAL', label: 'Interne uniquement' }, { value: 'EXTERNAL', label: 'Externe uniquement' }]}
+              placeholder="" />
+            <FormField label="Date limite" name="dateLimite" type="date"
+              value={formData.dateLimite} onChange={e => setFormData(p => ({ ...p, dateLimite: e.target.value }))} />
+            <FormField label="Postes ouverts" name="postesOuverts" type="number" min={1}
+              value={formData.postesOuverts} onChange={e => setFormData(p => ({ ...p, postesOuverts: parseInt(e.target.value) || 1 }))} />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <SelectField label="Qualification minimum" value={formData.qualificationMinimum}
-              onChange={e => setFormData(p => ({ ...p, qualificationMinimum: e.target.value }))}>
-              <option value="">Non spécifiée</option>
-              <option value="OUVRIER">Ouvrier</option>
-              <option value="EMPLOYE">Employé</option>
-              <option value="AGENT_MAITRISE">Agent de maîtrise</option>
-              <option value="CADRE">Cadre</option>
-              <option value="CADRE_SUPERIEUR">Cadre supérieur</option>
-            </SelectField>
-            <FormField label="Expérience min. (années)">
-              <input type="number" min={0} className="w-full px-3 py-2 rounded-lg bg-input border border-input-border focus:border-input-focus text-sm text-content-primary"
-                value={formData.experienceMinAnnees} onChange={e => setFormData(p => ({ ...p, experienceMinAnnees: parseInt(e.target.value) || 0 }))} />
-            </FormField>
-            <FormField label="Formation requise">
-              <input className="w-full px-3 py-2 rounded-lg bg-input border border-input-border focus:border-input-focus text-sm text-content-primary"
-                value={formData.formationRequise} onChange={e => setFormData(p => ({ ...p, formationRequise: e.target.value }))} placeholder="Ex: Licence en finance" />
-            </FormField>
+            <SelectField label="Qualification minimum" name="qualificationMinimum" value={formData.qualificationMinimum}
+              onChange={e => setFormData(p => ({ ...p, qualificationMinimum: e.target.value }))}
+              options={[
+                { value: '', label: 'Non spécifiée' },
+                { value: 'OUVRIER', label: 'Ouvrier' },
+                { value: 'EMPLOYE', label: 'Employé' },
+                { value: 'AGENT_MAITRISE', label: 'Agent de maîtrise' },
+                { value: 'CADRE', label: 'Cadre' },
+                { value: 'CADRE_SUPERIEUR', label: 'Cadre supérieur' },
+              ]}
+              placeholder="" />
+            <FormField label="Expérience min. (années)" name="experienceMinAnnees" type="number" min={0}
+              value={formData.experienceMinAnnees} onChange={e => setFormData(p => ({ ...p, experienceMinAnnees: parseInt(e.target.value) || 0 }))} />
+            <FormField label="Formation requise" name="formationRequise"
+              value={formData.formationRequise} onChange={e => setFormData(p => ({ ...p, formationRequise: e.target.value }))} placeholder="Ex: Licence en finance" />
           </div>
 
-          <FormField label="Compétences requises (séparées par des virgules)">
-            <input className="w-full px-3 py-2 rounded-lg bg-input border border-input-border focus:border-input-focus text-sm text-content-primary"
-              value={formData.competencesInput} onChange={e => setFormData(p => ({ ...p, competencesInput: e.target.value }))}
-              placeholder="Ex: Comptabilité, Analyse financière, Excel avancé" />
-          </FormField>
+          <FormField label="Compétences requises (séparées par des virgules)" name="competencesInput"
+            value={formData.competencesInput} onChange={e => setFormData(p => ({ ...p, competencesInput: e.target.value }))}
+            placeholder="Ex: Comptabilité, Analyse financière, Excel avancé" />
 
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="ghost" onClick={() => { setShowForm(false); resetForm(); }}>Annuler</Button>

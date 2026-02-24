@@ -322,7 +322,7 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
     clientId: selectedClient?.id,
     typeOperation,
     subType: typeOperation === 'Dépôt' ? typeDepot : typeRetrait,
-    selectedClient,
+    selectedClient: selectedClient as any,
     tontinesActives,
     creditsActifs,
     comptesClient
@@ -763,8 +763,8 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
     setConfirmationData(physicalData);
     setLoading(true);
     try {
-      const operationAvecConfirmation = { ...pendingOperationData, physical_confirmation: physicalData };
-      await executeCashOperation(operationAvecConfirmation, loadingId);
+      const operationAvecConfirmation = { ...pendingOperationData!, physical_confirmation: physicalData };
+      await executeCashOperation(operationAvecConfirmation as CaisseOperationPayload, loadingId);
     } finally {
       setLoading(false);
     }
@@ -926,7 +926,7 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
       title: `Reçu de ${lastOperationData.typeOperation}`,
       reference: lastOperationData.reference,
       date: lastOperationData.date,
-      type: lastOperationData.typeDetaille || lastOperationData.typeOperation,
+      type: lastOperationData.typeDetaille || lastOperationData.typeOperation || undefined,
       client: {
         nom: lastOperationData.client?.nom || '',
         prenom: lastOperationData.client?.prenom || '',
@@ -1169,7 +1169,7 @@ export default function CaisseOperations({ sessionId, soldeSession, recentTransa
                 {recentTransactions.map((tx) => {
                   const isReversalTx = tx.description?.startsWith('[ANNULATION]');
                   const isReversed = tx.statut === 'REVERSED';
-                  const incoming = isIncomingOperation(tx.typeOperation);
+                  const incoming = isIncomingOperation(tx.typeOperation || tx.type_operation);
                   const isEntree = isReversalTx ? !incoming : incoming;
                   const isCancelled = isReversed || isReversalTx;
                   return (
