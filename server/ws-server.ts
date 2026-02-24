@@ -177,7 +177,12 @@ export type GlobalMessage = {
     // =============================================
     // ÉCARTS DE CAISSE — APPROBATION
     // =============================================
-    | "ECART_APPROVAL_REQUEST" | "ECART_APPROVAL_DECISION";
+    | "ECART_APPROVAL_REQUEST" | "ECART_APPROVAL_DECISION"
+
+    // =============================================
+    // RÉÉVALUATIONS CRÉDIT
+    // =============================================
+    | "REEVALUATION_UPDATE";
 
   payload: any;
 };

@@ -5,6 +5,7 @@
  */
 
 import { db } from '../db';
+import { ReevaluationError } from './reevaluation-errors';
 import { eq, and, desc, sql } from 'drizzle-orm';
 import { differenceInDays } from 'date-fns';
 import {
@@ -252,24 +253,24 @@ export async function validateEligibility(
     .limit(1);
   
   if (!reevaluation) {
-    throw new Error('Réévaluation introuvable');
+    throw new ReevaluationError('REEVALUATION_NOT_FOUND', 'Réévaluation introuvable', 404);
   }
-  
+
   // 2. Validate transition
   const transitionValid = REEVALUATION_RULES.validateTransition(
     reevaluation.statut,
     StatutReevaluation.ELIGIBILITY_CHECK
   );
   if (!transitionValid.valid && !override?.force) {
-    throw new Error(transitionValid.message);
+    throw new ReevaluationError('TRANSITION_INVALIDE', transitionValid.message);
   }
-  
+
   // 3. Get demande and config
   const demande = await getDemandeById(reevaluation.demandeId);
   const config = await getConfigReevaluation();
-  
+
   if (!demande) {
-    throw new Error('Demande associée introuvable');
+    throw new ReevaluationError('DEMANDE_NOT_FOUND', 'Demande associée introuvable', 404);
   }
   
   // 4. Check eligibility - For an EXISTING reevaluation, we use the snapshot data
@@ -386,16 +387,16 @@ export async function startEnqueteComplementaire(
     .limit(1);
   
   if (!reevaluation) {
-    throw new Error('Réévaluation introuvable');
+    throw new ReevaluationError('REEVALUATION_NOT_FOUND', 'Réévaluation introuvable', 404);
   }
-  
+
   // 2. Validate transition
   const transitionValid = REEVALUATION_RULES.validateTransition(
     reevaluation.statut,
     StatutReevaluation.ADDITIONAL_INVESTIGATION
   );
   if (!transitionValid.valid) {
-    throw new Error(transitionValid.message);
+    throw new ReevaluationError('TRANSITION_INVALIDE', transitionValid.message);
   }
   
   // 3. Resolve creditPlanId from the demande and link initial enquête
@@ -476,16 +477,16 @@ export async function submitToCommittee(
     .limit(1);
   
   if (!reevaluation) {
-    throw new Error('Réévaluation introuvable');
+    throw new ReevaluationError('REEVALUATION_NOT_FOUND', 'Réévaluation introuvable', 404);
   }
-  
+
   // 2. Validate transition
   const transitionValid = REEVALUATION_RULES.validateTransition(
     reevaluation.statut,
     StatutReevaluation.IN_COMMITTEE
   );
   if (!transitionValid.valid) {
-    throw new Error(transitionValid.message);
+    throw new ReevaluationError('TRANSITION_INVALIDE', transitionValid.message);
   }
   
   // 3. Calculate new score (simplified - would use real scoring service)
@@ -589,26 +590,28 @@ export async function recordCommitteeDecision(
     .limit(1);
   
   if (!reevaluation) {
-    throw new Error('Réévaluation introuvable');
+    throw new ReevaluationError('REEVALUATION_NOT_FOUND', 'Réévaluation introuvable', 404);
   }
 
   // 2. SoD: Le validateur de l'éligibilité ne peut pas être le décideur final
   if (reevaluation.validePar && reevaluation.validePar === userId) {
-    throw new Error(
-      "Conflit d'intérêts : le validateur de l'éligibilité ne peut pas être le décideur final"
+    throw new ReevaluationError(
+      'CONFLIT_INTERETS',
+      "Conflit d'intérêts : le validateur de l'éligibilité ne peut pas être le décideur final",
+      409
     );
   }
 
   // 3. Determine final status
   const finalStatut = decision === 'REDUCED_AMOUNT' ? StatutReevaluation.APPROVED : decision;
-  
+
   // 3. Validate transition
   const transitionValid = REEVALUATION_RULES.validateTransition(
-    reevaluation.statut, 
+    reevaluation.statut,
     finalStatut
   );
   if (!transitionValid.valid) {
-    throw new Error(transitionValid.message);
+    throw new ReevaluationError('TRANSITION_INVALIDE', transitionValid.message);
   }
   
   // 4. Update reevaluation (will be locked by trigger)
@@ -697,17 +700,17 @@ export async function cancelReevaluation(
     .limit(1);
   
   if (!reevaluation) {
-    throw new Error('Réévaluation introuvable');
+    throw new ReevaluationError('REEVALUATION_NOT_FOUND', 'Réévaluation introuvable', 404);
   }
-  
+
   if (reevaluation.verrouille) {
-    throw new Error('Cette réévaluation est verrouillée');
+    throw new ReevaluationError('REEVALUATION_VERROUILLEE', 'Cette réévaluation est verrouillée');
   }
-  
+
   // Check if cancellation is allowed from current status
   const terminalStatuses = [StatutReevaluation.APPROVED, StatutReevaluation.DEFINITIVELY_REJECTED, StatutReevaluation.CANCELLED];
   if (terminalStatuses.includes(reevaluation.statut as typeof terminalStatuses[number])) {
-    throw new Error('Impossible d\'annuler une réévaluation dans cet état');
+    throw new ReevaluationError('ANNULATION_IMPOSSIBLE', 'Impossible d\'annuler une réévaluation dans cet état');
   }
 
   await db.update(reevaluationsCredit)

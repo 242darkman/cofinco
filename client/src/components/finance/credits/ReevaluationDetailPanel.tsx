@@ -4,16 +4,20 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { 
-  RefreshCw, Clock, CheckCircle, XCircle, AlertTriangle, 
+import {
+  RefreshCw, Clock, CheckCircle, XCircle, AlertTriangle,
   Users, Shield, FileText, TrendingUp, TrendingDown,
-  ChevronDown, ChevronUp, Loader2, ArrowLeft, Play,
-  UserCheck, Ban, Send, Eye, History, Check
+  ChevronDown, ChevronUp, Loader2, ArrowLeft,
+  UserCheck, Ban, History, Check
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatMoney } from '../../../lib/format';
 import { CreditTimeline } from './CreditTimeline';
 import { DecisionComite, DecisionComiteType, DECISION_COMITE_LABELS, StatutReevaluation, STATUT_REEVALUATION_LABELS } from '@shared/enum/status-constants';
+import { useCan } from '@/contexts/AbilityContext';
+import { Actions } from '@shared/ability/actions';
+import { Subjects } from '@shared/ability/subjects';
+import { useWebSocket } from '@/hooks/useWebSocket';
 
 interface Reevaluation {
   id: string;
@@ -65,6 +69,17 @@ interface Reevaluation {
   createdBy?: string;
 }
 
+interface Actor {
+  id: string;
+  nom: string | null;
+}
+
+interface Actors {
+  createdBy: Actor | null;
+  validePar: Actor | null;
+  decidePar: Actor | null;
+}
+
 interface AuditLog {
   id: string;
   action: string;
@@ -74,6 +89,7 @@ interface AuditLog {
   timestamp: string;
   userId?: string;
   roleUtilisateur?: string;
+  userName?: string;
 }
 
 interface ReevaluationDetailPanelProps {
@@ -138,7 +154,7 @@ const StepDetailModal = ({ step, logs, onClose }: { step: any, logs: AuditLog[],
                   )}
                   <div className="flex items-center gap-2 text-xs text-content-muted">
                     <UserCheck size={12} />
-                    <span>{log.roleUtilisateur || 'Système'}</span>
+                    <span>{log.userName || log.roleUtilisateur || 'Système'}{log.userName && log.roleUtilisateur ? ` · ${log.roleUtilisateur}` : ''}</span>
                   </div>
                 </div>
               ))}
@@ -150,7 +166,12 @@ const StepDetailModal = ({ step, logs, onClose }: { step: any, logs: AuditLog[],
   );
 };
 
-const WorkflowStepper = ({ currentStatus, onStepClick }: { currentStatus: string, onStepClick: (step: any) => void }) => {
+const WorkflowStepper = ({ currentStatus, onStepClick, actors, reevaluation }: {
+  currentStatus: string;
+  onStepClick: (step: any) => void;
+  actors?: Actors | null;
+  reevaluation?: Reevaluation | null;
+}) => {
   const steps = [
     { id: 'request', label: STATUT_REEVALUATION_LABELS[StatutReevaluation.REQUESTED], status: [StatutReevaluation.REQUESTED, StatutReevaluation.ELIGIBILITY_CHECK] },
     { id: 'authorized', label: STATUT_REEVALUATION_LABELS[StatutReevaluation.AUTHORIZED], status: [StatutReevaluation.AUTHORIZED, StatutReevaluation.ADDITIONAL_INVESTIGATION] },
@@ -164,15 +185,34 @@ const WorkflowStepper = ({ currentStatus, onStepClick }: { currentStatus: string
     if (([StatutReevaluation.AUTHORIZED, StatutReevaluation.ADDITIONAL_INVESTIGATION] as readonly string[]).includes(currentStatus)) return 1;
     return 0;
   };
-  
+
   const activeIndex = getCurrentStepIndex();
+
+  // Map step to actor info
+  const getStepActor = (stepId: string): { name: string; date: string } | null => {
+    if (!actors || !reevaluation) return null;
+    switch (stepId) {
+      case 'request':
+        return actors.createdBy?.nom ? { name: actors.createdBy.nom, date: new Date(reevaluation.createdAt).toLocaleDateString('fr-FR') } : null;
+      case 'authorized':
+        return actors.validePar?.nom && reevaluation.dateValidationEligibilite
+          ? { name: actors.validePar.nom, date: new Date(reevaluation.dateValidationEligibilite).toLocaleDateString('fr-FR') }
+          : null;
+      case 'decision':
+        return actors.decidePar?.nom && reevaluation.dateDecisionComite
+          ? { name: actors.decidePar.nom, date: new Date(reevaluation.dateDecisionComite).toLocaleDateString('fr-FR') }
+          : null;
+      default:
+        return null;
+    }
+  };
 
   return (
     <div className="w-full py-2">
       <div className="relative flex items-center justify-between w-full max-w-3xl mx-auto px-4">
         {/* Connector Line */}
         <div className="absolute left-4 right-4 top-[12px] h-0.5 bg-surface -z-10"></div>
-        <div 
+        <div
           className="absolute left-4 top-[12px] h-0.5 bg-accent-secondary -z-10 transition-all duration-500"
           style={{ width: `calc(${(activeIndex / (steps.length - 1)) * 100}% - 32px)` }}
         ></div>
@@ -180,24 +220,25 @@ const WorkflowStepper = ({ currentStatus, onStepClick }: { currentStatus: string
         {steps.map((step, index) => {
           const isActive = index <= activeIndex;
           const isCurrent = index === activeIndex;
-          const isClickable = index <= activeIndex; // Allow clicking past steps too
-          
+          const isClickable = index <= activeIndex;
+          const actor = isActive && index < activeIndex ? getStepActor(step.id) : null;
+
           return (
-            <div 
-              key={step.id} 
+            <div
+              key={step.id}
               className={`flex flex-col items-center gap-1.5 relative group ${isClickable ? 'cursor-pointer' : ''}`}
               onClick={() => isClickable && onStepClick(step)}
             >
-              <div 
+              <div
                 className={`w-6 h-6 rounded-full flex items-center justify-center border-2 transition-all duration-300 bg-surface-base z-10 ${
-                  isActive 
-                    ? 'bg-surface-base border-accent text-accent shadow-[0_0_8px_rgba(6,182,212,0.3)]' 
+                  isActive
+                    ? 'bg-surface-base border-accent text-accent shadow-[0_0_8px_rgba(6,182,212,0.3)]'
                     : 'bg-surface-base border-edge text-content-muted'
                 } ${isCurrent ? 'scale-110 ring-2 ring-accent/10' : ''}`}
               >
                 {isActive ? <Check size={12} strokeWidth={3} /> : <span className="text-[10px] font-bold">{index + 1}</span>}
               </div>
-              
+
               <div className="absolute top-7 flex flex-col items-center w-32">
                 <span className={`text-[10px] font-bold tracking-wide transition-colors ${isActive ? 'text-content-primary' : 'text-content-muted'}`}>
                   {step.label}
@@ -205,8 +246,13 @@ const WorkflowStepper = ({ currentStatus, onStepClick }: { currentStatus: string
                 {isCurrent && (
                   <span className="text-[9px] text-accent font-medium animate-pulse">En cours</span>
                 )}
+                {actor && (
+                  <span className="text-[9px] text-content-muted truncate max-w-full" title={`${actor.name} — ${actor.date}`}>
+                    {actor.name} · {actor.date}
+                  </span>
+                )}
               </div>
-              
+
               {/* Tooltip hint */}
               {isClickable && (
                 <div className="absolute -top-6 px-1.5 py-0.5 bg-surface text-[10px] text-content-primary rounded opacity-0 group-hover:opacity-100 transition pointer-events-none whitespace-nowrap border border-edge">
@@ -221,86 +267,117 @@ const WorkflowStepper = ({ currentStatus, onStepClick }: { currentStatus: string
   );
 };
 
-const StatusExplanation = ({ status }: { status: string }) => {
-  const config = {
+const StatusExplanation = ({ status, canAct }: { status: string; canAct: boolean }) => {
+  const config: Record<string, {
+    title: string;
+    description: string;
+    actionIfCan: string;
+    actionIfCannot: string;
+    whoActs: string;
+    icon: typeof Clock;
+    bg: string;
+    border: string;
+    iconBg: string;
+    text: string;
+  }> = {
     [StatutReevaluation.REQUESTED]: {
       title: 'Dossier reçu',
-      description: 'La demande a été créée mais n\'a pas encore été vérifiée. Vous devez vérifier l\'éligibilité pour continuer.',
-      action: 'Action requise : Cliquez sur "Vérifier l\'éligibilité"',
+      description: 'La demande a été créée mais n\'a pas encore été vérifiée.',
+      actionIfCan: 'Cliquez sur "Vérifier l\'éligibilité" ci-dessous.',
+      actionIfCannot: 'Un Chef d\'agence ou Gestionnaire crédit doit valider l\'éligibilité.',
+      whoActs: 'Chef d\'agence ou Gestionnaire crédit',
       icon: Clock,
-      color: 'blue'
+      bg: 'bg-status-info-bg', border: 'border-status-info/30', iconBg: 'bg-status-info/20 text-status-info', text: 'text-status-info',
     },
     [StatutReevaluation.ELIGIBILITY_CHECK]: {
-      title: 'Dossier reçu',
-      description: 'La demande a été créée mais n\'a pas encore été vérifiée. Vous devez vérifier l\'éligibilité pour continuer.',
-      action: 'Action requise : Cliquez sur "Vérifier l\'éligibilité"',
+      title: 'Vérification en cours',
+      description: 'La demande a été créée mais n\'a pas encore été vérifiée.',
+      actionIfCan: 'Cliquez sur "Vérifier l\'éligibilité" ci-dessous.',
+      actionIfCannot: 'Un Chef d\'agence ou Gestionnaire crédit doit valider l\'éligibilité.',
+      whoActs: 'Chef d\'agence ou Gestionnaire crédit',
       icon: Clock,
-      color: 'blue'
+      bg: 'bg-status-info-bg', border: 'border-status-info/30', iconBg: 'bg-status-info/20 text-status-info', text: 'text-status-info',
     },
     [StatutReevaluation.AUTHORIZED]: {
       title: 'Éligibilité validée',
-      description: 'Le dossier respecte les critères d\'éligibilité. Il est prêt pour l\'analyse approfondie avant passage en comité.',
-      action: 'Action requise : Préparez le dossier et cliquez sur "Soumettre au comité"',
+      description: 'Le dossier respecte les critères d\'éligibilité. Il est prêt pour passage en comité.',
+      actionIfCan: 'Préparez le dossier et cliquez sur "Soumettre au comité".',
+      actionIfCannot: 'Un responsable habilité doit soumettre le dossier au comité.',
+      whoActs: 'Chef d\'agence ou Gestionnaire crédit',
       icon: CheckCircle,
-      color: 'cyan'
+      bg: 'bg-accent/10', border: 'border-accent/30', iconBg: 'bg-accent/20 text-accent', text: 'text-accent',
     },
     [StatutReevaluation.ADDITIONAL_INVESTIGATION]: {
-      title: 'Éligibilité validée',
-      description: 'Le dossier respecte les critères d\'éligibilité. Il est prêt pour l\'analyse approfondie avant passage en comité.',
-      action: 'Action requise : Préparez le dossier et cliquez sur "Soumettre au comité"',
+      title: 'Enquête complémentaire',
+      description: 'Une enquête complémentaire est en cours. Le dossier pourra être soumis au comité après son achèvement.',
+      actionIfCan: 'Préparez le dossier et cliquez sur "Soumettre au comité" une fois l\'enquête terminée.',
+      actionIfCannot: 'Un responsable habilité doit soumettre le dossier au comité après l\'enquête.',
+      whoActs: 'Chef d\'agence ou Gestionnaire crédit',
       icon: CheckCircle,
-      color: 'cyan'
+      bg: 'bg-accent/10', border: 'border-accent/30', iconBg: 'bg-accent/20 text-accent', text: 'text-accent',
     },
     [StatutReevaluation.IN_COMMITTEE]: {
       title: 'Délibération en cours',
-      description: 'Le dossier est entre les mains du comité de crédit. Les membres doivent examiner les nouvelles conditions proposées.',
-      action: 'Action requise : Après la séance, cliquez sur "Enregistrer la décision" pour saisir le verdict.',
+      description: 'Le dossier est entre les mains du comité de crédit. Les membres doivent examiner les nouvelles conditions.',
+      actionIfCan: 'Après la séance, cliquez sur "Enregistrer la décision" pour saisir le verdict.',
+      actionIfCannot: 'Un autre responsable habilité (différent du validateur) doit enregistrer la décision.',
+      whoActs: 'Décideur comité (différent du validateur)',
       icon: Users,
-      color: 'orange'
+      bg: 'bg-status-warning-bg', border: 'border-status-warning/30', iconBg: 'bg-status-warning/20 text-status-warning', text: 'text-status-warning',
     },
     [StatutReevaluation.APPROVED]: {
       title: 'Réévaluation validée',
-      description: 'Le comité a donné son accord. Le crédit va être mis à jour avec les nouvelles conditions (montant, durée, score).',
-      action: 'Terminé',
+      description: 'Le comité a donné son accord. Le crédit va être mis à jour avec les nouvelles conditions.',
+      actionIfCan: 'Terminé', actionIfCannot: 'Terminé', whoActs: '',
       icon: CheckCircle,
-      color: 'emerald'
+      bg: 'bg-status-success-bg', border: 'border-status-success/30', iconBg: 'bg-status-success/20 text-status-success', text: 'text-status-success',
     },
     [StatutReevaluation.REFUSED]: {
       title: 'Non éligible',
       description: 'Le dossier ne remplit pas les critères techniques (délai, nombre de tentatives, etc.).',
-      action: 'Clôturé',
+      actionIfCan: 'Clôturé', actionIfCannot: 'Clôturé', whoActs: '',
       icon: XCircle,
-      color: 'red'
+      bg: 'bg-status-danger-bg', border: 'border-status-danger/30', iconBg: 'bg-status-danger/20 text-status-danger', text: 'text-status-danger',
     },
     [StatutReevaluation.DEFINITIVELY_REJECTED]: {
       title: 'Rejetée définitivement',
-      description: 'Le comité a rejeté la demande. Aucune autre action n\'est possible pour cette réévaluation.',
-      action: 'Clôturé',
+      description: 'Le comité a rejeté la demande. Aucune autre action n\'est possible.',
+      actionIfCan: 'Clôturé', actionIfCannot: 'Clôturé', whoActs: '',
       icon: XCircle,
-      color: 'red'
+      bg: 'bg-status-danger-bg', border: 'border-status-danger/30', iconBg: 'bg-status-danger/20 text-status-danger', text: 'text-status-danger',
     },
     [StatutReevaluation.CANCELLED]: {
       title: 'Annulée',
       description: 'La procédure de réévaluation a été annulée.',
-      action: 'Terminé',
+      actionIfCan: 'Terminé', actionIfCannot: 'Terminé', whoActs: '',
       icon: XCircle,
-      color: 'slate'
-    }
-  }[status];
+      bg: 'bg-surface-subtle', border: 'border-edge', iconBg: 'bg-surface-elevated text-content-muted', text: 'text-content-muted',
+    },
+  };
 
-  // Fallback for other statuses
-  if (!config) return null;
+  const c = config[status];
+  if (!c) return null;
+
+  const isTerminal = ['APPROVED', 'DEFINITIVELY_REJECTED', 'CANCELLED', 'REFUSED'].includes(status);
 
   return (
-    <div className={`bg-${config.color}-500/10 border border-${config.color}-500/30 rounded-lg p-3 flex items-start gap-3`}>
-      <div className={`p-1.5 rounded-full bg-${config.color}-500/20 text-${config.color}-400 mt-0.5`}>
-        <config.icon size={16} />
+    <div className={`${c.bg} border ${c.border} rounded-lg p-3 flex items-start gap-3`}>
+      <div className={`p-1.5 rounded-full ${c.iconBg} mt-0.5`}>
+        <c.icon size={16} />
       </div>
       <div>
-        <h4 className={`font-bold text-${config.color}-400 text-xs mb-0.5`}>{config.title}</h4>
-        <p className="text-content-secondary text-xs leading-relaxed">{config.description}</p>
-        <div className={`mt-1.5 text-[10px] font-semibold uppercase tracking-wider text-${config.color}-400/80`}>
-          {config.action}
+        <h4 className={`font-bold ${c.text} text-xs mb-0.5`}>{c.title}</h4>
+        <p className="text-content-secondary text-xs leading-relaxed">{c.description}</p>
+        {c.whoActs && !isTerminal && (
+          <div className="mt-1.5 flex items-center gap-1.5">
+            <UserCheck size={10} className="text-content-muted" />
+            <span className="text-[10px] text-content-muted">
+              Responsable : {c.whoActs}
+            </span>
+          </div>
+        )}
+        <div className={`mt-1 text-[10px] font-semibold uppercase tracking-wider ${c.text}/80`}>
+          {canAct ? c.actionIfCan : c.actionIfCannot}
         </div>
       </div>
     </div>
@@ -416,8 +493,20 @@ export function ReevaluationDetailPanel({ reevaluationId, onBack, onStatusChange
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [showAudit, setShowAudit] = useState(false);
+  const [wsUpdated, setWsUpdated] = useState(false);
   const [showDecisionModal, setShowDecisionModal] = useState(false);
   const [selectedStep, setSelectedStep] = useState<any>(null);
+  const [actionContext, setActionContext] = useState<{ hasConflictOfInterest: boolean } | null>(null);
+  const [actors, setActors] = useState<Actors | null>(null);
+
+  // CASL permissions
+  const canValidateEligibility = useCan(Actions.VALIDATE_REEVALUATION, Subjects.REEVALUATION);
+  const canDecide = useCan(Actions.DECIDE_REEVALUATION, Subjects.REEVALUATION);
+  const canSubmitToCommittee = useCan(Actions.APPROVE, Subjects.REEVALUATION);
+  const canCancel = useCan(Actions.REEVALUATE, Subjects.REEVALUATION);
+
+  // WebSocket
+  const { socket } = useWebSocket();
 
   useEffect(() => {
     if (reevaluationId) {
@@ -425,6 +514,24 @@ export function ReevaluationDetailPanel({ reevaluationId, onBack, onStatusChange
       loadAuditLogs();
     }
   }, [reevaluationId]);
+
+  // Listen for real-time reevaluation updates
+  useEffect(() => {
+    if (!socket || !reevaluationId) return;
+    const handler = (event: MessageEvent) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'REEVALUATION_UPDATE' && msg.payload?.reevaluationId === reevaluationId) {
+          loadReevaluation();
+          loadAuditLogs();
+          setWsUpdated(true);
+          setTimeout(() => setWsUpdated(false), 2500);
+        }
+      } catch { /* ignore */ }
+    };
+    socket.addEventListener('message', handler);
+    return () => socket.removeEventListener('message', handler);
+  }, [socket, reevaluationId]);
 
   const loadReevaluation = async () => {
     setLoading(true);
@@ -439,6 +546,8 @@ export function ReevaluationDetailPanel({ reevaluationId, onBack, onStatusChange
       }
       
       setReevaluation(data.reevaluation);
+      setActionContext(data.actionContext || null);
+      setActors(data.actors || null);
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -572,19 +681,25 @@ export function ReevaluationDetailPanel({ reevaluationId, onBack, onStatusChange
       case StatutReevaluation.REQUESTED:
       case StatutReevaluation.ELIGIBILITY_CHECK:
         actions.push(
-          <button
-            key="validate"
-            onClick={handleValidateEligibility}
-            disabled={actionLoading !== null}
-            className="flex-1 px-4 py-3 bg-accent-secondary hover:bg-accent-secondary-hover text-content-primary rounded-lg font-medium transition flex items-center justify-center gap-2 disabled:opacity-50"
-          >
-            {actionLoading === 'eligibility' ? (
-              <Loader2 size={18} className="animate-spin" />
-            ) : (
-              <Shield size={18} />
+          <div key="validate-group" className="flex-1 flex flex-col gap-2">
+            <button
+              onClick={handleValidateEligibility}
+              disabled={actionLoading !== null || !canValidateEligibility}
+              className="flex-1 px-4 py-3 bg-accent-secondary hover:bg-accent-secondary-hover text-content-primary rounded-lg font-medium transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {actionLoading === 'eligibility' ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <Shield size={18} />
+              )}
+              Vérifier l'éligibilité
+            </button>
+            {!canValidateEligibility && (
+              <p className="text-xs text-status-warning text-center">
+                Seuls le Chef d'agence et le Gestionnaire crédit peuvent valider l'éligibilité.
+              </p>
             )}
-            Vérifier l'éligibilité
-          </button>
+          </div>
         );
         break;
         
@@ -593,8 +708,8 @@ export function ReevaluationDetailPanel({ reevaluationId, onBack, onStatusChange
           <div key="committee-group" className="flex-1 flex flex-col gap-2">
             <button
               onClick={handleSubmitToCommittee}
-              disabled={actionLoading !== null}
-              className="w-full px-4 py-3 bg-status-warning hover:bg-status-warning text-white rounded-lg font-medium transition flex items-center justify-center gap-2 disabled:opacity-50"
+              disabled={actionLoading !== null || !canSubmitToCommittee}
+              className="w-full px-4 py-3 bg-status-warning hover:bg-status-warning text-white rounded-lg font-medium transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {actionLoading === 'committee' ? (
                 <Loader2 size={18} className="animate-spin" />
@@ -603,30 +718,49 @@ export function ReevaluationDetailPanel({ reevaluationId, onBack, onStatusChange
               )}
               Soumettre au comité
             </button>
-            <p className="text-xs text-content-muted text-center">
-              Envoie le dossier aux membres pour délibération (Session requise)
-            </p>
+            {canSubmitToCommittee ? (
+              <p className="text-xs text-content-muted text-center">
+                Envoie le dossier aux membres pour délibération (Session requise)
+              </p>
+            ) : (
+              <p className="text-xs text-status-warning text-center">
+                Vous n'avez pas la permission de soumettre au comité.
+              </p>
+            )}
           </div>
         );
         break;
         
-      case StatutReevaluation.IN_COMMITTEE:
+      case StatutReevaluation.IN_COMMITTEE: {
+        const hasConflict = actionContext?.hasConflictOfInterest ?? false;
+        const canMakeDecision = canDecide && !hasConflict;
         actions.push(
           <div key="decision-group" className="flex-1 flex flex-col gap-2">
             <button
               onClick={() => setShowDecisionModal(true)}
-              disabled={actionLoading !== null}
-              className="w-full px-4 py-3 bg-status-success hover:bg-status-success text-white rounded-lg font-medium transition flex items-center justify-center gap-2 disabled:opacity-50"
+              disabled={actionLoading !== null || !canMakeDecision}
+              className="w-full px-4 py-3 bg-status-success hover:bg-status-success text-white rounded-lg font-medium transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <CheckCircle size={18} />
               Enregistrer la décision
             </button>
-            <p className="text-xs text-content-muted text-center">
-              Saisir le verdict final (Approuvé/Rejeté) et les conditions retenues
-            </p>
+            {!canDecide ? (
+              <p className="text-xs text-status-warning text-center">
+                Vous n'avez pas la permission d'enregistrer une décision.
+              </p>
+            ) : hasConflict ? (
+              <p className="text-xs text-status-danger text-center">
+                Conflit d'intérêts : vous avez validé l'éligibilité et ne pouvez pas être le décideur final.
+              </p>
+            ) : (
+              <p className="text-xs text-content-muted text-center">
+                Saisir le verdict final (Approuvé/Rejeté) et les conditions retenues
+              </p>
+            )}
           </div>
         );
         break;
+      }
     }
     
     // Cancel button for non-terminal states
@@ -635,8 +769,8 @@ export function ReevaluationDetailPanel({ reevaluationId, onBack, onStatusChange
         <button
           key="cancel"
           onClick={handleCancel}
-          disabled={actionLoading !== null}
-          className="px-4 py-3 bg-surface-elevated hover:bg-surface-subtle text-content-secondary rounded-lg font-medium transition flex items-center justify-center gap-2 disabled:opacity-50"
+          disabled={actionLoading !== null || !canCancel}
+          className="px-4 py-3 bg-surface-elevated hover:bg-surface-subtle text-content-secondary rounded-lg font-medium transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {actionLoading === 'cancel' ? (
             <Loader2 size={18} className="animate-spin" />
@@ -706,11 +840,16 @@ export function ReevaluationDetailPanel({ reevaluationId, onBack, onStatusChange
             </button>
           )}
           <div className="flex items-center gap-3">
-            <RefreshCw className="text-status-warning" size={24} />
+            <RefreshCw className={`text-status-warning transition-transform ${wsUpdated ? 'animate-spin' : ''}`} size={24} style={wsUpdated ? { animationDuration: '1s', animationIterationCount: '1' } : undefined} />
             <div>
-              <h2 className="text-xl font-bold text-content-primary">
-                {reevaluation.numeroReevaluation || `Réévaluation #${reevaluation.numeroVersion}`}
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl font-bold text-content-primary">
+                  {reevaluation.numeroReevaluation || `Réévaluation #${reevaluation.numeroVersion}`}
+                </h2>
+                {wsUpdated && (
+                  <span className="text-xs text-status-success animate-pulse">Mis à jour</span>
+                )}
+              </div>
               <p className="text-content-muted text-sm">
                 Créée le {new Date(reevaluation.createdAt).toLocaleDateString('fr-FR', {
                   day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
@@ -731,9 +870,11 @@ export function ReevaluationDetailPanel({ reevaluationId, onBack, onStatusChange
       </div>
 
       {/* Stepper */}
-      <WorkflowStepper 
-        currentStatus={reevaluation.statut} 
+      <WorkflowStepper
+        currentStatus={reevaluation.statut}
         onStepClick={setSelectedStep}
+        actors={actors}
+        reevaluation={reevaluation}
       />
 
       {/* Detail Modal for Steps */}
@@ -746,7 +887,18 @@ export function ReevaluationDetailPanel({ reevaluationId, onBack, onStatusChange
       )}
 
       {/* Status Context Explanation */}
-      <StatusExplanation status={reevaluation.statut} />
+      <StatusExplanation
+        status={reevaluation.statut}
+        canAct={
+          [StatutReevaluation.REQUESTED, StatutReevaluation.ELIGIBILITY_CHECK].includes(reevaluation.statut as any)
+            ? canValidateEligibility
+            : [StatutReevaluation.AUTHORIZED, StatutReevaluation.ADDITIONAL_INVESTIGATION].includes(reevaluation.statut as any)
+              ? canSubmitToCommittee
+              : reevaluation.statut === StatutReevaluation.IN_COMMITTEE
+                ? (canDecide && !(actionContext?.hasConflictOfInterest))
+                : false
+        }
+      />
 
       {/* Comparatif montants */}
       <div className="grid grid-cols-2 gap-3">
@@ -864,39 +1016,73 @@ export function ReevaluationDetailPanel({ reevaluationId, onBack, onStatusChange
       {/* Actions */}
       {getActionButtons()}
 
-      {/* Audit trail toggle */}
-      <button
-        onClick={() => setShowAudit(!showAudit)}
-        className="w-full flex items-center justify-between px-4 py-3 bg-surface/50 rounded-xl hover:bg-surface transition"
-      >
-        <div className="flex items-center gap-2">
-          <History size={18} className="text-content-muted" />
-          <span className="text-content-secondary">Historique des actions ({auditLogs.length})</span>
-        </div>
-        {showAudit ? <ChevronUp size={18} className="text-content-muted" /> : <ChevronDown size={18} className="text-content-muted" />}
-      </button>
-
-      {/* Audit logs */}
-      {showAudit && auditLogs.length > 0 && (
-        <div className="space-y-2 pl-4 border-l-2 border-edge">
-          {auditLogs.map(log => (
-            <div key={log.id} className="bg-surface/30 rounded-lg p-3">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-content-primary font-medium text-sm">{log.action.replace(/_/g, ' ')}</span>
-                <span className="text-content-muted text-xs">
-                  {new Date(log.timestamp).toLocaleString('fr-FR')}
-                </span>
+      {/* Audit trail — last 3 always visible, rest in collapsible */}
+      {auditLogs.length > 0 && (
+        <div className="bg-surface/50 rounded-xl border border-edge overflow-hidden">
+          <div className="px-4 py-3 flex items-center gap-2 border-b border-edge/50">
+            <History size={16} className="text-content-muted" />
+            <span className="text-sm font-bold text-content-secondary">Dernières actions</span>
+            <span className="text-xs text-content-muted ml-auto">{auditLogs.length} entrée{auditLogs.length > 1 ? 's' : ''}</span>
+          </div>
+          <div className="space-y-0 divide-y divide-edge/30">
+            {auditLogs.slice(0, 3).map(log => (
+              <div key={log.id} className="px-4 py-2.5">
+                <div className="flex items-center justify-between mb-0.5">
+                  <span className="text-content-primary font-medium text-sm">{log.action.replace(/_/g, ' ')}</span>
+                  <span className="text-content-muted text-xs">
+                    {new Date(log.timestamp).toLocaleString('fr-FR')}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 text-xs text-content-muted">
+                  {log.statutAvant && log.statutApres && (
+                    <span>{log.statutAvant} → {log.statutApres}</span>
+                  )}
+                  {(log.userName || log.roleUtilisateur) && (
+                    <span className="flex items-center gap-1"><UserCheck size={10} /> {log.userName || log.roleUtilisateur}{log.userName && log.roleUtilisateur ? ` · ${log.roleUtilisateur}` : ''}</span>
+                  )}
+                </div>
+                {log.details?.description && (
+                  <p className="text-content-muted text-xs mt-1">{log.details.description}</p>
+                )}
               </div>
-              {log.statutAvant && log.statutApres && (
-                <div className="text-xs text-content-muted">
-                  {log.statutAvant} → {log.statutApres}
+            ))}
+          </div>
+          {auditLogs.length > 3 && (
+            <>
+              <button
+                onClick={() => setShowAudit(!showAudit)}
+                className="w-full px-4 py-2 text-xs text-accent hover:bg-surface transition flex items-center justify-center gap-1 border-t border-edge/30"
+              >
+                {showAudit ? 'Masquer' : `Voir les ${auditLogs.length - 3} actions précédentes`}
+                {showAudit ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              </button>
+              {showAudit && (
+                <div className="divide-y divide-edge/30 border-t border-edge/30">
+                  {auditLogs.slice(3).map(log => (
+                    <div key={log.id} className="px-4 py-2.5">
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className="text-content-primary font-medium text-sm">{log.action.replace(/_/g, ' ')}</span>
+                        <span className="text-content-muted text-xs">
+                          {new Date(log.timestamp).toLocaleString('fr-FR')}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-content-muted">
+                        {log.statutAvant && log.statutApres && (
+                          <span>{log.statutAvant} → {log.statutApres}</span>
+                        )}
+                        {(log.userName || log.roleUtilisateur) && (
+                          <span className="flex items-center gap-1"><UserCheck size={10} /> {log.userName || log.roleUtilisateur}{log.userName && log.roleUtilisateur ? ` · ${log.roleUtilisateur}` : ''}</span>
+                        )}
+                      </div>
+                      {log.details?.description && (
+                        <p className="text-content-muted text-xs mt-1">{log.details.description}</p>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
-              {log.details?.description && (
-                <p className="text-content-muted text-sm mt-1">{log.details.description}</p>
-              )}
-            </div>
-          ))}
+            </>
+          )}
         </div>
       )}
 
@@ -997,16 +1183,16 @@ function ReevaluationDecisionModalInline({
             <label className="text-sm text-content-muted mb-2 block">Décision</label>
             <div className="grid grid-cols-3 gap-2">
               {([
-                { value: DecisionComite.APPROVED, label: 'Approuver', color: 'emerald' },
-                { value: DecisionComite.REDUCED_AMOUNT, label: 'Réduire', color: 'amber' },
-                { value: DecisionComite.REJECTED, label: 'Rejeter', color: 'red' },
+                { value: DecisionComite.APPROVED, label: 'Approuver', active: 'bg-status-success-bg border-status-success/50 text-status-success' },
+                { value: DecisionComite.REDUCED_AMOUNT, label: 'Réduire', active: 'bg-status-warning-bg border-status-warning/50 text-status-warning' },
+                { value: DecisionComite.REJECTED, label: 'Rejeter', active: 'bg-status-danger-bg border-status-danger/50 text-status-danger' },
               ] as const).map(opt => (
                 <button
                   key={opt.value}
                   onClick={() => setDecision(opt.value)}
                   className={`px-4 py-3 rounded-lg border transition ${
                     decision === opt.value
-                      ? `bg-${opt.color}-500/20 border-${opt.color}-500/50 text-${opt.color}-400`
+                      ? opt.active
                       : 'bg-surface border-edge text-content-secondary hover:border-edge-strong'
                   }`}
                 >

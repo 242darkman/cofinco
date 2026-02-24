@@ -6,12 +6,16 @@
 import React, { useState, useEffect } from 'react';
 import {
   RefreshCw, Clock, CheckCircle, XCircle, AlertTriangle,
-  Users, Filter, Search, ChevronRight, Loader2, Eye
+  Users, Search, ChevronRight, Loader2, Zap
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatMoney, formatClientName, resolveStorageUrl } from '../../../lib/format';
 import { Pagination } from '../../ui';
 import { STATUT_REEVALUATION_LABELS } from '@shared/enum/status-constants';
+import { useWebSocket } from '@/hooks/useWebSocket';
+import { useCan } from '@/contexts/AbilityContext';
+import { Actions } from '@shared/ability/actions';
+import { Subjects } from '@shared/ability/subjects';
 
 interface Reevaluation {
   id: string;
@@ -30,6 +34,8 @@ interface Reevaluation {
   createdAt: string;
   dateDecisionComite?: string;
   decisionComite?: string;
+  validePar?: string;
+  createdBy?: string;
   client?: {
     nom: string;
     prenom?: string;
@@ -44,7 +50,7 @@ interface ReevaluationListProps {
   showFilters?: boolean;
 }
 
-type StatutFilter = 'all' | 'pending' | 'approved' | 'rejected';
+type StatutFilter = 'all' | 'actionable' | 'pending' | 'approved' | 'rejected';
 
 // Status keys are from backend (English) — labels from centralized STATUT_REEVALUATION_LABELS
 const STATUT_CONFIG: Record<string, { color: string; bg: string; icon: React.ReactNode; label: string }> = {
@@ -59,14 +65,26 @@ const STATUT_CONFIG: Record<string, { color: string; bg: string; icon: React.Rea
   'CANCELLED': { color: 'text-content-muted', bg: 'bg-surface-subtle/30', icon: <XCircle size={13} />, label: STATUT_REEVALUATION_LABELS.CANCELLED },
 };
 
+// Statuses where action is needed (non-terminal, non-waiting)
+const PENDING_STATUSES = ['REQUESTED', 'ELIGIBILITY_CHECK', 'AUTHORIZED', 'ADDITIONAL_INVESTIGATION', 'IN_COMMITTEE'];
+
 export function ReevaluationList({ onSelect, demandeId, showFilters = true }: ReevaluationListProps) {
   const [reevaluations, setReevaluations] = useState<Reevaluation[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statutFilter, setStatutFilter] = useState<StatutFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 7; // Increased density allows more items
+  const ITEMS_PER_PAGE = 7;
+
+  // Permissions for "actionable" filter
+  const canValidate = useCan(Actions.VALIDATE_REEVALUATION, Subjects.REEVALUATION);
+  const canDecide = useCan(Actions.DECIDE_REEVALUATION, Subjects.REEVALUATION);
+  const canSubmit = useCan(Actions.APPROVE, Subjects.REEVALUATION);
+
+  // WebSocket for real-time updates
+  const { socket } = useWebSocket();
 
   useEffect(() => {
     loadReevaluations();
@@ -76,24 +94,43 @@ export function ReevaluationList({ onSelect, demandeId, showFilters = true }: Re
     setCurrentPage(1);
   }, [statutFilter, searchQuery, demandeId]);
 
+  // Listen for reevaluation updates
+  const [wsUpdated, setWsUpdated] = useState(false);
+  useEffect(() => {
+    if (!socket) return;
+    const handler = (event: MessageEvent) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'REEVALUATION_UPDATE') {
+          loadReevaluations();
+          setWsUpdated(true);
+          setTimeout(() => setWsUpdated(false), 2500);
+        }
+      } catch { /* ignore */ }
+    };
+    socket.addEventListener('message', handler);
+    return () => socket.removeEventListener('message', handler);
+  }, [socket]);
+
   const loadReevaluations = async () => {
     setLoading(true);
     setError(null);
     try {
-      const url = demandeId 
+      const url = demandeId
         ? `/api/demandes/${demandeId}/reevaluations`
         : '/api/reevaluations';
-      
+
       const response = await fetch(url, {
         credentials: 'include'
       });
       const data = await response.json();
-      
+
       if (!response.ok || !data.success) {
         throw new Error(data.error?.message || 'Erreur de chargement');
       }
-      
+
       setReevaluations(data.reevaluations || []);
+      if (data.currentUserId) setCurrentUserId(data.currentUserId);
     } catch (err: any) {
       setError(err.message);
       toast.error('Erreur lors du chargement des réévaluations');
@@ -102,18 +139,31 @@ export function ReevaluationList({ onSelect, demandeId, showFilters = true }: Re
     }
   };
 
+  // Determine if a reevaluation is actionable by the current user
+  const isActionable = (r: Reevaluation): boolean => {
+    if (!currentUserId) return false;
+    const s = r.statut;
+    // Eligibility validation: user must have permission AND not be the creator (SoD for some orgs)
+    if ((s === 'REQUESTED' || s === 'ELIGIBILITY_CHECK') && canValidate) return true;
+    // Submit to committee
+    if (s === 'AUTHORIZED' && canSubmit) return true;
+    // Committee decision: user must have permission AND no conflict of interest
+    if (s === 'IN_COMMITTEE' && canDecide && r.validePar !== currentUserId) return true;
+    return false;
+  };
+
   const filteredReevaluations = reevaluations.filter(r => {
     // Status filter
-    if (statutFilter === 'pending' && !['REQUESTED', 'ELIGIBILITY_CHECK', 'AUTHORIZED', 'ADDITIONAL_INVESTIGATION', 'IN_COMMITTEE'].includes(r.statut)) {
+    if (statutFilter === 'actionable') {
+      if (!isActionable(r)) return false;
+    } else if (statutFilter === 'pending' && !PENDING_STATUSES.includes(r.statut)) {
+      return false;
+    } else if (statutFilter === 'approved' && r.statut !== 'APPROVED') {
+      return false;
+    } else if (statutFilter === 'rejected' && !['REFUSED', 'DEFINITIVELY_REJECTED', 'CANCELLED'].includes(r.statut)) {
       return false;
     }
-    if (statutFilter === 'approved' && r.statut !== 'APPROVED') {
-      return false;
-    }
-    if (statutFilter === 'rejected' && !['REFUSED', 'DEFINITIVELY_REJECTED', 'CANCELLED'].includes(r.statut)) {
-      return false;
-    }
-    
+
     // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -123,9 +173,11 @@ export function ReevaluationList({ onSelect, demandeId, showFilters = true }: Re
         r.client?.prenom?.toLowerCase().includes(query)
       );
     }
-    
+
     return true;
   });
+
+  const actionableCount = reevaluations.filter(isActionable).length;
 
   const totalItems = filteredReevaluations.length;
   const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
@@ -135,11 +187,11 @@ export function ReevaluationList({ onSelect, demandeId, showFilters = true }: Re
   );
 
   const getStatutConfig = (statut: string) => {
-    return STATUT_CONFIG[statut] || { 
-      color: 'text-content-muted', 
-      bg: 'bg-surface-subtle/30', 
+    return STATUT_CONFIG[statut] || {
+      color: 'text-content-muted',
+      bg: 'bg-surface-subtle/30',
       icon: <AlertTriangle size={13} />,
-      label: statut 
+      label: statut
     };
   };
 
@@ -157,7 +209,7 @@ export function ReevaluationList({ onSelect, demandeId, showFilters = true }: Re
       <div className="bg-status-danger-bg border border-status-danger/50 rounded-lg p-4 text-center">
         <XCircle className="mx-auto text-status-danger mb-2" size={24} />
         <p className="text-status-danger text-sm">{error}</p>
-        <button 
+        <button
           onClick={loadReevaluations}
           className="mt-2 px-3 py-1 bg-status-danger hover:bg-status-danger text-white text-xs rounded transition"
         >
@@ -172,13 +224,16 @@ export function ReevaluationList({ onSelect, demandeId, showFilters = true }: Re
       {/* Header Compact */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <RefreshCw className="text-status-warning" size={16} />
+          <RefreshCw className={`text-status-warning transition-transform ${wsUpdated ? 'animate-spin' : ''}`} size={16} style={wsUpdated ? { animationDuration: '1s', animationIterationCount: '1' } : undefined} />
           <h3 className="text-sm font-bold text-content-primary uppercase tracking-wider">Réévaluations</h3>
           <span className="px-1.5 py-0.5 bg-surface-elevated text-content-secondary text-xs rounded-full font-mono">
             {reevaluations.length}
           </span>
+          {wsUpdated && (
+            <span className="text-xs text-status-success animate-pulse">Mis à jour</span>
+          )}
         </div>
-        
+
         {showFilters && (
           <div className="flex items-center gap-2">
             <div className="relative">
@@ -191,10 +246,11 @@ export function ReevaluationList({ onSelect, demandeId, showFilters = true }: Re
                 className="w-40 sm:w-64 bg-surface-base/50 border border-edge-subtle rounded-md pl-8 pr-3 py-1 text-xs text-content-primary focus:outline-none focus:border-accent/50 transition-colors"
               />
             </div>
-            
+
             <div className="flex bg-surface-base/50 p-0.5 rounded-md border border-edge-subtle">
               {[
                 { value: 'all', label: 'Tout' },
+                { value: 'actionable', label: 'Mes actions', count: actionableCount },
                 { value: 'pending', label: 'En cours' },
                 { value: 'approved', label: 'Validées' },
                 { value: 'rejected', label: 'Rejetées' },
@@ -202,13 +258,21 @@ export function ReevaluationList({ onSelect, demandeId, showFilters = true }: Re
                 <button
                   key={filter.value}
                   onClick={() => setStatutFilter(filter.value as StatutFilter)}
-                  className={`px-2.5 py-1 rounded text-xs font-medium transition-all ${
+                  className={`px-2.5 py-1 rounded text-xs font-medium transition-all flex items-center gap-1 ${
                     statutFilter === filter.value
                       ? 'bg-surface-elevated text-content-primary shadow-sm'
                       : 'text-content-muted hover:text-content-secondary hover:bg-surface'
                   }`}
                 >
+                  {filter.value === 'actionable' && <Zap size={11} />}
                   {filter.label}
+                  {'count' in filter && filter.count! > 0 && (
+                    <span className={`ml-0.5 px-1 py-0 rounded-full text-[10px] font-bold ${
+                      statutFilter === 'actionable' ? 'bg-accent/20 text-accent' : 'bg-status-warning-bg text-status-warning'
+                    }`}>
+                      {filter.count}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
@@ -219,23 +283,34 @@ export function ReevaluationList({ onSelect, demandeId, showFilters = true }: Re
       {/* List Compact */}
       {filteredReevaluations.length === 0 ? (
         <div className="bg-surface/30 border border-edge-subtle rounded-lg p-6 text-center">
-          <p className="text-content-muted text-sm">Aucune réévaluation trouvée</p>
+          <p className="text-content-muted text-sm">
+            {statutFilter === 'actionable' ? 'Aucune réévaluation en attente de votre action' : 'Aucune réévaluation trouvée'}
+          </p>
         </div>
       ) : (
         <div className="space-y-1">
           {paginatedReevaluations.map(reeval => {
             const statutConfig = getStatutConfig(reeval.statut);
             const isClickable = !!onSelect;
-            
+            const actionable = isActionable(reeval);
+
             return (
               <div
                 key={reeval.id}
                 onClick={() => onSelect?.(reeval)}
-                className={`group bg-surface/40 border border-edge-subtle hover:bg-surface hover:border-accent/30 rounded-lg p-2.5 transition-all ${
+                className={`group bg-surface/40 border rounded-lg p-2.5 transition-all ${
                   isClickable ? 'cursor-pointer' : ''
+                } ${actionable
+                  ? 'border-accent/30 hover:border-accent/60 hover:bg-surface'
+                  : 'border-edge-subtle hover:bg-surface hover:border-accent/30'
                 }`}
               >
                 <div className="flex items-center gap-4">
+                  {/* Actionable indicator */}
+                  {actionable && (
+                    <div className="shrink-0 w-1 self-stretch rounded-full bg-accent" title="En attente de votre action" />
+                  )}
+
                   {/* Client Avatar & Info - Compact */}
                   <div className="flex items-center gap-3 w-[200px] shrink-0">
                     <div className="shrink-0 relative">
@@ -261,7 +336,7 @@ export function ReevaluationList({ onSelect, demandeId, showFilters = true }: Re
                       {/* Status Dot for very compact view */}
                       <div className={`absolute -right-0.5 -bottom-0.5 w-3 h-3 rounded-full border-2 border-edge ${statutConfig.bg.replace('/10', '')} ${statutConfig.color.replace('text-', 'bg-')}`}></div>
                     </div>
-                    
+
                     <div className="min-w-0">
                       <p className="text-content-secondary font-semibold text-sm truncate group-hover:text-accent transition-colors">
                         {formatClientName(reeval.client?.nom || '', reeval.client?.prenom || '')}
@@ -288,7 +363,7 @@ export function ReevaluationList({ onSelect, demandeId, showFilters = true }: Re
                        <span className="text-[10px] text-content-muted uppercase tracking-wide">Initial</span>
                        <span className="text-content-muted text-xs font-mono">{formatMoney(Number(reeval.montantInitialDemande))}</span>
                     </div>
-                    
+
                     <div className="flex items-baseline justify-between">
                        <span className="text-[10px] text-content-muted uppercase tracking-wide">Nouveau</span>
                        <span className="text-accent text-xs font-bold font-mono">
@@ -304,7 +379,7 @@ export function ReevaluationList({ onSelect, demandeId, showFilters = true }: Re
                              </span>
                           ))}
                        </div>
-                       
+
                        {reeval.deltaScore !== undefined && reeval.deltaScore !== null && (
                         <div className={`text-xs font-mono font-medium ${reeval.deltaScore > 0 ? 'text-status-success' : 'text-status-danger'}`}>
                           {reeval.deltaScore > 0 ? '+' : ''}{reeval.deltaScore} pts
@@ -312,7 +387,7 @@ export function ReevaluationList({ onSelect, demandeId, showFilters = true }: Re
                        )}
                     </div>
                   </div>
-                  
+
                   {/* Action Arrow */}
                   {isClickable && (
                     <div className="shrink-0 pl-2">

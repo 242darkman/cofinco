@@ -12,6 +12,8 @@ import { attachAbility, requireAbility } from "../authorization/middleware";
 import { Actions, Subjects } from "@shared/ability";
 
 const logger = createLogger('Routes:Reevaluations');
+import { getWsInstance } from "../ws-server";
+import { isReevaluationError } from "../services/reevaluation-errors";
 import {
   createReevaluation,
   validateEligibility,
@@ -126,6 +128,9 @@ export function registerReevaluationRoutes(app: Express) {
       });
     } catch (error: any) {
       logger.error({ err: error }, 'Error checking eligibility');
+      if (isReevaluationError(error)) {
+        return res.status(error.httpStatus).json({ success: false, error: error.toJSON() });
+      }
       res.status(500).json({
         success: false,
         error: { code: "SERVER_ERROR", message: "Erreur interne du serveur" }
@@ -195,9 +200,12 @@ export function registerReevaluationRoutes(app: Express) {
       });
     } catch (error: any) {
       logger.error({ err: error }, 'Error creating reevaluation');
-      res.status(500).json({ 
-        success: false, 
-        error: { code: "SERVER_ERROR", message: "Erreur interne du serveur" } 
+      if (isReevaluationError(error)) {
+        return res.status(error.httpStatus).json({ success: false, error: error.toJSON() });
+      }
+      res.status(500).json({
+        success: false,
+        error: { code: "SERVER_ERROR", message: "Erreur interne du serveur" }
       });
     }
   });
@@ -218,9 +226,12 @@ export function registerReevaluationRoutes(app: Express) {
       });
     } catch (error: any) {
       logger.error({ err: error }, 'Error fetching reevaluations');
-      res.status(500).json({ 
-        success: false, 
-        error: { code: "SERVER_ERROR", message: "Erreur interne du serveur" } 
+      if (isReevaluationError(error)) {
+        return res.status(error.httpStatus).json({ success: false, error: error.toJSON() });
+      }
+      res.status(500).json({
+        success: false,
+        error: { code: "SERVER_ERROR", message: "Erreur interne du serveur" }
       });
     }
   });
@@ -367,9 +378,12 @@ export function registerReevaluationRoutes(app: Express) {
       });
     } catch (error: any) {
       logger.error({ err: error }, 'Error fetching timeline');
-      res.status(500).json({ 
-        success: false, 
-        error: { code: "SERVER_ERROR", message: "Erreur interne du serveur" } 
+      if (isReevaluationError(error)) {
+        return res.status(error.httpStatus).json({ success: false, error: error.toJSON() });
+      }
+      res.status(500).json({
+        success: false,
+        error: { code: "SERVER_ERROR", message: "Erreur interne du serveur" }
       });
     }
   });
@@ -396,21 +410,42 @@ export function registerReevaluationRoutes(app: Express) {
       
       // Get related data
       const demande = await getDemandeById(reevaluation.demandeId);
-      const [client] = demande 
+      const [client] = demande
         ? await db.select().from(clients).where(eq(clients.id, demande.clientId))
         : [null];
-      
+
+      // Resolve actor names (validePar, decidePar, createdBy)
+      const actorIds = [reevaluation.validePar, reevaluation.decidePar, reevaluation.createdBy].filter(Boolean) as string[];
+      const actorRows = actorIds.length > 0
+        ? await db.select({ id: users.id, nom: users.nom, prenom: users.prenom })
+            .from(users)
+            .where(sql`${users.id} IN (${sql.join(actorIds.map(id => sql`${id}`), sql`,`)})`)
+        : [];
+      const actorMap = Object.fromEntries(actorRows.map(u => [u.id, `${u.prenom || ''} ${u.nom}`.trim()]));
+
+      const userId = req.user?.id;
       res.json({
         success: true,
         reevaluation,
         demande,
-        client
+        client,
+        actors: {
+          createdBy: reevaluation.createdBy ? { id: reevaluation.createdBy, nom: actorMap[reevaluation.createdBy] || null } : null,
+          validePar: reevaluation.validePar ? { id: reevaluation.validePar, nom: actorMap[reevaluation.validePar] || null } : null,
+          decidePar: reevaluation.decidePar ? { id: reevaluation.decidePar, nom: actorMap[reevaluation.decidePar] || null } : null,
+        },
+        actionContext: {
+          hasConflictOfInterest: !!(reevaluation.validePar && reevaluation.validePar === userId),
+        }
       });
     } catch (error: any) {
       logger.error({ err: error }, 'Error fetching reevaluation');
-      res.status(500).json({ 
-        success: false, 
-        error: { code: "SERVER_ERROR", message: "Erreur interne du serveur" } 
+      if (isReevaluationError(error)) {
+        return res.status(error.httpStatus).json({ success: false, error: error.toJSON() });
+      }
+      res.status(500).json({
+        success: false,
+        error: { code: "SERVER_ERROR", message: "Erreur interne du serveur" }
       });
     }
   });
@@ -450,11 +485,17 @@ export function registerReevaluationRoutes(app: Express) {
           statut: result.statut
         }
       });
+
+      // Broadcast status change
+      getWsInstance()?.broadcast({ type: "REEVALUATION_UPDATE", payload: { reevaluationId, statut: result.statut, action: 'ELIGIBILITE_VERIFIEE' } });
     } catch (error: any) {
       logger.error({ err: error }, 'Error validating eligibility');
-      res.status(400).json({ 
-        success: false, 
-        error: { code: "VALIDATION_FAILED", message: "Erreur interne du serveur" } 
+      if (isReevaluationError(error)) {
+        return res.status(error.httpStatus).json({ success: false, error: error.toJSON() });
+      }
+      res.status(500).json({
+        success: false,
+        error: { code: "SERVER_ERROR", message: "Erreur interne du serveur" }
       });
     }
   });
@@ -500,11 +541,16 @@ export function registerReevaluationRoutes(app: Express) {
         enquete: result.enquete,
         creditPlanId: (result as any).creditPlanId,
       });
+
+      getWsInstance()?.broadcast({ type: "REEVALUATION_UPDATE", payload: { reevaluationId, statut: StatutReevaluation.ADDITIONAL_INVESTIGATION, action: 'ENQUETE_LANCEE' } });
     } catch (error: any) {
       logger.error({ err: error }, 'Error starting enquete');
-      res.status(400).json({
+      if (isReevaluationError(error)) {
+        return res.status(error.httpStatus).json({ success: false, error: error.toJSON() });
+      }
+      res.status(500).json({
         success: false,
-        error: { code: "ENQUETE_FAILED", message: "Erreur interne du serveur" }
+        error: { code: "SERVER_ERROR", message: "Erreur interne du serveur" }
       });
     }
   });
@@ -569,11 +615,16 @@ export function registerReevaluationRoutes(app: Express) {
           }
         } : null
       });
+
+      getWsInstance()?.broadcast({ type: "REEVALUATION_UPDATE", payload: { reevaluationId, statut: StatutReevaluation.IN_COMMITTEE, action: 'SOUMIS_COMITE' } });
     } catch (error: any) {
       logger.error({ err: error }, 'Error submitting to committee');
-      res.status(400).json({ 
-        success: false, 
-        error: { code: "SUBMISSION_FAILED", message: "Erreur interne du serveur" } 
+      if (isReevaluationError(error)) {
+        return res.status(error.httpStatus).json({ success: false, error: error.toJSON() });
+      }
+      res.status(500).json({
+        success: false,
+        error: { code: "SERVER_ERROR", message: "Erreur interne du serveur" }
       });
     }
   });
@@ -638,11 +689,16 @@ export function registerReevaluationRoutes(app: Express) {
           nombreReevaluations: demande.nombreReevaluations
         } : null
       });
+
+      getWsInstance()?.broadcast({ type: "REEVALUATION_UPDATE", payload: { reevaluationId, statut: reevaluation?.statut, action: 'DECISION_ENREGISTREE' } });
     } catch (error: any) {
       logger.error({ err: error }, 'Error recording decision');
-      res.status(400).json({ 
-        success: false, 
-        error: { code: "DECISION_FAILED", message: "Erreur interne du serveur" } 
+      if (isReevaluationError(error)) {
+        return res.status(error.httpStatus).json({ success: false, error: error.toJSON() });
+      }
+      res.status(500).json({
+        success: false,
+        error: { code: "SERVER_ERROR", message: "Erreur interne du serveur" }
       });
     }
   });
@@ -681,11 +737,16 @@ export function registerReevaluationRoutes(app: Express) {
         success: true,
         message: "Réévaluation annulée"
       });
+
+      getWsInstance()?.broadcast({ type: "REEVALUATION_UPDATE", payload: { reevaluationId, statut: StatutReevaluation.CANCELLED, action: 'ANNULEE' } });
     } catch (error: any) {
       logger.error({ err: error }, 'Error cancelling reevaluation');
-      res.status(400).json({ 
-        success: false, 
-        error: { code: "CANCELLATION_FAILED", message: "Erreur interne du serveur" } 
+      if (isReevaluationError(error)) {
+        return res.status(error.httpStatus).json({ success: false, error: error.toJSON() });
+      }
+      res.status(500).json({
+        success: false,
+        error: { code: "SERVER_ERROR", message: "Erreur interne du serveur" }
       });
     }
   });
@@ -697,18 +758,35 @@ export function registerReevaluationRoutes(app: Express) {
   app.get("/api/reevaluations/:reevaluationId/audit-logs", requireAuth, attachAbility, requireAbility(Actions.VIEW, Subjects.REEVALUATION), async (req: Request, res: Response) => {
     try {
       const { reevaluationId } = req.params;
-      
+
       const logs = await getAuditLogs(reevaluationId);
-      
+
+      // Resolve user names for all audit log entries
+      const userIds = [...new Set(logs.map(l => l.userId).filter(Boolean))] as string[];
+      const userRows = userIds.length > 0
+        ? await db.select({ id: users.id, nom: users.nom, prenom: users.prenom })
+            .from(users)
+            .where(sql`${users.id} IN (${sql.join(userIds.map(id => sql`${id}`), sql`,`)})`)
+        : [];
+      const userMap = Object.fromEntries(userRows.map(u => [u.id, `${u.prenom || ''} ${u.nom}`.trim()]));
+
+      const enrichedLogs = logs.map(log => ({
+        ...log,
+        userName: log.userId ? userMap[log.userId] || null : null,
+      }));
+
       res.json({
         success: true,
-        logs
+        logs: enrichedLogs
       });
     } catch (error: any) {
       logger.error({ err: error }, 'Error fetching audit logs');
-      res.status(500).json({ 
-        success: false, 
-        error: { code: "SERVER_ERROR", message: "Erreur interne du serveur" } 
+      if (isReevaluationError(error)) {
+        return res.status(error.httpStatus).json({ success: false, error: error.toJSON() });
+      }
+      res.status(500).json({
+        success: false,
+        error: { code: "SERVER_ERROR", message: "Erreur interne du serveur" }
       });
     }
   });
@@ -743,6 +821,8 @@ export function registerReevaluationRoutes(app: Express) {
         dateDecisionComite: reevaluationsCredit.dateDecisionComite,
         decisionComite: reevaluationsCredit.decisionComite,
         creditPlanId: demandesCredit.creditPlanId,
+        validePar: reevaluationsCredit.validePar,
+        createdBy: reevaluationsCredit.createdBy,
         // Architecture V3: nom/prenom sont dans users
         client: {
           nom: users.nom,
@@ -767,6 +847,7 @@ export function registerReevaluationRoutes(app: Express) {
       res.json({
         success: true,
         reevaluations,
+        currentUserId: req.user?.id,
         pagination: {
           limit: parseInt(limit as string),
           offset: parseInt(offset as string)
@@ -774,6 +855,9 @@ export function registerReevaluationRoutes(app: Express) {
       });
     } catch (error: any) {
       logger.error({ err: error }, 'Error listing reevaluations');
+      if (isReevaluationError(error)) {
+        return res.status(error.httpStatus).json({ success: false, error: error.toJSON() });
+      }
       res.status(500).json({
         success: false,
         error: { code: "SERVER_ERROR", message: "Erreur interne du serveur" }
