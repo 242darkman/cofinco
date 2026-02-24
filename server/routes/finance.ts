@@ -2371,7 +2371,7 @@ export function registerFinanceRoutes(app: Express) {
 
   app.get("/api/demandes-credit/:id/enquete", requireAuth, async (req, res) => {
       const enquetesList = await storage.getEnqueteByDemandeId(req.params.id);
-      if (!enquetesList || enquetesList.length === 0) return res.status(404).json({ message: "Enquête non trouvée" });
+      if (!enquetesList || enquetesList.length === 0) return res.json([]);
       const enquete = enquetesList[0];
       // Enrich with credit plan data
       const planId = enquete.creditPlanId;
