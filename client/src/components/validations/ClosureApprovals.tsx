@@ -1,18 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  CheckCircle, 
-  XCircle, 
-  Clock, 
-  User, 
-  Loader2, 
-  Banknote, 
-  Smartphone, 
-  CreditCard, 
-  AlertTriangle, 
+  CheckCircle,
+  XCircle,
+  User,
+  Loader2,
+  CreditCard,
   FileText,
   Calendar,
-  ShieldAlert,
-  ChevronRight
+  ShieldAlert
 } from 'lucide-react';
 import Card from '../ui/Card';
 import Badge from '../ui/Badge';
@@ -21,7 +16,6 @@ import Button from '../ui/Button';
 import { toast, handleApiError } from '../../lib/toast';
 import { formatMoney } from '../../lib/format';
 import { type ClosurePayoutMethodType } from '@shared/enum/status-constants';
-import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 

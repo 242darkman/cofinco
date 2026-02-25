@@ -1,19 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  CheckCircle, 
-  XCircle, 
-  Clock, 
-  User, 
-  Loader2, 
-  Banknote, 
-  CreditCard, 
-  AlertTriangle,
-  PiggyBank, 
-  Lock, 
+  CheckCircle,
+  XCircle,
+  User,
+  Loader2,
+  Banknote,
+  CreditCard,
+  PiggyBank,
+  Lock,
   Wallet,
   Calendar,
-  ShieldCheck,
-  Building2
+  ShieldCheck
 } from 'lucide-react';
 import Card from '../ui/Card';
 import Badge from '../ui/Badge';
