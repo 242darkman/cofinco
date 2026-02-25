@@ -223,6 +223,8 @@ export function setupWebSocket(server: Server) {
     clearInterval(interval);
   });
 
+  const SESSION_MIDDLEWARE_TIMEOUT_MS = 5000;
+
   server.prependListener("upgrade", (request, socket, head) => {
     // Handle socket errors to prevent EPIPE crashes
     socket.on('error', (err: any) => {
@@ -235,14 +237,14 @@ export function setupWebSocket(server: Server) {
     try {
       // Parse URL for path only (no query params)
       const url = parse(request.url || '', true);
-      
+
       // Only handle /ws path
       if (!url.pathname?.startsWith('/ws')) {
         return;
       }
-      
-      logger.debug({ pathname: url.pathname }, 'Upgrade request received');
-      
+
+      logger.info({ pathname: url.pathname }, 'WS upgrade request received');
+
       const isProduction = process.env.NODE_ENV === 'production';
 
       // 1. Strict Cookie Authentication
@@ -302,16 +304,34 @@ export function setupWebSocket(server: Server) {
         setHeader: () => {}
       };
 
+      // Timeout guard: if sessionMiddleware never calls back (DB hang, pool exhaustion),
+      // destroy the socket instead of leaving it hanging indefinitely.
+      let callbackFired = false;
+      const sessionTimeout = setTimeout(() => {
+        if (!callbackFired) {
+          callbackFired = true;
+          logger.error({ sessionId }, 'Session middleware timed out during WS upgrade');
+          try {
+            socket.write('HTTP/1.1 503 Service Unavailable\r\n\r\n');
+            socket.destroy();
+          } catch { /* ignore */ }
+        }
+      }, SESSION_MIDDLEWARE_TIMEOUT_MS);
+
       sessionMiddleware(request, mockRes as any, (err?: Error) => {
+        if (callbackFired) return; // Already timed out
+        callbackFired = true;
+        clearTimeout(sessionTimeout);
+
         if (err) {
           logger.error({ err }, 'Session middleware error');
           socket.write('HTTP/1.1 500 Internal Server Error\r\n\r\n');
           socket.destroy();
           return;
         }
-        
+
         const session = (request as any).session;
-        
+
         // Final sanity check: session ID must match what we unsigned
         // (Middleware usually handles this, but good to be sure)
         if (session.id !== sessionId) {
@@ -319,14 +339,14 @@ export function setupWebSocket(server: Server) {
         }
 
         const userId = session?.userId;
-        
+
         if (!userId) {
           logger.warn('Rejected: No userId in session (expired or invalid)');
           socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
           socket.destroy();
           return;
         }
-        
+
         // 4. Proceed with Upgrade
         try {
               // Store userId and sessionId in request for connection handler
@@ -335,7 +355,7 @@ export function setupWebSocket(server: Server) {
               (request as any).userAgence = session?.user?.agence;
               (request as any).userRole = session?.user?.role;
 
-              logger.debug({ userId }, 'Connection established (upgrade handler)');
+              logger.info({ userId }, 'WS upgrade successful');
               wss.handleUpgrade(request, socket, head, (ws) => {
                 const extWs = ws as ExtendedWebSocket;
                 extWs.isAlive = true;
