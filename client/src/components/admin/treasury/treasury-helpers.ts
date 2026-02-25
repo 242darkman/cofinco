@@ -133,28 +133,24 @@ export function formatTooltipDate(dateStr: string, period: Period): string {
 const SEVERITY_ORDER: Record<InsightSeverity, number> = { danger: 0, warning: 1, info: 2 };
 
 export function computeInsights(data: SupervisionData): Insight[] {
-  const insights: Insight[] = [];
   const { breakdown, ranking, previousPeriod, globalBalance } = data;
+  
+  // Only consider active agencies for insights
+  const activeBreakdown = (breakdown || []).filter(a => a.solde > 0);
 
-  if (!breakdown.length) return [];
+  if (!activeBreakdown.length) return [];
 
-  // Rule 1: Empty safe
-  const emptyAgencies = breakdown.filter(a => a.solde <= 0);
-  if (emptyAgencies.length > 0) {
-    const names = emptyAgencies.slice(0, 3).map(a => a.agenceNom).join(', ');
-    insights.push({
-      id: 'empty-safe',
-      severity: 'danger',
-      message: emptyAgencies.length === 1
-        ? `${names} a un coffre vide`
-        : `${emptyAgencies.length} agences ont un coffre vide`,
-      detail: emptyAgencies.length > 3 ? `dont ${names}...` : undefined,
-    });
-  }
+  // Rule 1: Empty safe (only if they are supposed to be active but empty? 
+  // Actually the prompt says "Les agences inactives ou coffres vides ne doivent pas apparaître dans les statistiques globales ni dans les classements."
+  // So we skip "Empty safe" alert if we don't even show them. 
+  // However, "Les alertes concernent uniquement agences actives"
+  // Let's assume an alert is triggered if an active agency drops below a threshold (seuil).
+  
+  const insights: Insight[] = [];
 
   // Rule 2: Concentration
-  if (breakdown.length >= 5 && globalBalance > 0) {
-    const sorted = [...breakdown].sort((a, b) => b.solde - a.solde);
+  if (activeBreakdown.length >= 5 && globalBalance > 0) {
+    const sorted = [...activeBreakdown].sort((a, b) => b.solde - a.solde);
     const top3Sum = sorted.slice(0, 3).reduce((s, a) => s + a.solde, 0);
     const share = (top3Sum / globalBalance) * 100;
     if (share > 80) {
@@ -200,4 +196,29 @@ export function computeInsights(data: SupervisionData): Insight[] {
   return insights
     .sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity])
     .slice(0, 3);
+}
+/** Filter active agencies (solde > 0) */
+export function getActiveAgencies<T extends { solde: number }>(items: T[] | undefined): T[] {
+  return (items || []).filter(item => item.solde > 0);
+}
+
+/** Calculate adjusted stats for active agencies only */
+export function calculateActiveStats(data: SupervisionData) {
+  const activeAgencies = getActiveAgencies(data.breakdown);
+  const activeCount = activeAgencies.length;
+  const totalBalance = activeAgencies.reduce((sum, a) => sum + a.solde, 0);
+  const averageBalance = activeCount > 0 ? totalBalance / activeCount : 0;
+  
+  // Find leader among active
+  const leader = activeAgencies.length > 0 
+    ? [...activeAgencies].sort((a, b) => b.solde - a.solde)[0]
+    : null;
+
+  return {
+    activeAgencies,
+    activeCount,
+    totalBalance,
+    averageBalance,
+    leader
+  };
 }
