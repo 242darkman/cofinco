@@ -675,12 +675,14 @@ export class OperationService {
             nom: users.nom,
             prenom: users.prenom,
             photoProfile: users.photoProfile,
+            agenceId: employes.agenceId,
           })
           .from(agentsTerrain)
           .leftJoin(employes, eq(agentsTerrain.employeId, employes.id))
           .leftJoin(users, eq(employes.userId, users.id))
           .where(eq(agentsTerrain.id, op.agentId));
 
+        const agenceId = agentData?.agenceId ?? undefined;
         const agent = agentData ? {
           ...agentData,
           nom: agentData.nom || "",
@@ -746,6 +748,7 @@ export class OperationService {
 
         return {
           ...op,
+          agenceId,
           agent,
           client,
           destinationCaisse,

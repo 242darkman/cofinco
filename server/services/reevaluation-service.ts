@@ -262,7 +262,7 @@ export async function validateEligibility(
     StatutReevaluation.ELIGIBILITY_CHECK
   );
   if (!transitionValid.valid && !override?.force) {
-    throw new ReevaluationError('TRANSITION_INVALIDE', transitionValid.message);
+    throw new ReevaluationError('TRANSITION_INVALIDE', transitionValid.message || 'Transition non autorisée');
   }
 
   // 3. Get demande and config
@@ -396,7 +396,7 @@ export async function startEnqueteComplementaire(
     StatutReevaluation.ADDITIONAL_INVESTIGATION
   );
   if (!transitionValid.valid) {
-    throw new ReevaluationError('TRANSITION_INVALIDE', transitionValid.message);
+    throw new ReevaluationError('TRANSITION_INVALIDE', transitionValid.message || 'Transition non autorisée');
   }
   
   // 3. Resolve creditPlanId from the demande and link initial enquête
@@ -486,7 +486,7 @@ export async function submitToCommittee(
     StatutReevaluation.IN_COMMITTEE
   );
   if (!transitionValid.valid) {
-    throw new ReevaluationError('TRANSITION_INVALIDE', transitionValid.message);
+    throw new ReevaluationError('TRANSITION_INVALIDE', transitionValid.message || 'Transition non autorisée');
   }
   
   // 3. Calculate new score (simplified - would use real scoring service)
@@ -611,7 +611,7 @@ export async function recordCommitteeDecision(
     finalStatut
   );
   if (!transitionValid.valid) {
-    throw new ReevaluationError('TRANSITION_INVALIDE', transitionValid.message);
+    throw new ReevaluationError('TRANSITION_INVALIDE', transitionValid.message || 'Transition non autorisée');
   }
   
   // 4. Update reevaluation (will be locked by trigger)

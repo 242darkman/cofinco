@@ -1,12 +1,29 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  CheckCircle, XCircle, Clock, User, Loader2, RefreshCw,
-  Banknote, Smartphone, CreditCard, AlertTriangle, FileText,
-  Search, ChevronLeft, ChevronRight,
+  CheckCircle, 
+  XCircle, 
+  Clock, 
+  User, 
+  Loader2, 
+  Banknote, 
+  Smartphone, 
+  CreditCard, 
+  AlertTriangle, 
+  FileText,
+  Calendar,
+  ShieldAlert,
+  ChevronRight
 } from 'lucide-react';
-import { Card, Badge, ConfirmDialog } from '../ui';
+import Card from '../ui/Card';
+import Badge from '../ui/Badge';
+import ConfirmDialog from '../ui/ConfirmDialog';
+import Button from '../ui/Button';
 import { toast, handleApiError } from '../../lib/toast';
+import { formatMoney } from '../../lib/format';
 import { type ClosurePayoutMethodType } from '@shared/enum/status-constants';
+import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
 
 interface ClosureRequest {
   id: string;
@@ -20,44 +37,42 @@ interface ClosureRequest {
   payoutPhoneNumber?: string;
   balanceAtInitiation: string;
   closingFeeAmount: string;
-  // Joined fields
   numeroCompte?: string;
   clientNom?: string;
   initiatorName?: string;
+  agenceId?: string;
 }
 
 interface ClosureApprovalsProps {
   agenceId?: string;
+  searchTerm?: string;
 }
 
-const PAGE_SIZE = 10;
-
-function formatMoney(value: string | number): string {
-  return Number(value).toLocaleString('fr-FR');
-}
+const PAGE_SIZE = 8;
 
 function PayoutMethodBadge({ method, phoneNumber }: { method: ClosurePayoutMethodType; phoneNumber?: string }) {
   if (method === 'CASH') {
     return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-status-warning-bg border border-status-warning/20 text-status-warning text-xs font-medium">
-        <Banknote size={14} />
-        Espèces — via Caisse
-      </span>
+      <Badge 
+        value="LIQUIDE / CAISSE" 
+        variant="warning" 
+        className="text-[10px] py-0.5 h-5 bg-status-warning/10 border-status-warning/20 text-status-warning font-bold uppercase tracking-tight" 
+      />
     );
   }
   return (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-status-info-bg border border-status-info/20 text-status-info text-xs font-medium">
-      <Smartphone size={14} />
-      Mobile Money{phoneNumber ? ` — ${phoneNumber}` : ''}
-    </span>
+    <Badge 
+      value={`MOMO: ${phoneNumber || 'MOBILE'}`} 
+      variant="info" 
+      className="text-[10px] py-0.5 h-5 bg-status-info/10 border-status-info/20 text-status-info font-bold uppercase tracking-tight" 
+    />
   );
 }
 
-export default function ClosureApprovals({ agenceId }: ClosureApprovalsProps) {
+export default function ClosureApprovals({ agenceId, searchTerm = '' }: ClosureApprovalsProps) {
   const [requests, setRequests] = useState<ClosureRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
 
   // Approve dialog
@@ -69,16 +84,10 @@ export default function ClosureApprovals({ agenceId }: ClosureApprovalsProps) {
 
   useEffect(() => {
     fetchPending();
+    const handleUpdate = () => fetchPending();
+    window.addEventListener('closure-update', handleUpdate);
+    return () => window.removeEventListener('closure-update', handleUpdate);
   }, [agenceId]);
-
-  // Real-time: listen for closure-update DOM events (from WS bridge or same-tab)
-  useEffect(() => {
-    const handleClosureUpdate = () => {
-      fetchPending();
-    };
-    window.addEventListener('closure-update', handleClosureUpdate);
-    return () => window.removeEventListener('closure-update', handleClosureUpdate);
-  }, []);
 
   const fetchPending = async () => {
     setLoading(true);
@@ -97,25 +106,26 @@ export default function ClosureApprovals({ agenceId }: ClosureApprovalsProps) {
     }
   };
 
-  // Filtered + paginated data
   const filtered = useMemo(() => {
-    if (!searchQuery.trim()) return requests;
-    const q = searchQuery.toLowerCase().trim();
-    return requests.filter(r =>
-      (r.numeroCompte || '').toLowerCase().includes(q) ||
-      (r.clientNom || '').toLowerCase().includes(q) ||
-      (r.initiatorName || '').toLowerCase().includes(q)
-    );
-  }, [requests, searchQuery]);
+    let result = requests;
+    if (searchTerm.trim()) {
+      const q = searchTerm.toLowerCase().trim();
+      result = result.filter(r =>
+        (r.numeroCompte || '').toLowerCase().includes(q) ||
+        (r.clientNom || '').toLowerCase().includes(q) ||
+        (r.initiatorName || '').toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [requests, searchTerm]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safeCurrentPage = Math.min(currentPage, totalPages);
   const paginated = filtered.slice((safeCurrentPage - 1) * PAGE_SIZE, safeCurrentPage * PAGE_SIZE);
 
-  // Reset page when search changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery]);
+  }, [searchTerm, agenceId]);
 
   const handleApprove = async () => {
     if (!approveTarget) return;
@@ -125,16 +135,13 @@ export default function ClosureApprovals({ agenceId }: ClosureApprovalsProps) {
         method: 'POST',
         credentials: 'include',
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || 'Erreur lors de l\'approbation');
-      }
-      toast.success('Clôture approuvée et exécutée');
+      if (!res.ok) throw new Error('Erreur lors de l\'approbation');
+      toast.success('Clôture approuvée');
       setApproveTarget(null);
       fetchPending();
       window.dispatchEvent(new CustomEvent('closure-update'));
     } catch (error) {
-      toast.error(handleApiError(error, 'Erreur lors de l\'approbation'));
+      toast.error(handleApiError(error));
     } finally {
       setActionLoading(null);
     }
@@ -150,17 +157,14 @@ export default function ClosureApprovals({ agenceId }: ClosureApprovalsProps) {
         credentials: 'include',
         body: JSON.stringify({ cancelReason }),
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || 'Erreur lors de l\'annulation');
-      }
-      toast.success('Demande de clôture annulée. Le compte est réactivé.');
+      if (!res.ok) throw new Error('Erreur lors du rejet');
+      toast.success('Demande rejetée');
       setCancelTarget(null);
       setCancelReason('');
       fetchPending();
       window.dispatchEvent(new CustomEvent('closure-update'));
     } catch (error) {
-      toast.error(handleApiError(error, 'Erreur lors de l\'annulation'));
+      toast.error(handleApiError(error));
     } finally {
       setActionLoading(null);
     }
@@ -168,299 +172,148 @@ export default function ClosureApprovals({ agenceId }: ClosureApprovalsProps) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-8">
-        <Loader2 size={24} className="animate-spin text-accent" />
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
+        <Loader2 className="w-10 h-10 text-status-danger animate-spin" />
+        <p className="text-sm font-medium text-content-muted">Chargement des clôtures...</p>
       </div>
     );
   }
 
   if (requests.length === 0) {
     return (
-      <Card variant="default" padding="lg" className="border-dashed border-edge bg-transparent">
-        <div className="text-center py-8">
-          <CheckCircle className="text-status-success mx-auto mb-2" size={32} />
-          <p className="text-content-muted text-sm">Aucune demande de clôture en attente</p>
+      <Card className="py-20 text-center border-dashed border-2 border-edge bg-surface-muted/5 rounded-2xl">
+        <div className="w-16 h-16 bg-surface-base rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+          <CheckCircle size={32} className="text-status-success" />
         </div>
+        <h3 className="text-lg font-bold text-content-primary">Aucune clôture en attente</h3>
+        <p className="text-sm text-content-muted mt-1 max-w-xs mx-auto">
+          Tous les comptes sont actifs ou déjà clôturés.
+        </p>
       </Card>
     );
   }
 
   return (
-    <div className="space-y-3">
-      {/* Header + Search */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <h4 className="text-sm font-semibold text-content-muted uppercase flex items-center gap-2">
-          <Clock size={14} />
-          Clôtures en attente
-          <Badge value={String(requests.length)} size="sm" />
-        </h4>
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-content-muted" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="N° compte, client..."
-              className="pl-8 pr-3 py-1.5 w-48 sm:w-56 bg-surface/60 border border-edge rounded-lg text-xs text-content-primary placeholder-content-muted focus:outline-none focus:border-status-info/50 transition"
-            />
-          </div>
-          <button
-            onClick={fetchPending}
-            className="p-1.5 rounded hover:bg-surface text-content-muted hover:text-content-primary transition"
-            title="Rafraîchir"
-          >
-            <RefreshCw size={14} />
-          </button>
-        </div>
+    <div className="space-y-4 animate-in fade-in duration-500 pb-12">
+      <div className="flex items-center justify-between px-1">
+        <h3 className="text-sm font-bold text-content-primary flex items-center gap-2">
+          <ShieldAlert size={18} className="text-status-danger" />
+          Approbation des Clôtures
+        </h3>
+        <Badge value={`${filtered.length} demandes`} variant="outline" className="text-[10px] bg-status-danger/5 border-status-danger/20 text-status-danger" />
       </div>
 
-      {/* Search result count when filtering */}
-      {searchQuery.trim() && (
-        <p className="text-xs text-content-muted">
-          {filtered.length} résultat{filtered.length !== 1 ? 's' : ''} sur {requests.length}
-        </p>
-      )}
-
-      {/* Cards */}
-      {paginated.length === 0 ? (
-        <Card variant="default" padding="md" className="border-dashed border-edge bg-transparent">
-          <p className="text-center text-sm text-content-muted py-4">
-            Aucun résultat pour « {searchQuery} »
-          </p>
-        </Card>
-      ) : (
-        paginated.map((req) => {
-          const balance = Number(req.balanceAtInitiation);
-          const fee = Number(req.closingFeeAmount);
-          const payout = Number(req.payoutAmount);
-          const isCash = req.payoutMethod === 'CASH';
-
-          return (
-            <Card key={req.id} variant="default" padding="md" className="border-status-info/20">
-              <div className="space-y-4">
-                {/* Top: Account + Client */}
-                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <CreditCard size={16} className="text-status-info" />
-                      <span className="text-content-primary font-mono text-sm font-semibold">
-                        {req.numeroCompte || req.compteId.slice(0, 8)}
-                      </span>
-                    </div>
-                    {req.clientNom && (
-                      <p className="text-sm text-content-secondary pl-6">{req.clientNom}</p>
-                    )}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {paginated.map((req) => (
+          <Card key={req.id} className="p-0 border-edge hover:shadow-lg transition-all duration-300 rounded-2xl overflow-hidden group">
+            <div className="p-4 flex items-start justify-between bg-surface-muted/10 group-hover:bg-status-danger/5 transition-colors">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-status-danger/10 rounded-lg">
+                    <CreditCard size={14} className="text-status-danger" />
                   </div>
-                  <PayoutMethodBadge method={req.payoutMethod} phoneNumber={req.payoutPhoneNumber} />
+                  <span className="text-sm font-black text-content-primary font-mono tracking-tighter">
+                    {req.numeroCompte || 'COMPTE-ID'}
+                  </span>
                 </div>
+                <p className="text-sm font-bold text-content-secondary pl-0.5">{req.clientNom || 'Client Inconnu'}</p>
+              </div>
+              <PayoutMethodBadge method={req.payoutMethod} phoneNumber={req.payoutPhoneNumber} />
+            </div>
 
-                {/* Financial details grid */}
-                <div className="grid grid-cols-3 gap-3 bg-surface/40 rounded-lg p-3">
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wider text-content-muted mb-0.5">Solde au moment</p>
-                    <p className="text-sm font-semibold text-content-secondary">{formatMoney(balance)} <span className="text-[10px] text-content-muted">FCFA</span></p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wider text-content-muted mb-0.5">Frais de clôture</p>
-                    <p className={`text-sm font-semibold ${fee > 0 ? 'text-status-danger' : 'text-content-secondary'}`}>
-                      {fee > 0 ? `- ${formatMoney(fee)}` : '0'} <span className="text-[10px] text-content-muted">FCFA</span>
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wider text-content-muted mb-0.5">Net à restituer</p>
-                    <p className="text-sm font-bold text-status-success">{formatMoney(payout)} <span className="text-[10px] text-content-muted">FCFA</span></p>
-                  </div>
+            <div className="p-4 space-y-4">
+              <div className="grid grid-cols-3 gap-2 py-3 px-4 bg-surface-base border border-edge-subtle rounded-xl shadow-inner-sm">
+                <div className="border-r border-edge-subtle">
+                  <p className="text-[9px] font-bold text-content-muted uppercase tracking-widest mb-1">Solde</p>
+                  <p className="text-xs font-black text-content-primary">{formatMoney(req.balanceAtInitiation)}</p>
                 </div>
-
-                {/* Cash caisse notice */}
-                {isCash && payout > 0 && (
-                  <div className="flex items-start gap-2 px-3 py-2 bg-status-warning/5 border border-status-warning/15 rounded-lg">
-                    <AlertTriangle size={14} className="text-status-warning mt-0.5 shrink-0" />
-                    <p className="text-xs text-status-warning/90">
-                      La restitution en espèces sera traitée en caisse. Le caissier devra confirmer la remise physique des fonds.
-                    </p>
-                  </div>
-                )}
-
-                {/* Reason */}
-                <div className="flex items-start gap-2 text-xs text-content-muted">
-                  <FileText size={12} className="mt-0.5 shrink-0 text-content-muted" />
-                  <span><span className="text-content-muted">Motif :</span> {req.reason}</span>
+                <div className="border-r border-edge-subtle px-1">
+                  <p className="text-[9px] font-bold text-content-muted uppercase tracking-widest mb-1 text-center">Frais</p>
+                  <p className="text-xs font-black text-status-danger text-center">-{formatMoney(req.closingFeeAmount)}</p>
                 </div>
-
-                {/* Footer: Initiator + Actions */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-edge-subtle">
-                  <div className="flex items-center gap-2 text-xs text-content-muted">
-                    <User size={12} />
-                    <span>
-                      Initié par <span className="text-content-secondary">{req.initiatorName || req.initiatedBy.slice(0, 8)}</span>
-                      {' — '}
-                      {new Date(req.initiatedAt).toLocaleDateString('fr-FR', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setApproveTarget(req)}
-                      disabled={actionLoading === req.id}
-                      className="px-3 py-1.5 bg-status-success-bg hover:bg-status-success-bg text-status-success border border-status-success/30 rounded-lg text-xs font-medium flex items-center gap-1.5 transition"
-                    >
-                      <CheckCircle size={14} />
-                      Approuver
-                    </button>
-                    <button
-                      onClick={() => setCancelTarget(req)}
-                      disabled={actionLoading === req.id}
-                      className="px-3 py-1.5 bg-status-danger-bg hover:bg-status-danger-bg text-status-danger border border-status-danger/30 rounded-lg text-xs font-medium flex items-center gap-1.5 transition"
-                    >
-                      <XCircle size={14} />
-                      Rejeter
-                    </button>
-                  </div>
+                <div className="pl-1">
+                  <p className="text-[9px] font-bold text-content-muted uppercase tracking-widest mb-1 text-right">Net</p>
+                  <p className="text-xs font-black text-status-success text-right">{formatMoney(req.payoutAmount)}</p>
                 </div>
               </div>
-            </Card>
-          );
-        })
-      )}
 
-      {/* Pagination */}
-      {filtered.length > PAGE_SIZE && (
-        <div className="flex items-center justify-between pt-2">
-          <p className="text-xs text-content-muted">
-            {(safeCurrentPage - 1) * PAGE_SIZE + 1}–{Math.min(safeCurrentPage * PAGE_SIZE, filtered.length)} sur {filtered.length}
-          </p>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              disabled={safeCurrentPage <= 1}
-              className="p-1.5 rounded hover:bg-surface text-content-muted hover:text-content-primary disabled:opacity-30 disabled:pointer-events-none transition"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-              <button
-                key={page}
-                onClick={() => setCurrentPage(page)}
-                className={`px-2.5 py-1 rounded text-xs font-medium transition ${
-                  page === safeCurrentPage
-                    ? 'bg-status-info-bg text-status-info border border-status-info/30'
-                    : 'text-content-muted hover:bg-surface hover:text-content-primary'
-                }`}
-              >
-                {page}
-              </button>
-            ))}
-            <button
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              disabled={safeCurrentPage >= totalPages}
-              className="p-1.5 rounded hover:bg-surface text-content-muted hover:text-content-primary disabled:opacity-30 disabled:pointer-events-none transition"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
+              <div className="flex items-start gap-2 text-[11px] text-content-muted bg-surface-muted/30 p-2.5 rounded-lg border border-edge-subtle">
+                <FileText size={14} className="shrink-0 mt-0.5" />
+                <span><span className="font-bold text-content-secondary">Motif:</span> {req.reason}</span>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-edge-subtle">
+                <div className="flex items-center gap-1.5 text-[10px] text-content-muted font-medium">
+                  <User size={12} />
+                  <span>{req.initiatorName || 'Agent'}</span>
+                  <span className="opacity-50">•</span>
+                  <Calendar size={12} />
+                  <span>{format(new Date(req.initiatedAt), 'dd MMM HH:mm', { locale: fr })}</span>
+                </div>
+                
+                <div className="flex gap-2">
+                  <Button 
+                    variant="ghost" 
+                    size="xs" 
+                    className="h-8 w-8 p-0 rounded-full hover:bg-status-danger/10 text-status-danger"
+                    onClick={() => setCancelTarget(req)}
+                  >
+                    <XCircle size={16} />
+                  </Button>
+                  <Button 
+                    variant="success" 
+                    size="xs" 
+                    className="h-8 gap-1.5 px-3 rounded-full shadow-sm"
+                    onClick={() => setApproveTarget(req)}
+                  >
+                    <CheckCircle size={16} />
+                    Valider
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      {/* Pagination View */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 pt-6">
+          <Button variant="ghost" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={safeCurrentPage === 1}>Précédent</Button>
+          <span className="text-xs font-bold text-content-muted uppercase tracking-widest">Page {safeCurrentPage} / {totalPages}</span>
+          <Button variant="ghost" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={safeCurrentPage === totalPages}>Suivant</Button>
         </div>
       )}
 
-      {/* Approve dialog */}
+      {/* Dialogs remain similar but with updated Button styles */}
       <ConfirmDialog
         isOpen={!!approveTarget}
         onClose={() => setApproveTarget(null)}
         onConfirm={handleApprove}
         title="Approuver la clôture"
-        size="md"
-        message={
-          approveTarget ? (
-            <div className="space-y-3">
-              <p>
-                Vous allez approuver la clôture du compte{' '}
-                <span className="font-mono text-content-primary font-semibold">{approveTarget.numeroCompte || approveTarget.compteId.slice(0, 8)}</span>
-                {approveTarget.clientNom && (
-                  <> du client <span className="text-content-primary">{approveTarget.clientNom}</span></>
-                )}.
-              </p>
-
-              {/* Financial summary in dialog */}
-              <div className="grid grid-cols-3 gap-2 bg-surface/60 rounded-lg p-3 text-center">
-                <div>
-                  <p className="text-[10px] text-content-muted uppercase">Solde</p>
-                  <p className="text-sm font-semibold text-content-secondary">{formatMoney(approveTarget.balanceAtInitiation)}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-content-muted uppercase">Frais</p>
-                  <p className={`text-sm font-semibold ${Number(approveTarget.closingFeeAmount) > 0 ? 'text-status-danger' : 'text-content-secondary'}`}>
-                    {Number(approveTarget.closingFeeAmount) > 0 ? `- ${formatMoney(approveTarget.closingFeeAmount)}` : '0'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-content-muted uppercase">Net</p>
-                  <p className="text-sm font-bold text-status-success">{formatMoney(approveTarget.payoutAmount)}</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-content-muted">Restitution par :</span>
-                <PayoutMethodBadge method={approveTarget.payoutMethod} phoneNumber={approveTarget.payoutPhoneNumber} />
-              </div>
-
-              {approveTarget.payoutMethod === 'CASH' && Number(approveTarget.payoutAmount) > 0 && (
-                <div className="flex items-start gap-2 px-3 py-2 bg-status-warning-bg border border-status-warning/20 rounded-lg">
-                  <AlertTriangle size={14} className="text-status-warning mt-0.5 shrink-0" />
-                  <p className="text-xs text-status-warning">
-                    La restitution en espèces devra être confirmée en caisse par le caissier.
-                  </p>
-                </div>
-              )}
-
-              <p className="text-status-warning text-sm flex items-center gap-1.5">
-                <AlertTriangle size={14} />
-                Cette action est irréversible.
-              </p>
-            </div>
-          ) : ''
-        }
-        confirmText={approveTarget?.payoutMethod === 'CASH' && Number(approveTarget?.payoutAmount) > 0
-          ? "Approuver et envoyer en caisse"
-          : "Approuver et exécuter"
-        }
+        confirmText="Confirmer l'approbation"
         variant="success"
         isLoading={!!actionLoading}
+        message={approveTarget ? `Vous validez le remboursement de ${formatMoney(Number(approveTarget.payoutAmount))} pour le compte ${approveTarget.numeroCompte}.` : ''}
       />
 
-      {/* Cancel dialog */}
       <ConfirmDialog
         isOpen={!!cancelTarget}
         onClose={() => { setCancelTarget(null); setCancelReason(''); }}
         onConfirm={handleCancel}
-        title="Rejeter la clôture"
-        size="md"
+        title="Rejeter la demande"
         message={
           <div className="space-y-3">
-            <p>
-              Le compte{' '}
-              <span className="font-mono text-content-primary">{cancelTarget?.numeroCompte || cancelTarget?.compteId.slice(0, 8)}</span>
-              {' '}sera réactivé et la demande annulée.
-            </p>
-            <div>
-              <label className="block text-xs text-content-muted mb-1">Motif du rejet *</label>
-              <textarea
-                value={cancelReason}
-                onChange={(e) => setCancelReason(e.target.value)}
-                placeholder="Raison du rejet..."
-                rows={2}
-                className="w-full bg-surface-base border border-edge rounded p-2 text-sm text-content-primary resize-none"
-              />
-            </div>
+            <p className="text-sm text-content-secondary">Veuillez indiquer le motif du rejet pour ce compte.</p>
+            <textarea
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              className="w-full h-20 p-3 text-sm bg-surface-muted/50 border border-edge rounded-xl focus:ring-2 focus:ring-status-danger/20 outline-none transition-all resize-none"
+              placeholder="Ex: Solde insuffisant pour frais..."
+            />
           </div>
         }
-        confirmText="Rejeter"
+        confirmText="Confirmer Rejet"
         variant="danger"
         isLoading={!!actionLoading}
         disabled={cancelReason.trim().length < 3}

@@ -1,12 +1,29 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  CheckCircle, XCircle, Clock, User, Loader2, RefreshCw,
-  Banknote, CreditCard, AlertTriangle,
-  Search, ChevronLeft, ChevronRight, PiggyBank, Lock, Wallet,
+  CheckCircle, 
+  XCircle, 
+  Clock, 
+  User, 
+  Loader2, 
+  Banknote, 
+  CreditCard, 
+  AlertTriangle,
+  PiggyBank, 
+  Lock, 
+  Wallet,
+  Calendar,
+  ShieldCheck,
+  Building2
 } from 'lucide-react';
-import { Card, Badge, ConfirmDialog } from '../ui';
+import Card from '../ui/Card';
+import Badge from '../ui/Badge';
+import ConfirmDialog from '../ui/ConfirmDialog';
+import Button from '../ui/Button';
 import { toast, handleApiError } from '../../lib/toast';
 import { formatMoney } from '../../lib/format';
+import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
 
 interface OpeningRequest {
   id: string;
@@ -18,43 +35,45 @@ interface OpeningRequest {
   initialDepositAmount: string;
   produitId: string | null;
   createdAt: string;
-  // Joined fields
   numeroCompte?: string;
   typeCompte?: string;
   produitNom?: string;
   clientNom?: string;
   initiatorName?: string;
+  agenceId?: string;
 }
 
 interface OpeningApprovalsProps {
   agenceId?: string;
+  searchTerm?: string;
 }
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 8;
 
-
-const TYPE_LABEL: Record<string, { label: string; icon: React.ElementType; className: string }> = {
-  SAVINGS: { label: 'Épargne', icon: PiggyBank, className: 'bg-status-success-bg border-status-success/20 text-status-success' },
-  CURRENT: { label: 'Courant', icon: Wallet, className: 'bg-status-info-bg border-status-info/20 text-status-info' },
-  BLOCKED: { label: 'Bloqué', icon: Lock, className: 'bg-status-warning-bg border-status-warning/20 text-status-warning' },
+const TYPE_LABEL: Record<string, { label: string; icon: React.ElementType; color: string; bg: string }> = {
+  SAVINGS: { label: 'Épargne', icon: PiggyBank, color: 'text-status-success', bg: 'bg-status-success/10' },
+  CURRENT: { label: 'Courant', icon: Wallet, color: 'text-status-info', bg: 'bg-status-info/10' },
+  BLOCKED: { label: 'Bloqué', icon: Lock, color: 'text-status-warning', bg: 'bg-status-warning/10' },
 };
 
 function AccountTypeBadge({ typeCompte }: { typeCompte?: string }) {
-  const config = TYPE_LABEL[typeCompte || ''] || { label: typeCompte || '—', icon: CreditCard, className: 'bg-surface-subtle/30 border-edge-strong/20 text-content-muted' };
+  const config = TYPE_LABEL[typeCompte || ''] || { label: typeCompte || '—', icon: CreditCard, color: 'text-content-muted', bg: 'bg-surface-muted' };
   const Icon = config.icon;
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-medium ${config.className}`}>
-      <Icon size={14} />
+    <Badge 
+      variant="outline" 
+      className={cn("text-[10px] font-bold uppercase gap-1 px-2 py-0.5 border-none", config.bg, config.color)}
+    >
+      <Icon size={12} />
       {config.label}
-    </span>
+    </Badge>
   );
 }
 
-export default function OpeningApprovals({ agenceId }: OpeningApprovalsProps) {
+export default function OpeningApprovals({ agenceId, searchTerm = '' }: OpeningApprovalsProps) {
   const [requests, setRequests] = useState<OpeningRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
 
   // Approve dialog
@@ -66,16 +85,10 @@ export default function OpeningApprovals({ agenceId }: OpeningApprovalsProps) {
 
   useEffect(() => {
     fetchPending();
+    const handleUpdate = () => fetchPending();
+    window.addEventListener('opening-update', handleUpdate);
+    return () => window.removeEventListener('opening-update', handleUpdate);
   }, [agenceId]);
-
-  // Real-time: listen for opening-update DOM events (from WS bridge or same-tab)
-  useEffect(() => {
-    const handleOpeningUpdate = () => {
-      fetchPending();
-    };
-    window.addEventListener('opening-update', handleOpeningUpdate);
-    return () => window.removeEventListener('opening-update', handleOpeningUpdate);
-  }, []);
 
   const fetchPending = async () => {
     setLoading(true);
@@ -94,26 +107,27 @@ export default function OpeningApprovals({ agenceId }: OpeningApprovalsProps) {
     }
   };
 
-  // Filtered + paginated data
   const filtered = useMemo(() => {
-    if (!searchQuery.trim()) return requests;
-    const q = searchQuery.toLowerCase().trim();
-    return requests.filter(r =>
-      (r.numeroCompte || '').toLowerCase().includes(q) ||
-      (r.clientNom || '').toLowerCase().includes(q) ||
-      (r.initiatorName || '').toLowerCase().includes(q) ||
-      (r.produitNom || '').toLowerCase().includes(q)
-    );
-  }, [requests, searchQuery]);
+    let result = requests;
+    if (searchTerm.trim()) {
+      const q = searchTerm.toLowerCase().trim();
+      result = result.filter(r =>
+        (r.numeroCompte || '').toLowerCase().includes(q) ||
+        (r.clientNom || '').toLowerCase().includes(q) ||
+        (r.initiatorName || '').toLowerCase().includes(q) ||
+        (r.produitNom || '').toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [requests, searchTerm]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safeCurrentPage = Math.min(currentPage, totalPages);
   const paginated = filtered.slice((safeCurrentPage - 1) * PAGE_SIZE, safeCurrentPage * PAGE_SIZE);
 
-  // Reset page when search changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery]);
+  }, [searchTerm, agenceId]);
 
   const handleApprove = async () => {
     if (!approveTarget) return;
@@ -123,16 +137,13 @@ export default function OpeningApprovals({ agenceId }: OpeningApprovalsProps) {
         method: 'POST',
         credentials: 'include',
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "Erreur lors de l'approbation");
-      }
-      toast.success('Ouverture de compte approuvée. Le caissier peut maintenant encaisser le dépôt initial.');
+      if (!res.ok) throw new Error('Erreur lors de l\'approbation');
+      toast.success('Ouverture approuvée');
       setApproveTarget(null);
       fetchPending();
       window.dispatchEvent(new CustomEvent('opening-update'));
     } catch (error) {
-      toast.error(handleApiError(error, "Erreur lors de l'approbation"));
+      toast.error(handleApiError(error));
     } finally {
       setActionLoading(null);
     }
@@ -148,17 +159,14 @@ export default function OpeningApprovals({ agenceId }: OpeningApprovalsProps) {
         credentials: 'include',
         body: JSON.stringify({ reason: rejectReason }),
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || 'Erreur lors du rejet');
-      }
-      toast.success("Demande d'ouverture rejetée. Le compte a été annulé.");
+      if (!res.ok) throw new Error('Erreur lors du rejet');
+      toast.success('Demande rejetée');
       setRejectTarget(null);
       setRejectReason('');
       fetchPending();
       window.dispatchEvent(new CustomEvent('opening-update'));
     } catch (error) {
-      toast.error(handleApiError(error, 'Erreur lors du rejet'));
+      toast.error(handleApiError(error));
     } finally {
       setActionLoading(null);
     }
@@ -166,307 +174,159 @@ export default function OpeningApprovals({ agenceId }: OpeningApprovalsProps) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-8">
-        <Loader2 size={24} className="animate-spin text-accent" />
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
+        <Loader2 className="w-10 h-10 text-status-success animate-spin" />
+        <p className="text-sm font-medium text-content-muted">Chargement des ouvertures...</p>
       </div>
     );
   }
 
   if (requests.length === 0) {
     return (
-      <Card variant="default" padding="lg" className="border-dashed border-edge bg-transparent">
-        <div className="text-center py-8">
-          <CheckCircle className="text-status-success mx-auto mb-2" size={32} />
-          <p className="text-content-muted text-sm">Aucune demande d'ouverture en attente</p>
+      <Card className="py-20 text-center border-dashed border-2 border-edge bg-surface-muted/5 rounded-2xl">
+        <div className="w-16 h-16 bg-surface-base rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+          <CheckCircle size={32} className="text-status-success" />
         </div>
+        <h3 className="text-lg font-bold text-content-primary">Aucune ouverture en attente</h3>
+        <p className="text-sm text-content-muted mt-1 max-w-xs mx-auto">
+          Toutes les demandes de création de compte ont été traitées.
+        </p>
       </Card>
     );
   }
 
   return (
-    <div className="space-y-3">
-      {/* Header + Search */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <h4 className="text-sm font-semibold text-content-muted uppercase flex items-center gap-2">
-          <Clock size={14} />
-          Ouvertures en attente
-          <Badge value={String(requests.length)} size="sm" />
-        </h4>
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-content-muted" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="N° compte, client, produit..."
-              className="pl-8 pr-3 py-1.5 w-48 sm:w-56 bg-surface/60 border border-edge rounded-lg text-xs text-content-primary placeholder-content-muted focus:outline-none focus:border-status-info/50 transition"
-            />
-          </div>
-          <button
-            onClick={fetchPending}
-            className="p-1.5 rounded hover:bg-surface text-content-muted hover:text-content-primary transition"
-            title="Rafraîchir"
-          >
-            <RefreshCw size={14} />
-          </button>
-        </div>
+    <div className="space-y-4 animate-in fade-in duration-500 pb-12">
+      <div className="flex items-center justify-between px-1">
+        <h3 className="text-sm font-bold text-content-primary flex items-center gap-2">
+          <ShieldCheck size={18} className="text-status-success" />
+          Validation des Ouvertures
+        </h3>
+        <Badge value={`${filtered.length} demandes`} variant="outline" className="text-[10px] bg-status-success/5 border-status-success/20 text-status-success" />
       </div>
 
-      {/* Search result count when filtering */}
-      {searchQuery.trim() && (
-        <p className="text-xs text-content-muted">
-          {filtered.length} résultat{filtered.length !== 1 ? 's' : ''} sur {requests.length}
-        </p>
-      )}
-
-      {/* Cards */}
-      {paginated.length === 0 ? (
-        <Card variant="default" padding="md" className="border-dashed border-edge bg-transparent">
-          <p className="text-center text-sm text-content-muted py-4">
-            Aucun résultat pour « {searchQuery} »
-          </p>
-        </Card>
-      ) : (
-        paginated.map((req) => {
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {paginated.map((req) => {
           const fee = Number(req.openingFeeAmount);
           const deposit = Number(req.initialDepositAmount);
-          const total = deposit; // deposit already includes fees
-          const netDeposit = deposit - fee; // amount actually credited to account
+          const netDeposit = deposit - fee;
 
           return (
-            <Card key={req.id} variant="default" padding="md" className="border-status-info/20">
-              <div className="space-y-4">
-                {/* Top: Account + Client */}
-                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <CreditCard size={16} className="text-status-info" />
-                      <span className="text-content-primary font-mono text-sm font-semibold">
-                        {req.numeroCompte || req.compteId.slice(0, 8)}
-                      </span>
-                    </div>
-                    {req.clientNom && (
-                      <p className="text-sm text-content-secondary pl-6">{req.clientNom}</p>
-                    )}
-                  </div>
+            <Card key={req.id} className="p-0 border-edge hover:shadow-lg transition-all duration-300 rounded-2xl overflow-hidden group">
+              <div className="p-4 flex items-start justify-between bg-surface-muted/10 group-hover:bg-status-success/5 transition-colors">
+                <div className="space-y-1">
                   <div className="flex items-center gap-2">
-                    <AccountTypeBadge typeCompte={req.typeCompte} />
-                    {req.produitNom && (
-                      <span className="text-xs text-content-muted bg-surface/60 px-2 py-1 rounded-md border border-edge-subtle">
-                        {req.produitNom}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Financial details grid */}
-                <div className="grid grid-cols-3 gap-3 bg-surface/40 rounded-lg p-3">
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wider text-content-muted mb-0.5">Frais d'ouverture</p>
-                    <p className="text-sm font-semibold text-status-danger">
-                      {fee > 0 ? formatMoney(fee) : 'Offerts'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wider text-content-muted mb-0.5">Dépôt sur compte</p>
-                    <p className="text-sm font-semibold text-content-secondary">
-                      {formatMoney(netDeposit)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wider text-content-muted mb-0.5">Total à verser</p>
-                    <p className="text-sm font-bold text-status-success">
-                      {formatMoney(total)}
-                    </p>
-                    {fee > 0 && (
-                      <p className="text-[10px] text-content-muted mt-0.5">dont {formatMoney(fee)} de frais</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Info notice */}
-                <div className="flex items-start gap-2 px-3 py-2 bg-status-info/5 border border-status-info/15 rounded-lg">
-                  <Banknote size={14} className="text-status-info mt-0.5 shrink-0" />
-                  <p className="text-xs text-status-info/90">
-                    Après approbation, le caissier pourra encaisser le dépôt initial de {formatMoney(total)}.
-                  </p>
-                </div>
-
-                {/* Footer: Initiator + Actions */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-edge-subtle">
-                  <div className="flex items-center gap-2 text-xs text-content-muted">
-                    <User size={12} />
-                    <span>
-                      Initié par <span className="text-content-secondary">{req.initiatorName || req.initiatedBy.slice(0, 8)}</span>
-                      {' — '}
-                      {new Date(req.initiatedAt).toLocaleDateString('fr-FR', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
+                    <div className="p-1.5 bg-status-success/10 rounded-lg">
+                      <CreditCard size={14} className="text-status-success" />
+                    </div>
+                    <span className="text-sm font-black text-content-primary font-mono tracking-tighter">
+                      {req.numeroCompte || 'NOUVEAU'}
                     </span>
                   </div>
+                  <p className="text-sm font-bold text-content-secondary pl-0.5">{req.clientNom || 'Client Inconnu'}</p>
+                </div>
+                <div className="flex flex-col items-end gap-1.5">
+                  <AccountTypeBadge typeCompte={req.typeCompte} />
+                  {req.produitNom && (
+                    <span className="text-[9px] font-bold text-content-muted bg-surface/60 px-1.5 py-0.5 rounded border border-edge-subtle uppercase tracking-tight">
+                      {req.produitNom}
+                    </span>
+                  )}
+                </div>
+              </div>
 
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setApproveTarget(req)}
-                      disabled={actionLoading === req.id}
-                      className="px-3 py-1.5 bg-status-success-bg hover:bg-status-success-bg text-status-success border border-status-success/30 rounded-lg text-xs font-medium flex items-center gap-1.5 transition"
-                    >
-                      <CheckCircle size={14} />
-                      Approuver
-                    </button>
-                    <button
+              <div className="p-4 space-y-4">
+                <div className="grid grid-cols-3 gap-2 py-3 px-4 bg-surface-base border border-edge-subtle rounded-xl shadow-inner-sm">
+                  <div className="border-r border-edge-subtle">
+                    <p className="text-[9px] font-bold text-content-muted uppercase tracking-widest mb-1">Frais</p>
+                    <p className="text-xs font-black text-status-danger">{fee > 0 ? formatMoney(fee) : '0'}</p>
+                  </div>
+                  <div className="border-r border-edge-subtle px-1">
+                    <p className="text-[9px] font-bold text-content-muted uppercase tracking-widest mb-1 text-center">Crédité</p>
+                    <p className="text-xs font-black text-content-secondary text-center">{formatMoney(netDeposit)}</p>
+                  </div>
+                  <div className="pl-1">
+                    <p className="text-[9px] font-bold text-content-muted uppercase tracking-widest mb-1 text-right">À Verser</p>
+                    <p className="text-xs font-black text-status-success text-right">{formatMoney(deposit)}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-2 text-[10px] text-status-success bg-status-success/5 p-2.5 rounded-lg border border-status-success/10">
+                  <Banknote size={14} className="shrink-0" />
+                  <p className="font-medium">Après validation, le dépôt de {formatMoney(deposit)} sera attendu en caisse.</p>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-edge-subtle">
+                  <div className="flex items-center gap-1.5 text-[10px] text-content-muted font-medium">
+                    <User size={12} />
+                    <span>{req.initiatorName || 'Conseiller'}</span>
+                    <span className="opacity-50">•</span>
+                    <Calendar size={12} />
+                    <span>{format(new Date(req.initiatedAt), 'dd MMM HH:mm', { locale: fr })}</span>
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="ghost" 
+                      size="xs" 
+                      className="h-8 w-8 p-0 rounded-full hover:bg-status-danger/10 text-status-danger"
                       onClick={() => setRejectTarget(req)}
-                      disabled={actionLoading === req.id}
-                      className="px-3 py-1.5 bg-status-danger-bg hover:bg-status-danger-bg text-status-danger border border-status-danger/30 rounded-lg text-xs font-medium flex items-center gap-1.5 transition"
                     >
-                      <XCircle size={14} />
-                      Rejeter
-                    </button>
+                      <XCircle size={16} />
+                    </Button>
+                    <Button 
+                      variant="success" 
+                      size="xs" 
+                      className="h-8 gap-1.5 px-3 rounded-full shadow-sm"
+                      onClick={() => setApproveTarget(req)}
+                    >
+                      <CheckCircle size={16} />
+                      Approuver
+                    </Button>
                   </div>
                 </div>
               </div>
             </Card>
           );
-        })
-      )}
+        })}
+      </div>
 
-      {/* Pagination */}
-      {filtered.length > PAGE_SIZE && (
-        <div className="flex items-center justify-between pt-2">
-          <p className="text-xs text-content-muted">
-            {(safeCurrentPage - 1) * PAGE_SIZE + 1}–{Math.min(safeCurrentPage * PAGE_SIZE, filtered.length)} sur {filtered.length}
-          </p>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              disabled={safeCurrentPage <= 1}
-              className="p-1.5 rounded hover:bg-surface text-content-muted hover:text-content-primary disabled:opacity-30 disabled:pointer-events-none transition"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-              <button
-                key={page}
-                onClick={() => setCurrentPage(page)}
-                className={`px-2.5 py-1 rounded text-xs font-medium transition ${
-                  page === safeCurrentPage
-                    ? 'bg-status-info-bg text-status-info border border-status-info/30'
-                    : 'text-content-muted hover:bg-surface hover:text-content-primary'
-                }`}
-              >
-                {page}
-              </button>
-            ))}
-            <button
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              disabled={safeCurrentPage >= totalPages}
-              className="p-1.5 rounded hover:bg-surface text-content-muted hover:text-content-primary disabled:opacity-30 disabled:pointer-events-none transition"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 pt-6">
+          <Button variant="ghost" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={safeCurrentPage === 1}>Précédent</Button>
+          <span className="text-xs font-bold text-content-muted uppercase tracking-widest">Page {safeCurrentPage} / {totalPages}</span>
+          <Button variant="ghost" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={safeCurrentPage === totalPages}>Suivant</Button>
         </div>
       )}
 
-      {/* Approve dialog */}
       <ConfirmDialog
         isOpen={!!approveTarget}
         onClose={() => setApproveTarget(null)}
         onConfirm={handleApprove}
-        title="Approuver l'ouverture de compte"
-        size="md"
-        message={
-          approveTarget ? (
-            <div className="space-y-3">
-              <p>
-                Vous allez approuver l'ouverture du compte{' '}
-                <span className="font-mono text-content-primary font-semibold">{approveTarget.numeroCompte || approveTarget.compteId.slice(0, 8)}</span>
-                {approveTarget.clientNom && (
-                  <> du client <span className="text-content-primary">{approveTarget.clientNom}</span></>
-                )}.
-              </p>
-
-              {/* Financial summary in dialog */}
-              <div className="grid grid-cols-3 gap-2 bg-surface/60 rounded-lg p-3 text-center">
-                <div>
-                  <p className="text-[10px] text-content-muted uppercase">Frais ouverture</p>
-                  <p className="text-sm font-semibold text-status-danger">
-                    {Number(approveTarget.openingFeeAmount) > 0
-                      ? formatMoney(approveTarget.openingFeeAmount)
-                      : 'Offerts'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-content-muted uppercase">Dépôt sur compte</p>
-                  <p className="text-sm font-semibold text-content-secondary">{formatMoney(Number(approveTarget.initialDepositAmount) - Number(approveTarget.openingFeeAmount))}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-content-muted uppercase">Total</p>
-                  <p className="text-sm font-bold text-status-success">
-                    {formatMoney(approveTarget.initialDepositAmount)}
-                  </p>
-                  {Number(approveTarget.openingFeeAmount) > 0 && (
-                    <p className="text-[10px] text-content-muted mt-0.5">dont {formatMoney(approveTarget.openingFeeAmount)} de frais</p>
-                  )}
-                </div>
-              </div>
-
-              {approveTarget.produitNom && (
-                <p className="text-sm text-content-muted">
-                  Produit : <span className="text-content-primary">{approveTarget.produitNom}</span>
-                </p>
-              )}
-
-              <p className="text-sm text-content-muted">
-                Le compte passera en statut <span className="text-accent font-medium">En attente d'activation</span>.
-                Le caissier pourra ensuite encaisser le dépôt initial.
-              </p>
-            </div>
-          ) : ''
-        }
-        confirmText="Approuver l'ouverture"
+        title="Approuver l'ouverture"
+        confirmText="Confirmer"
         variant="success"
         isLoading={!!actionLoading}
+        message={approveTarget ? `Vous validez l'ouverture du compte pour ${approveTarget.clientNom}. Dépôt initial requis : ${formatMoney(Number(approveTarget.initialDepositAmount))}.` : ''}
       />
 
-      {/* Reject dialog */}
       <ConfirmDialog
         isOpen={!!rejectTarget}
         onClose={() => { setRejectTarget(null); setRejectReason(''); }}
         onConfirm={handleReject}
-        title="Rejeter l'ouverture de compte"
-        size="md"
+        title="Rejeter l'ouverture"
         message={
           <div className="space-y-3">
-            <p>
-              Le compte{' '}
-              <span className="font-mono text-content-primary">{rejectTarget?.numeroCompte || rejectTarget?.compteId.slice(0, 8)}</span>
-              {' '}sera annulé et la demande rejetée.
-            </p>
-            <div className="flex items-start gap-2 px-3 py-2 bg-status-danger-bg border border-status-danger/20 rounded-lg">
-              <AlertTriangle size={14} className="text-status-danger mt-0.5 shrink-0" />
-              <p className="text-xs text-status-danger">
-                Cette action est irréversible. Le client devra recommencer la procédure d'ouverture.
-              </p>
-            </div>
-            <div>
-              <label className="block text-xs text-content-muted mb-1">Motif du rejet *</label>
-              <textarea
-                value={rejectReason}
-                onChange={(e) => setRejectReason(e.target.value)}
-                placeholder="Raison du rejet..."
-                rows={2}
-                className="w-full bg-surface-base border border-edge rounded p-2 text-sm text-content-primary resize-none"
-              />
-            </div>
+            <p className="text-sm text-content-secondary">Indiquez le motif du rejet pour cette ouverture de compte.</p>
+            <textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              className="w-full h-20 p-3 text-sm bg-surface-muted/50 border border-edge rounded-xl focus:ring-2 focus:ring-status-danger/20 outline-none transition-all resize-none"
+              placeholder="Ex: Pièces justificatives manquantes..."
+            />
           </div>
         }
-        confirmText="Rejeter"
+        confirmText="Confirmer Rejet"
         variant="danger"
         isLoading={!!actionLoading}
         disabled={rejectReason.trim().length < 3}

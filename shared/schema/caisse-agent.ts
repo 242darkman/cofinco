@@ -399,6 +399,7 @@ export interface OperationResult<T = unknown> {
  * Opération terrain enrichie avec les relations
  */
 export interface OperationTerrainWithRelations extends OperationTerrain {
+  agenceId?: string;
   agent?: {
     id: string;
     nom?: string | null;
