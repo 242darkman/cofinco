@@ -8,12 +8,15 @@ export interface Credit {
   id: string;
   numeroCredit: string;
   clientId: string;
+  demandeId?: string | null;
   montantPrincipal: number;
   tauxInteret: number;
   dureeMois: number;
   montantTotal: number;
   montantEcheance: number;
   dateDeblocage: string;
+  dateDebut?: string | null;
+  disbursedAt?: string | null;
   statut: string;
   nombreEcheancesPayees: number;
   nombreEcheancesTotal: number;

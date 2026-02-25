@@ -305,6 +305,33 @@ export function formatFileSize(bytes: number): string {
 }
 
 // ============================================
+// DURATION UTILITIES
+// ============================================
+
+/**
+ * Formate une durée en millisecondes dans l'unité la plus naturelle (FR).
+ *   < 1h     → "X min"
+ *   1-24h    → "Xh"
+ *   1-30j    → "Xj"
+ *   1-12 mois → "X.X mois"
+ *   >= 12 mois → "X.X ans"
+ */
+export function formatSmartDuration(ms: number): string {
+  if (ms < 0) return '—';
+  const minutes = ms / 60_000;
+  const hours = minutes / 60;
+  const days = hours / 24;
+  const months = days / 30.44;
+  const years = days / 365.25;
+
+  if (hours < 1) return `${Math.round(minutes)} min`;
+  if (days < 1) return `${Math.round(hours)}h`;
+  if (days < 30) return `${Math.round(days)}j`;
+  if (months < 12) return `${months.toFixed(1).replace('.', ',')} mois`;
+  return `${years.toFixed(1).replace('.', ',')} ans`;
+}
+
+// ============================================
 // COUNTRY FLAG UTILITIES
 // ============================================
 

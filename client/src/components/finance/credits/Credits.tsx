@@ -19,7 +19,7 @@ import CreditFeesPaymentModal from './CreditFeesPaymentModal';
 import ReferenceTable from './CreditRemboursement';
 import CreditEcheancier from './CreditEcheancier';
 import { ReevaluationWorkflowPage } from './ReevaluationWorkflowPage';
-import { formatClientName, resolveClientPhotoUrl } from '../../../lib/format';
+import { formatClientName, resolveClientPhotoUrl, formatSmartDuration } from '../../../lib/format';
 import { TableColumn } from '../../ui/ResponsiveTable';
 import { ProtectedFeature } from '../../auth/ProtectedFeature';
 import { Actions, Subjects } from '../../../lib/casl';
@@ -319,26 +319,51 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
   }, [demandes.demandes]);
 
   const kpis = React.useMemo(() => {
-    // Taux de Transformation: Disbursed / Total Requests (historical?)
-    // This is hard with just "active" list. Let's approx with "Disbursed / (Disbursed + Rejected + Cancelled)" or just "Active Credits / Total Demandes ever"?
-    // Using available loaded data: 
-    const totalDemandes = demandes.demandes.length + credits.credits.length; // Approximate
-    const disbursed = credits.credits.length;
-    const transformationRate = totalDemandes > 0 ? (disbursed / totalDemandes) * 100 : 0;
+    // --- Taux de Transformation ---
+    // Parmi toutes les demandes ayant atteint un état terminal, quel % a abouti à un crédit ?
+    const terminalNegativeDemandes = demandes.demandes.filter(d => {
+      if (d.deletedAt || d.deleted_at) return false;
+      const s = d.statut;
+      return s === StatutDemande.REJECTED || s === StatutDemande.CANCELLED || s === StatutDemande.DEFINITIVELY_REJECTED;
+    });
+    const successCount = credits.credits.length;
+    const totalDecided = successCount + terminalNegativeDemandes.length;
+    const transformationRate = totalDecided > 0 ? (successCount / totalDecided) * 100 : 0;
 
-    // Average Delay (Request Date -> Disbursed Date)
-    // We only have active dates. 
-    // Placeholder logic:
-    const avgDelay = 4.5; // Days (Mocked for now as we need deeper data)
+    // --- Délai Moyen (Demande → Décaissement) ---
+    const demandesMap = new Map(demandes.demandes.map(d => [d.id, d]));
+    const delays: number[] = [];
 
-    // Pipeline Volume (Total potential)
-    const pipelineVolume = 
-      (funnelData.demandes.amount) + 
-      (funnelData.frais.amount) + 
-      (funnelData.enquetes.amount) + 
+    for (const credit of credits.credits) {
+      const disbDateStr = credit.disbursedAt || credit.dateDebut || credit.dateDeblocage;
+      if (!disbDateStr) continue;
+      const disbDate = new Date(disbDateStr);
+      if (isNaN(disbDate.getTime())) continue;
+
+      const demande = credit.demandeId ? demandesMap.get(credit.demandeId) : null;
+      if (!demande) continue;
+
+      const createdStr = demande.createdAt || demande.created_at;
+      if (!createdStr) continue;
+      const createdAt = new Date(createdStr);
+      if (isNaN(createdAt.getTime())) continue;
+
+      const delayMs = disbDate.getTime() - createdAt.getTime();
+      if (delayMs >= 0) delays.push(delayMs);
+    }
+
+    const avgDelayFormatted = delays.length > 0
+      ? formatSmartDuration(delays.reduce((sum, d) => sum + d, 0) / delays.length)
+      : '—';
+
+    // --- Pipeline Volume ---
+    const pipelineVolume =
+      (funnelData.demandes.amount) +
+      (funnelData.frais.amount) +
+      (funnelData.enquetes.amount) +
       (funnelData.comite.amount);
 
-    return { transformationRate, avgDelay, pipelineVolume };
+    return { transformationRate, avgDelayFormatted, pipelineVolume };
   }, [demandes.demandes, credits.credits, funnelData]);
 
   const actionItems = React.useMemo(() => {
@@ -765,7 +790,7 @@ export default function CreditsRefactored({ userRole, activeView, onModuleChange
                  <div className="bg-surface/40 border border-edge-subtle rounded-lg p-3 flex flex-col col-span-2 lg:col-span-1">
                     <span className="text-[10px] font-bold text-content-muted uppercase tracking-widest mb-1">Délai Moyen</span>
                     <div className="flex items-end justify-between">
-                       <div className="text-lg font-black text-content-primary">{kpis.avgDelay}j</div>
+                       <div className="text-lg font-black text-content-primary">{kpis.avgDelayFormatted}</div>
                        <span className="text-[10px] text-content-muted text-right">Demande à<br/>Décaissement</span>
                     </div>
                  </div>
