@@ -188,7 +188,11 @@ export default function PlatformSidebarContent({
   };
 
   // Group routes
-  const accessibleRoutes = ROUTES.filter(route => canAccessRoute(route, ability));
+  const accessibleRoutes = ROUTES.filter(route => {
+    // Hide beta features in production
+    if (route.key === 'kpi' && !import.meta.env.DEV) return false;
+    return canAccessRoute(route, ability);
+  });
   const groupedRoutes: Record<string, RouteConfig[]> = {};
 
   // Define group order and labels
