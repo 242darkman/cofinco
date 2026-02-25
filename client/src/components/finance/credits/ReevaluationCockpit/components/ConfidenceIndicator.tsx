@@ -23,8 +23,8 @@ function getScoreColor(score: number): string {
 }
 
 function getScoreLabel(score: number): { label: string; color: 'success' | 'warning' | 'danger' } {
-  if (score >= 80) return { label: 'Bon', color: 'success' };
-  if (score >= 60) return { label: 'Moyen', color: 'warning' };
+  if (score >= 70) return { label: 'Bon', color: 'success' };
+  if (score >= 40) return { label: 'Moyen', color: 'warning' };
   return { label: 'Faible', color: 'danger' };
 }
 
