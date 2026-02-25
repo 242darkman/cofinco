@@ -39,7 +39,7 @@ const MODE_OPTIONS: { value: ComparisonMode; label: string }[] = [
 ];
 
 const BENCHMARK_KEY = '__avg__';
-const BENCHMARK_COLOR = '#9ca3af'; // neutral gray for dashed benchmark line
+const BENCHMARK_COLOR = '#64748b'; // slate-500 for better visibility in both modes
 
 // ============================================================================
 // Data transformation
@@ -158,8 +158,8 @@ function ComparisonTooltip({ active, payload, label, agencyMap, period, mode }: 
   };
 
   return (
-    <div className="bg-card border border-edge rounded-xl shadow-xl p-4 min-w-[200px] backdrop-blur-sm bg-card/95">
-      <p className="text-sm font-semibold mb-3 border-b border-edge pb-2 text-content-primary">
+    <div className="bg-surface-elevated dark:bg-slate-900 border border-edge dark:border-slate-800 rounded-xl shadow-xl p-4 min-w-[200px] backdrop-blur-sm">
+      <p className="text-sm font-semibold mb-3 border-b border-edge dark:border-slate-800 pb-2 text-content-primary dark:text-slate-100">
         {formatTooltipDate(label!, period)}
       </p>
       <div className="space-y-2">
@@ -180,14 +180,14 @@ function ComparisonTooltip({ active, payload, label, agencyMap, period, mode }: 
                   className="w-2.5 h-2.5 rounded-full shrink-0"
                   style={{
                     backgroundColor: entry.color || entry.stroke,
-                    ...(isBenchmark ? { border: '1px dashed #6b7280' } : {}),
+                    ...(isBenchmark ? { border: '1px dashed #94a3b8' } : {}),
                   }}
                 />
-                <span className="text-xs font-medium text-content-muted whitespace-nowrap">
+                <span className="text-xs font-medium text-content-muted dark:text-slate-400 whitespace-nowrap">
                   {name}
                 </span>
               </div>
-              <span className="text-sm font-bold font-mono text-content-primary">
+              <span className="text-sm font-bold font-mono text-content-primary dark:text-slate-200">
                 {formatValue(entry.value, entry.dataKey)}
               </span>
             </div>
@@ -343,7 +343,9 @@ function MultiLineChart({
               <span
                 className={cn(
                   'text-xs ml-0.5 cursor-pointer select-none',
-                  isHidden ? 'text-content-muted line-through opacity-50' : 'text-content-muted',
+                  isHidden 
+                    ? 'text-content-muted/40 dark:text-slate-600 line-through opacity-50' 
+                    : 'text-content-muted dark:text-slate-400',
                 )}
               >
                 {value}
@@ -465,7 +467,7 @@ function TreasuryComparisonChartInner({
       {isComparison && (
         <div className="flex items-center gap-3 mb-4">
           {/* Mode selector pills */}
-          <div className="flex items-center bg-surface-subtle rounded-lg p-1">
+          <div className="flex items-center bg-surface-subtle dark:bg-slate-800 rounded-lg p-1">
             {MODE_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
@@ -473,8 +475,8 @@ function TreasuryComparisonChartInner({
                 className={cn(
                   'px-3 py-1 rounded text-xs font-medium transition-all',
                   mode === opt.value
-                    ? 'bg-surface shadow-sm text-accent'
-                    : 'text-content-muted hover:text-content-secondary',
+                    ? 'bg-surface dark:bg-slate-700 shadow-sm text-accent dark:text-emerald-500'
+                    : 'text-content-muted hover:text-content-secondary dark:text-slate-400 dark:hover:text-slate-200',
                 )}
               >
                 {opt.label}
@@ -488,8 +490,8 @@ function TreasuryComparisonChartInner({
             className={cn(
               'px-3 py-1 rounded-lg text-xs font-medium border transition-all',
               showBenchmark
-                ? 'bg-surface-subtle-elevated border-accent text-accent'
-                : 'border-edge text-content-muted hover:text-content-secondary hover:border-edge',
+                ? 'bg-surface-subtle-elevated dark:bg-slate-800 border-accent dark:border-emerald-500/50 text-accent dark:text-emerald-500'
+                : 'border-edge dark:border-slate-800 text-content-muted dark:text-slate-400 hover:text-content-secondary dark:hover:text-slate-200 hover:border-edge dark:hover:border-slate-700',
             )}
           >
             vs Moyenne

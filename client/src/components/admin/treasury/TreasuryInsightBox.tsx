@@ -7,9 +7,9 @@ interface Props {
 }
 
 const SEVERITY_CONFIG: Record<InsightSeverity, { bg: string; text: string; icon: typeof Info }> = {
-  danger: { bg: 'bg-status-danger-bg', text: 'text-status-danger', icon: AlertOctagon },
-  warning: { bg: 'bg-status-warning-bg', text: 'text-status-warning', icon: AlertTriangle },
-  info: { bg: 'bg-status-info-bg', text: 'text-status-info', icon: Info },
+  danger: { bg: 'bg-status-danger-bg dark:bg-status-danger/10', text: 'text-status-danger dark:text-rose-400', icon: AlertOctagon },
+  warning: { bg: 'bg-status-warning-bg dark:bg-status-warning/10', text: 'text-status-warning dark:text-amber-400', icon: AlertTriangle },
+  info: { bg: 'bg-status-info-bg dark:bg-status-info/10', text: 'text-status-info dark:text-blue-400', icon: Info },
 };
 
 export default function TreasuryInsightBox({ insights }: Props) {

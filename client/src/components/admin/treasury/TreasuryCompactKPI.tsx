@@ -63,8 +63,8 @@ export default function TreasuryCompactKPI({ data, activeStats, criticalCount }:
       <KPICard 
         title="Agences Critiques"
         value={criticalCount.toString()}
-        icon={<AlertCircle className={cn("w-4 h-4", criticalCount > 0 ? "text-rose-500" : "text-slate-400")} />}
-        className={cn(criticalCount > 0 && "bg-rose-50/50 border-rose-100")}
+        icon={<AlertCircle className={cn("w-4 h-4", criticalCount > 0 ? "text-rose-500" : "text-slate-400 dark:text-slate-600")} />}
+        className={cn(criticalCount > 0 && "bg-rose-50/50 dark:bg-rose-500/5 border-rose-100 dark:border-rose-500/20")}
       />
 
       {/* 📈 Variation (Optional placeholder or extra metric) */}
@@ -89,19 +89,19 @@ function KPICard({ title, value, subValue, unit, icon, footer, className }: {
 }) {
   return (
     <div className={cn(
-      "bg-white border border-slate-200 rounded-xl p-3 flex flex-col justify-between hover:shadow-sm transition-all duration-200 group",
+      "bg-surface border border-edge dark:border-slate-800 rounded-xl p-3 flex flex-col justify-between hover:shadow-sm transition-all duration-200 group dark:bg-slate-900",
       className
     )}>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-tight">{title}</span>
+        <span className="text-[10px] font-semibold text-content-muted dark:text-slate-400 uppercase tracking-tight">{title}</span>
         {icon}
       </div>
       <div className="flex flex-col">
         <div className="flex items-baseline gap-1">
-          <span className="text-lg font-bold text-slate-900 truncate max-w-full leading-tight">{value}</span>
-          {unit && <span className="text-[10px] text-slate-400 font-medium">{unit}</span>}
+          <span className="text-lg font-bold text-content-primary dark:text-slate-100 truncate max-w-full leading-tight">{value}</span>
+          {unit && <span className="text-[10px] text-content-muted/60 dark:text-slate-500 font-medium">{unit}</span>}
         </div>
-        {subValue && <span className="text-[10px] text-slate-500 truncate">{subValue}</span>}
+        {subValue && <span className="text-[10px] text-content-muted dark:text-slate-500 truncate">{subValue}</span>}
       </div>
       {footer && <div className="mt-2">{footer}</div>}
     </div>

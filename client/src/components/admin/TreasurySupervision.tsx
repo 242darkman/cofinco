@@ -218,18 +218,18 @@ export function TreasurySupervision() {
   if (!data) return null;
 
   return (
-    <div className="flex flex-col h-full overflow-hidden bg-slate-50/50">
+    <div className="flex flex-col h-full overflow-hidden">
       {/* Sticky Header */}
-      <div className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-sm">
+      <div className="sticky top-0 z-30 bg-surface/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-edge dark:border-slate-800 px-4 py-3 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-emerald-50 rounded-lg">
-            <TrendingUp className="w-5 h-5 text-emerald-600" />
+          <div className="p-2 bg-emerald-50 dark:bg-emerald-500/10 rounded-lg">
+            <TrendingUp className="w-5 h-5 text-emerald-600 dark:text-emerald-500" />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-slate-900 leading-tight">Supervision Trésorerie</h1>
+            <h1 className="text-lg font-bold text-content-primary dark:text-slate-100 leading-tight">Supervision Trésorerie</h1>
             <div className="flex items-center gap-2">
               <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              <p className="text-[11px] font-medium text-slate-500 uppercase tracking-tight">
+              <p className="text-[11px] font-medium text-content-muted uppercase tracking-tight dark:text-slate-400">
                 {activeStats?.activeCount || 0} {activeStats?.activeCount && activeStats.activeCount > 1 ? 'agences actives' : 'agence active'}
               </p>
             </div>
@@ -237,7 +237,7 @@ export function TreasurySupervision() {
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="bg-slate-100 p-1 rounded-lg flex gap-1">
+          <div className="bg-surface-subtle dark:bg-slate-800 p-1 rounded-lg flex gap-1">
             {PERIOD_OPTIONS.map(opt => (
               <button
                 key={opt.value}
@@ -245,8 +245,8 @@ export function TreasurySupervision() {
                 className={cn(
                   "px-3 py-1.5 rounded-md text-[11px] font-semibold transition-all",
                   period === opt.value
-                    ? "bg-white shadow-sm text-emerald-600"
-                    : "text-slate-500 hover:text-slate-700"
+                    ? "bg-surface shadow-sm text-emerald-600 dark:text-emerald-500 dark:bg-slate-700"
+                    : "text-content-muted hover:text-content-primary dark:hover:text-slate-200"
                 )}
               >
                 {opt.label}
@@ -254,7 +254,7 @@ export function TreasurySupervision() {
             ))}
           </div>
           
-          <div className="h-8 w-px bg-slate-200 mx-2" />
+          <div className="h-8 w-px bg-edge dark:bg-slate-800 mx-2" />
 
           <div className="flex items-center gap-2">
             <div className="relative">
@@ -262,21 +262,21 @@ export function TreasurySupervision() {
                 variant="outline"
                 size="sm"
                 onClick={() => setShowExportMenu(!showExportMenu)}
-                className="h-9 px-3 text-xs font-semibold rounded-lg bg-white border-slate-200"
+                className="h-9 px-3 text-xs font-semibold rounded-lg bg-surface border-edge dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
               >
                 <Download size={14} className="mr-2" /> Export
               </Button>
               {showExportMenu && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setShowExportMenu(false)} />
-                  <div className="absolute right-0 top-full mt-2 w-44 bg-white border border-slate-200 rounded-xl shadow-lg z-50 py-1 overflow-hidden">
-                    <button onClick={() => handleExport('csv')} className="w-full px-4 py-2 text-left text-xs font-medium hover:bg-slate-50 flex items-center gap-3 text-slate-600">
-                      <FileText size={14} className="text-slate-400" /> CSV
+                  <div className="absolute right-0 top-full mt-2 w-44 bg-surface-elevated border border-edge dark:border-slate-800 rounded-xl shadow-lg z-50 py-1 overflow-hidden">
+                    <button onClick={() => handleExport('csv')} className="w-full px-4 py-2 text-left text-xs font-medium hover:bg-surface-subtle flex items-center gap-3 text-content-secondary dark:text-slate-300 dark:hover:bg-slate-800">
+                      <FileText size={14} className="text-content-muted" /> CSV
                     </button>
-                    <button onClick={() => handleExport('excel')} className="w-full px-4 py-2 text-left text-xs font-medium hover:bg-slate-50 flex items-center gap-3 text-slate-600">
+                    <button onClick={() => handleExport('excel')} className="w-full px-4 py-2 text-left text-xs font-medium hover:bg-surface-subtle flex items-center gap-3 text-content-secondary dark:text-slate-300 dark:hover:bg-slate-800">
                       <FileSpreadsheet size={14} className="text-emerald-500" /> Excel
                     </button>
-                    <button onClick={() => handleExport('pdf')} className="w-full px-4 py-2 text-left text-xs font-medium hover:bg-slate-50 flex items-center gap-3 text-slate-600">
+                    <button onClick={() => handleExport('pdf')} className="w-full px-4 py-2 text-left text-xs font-medium hover:bg-surface-subtle flex items-center gap-3 text-content-secondary dark:text-slate-300 dark:hover:bg-slate-800">
                       <FileText size={14} className="text-rose-500" /> PDF
                     </button>
                   </div>
@@ -303,11 +303,11 @@ export function TreasurySupervision() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[450px]">
           {/* Left Block: Modern Graph (60%) */}
           <div className="lg:col-span-7 flex flex-col">
-            <Card className="rounded-xl p-4 shadow-sm border-slate-200 flex flex-col h-full bg-white">
+            <Card className="rounded-xl p-4 shadow-sm border-edge dark:border-slate-800 flex flex-col h-full bg-surface-base dark:bg-slate-900">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">{getChartTitle()}</h3>
+                <h3 className="text-xs font-bold text-content-muted dark:text-slate-400 uppercase tracking-wider">{getChartTitle()}</h3>
                 {selectedAgencies.length > 0 && (
-                  <button onClick={() => setSelectedAgencies([])} className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 uppercase tracking-tight flex items-center gap-1">
+                  <button onClick={() => setSelectedAgencies([])} className="text-[10px] font-bold text-emerald-600 dark:text-emerald-500 hover:text-emerald-700 uppercase tracking-tight flex items-center gap-1">
                     <X size={12} /> Réinitialiser
                   </button>
                 )}
@@ -327,10 +327,10 @@ export function TreasurySupervision() {
 
           {/* Right Block: Ranking List (40%) */}
           <div className="lg:col-span-5 flex flex-col">
-            <Card className="rounded-xl p-0 shadow-sm border-slate-200 flex flex-col h-full bg-white overflow-hidden">
-               <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/30">
-                 <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Classement Agences</h3>
-                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">
+            <Card className="rounded-xl p-0 shadow-sm border-edge dark:border-slate-800 flex flex-col h-full bg-surface-base dark:bg-slate-900 overflow-hidden">
+               <div className="p-4 border-b border-edge dark:border-slate-800 flex items-center justify-between bg-surface-subtle dark:bg-slate-800/50">
+                 <h3 className="text-xs font-bold text-content-muted dark:text-slate-400 uppercase tracking-wider">Classement Agences</h3>
+                 <span className="text-[10px] font-bold text-content-muted/60 dark:text-slate-500 uppercase tracking-tighter">
                    {activeStats?.activeCount || 0} {activeStats?.activeCount && activeStats.activeCount > 1 ? 'ACTIVES' : 'ACTIVE'}
                  </span>
                </div>
@@ -342,7 +342,7 @@ export function TreasurySupervision() {
                />
                
                {insights.length > 0 && (
-                 <div className="p-3 border-t border-slate-100 bg-slate-50/50">
+                 <div className="p-3 border-t border-edge dark:border-slate-800 bg-surface-subtle dark:bg-slate-800/30">
                     <TreasuryInsightBox insights={insights} />
                  </div>
                )}
