@@ -49,10 +49,9 @@ const ThemeToggle: React.FC<ThemeToggleProps> = ({ className = '' }) => {
       >
         <CurrentIcon size={20} className="transition-transform duration-300 active:scale-90" />
       </button>
-
       {isOpen && (
         <div
-            className="absolute left-0 top-full mt-2 z-[100] w-max min-w-[200px] max-w-[90vw] animate-in fade-in slide-in-from-top-2 duration-200"
+            className="absolute left-0 top-full mt-2 z-[9999] w-max min-w-[200px] max-w-[90vw] animate-in fade-in slide-in-from-top-2 duration-200"
         >
           <div className="bg-surface-base/95 backdrop-blur-xl border border-edge rounded-2xl p-2 shadow-theme-lg ring-1 ring-edge-subtle">
             <div className="text-[10px] font-bold text-content-muted uppercase tracking-wider px-3 py-1.5 mb-1">

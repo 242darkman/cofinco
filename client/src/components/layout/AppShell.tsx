@@ -93,7 +93,7 @@ export default function AppShell({
         ].join(' ')}
       >
         {/* Fixed header */}
-        <header className="shrink-0 z-30 border-b border-edge bg-surface-base/95 backdrop-blur supports-[backdrop-filter]:bg-surface-base/80 transition-colors duration-300">
+        <header className="shrink-0 z-[50] border-b border-edge bg-surface-base/95 backdrop-blur supports-[backdrop-filter]:bg-surface-base/80 transition-colors duration-300">
           <div className="px-4 py-2.5 sm:px-5 sm:py-3 lg:px-6">
             {header}
           </div>
