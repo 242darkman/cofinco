@@ -53,13 +53,14 @@ export const authLimiter = rateLimit({
  * Limiteur standard pour l'API
  * Protège contre le spam sans bloquer les utilisateurs légitimes
  *
- * - Max 200 requêtes par 15 minutes par IP (PROD)
+ * - Max 1000 requêtes par 15 minutes par IP (PROD)
  * - Désactivé en développement
- * - Suffisant pour les agents actifs en agence
+ * - Dimensionné pour 3 sessions SPA concurrentes avec polling actif
+ *   (~15 queries/page x 3 tabs + heartbeat/sync background polling)
  */
 export const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: isDevelopment ? DEV_MAX : 200, // Désactivé en dev
+  max: isDevelopment ? DEV_MAX : 1000, // Désactivé en dev
   message: {
     error: "Trop de requêtes, veuillez réessayer plus tard",
     retryAfter: 15 * 60,
