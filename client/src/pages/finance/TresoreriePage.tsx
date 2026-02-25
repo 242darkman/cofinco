@@ -178,7 +178,7 @@ export default function TresoreriePage() {
     return () => window.removeEventListener('caisse-update', handleCaisseUpdate);
   }, [handleCaisseUpdate]);
 
-  const { data: providerData } = useQuery<{ providers: ProviderBalance[] }>({
+  const { data: providerData, isError: providerError } = useQuery<{ providers: ProviderBalance[] }>({
     queryKey: ['provider-balances'],
     queryFn: async () => {
       const res = await fetch('/api/payments/provider-balances');
@@ -189,15 +189,22 @@ export default function TresoreriePage() {
     staleTime: 30_000,
   });
 
-  const providerBalances = providerData?.providers || [];
+  // Quand l'endpoint échoue, ignorer les données stale
+  const providerBalances = providerError ? [] : (providerData?.providers || []);
   const mtnBalance = resolveProviderBalance(providerBalances, 'MTN');
   const airtelBalance = resolveProviderBalance(providerBalances, 'AIRTEL');
 
+  // Disponibilité par opérateur
+  const mtnUnavailable = providerError || !mtnBalance || !!mtnBalance.error;
+  const airtelUnavailable = providerError || !airtelBalance || !!airtelBalance.error;
+  const mmUnavailable = mtnUnavailable && airtelUnavailable;
+
   // Solde total pawaPay (dédupliqué si wallet partagé)
+  // Solde indisponible = 0
   const pawapayTotal = (() => {
-    if (!mtnBalance && !airtelBalance) return 0;
-    if (mtnBalance?.shared) return mtnBalance.balance; // partagé = un seul solde réel
-    return (mtnBalance?.balance || 0) + (airtelBalance?.balance || 0);
+    if (mtnUnavailable && airtelUnavailable) return 0;
+    if (!mtnUnavailable && mtnBalance?.shared) return mtnBalance.balance;
+    return (mtnUnavailable ? 0 : mtnBalance!.balance) + (airtelUnavailable ? 0 : airtelBalance!.balance);
   })();
 
   const totalPhysique = stats?.totalPhysique || 0;
@@ -283,7 +290,10 @@ export default function TresoreriePage() {
               <div className="mt-2 flex items-center gap-3 text-[10px] text-content-muted">
                 <span className="flex items-center gap-1"><Banknote size={10} className="text-status-success" /> {totalEspeces.toLocaleString('fr-FR')}</span>
                 <span className="text-content-muted">|</span>
-                <span className="flex items-center gap-1"><Smartphone size={10} className="text-accent" /> {pawapayTotal.toLocaleString('fr-FR')}</span>
+                <span className="flex items-center gap-1">
+                  <Smartphone size={10} className="text-accent" />
+                  {mmUnavailable ? <span className="italic text-status-warning">Indisponible</span> : pawapayTotal.toLocaleString('fr-FR')}
+                </span>
               </div>
             </div>
 
@@ -315,13 +325,20 @@ export default function TresoreriePage() {
               <p className="text-[10px] text-accent/80 uppercase tracking-widest font-semibold mb-1 flex items-center gap-1">
                 <Smartphone size={11} /> Mobile Money
               </p>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-xl font-bold text-content-primary">{pawapayTotal.toLocaleString('fr-FR')}</span>
-                <span className="text-[10px] text-content-muted">FCFA</span>
-              </div>
+              {mmUnavailable ? (
+                <div className="flex items-center gap-1.5 mt-1">
+                  <AlertCircle size={14} className="text-status-warning" />
+                  <span className="text-sm font-semibold text-status-warning italic">Solde indisponible</span>
+                </div>
+              ) : (
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-xl font-bold text-content-primary">{pawapayTotal.toLocaleString('fr-FR')}</span>
+                  <span className="text-[10px] text-content-muted">FCFA</span>
+                </div>
+              )}
               <div className="mt-2 flex items-center justify-between">
                 <span className="text-[10px] text-content-muted">via pawaPay</span>
-                <span className="text-[10px] font-medium text-accent/60">{totalGlobal > 0 ? Math.round((pawapayTotal / totalGlobal) * 100) : 0}%</span>
+                <span className="text-[10px] font-medium text-accent/60">{mmUnavailable ? '—' : `${totalGlobal > 0 ? Math.round((pawapayTotal / totalGlobal) * 100) : 0}%`}</span>
               </div>
             </div>
           </div>
@@ -337,6 +354,7 @@ export default function TresoreriePage() {
               chipBg="bg-white/15"
               chipBorder="border-white/20"
               providerBalance={mtnBalance}
+              unavailable={mtnUnavailable}
               agences={mtnData.byAgence}
               expanded={mtnExpanded}
               onToggle={() => setMtnExpanded(!mtnExpanded)}
@@ -351,6 +369,7 @@ export default function TresoreriePage() {
               chipBg="bg-white/15"
               chipBorder="border-white/20"
               providerBalance={airtelBalance}
+              unavailable={airtelUnavailable}
               agences={airtelData.byAgence}
               expanded={airtelExpanded}
               onToggle={() => setAirtelExpanded(!airtelExpanded)}
@@ -461,6 +480,7 @@ interface WalletCardProps {
   chipBg: string;
   chipBorder: string;
   providerBalance: ReturnType<typeof resolveProviderBalance>;
+  unavailable?: boolean;
   agences: DigitalCaisseByAgence[];
   expanded: boolean;
   onToggle: () => void;
@@ -469,7 +489,7 @@ interface WalletCardProps {
 function WalletCard({
   logo, name, gradient, borderColor,
   chipBg, chipBorder,
-  providerBalance, agences, expanded, onToggle,
+  providerBalance, unavailable, agences, expanded, onToggle,
 }: WalletCardProps) {
   const hasAgences = agences.length > 0;
 
@@ -493,21 +513,22 @@ function WalletCard({
         </div>
 
         {/* Balance */}
-        <div className="flex items-baseline gap-1.5">
-          <span className="text-2xl font-extrabold text-white tracking-tight font-mono">
-            {providerBalance
-              ? (providerBalance.error ? '---' : providerBalance.balance.toLocaleString('fr-FR'))
-              : '---'
-            }
-          </span>
-          <span className="text-xs text-white/60 font-medium">FCFA</span>
-          {providerBalance?.active && <CheckCircle2 size={12} className="text-white/80 ml-1" />}
-        </div>
-
-        {providerBalance?.error && (
-          <p className="text-[10px] text-white/70 flex items-center gap-1 mt-1">
-            <AlertCircle size={10} /> {providerBalance.error}
-          </p>
+        {unavailable ? (
+          <div className="flex items-center gap-1.5 mt-1">
+            <AlertCircle size={14} className="text-white/70" />
+            <span className="text-lg font-semibold text-white/70 italic">Solde indisponible</span>
+          </div>
+        ) : (
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-2xl font-extrabold text-white tracking-tight font-mono">
+              {providerBalance
+                ? providerBalance.balance.toLocaleString('fr-FR')
+                : '---'
+              }
+            </span>
+            <span className="text-xs text-white/60 font-medium">FCFA</span>
+            {providerBalance?.active && <CheckCircle2 size={12} className="text-white/80 ml-1" />}
+          </div>
         )}
 
         <div className="mt-2 flex items-center justify-between">
