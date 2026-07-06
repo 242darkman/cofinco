@@ -1,6 +1,6 @@
 /**
  * ============================================
- * COFINCO Authentication & Session Management
+ * MICROFLEX Authentication & Session Management
  * ============================================
  *
  * Architecture Overview:

@@ -1,5 +1,5 @@
 /**
- * COFINCO — Seed Géographique Mondial
+ * MICROFLEX — Seed Géographique Mondial
  *
  * Phases couvertes :
  *   3. Seed regions (ADM1) + migration Congo + seed departements (ADM2) + cleanup legacy
@@ -470,7 +470,7 @@ async function enrichFromStaging(): Promise<StepResult[]> {
 
 async function main() {
   logger.info('═══════════════════════════════════════════════════════════════');
-  logger.info('COFINCO — Seed Géographique Mondial');
+  logger.info('MICROFLEX — Seed Géographique Mondial');
   logger.info('═══════════════════════════════════════════════════════════════');
 
   if (DRY_RUN) logger.info('MODE: DRY-RUN');

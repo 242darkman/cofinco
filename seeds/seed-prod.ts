@@ -1,5 +1,5 @@
 /**
- * COFINCO - Production Seed v2.0
+ * MICROFLEX - Production Seed v2.0
  *
  * Seed production-ready avec:
  * - Idempotence (upsert patterns)
@@ -1270,7 +1270,7 @@ const ACCOUNTING_RULES_DATA = [
   },
 
   // ============================================================================
-  // FRAIS MM FACTURÉS AU CLIENT (Revenus Cofinco)
+  // FRAIS MM FACTURÉS AU CLIENT (Revenus MicroFlex)
   // ============================================================================
 
   {
@@ -2739,13 +2739,13 @@ async function seedGeography(context: SeedContext, dryRun: boolean): Promise<See
   const siegeData = {
     nom: 'Siège',
     codeAgence: 'SIEGE',
-    adresse: "1er Etage Immeuble Cofinco, en diagonale de l'hopital congo malembe",
+    adresse: "1er Etage Immeuble MicroFlex, en diagonale de l'hopital congo malembe",
     villeId: villeIdMap['Pointe-Noire'] || undefined,
     typeAgence: TypeAgence.MAIN,
     statut: StatutAgence.ACTIVE,
     activatedAt: new Date('2018-01-01'),
     telephone: '+242060000100',
-    email: 'siege@cofinco-m.com',
+    email: 'siege@microflex-m.com',
     dateOuverture: '2018-01-01',
   };
 
@@ -5260,7 +5260,7 @@ async function seedAdminUser(context: SeedContext, dryRun: boolean): Promise<See
   }
 
   // Password from env or default (WARNING in logs)
-  const adminPassword = process.env.SEED_ADMIN_PASSWORD || 'Cofinco-m@2026';
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD || 'MicroFlex-m@2026';
   if (!process.env.SEED_ADMIN_PASSWORD) {
     logger.info('Using default admin password. Override with SEED_ADMIN_PASSWORD env var.');
   }
@@ -5496,7 +5496,7 @@ async function seedProd() {
   };
 
   logger.info('═══════════════════════════════════════════════════════════════');
-  logger.info('COFINCO Production Seed v2.0');
+  logger.info('MICROFLEX Production Seed v2.0');
   logger.info('═══════════════════════════════════════════════════════════════');
 
   if (DRY_RUN) {
@@ -5700,7 +5700,7 @@ async function seedProd() {
     logger.info('═══════════════════════════════════════════════════════════════');
 
     if (!DRY_RUN) {
-      logger.info('Login: s.administrateur / [SEED_ADMIN_PASSWORD or Cofinco-m@2026]');
+      logger.info('Login: s.administrateur / [SEED_ADMIN_PASSWORD or MicroFlex-m@2026]');
     }
 
     if (!report.success) {

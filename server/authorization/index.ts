@@ -2,7 +2,7 @@
  * CASL Authorization Module
  * =========================
  *
- * Provides CASL-based authorization for the COFINCO application.
+ * Provides CASL-based authorization for the MICROFLEX application.
  *
  * Usage:
  * ------

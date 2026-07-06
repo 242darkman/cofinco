@@ -78,7 +78,7 @@ export default function NotificationPreview({
       rendered = rendered.replace(new RegExp(`\\{\\{${placeholder}\\}\\}`, 'g'), value);
     });
     // Replace email CID references with actual public path for browser preview
-    rendered = rendered.replace(/src=["']cid:company-logo["']/g, 'src="/cofin-logo.png"');
+    rendered = rendered.replace(/src=["']cid:company-logo["']/g, 'src="/microflex-logo.png"');
     return rendered;
   };
 

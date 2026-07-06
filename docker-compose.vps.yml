@@ -1,5 +1,5 @@
 # ==========================================================
-# Cofinco — VPS PRODUCTION (Option B — Microfinance)
+# MicroFlex — VPS PRODUCTION (Option B — Microfinance)
 # ==========================================================
 # Architecture hybride :
 #   - PostgreSQL : NATIF sur le VPS (hors Docker)
@@ -10,11 +10,11 @@
 #   - PostgreSQL 16 installé et configuré (voir scripts/vps/setup.sh)
 #   - Nginx installé avec config reverse proxy
 #   - Certbot configuré avec auto-renew
-#   - Fichier /opt/cofinco/env/.env.runtime généré par CI/CD
+#   - Fichier /opt/microflex/env/.env.runtime généré par CI/CD
 #
 # Usage :
 #   docker compose -f docker-compose.vps.yml \
-#     --env-file /opt/cofinco/env/.env.runtime up -d
+#     --env-file /opt/microflex/env/.env.runtime up -d
 #
 # Déploiement :
 #   bash scripts/vps/deploy.sh <tag>
@@ -42,7 +42,7 @@ x-app-env: &app-env
   SMTP_SECURE: ${SMTP_SECURE:-false}
   MTN_SMS_CLIENT_ID: ${MTN_SMS_CLIENT_ID:-}
   MTN_SMS_CLIENT_SECRET: ${MTN_SMS_CLIENT_SECRET:-}
-  MTN_SMS_SENDER_ID: ${MTN_SMS_SENDER_ID:-COFINCO}
+  MTN_SMS_SENDER_ID: ${MTN_SMS_SENDER_ID:-MICROFLEX}
   MTN_SMS_WEBHOOK_SECRET: ${MTN_SMS_WEBHOOK_SECRET:-}
   MTN_SMS_TOKEN_URL: ${MTN_SMS_TOKEN_URL:-}
   MTN_SMS_BASE_URL: ${MTN_SMS_BASE_URL:-}
@@ -50,7 +50,7 @@ x-app-env: &app-env
   PAWAPAY_API_TOKEN: ${PAWAPAY_API_TOKEN:-}
   PAWAPAY_CALLBACK_URL: ${PAWAPAY_CALLBACK_URL:-}
   PAWAPAY_WEBHOOK_PUBLIC_KEYS: ${PAWAPAY_WEBHOOK_PUBLIC_KEYS:-}
-  PAWAPAY_STATEMENT_PREFIX: ${PAWAPAY_STATEMENT_PREFIX:-Cofinco}
+  PAWAPAY_STATEMENT_PREFIX: ${PAWAPAY_STATEMENT_PREFIX:-MicroFlex}
   WEBHOOK_IP_VALIDATION: ${WEBHOOK_IP_VALIDATION:-true}
   LOG_LEVEL: ${LOG_LEVEL:-info}
   APP_VERSION: ${APP_VERSION:-latest}
@@ -76,8 +76,8 @@ services:
   # Se connecte au PG natif via host.docker.internal
   # ==========================================
   db-init:
-    container_name: cofinco-db-init
-    image: ${REGISTRY:-ghcr.io}/${IMAGE_NAME:-cofinco}:${APP_VERSION:-latest}-init
+    container_name: microflex-db-init
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_NAME:-microflex}:${APP_VERSION:-latest}-init
     environment:
       DATABASE_URL: ${DATABASE_URL:?}
     extra_hosts: *extra-hosts
@@ -97,7 +97,7 @@ services:
   # ==========================================
   app:
     # No container_name — incompatible with replicas > 1
-    image: ${REGISTRY:-ghcr.io}/${IMAGE_NAME:-cofinco}:${APP_VERSION:-latest}
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_NAME:-microflex}:${APP_VERSION:-latest}
     restart: unless-stopped
     environment:
       <<: *app-env
@@ -139,8 +139,8 @@ services:
   # Single instance — NEVER scale this
   # ==========================================
   worker:
-    container_name: cofinco-worker
-    image: ${REGISTRY:-ghcr.io}/${IMAGE_NAME:-cofinco}:${APP_VERSION:-latest}
+    container_name: microflex-worker
+    image: ${REGISTRY:-ghcr.io}/${IMAGE_NAME:-microflex}:${APP_VERSION:-latest}
     restart: unless-stopped
     environment:
       <<: *app-env
@@ -173,7 +173,7 @@ services:
   # CACHE / SESSION STORE — Redis
   # ==========================================
   redis:
-    container_name: cofinco-redis
+    container_name: microflex-redis
     image: redis:7.2-alpine
     restart: unless-stopped
     volumes:
@@ -201,7 +201,7 @@ services:
   # OBJECT STORAGE — MinIO (S3-compatible)
   # ==========================================
   minio:
-    container_name: cofinco-minio
+    container_name: microflex-minio
     image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     restart: unless-stopped
     environment:

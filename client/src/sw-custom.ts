@@ -254,7 +254,7 @@ self.addEventListener('install', (event) => {
       return cache.addAll([
         OFFLINE_FALLBACK_PAGE,
         OFFLINE_FALLBACK_IMAGE,
-        '/cofin-logo.png'
+        '/microflex-logo.png'
       ]).catch(err => {
         if (import.meta.env.DEV) console.log('[SW] Some offline resources not available:', err);
       });

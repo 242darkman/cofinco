@@ -204,7 +204,7 @@ async function processEmailJob(job: {
   const logoBuffer = getLogoBuffer();
   if (logoBuffer) {
     attachments.push({
-      filename: 'cofin-logo.png',
+      filename: 'microflex-logo.png',
       content: logoBuffer,
       contentType: 'image/png',
       cid: 'company-logo',

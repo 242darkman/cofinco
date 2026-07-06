@@ -14,7 +14,7 @@ export const STEPS: StepDefinition[] = [
 
 export const TOTAL_STEPS = STEPS.length;
 
-export const AUTO_SAVE_KEY = "cofinco_tontine_plan_draft";
+export const AUTO_SAVE_KEY = "microflex_tontine_plan_draft";
 
 export const DEFAULT_FORM_DATA: TontinePlanFormData = {
   // Step 1: General

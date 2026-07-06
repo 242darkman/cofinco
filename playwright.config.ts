@@ -1,9 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * Playwright Configuration for Cofinco E2E Tests
+ * Playwright Configuration for MicroFlex E2E Tests
  *
- * Run via Docker (uses isolated cofinco_test database):
+ * Run via Docker (uses isolated microflex_test database):
  *   docker compose --profile test run --rm test-e2e
  *
  * Or locally (requires running app + DATABASE_URL pointing to test DB):

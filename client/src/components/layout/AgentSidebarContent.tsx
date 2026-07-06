@@ -74,7 +74,7 @@ export default function AgentSidebarContent({
           <div className="relative flex flex-col items-center py-2">
             <div className="relative w-16 h-16 bg-surface rounded-2xl flex items-center justify-center">
               <img
-                src="/cofin-logo.png"
+                src="/microflex-logo.png"
                 alt={`${branding.appName} Logo`}
                 className="w-12 h-12 object-contain"
               />

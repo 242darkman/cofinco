@@ -33,7 +33,7 @@ const CONFIG = {
   MAX_TOKENS_PER_USER: 5,
 
   // Nom du cookie pour le refresh token
-  COOKIE_NAME: 'cofinco_refresh',
+  COOKIE_NAME: 'microflex_refresh',
 };
 
 /**

@@ -1,5 +1,5 @@
 # ==========================================================
-# Cofinco — PRODUCTION-LOCAL (mirroring VPS in Docker)
+# MicroFlex — PRODUCTION-LOCAL (mirroring VPS in Docker)
 # ==========================================================
 # Reproduit l'architecture de production en local, 100% Docker :
 #   - 3 replicas app (stateless, DISABLE_CRON_JOBS=true)
@@ -45,7 +45,7 @@ x-app-env: &app-env
   SMTP_SECURE: ${SMTP_SECURE:-false}
   MTN_SMS_CLIENT_ID: ${MTN_SMS_CLIENT_ID:-}
   MTN_SMS_CLIENT_SECRET: ${MTN_SMS_CLIENT_SECRET:-}
-  MTN_SMS_SENDER_ID: ${MTN_SMS_SENDER_ID:-COFINCO}
+  MTN_SMS_SENDER_ID: ${MTN_SMS_SENDER_ID:-MICROFLEX}
   MTN_SMS_WEBHOOK_SECRET: ${MTN_SMS_WEBHOOK_SECRET:-}
   MTN_SMS_TOKEN_URL: ${MTN_SMS_TOKEN_URL:-}
   MTN_SMS_BASE_URL: ${MTN_SMS_BASE_URL:-}
@@ -53,7 +53,7 @@ x-app-env: &app-env
   PAWAPAY_API_TOKEN: ${PAWAPAY_API_TOKEN:-}
   PAWAPAY_CALLBACK_URL: ${PAWAPAY_CALLBACK_URL:-}
   PAWAPAY_WEBHOOK_PUBLIC_KEYS: ${PAWAPAY_WEBHOOK_PUBLIC_KEYS:-}
-  PAWAPAY_STATEMENT_PREFIX: ${PAWAPAY_STATEMENT_PREFIX:-Cofinco}
+  PAWAPAY_STATEMENT_PREFIX: ${PAWAPAY_STATEMENT_PREFIX:-MicroFlex}
   WEBHOOK_IP_VALIDATION: ${WEBHOOK_IP_VALIDATION:-false}
   LOG_LEVEL: ${LOG_LEVEL:-info}
   APP_VERSION: ${APP_VERSION:-local}
@@ -86,7 +86,7 @@ x-app-base: &app-base
     minio:
       condition: service_healthy
   networks:
-    - cofinco_internal
+    - microflex_internal
   deploy:
     resources:
       limits:
@@ -106,7 +106,7 @@ services:
   # DB INIT — schema push + seed (one-shot)
   # ==========================================
   db-init:
-    container_name: cofinco-db-init
+    container_name: microflex-db-init
     build:
       context: .
       dockerfile: Dockerfile
@@ -117,7 +117,7 @@ services:
       db:
         condition: service_healthy
     networks:
-      - cofinco_internal
+      - microflex_internal
     restart: "no"
 
   # ==========================================
@@ -126,19 +126,19 @@ services:
   # ==========================================
   app-1:
     <<: *app-base
-    container_name: cofinco-app-1
+    container_name: microflex-app-1
     ports:
       - "127.0.0.1:5001:5000"
 
   app-2:
     <<: *app-base
-    container_name: cofinco-app-2
+    container_name: microflex-app-2
     ports:
       - "127.0.0.1:5002:5000"
 
   app-3:
     <<: *app-base
-    container_name: cofinco-app-3
+    container_name: microflex-app-3
     ports:
       - "127.0.0.1:5003:5000"
 
@@ -147,7 +147,7 @@ services:
   # Singleton — JAMAIS plus d'une instance
   # ==========================================
   worker:
-    container_name: cofinco-worker
+    container_name: microflex-worker
     build:
       context: .
       dockerfile: Dockerfile
@@ -167,7 +167,7 @@ services:
       minio:
         condition: service_healthy
     networks:
-      - cofinco_internal
+      - microflex_internal
     deploy:
       replicas: 1
       resources:
@@ -185,11 +185,11 @@ services:
   # Miroir de la config Nginx VPS
   # ==========================================
   nginx:
-    container_name: cofinco-nginx
+    container_name: microflex-nginx
     image: nginx:1.27-alpine
     restart: unless-stopped
     volumes:
-      - ./infra/nginx/cofinco-local.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./infra/nginx/microflex-local.conf:/etc/nginx/conf.d/default.conf:ro
       - ./infra/certs:/etc/nginx/certs:ro
     ports:
       - "80:80"
@@ -202,7 +202,7 @@ services:
       app-3:
         condition: service_healthy
     networks:
-      - cofinco_internal
+      - microflex_internal
 
   # ==========================================
   # Override: no exposed ports for infra

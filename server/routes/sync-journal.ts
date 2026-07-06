@@ -744,7 +744,7 @@ async function executeJournalBusinessOperation(
  * Sign offline limits using server HMAC key.
  */
 function signLimits(limits: Record<string, unknown>): string {
-  const hmacKey = process.env.OFFLINE_LIMITS_HMAC_KEY || 'cofinco-offline-limits-v1';
+  const hmacKey = process.env.OFFLINE_LIMITS_HMAC_KEY || 'microflex-offline-limits-v1';
   const data = JSON.stringify(limits);
   return crypto
     .createHmac('sha256', hmacKey)

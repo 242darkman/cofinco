@@ -68,8 +68,8 @@ RUN npm run build
 FROM node:20-alpine AS runtime
 
 # OCI labels
-LABEL org.opencontainers.image.source="https://github.com/owner/cofinco"
-LABEL org.opencontainers.image.description="Cofinco Platform"
+LABEL org.opencontainers.image.source="https://github.com/owner/microflex"
+LABEL org.opencontainers.image.description="MicroFlex Platform"
 LABEL org.opencontainers.image.licenses="MIT"
 
 # Create non-root user

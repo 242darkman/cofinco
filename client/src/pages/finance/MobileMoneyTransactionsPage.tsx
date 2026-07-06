@@ -73,7 +73,7 @@ interface PaymentIntent {
   creditId?: string;
   tontineId?: string;
   agenceId?: string;
-  // Cofinco client fees
+  // MicroFlex client fees
   feeOption?: string | null;
   clientFeeAmount?: string | null;
   clientFeeRate?: string | null;

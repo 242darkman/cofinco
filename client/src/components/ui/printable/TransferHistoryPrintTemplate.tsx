@@ -48,7 +48,7 @@ const DEFAULT_COMPANY_INFO = {
   nom: 'COFIN&CO',
   adresse: 'Brazzaville, République du Congo',
   telephone: '+242 06 123 4567',
-  email: 'contact@cofinco-m.com',
+  email: 'contact@microflex-m.com',
   nif: 'NIF-123456789',
   rccm: 'RCCM-BZV-1234'
 };

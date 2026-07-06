@@ -1,5 +1,5 @@
 /**
- * Prometheus Metrics for COFINCO
+ * Prometheus Metrics for MICROFLEX
  * ===============================
  *
  * Métriques exposées via /api/metrics pour Prometheus.
@@ -29,7 +29,7 @@ export const metricsRegistry = new Registry();
 // Add default metrics (CPU, memory, event loop, etc.)
 collectDefaultMetrics({
   register: metricsRegistry,
-  prefix: 'cofinco_',
+  prefix: 'microflex_',
 });
 
 // =============================================================================
@@ -66,14 +66,14 @@ export const httpActiveConnections = new Gauge({
 
 // Active caisse sessions
 export const activeCaisseSessions = new Gauge({
-  name: 'cofinco_caisse_sessions_active',
+  name: 'microflex_caisse_sessions_active',
   help: 'Number of active caisse sessions',
   registers: [metricsRegistry],
 });
 
 // Daily transactions counter
 export const dailyTransactions = new Counter({
-  name: 'cofinco_transactions_daily_total',
+  name: 'microflex_transactions_daily_total',
   help: 'Total number of transactions today',
   labelNames: ['type', 'method'],
   registers: [metricsRegistry],
@@ -81,7 +81,7 @@ export const dailyTransactions = new Counter({
 
 // Transaction amount histogram
 export const transactionAmount = new Histogram({
-  name: 'cofinco_transaction_amount_fcfa',
+  name: 'microflex_transaction_amount_fcfa',
   help: 'Transaction amounts in FCFA',
   labelNames: ['type'],
   buckets: [1000, 5000, 10000, 50000, 100000, 500000, 1000000, 5000000, 10000000],
@@ -90,21 +90,21 @@ export const transactionAmount = new Histogram({
 
 // WebSocket connections
 export const wsConnections = new Gauge({
-  name: 'cofinco_websocket_connections',
+  name: 'microflex_websocket_connections',
   help: 'Number of active WebSocket connections',
   registers: [metricsRegistry],
 });
 
 // Pending credit requests
 export const pendingCreditRequests = new Gauge({
-  name: 'cofinco_credit_requests_pending',
+  name: 'microflex_credit_requests_pending',
   help: 'Number of pending credit requests',
   registers: [metricsRegistry],
 });
 
 // Active monitoring alerts
 export const monitoringAlerts = new Gauge({
-  name: 'cofinco_monitoring_alerts_active',
+  name: 'microflex_monitoring_alerts_active',
   help: 'Number of active monitoring alerts',
   labelNames: ['severity'],
   registers: [metricsRegistry],
@@ -112,7 +112,7 @@ export const monitoringAlerts = new Gauge({
 
 // Database query duration
 export const dbQueryDuration = new Histogram({
-  name: 'cofinco_db_query_duration_seconds',
+  name: 'microflex_db_query_duration_seconds',
   help: 'Duration of database queries',
   labelNames: ['operation'],
   buckets: [0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1],
@@ -125,7 +125,7 @@ export const dbQueryDuration = new Histogram({
 
 // Caisse openings blocked due to GL discrepancy
 export const caisseOpeningBlocked = new Counter({
-  name: 'cofinco_caisse_opening_blocked_total',
+  name: 'microflex_caisse_opening_blocked_total',
   help: 'Number of caisse openings blocked due to GL discrepancy',
   labelNames: ['agence_id', 'strictness_mode'],
   registers: [metricsRegistry],
@@ -133,7 +133,7 @@ export const caisseOpeningBlocked = new Counter({
 
 // Caisse openings with discrepancy (not blocked)
 export const caisseOpeningDiscrepancy = new Counter({
-  name: 'cofinco_caisse_opening_discrepancy_total',
+  name: 'microflex_caisse_opening_discrepancy_total',
   help: 'Number of caisse openings with GL discrepancy (allowed)',
   labelNames: ['agence_id', 'strictness_mode', 'action'],
   registers: [metricsRegistry],
@@ -141,7 +141,7 @@ export const caisseOpeningDiscrepancy = new Counter({
 
 // GL discrepancy amount histogram
 export const glDiscrepancyAmount = new Histogram({
-  name: 'cofinco_gl_discrepancy_amount_fcfa',
+  name: 'microflex_gl_discrepancy_amount_fcfa',
   help: 'GL discrepancy amounts at caisse opening in FCFA',
   labelNames: ['strictness_mode'],
   buckets: [1000, 5000, 10000, 50000, 100000, 500000, 1000000],
@@ -154,21 +154,21 @@ export const glDiscrepancyAmount = new Histogram({
 
 // Late installments marked count
 export const lateInstallmentsMarked = new Gauge({
-  name: 'cofinco_late_installments_marked',
+  name: 'microflex_late_installments_marked',
   help: 'Number of installments marked as late in the last run',
   registers: [metricsRegistry],
 });
 
 // Late credits count
 export const lateCreditsCount = new Gauge({
-  name: 'cofinco_late_credits_count',
+  name: 'microflex_late_credits_count',
   help: 'Number of credits with late installments found in the last run',
   registers: [metricsRegistry],
 });
 
 // Late installments job duration
 export const lateInstallmentsJobDuration = new Histogram({
-  name: 'cofinco_late_installments_job_duration_ms',
+  name: 'microflex_late_installments_job_duration_ms',
   help: 'Duration of the late installments job in milliseconds',
   buckets: [100, 500, 1000, 5000, 10000],
   registers: [metricsRegistry],

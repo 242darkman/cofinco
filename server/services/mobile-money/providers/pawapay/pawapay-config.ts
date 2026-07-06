@@ -117,7 +117,7 @@ export function loadPawaPayConfig(): PawaPayProviderConfig {
     apiToken: process.env.PAWAPAY_API_TOKEN || "",
     callbackUrl: process.env.PAWAPAY_CALLBACK_URL || `${process.env.APP_URL || "http://localhost:5000"}/api/webhooks/pawapay`,
     webhookPublicKeys: parsePublicKeys(process.env.PAWAPAY_WEBHOOK_PUBLIC_KEYS || ""),
-    statementPrefix: process.env.PAWAPAY_STATEMENT_PREFIX || "Cofinco",
+    statementPrefix: process.env.PAWAPAY_STATEMENT_PREFIX || "MicroFlex",
     currency: "XAF",
     country: "COG",
     requestTimeout: parseInt(process.env.PAWAPAY_REQUEST_TIMEOUT || (isProduction ? "60000" : "30000"), 10),

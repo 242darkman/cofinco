@@ -116,7 +116,7 @@ let currentAgenceId: string | null = null;
  * BroadcastChannel for cross-tab logout synchronization
  * When one tab logs out, all other tabs are notified and also logout
  */
-const LOGOUT_CHANNEL_NAME = 'cofinco-auth-channel';
+const LOGOUT_CHANNEL_NAME = 'microflex-auth-channel';
 let logoutChannel: BroadcastChannel | null = null;
 
 // Initialize BroadcastChannel if supported

@@ -11,11 +11,11 @@ function loadLogo(): void {
   if (_logoBuffer !== undefined) return; // Already loaded (or failed)
 
   try {
-    const logoPath = resolve(process.cwd(), 'client/public/cofin-logo.png');
+    const logoPath = resolve(process.cwd(), 'client/public/microflex-logo.png');
     _logoBuffer = readFileSync(logoPath);
     _logoBase64 = `data:image/png;base64,${_logoBuffer.toString('base64')}`;
   } catch {
-    logger.warn('Company logo not found at client/public/cofin-logo.png');
+    logger.warn('Company logo not found at client/public/microflex-logo.png');
     _logoBuffer = null;
     _logoBase64 = null;
   }

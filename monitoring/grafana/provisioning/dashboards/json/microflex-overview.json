@@ -114,7 +114,7 @@
       },
       "targets": [
         {
-          "expr": "{app=\"cofinco\"} |= ``",
+          "expr": "{app=\"microflex\"} |= ``",
           "refId": "A"
         }
       ],
@@ -140,7 +140,7 @@
       },
       "targets": [
         {
-          "expr": "{app=\"cofinco\"} |~ `error|Error|ERROR`",
+          "expr": "{app=\"microflex\"} |~ `error|Error|ERROR`",
           "refId": "A"
         }
       ],
@@ -192,12 +192,12 @@
   ],
   "refresh": "30s",
   "schemaVersion": 39,
-  "tags": ["cofinco", "nodejs", "microfinance"],
+  "tags": ["microflex", "nodejs", "microfinance"],
   "templating": { "list": [] },
   "time": { "from": "now-1h", "to": "now" },
   "timepicker": {},
   "timezone": "Africa/Brazzaville",
-  "title": "COFINCO Overview",
-  "uid": "cofinco-overview",
+  "title": "MICROFLEX Overview",
+  "uid": "microflex-overview",
   "version": 1
 }

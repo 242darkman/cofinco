@@ -22,7 +22,7 @@ import type { GeoPoint, GeoSession } from './types';
 
 // ─── Session key in sessionStorage ───────────────────────────────
 
-const SESSION_STORAGE_KEY = 'cofinco_tracking_session';
+const SESSION_STORAGE_KEY = 'microflex_tracking_session';
 
 interface PersistedSession {
   sessionId: string;

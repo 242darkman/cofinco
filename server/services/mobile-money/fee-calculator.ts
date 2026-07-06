@@ -1,11 +1,11 @@
 /**
  * Mobile Money Fee Calculator
- * Calcule les frais Cofinco facturés au client pour les opérations Mobile Money.
+ * Calcule les frais MicroFlex facturés au client pour les opérations Mobile Money.
  *
  * Formule: fee = max(minFee, min(maxFee, feeFixed + amount × feePct / 100))
  * Arrondi: Math.round() car XAF a 0 décimales.
  *
- * Distinct des frais pawaPay (aggregator fee) qui sont le coût Cofinco.
+ * Distinct des frais pawaPay (aggregator fee) qui sont le coût MicroFlex.
  */
 
 import { db } from "../../db";

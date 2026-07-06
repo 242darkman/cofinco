@@ -205,7 +205,7 @@ export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: Log
               }}
             >
               <img
-                src="/cofin-logo.png"
+                src="/microflex-logo.png"
                 alt={appName}
                 className="h-10 w-10 object-contain"
               />
@@ -253,7 +253,7 @@ export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: Log
                   }}
                 >
                   <img
-                    src="/cofin-logo.png"
+                    src="/microflex-logo.png"
                     alt={`${appName} Logo`}
                     className="w-32 h-32 xl:w-36 xl:h-36 object-contain"
                     data-testid="img-logo"

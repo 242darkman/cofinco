@@ -1,6 +1,6 @@
 # Moteur de Cr\u00e9dit Relationnel Intelligent (CRI)
 
-> Document de conception R&D \u2014 Cofinco IMF
+> Document de conception R&D \u2014 MicroFlex IMF
 > Conformit\u00e9 COBAC / SYSCOHADA r\u00e9vis\u00e9 / Zone CEMAC
 > Version 1.0
 

@@ -1,6 +1,6 @@
-# COFINCO Mobile
+# MICROFLEX Mobile
 
-Application mobile COFINCO (Expo SDK 54 + React Native).
+Application mobile MICROFLEX (Expo SDK 54 + React Native).
 
 ## Stack
 

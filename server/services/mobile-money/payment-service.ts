@@ -125,7 +125,7 @@ class PaymentService {
     const operator = resolveOperator(provider, phone);
     const correspondent = operatorToCorrespondent(operator);
 
-    // Calculer les frais Cofinco si feeOption est fourni
+    // Calculer les frais MicroFlex si feeOption est fourni
     let feeEstimate: FeeEstimate | null = null;
     if (params.feeOption) {
       feeEstimate = await calculateFee(amount, operator, "COLLECTION", params.feeOption);
@@ -156,7 +156,7 @@ class PaymentService {
       tontineId,
       agenceId,
       idempotencyKey,
-      // Cofinco client fee fields
+      // MicroFlex client fee fields
       feeOption: params.feeOption || null,
       clientFeeAmount: feeEstimate?.feeAmount?.toString() || null,
       clientFeeRate: feeEstimate?.feeRate?.toString() || null,
@@ -245,7 +245,7 @@ class PaymentService {
     const operator = resolveOperator(provider, phone);
     const correspondent = operatorToCorrespondent(operator);
 
-    // Calculer les frais Cofinco si feeOption est fourni
+    // Calculer les frais MicroFlex si feeOption est fourni
     let feeEstimate: FeeEstimate | null = null;
     if (params.feeOption) {
       feeEstimate = await calculateFee(amount, operator, "PAYOUT", params.feeOption);
@@ -284,7 +284,7 @@ class PaymentService {
       tontineId,
       agenceId,
       idempotencyKey,
-      // Cofinco client fee fields
+      // MicroFlex client fee fields
       feeOption: params.feeOption || null,
       clientFeeAmount: feeEstimate?.feeAmount?.toString() || null,
       clientFeeRate: feeEstimate?.feeRate?.toString() || null,
@@ -552,7 +552,7 @@ class PaymentService {
       await this.postFeeGlEntry(intent, effectiveFee);
     }
 
-    // Post GL entry for Cofinco client-facing fees (DR 578x / CR 708700)
+    // Post GL entry for MicroFlex client-facing fees (DR 578x / CR 708700)
     const clientFee = intent.clientFeeAmount ? parseFloat(intent.clientFeeAmount) : 0;
     if (clientFee > 0) {
       await this.postClientFeeGlEntry(intent, clientFee);
@@ -1063,7 +1063,7 @@ class PaymentService {
   }
 
   /**
-   * Poste l'écriture GL pour les frais Cofinco facturés au client
+   * Poste l'écriture GL pour les frais MicroFlex facturés au client
    * Utilise les règles MM_FEE_REVENUE_MTN / MM_FEE_REVENUE_AIRTEL (eventType: MM_FEE_REVENUE)
    * DR 578x (Compte Mobile Money) / CR 708700 (Frais services Mobile Money)
    */

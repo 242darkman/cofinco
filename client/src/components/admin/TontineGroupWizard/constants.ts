@@ -14,7 +14,7 @@ export const STEPS: StepDefinition[] = [
 
 export const TOTAL_STEPS = STEPS.length;
 
-export const AUTO_SAVE_KEY = "cofinco_tontine_group_draft";
+export const AUTO_SAVE_KEY = "microflex_tontine_group_draft";
 
 export const END_RULE_OPTIONS = [
   { value: "WHEN_ALL_RECEIVED", label: "Quand tous ont recu" },

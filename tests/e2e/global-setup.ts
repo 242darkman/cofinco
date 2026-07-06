@@ -1,7 +1,7 @@
 /**
  * Playwright Global Setup — E2E Test Database Isolation
  *
- * Creates a dedicated `cofinco_test` database before the test run.
+ * Creates a dedicated `microflex_test` database before the test run.
  * The schema is pushed and reference data seeded automatically by
  * the `db-init-test` Docker service (see docker-compose.override.yml).
  *

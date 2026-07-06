@@ -31,7 +31,7 @@ echo "Génération des certificats TLS auto-signés..."
 openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
   -keyout "$CERT_DIR/localhost.key" \
   -out "$CERT_DIR/localhost.crt" \
-  -subj "/C=CG/ST=Brazzaville/L=Brazzaville/O=Cofinco/CN=localhost" \
+  -subj "/C=CG/ST=Brazzaville/L=Brazzaville/O=MicroFlex/CN=localhost" \
   -addext "subjectAltName=DNS:localhost,IP:127.0.0.1" \
   2>/dev/null
 

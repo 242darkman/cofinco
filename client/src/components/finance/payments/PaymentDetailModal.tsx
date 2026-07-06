@@ -60,7 +60,7 @@ export interface PaymentDetailData {
   };
   // Allocation details (for credit repayments)
   allocation?: PaymentAllocation;
-  // Cofinco client-facing fees
+  // MicroFlex client-facing fees
   feeOption?: string | null;
   clientFeeAmount?: string | null;
   clientFeeRate?: string | null;
@@ -200,7 +200,7 @@ export function PaymentDetailModal({
             </p>
           </div>
 
-          {/* Fee Breakdown (if Cofinco client fees apply) */}
+          {/* Fee Breakdown (if MicroFlex client fees apply) */}
           {payment.clientFeeAmount && Number(payment.clientFeeAmount) > 0 && (
             <div className="bg-accent/5 border border-accent/20 rounded-xl p-4">
               <h5 className="text-xs font-semibold text-accent mb-3">

@@ -5,7 +5,7 @@ import { mobileWs } from './websocket';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
-const BACKGROUND_TASK_NAME = 'COFINCO_BACKGROUND_LOCATION';
+const BACKGROUND_TASK_NAME = 'MICROFLEX_BACKGROUND_LOCATION';
 const MAX_BUFFER_SIZE = 500;
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -158,7 +158,7 @@ async function startBackgroundTracking() {
     deferredUpdatesInterval: 60_000,
     showsBackgroundLocationIndicator: true,
     foregroundService: {
-      notificationTitle: 'COFINCO Agent Terrain',
+      notificationTitle: 'MICROFLEX Agent Terrain',
       notificationBody: 'Suivi GPS actif',
       notificationColor: '#0284c7',
     },

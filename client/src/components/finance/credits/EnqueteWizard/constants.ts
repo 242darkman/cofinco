@@ -46,7 +46,7 @@ export const ENQUETE_STEPS: EnqueteStepDefinition[] = [
 
 export const TOTAL_ENQUETE_STEPS = ENQUETE_STEPS.length;
 
-export const ENQUETE_AUTO_SAVE_KEY = 'cofinco_enquete_credit_draft';
+export const ENQUETE_AUTO_SAVE_KEY = 'microflex_enquete_credit_draft';
 
 export const DEFAULT_ENQUETE_FORM: EnqueteFormData = {
   demandeId: '',

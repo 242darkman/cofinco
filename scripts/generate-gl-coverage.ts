@@ -10,7 +10,7 @@
  * referenced account/journal does not exist.
  *
  * Run via Docker:
- *   docker exec cofinco-app node --import tsx scripts/generate-gl-coverage.ts
+ *   docker exec microflex-app node --import tsx scripts/generate-gl-coverage.ts
  */
 
 import { db, pool } from "../server/db";

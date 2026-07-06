@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 # ==========================================================
-# Cofinco — PostgreSQL Backup (VPS natif)
+# MicroFlex — PostgreSQL Backup (VPS natif)
 # ==========================================================
 # Usage :
 #   bash scripts/vps/backup-db.sh
 #
-# Configuré automatiquement via systemd timer (cofinco-backup.timer)
+# Configuré automatiquement via systemd timer (microflex-backup.timer)
 # Exécuté quotidiennement à 02:00 UTC.
 #
 # Options (via variables d'environnement) :
-#   PG_DB           Database name (default: cofinco)
-#   PG_USER         Database user (default: cofinco_app)
+#   PG_DB           Database name (default: microflex)
+#   PG_USER         Database user (default: microflex_app)
 #   PG_HOST         Database host (default: localhost)
 #   PG_PORT         Database port (default: 5432)
-#   BACKUP_DIR      Backup directory (default: /opt/cofinco/backups)
+#   BACKUP_DIR      Backup directory (default: /opt/microflex/backups)
 #   RETENTION_DAILY Number of daily backups to keep (default: 7)
 #   RETENTION_WEEKLY Number of weekly backups to keep (default: 4)
 #   GPG_RECIPIENT   GPG key ID for encryption (optional)
@@ -25,11 +25,11 @@ set -euo pipefail
 umask 077
 
 # ── Configuration ────────────────────────────────────────
-PG_DB="${PG_DB:-cofinco}"
-PG_USER="${PG_USER:-cofinco_app}"
+PG_DB="${PG_DB:-microflex}"
+PG_USER="${PG_USER:-microflex_app}"
 PG_HOST="${PG_HOST:-localhost}"
 PG_PORT="${PG_PORT:-5432}"
-BACKUP_DIR="${BACKUP_DIR:-/opt/cofinco/backups}"
+BACKUP_DIR="${BACKUP_DIR:-/opt/microflex/backups}"
 RETENTION_DAILY="${RETENTION_DAILY:-7}"
 RETENTION_WEEKLY="${RETENTION_WEEKLY:-4}"
 

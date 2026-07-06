@@ -16,7 +16,7 @@
 const ALGORITHM = 'AES-GCM';
 const KEY_LENGTH = 256;
 const IV_LENGTH = 12; // 96 bits for GCM
-const SALT = new TextEncoder().encode('cofinco-offline-v1');
+const SALT = new TextEncoder().encode('microflex-offline-v1');
 
 let cachedKey: CryptoKey | null = null;
 

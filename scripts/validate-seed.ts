@@ -1,5 +1,5 @@
 /**
- * COFINCO - Seed Validation Script
+ * MICROFLEX - Seed Validation Script
  *
  * Validates that the database has all required data for production.
  * Run after seed or anytime to check database health.
@@ -40,7 +40,7 @@ interface ValidationResult {
 
 async function validateSeed(): Promise<ValidationResult[]> {
   console.log('═══════════════════════════════════════════════════════════════');
-  console.log('🔍 COFINCO - Seed Validation');
+  console.log('🔍 MICROFLEX - Seed Validation');
   console.log('═══════════════════════════════════════════════════════════════\n');
 
   const results: ValidationResult[] = [];

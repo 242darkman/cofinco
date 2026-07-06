@@ -19,7 +19,7 @@ import type { SearchResult } from '../types';
 
 const DEBOUNCE_MS = 200;
 const MAX_RECENTS = 5;
-const RECENTS_KEY = 'cofinco_search_recents';
+const RECENTS_KEY = 'microflex_search_recents';
 
 interface UseGlobalSearchReturn {
   /** Current query string */

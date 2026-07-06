@@ -2,7 +2,7 @@
  * Centralized Logger with Pino
  * ============================
  *
- * Logger centralisé haute performance pour l'application COFINCO.
+ * Logger centralisé haute performance pour l'application MICROFLEX.
  * Basé sur Pino pour des performances optimales en production.
  *
  * ## Caractéristiques:
@@ -120,7 +120,7 @@ const baseConfig: LoggerOptions = {
   serializers,
   base: {
     env: process.env.NODE_ENV || 'development',
-    app: 'cofinco',
+    app: 'microflex',
     version: process.env.APP_VERSION || '1.0.0',
   },
   timestamp: pino.stdTimeFunctions.isoTime,

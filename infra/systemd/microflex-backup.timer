@@ -1,5 +1,5 @@
 [Unit]
-Description=Cofinco Daily PostgreSQL Backup Timer
+Description=MicroFlex Daily PostgreSQL Backup Timer
 
 [Timer]
 # Daily at 02:00 UTC with random delay up to 5 minutes

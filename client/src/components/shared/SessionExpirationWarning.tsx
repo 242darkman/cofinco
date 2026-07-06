@@ -43,7 +43,7 @@ const CONFIG = {
   REDIRECT_DELAY_MS: 2000,
 
   // BroadcastChannel name
-  CHANNEL_NAME: 'cofinco-session-sync',
+  CHANNEL_NAME: 'microflex-session-sync',
 };
 
 // ============================================

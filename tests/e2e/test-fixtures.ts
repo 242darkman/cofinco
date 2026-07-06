@@ -1,7 +1,7 @@
 /**
  * E2E Test Fixtures — Shared test data helpers
  *
- * Since E2E tests run against an isolated `cofinco_test` database
+ * Since E2E tests run against an isolated `microflex_test` database
  * (created by db-init-test, truncated by global-setup), each test
  * suite only needs to insert its own test data in beforeAll.
  *

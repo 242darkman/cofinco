@@ -33,7 +33,7 @@ export default function QRGenerateScreen() {
 
   const generateQR = (data: QRForm) => {
     const payload = {
-      type: 'cofinco_payment',
+      type: 'microflex_payment',
       account: mainAccount?.numeroCompte,
       name: `${user?.nom} ${user?.prenom ?? ''}`.trim(),
       amount: data.amount ? parseFloat(data.amount) : undefined,

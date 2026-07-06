@@ -31,7 +31,7 @@ RUN npx expo export --platform web
 # ============================================
 FROM nginx:1.27-alpine AS runtime
 
-LABEL org.opencontainers.image.description="Cofinco Mobile — Web build"
+LABEL org.opencontainers.image.description="MicroFlex Mobile — Web build"
 
 # Remove default nginx config
 RUN rm /etc/nginx/conf.d/default.conf

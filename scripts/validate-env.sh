@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==========================================================
-# Cofinco — Validation des variables d'environnement
+# MicroFlex — Validation des variables d'environnement
 # ==========================================================
 # Usage :
 #   bash scripts/validate-env.sh .env.staging       # staging
@@ -37,7 +37,7 @@ else
 fi
 
 echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BOLD}  Cofinco — Validation de $ENV_FILE (${ENV_MODE})${NC}"
+echo -e "${BOLD}  MicroFlex — Validation de $ENV_FILE (${ENV_MODE})${NC}"
 echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
@@ -183,11 +183,11 @@ check_secret_strength "MINIO_ROOT_PASSWORD" 8
 check_secret_strength "GRAFANA_ADMIN_PASSWORD" 8
 
 # Vérifier qu'on n'utilise pas les valeurs dev par défaut
-check_no_dev_value "POSTGRES_PASSWORD" "cofinco_dev" "password" "postgres"
+check_no_dev_value "POSTGRES_PASSWORD" "microflex_dev" "password" "postgres"
 check_no_dev_value "REDIS_PASSWORD" "redis_dev" "password" "redis"
 check_no_dev_value "SESSION_SECRET" "dev-session-secret-not-for-production-use-32chars"
 check_no_dev_value "OTP_HMAC_SECRET" "dev-otp-hmac-secret-not-for-production-use-64chars-long-enough"
-check_no_dev_value "OFFLINE_LIMITS_HMAC_KEY" "dev-offline-limits-hmac-key-not-for-production" "cofinco-offline-limits-v1"
+check_no_dev_value "OFFLINE_LIMITS_HMAC_KEY" "dev-offline-limits-hmac-key-not-for-production" "microflex-offline-limits-v1"
 check_no_dev_value "MINIO_ROOT_PASSWORD" "minioadmin" "minioadmin123"
 check_no_dev_value "GRAFANA_ADMIN_PASSWORD" "admin"
 

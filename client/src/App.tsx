@@ -247,7 +247,7 @@ function App() {
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 bg-surface rounded-lg flex items-center justify-center p-1">
                 <img
-                  src="/cofin-logo.png"
+                  src="/microflex-logo.png"
                   alt={`${branding?.appName ?? 'App'} Logo`}
                   className="w-full h-full object-contain"
                 />

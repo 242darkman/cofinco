@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==========================================================
-# Cofinco — VPS Initial Setup (Ubuntu 22.04/24.04 LTS)
+# MicroFlex — VPS Initial Setup (Ubuntu 22.04/24.04 LTS)
 # ==========================================================
 # Usage :
 #   sudo bash scripts/vps/setup.sh
@@ -10,7 +10,7 @@
 #   2. Nginx + Certbot (reverse proxy, HTTPS auto-renew)
 #   3. Docker + Docker Compose
 #   4. UFW Firewall (restrictif)
-#   5. Arborescence /opt/cofinco
+#   5. Arborescence /opt/microflex
 #   6. Utilisateur deploy (sans accès root)
 #   7. systemd timer pour backups DB
 #
@@ -21,12 +21,12 @@
 set -euo pipefail
 
 # ── Configuration ────────────────────────────────────────
-APP_NAME="cofinco"
+APP_NAME="microflex"
 APP_DIR="/opt/$APP_NAME"
 DEPLOY_USER="${DEPLOY_USER:-deploy}"
 PG_VERSION="16"
-PG_DB="${PG_DB:-cofinco}"
-PG_USER="${PG_USER:-cofinco_app}"
+PG_DB="${PG_DB:-microflex}"
+PG_USER="${PG_USER:-microflex_app}"
 # PG_PASS should be set as env var or will be auto-generated
 DOMAIN="${DOMAIN:-}"
 ACME_EMAIL="${ACME_EMAIL:-}"
@@ -132,7 +132,7 @@ fi
 # Add Docker subnet to pg_hba.conf (if not already there)
 if ! grep -q "$DOCKER_SUBNET" "$PG_HBA" 2>/dev/null; then
   # Add before the first "host" line
-  echo "# Docker containers (Cofinco app)" >> "$PG_HBA"
+  echo "# Docker containers (MicroFlex app)" >> "$PG_HBA"
   echo "host    $PG_DB    $PG_USER    $DOCKER_SUBNET    scram-sha-256" >> "$PG_HBA"
   log "Added Docker subnet to pg_hba.conf"
 fi
@@ -166,12 +166,12 @@ if [ "$PARALLEL_WORKERS" -gt 8 ]; then
 fi
 PARALLEL_GATHER=$((PARALLEL_WORKERS / 2))
 
-PG_TUNE_CONF="/etc/postgresql/$PG_VERSION/main/conf.d/99-cofinco-tuning.conf"
+PG_TUNE_CONF="/etc/postgresql/$PG_VERSION/main/conf.d/99-microflex-tuning.conf"
 mkdir -p "/etc/postgresql/$PG_VERSION/main/conf.d"
 
 cat > "$PG_TUNE_CONF" <<PGEOF
 # ==========================================================
-# Cofinco — PostgreSQL Tuning (auto-generated)
+# MicroFlex — PostgreSQL Tuning (auto-generated)
 # Server: ${TOTAL_RAM_GB}GB RAM, ${CPU_CORES} CPU cores
 # ==========================================================
 
@@ -288,8 +288,8 @@ systemctl enable nginx
 if [ -n "$DOMAIN" ]; then
   NGINX_CONF="/etc/nginx/sites-available/$APP_NAME"
 
-  if [ -f "$APP_DIR/infra/nginx/cofinco.conf" ]; then
-    cp "$APP_DIR/infra/nginx/cofinco.conf" "$NGINX_CONF"
+  if [ -f "$APP_DIR/infra/nginx/microflex.conf" ]; then
+    cp "$APP_DIR/infra/nginx/microflex.conf" "$NGINX_CONF"
     # Replace DOMAIN placeholder
     sed -i "s/DOMAIN/$DOMAIN/g" "$NGINX_CONF"
 
@@ -318,7 +318,7 @@ if [ -n "$DOMAIN" ]; then
       echo "  sudo certbot --nginx -d $DOMAIN -d www.$DOMAIN -m admin@$DOMAIN"
     fi
   else
-    warn "Nginx config template not found at $APP_DIR/infra/nginx/cofinco.conf"
+    warn "Nginx config template not found at $APP_DIR/infra/nginx/microflex.conf"
   fi
 else
   warn "DOMAIN not set — skipping Nginx/Certbot configuration"
@@ -410,9 +410,9 @@ if [ -f "$APP_DIR/scripts/vps/backup-db.sh" ]; then
 fi
 
 # Create systemd service
-cat > /etc/systemd/system/cofinco-backup.service <<EOF
+cat > /etc/systemd/system/microflex-backup.service <<EOF
 [Unit]
-Description=Cofinco PostgreSQL Backup
+Description=MicroFlex PostgreSQL Backup
 After=postgresql.service
 
 [Service]
@@ -430,9 +430,9 @@ WantedBy=multi-user.target
 EOF
 
 # Create systemd timer (daily at 2:00 AM)
-cat > /etc/systemd/system/cofinco-backup.timer <<EOF
+cat > /etc/systemd/system/microflex-backup.timer <<EOF
 [Unit]
-Description=Cofinco Daily PostgreSQL Backup
+Description=MicroFlex Daily PostgreSQL Backup
 
 [Timer]
 OnCalendar=*-*-* 02:00:00
@@ -444,13 +444,13 @@ WantedBy=timers.target
 EOF
 
 systemctl daemon-reload
-systemctl enable cofinco-backup.timer
-systemctl start cofinco-backup.timer
+systemctl enable microflex-backup.timer
+systemctl start microflex-backup.timer
 
 log "Backup timer enabled (daily at 02:00 UTC)"
 
 # Logrotate for deploy logs
-cat > /etc/logrotate.d/cofinco <<EOF
+cat > /etc/logrotate.d/microflex <<EOF
 $APP_DIR/logs/*.log {
     daily
     missingok
@@ -480,7 +480,7 @@ enabled = true
 
 [nginx-limit-req]
 enabled = true
-logpath = /var/log/nginx/cofinco_error.log
+logpath = /var/log/nginx/microflex_error.log
 EOF
 
   systemctl enable fail2ban

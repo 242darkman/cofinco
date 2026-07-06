@@ -1,16 +1,16 @@
 {
   "expo": {
     "name": "COFIN&CO",
-    "slug": "cofinco-mobile",
+    "slug": "microflex-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "cofinco",
+    "scheme": "microflex",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.cofinco.mobile",
+      "bundleIdentifier": "com.microflex.mobile",
       "infoPlist": {
         "NSCameraUsageDescription": "Utilise la camera pour scanner les codes QR de paiement",
         "NSFaceIDUsageDescription": "Utilise Face ID pour securiser votre connexion",
@@ -21,7 +21,7 @@
       }
     },
     "android": {
-      "package": "com.cofinco.mobile",
+      "package": "com.microflex.mobile",
       "adaptiveIcon": {
         "backgroundColor": "#047857",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

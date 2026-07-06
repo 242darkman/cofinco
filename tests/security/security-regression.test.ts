@@ -360,7 +360,7 @@ describe("Environment — No real credentials in example files", () => {
   it(".env.production.example should not contain real-looking passwords", () => {
     const content = readFileSync(resolve(PROJECT_ROOT, ".env.production.example"), "utf-8");
     expect(content).not.toMatch(/Admin123/);
-    expect(content).not.toMatch(/COFINCO_SECRET_2026/);
+    expect(content).not.toMatch(/MICROFLEX_SECRET_2026/);
   });
 });
 

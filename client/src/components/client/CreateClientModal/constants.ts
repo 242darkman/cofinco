@@ -30,7 +30,7 @@ export const STEPS: StepDefinition[] = [
 
 export const TOTAL_STEPS = STEPS.length;
 
-export const AUTO_SAVE_KEY = 'cofinco_create_client_draft';
+export const AUTO_SAVE_KEY = 'microflex_create_client_draft';
 
 export const EMPTY_REFERENCE: ReferencePersonne = {
   nom: '', prenom: '', telephone: '', relation: '', adresse: '', profession: '',

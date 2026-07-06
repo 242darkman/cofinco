@@ -70,9 +70,9 @@ function getCanvasHash(): string {
     ctx.fillStyle = '#f60';
     ctx.fillRect(125, 1, 62, 20);
     ctx.fillStyle = '#069';
-    ctx.fillText('COFINCO fingerprint', 2, 15);
+    ctx.fillText('MICROFLEX fingerprint', 2, 15);
     ctx.fillStyle = 'rgba(102, 204, 0, 0.7)';
-    ctx.fillText('COFINCO fingerprint', 4, 17);
+    ctx.fillText('MICROFLEX fingerprint', 4, 17);
 
     // Ajouter des formes géométriques
     ctx.beginPath();
@@ -192,7 +192,7 @@ export function generatePartialFingerprint(): string {
  * L'empreinte est stockée en sessionStorage pour cohérence pendant la session
  */
 export function getOrCreateFingerprint(): { full: string; partial: string } {
-  const storageKey = 'cofinco_device_fp';
+  const storageKey = 'microflex_device_fp';
 
   try {
     const stored = sessionStorage.getItem(storageKey);
@@ -220,7 +220,7 @@ export function getOrCreateFingerprint(): { full: string; partial: string } {
  */
 export function clearStoredFingerprint(): void {
   try {
-    sessionStorage.removeItem('cofinco_device_fp');
+    sessionStorage.removeItem('microflex_device_fp');
   } catch {
     // Ignore errors
   }

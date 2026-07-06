@@ -3,10 +3,10 @@ import { test, expect, Page } from '@playwright/test';
 // Helper to login
 async function login(page: Page, role: 'admin' | 'superviseur' | 'agent' | 'caissier') {
   const credentials = {
-    admin: { email: 'admin@cofinco.com', password: 'Admin@123' },
-    superviseur: { email: 'supervisor@cofinco.com', password: 'Supervisor@123' },
-    agent: { email: 'agent@cofinco.com', password: 'Agent@123' },
-    caissier: { email: 'caissier@cofinco.com', password: 'Caissier@123' }
+    admin: { email: 'admin@microflex.com', password: 'Admin@123' },
+    superviseur: { email: 'supervisor@microflex.com', password: 'Supervisor@123' },
+    agent: { email: 'agent@microflex.com', password: 'Agent@123' },
+    caissier: { email: 'caissier@microflex.com', password: 'Caissier@123' }
   };
 
   await page.goto('/login');

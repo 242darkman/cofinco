@@ -127,7 +127,7 @@ export default function LoadingScreen({ message = 'Chargement...', fullScreen = 
               <div className="relative w-24 h-24 mx-auto bg-white rounded-2xl flex items-center justify-center"
                    style={{ boxShadow: '0 20px 40px -10px rgba(27, 42, 74, 0.35), 0 0 0 1px rgba(45, 139, 87, 0.1)' }}>
                 <img
-                  src="/cofin-logo.png"
+                  src="/microflex-logo.png"
                   alt={`${branding.appName} Logo`}
                   className="w-20 h-20 object-contain"
                 />

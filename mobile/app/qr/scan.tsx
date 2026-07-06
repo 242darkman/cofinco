@@ -29,8 +29,8 @@ export default function QRScanScreen() {
 
     try {
       const parsed: QRPayload = JSON.parse(data);
-      if (parsed.type !== 'cofinco_payment') {
-        Alert.alert('QR invalide', 'Ce code QR n\'est pas un paiement COFINCO.');
+      if (parsed.type !== 'microflex_payment') {
+        Alert.alert('QR invalide', 'Ce code QR n\'est pas un paiement MICROFLEX.');
         setScanned(false);
         return;
       }

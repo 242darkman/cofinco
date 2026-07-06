@@ -5,9 +5,9 @@ import { api, setOnUnauthorized } from '@/lib/api-client';
 import type { SystemRole, AppContext } from '@shared/types/mobile';
 
 // Keys for SecureStore
-const BIOMETRICS_ENABLED_KEY = 'cofinco_biometrics_enabled';
-const LAST_USERNAME_KEY = 'cofinco_last_username';
-const ACTIVE_CONTEXT_KEY = 'cofinco_active_context';
+const BIOMETRICS_ENABLED_KEY = 'microflex_biometrics_enabled';
+const LAST_USERNAME_KEY = 'microflex_last_username';
+const ACTIVE_CONTEXT_KEY = 'microflex_active_context';
 
 export interface AuthUser {
   id: string;

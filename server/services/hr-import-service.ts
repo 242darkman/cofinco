@@ -136,7 +136,7 @@ export async function importEmployees(
   }
 
   // Default password for new employees (must be changed on first login)
-  const defaultPassword = await hashPassword("Cofinco2024!");
+  const defaultPassword = await hashPassword("MicroFlex2024!");
 
   for (let i = 0; i < rows.length; i++) {
     const rowIndex = i + 2; // Row 1 is header, so data starts at row 2

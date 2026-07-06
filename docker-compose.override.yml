@@ -1,5 +1,5 @@
 # ==========================================================
-# Cofinco — DEV OVERLAY (chargé automatiquement)
+# MicroFlex — DEV OVERLAY (chargé automatiquement)
 # ==========================================================
 # Hot reload complet dans Docker :
 #   - Backend : tsx watch (restart auto sur modif *.ts)
@@ -17,7 +17,7 @@ services:
   # DB INIT — schema push + seed (one-shot)
   # ==========================================
   db-init:
-    container_name: cofinco-db-init
+    container_name: microflex-db-init
     build:
       context: .
       dockerfile: Dockerfile
@@ -28,14 +28,14 @@ services:
       db:
         condition: service_healthy
     networks:
-      - cofinco_internal
+      - microflex_internal
     restart: "no"
 
   # ==========================================
   # APPLICATION — hot reload dev
   # ==========================================
   app:
-    container_name: cofinco-app
+    container_name: microflex-app
     build:
       context: .
       dockerfile: Dockerfile
@@ -57,12 +57,12 @@ services:
       SMTP_PORT: ${SMTP_PORT:-1025}
       SMTP_USERNAME: ${SMTP_USERNAME:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-dev@cofinco.local}
-      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-COFINCO-DEV}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-dev@microflex.local}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-MICROFLEX-DEV}
       SMTP_SECURE: "false"
       MTN_SMS_CLIENT_ID: ${MTN_SMS_CLIENT_ID:-}
       MTN_SMS_CLIENT_SECRET: ${MTN_SMS_CLIENT_SECRET:-}
-      MTN_SMS_SENDER_ID: ${MTN_SMS_SENDER_ID:-COFINCO}
+      MTN_SMS_SENDER_ID: ${MTN_SMS_SENDER_ID:-MICROFLEX}
       MTN_SMS_WEBHOOK_SECRET: ${MTN_SMS_WEBHOOK_SECRET:-}
       MTN_SMS_TOKEN_URL: ${MTN_SMS_TOKEN_URL:-}
       MTN_SMS_BASE_URL: ${MTN_SMS_BASE_URL:-}
@@ -88,13 +88,13 @@ services:
       pgbouncer:
         condition: service_started
     networks:
-      - cofinco_internal
+      - microflex_internal
 
   # ==========================================
   # MOBILE — Expo dev server (hot reload)
   # ==========================================
   mobile:
-    container_name: cofinco-mobile
+    container_name: microflex-mobile
     profiles: ["mobile"]
     build:
       context: ./mobile
@@ -116,7 +116,7 @@ services:
       app:
         condition: service_started
     networks:
-      - cofinco_internal
+      - microflex_internal
 
   # ==========================================
   # INFRASTRUCTURE — ports exposés pour debug
@@ -164,7 +164,7 @@ services:
   # TESTS — unit + integration (profile: test)
   # ==========================================
   test-unit:
-    container_name: cofinco-test-unit
+    container_name: microflex-test-unit
     build:
       context: .
       dockerfile: Dockerfile
@@ -184,46 +184,46 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - cofinco_internal
+      - microflex_internal
     restart: "no"
 
   # ==========================================
   # TESTS — E2E: test DB init (profile: test)
   # ==========================================
-  # Creates cofinco_test database, pushes schema, seeds reference data.
+  # Creates microflex_test database, pushes schema, seeds reference data.
   # Runs once before app-test starts.
   db-init-test:
-    container_name: cofinco-db-init-test
+    container_name: microflex-db-init-test
     build:
       context: .
       dockerfile: Dockerfile
       target: init
     profiles: ["test"]
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@db:5432/cofinco_test
+      DATABASE_URL: postgresql://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@db:5432/microflex_test
       PGPASSWORD: ${POSTGRES_PASSWORD:?}
     entrypoint: ["sh", "-c"]
     command:
       - |
         # Create test database if it doesn't exist
-        psql -h db -U ${POSTGRES_USER:?} -tc "SELECT 1 FROM pg_database WHERE datname = 'cofinco_test'" | grep -q 1 \
-          || psql -h db -U ${POSTGRES_USER:?} -c "CREATE DATABASE cofinco_test"
+        psql -h db -U ${POSTGRES_USER:?} -tc "SELECT 1 FROM pg_database WHERE datname = 'microflex_test'" | grep -q 1 \
+          || psql -h db -U ${POSTGRES_USER:?} -c "CREATE DATABASE microflex_test"
         # Download GeoNames data + push schema + ensure SQL objects + seed
         sh scripts/download-geonames.sh && npx drizzle-kit push --force && node --import tsx scripts/ensure-sql.ts && node --import tsx seeds/seed-prod.ts
     depends_on:
       db:
         condition: service_healthy
     networks:
-      - cofinco_internal
+      - microflex_internal
     restart: "no"
 
   # ==========================================
   # TESTS — E2E: isolated app (profile: test)
   # ==========================================
-  # Same as app but points to cofinco_test database.
+  # Same as app but points to microflex_test database.
   # E2E browser tests hit this instance, not the dev app.
   app-test:
-    container_name: cofinco-app-test
+    container_name: microflex-app-test
     build:
       context: .
       dockerfile: Dockerfile
@@ -233,7 +233,7 @@ services:
     environment:
       NODE_ENV: test
       PORT: "5000"
-      DATABASE_URL: postgresql://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@db:5432/cofinco_test
+      DATABASE_URL: postgresql://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@db:5432/microflex_test
       REDIS_URL: redis://:${REDIS_PASSWORD:?}@redis:6379
       SESSION_SECRET: ${SESSION_SECRET:?}
       OTP_HMAC_SECRET: ${OTP_HMAC_SECRET:?}
@@ -251,14 +251,14 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - cofinco_internal
+      - microflex_internal
     restart: "no"
 
   # ==========================================
   # TESTS — E2E Playwright (profile: test)
   # ==========================================
   test-e2e:
-    container_name: cofinco-test-e2e
+    container_name: microflex-test-e2e
     build:
       context: .
       dockerfile: Dockerfile
@@ -266,7 +266,7 @@ services:
     profiles: ["test"]
     environment:
       PLAYWRIGHT_BASE_URL: http://app-test:5000
-      DATABASE_URL: postgresql://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@db:5432/cofinco_test
+      DATABASE_URL: postgresql://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@db:5432/microflex_test
     volumes:
       - .:/app
       - /app/node_modules
@@ -277,14 +277,14 @@ services:
       db:
         condition: service_healthy
     networks:
-      - cofinco_internal
+      - microflex_internal
     restart: "no"
 
   # ==========================================
   # DEV-ONLY — Admin tools (profile: admin)
   # ==========================================
   mailpit:
-    container_name: cofinco-mailpit
+    container_name: microflex-mailpit
     image: axllent/mailpit:v1.21
     restart: unless-stopped
     profiles: ["admin"]
@@ -296,14 +296,14 @@ services:
       MP_SMTP_AUTH_ACCEPT_ANY: 1
       MP_SMTP_AUTH_ALLOW_INSECURE: 1
     networks:
-      - cofinco_internal
+      - microflex_internal
 
   pgadmin:
-    container_name: cofinco-pgadmin
+    container_name: microflex-pgadmin
     image: dpage/pgadmin4:8.9
     profiles: ["admin"]
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@cofinco.local
+      PGADMIN_DEFAULT_EMAIL: admin@microflex.local
       PGADMIN_DEFAULT_PASSWORD: admin
       PGADMIN_CONFIG_SERVER_MODE: "False"
     ports:
@@ -314,10 +314,10 @@ services:
       db:
         condition: service_healthy
     networks:
-      - cofinco_internal
+      - microflex_internal
 
   redisinsight:
-    container_name: cofinco-redisinsight
+    container_name: microflex-redisinsight
     image: redis/redisinsight:2.50.0
     profiles: ["admin"]
     ports:
@@ -328,7 +328,7 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - cofinco_internal
+      - microflex_internal
 
 volumes:
   cofin_pgadmin_data:

@@ -1,6 +1,6 @@
-# Cofinco — Mode Operatoire de Deploiement (VPS OVH)
+# MicroFlex — Mode Operatoire de Deploiement (VPS OVH)
 
-> Guide complet et pratique pour deployer Cofinco sur un VPS OVH.
+> Guide complet et pratique pour deployer MicroFlex sur un VPS OVH.
 > Teste et valide sur VPS OVH Rise-4 (64GB RAM, 16 vCores, 350GB SSD).
 
 ---
@@ -82,7 +82,7 @@ Avant de commencer, vous devez avoir :
 
 - [ ] **Un VPS OVH** avec Ubuntu 22.04 ou 24.04 LTS
 - [ ] **Un nom de domaine** pointe vers l'IP du VPS (A record + www CNAME)
-- [ ] **Un repo GitHub** avec le code Cofinco et les workflows CI/CD
+- [ ] **Un repo GitHub** avec le code MicroFlex et les workflows CI/CD
 - [ ] **Un Personal Access Token GitHub** (PAT) avec scope `read:packages` pour GHCR
 - [ ] **Acces root** au VPS (SSH)
 
@@ -93,10 +93,10 @@ Configurez les enregistrements DNS pour votre domaine :
 ```
 Type    Nom       Valeur            TTL
 A       @         91.134.136.73     3600
-CNAME   www       cofinco-m.com.    3600
+CNAME   www       microflex-m.com.    3600
 ```
 
-> **Important** : Le DNS doit etre propage AVANT de lancer Certbot (etape setup). Verifiez avec `dig +short cofinco-m.com`.
+> **Important** : Le DNS doit etre propage AVANT de lancer Certbot (etape setup). Verifiez avec `dig +short microflex-m.com`.
 
 ---
 
@@ -111,24 +111,24 @@ ssh root@91.134.136.73
 ### 1.2 Cloner le repo (temporairement, pour les scripts)
 
 ```bash
-git clone https://github.com/242darkman/cofinco.git /tmp/cofinco-setup
-cd /tmp/cofinco-setup
+git clone https://github.com/242darkman/microflex.git /tmp/microflex-setup
+cd /tmp/microflex-setup
 ```
 
 ### 1.3 Lancer le script de setup
 
 ```bash
-sudo DOMAIN=cofinco-m.com ACME_EMAIL=admin@cofinco-m.com bash scripts/vps/setup.sh
+sudo DOMAIN=microflex-m.com ACME_EMAIL=admin@microflex-m.com bash scripts/vps/setup.sh
 ```
 
 Ce script installe et configure automatiquement :
-- **PostgreSQL 16** : base `cofinco`, user `cofinco_app`, tuning auto (shared_buffers=16GB, etc.)
+- **PostgreSQL 16** : base `microflex`, user `microflex_app`, tuning auto (shared_buffers=16GB, etc.)
 - **Docker** : daemon avec log rotation, live-restore, subnet `172.20.0.0/16`
-- **Nginx** : reverse proxy avec config Cofinco (least_conn, rate limiting, security headers)
+- **Nginx** : reverse proxy avec config MicroFlex (least_conn, rate limiting, security headers)
 - **Certbot** : certificat SSL Let's Encrypt + auto-renew
 - **UFW** : firewall restrictif (SSH + HTTP/HTTPS + PostgreSQL Docker)
 - **Fail2ban** : protection SSH + Nginx
-- **User `deploy`** : acces Docker, arborescence `/opt/cofinco/`
+- **User `deploy`** : acces Docker, arborescence `/opt/microflex/`
 - **Backup timer** : pg_dump quotidien a 02:00 UTC
 
 ### 1.4 NOTER les informations affichees
@@ -137,10 +137,10 @@ A la fin du script, **notez imperativement** :
 
 ```
   PostgreSQL
-    Database:  cofinco
-    User:      cofinco_app
+    Database:  microflex
+    User:      microflex_app
     Password:  <MOT_DE_PASSE_GENERE>
-    URL:       postgresql://cofinco_app:<PASSWORD>@host.docker.internal:5432/cofinco
+    URL:       postgresql://microflex_app:<PASSWORD>@host.docker.internal:5432/microflex
 ```
 
 > **CRITIQUE** : Le `DATABASE_URL` sera necessaire pour GitHub Secrets. Notez-le maintenant.
@@ -208,12 +208,12 @@ Dans **Settings → Environments → production → Environment secrets**, ajout
 
 | Secret | Description | Exemple |
 |---|---|---|
-| `DATABASE_URL` | URL PostgreSQL (du setup) | `postgresql://cofinco_app:xxx@host.docker.internal:5432/cofinco` |
+| `DATABASE_URL` | URL PostgreSQL (du setup) | `postgresql://microflex_app:xxx@host.docker.internal:5432/microflex` |
 | `REDIS_PASSWORD` | Mot de passe Redis (alphanum only) | `0rYnqEJzeMwTzdrE9UzCHIIhm9evNHxX` |
 | `SESSION_SECRET` | Secret sessions Express | `openssl rand -base64 32` |
 | `OTP_HMAC_SECRET` | Secret HMAC pour OTP | `openssl rand -hex 32` |
 | `OFFLINE_LIMITS_HMAC_KEY` | Secret HMAC offline | `openssl rand -hex 32` |
-| `MINIO_ROOT_USER` | User MinIO | `cofinco_minio_admin` |
+| `MINIO_ROOT_USER` | User MinIO | `microflex_minio_admin` |
 | `MINIO_ROOT_PASSWORD` | Password MinIO | `openssl rand -base64 32` |
 | `SMTP_HOST` | Serveur SMTP | `smtp-relay.brevo.com` |
 | `SMTP_USERNAME` | User SMTP | (votre login SMTP) |
@@ -234,18 +234,18 @@ Dans **Settings → Environments → production → Environment variables**, ajo
 
 | Variable | Valeur |
 |---|---|
-| `DOMAIN` | `cofinco-m.com` |
-| `MINIO_PUBLIC_ENDPOINT` | `https://cofinco-m.com/storage` |
+| `DOMAIN` | `microflex-m.com` |
+| `MINIO_PUBLIC_ENDPOINT` | `https://microflex-m.com/storage` |
 | `SMTP_PORT` | `587` |
-| `SMTP_FROM_EMAIL` | `noreply@cofinco-m.com` |
-| `SMTP_FROM_NAME` | `COFINCO-M` |
+| `SMTP_FROM_EMAIL` | `noreply@microflex-m.com` |
+| `SMTP_FROM_NAME` | `MICROFLEX-M` |
 | `SMTP_SECURE` | `false` |
-| `MTN_SMS_SENDER_ID` | `COFINCO` |
+| `MTN_SMS_SENDER_ID` | `MICROFLEX` |
 | `MTN_SMS_TOKEN_URL` | (URL token MTN) |
 | `MTN_SMS_BASE_URL` | (URL base MTN) |
 | `PAWAPAY_ENVIRONMENT` | `production` |
-| `PAWAPAY_CALLBACK_URL` | `https://cofinco-m.com/api/webhooks/pawapay` |
-| `PAWAPAY_STATEMENT_PREFIX` | `Cofinco` |
+| `PAWAPAY_CALLBACK_URL` | `https://microflex-m.com/api/webhooks/pawapay` |
+| `PAWAPAY_STATEMENT_PREFIX` | `MicroFlex` |
 | `WEBHOOK_IP_VALIDATION` | `true` |
 | `GL_POSTING_MODE` | `STRICT` |
 | `BALANCE_RECONCILIATION_INTERVAL_MINUTES` | `60` |
@@ -260,11 +260,11 @@ La cle SSH doit permettre au runner GitHub Actions de se connecter au VPS en tan
 
 **Option A** (recommande) : Generer une cle dediee sur votre machine locale :
 ```bash
-ssh-keygen -t ed25519 -C "github-actions-deploy" -f ~/.ssh/cofinco-deploy
+ssh-keygen -t ed25519 -C "github-actions-deploy" -f ~/.ssh/microflex-deploy
 # Copier la cle publique sur le VPS
-ssh-copy-id -i ~/.ssh/cofinco-deploy.pub deploy@91.134.136.73
+ssh-copy-id -i ~/.ssh/microflex-deploy.pub deploy@91.134.136.73
 # Copier le contenu de la cle PRIVEE dans le secret VPS_SSH_KEY
-cat ~/.ssh/cofinco-deploy
+cat ~/.ssh/microflex-deploy
 ```
 
 **Option B** : Reutiliser la cle du VPS (deja copiee par setup.sh vers l'user deploy).
@@ -281,20 +281,20 @@ ssh deploy@91.134.136.73
 
 ```bash
 # Depuis le clone temporaire (si encore present)
-cp /tmp/cofinco-setup/docker-compose.vps.yml /opt/cofinco/
-cp -r /tmp/cofinco-setup/scripts/vps/ /opt/cofinco/scripts/
-cp -r /tmp/cofinco-setup/infra/ /opt/cofinco/infra/
-chmod +x /opt/cofinco/scripts/vps/*.sh
+cp /tmp/microflex-setup/docker-compose.vps.yml /opt/microflex/
+cp -r /tmp/microflex-setup/scripts/vps/ /opt/microflex/scripts/
+cp -r /tmp/microflex-setup/infra/ /opt/microflex/infra/
+chmod +x /opt/microflex/scripts/vps/*.sh
 
 # Nettoyer le clone temporaire
-rm -rf /tmp/cofinco-setup
+rm -rf /tmp/microflex-setup
 ```
 
 > **Si le clone a deja ete supprime**, copiez les fichiers depuis votre machine locale :
 > ```bash
-> scp docker-compose.vps.yml deploy@91.134.136.73:/opt/cofinco/
-> scp -r scripts/vps/ deploy@91.134.136.73:/opt/cofinco/scripts/
-> scp -r infra/ deploy@91.134.136.73:/opt/cofinco/infra/
+> scp docker-compose.vps.yml deploy@91.134.136.73:/opt/microflex/
+> scp -r scripts/vps/ deploy@91.134.136.73:/opt/microflex/scripts/
+> scp -r infra/ deploy@91.134.136.73:/opt/microflex/infra/
 > ```
 
 ### 3.2 Se connecter a GHCR (GitHub Container Registry)
@@ -312,18 +312,18 @@ echo "ghp_VOTRE_TOKEN" | docker login ghcr.io -u VOTRE_USERNAME_GITHUB --passwor
 ### 3.3 Creer les repertoires manquants
 
 ```bash
-mkdir -p /opt/cofinco/{logs,data/geonames}
+mkdir -p /opt/microflex/{logs,data/geonames}
 ```
 
 ### 3.4 Verifier l'arborescence
 
 ```bash
-tree /opt/cofinco/ -L 2
+tree /opt/microflex/ -L 2
 ```
 
 Resultat attendu :
 ```
-/opt/cofinco/
+/opt/microflex/
 ├── backups/
 ├── data/
 │   └── geonames/
@@ -364,7 +364,7 @@ Le workflow `.github/workflows/release.yml` :
 3. **Build** : images Docker `runtime` + `init` → GHCR
 4. **Deploy** :
    - Genere `.env.runtime` depuis les GitHub Secrets
-   - Upload `.env.runtime` vers `/opt/cofinco/env/` via SCP
+   - Upload `.env.runtime` vers `/opt/microflex/env/` via SCP
    - Execute `deploy.sh v2.0.0` via SSH
 
 ### 4.3 Ce que fait `deploy.sh`
@@ -373,7 +373,7 @@ Le workflow `.github/workflows/release.yml` :
 2. Met a jour `APP_VERSION` dans `.env.runtime`
 3. Pull les images depuis GHCR
 4. **DB init** (one-shot) :
-   - Telecharge GeoNames (~1.6 GB, cache dans `/opt/cofinco/data/geonames/`)
+   - Telecharge GeoNames (~1.6 GB, cache dans `/opt/microflex/data/geonames/`)
    - Schema push (`drizzle-kit push --force`)
    - SQL functions/triggers/views (`ensure-sql.ts`)
    - Seeds production (`seed-prod.ts`)
@@ -401,18 +401,18 @@ Le premier deploiement est plus long car :
 
 ```bash
 ssh deploy@91.134.136.73
-docker compose -f /opt/cofinco/docker-compose.vps.yml --env-file /opt/cofinco/env/.env.runtime ps
+docker compose -f /opt/microflex/docker-compose.vps.yml --env-file /opt/microflex/env/.env.runtime ps
 ```
 
 Resultat attendu :
 ```
 NAME              IMAGE                                    STATUS                   PORTS
-cofinco-app-1     ghcr.io/242darkman/cofinco:v2.0.0       Up (healthy)             127.0.0.1:5001->5000/tcp
-cofinco-app-2     ghcr.io/242darkman/cofinco:v2.0.0       Up (healthy)             127.0.0.1:5002->5000/tcp
-cofinco-app-3     ghcr.io/242darkman/cofinco:v2.0.0       Up (healthy)             127.0.0.1:5003->5000/tcp
-cofinco-worker    ghcr.io/242darkman/cofinco:v2.0.0       Up (healthy)             5000/tcp
-cofinco-redis     redis:7.2-alpine                        Up (healthy)             6379/tcp
-cofinco-minio     minio/minio:...                         Up (healthy)             127.0.0.1:9001->9001/tcp
+microflex-app-1     ghcr.io/242darkman/microflex:v2.0.0       Up (healthy)             127.0.0.1:5001->5000/tcp
+microflex-app-2     ghcr.io/242darkman/microflex:v2.0.0       Up (healthy)             127.0.0.1:5002->5000/tcp
+microflex-app-3     ghcr.io/242darkman/microflex:v2.0.0       Up (healthy)             127.0.0.1:5003->5000/tcp
+microflex-worker    ghcr.io/242darkman/microflex:v2.0.0       Up (healthy)             5000/tcp
+microflex-redis     redis:7.2-alpine                        Up (healthy)             6379/tcp
+microflex-minio     minio/minio:...                         Up (healthy)             127.0.0.1:9001->9001/tcp
 ```
 
 ### 5.2 Verifier la sante de l'API
@@ -422,7 +422,7 @@ cofinco-minio     minio/minio:...                         Up (healthy)          
 curl http://127.0.0.1:5001/api/health
 
 # Depuis l'exterieur (via Nginx + HTTPS)
-curl https://cofinco-m.com/api/health
+curl https://microflex-m.com/api/health
 ```
 
 Reponse attendue : `{"status":"ok"}` (HTTP 200)
@@ -430,7 +430,7 @@ Reponse attendue : `{"status":"ok"}` (HTTP 200)
 ### 5.3 Verifier les cron jobs (worker)
 
 ```bash
-docker logs cofinco-worker --tail 50
+docker logs microflex-worker --tail 50
 ```
 
 Les crons doivent s'afficher (ils tournent UNIQUEMENT sur le worker, pas sur les 3 instances app) :
@@ -444,7 +444,7 @@ Les crons doivent s'afficher (ils tournent UNIQUEMENT sur le worker, pas sur les
 
 ```bash
 ssh deploy@91.134.136.73
-sudo -u postgres psql -d cofinco -c "SELECT COUNT(*) AS total_villes FROM villes;"
+sudo -u postgres psql -d microflex -c "SELECT COUNT(*) AS total_villes FROM villes;"
 ```
 
 Resultat attendu : `143699` villes.
@@ -452,8 +452,8 @@ Resultat attendu : `143699` villes.
 ### 5.5 Verifier les backups
 
 ```bash
-systemctl status cofinco-backup.timer
-systemctl list-timers cofinco-backup.timer
+systemctl status microflex-backup.timer
+systemctl list-timers microflex-backup.timer
 ```
 
 ### 5.6 Verifier Nginx et SSL
@@ -466,7 +466,7 @@ sudo certbot certificates
 sudo nginx -t
 
 # Logs d'acces
-tail -5 /var/log/nginx/cofinco_access.log
+tail -5 /var/log/nginx/microflex_access.log
 ```
 
 ---
@@ -500,7 +500,7 @@ Si le CI/CD est en panne, deployer directement depuis le VPS :
 
 ```bash
 ssh deploy@91.134.136.73
-bash /opt/cofinco/scripts/vps/deploy.sh v2.1.0
+bash /opt/microflex/scripts/vps/deploy.sh v2.1.0
 ```
 
 > **Prerequis** : le `.env.runtime` doit deja contenir les bonnes valeurs et les images doivent etre disponibles sur GHCR.
@@ -530,10 +530,10 @@ Si le health check echoue apres un deploiement, `deploy.sh` tente automatiquemen
 ssh deploy@91.134.136.73
 
 # Rollback au tag precedent
-bash /opt/cofinco/scripts/vps/rollback.sh
+bash /opt/microflex/scripts/vps/rollback.sh
 
 # Rollback a un tag specifique
-bash /opt/cofinco/scripts/vps/rollback.sh v2.0.0
+bash /opt/microflex/scripts/vps/rollback.sh v2.0.0
 ```
 
 Le rollback :
@@ -552,45 +552,45 @@ Le rollback :
 
 ```bash
 # Lancer un backup manuel
-bash /opt/cofinco/scripts/vps/backup-db.sh
+bash /opt/microflex/scripts/vps/backup-db.sh
 
 # Verifier le timer automatique
-systemctl status cofinco-backup.timer
-journalctl -u cofinco-backup.service --since today
+systemctl status microflex-backup.timer
+journalctl -u microflex-backup.service --since today
 
 # Lister les backups
-ls -lht /opt/cofinco/backups/
+ls -lht /opt/microflex/backups/
 
 # Restaurer un backup
-sudo -u postgres pg_restore -d cofinco -c /opt/cofinco/backups/cofinco_2026-02-24_020000.sql.gz
+sudo -u postgres pg_restore -d microflex -c /opt/microflex/backups/microflex_2026-02-24_020000.sql.gz
 ```
 
 ### Logs
 
 ```bash
 # Logs applicatifs (docker)
-docker compose -f /opt/cofinco/docker-compose.vps.yml --env-file /opt/cofinco/env/.env.runtime logs -f app
-docker compose -f /opt/cofinco/docker-compose.vps.yml --env-file /opt/cofinco/env/.env.runtime logs -f worker
+docker compose -f /opt/microflex/docker-compose.vps.yml --env-file /opt/microflex/env/.env.runtime logs -f app
+docker compose -f /opt/microflex/docker-compose.vps.yml --env-file /opt/microflex/env/.env.runtime logs -f worker
 
 # Logs de deploiement
-cat /opt/cofinco/logs/deploy.log
+cat /opt/microflex/logs/deploy.log
 
 # Logs Nginx
-tail -f /var/log/nginx/cofinco_access.log
-tail -f /var/log/nginx/cofinco_error.log
+tail -f /var/log/nginx/microflex_access.log
+tail -f /var/log/nginx/microflex_error.log
 ```
 
 ### PostgreSQL
 
 ```bash
 # Connexion psql
-sudo -u postgres psql -d cofinco
+sudo -u postgres psql -d microflex
 
 # Taille de la base
-sudo -u postgres psql -c "SELECT pg_size_pretty(pg_database_size('cofinco'));"
+sudo -u postgres psql -c "SELECT pg_size_pretty(pg_database_size('microflex'));"
 
 # Vacuum analyze
-sudo -u postgres psql -d cofinco -c "VACUUM ANALYZE;"
+sudo -u postgres psql -d microflex -c "VACUUM ANALYZE;"
 
 # Requetes lentes (> 1s, logged par defaut)
 sudo -u postgres psql -c "SELECT * FROM pg_stat_activity WHERE state = 'active';"
@@ -640,17 +640,17 @@ ssh -L 9001:127.0.0.1:9001 deploy@91.134.136.73
 
 ```bash
 # 1. Verifier les logs
-docker compose -f /opt/cofinco/docker-compose.vps.yml --env-file /opt/cofinco/env/.env.runtime logs app --tail 100
+docker compose -f /opt/microflex/docker-compose.vps.yml --env-file /opt/microflex/env/.env.runtime logs app --tail 100
 
 # 2. Verifier la connectivite PostgreSQL
 docker run --rm --network host postgres:16-alpine \
-  pg_isready -h localhost -p 5432 -U cofinco_app
+  pg_isready -h localhost -p 5432 -U microflex_app
 
 # 3. Verifier Redis
-docker compose -f /opt/cofinco/docker-compose.vps.yml --env-file /opt/cofinco/env/.env.runtime exec redis redis-cli -a "VOTRE_REDIS_PASSWORD" ping
+docker compose -f /opt/microflex/docker-compose.vps.yml --env-file /opt/microflex/env/.env.runtime exec redis redis-cli -a "VOTRE_REDIS_PASSWORD" ping
 
 # 4. Verifier MinIO
-docker compose -f /opt/cofinco/docker-compose.vps.yml --env-file /opt/cofinco/env/.env.runtime exec minio mc ready local
+docker compose -f /opt/microflex/docker-compose.vps.yml --env-file /opt/microflex/env/.env.runtime exec minio mc ready local
 ```
 
 ### Erreur PostgreSQL : connection timeout depuis Docker
@@ -685,42 +685,42 @@ Mettre a jour le secret `REDIS_PASSWORD` dans GitHub Environments et redeployer.
 
 ### Erreur deploy : "container name already in use"
 
-**Symptome** : `cofinco-db-init` "is already in use by container".
+**Symptome** : `microflex-db-init` "is already in use by container".
 
 **Cause** : Un deploy precedent a echoue et le container init n'a pas ete nettoye.
 
 **Solution** : Le script `deploy.sh` gere ce cas automatiquement (`docker rm -f`). Si le probleme persiste :
 ```bash
-docker rm -f cofinco-db-init
+docker rm -f microflex-db-init
 ```
 
 ### DB init echoue
 
 ```bash
 # Relancer manuellement le db-init
-bash /opt/cofinco/scripts/vps/deploy.sh v2.0.0
+bash /opt/microflex/scripts/vps/deploy.sh v2.0.0
 # (le deploy.sh relance le db-init)
 
 # Ou relancer uniquement le db-init via compose
-docker compose -f /opt/cofinco/docker-compose.vps.yml --env-file /opt/cofinco/env/.env.runtime run --rm db-init
+docker compose -f /opt/microflex/docker-compose.vps.yml --env-file /opt/microflex/env/.env.runtime run --rm db-init
 ```
 
 ### Health check echoue (502/503)
 
 ```bash
 # 1. Verifier que les containers tournent
-docker ps | grep cofinco
+docker ps | grep microflex
 
 # 2. Test direct sur un container
 curl -v http://127.0.0.1:5001/api/health
 
 # 3. Test via Nginx
-curl -v https://cofinco-m.com/api/health
+curl -v https://microflex-m.com/api/health
 
 # 4. Verifier Nginx
 sudo nginx -t
 sudo systemctl status nginx
-tail -20 /var/log/nginx/cofinco_error.log
+tail -20 /var/log/nginx/microflex_error.log
 ```
 
 ### Espace disque sature
@@ -734,13 +734,13 @@ docker system df
 docker image prune -a --filter "until=168h"
 
 # Backups
-du -sh /opt/cofinco/backups/
+du -sh /opt/microflex/backups/
 
 # Logs systeme
 sudo journalctl --vacuum-size=500M
 
 # Logs Docker
-docker compose -f /opt/cofinco/docker-compose.vps.yml --env-file /opt/cofinco/env/.env.runtime logs --tail 0
+docker compose -f /opt/microflex/docker-compose.vps.yml --env-file /opt/microflex/env/.env.runtime logs --tail 0
 # Les logs Docker sont limites a 10MB x 5 fichiers par container (daemon.json)
 ```
 
@@ -748,16 +748,16 @@ docker compose -f /opt/cofinco/docker-compose.vps.yml --env-file /opt/cofinco/en
 
 **Cause** : Le download GeoNames a echoue (reseau, timeout).
 
-**Solution** : Le cache dans `/opt/cofinco/data/geonames/` evite le re-telechargement. Si le cache est vide, redeployer relancera le download.
+**Solution** : Le cache dans `/opt/microflex/data/geonames/` evite le re-telechargement. Si le cache est vide, redeployer relancera le download.
 
 ```bash
 # Verifier le cache
-ls -lh /opt/cofinco/data/geonames/
+ls -lh /opt/microflex/data/geonames/
 # Devrait contenir allCountries.txt (~1.6 GB) et cities5000.txt
 
 # Si vide, supprimer le cache et redeployer
-rm -rf /opt/cofinco/data/geonames/*
-bash /opt/cofinco/scripts/vps/deploy.sh vX.Y.Z
+rm -rf /opt/microflex/data/geonames/*
+bash /opt/microflex/scripts/vps/deploy.sh vX.Y.Z
 ```
 
 ---
@@ -768,7 +768,7 @@ bash /opt/cofinco/scripts/vps/deploy.sh vX.Y.Z
 
 ```bash
 # Alias utile (a ajouter dans ~/.bashrc du user deploy)
-alias cdc='docker compose -f /opt/cofinco/docker-compose.vps.yml --env-file /opt/cofinco/env/.env.runtime'
+alias cdc='docker compose -f /opt/microflex/docker-compose.vps.yml --env-file /opt/microflex/env/.env.runtime'
 
 # Etat des containers
 cdc ps
@@ -781,13 +781,13 @@ cdc logs -f worker
 cdc restart app
 
 # Deployer un tag
-bash /opt/cofinco/scripts/vps/deploy.sh v2.1.0
+bash /opt/microflex/scripts/vps/deploy.sh v2.1.0
 
 # Rollback
-bash /opt/cofinco/scripts/vps/rollback.sh
+bash /opt/microflex/scripts/vps/rollback.sh
 
 # Backup manuel
-bash /opt/cofinco/scripts/vps/backup-db.sh
+bash /opt/microflex/scripts/vps/backup-db.sh
 ```
 
 ### Ports (tous sur localhost sauf 80/443)
@@ -804,7 +804,7 @@ bash /opt/cofinco/scripts/vps/backup-db.sh
 ### Fichiers importants sur le VPS
 
 ```
-/opt/cofinco/
+/opt/microflex/
 ├── docker-compose.vps.yml       # Compose principal
 ├── env/.env.runtime             # Variables d'environnement (genere par CI)
 ├── env/.previous-tag            # Tag precedent (pour rollback)

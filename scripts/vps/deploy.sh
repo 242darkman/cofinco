@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==========================================================
-# Cofinco — Deploy Script (VPS, idempotent)
+# MicroFlex — Deploy Script (VPS, idempotent)
 # ==========================================================
 # Usage :
 #   bash scripts/vps/deploy.sh <tag>
@@ -8,7 +8,7 @@
 #   bash scripts/vps/deploy.sh rc-v3.62.0
 #
 # Prérequis :
-#   - /opt/cofinco/env/.env.runtime existe (généré par CI/CD)
+#   - /opt/microflex/env/.env.runtime existe (généré par CI/CD)
 #   - Docker + docker compose installés
 #   - Accès GHCR (docker login ghcr.io)
 #   - PostgreSQL natif accessible
@@ -19,7 +19,7 @@
 set -euo pipefail
 
 # ── Configuration ────────────────────────────────────────
-APP_DIR="/opt/cofinco"
+APP_DIR="/opt/microflex"
 ENV_FILE="$APP_DIR/env/.env.runtime"
 COMPOSE_FILE="$APP_DIR/docker-compose.vps.yml"
 COMPOSE_CMD="docker compose -f $COMPOSE_FILE --env-file $ENV_FILE"
@@ -87,7 +87,7 @@ log "Pulling images for tag: $TAG"
 $COMPOSE_CMD pull app worker 2>&1 | while read -r line; do log "  $line"; done
 
 # Pull init image
-IMAGE_NAME=$(grep "^IMAGE_NAME=" "$ENV_FILE" | cut -d= -f2 || echo "cofinco")
+IMAGE_NAME=$(grep "^IMAGE_NAME=" "$ENV_FILE" | cut -d= -f2 || echo "microflex")
 INIT_IMAGE="$REGISTRY/$IMAGE_NAME:$TAG-init"
 log "Pulling init image: $INIT_IMAGE"
 docker pull "$INIT_IMAGE" 2>&1 | while read -r line; do log "  $line"; done
@@ -103,13 +103,13 @@ DB_URL=$(grep "^DATABASE_URL=" "$ENV_FILE" | cut -d= -f2-)
 DB_URL_LOCAL=$(echo "$DB_URL" | sed 's/host\.docker\.internal/localhost/g')
 
 # Remove leftover init container from a previous failed deploy
-docker rm -f cofinco-db-init 2>/dev/null || true
+docker rm -f microflex-db-init 2>/dev/null || true
 
 # Persist GeoNames data (~1.6 GB) across deploys to avoid re-downloading
 mkdir -p "$APP_DIR/data/geonames"
 
 docker run --rm \
-  --name cofinco-db-init \
+  --name microflex-db-init \
   --network host \
   -e "DATABASE_URL=$DB_URL_LOCAL" \
   -v "$APP_DIR/data/geonames:/geonames_cache" \

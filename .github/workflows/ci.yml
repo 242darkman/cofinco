@@ -1,5 +1,5 @@
 # ==========================================================
-# Cofinco — CI Pipeline (Pull Requests)
+# MicroFlex — CI Pipeline (Pull Requests)
 # ==========================================================
 # Runs on every PR to master/develop:
 #   - Type checking (tsc)
@@ -59,9 +59,9 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: cofinco
-          POSTGRES_PASSWORD: cofinco
-          POSTGRES_DB: cofinco
+          POSTGRES_USER: microflex
+          POSTGRES_PASSWORD: microflex
+          POSTGRES_DB: microflex
         ports:
           - 5432:5432
         options: >-
@@ -82,7 +82,7 @@ jobs:
 
       - name: DB Init — schema push + seeds
         env:
-          DATABASE_URL: postgresql://cofinco:cofinco@localhost:5432/cofinco
+          DATABASE_URL: postgresql://microflex:microflex@localhost:5432/microflex
         run: |
           npx drizzle-kit push --force
           node --env-file=.env --import tsx seeds/seed-prod.ts
@@ -90,13 +90,13 @@ jobs:
 
       - name: GL Contract Tests (14 tests)
         env:
-          DATABASE_URL: postgresql://cofinco:cofinco@localhost:5432/cofinco
+          DATABASE_URL: postgresql://microflex:microflex@localhost:5432/microflex
           GL_POSTING_MODE: STRICT
         run: npx vitest run tests/contracts/gl-accounting-contracts.test.ts
 
       - name: GL Coverage Matrix (must be 100%)
         env:
-          DATABASE_URL: postgresql://cofinco:cofinco@localhost:5432/cofinco
+          DATABASE_URL: postgresql://microflex:microflex@localhost:5432/microflex
         run: node --import tsx scripts/generate-gl-coverage.ts
 
       - name: Upload coverage artifacts
@@ -126,6 +126,6 @@ jobs:
           context: .
           target: runtime
           push: false
-          tags: cofinco:ci-test
+          tags: microflex:ci-test
           cache-from: type=gha
           cache-to: type=gha,mode=max
