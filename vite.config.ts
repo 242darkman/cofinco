@@ -199,13 +199,13 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      "@": path.resolve(import.meta.dirname, "client", "src"),
-      "@shared": path.resolve(import.meta.dirname, "shared"),
-      "server": path.resolve(import.meta.dirname, "server"),
+      "@": path.resolve(import.meta.dirname, "apps/web/src"),
+      "@shared": path.resolve(import.meta.dirname, "packages/shared"),
+      "server": path.resolve(import.meta.dirname, "apps/api"),
     },
     dedupe: ['react', 'react-dom'],
   },
-  root: path.resolve(import.meta.dirname, "client"),
+  root: path.resolve(import.meta.dirname, "apps/web"),
 
   // ========== BUILD OPTIMIZATION FOR SLOW CONNECTIONS ==========
   build: {

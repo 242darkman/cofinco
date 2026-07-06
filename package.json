@@ -1,11 +1,16 @@
 {
-  "name": "microflex",
+  "name": "microflex-monorepo",
   "version": "2.0.1",
   "type": "module",
+  "private": true,
   "license": "MIT",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "dev:client": "vite dev --port 5173",
-    "dev": "mkdir -p .tmp && TMPDIR=.tmp NODE_ENV=development node --env-file=.env --import tsx server/index.ts",
+    "dev": "mkdir -p .tmp && TMPDIR=.tmp NODE_ENV=development node --env-file=.env --import tsx apps/api/index.ts",
     "build": "tsx script/build.ts",
     "start": "NODE_ENV=production node --env-file=.env dist/index.cjs",
     "check": "tsc",

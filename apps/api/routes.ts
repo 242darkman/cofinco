@@ -12,7 +12,7 @@ import { registerDashboardRoutes } from "./routes/dashboard";
 import { hrRouter } from "./routes/hr";
 import { registerMobileMoneyRoutes } from "./mobile-money-service";
 import { registerConversationsRoutes } from "./routes/conversations";
-import { createServer, type Server } from "http";
+import { createServer, type Server } from "node:http";
 import { setupWebSocket, setWsInstance } from "./ws-server";
 import { registerAccountingRoutes } from "./routes/accounting";
 import { registerTreasuryRoutes } from "./routes/treasury";

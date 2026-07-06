@@ -4,10 +4,9 @@ export default {
   // Tailwind scans these files to determine which classes to include
   // This reduces CSS bundle size by ~50-70%
   content: [
-    './index.html',
-    './src/**/*.{js,ts,jsx,tsx}',
-    // Include shared types that might contain class names
-    '../shared/**/*.{ts,tsx}',
+    './apps/web/index.html',
+    './apps/web/src/**/*.{js,ts,jsx,tsx}',
+    './packages/shared/**/*.{ts,tsx}',
   ],
   darkMode: 'class',
   // ========== FUTURE FLAGS FOR SMALLER OUTPUT ==========

@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { db } from './db';
-import { userAgences, agences } from '../shared/schema';
+import { userAgences, agences } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
-import { SystemRole } from '../shared/types/roles';
+import { SystemRole } from '@shared/types/roles';
 import { createLogger } from './lib/logger';
 
 const logger = createLogger('Middleware');

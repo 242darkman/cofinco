@@ -3,13 +3,13 @@ import { createLogger } from "../lib/logger";
 import { db } from "../db";
 
 const logger = createLogger('Routes:Agences');
-import { agences, userAgences, users, coffresForts, comptesLiaison, userRoles } from "../../shared/schema";
-import { employes } from "../../shared/schema/employes";
-import { clients } from "../../shared/schema/clients";
+import { agences, userAgences, users, coffresForts, comptesLiaison, userRoles } from "@shared/schema";
+import { employes } from "@shared/schema/employes";
+import { clients } from "@shared/schema/clients";
 import { eq, and, ilike, or, desc, asc, sql, ne, isNull } from "drizzle-orm";
-import { villes } from "../../shared/schema/operations";
-import { regions } from "../../shared/schema/geography";
-import { pays as paysTable } from "../../shared/schema/pays";
+import { villes } from "@shared/schema/operations";
+import { regions } from "@shared/schema/geography";
+import { pays as paysTable } from "@shared/schema/pays";
 import { requireAuth } from "../auth";
 import { attachAbility, requireAbility } from "../authorization";
 import { Actions, Subjects } from "@shared/ability";
@@ -21,11 +21,11 @@ import {
   migrationAuditLogs,
   migrationEntityLogs,
   MIGRATION_STATUS
-} from "../../shared/schema/agency_migration";
+} from "@shared/schema/agency_migration";
 import { agencyMigrationService, MigrationError } from "../services/agency-migration";
 import { getWsInstance } from "../ws-server";
-import { TypeAgence, StatutAgence, AGENCY_STATUS_TRANSITIONS, StatutUser, StatutClient } from "../../shared/enum/status-constants";
-import { agencyStatusHistory } from "../../shared/schema/agences";
+import { TypeAgence, StatutAgence, AGENCY_STATUS_TRANSITIONS, StatutUser, StatutClient } from "@shared/enum/status-constants";
+import { agencyStatusHistory } from "@shared/schema/agences";
 import { getAgencyActivationChecklist } from "../services/agency-checklist";
 import { currencyCode } from "@shared/config/currency";
 import { normalizePhone } from "@shared/utils/phone";
