@@ -1,5 +1,6 @@
 import React from 'react';
 import { useBranding } from '../../contexts/BrandingContext';
+import { useTenant } from '../../contexts/TenantContext';
 
 interface LoadingScreenProps {
   message?: string;
@@ -113,6 +114,7 @@ function SmallSpinner({ size = 48 }: { size?: number }) {
 
 export default function LoadingScreen({ message = 'Chargement...', fullScreen = true, showLogo = false }: LoadingScreenProps) {
   const { branding } = useBranding();
+  const { config: tenantConfig } = useTenant();
   if (fullScreen) {
     return (
       <div className="fixed inset-0 bg-gradient-to-br from-surface-base via-surface-base to-surface flex items-center justify-center z-50">
@@ -127,8 +129,8 @@ export default function LoadingScreen({ message = 'Chargement...', fullScreen = 
               <div className="relative w-24 h-24 mx-auto bg-white rounded-2xl flex items-center justify-center"
                    style={{ boxShadow: '0 20px 40px -10px rgba(27, 42, 74, 0.35), 0 0 0 1px rgba(45, 139, 87, 0.1)' }}>
                 <img
-                  src="/microflex-logo.png"
-                  alt={`${branding.appName} Logo`}
+                  src={tenantConfig?.theme?.logoUrl || "/microflex-logo.png"}
+                  alt={`${tenantConfig?.name || branding.appName} Logo`}
                   className="w-20 h-20 object-contain"
                 />
               </div>

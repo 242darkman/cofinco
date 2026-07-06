@@ -1,0 +1,86 @@
+import React, { createContext, useContext, ReactNode } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { defaultTenantConfig, type TenantConfig } from '@shared/tenant-config';
+
+interface TenantContextType {
+  config: TenantConfig;
+  isLoading: boolean;
+  error: Error | null;
+}
+
+const TenantContext = createContext<TenantContextType>({
+  config: defaultTenantConfig,
+  isLoading: true,
+  error: null,
+});
+
+/**
+ * Compute a derived color (lighter or darker) for hover states.
+ */
+function adjustColor(hex: string | undefined, amount: number): string | undefined {
+  if (!hex || !hex.startsWith('#')) return undefined; // Simplistic approach: only hex
+  try {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+
+    const clamp = (v: number) => Math.max(0, Math.min(255, v));
+    const nr = clamp(r + amount);
+    const ng = clamp(g + amount);
+    const nb = clamp(b + amount);
+
+    return `#${nr.toString(16).padStart(2, '0')}${ng.toString(16).padStart(2, '0')}${nb.toString(16).padStart(2, '0')}`;
+  } catch (e) {
+    return hex;
+  }
+}
+
+function applyTenantTheme(config: TenantConfig) {
+  const root = document.documentElement;
+  
+  if (config.theme.primaryColor) {
+    // We expect primaryColor to be a valid CSS value (HSL, RGB or Hex)
+    root.style.setProperty('--accent-primary', config.theme.primaryColor);
+    
+    // Attempt hover color if hex
+    const hoverColor = adjustColor(config.theme.primaryColor, -20);
+    if (hoverColor) {
+      root.style.setProperty('--accent-primary-hover', hoverColor);
+    }
+  }
+  
+  if (config.theme.secondaryColor) {
+    root.style.setProperty('--accent-secondary', config.theme.secondaryColor);
+  }
+}
+
+export function TenantProvider({ children }: { children: ReactNode }) {
+  const { data: config, isLoading, error } = useQuery({
+    queryKey: ['/api/tenant/config'],
+    queryFn: async () => {
+      const res = await fetch('/api/tenant/config');
+      if (!res.ok) throw new Error('Failed to fetch tenant config');
+      return res.json() as Promise<TenantConfig>;
+    },
+    // We can assume tenant config rarely changes during a session (requires restart/redeploy)
+    staleTime: Infinity, 
+    initialData: defaultTenantConfig, // Start with MicroFlex defaults
+  });
+
+  // Apply CSS variables whenever config changes
+  React.useEffect(() => {
+    if (config) {
+      applyTenantTheme(config);
+    }
+  }, [config]);
+
+  return (
+    <TenantContext.Provider value={{ config: config || defaultTenantConfig, isLoading, error }}>
+      {children}
+    </TenantContext.Provider>
+  );
+}
+
+export function useTenant() {
+  return useContext(TenantContext);
+}

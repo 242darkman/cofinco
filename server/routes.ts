@@ -28,6 +28,7 @@ import { registerComptesRoutes } from "./routes/comptes";
 import { registerReevaluationRoutes } from "./routes/reevaluations";
 import { registerNotificationsRoutes } from "./routes/notifications";
 import { registerPushRoutes } from "./routes/push";
+import { registerTenantRoutes } from "./routes/tenant";
 
 import { coffreRouter } from "./routes/coffre";
 import { caisseAgentRouter } from "./routes/caisse-agent";
@@ -137,6 +138,9 @@ export function registerRoutes(app: Express): Server {
 
   // Branding Module (app name, logo, theme colors)
   registerBrandingRoutes(app);
+
+  // Tenant Configuration (Feature Flags, White-label variables)
+  registerTenantRoutes(app);
 
   // Reevaluation Module (Credit reevaluation workflow)
   registerReevaluationRoutes(app);

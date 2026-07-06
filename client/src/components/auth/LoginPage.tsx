@@ -21,6 +21,7 @@ import FormField from '../ui/FormField';
 import Card from '../ui/Card';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useBranding } from '../../contexts/BrandingContext';
+import { useTenant } from '../../contexts/TenantContext';
 
 interface LoginPageProps {
   onLoginSuccess: (user: UserType) => void;
@@ -30,7 +31,8 @@ interface LoginPageProps {
 export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: LoginPageProps) {
   const { t } = useLanguage();
   const { branding } = useBranding();
-  const appName = branding.appName;
+  const { config: tenantConfig } = useTenant();
+  const appName = tenantConfig?.name || branding.appName;
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -205,7 +207,7 @@ export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: Log
               }}
             >
               <img
-                src="/microflex-logo.png"
+                src={tenantConfig?.theme?.logoUrl || "/microflex-logo.png"}
                 alt={appName}
                 className="h-10 w-10 object-contain"
               />
@@ -253,7 +255,7 @@ export default function LoginPage({ onLoginSuccess, sessionExpiredMessage }: Log
                   }}
                 >
                   <img
-                    src="/microflex-logo.png"
+                    src={tenantConfig?.theme?.logoUrl || "/microflex-logo.png"}
                     alt={`${appName} Logo`}
                     className="w-32 h-32 xl:w-36 xl:h-36 object-contain"
                     data-testid="img-logo"

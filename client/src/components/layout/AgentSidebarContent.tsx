@@ -3,6 +3,7 @@ import { Menu, X, LogOut, ArrowDownCircle, ArrowUpCircle, CreditCard, Banknote }
 import IconButton from '../ui/IconButton';
 import Button from '../ui/Button';
 import { useBranding } from '../../contexts/BrandingContext';
+import { useTenant } from '../../contexts/TenantContext';
 
 interface AgentSidebarContentProps {
   sidebarOpen: boolean;
@@ -29,6 +30,7 @@ export default function AgentSidebarContent({
   agent
 }: AgentSidebarContentProps) {
   const { branding } = useBranding();
+  const { config: tenantConfig } = useTenant();
 
   const getTabLabel = (tab: 'versement' | 'retrait' | 'remboursement' | 'epargne') => {
     switch (tab) {
@@ -74,8 +76,8 @@ export default function AgentSidebarContent({
           <div className="relative flex flex-col items-center py-2">
             <div className="relative w-16 h-16 bg-surface rounded-2xl flex items-center justify-center">
               <img
-                src="/microflex-logo.png"
-                alt={`${branding.appName} Logo`}
+                src={tenantConfig?.theme?.logoUrl || "/microflex-logo.png"}
+                alt={`${tenantConfig?.name || branding.appName} Logo`}
                 className="w-12 h-12 object-contain"
               />
             </div>

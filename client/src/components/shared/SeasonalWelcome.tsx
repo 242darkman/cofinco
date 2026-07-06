@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Sparkles, PartyPopper } from 'lucide-react';
 import { useBranding } from '../../contexts/BrandingContext';
+import { useTenant } from '../../contexts/TenantContext';
 
 interface SeasonalWelcomeProps {
   userName?: string;
@@ -11,6 +12,7 @@ type EventType = 'christmas' | 'newyear' | null;
 
 export default function SeasonalWelcome({ userName = 'Utilisateur', onComplete }: SeasonalWelcomeProps) {
   const { branding } = useBranding();
+  const { config: tenantConfig } = useTenant();
   const [eventType, setEventType] = useState<EventType>(null);
   const [visible, setVisible] = useState(true);
   const [particles, setParticles] = useState<Array<{ id: number; left: number; delay: number; duration: number; color?: string }>>([]);
@@ -86,7 +88,7 @@ export default function SeasonalWelcome({ userName = 'Utilisateur', onComplete }
           <div className={`absolute inset-0 rounded-2xl blur-xl ${eventType === 'christmas' ? 'bg-status-success-bg' : 'bg-status-info-bg'}`} />
           
           <div className="relative w-full h-full bg-white rounded-2xl flex items-center justify-center shadow-2xl">
-            <img src="/microflex-logo.png" alt="Logo" className="w-12 h-12 md:w-16 md:h-16 object-contain" />
+            <img src={tenantConfig?.theme?.logoUrl || "/microflex-logo.png"} alt="Logo" className="w-12 h-12 md:w-16 md:h-16 object-contain" />
             <div className="absolute -top-2 -right-2 text-2xl md:text-3xl animate-bounce">
               {eventType === 'christmas' ? '🎅' : '🥳'}
             </div>

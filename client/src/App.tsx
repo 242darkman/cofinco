@@ -25,6 +25,7 @@ import SessionExpirationWarning from './components/shared/SessionExpirationWarni
 import { useOfflineBus } from './hooks/useOfflineBus';
 import { useBranding } from './contexts/BrandingContext';
 import { OfflineProvider } from './contexts/OfflineContext';
+import { useTenant, TenantProvider } from './contexts/TenantContext';
 
 // Lazy load heavy components
 const COFINPlatform = lazy(() => import('./COFINPlatform'));
@@ -43,6 +44,7 @@ function App() {
   const { isServerReachable, isChecking, checkHealth } = useServerHealth();
   const { status: networkStatus, isOffline, isApiDown, forceRetry } = useNetwork();
   const { branding } = useBranding();
+  const { config: tenantConfig } = useTenant();
   const [location, setLocation] = useLocation();
   const queryClient = useQueryClient();
 
@@ -247,8 +249,8 @@ function App() {
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 bg-surface rounded-lg flex items-center justify-center p-1">
                 <img
-                  src="/microflex-logo.png"
-                  alt={`${branding?.appName ?? 'App'} Logo`}
+                  src={tenantConfig?.theme?.logoUrl || "/microflex-logo.png"}
+                  alt={`${(tenantConfig?.name || branding?.appName) ?? 'App'} Logo`}
                   className="w-full h-full object-contain"
                 />
               </div>
@@ -357,9 +359,11 @@ function App() {
 }
 
 const AppWrapper = () => (
-    <LanguageProvider>
-      <App />
-    </LanguageProvider>
+    <TenantProvider>
+      <LanguageProvider>
+        <App />
+      </LanguageProvider>
+    </TenantProvider>
 );
 
 export default AppWrapper;
