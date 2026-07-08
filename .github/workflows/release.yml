@@ -28,6 +28,8 @@ on:
 permissions:
   contents: read
   packages: write
+  id-token: write
+  attestations: write
 
 env:
   REGISTRY: ghcr.io
@@ -132,8 +134,9 @@ jobs:
         env:
           DATABASE_URL: postgresql://microflex:microflex@localhost:5432/microflex
         run: |
-          npx drizzle-kit push --force
-          node --env-file=.env --import tsx seeds/seed-prod.ts
+          npm run db:migrate
+          node --import dotenv/config --import tsx scripts/ensure-sql.ts
+          node --import dotenv/config --import tsx seeds/seed-prod.ts
 
       - name: GL Contract Tests
         env:
@@ -176,11 +179,14 @@ jobs:
             type=raw,value=latest,enable=${{ needs.prepare.outputs.is_prod }}
 
       - name: Build & push runtime image
+        id: build-runtime
         uses: docker/build-push-action@v6
         with:
           context: .
           target: runtime
           push: true
+          build-args: |
+            TENANT_CONFIG_FILE=${{ vars.TENANT_CONFIG_FILE || 'config/tenants/microflex.json' }}
           tags: ${{ steps.meta-runtime.outputs.tags }}
           labels: ${{ steps.meta-runtime.outputs.labels }}
           cache-from: type=gha
@@ -196,14 +202,29 @@ jobs:
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.prepare.outputs.image_tag }}-init
           cache-from: type=gha
 
+      - name: Attest image provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.build-runtime.outputs.digest }}
+          push-to-registry: true
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.prepare.outputs.image_tag }}
+          format: spdx-json
+          output-file: sbom.spdx.json
+
       # --- Security scan ---
       - name: Scan Docker image (Trivy)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.28.0
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.prepare.outputs.image_tag }}
           format: 'table'
           severity: 'CRITICAL,HIGH'
-          exit-code: '0'
+          ignore-unfixed: true
+          exit-code: '1'
 
   # ==========================================
   # Step 3: Deploy to VPS
@@ -225,6 +246,15 @@ jobs:
           NODE_ENV=production
           PORT=5000
           APP_VERSION=${{ needs.prepare.outputs.image_tag }}
+
+          # Tenant
+          TENANT_CONFIG_PATH=dist/tenant-config.json
+          TENANT_ID=${{ vars.TENANT_ID }}
+          TENANT_NAME=${{ vars.TENANT_NAME }}
+          TENANT_FEATURE_SMS=${{ vars.TENANT_FEATURE_SMS }}
+          TENANT_FEATURE_TONTINE=${{ vars.TENANT_FEATURE_TONTINE }}
+          TENANT_FEATURE_MOBILE_MONEY=${{ vars.TENANT_FEATURE_MOBILE_MONEY }}
+          TENANT_FEATURE_FIELD_AGENTS=${{ vars.TENANT_FEATURE_FIELD_AGENTS }}
 
           # Registry
           REGISTRY=${{ env.REGISTRY }}
