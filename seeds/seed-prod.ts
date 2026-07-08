@@ -5276,7 +5276,7 @@ async function seedAdminUser(context: SeedContext, dryRun: boolean): Promise<See
   }
 
   // Password from env or default (WARNING in logs)
-  const adminPassword = process.env.SEED_ADMIN_PASSWORD || 'MicroFlex-m@2026';
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD || 'Admin123!dev';
   if (!process.env.SEED_ADMIN_PASSWORD) {
     logger.info('Using default admin password. Override with SEED_ADMIN_PASSWORD env var.');
   }
@@ -5716,7 +5716,7 @@ async function seedProd() {
     logger.info('═══════════════════════════════════════════════════════════════');
 
     if (!DRY_RUN) {
-      logger.info('Login: s.administrateur / [SEED_ADMIN_PASSWORD or MicroFlex-m@2026]');
+      logger.info('Login: s.administrateur / [SEED_ADMIN_PASSWORD or Admin123!dev]');
     }
 
     if (!report.success) {
