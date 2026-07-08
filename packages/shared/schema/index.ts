@@ -35,6 +35,7 @@ export * from "./idempotency";
 export * from "./device-keys";
 export * from "./kpi";
 export * from "./scoring";
+export * from "./deployment";
 
 // Relations are defined in relations.ts (imports specific files to avoid circular deps)
 export * from "./relations";

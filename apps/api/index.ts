@@ -210,6 +210,16 @@ app.get("/api/health", async (_req, res) => {
     logger.info('Skipping ensureCustomFunctions (pgbouncer detected — handled by db-init)');
   }
 
+  // Vérification d'identité du déploiement (1 instance = 1 client).
+  // Refuse de démarrer si la base appartient à un autre tenant.
+  try {
+    const { verifyDeploymentIdentity } = await import("./services/deployment-identity");
+    await verifyDeploymentIdentity();
+  } catch (error) {
+    logger.fatal({ err: error }, "Identité du déploiement invalide — arrêt du serveur");
+    process.exit(1);
+  }
+
   // Load currency presets + active currency from DB (overrides compile-time defaults)
   try {
     const { db } = await import("./db");
