@@ -694,10 +694,17 @@ export async function executeWithLedger<T>(
   const requiresGl = mouvementData.requiresGlPosting !== false;
 
   // PRE-VALIDATION: Vérifier que la règle comptable existe AVANT la transaction
-  // En mode STRICT ou si requiresGl=true, cette validation est critique
-  if (mouvementData.agenceId && mouvementData.typePaiement && (requiresGl || isGLStrictMode())) {
+  // En mode STRICT ou si requiresGl=true, cette validation est critique.
+  // La résolution du type d'événement doit être identique à celle du posting :
+  // metadata.glEventType prime sur typePaiement (ex: MAINTENANCE_FEE →
+  // MAINTENANCE_FEE_CURRENT selon le type de compte).
+  const preValidationEventType =
+    (mouvementData.metadata as Record<string, unknown> | undefined)?.glEventType as string | undefined
+    || mouvementData.typePaiement;
+
+  if (mouvementData.agenceId && preValidationEventType && (requiresGl || isGLStrictMode())) {
     try {
-      await validateAccountingRule(mouvementData.typePaiement, mouvementData.agenceId);
+      await validateAccountingRule(preValidationEventType, mouvementData.agenceId);
       logger.debug({
         typePaiement: mouvementData.typePaiement,
         agenceId: mouvementData.agenceId

@@ -20,7 +20,7 @@ import * as fs from "fs";
 import * as path from "path";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// REQUIRED EVENT TYPES — authoritative list of all 53 event_types that must
+// REQUIRED EVENT TYPES — authoritative list of all event_types that must
 // have at least one active accounting rule.  Sourced from seed-prod.ts.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -89,8 +89,36 @@ const REQUIRED_EVENT_TYPES = [
   "PAYROLL_PAYMENT",
   "PROSPECTION_PRIME",
   "SALARY_ADVANCE",
+  "SALARY_PAYMENT",
   // Interest
   "INTEREST_PAYMENT",
+  "CREDIT_INTEREST_ACCRUAL",
+  "CREDIT_INTEREST_COLLECTION",
+  // Frais de cycle de vie des comptes (ouverture, tenue, clôture, restitution)
+  "OPENING_FEE",
+  "MAINTENANCE_FEE_CURRENT",
+  "MAINTENANCE_FEE_SAVINGS",
+  "MAINTENANCE_FEE_BLOCKED",
+  "CLOSING_FEE_CURRENT",
+  "CLOSING_FEE_SAVINGS",
+  "CLOSING_FEE_BLOCKED",
+  "CLOSURE_PAYOUT_CURRENT",
+  "CLOSURE_PAYOUT_SAVINGS",
+  "CLOSURE_PAYOUT_BLOCKED",
+  "FEE_REFUND",
+  // Sync offline (alias crédit) — utilisés par le journal de synchronisation
+  "LOAN_DISBURSEMENT",
+  "LOAN_REPAYMENT",
+  // Agents terrain — sessions et écarts
+  "AGENT_COMMISSION",
+  "AGENT_PROVISIONING",
+  "AGENT_SESSION_CLOSE",
+  "AGENT_ECART_DEFICIT",
+  "AGENT_ECART_SURPLUS",
+  "AGENT_WITHDRAWAL_CURRENT",
+  "AGENT_WITHDRAWAL_SAVINGS",
+  // Mobile Money — revenus de frais
+  "MM_FEE_REVENUE",
 ] as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
